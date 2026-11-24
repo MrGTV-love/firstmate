@@ -146,28 +146,33 @@ Pipeline starts:
     the no-mistakes fork (backlog task nm-run-creation-admission).
   - The start lock serializes each decision with the publication of its
     admitted start's pending reservation (a locked pending-*.lock naming the
-    admitting pid, the admitted no-mistakes arguments and the running run IDs
-    of the decision), then is released. Every later decision counts each
-    admitted start that has not registered a run yet at the full R, and as one
-    run in the count fallback and the one-start minimum (live_pending). A new
-    running run ID releases the one pending start whose client it is: the row
-    carries the client's own --launch-nonce, or, with none, the row has no nonce
-    and the repository, branch and intent the start was bound to when it was
-    admitted or claimed (start_binding), and no other pending start shares that
-    nonce or binding. Its run is then charged once, by its own row. A start with
-    neither (rerun, an intent read from standard input or an unreadable file, a
-    directory that is no registered repository's) is released by no row; and the
-    late row of an earlier start with the same binding, whose pending start has
-    already ended, can release a later one. A pending
-    start also ends when its COMMAND returns, or when the client that
-    claimed it through the interception has exited (its run, if any, is then in
-    the run database). It does not reserve a run's lifetime; status changes
-    release capacity. A registered run whose process tree the reading cannot
+    admitting pid, the admitted no-mistakes arguments, the running run IDs
+    of the decision and the start's binding), then is released. Every later decision counts each
+    admitted start at the full R, and as one run in the count fallback and the
+    one-start minimum (live_pending), except while a run that decision counts
+    as active is on the repository and branch the start was bound to when it
+    was admitted or claimed (start_binding; pending_census). The daemon keeps
+    one active run per repository and branch (it cancels the old run and waits
+    for it to end before it writes the new row), and a client with no launch
+    nonce reattaches to that branch's active run, so that run is the one the
+    start's client drives or replaces, and its one charge covers the start.
+    This holds for every route: rerun, an intent from standard input or a file,
+    and a caller's own --launch-nonce alike. Coverage is read again at every
+    decision: in the gap between a replaced run's end and its replacement's
+    row, or once the run is CI-ready, parked or ended, the start counts at R
+    again. A start with no binding (a directory that is no registered
+    repository's, a detached HEAD) is covered by no run; its client starts no
+    run there, so it is charged once, by its reservation. A pending start ends
+    when its COMMAND returns, or when the client that claimed it through the
+    interception has exited (K7; its run, if any, is then in the run database).
+    It does not reserve a run's lifetime; status changes release capacity. A
+    registered run whose process tree the reading cannot
     see yet reserves its full R in the next decision.
     The admitted client itself, reached through a nested route or the
     interception, claims its own pending start (claim_pending): same arguments,
     (same_start_args), the admitting pid among its ancestors, and either unclaimed or claimed by
-    itself or an ancestor, and no new run has registered for it yet; it runs
+    itself or an ancestor, and every run created since its admission covers
+    another start; it runs
     without queueing again. Every other start, a sibling, a second client or
     the same arguments run again, is decided on its own with the pending start
     counted, except that a start nested in the admitted command does not count
@@ -1286,7 +1291,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         running) with no live agent (no pid or a dead one) and nothing visible, what it holds; otherwise
         the larger of what it holds and A once seen, R unseen; an uncounted run, what it holds;
       and R for each of its unproven launches, so a later attempt never masks an earlier one.
-    The new run reserves S; each pending admitted start not yet registered reserves R.
+    The new run reserves S; each pending admitted start that no counted run covers reserves R.
     Budget is available memory plus what the runs held. The one-start minimum admits only
     when nothing else is counted: every other counted run counts at least one, and the
     requesting run's own held attempts and unproven launches count (Main 1727).
@@ -1988,37 +1993,13 @@ def history_units(directory: Optional[str], states: Dict[str, dict], runs: set) 
     return units
 
 
-def intent_of(args) -> Optional[str]:
-    """The intent text a fresh start's arguments carry, or None when it cannot be read here (stdin, no file)."""
-    if not isinstance(args, list):
-        return None
-    for index, word in enumerate(args):
-        value = None
-        if word in ("--intent", "--intent-file") and index + 1 < len(args):
-            value = args[index + 1]
-        elif word.startswith(("--intent=", "--intent-file=")):
-            value = word.split("=", 1)[1]
-        else:
-            continue
-        if word.startswith("--intent-file"):
-            if value == "-":
-                return None
-            try:
-                with open(value, "r", encoding="utf-8") as handle:
-                    return handle.read().strip()
-            except (OSError, ValueError):
-                return None
-        return value.strip()
-    return None
-
-
-def start_binding(cwd: str, args) -> Optional[dict]:
-    """The run a fresh client in CWD starts: repo ID, branch and intent, or None when it cannot be told.
+def start_binding(cwd: str) -> Optional[dict]:
+    """The repository and branch a fresh client in CWD starts its run on: repo ID and branch, or None when not told.
 
     The repository follows the client's own rule (no-mistakes fork
     internal/cli/root.go findRepo, line 112): the git root, else the main
     worktree root, matched to repos.working_path. A start whose repository or
-    branch cannot be told has no binding and is ended by no run's row.
+    branch cannot be told has no binding and is covered by no run (pending_census).
     """
     def git(*words) -> Optional[str]:
         try:
@@ -2040,19 +2021,7 @@ def start_binding(cwd: str, args) -> Optional[dict]:
     for root in roots:
         for repo, path in repos:
             if isinstance(path, str) and os.path.realpath(path) == os.path.realpath(root):
-                return dict(repo=repo, branch=branch, intent=intent_of(args), bound=int(time.time()))
-    return None
-
-
-def launch_nonce_of(args) -> Optional[str]:
-    """The --launch-nonce a fresh start's arguments carry, the identity the daemon writes into its run's row."""
-    if not isinstance(args, list):
-        return None
-    for index, word in enumerate(args):
-        if word == "--launch-nonce" and index + 1 < len(args) and args[index + 1]:
-            return args[index + 1]
-        if word.startswith("--launch-nonce=") and len(word) > len("--launch-nonce="):
-            return word.split("=", 1)[1]
+                return dict(repo=repo, branch=branch)
     return None
 
 
@@ -2070,9 +2039,7 @@ def claim_record(path: str) -> Optional[dict]:
 
 def valid_claim(claim) -> bool:
     """Whether a claim has every field claim_round writes, each of its own type (Main 1812 B)."""
-    return (isinstance(claim, dict) and type(claim.get("pid")) is int and "nonce" in claim
-            and (claim["nonce"] is None or (isinstance(claim["nonce"], str) and bool(claim["nonce"])))
-            and isinstance(claim.get("seen"), list) and all(isinstance(run, str) for run in claim["seen"])
+    return (isinstance(claim, dict) and type(claim.get("pid")) is int
             and type(claim.get("direct")) is bool and (claim.get("client") is None or type(claim.get("client")) is int)
             and "client" in claim)
 
@@ -2082,9 +2049,7 @@ def valid_pending(entry) -> bool:
     return (isinstance(entry, dict) and type(entry.get("holder")) is int and type(entry.get("created_ns")) is int
             and isinstance(entry.get("before"), list) and all(isinstance(run, str) for run in entry["before"])
             and "args" in entry and (entry["args"] is None or (isinstance(entry["args"], list)
-                                                               and all(isinstance(word, str) for word in entry["args"])))
-            and "client_nonce" in entry
-            and (entry["client_nonce"] is None or (isinstance(entry["client_nonce"], str) and bool(entry["client_nonce"]))))
+                                                               and all(isinstance(word, str) for word in entry["args"]))))
 
 
 def read_pending(fd: int) -> Optional[dict]:
@@ -2100,61 +2065,60 @@ def read_pending(fd: int) -> Optional[dict]:
     return entry if isinstance(entry, dict) else None
 
 
-def run_rows(running: set, since_ns: Optional[int] = None) -> Dict[str, tuple]:
-    """run -> (launch_nonce, repo_id, branch, intent, created_at) for every running run and, with SINCE_NS, every run
-    created since then whatever its status."""
-    columns = "SELECT id, repo_id, branch, intent, created_at, launch_nonce FROM runs"
-    if since_ns is None:
-        if not running:
-            return {}
-        marks = ",".join("?" * len(running))
-        return {row[0]: (row[5],) + tuple(row[1:5]) for row in read_host_db(
-            columns + " WHERE id IN (%s)" % marks, tuple(sorted(running)))}
-    return {row[0]: (row[5],) + tuple(row[1:5]) for row in read_host_db(
-        columns + " WHERE status = 'running' OR created_at >= ?", (since_ns // 1000000000 - 1,))}
+def runs_since(running: set, since_ns: int) -> set:
+    """Every run in RUNNING and every run created since SINCE_NS, whatever its status now."""
+    return {row[0] for row in read_host_db(
+        "SELECT id FROM runs WHERE status = 'running' OR created_at >= ?", (since_ns // 1000000000 - 1,))} | set(running)
+
+
+def counted_places(running: set) -> Dict[str, tuple]:
+    """run -> (repo ID, branch) for every run in RUNNING that a decision counts as active (running_runs' rule)."""
+    if not running:
+        return {}
+    marks = ",".join("?" * len(running))
+    return {row[0]: (row[1], row[2]) for row in read_host_db(
+        "SELECT id, repo_id, branch FROM runs WHERE status = 'running' AND ci_ready_at IS NULL"
+        " AND awaiting_agent_since IS NULL AND id IN (%s)" % marks, tuple(sorted(running)))}
 
 
 def binding_key(binding) -> Optional[tuple]:
-    """(repo, branch, intent, bound) of a start's binding (start_binding), or None when any of them is not told."""
+    """(repo, branch) of a start's binding (start_binding), or None when either is not told."""
     if not isinstance(binding, dict):
         return None
-    repo, branch, intent, bound = (binding.get(field) for field in ("repo", "branch", "intent", "bound"))
-    if not (isinstance(repo, str) and isinstance(branch, str) and isinstance(intent, str) and intent
-            and type(bound) is int):
+    repo, branch = binding.get("repo"), binding.get("branch")
+    if not (isinstance(repo, str) and repo and isinstance(branch, str) and branch):
         return None
-    return repo, branch, intent, bound
-
-
-def binds(row: tuple, key: tuple) -> bool:
-    """Whether a run row is the run a start bound to KEY starts: no launch nonce, the same repository, branch and
-    intent, created no earlier than the second before the binding."""
-    nonce, repo, branch, intent, created = row
-    return (nonce is None and repo == key[0] and branch == key[1] and isinstance(intent, str)
-            and intent.strip() == key[2] and type(created) is int and created >= key[3] - 1)
+    return repo, branch
 
 
 def pending_census(directory: str, running: set) -> List[dict]:
-    """One read of every pending admitted start, its claim and its release, oldest first (Main 1759, 1812).
+    """One read of every pending admitted start, its claim and whether it counts, oldest first (Main 1759, 1812, 3852).
 
     Each item: path, entry (None when unreadable), claim (None when none or unreadable),
-    known (its claimant's identity is read), key (the claimant's own launch nonce or binding, or None),
-    released, own (the run whose row released it). The claimant is the client the
-    reservation is for: the client of a final claim (its own --launch-nonce and binding), or,
-    with no claim, the client a direct route runs as its one program (client_nonce, and the
-    entry's binding). An entry or a claim that cannot be read or lacks a field of its type is
-    unknown: noted (the decision waits), counted, never released, and while any claimant is
-    unknown no row releases any start. A row releases a start only when it is the one running
-    row of the claimant's own key, and that key is no other start's claimant's: its nonce
-    when it carries one, otherwise its binding (repository, branch and intent, the row having
-    no nonce and created since the binding); and the row was neither running when the start
-    was admitted nor read when its claim was made final. A start with neither (rerun, an
-    intent read from standard input or a file that cannot be read, a directory that is no
-    registered repository's) is released by no row. Limit: a binding names no single client,
-    so the late row of an earlier start with the same binding, whose pending start has
-    already ended, can release a later one. K7
-    ends a start whose known claimant's pid is dead. A locked file is a live start; an
-    unlocked one belongs to a start that no longer exists and is removed. OSError when the
-    pool cannot be listed.
+    known (its claimant's identity is read), claimed, key (the repository and branch the
+    start is bound to, or None), ended, covered (the counted run on that repository and
+    branch, or None) and released (ended or covered: this decision does not count it).
+    The binding is the claimant's: a final claim's binding, or, with no claim, the binding
+    the admission took from its own directory (start_binding). An entry or a claim that
+    cannot be read or lacks a field of its type is unknown: noted (the decision waits),
+    counted, never covered, and while any claimant is unknown no start is covered.
+    A start is covered while a run in RUNNING that a decision counts as active (not
+    CI-ready, not awaiting an agent) is on its repository and branch (Main 3852). The
+    daemon keeps one active run per repository and branch: before it creates a row it
+    cancels every pending or running run there and waits for each to end (no-mistakes fork
+    internal/daemon/manager.go cancelActiveRuns); and a client with no launch nonce on a
+    branch with an active run reattaches to it (internal/cli/axi_drive.go). So that run is
+    the run the start's client drives or the run it is replacing, and the one charge it
+    carries covers the start. Coverage is read again at every decision, never kept: in the
+    gap between a replaced run's end and its replacement's row, and once the run leaves the
+    counted set (CI-ready, parked or ended), the start counts at R again. A start with no
+    binding (a directory that is no registered repository's, a detached HEAD) is never
+    covered; its client starts no run there (the client refuses), so it is charged once,
+    by its reservation, until its COMMAND returns. A stale running row that an earlier
+    daemon left, which no cancel reaches, covers its branch's starts too; it is itself
+    counted at R. K7 ends a start whose known claimant's pid is dead. A locked file is a
+    live start; an unlocked one belongs to a start that no longer exists and is removed.
+    OSError when the pool cannot be listed.
     """
     found = []
     for path in list_pool(directory, "pending-*.lock"):
@@ -2183,49 +2147,38 @@ def pending_census(directory: str, running: set) -> List[dict]:
         claim = claim_record(path) if claimed else None
         if entry is None:
             note_unknown("pending start %s unreadable or malformed" % path)
-            known, nonce = False, None
+            known = False
         elif claimed is None:
-            known, nonce = False, None
+            known = False
         elif claimed:
             known = valid_claim(claim)
-            nonce = claim["nonce"] if known else None
             if not known:
                 note_unknown("claim %s.claimed unreadable or malformed" % path)
         else:
-            known, nonce = True, entry["client_nonce"]
-        if not known:
-            key = None
-        elif nonce:
-            key = ("nonce", nonce)
-        else:
-            bound = binding_key((claim or {}).get("binding") if claimed else entry.get("binding"))
-            key = None if bound is None else ("binding",) + bound
+            known = True
+        key = binding_key(claim.get("binding") if claimed else entry.get("binding")) if known else None
         found.append(dict(path=path, entry=entry, claim=claim if known else None, known=known, claimed=claimed, key=key,
                           order=(entry["created_ns"] if entry else 0, path)))
     found.sort(key=lambda item: item["order"])
     all_known = all(item["known"] for item in found)
-    carried = [item["key"][:4] for item in found if item["key"]]
-    rows_now = run_rows(running) if carried and running and all_known else {}
+    places = counted_places(running) if all_known and any(item["key"] for item in found) else {}
+    cover: Dict[tuple, str] = {}
+    for run, place in sorted(places.items()):
+        cover.setdefault(place, run)
     for item in found:
         claim = item["claim"]
-        item["own"] = None
-        key = item["key"]
-        if all_known and key and carried.count(key[:4]) == 1:
-            rows = [run for run, row in rows_now.items()
-                    if (row[0] == key[1] if key[0] == "nonce" else binds(row, key[1:]))]
-            if len(rows) == 1 and rows[0] not in item["entry"]["before"] and rows[0] not in ((claim or {}).get("seen") or ()):
-                item["own"] = rows[0]
+        item["covered"] = cover.get(item["key"]) if item["key"] else None
         # K7 by the claim's bound client, the one client the reservation is for (Main 1876 C); a shell claim with no
         # client bound yet ends with the shell.
-        ended = item["known"] and claim is not None and pid_dead(
+        item["ended"] = item["known"] and claim is not None and pid_dead(
             claim["client"] if claim["client"] is not None else claim["pid"]) is True
-        item["released"] = ended or item["own"] is not None
+        item["released"] = item["ended"] or item["covered"] is not None
     return found
 
 
 def live_pending(directory: str, running: set) -> List[Tuple[str, dict, bool, Optional[str]]]:
-    """(path, entry, released, own run) for each pending admitted start (pending_census), oldest first."""
-    return [(item["path"], item["entry"] or dict(unreadable=True), item["released"], item["own"])
+    """(path, entry, released, covering run) for each pending admitted start (pending_census), oldest first."""
+    return [(item["path"], item["entry"] or dict(unreadable=True), item["released"], item["covered"])
             for item in pending_census(directory, running)]
 
 
@@ -2575,7 +2528,7 @@ def claim_pending(directory: str, args: List[str], direct: bool = True) -> Optio
         # and this start is decided on its own. A row arriving after the unlock belongs to the next decision.
         path, rows, running, created_ns = claimed
         try:
-            again = run_rows(running, created_ns)
+            again = runs_since(running, created_ns)
         except (OSError, sqlite3.Error, ValueError):
             again = None
         if again is None or set(again) - set(rows):
@@ -2598,11 +2551,11 @@ def claim_round(directory: str, args: List[str], same_args: bool, direct: bool =
     (Main 1812 C): the first client below it binds it (client), later ones are decided on their
     own. A new claim is refused when any start's claimant is unknown, when a process in the
     holder's tree outside this client's own line runs the admitted client, or when a run row
-    created since the admission, whatever its status now, is not another start's own (its
-    pending_census release, with that start's own admission set and claim applied: Main 1812
-    D). The rows are read once, after the client check: a first client that exited made its
-    row before it exited, so its row is read. The final claim names every row of that read as
-    not its own; the rows are read again once it is published, and any new row withdraws it.
+    created since the admission, whatever its status now, covers no other start (pending_census:
+    a counted run on that start's repository and branch; Main 1812 D, Main 3852): such a row may
+    be this reservation's first client's. The rows are read once, after the client check: a
+    first client that exited made its row before it exited, so its row is read. The rows are
+    read again once the claim is published, and any new row withdraws it.
     """
     try:
         running = set(running_runs())
@@ -2611,12 +2564,15 @@ def claim_round(directory: str, args: List[str], same_args: bool, direct: bool =
         return None  # without the run database or the pool listing nothing is known: no reservation is claimed
     if not all(item["known"] for item in census):
         return None
-    explained = {item["own"]: item["path"] for item in census if item["own"] is not None}
+    covering: Dict[str, set] = {}
+    for item in census:
+        if item["covered"] is not None:
+            covering.setdefault(item["covered"], set()).add(item["path"])
     me = os.getpid()
     mine = None
     for item in census:
         entry, path = item["entry"], item["path"]
-        if item["released"] or entry is None:
+        if item["ended"] or entry is None:
             continue
         holder, admitted = entry["holder"], entry["args"]
         if same_args != same_start_args(admitted, list(args)):
@@ -2634,8 +2590,7 @@ def claim_round(directory: str, args: List[str], same_args: bool, direct: bool =
             if claim["pid"] in mine and claim["client"] is None:
                 # The first client below a shell its claimant admitted: it binds the claim, the shell's one client.
                 try:
-                    publish_claim(path, dict(claim, client=me, nonce=launch_nonce_of(list(args)),  # client and nonce together
-                                             binding=start_binding(os.getcwd(), list(args))))
+                    publish_claim(path, dict(claim, client=me, binding=start_binding(os.getcwd())))  # client and binding together
                 except OSError:
                     return None
                 return holder
@@ -2645,14 +2600,13 @@ def claim_round(directory: str, args: List[str], same_args: bool, direct: bool =
         if not isinstance(admitted, list) or admitted_client_running(holder, admitted, exclude=frozenset(mine) | {me}):
             continue  # the admitted client itself may run on that reservation: one client, one reservation
         try:
-            rows = run_rows(running, entry["created_ns"])
+            rows = runs_since(running, entry["created_ns"])
         except (OSError, sqlite3.Error, ValueError):
             return None
         before = set(entry["before"])
-        if any(run not in before and explained.get(run) is None for run in rows):
+        if any(run not in before and not covering.get(run, set()) - {path} for run in rows):
             continue  # a run that may be this reservation's own client's appeared: its admission may be used
-        claim = dict(pid=me, nonce=launch_nonce_of(list(args)), seen=sorted(rows), direct=direct,
-                     client=me if direct else None, binding=start_binding(os.getcwd(), list(args)))
+        claim = dict(pid=me, direct=direct, client=me if direct else None, binding=start_binding(os.getcwd()))
         try:
             published = publish_claim(path, claim, new=True)
         except OSError:
@@ -2912,59 +2866,23 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
                 log(2, "pipeline-start: this start was admitted by its enclosing start (pid %d); not queued again" % holder)
                 _restore_exec_signals()
                 return exec_direct(command, child_environment, 2)
-        # The reservation is bound now to the run its client starts from this directory; a client reached through
-        # the interception binds it again from its own directory when it claims (claim_pending). A COMMAND that
-        # changes directory first gives a binding no row matches: it then ends by its claim or its return.
-        binding = start_binding(os.getcwd(), list(route[0])) if route is not None else None
+        # The reservation is bound now to the repository and branch its client starts from in this directory; a client
+        # reached through the interception binds it again from its own directory when it claims (claim_pending). A
+        # COMMAND that changes directory first may give a binding no counted run is on: it then stays counted.
+        binding = start_binding(os.getcwd()) if route is not None else None
         context = decision_context(directory, (binding or {}).get("repo"), (binding or {}).get("branch"))
         admission_fd, before, reason, _ = wait_for_admission(directory, args.priority, context=context)
         log(2, "pipeline-start admitted: %s %s" % (reason, context))
         # In the same locked step as the admit, publish this start's pending reservation: every later decision
-        # counts it at the full R until its own run's row appears, its client exits (K7) or COMMAND returns.
+        # counts it at the full R until its COMMAND returns or its client exits (K7), except while a counted run is
+        # on its repository and branch (pending_census).
         pending_fd, pending_path = publish_locked(directory, "pending-", {
             "holder": os.getpid(), "args": None if route is None else list(route[0]),
-            # The claimant's identity when COMMAND is the client itself (a direct route); otherwise only a claim names it.
-            "client_nonce": launch_nonce_of(list(route[0])) if route is not None and runs_client_directly(command) else None,
             "before": sorted(before), "created_ns": time.time_ns(), "binding": binding})
         fcntl.flock(admission_fd, fcntl.LOCK_UN)
         os.close(admission_fd)
         admission_fd = None
-        registration_error = False
-
-        def registered() -> bool:
-            nonlocal registration_error, pending_path, pending_fd
-            try:
-                # The release is proven and applied in one step under the start lock (Main 1876 L): no decision or
-                # claim in between can act on a result read before it.
-                released = None
-                with start_lock(directory):
-                    running = set(running_runs())
-                    for item in pending_census(directory, running):
-                        if item["path"] == pending_path:
-                            if item["released"]:
-                                released = item["own"]
-                                for path in (pending_path, pending_path + ".claimed"):
-                                    with contextlib.suppress(FileNotFoundError):
-                                        os.unlink(path)
-                            break
-                    else:
-                        return False
-                    if not (item["released"]):
-                        return False
-                if released is not None:
-                    log(2, "pipeline-start registered: run %s (its own row ended this start's reservation) %s" % (released, context))
-                pending_path = None
-                if pending_fd is not None:
-                    os.close(pending_fd)
-                    pending_fd = None
-                return True
-            except (OSError, sqlite3.Error, ValueError) as exc:
-                if not registration_error:
-                    log(2, "cannot confirm startup registration; keeping the pending reservation until command returns: %s" % exc)
-                    registration_error = True
-            return False
-
-        return run_child(command, child_environment, 2, registered, cancellable=True)
+        return run_child(command, child_environment, 2, cancellable=True)
     except KeyboardInterrupt:
         return 130
     except (PoolUnavailable, OSError, sqlite3.Error, ValueError, KeyError) as exc:

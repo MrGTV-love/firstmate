@@ -121,7 +121,7 @@ class World:
         self.db = self.dir / 'state.sqlite'
         with sqlite3.connect(self.db) as c:
             c.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER,'
-                      ' repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER, launch_nonce TEXT)')
+                      ' repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER)')
             c.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL,'
                       ' step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
             c.execute('CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT, started_at INTEGER,'
@@ -147,9 +147,9 @@ class World:
     def activate(self, at):
         (self.pool / 'gate-activation.json').write_text(json.dumps(dict(activated_at=at, gate_sha256='0' * 64)))
 
-    def run(self, run, step=('ci', 'running', None), counted=True, created=None, nonce=None):
-        self.sql('INSERT INTO runs (id, status, repo_id, created_at, ci_ready_at, launch_nonce) VALUES (?, ?, ?, ?, ?, ?)',
-                 (run, 'running', 'repo', NOW - 500 if created is None else created, None if counted else NOW, nonce))
+    def run(self, run, step=('ci', 'running', None), counted=True, created=None, branch=None):
+        self.sql('INSERT INTO runs (id, status, repo_id, created_at, ci_ready_at, branch) VALUES (?, ?, ?, ?, ?, ?)',
+                 (run, 'running', 'repo', NOW - 500 if created is None else created, None if counted else NOW, branch))
         if step:
             self.sql('INSERT INTO step_results (id, run_id, step_name, step_order, status, agent_pid, round_started_at)'
                      ' VALUES (?, ?, ?, 1, ?, ?, ?)', (run + '-s', run, step[0], step[1], step[2], NOW - 10))
@@ -610,11 +610,12 @@ def pending_released(world, running):
 
 
 def m1759_claim_read_once():
-    # The claim names run-old as present when it was made; a second read of the claim fails. Read once, its seen rows
-    # stand: run-old never releases it. (claim_record, the claim file's reader, gives the claim once, then nothing.)
-    w = World('m1759-claim').run('run-old', step=('review', 'running', None), nonce='N')
-    w.pending(dict(holder=1, args=None, before=[], created_ns=1, client_nonce=None),
-              claim=dict(pid=os.getpid(), nonce='N', seen=['run-old'], direct=True, client=os.getpid(), provisional=False))
+    # The claim binds the start to repo/main, where counted run run-old is; a second read of the claim fails. Read once,
+    # the claim stands and run-old covers the start; read twice, the start would turn unknown. (claim_record, the claim
+    # file's reader, gives the claim once, then nothing.)
+    w = World('m1759-claim').run('run-old', step=('review', 'running', None), branch='main')
+    w.pending(dict(holder=1, args=None, before=[], created_ns=1),
+              claim=dict(pid=os.getpid(), direct=True, client=os.getpid(), binding=dict(repo='repo', branch='main')))
     real, reads = engine.claim_record, []
 
     def once(path):
@@ -625,44 +626,46 @@ def m1759_claim_read_once():
         got = pending_released(w, {'run-old'})
     finally:
         engine.claim_record = real
-    harm('m1759-claim-seen-row', got == [(False, None)], got)
+    harm('m1759-claim-read-twice', got == [(True, 'run-old')], got)
 
 
 def m1759_undecodable_pending():
-    w = World('m1759-undecodable').run('run-own', nonce='N')
-    w.pending(raw=b'{', claim=dict(pid=os.getpid(), nonce='N', seen=[], direct=True, client=os.getpid(), provisional=False))
+    w = World('m1759-undecodable').run('run-own', branch='main')
+    w.pending(raw=b'{', claim=dict(pid=os.getpid(), direct=True, client=os.getpid(), binding=dict(repo='repo', branch='main')))
     got = pending_released(w, {'run-own'})
     harm('m1759-undecodable-released', got == [(False, None)], got)
 
 
 def m1759_unknown_claimant():
-    w = World('m1759-unknown-claimant').run('run-B', nonce='N')
-    w.pending(dict(holder=1, args=None, before=[], created_ns=1, client_nonce=None), claim=dict(pid=os.getpid(), nonce='N', seen=[], direct=True, client=os.getpid(), provisional=False))
-    w.pending(dict(holder=1, args=None, before=[], created_ns=2, client_nonce=None), claim='{unreadable')
+    w = World('m1759-unknown-claimant').run('run-B', branch='main')
+    w.pending(dict(holder=1, args=None, before=[], created_ns=1), claim=dict(pid=os.getpid(), direct=True, client=os.getpid(), binding=dict(repo='repo', branch='main')))
+    w.pending(dict(holder=1, args=None, before=[], created_ns=2), claim='{unreadable')
     got = pending_released(w, {'run-B'})
     harm('m1759-unknown-claimant-collision', not any(released for released, _ in got), got)
 
 
-def m1712_claimant_nonce():
-    w = World('m1712-nonce').run('run-A', nonce='nonce-A')
-    w.pending(dict(holder=1, args=['axi', 'run', '--launch-nonce', 'nonce-A'], before=[], created_ns=1, client_nonce=None),
-              claim=dict(pid=os.getpid(), nonce='nonce-B', seen=[], direct=True, client=os.getpid(), provisional=False))
-    got = pending_released(w, {'run-A'})
-    harm('m1712-outer-nonce', got == [(False, None)], got)
-    w = World('m1712-nonce-control').run('run-B', nonce='nonce-B')
-    w.pending(dict(holder=1, args=['axi', 'run', '--launch-nonce', 'nonce-A'], before=[], created_ns=1, client_nonce=None),
-              claim=dict(pid=os.getpid(), nonce='nonce-B', seen=[], direct=True, client=os.getpid(), provisional=False))
-    got = pending_released(w, {'run-B'})
-    control(got == [(True, 'run-B')], got)
+def m3852_claimant_branch():
+    # Main 3852 (replaces Main 1712 item 3's nonce case): a claimed start is bound by its claimant's own binding, never
+    # by the admission's directory. The admission bound the start to repo/other; its client claimed it from repo/main. A
+    # counted run on repo/other covers nothing; control: a counted run on repo/main covers it.
+    for label, branch in (('admission branch', 'other'), ('claimant branch', 'main')):
+        w = World('m3852-claimant-' + branch).run('run-' + branch, branch=branch)
+        w.pending(dict(holder=1, args=['axi', 'run'], before=[], created_ns=1, binding=dict(repo='repo', branch='other')),
+                  claim=dict(pid=os.getpid(), direct=True, client=os.getpid(), binding=dict(repo='repo', branch='main')))
+        got = pending_released(w, {'run-' + branch})
+        if branch == 'other':
+            harm('m3852-admission-binding-covers', got == [(False, None)], label, got)
+        else:
+            control(got == [(True, 'run-main')], label, got)
 
 
 def m1759_completed_first_run():
-    # An admitted command's first no-nonce client created a run that has completed; an identical second client must not
+    # An admitted command's first client created a run that has completed; an identical second client must not
     # claim the admission. Control: with no run created since the admission, the unused reservation is claimed.
     args = ['axi', 'run', '--intent', 'reg-x']
     for label, completed in (('completed', True), ('none', False)):
         w = pending_world('m1759-completed-' + label)
-        w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9, client_nonce=None))
+        w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9))
         if completed:
             w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('first', 'completed', 'repo', ?)", (NOW,))
         engine.HOST_STATE_DB = str(w.db)
@@ -676,20 +679,20 @@ def m1759_completed_first_run():
 
 
 def m1759_row_between_census_and_claim():
-    # A delayed row carrying the claimant's nonce N arrives after claim_round's census and before its claim is linked
-    # (here: while the claim's binding is read). The claim is withdrawn (decided on its own), never made final over that
+    # A row arriving after claim_round's census and before its claim is linked (here: while the claim's binding is
+    # read) may be the first client's. The claim is withdrawn (decided on its own), never made final over that
     # row. Control: with no row arriving, the unused reservation is claimed and its claim made final.
-    args = ['axi', 'run', '--intent', 'x', '--launch-nonce', 'N']
+    args = ['axi', 'run', '--intent', 'x']
     for label, arrives in (('arrives', True), ('none', False)):
         w = World('m1759-window-' + label)
-        path = w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9, client_nonce=None))
+        path = w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9))
         engine.HOST_STATE_DB = str(w.db)
         engine.sibling = lambda module, filename: proc
         real_binding = engine.start_binding
 
-        def binding(cwd, words, w=w, arrives=arrives):
+        def binding(*_, w=w, arrives=arrives):
             if arrives:
-                w.sql("INSERT INTO runs (id, status, repo_id, created_at, launch_nonce) VALUES ('late', 'running', 'repo', ?, 'N')", (NOW,))
+                w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('late', 'running', 'repo', ?)", (NOW,))
             return None
         engine.start_binding = binding
         try:
@@ -702,7 +705,7 @@ def m1759_row_between_census_and_claim():
         if arrives:
             harm('m1759-row-in-claim-window', got is None and final is None, got, final)
         else:
-            control(got == os.getppid() and final and final.get('seen') == [], got, final)
+            control(got == os.getppid() and final and final.get('pid') == os.getpid(), got, final)
 
 
 # Main 1812 (outside review of 8de219173): each a red at 8de219173 and green at the head, with its control.
@@ -816,7 +819,7 @@ def pending_world(name):
     engine.sibling = lambda module, filename: proc
     engine.HOST_STATE_DB = str(w.db)
     engine.process_argv = lambda pid: ['fake']
-    engine.start_binding = lambda cwd, args: None  # its git reads start processes; a claim's binding decides nothing
+    engine.start_binding = lambda *_: None  # its git reads start processes; a claim's binding decides nothing
     return w
 
 
@@ -829,24 +832,23 @@ def claim_once(w, args, **kw):
 
 def m1812_claim_boundaries():
     # Finding 4: a run row arriving at any boundary of the claim (during its pending census, after its rows read, while
-    # the claim is published, after it is published) never lets a claim stand: a no-nonce first client's row, or a
-    # delayed row carrying the claimant's nonce. Each injection is asserted to have fired. Control: none arrives, the
-    # unused reservation is claimed and its claim names no row. (Their reds at 8de219173 are the review's
+    # the claim is published, after it is published) never lets a claim stand: the row may be a first client's, on no
+    # branch or on the start's own. Each injection is asserted to have fired. Control: none arrives, the unused
+    # reservation is claimed. (Their reds at 8de219173 are the review's
     # pending_route_probe.py and pending_late_row_probe.py, run unmodified.)
-    args = ['axi', 'run', '--intent', 'x', '--launch-nonce', 'N']
-    for row_nonce in (None, 'N'):
+    args = ['axi', 'run', '--intent', 'x']
+    for branch in (None, 'main'):
         for boundary in ('census', 'after-read', 'publish', 'after-publish', None):
-            w = pending_world('m1812-boundary-%s-%s' % (row_nonce, boundary))
-            path = w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9, client_nonce=None))
+            w = pending_world('m1812-boundary-%s-%s' % (branch, boundary))
+            path = w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9))
             fired = []
 
-            def inject(w=w, row_nonce=row_nonce, fired=fired):
+            def inject(w=w, branch=branch, fired=fired):
                 if not fired:
-                    w.sql("INSERT INTO runs (id, status, repo_id, created_at, launch_nonce) VALUES ('late', 'running', 'repo', ?, ?)",
-                          (NOW, row_nonce))
+                    w.sql("INSERT INTO runs (id, status, repo_id, created_at, branch) VALUES ('late', 'running', 'repo', ?, ?)",
+                          (NOW, branch))
                     fired.append(True)
-            real = dict(pending_census=engine.pending_census, start_binding=engine.start_binding, publish_claim=engine.publish_claim,
-                        run_rows=engine.run_rows)
+            real = dict(pending_census=engine.pending_census, start_binding=engine.start_binding, publish_claim=engine.publish_claim)
             if boundary == 'census':
                 def census(*a, **k):
                     inject()
@@ -876,43 +878,43 @@ def m1812_claim_boundaries():
             final = json.loads(Path(path + '.claimed').read_text()) if Path(path + '.claimed').exists() else None
             w.close()
             if boundary is None:
-                control(got == os.getppid() and final and final['seen'] == [], 'an unused reservation is claimed', got, final)
+                control(got == os.getppid() and final and final['pid'] == os.getpid(), 'an unused reservation is claimed', got, final)
             else:
                 control(fired, boundary, 'the injected row arrived')
-                harm('m1812-claim-boundary', got is None and final is None, boundary, row_nonce, got, final)
+                harm('m1812-claim-boundary', got is None and final is None, boundary, branch, got, final)
 
 
 def m1812_explained_by_admission_set():
-    # Finding 5: row 'first' (nonce N) was running when Q (client nonce N) was admitted, so it is not Q's own; it is
-    # unexplained for P, whose claim is refused. Control: Q admitted before it, so 'first' is Q's own row, and P's
-    # unused reservation is claimed.
+    # Finding 5, under Main 3852's rule: row 'first', created since P's admission, is explained only by covering another
+    # start. Q (bound to repo/main, its holder no ancestor of this client) is covered by 'first' when 'first' is a counted
+    # run on repo/main, so P's unused reservation is claimed (control). On repo/other 'first' covers no start: it may be
+    # P's first client's run, and P's claim is refused.
     args = ['axi', 'run', '--intent', 'x']
-    for label, before in (('in-before', ['first']), ('owned', [])):
-        w = pending_world('m1812-explained-' + label).run('first', step=('review', 'running', None), nonce='N', created=NOW)
-        w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9, client_nonce=None))
-        w.pending(dict(holder=999999, args=['axi', 'run', '--intent', 'q'], before=before, created_ns=time.time_ns() - 10 ** 9,
-                       client_nonce='N'))  # Q's holder is no ancestor of this client: only P's reservation is claimable
+    for label, branch in (('uncovering', 'other'), ('covering', 'main')):
+        w = pending_world('m1812-explained-' + label).run('first', step=('review', 'running', None), created=NOW, branch=branch)
+        w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9))
+        w.pending(dict(holder=999999, args=['axi', 'run', '--intent', 'q'], before=[], created_ns=time.time_ns() - 10 ** 9,
+                       binding=dict(repo='repo', branch='main')))  # Q's holder is no ancestor of this client: only P's reservation is claimable
         got = engine.claim_pending(str(w.pool), args)
         w.close()
-        if before:
-            harm('m1812-explained-ignores-admission-set', got is None, got)
+        if branch == 'other':
+            harm('m1812-uncovering-row-explained', got is None, got)
         else:
             control(got == os.getppid(), got)
 
 
 def m1812_unknown_claimant():
-    # Finding 6: B's claim carries a nonce of the wrong type, so B's claimant is unknown: A (nonce N) is not released by
-    # the row carrying N, B is not released by K7 though its pid is dead, and the decision waits. Control: B's claim
-    # readable with another nonce: A's own row releases A.
-    for label, b_nonce in (('malformed', 123), ('readable', 'M')):
-        w = pending_world('m1812-unknown-' + label).run('row-B', step=('review', 'running', None), nonce='N')
-        dead = SimpleNamespace(pid=DEAD_PID)  # no process has it
-        w.pending(dict(holder=1, args=None, before=[], created_ns=1, client_nonce=None),
-                  claim=dict(pid=os.getpid(), nonce='N', seen=[], direct=True, client=os.getpid(), provisional=False))
-        w.pending(dict(holder=1, args=None, before=[], created_ns=2, client_nonce=None),
-                  claim=dict(pid=dead.pid, nonce=b_nonce, seen=[], direct=True, client=dead.pid, provisional=False))
+    # Finding 6: B's claim names a client of the wrong type, so B's claimant is unknown: A (bound to repo/main) is not
+    # covered by counted run row-B on repo/main, B is not ended by K7 though its pid is dead, and the decision waits.
+    # Control: B's claim readable: row-B covers A, and K7 ends B.
+    for label, b_client in (('malformed', 'x'), ('readable', DEAD_PID)):
+        w = pending_world('m1812-unknown-' + label).run('row-B', step=('review', 'running', None), branch='main')
+        w.pending(dict(holder=1, args=None, before=[], created_ns=1),
+                  claim=dict(pid=os.getpid(), direct=True, client=os.getpid(), binding=dict(repo='repo', branch='main')))
+        w.pending(dict(holder=1, args=None, before=[], created_ns=2),
+                  claim=dict(pid=DEAD_PID, direct=True, client=b_client, binding=dict(repo='repo', branch='other')))
         got = pending_released(w, {'row-B'})
-        if b_nonce == 123:
+        if b_client == 'x':
             harm('m1812-unknown-claimant-released', not any(released for released, _ in got), got)
         else:
             control(got == [(True, 'row-B'), (True, None)], got)
@@ -922,8 +924,8 @@ def m1812_incomplete_own_entry():
     # Finding 6: this start's own enclosing entry lacks its admission set and arguments: it is unknown, so it is counted
     # (never skipped as this start's own) and the decision waits. Control: complete and unclaimed, with its admitted
     # client not running, it is skipped.
-    for label, entry in (('incomplete', dict(holder=os.getppid(), created_ns=1, client_nonce=None)),
-                         ('complete', dict(holder=os.getppid(), created_ns=1, client_nonce=None, before=[], args=['axi', 'run']))):
+    for label, entry in (('incomplete', dict(holder=os.getppid(), created_ns=1)),
+                         ('complete', dict(holder=os.getppid(), created_ns=1, before=[], args=['axi', 'run']))):
         w = pending_world('m1812-own-' + label)
         w.pending(entry)
         count = engine.counted_pending(str(w.pool), set())
@@ -933,7 +935,7 @@ def m1812_incomplete_own_entry():
         else:
             control(count == 0, count)
     w = World('m1812-own-decision')
-    w.pending(dict(holder=os.getppid(), created_ns=1, client_nonce=None))
+    w.pending(dict(holder=os.getppid(), created_ns=1))
     waits('m1812-incomplete-own-entry-admitted', w, unknown='pending start')
 
 
@@ -941,7 +943,7 @@ def m1812_undecodable_claim():
     # Finding 6: a claim of invalid UTF-8 is unknown: the claim path returns no holder (the start is decided on its
     # own, and that decision waits), never an exception the entrypoint turns into 125.
     w = pending_world('m1812-utf8')
-    path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None))
+    path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1))
     Path(path + '.claimed').write_bytes(b'\xff')
     try:
         got = engine.claim_pending(str(w.pool), ['axi', 'run'])
@@ -960,14 +962,14 @@ def m1812_nested_shell_two_clients():
     import inspect
     args = ['axi', 'run', '--intent', 'x']
     w = pending_world('m1812-nested')
-    w.pending(dict(holder=4242, args=args, before=[], created_ns=1, client_nonce=None))
+    w.pending(dict(holder=4242, args=args, before=[], created_ns=1))
     real = dict(getpid=os.getpid, ancestors=engine.ancestors, process_table=engine.process_table, pid_dead=engine.pid_dead,
                 process_argv=engine.process_argv, start_binding=engine.start_binding)
     table = {202: 4242}
     engine.process_table = lambda: dict(table)
     engine.process_argv = lambda pid: ['no-mistakes'] + args if pid in (301, 303) else ['bash']
     engine.pid_dead = lambda pid: False
-    engine.start_binding = lambda cwd, words: None
+    engine.start_binding = lambda *_: None
     direct_kw = {'direct': False} if 'direct' in inspect.signature(engine.claim_round).parameters else {}
 
     def as_pid(pid, chain, **kw):
@@ -1122,7 +1124,7 @@ def m1876_nested_shell_subtree():
     # subtree gives both the holder. Control: 250 itself, through one more route, gets the holder.
     args = ['axi', 'run', '--intent', 'x']
     w = pending_world('m1876-subtree')
-    w.pending(dict(holder=4242, args=args, before=[], created_ns=1, client_nonce=None))
+    w.pending(dict(holder=4242, args=args, before=[], created_ns=1))
     real = dict(ancestors=engine.ancestors, process_table=engine.process_table, process_argv=engine.process_argv)
     engine.process_table = lambda: {202: 4242, 250: 202, 301: 250, 303: 250}
     engine.process_argv = lambda pid: ['bash']
@@ -1140,28 +1142,30 @@ def m1876_nested_shell_subtree():
     harm('m1876-subtree-shares-reservation', first is None and second is None, first, second)
 
 
-def m1876_binding_nonce():
-    # Finding 4: the shell's parsed command carries nonce N; its first actual client carries M and binds the claim. A
-    # delayed row carrying N is not that client's: it releases nothing; the client's own M row releases it.
-    args_n = ['axi', 'run', '--intent', 'x', '--launch-nonce', 'N']
-    args_m = ['axi', 'run', '--intent', 'y', '--launch-nonce', 'M']
+def m1876_binding_client():
+    # Finding 4, under Main 3852's rule: the shell was admitted from repo/other; its first actual client runs from
+    # repo/main and binds the claim. A counted run on repo/other is not that client's run: it covers nothing; a counted
+    # run on the client's repo/main covers it.
+    args = ['axi', 'run', '--intent', 'x']
     results = {}
-    for label, row_nonce in (('N row', 'N'), ('M row', 'M')):
-        w = pending_world('m1876-nonce-' + label.split()[0])
-        path = w.pending(dict(holder=4242, args=args_n, before=[], created_ns=1, client_nonce=None))
-        real = dict(ancestors=engine.ancestors, process_table=engine.process_table, process_argv=engine.process_argv)
+    for branch in ('other', 'main'):
+        w = pending_world('m1876-binding-' + branch)
+        w.pending(dict(holder=4242, args=args, before=[], created_ns=1, binding=dict(repo='repo', branch='other')))
+        real = dict(ancestors=engine.ancestors, process_table=engine.process_table, process_argv=engine.process_argv,
+                    start_binding=engine.start_binding)
         engine.process_table = lambda: {202: 4242, 301: 202}
         engine.process_argv = lambda pid: ['bash']
+        engine.start_binding = lambda *_: dict(repo='repo', branch='main')
         try:
-            as_client(w, 202, [4242, 1], args_n, direct=False)
-            as_client(w, 301, [202, 4242, 1], args_m)
+            as_client(w, 202, [4242, 1], args, direct=False)
+            as_client(w, 301, [202, 4242, 1], args)
         finally:
             for name, value in real.items():
                 setattr(engine, name, value)
-        w.sql("INSERT INTO runs (id, status, repo_id, created_at, launch_nonce) VALUES ('late', 'running', 'repo', ?, ?)", (NOW, row_nonce))
-        results[label] = pending_released(w, {'late'})
-    harm('m1876-binding-keeps-old-nonce', results['N row'] == [(False, None)], results)
-    control(results['M row'] == [(True, 'late')], results)
+        w.sql("INSERT INTO runs (id, status, repo_id, created_at, branch) VALUES ('late', 'running', 'repo', ?, ?)", (NOW, branch))
+        results[branch] = pending_released(w, {'late'})
+    harm('m1876-binding-keeps-admission-branch', results['other'] == [(False, None)], results)
+    control(results['main'] == [(True, 'late')], results)
 
 
 def m1876_k7_bound_client():
@@ -1170,46 +1174,47 @@ def m1876_k7_bound_client():
     out = {}
     for label, shell, client in (('shell gone', DEAD_PID, os.getpid()), ('client gone', os.getpid(), DEAD_PID)):
         w = pending_world('m1876-k7-' + label.split()[0])
-        w.pending(dict(holder=4242, args=['axi', 'run'], before=[], created_ns=1, client_nonce=None),
-                  claim=dict(pid=shell, nonce=None, seen=[], direct=False, client=client, provisional=False))
+        w.pending(dict(holder=4242, args=['axi', 'run'], before=[], created_ns=1),
+                  claim=dict(pid=shell, direct=False, client=client, binding=None))
         out[label] = pending_released(w, set())
     harm('m1876-k7-by-shell-pid', out['shell gone'] == [(False, None)], out)
     control(out['client gone'] == [(True, None)], out)
 
 
-def m1876_registration_under_lock():
-    # Finding 5 (L): a start's registration release is proven and applied while it holds the start lock. Through the
-    # engine's own cmd_pipeline_start, in this process, with COMMAND replaced (no process): the release's pending census
-    # is read while the lock is held. Control: the start is admitted and its own row releases it.
+def m3852_coverage_lapses():
+    # Main 3852: a covered start keeps its pending reservation until COMMAND returns, and counts at R again once no
+    # counted run is on its branch. Through the engine's own cmd_pipeline_start, in this process, with COMMAND replaced
+    # (no process): while COMMAND runs, its branch's run 'own' registers (covered, the file kept), turns CI-ready (the
+    # start counts again), ends, and a replacement 'next' registers (covered again). A row that removes the reservation,
+    # or a start that stays uncounted with no counted run on its branch, fails.
     import argparse
-    w = World('m1876-registered')
+    w = World('m3852-lapses')
     w.observe()
-    probe = {}
-    real = dict(run_child=engine.run_child, pending_census=engine.pending_census, start_binding=engine.start_binding,
-                with_intercept=engine.with_intercept)
+    seen = {}
+    real = dict(run_child=engine.run_child, start_binding=engine.start_binding, with_intercept=engine.with_intercept)
 
-    def census(directory, running):
-        if probe.get('armed'):
-            fd = engine.open_lock(os.path.join(directory, 'pipeline-start.lock'))
-            try:
-                probe['held'] = not engine.try_lock(fd)
-            finally:
-                os.close(fd)
-        return real['pending_census'](directory, running)
+    def state():
+        return [(item['released'], item['covered']) for item in engine.pending_census(str(w.pool), set(engine.running_runs()))]
 
     def child(command, environment, fd, on_poll=None, cancellable=False):
-        w.sql("INSERT INTO runs (id, status, repo_id, created_at, launch_nonce) VALUES ('own', 'running', 'repo', ?, 'N')", (NOW,))
-        probe['armed'] = True
-        probe['released'] = on_poll()
+        seen['admitted'] = state()
+        w.sql("INSERT INTO runs (id, status, repo_id, branch, created_at) VALUES ('own', 'running', 'repo', 'main', ?)", (NOW,))
+        seen['registered'] = state()
+        w.sql("UPDATE runs SET ci_ready_at = ? WHERE id = 'own'", (NOW,))
+        seen['ci-ready'] = state()
+        w.sql("UPDATE runs SET status = 'completed' WHERE id = 'own'")
+        seen['gap'] = state()
+        w.sql("INSERT INTO runs (id, status, repo_id, branch, created_at) VALUES ('next', 'running', 'repo', 'main', ?)", (NOW,))
+        seen['replaced'] = state()
         return 0
-    engine.pending_census, engine.run_child = census, child
-    engine.start_binding = lambda cwd, words: None
+    engine.run_child = child
+    engine.start_binding = lambda *_: dict(repo='repo', branch='main')
     engine.with_intercept = lambda env, priority: None
     saved = dict(os.environ)
     os.environ['FM_CPU_POOL_DIR'] = str(w.pool)
     try:
-        code = engine.cmd_pipeline_start(argparse.Namespace(command=['no-mistakes', 'axi', 'run', '--intent', 'x', '--launch-nonce', 'N'],
-                                                            only_fresh=False, priority='other'))
+        code = engine.cmd_pipeline_start(argparse.Namespace(command=['no-mistakes', 'rerun'], only_fresh=False, priority='other'))
+        seen['after'] = state()
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -1217,8 +1222,9 @@ def m1876_registration_under_lock():
             setattr(engine, name, value)
         proc.sysctl, proc.libc = REAL_SYSCTL, REAL_LIBC
         w.close()
-    control(code == 0 and probe.get('released') is True, 'admitted and released by its own row', code, probe)
-    harm('m1876-registration-outside-lock', probe.get('held') is True, probe)
+    control(code == 0 and seen.get('admitted') == [(False, None)] and seen.get('after') == [], 'counted, then gone', code, seen)
+    harm('m3852-row-removes-reservation', seen.get('registered') == [(True, 'own')] and seen.get('replaced') == [(True, 'next')], seen)
+    harm('m3852-lapsed-coverage-uncounted', seen.get('ci-ready') == [(False, None)] and seen.get('gap') == [(False, None)], seen)
 
 
 def noted_unknowns():
@@ -1239,8 +1245,8 @@ def m1876_claim_stat():
     for label, denied in (('denied', True), ('readable', False)):
         real_lstat, real_lexists = os.lstat, os.path.lexists
         w = pending_world('m1876-stat-' + label)
-        path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None),
-                         claim=dict(pid=os.getpid(), nonce=None, seen=[], direct=True, client=os.getpid(), provisional=False))
+        path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1),
+                         claim=dict(pid=os.getpid(), direct=True, client=os.getpid()))
 
         def lstat(target, *a, **k):
             if denied and str(target) == path + '.claimed':
@@ -1258,8 +1264,8 @@ def m1876_claim_stat():
                 control(count == 1, 'the readable claim is counted', count)
             w.close()
             w = World('m1876-stat-decision-' + label, available=10)
-            path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1, client_nonce=None),
-                             claim=dict(pid=os.getpid(), nonce=None, seen=[], direct=True, client=os.getpid(), provisional=False))
+            path = w.pending(dict(holder=os.getppid(), args=['axi', 'run'], before=[], created_ns=1),
+                             claim=dict(pid=os.getpid(), direct=True, client=os.getpid()))
             if denied:
                 waits('m1876-claim-stat-decision', w, unknown='.claimed')
             else:
@@ -1272,7 +1278,7 @@ def m1876_short_pending_read():
     # Finding 6: a pending entry read shorter than its file is unknown, never the prefix's entry (the review's
     # review_claim_transitions_falsifier.py: a prefix ending at valid JSON was accepted). At the census the entry is
     # unknown; the decision then waits naming it.
-    entry = json.dumps(dict(holder=1, args=None, before=[], created_ns=1, client_nonce=None))
+    entry = json.dumps(dict(holder=1, args=None, before=[], created_ns=1))
     real_pread = os.pread
     for build in (pending_world, World):
         w = build('m1876-short-read-' + build.__name__.lower())
@@ -1309,7 +1315,7 @@ def m1876_partial_process_table():
     args = ['axi', 'run', '--intent', 'x']
     for label in ('partial', 'whole', 'none'):
         w = World('m1876-table-' + label, available=10)
-        w.pending(dict(holder=4242, args=args, before=[], created_ns=1, client_nonce=None))
+        w.pending(dict(holder=4242, args=args, before=[], created_ns=1))
         if label != 'none':
             w.real_argv = True
             w.argv[777] = (5, ['no-mistakes'] + args)
@@ -1334,7 +1340,7 @@ def m1876_short_argv():
         w = World('m1876-argv-' + label, available=10).process(777, parent=4242, start=101000000)
         w.real_argv = True
         w.argv[777] = record
-        w.pending(dict(holder=4242, args=args, before=[], created_ns=1, client_nonce=None))
+        w.pending(dict(holder=4242, args=args, before=[], created_ns=1))
         if label == 'short':
             below_holder(4242, lambda: waits('m1876-short-argv', w, 11))
         elif label == 'other':
@@ -1406,7 +1412,7 @@ def start_in_process(w, read_host_db=None, db=None):
     def child(command, environment, fd, on_poll=None, cancellable=False):
         ran.append(True)
         return 0
-    engine.run_child, engine.start_binding, engine.with_intercept = child, (lambda cwd, words: None), (lambda env, priority: None)
+    engine.run_child, engine.start_binding, engine.with_intercept = child, (lambda *_: None), (lambda env, priority: None)
     engine.log = lambda fd, message: lines.append(message)
     engine.FIRST_NOTICE_SECS = 0.0  # the first wait is logged at once
     if read_host_db is not None:
@@ -1478,13 +1484,13 @@ def m1876_row_read_error():
     # Finding 6: the run-row read for pending releases fails (OperationalError): unknown, the decision waits, never an
     # escaping error (which the entrypoint turns into 125). Control: the rows read: the entry is counted, 11 against 10.
     for label, broken in (('broken', True), ('readable', False)):
-        w = World('m1876-row-error-' + label, available=10).run('own', step=('review', 'running', None), nonce='N')
+        w = World('m1876-row-error-' + label, available=10).run('own', step=('review', 'running', None), branch='main')
         w.proved('own')
-        w.pending(dict(holder=1, args=None, before=[], created_ns=1, client_nonce='M'))
+        w.pending(dict(holder=1, args=None, before=[], created_ns=1, binding=dict(repo='repo', branch='other')))
         real = engine.read_host_db
 
         def read(sql, parameters=(), real=real):
-            if broken and 'launch_nonce FROM runs' in sql:
+            if broken and 'SELECT id, repo_id, branch FROM runs' in sql:
                 raise sqlite3.OperationalError('database is locked')
             return real(sql, parameters)
         engine.read_host_db = read
@@ -1661,7 +1667,7 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1712 item 5 short, other-generation and malformed reads hold', item5_reads),
          ('Main 1712 item 6 a live attempt counts whatever its run status', item6_run_status),
          ('Main 1712 item 7 a run with no history before activation holds', item7_no_history_before_activation),
-         ("Main 1712 item 3 a row ends only its claimant's own reservation", m1712_claimant_nonce),
+         ("Main 3852 a claimed start is covered only on its claimant's branch", m3852_claimant_branch),
          ('Main 1759 a missing step row holds', m1759_missing_step_row),
          ('Main 1759 a missing step row holds the count fallback too', m1759_missing_step_row_fallback),
          ('Main 1759 a live unrecorded agent is no waiter', m1759_live_unrecorded_agent_waiter),
@@ -1678,7 +1684,7 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('the activation record is written once, and never on a refusal', activation_writer),
          ('Main 1759 a claim is read once', m1759_claim_read_once),
          ('Main 1759 an undecodable pending entry is never released', m1759_undecodable_pending),
-         ('Main 1759 an unknown claimant blocks a nonce release', m1759_unknown_claimant),
+         ('Main 1759 an unknown claimant blocks every coverage', m1759_unknown_claimant),
          ('Main 1759 a completed first run never lends its admission', m1759_completed_first_run),
          ('Main 1759 a row inside the claim window withdraws the claim', m1759_row_between_census_and_claim),
          ('Main 1812 an unreadable attempt listing waits', m1812_listing_unreadable),
@@ -1687,7 +1693,7 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ('Main 1812 an attempt ends only at two successive censuses', m1812_successive_censuses),
          ('Main 1812 a partly joined attempt counts at least R', m1812_partial_join),
          ('Main 1812 a row at any claim boundary withdraws the claim', m1812_claim_boundaries),
-         ("Main 1812 a row in another start's admission set is unexplained", m1812_explained_by_admission_set),
+         ('Main 1812 a row that covers no other start is unexplained', m1812_explained_by_admission_set),
          ('Main 1812 an unknown claimant releases nothing', m1812_unknown_claimant),
          ('Main 1812 an incomplete own entry is counted', m1812_incomplete_own_entry),
          ('Main 1812 an undecodable claim is unknown, not a refusal', m1812_undecodable_claim),
@@ -1697,9 +1703,9 @@ CASES = (('F1 an unreadable confirming read holds', f1_unreadable_confirming_rea
          ("Main 1876 a stopped run's history is built", m1876_stopped_history),
          ('Main 1876 an unjoined possible process waits', m1876_unjoined_possible),
          ("Main 1876 a binding names one client, never its subtree", m1876_nested_shell_subtree),
-         ('Main 1876 a binding takes its client nonce', m1876_binding_nonce),
+         ("Main 1876 a binding takes its client's branch", m1876_binding_client),
          ('Main 1876 K7 ends a shell claim by its bound client', m1876_k7_bound_client),
-         ('Main 1876 a registration release is proven under the lock', m1876_registration_under_lock),
+         ('Main 3852 a covered start counts again when its run leaves the counted set', m3852_coverage_lapses),
          ('Main 1876 an unreadable claim stat waits', m1876_claim_stat),
          ('Main 1876 a short pending read waits', m1876_short_pending_read),
          ('Main 1876 a partial process table counts the entry', m1876_partial_process_table),

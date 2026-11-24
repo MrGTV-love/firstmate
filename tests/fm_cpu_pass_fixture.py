@@ -507,18 +507,25 @@ def registered_checkout(folder, db):
 def client_start(folder, db, env, name):
     """A fresh no-mistakes start whose own run this fixture registers: (command, cwd) for pipeline-start.
 
-    The fake client (start.py, reached as no-mistakes on PATH) runs in a registered git checkout on branch main,
-    registers its own running row (repo, branch, intent NAME) after CASE_LAUNCH_DELAY, touches NAME.started,
-    waits for NAME.release, then completes its run, as a real client's run does.
+    The fake client (start.py, reached as no-mistakes on PATH) runs in its own worktree of the registered checkout,
+    on its own branch NAME, so each run is the one active run of its repository and branch, as the daemon keeps it
+    (Main 3852). It registers its own running row (repo, branch NAME, intent NAME) after CASE_LAUNCH_DELAY, touches
+    NAME.started, waits for NAME.release, then completes its run, as a real client's run does.
     """
     checkout = registered_checkout(folder, db)
+    own = folder / ('wt-' + name)
+    if not own.exists():
+        git = ['git', '-C', str(checkout), '-c', 'user.name=fixture', '-c', 'user.email=fixture@invalid']
+        if subprocess.run(git + ['rev-parse', '-q', '--verify', 'HEAD'], stdin=subprocess.DEVNULL, capture_output=True).returncode:
+            subprocess.run(git + ['commit', '-q', '--allow-empty', '--no-verify', '-m', 'fixture'], check=True, stdin=subprocess.DEVNULL)
+        subprocess.run(git + ['worktree', 'add', '-q', '-b', name, str(own)], check=True, stdin=subprocess.DEVNULL)
     if not (folder / 'clientbin').exists():
         bin_dir = folder / 'clientbin'
         bin_dir.mkdir()
         (bin_dir / 'no-mistakes').write_text('#!' + python + '\n' + 'import runpy, sys\nrunpy.run_path(%r, run_name="__main__")\n' % str(worker))
         (bin_dir / 'no-mistakes').chmod(0o700)
         env.update(PATH=str(bin_dir) + os.pathsep + env['PATH'])
-    return ['no-mistakes', 'axi', 'run', '--intent', name, '--launch-nonce', 'nonce-' + name], checkout
+    return ['no-mistakes', 'axi', 'run', '--intent', name], own
 
 
 worker = root / 'start.py'
@@ -530,9 +537,8 @@ else:
 # Test-only: a delay before this fake start registers, while the admission lock is held.
 time.sleep(float(os.environ.get('CASE_LAUNCH_DELAY', '0')))
 with sqlite3.connect(folder / 'state.sqlite') as db:
-    nonce = sys.argv[sys.argv.index('--launch-nonce') + 1] if '--launch-nonce' in sys.argv else None
-    db.execute('INSERT INTO runs (id, status, repo_id, branch, intent, created_at, launch_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)',
-               (name, 'running', 'repo', 'main', name, int(time.time()), nonce))
+    db.execute('INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+               (name, 'running', 'repo', name, name, int(time.time())))
 with (folder / 'order').open('a') as out: out.write(name + '\\n')
 (folder / (name + '.started')).touch()
 while not (folder / (name + '.release')).exists(): time.sleep(0.025)

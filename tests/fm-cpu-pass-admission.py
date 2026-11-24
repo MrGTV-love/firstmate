@@ -130,7 +130,7 @@ try:
     # n x R + S <= available + held. 37 GiB admits n = 0..9 (9 x 3 + 8 = 35) and refuses n = 10 (38).
     folder, db, env = case('burst', cores=3, measured=True, available=37 * GIB)
     names = ['burst-%d' % i for i in range(11)]
-    clients = {name: launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, name)[0], env, folder / name, cwd=folder / 'checkout') for name in names[:10]}
+    clients = {name: launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, name)[0], env, folder / name, cwd=folder / ('wt-%s' % name)) for name in names[:10]}
     for name in names[:10]:
         wait_for(lambda: (folder / (name + '.started')).exists(), name + ' grant')
     # All ten run together, none waited for capacity, and three cores' fallback of one never applied.
@@ -146,7 +146,7 @@ try:
     # No artificial wait: the grants follow each other by the registration handshake alone.
     burst_gaps = assert_no_spacing(folder, names[:10])
     # The eleventh projects 38 GiB of 37 and waits; releasing one run lets it start.
-    clients[names[10]] = launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, names[10])[0], env, folder / names[10], cwd=folder / 'checkout')
+    clients[names[10]] = launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, names[10])[0], env, folder / names[10], cwd=folder / ('wt-%s' % names[10]))
     pending(folder, 1)
     wait_for(lambda: 'waiting: overload' not in (folder / (names[10] + '.stderr')).read_text() and
              'waiting: counted=10 projected=%d budget=%d' % (3 * GIB * 10 + 8 * GIB, 37 * GIB) in (folder / (names[10] + '.stderr')).read_text(),
@@ -165,7 +165,7 @@ try:
     folder, db, env = case('spacing-registration-delay', cores=3, measured=True, available=37 * GIB)
     env['CASE_LAUNCH_DELAY'] = '2'
     names = ['slow-%d' % i for i in range(4)]
-    clients = {name: launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, name)[0], env, folder / name, cwd=folder / 'checkout') for name in names}
+    clients = {name: launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, name)[0], env, folder / name, cwd=folder / ('wt-%s' % name)) for name in names}
     for name in names:
         wait_for(lambda: (folder / (name + '.started')).exists(), name + ' delayed grant')
     for name in names:
@@ -347,7 +347,7 @@ try:
     # Pause-only backstop (M3). Fitting reservations never override it, it stops nothing
     # that runs, and an unreadable observation never reads as an empty host.
     folder, db, env = case('backstop', measured=True, available=100 * GIB)
-    running = launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, 'already-running')[0], env, folder / 'already', cwd=folder / 'checkout')
+    running = launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, 'already-running')[0], env, folder / 'already', cwd=folder / ('wt-%s' % 'already-running'))
     wait_for(lambda: (folder / 'already-running.started').exists(), 'a run already started')
     before_hash = hashlib.sha256(db.read_bytes()).hexdigest()
     for label, bad, good, expected in (
@@ -436,7 +436,7 @@ try:
     clients = {}
     for priority in classes:
         clients[priority] = launch(cli + ['pipeline-start', '--priority', priority, '--'] + client_start(folder, db, env, priority)[0],
-            env, folder / priority, cwd=folder / 'checkout')
+            env, folder / priority, cwd=folder / ('wt-%s' % priority))
         pending(folder, len(clients))
     time.sleep(0.6)
     assert not (folder / 'order').exists()
@@ -478,7 +478,7 @@ try:
     clients = {}
     for priority in classes:
         clients[priority] = launch(cli + ['pipeline-start', '--priority', priority, '--'] + client_start(folder, db, env, priority)[0],
-            env, folder / priority, cwd=folder / 'checkout')
+            env, folder / priority, cwd=folder / ('wt-%s' % priority))
         pending(folder, len(clients))
     change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
     expected = list(reversed(classes))
@@ -1190,9 +1190,10 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             assert not list((folder / 'pool').glob('pipeline-waiter-*.lock')), name
 
     def nest_client(folder, env):
-        # A fake no-mistakes client: it logs "<cwd name> :: <args>"; an intent beginning reg registers a running run,
-        # one beginning hold waits for folder/release-<intent> and then exits without registering, any other exits
-        # without registering.
+        # A fake no-mistakes client: it logs "<cwd name> :: <args>"; an intent beginning reg registers a running run on
+        # repo/main, cancelling the one running there first as the daemon does (one active run per repository and
+        # branch), one beginning hold waits for folder/release-<intent> and then exits without registering, any other
+        # exits without registering.
         nest = folder / 'nestbin'
         nest.mkdir()
         (nest / 'no-mistakes').write_text('#!' + python + '\n' + """import os, pathlib, sqlite3, sys, time
@@ -1204,9 +1205,9 @@ if intent.startswith('hold'):
     while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
 if intent.startswith('reg'):
     with sqlite3.connect(folder / 'state.sqlite') as db:
-        nonce = args[args.index('--launch-nonce') + 1] if '--launch-nonce' in args else None
-        db.execute("INSERT INTO runs (id, status, repo_id, branch, intent, created_at, launch_nonce) VALUES (?, 'running', 'repo', 'main', ?, ?, ?)",
-                   ('run-%s-%d' % (intent, os.getpid()), intent, int(time.time()), nonce))
+        db.execute("UPDATE runs SET status = 'cancelled' WHERE status = 'running' AND repo_id = 'repo' AND branch = 'main'")
+        db.execute("INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, 'running', 'repo', 'main', ?, ?)",
+                   ('run-%s-%d' % (intent, os.getpid()), intent, int(time.time())))
 """)
         (nest / 'no-mistakes').chmod(0o700)
         env.update(PATH=str(nest) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
@@ -1236,9 +1237,9 @@ if intent.startswith('reg'):
                 ('path-unregistered', 18, 'no-mistakes axi run --intent a; no-mistakes axi run --intent b', 2),
                 ('abs-first-unregistered', 18, '{abs} axi run --intent a; no-mistakes axi run --intent b', 1),
                 ('tight-abs-first-unregistered', 3, '{abs} axi run --intent a; no-mistakes axi run --intent b', 1),
-                # The first created a run: the second, same arguments, is decided as another start, with no nonce (the
-                # run may be the first's, so its admission is never reused: Main 1712) and with one (its own row ended
-                # the reservation: Main 1683).
+                # The first created a run: the second, same arguments, is decided as another start (the run covers no
+                # other start, so it may be the first's, and the admission is never reused: Main 1712, Main 3852), also
+                # when the caller passes its own --launch-nonce.
                 ('abs-first-same-args-registered', 18, '{abs} axi run --intent reg-x; no-mistakes axi run --intent reg-x', 2),
                 ('abs-first-same-args-registered-nonce', 18, '{abs} axi run --intent reg-x --launch-nonce n-x; no-mistakes axi run --intent reg-x --launch-nonce n-x', 2),
                 ('abs-first-same-args-unregistered', 18, '{abs} axi run --intent x; no-mistakes axi run --intent x', 1),
@@ -1299,13 +1300,13 @@ if intent.startswith('reg'):
 
     def nested_class_order():
         # A higher-class start queued elsewhere while a nested second client waits: no hang, and class order holds.
-        # The first client registers its run, so the command's reservation ends by its own row and the second client
-        # needs an admission of its own (P5.lock).
+        # The first client registers its run, which covers no other start, so the second client is not given the
+        # command's reservation and needs an admission of its own (P5.lock, Main 3852).
         import fcntl
         folder, db, env = case('nested-class-order', cores=18)
         client = nest_client(folder, env)
         go = folder / 'go'
-        line = '{abs} axi run --intent reg-first --launch-nonce n-first; while [ ! -e {go} ]; do sleep 0.05; done; no-mistakes axi run --intent second'
+        line = '{abs} axi run --intent reg-first; while [ ! -e {go} ]; do sleep 0.05; done; no-mistakes axi run --intent second'
         outer = launch(mem_guard + ['bash', '-c', line.format(abs=client, go=go)], env, folder / 'outer', cwd=registered_checkout(folder, db))
         wait_for(lambda: calls(folder) == ['reg-first'], 'the first client ran')
         lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
@@ -1329,7 +1330,7 @@ if intent.startswith('reg'):
         procs(folder)
         assert ended(elsewhere, folder, 'the elsewhere start') == 0
         assert ended(outer, folder, 'the outer command') == 0
-        assert calls(folder) == ['reg-first', 'elsewhere', 'second'], calls(folder)  # the nonce row proved reg-first's run its own
+        assert calls(folder) == ['reg-first', 'elsewhere', 'second'], calls(folder)  # reg-first's run covers no other start, so second needed its own admission
 
     def nested_parallel_counted():
         # Two nested clients started together: the second is decided with the first, admitted and not registered,
@@ -1569,7 +1570,10 @@ exec /bin/ln "$@"
         """A registered git checkout on branch main, and a fake client that registers its own run from there.
 
         The fake client logs its pid as pid-<intent>; an intent beginning hold waits for release-<intent>, one beginning
-        reg inserts a running row for its own run (repo, branch, intent) and then waits for release-<intent>.
+        reg inserts a running row for its own run (repo, branch, intent) and then waits for release-<intent>. The intent
+        is read as the real client reads it: --intent TEXT, --intent - (standard input), --intent-file PATH or their =
+        forms; a rerun is reg-rerun. Like the daemon (no-mistakes fork internal/daemon/manager.go cancelActiveRuns), it
+        cancels the running run on repo/main before it writes its own, so one run is active per repository and branch.
         """
         checkout = folder / 'checkout'
         subprocess.run(['git', 'init', '-q', '-b', 'main', str(checkout)], check=True, stdin=subprocess.DEVNULL)
@@ -1578,22 +1582,32 @@ exec /bin/ln "$@"
         nest.mkdir()
         (nest / 'no-mistakes').write_text('#!' + python + '\n' + """import os, pathlib, sqlite3, sys, time
 folder = pathlib.Path(os.environ['CASE_FOLDER']); args = sys.argv[1:]
-intent = args[args.index('--intent') + 1] if '--intent' in args else ''
-nonce = args[args.index('--launch-nonce') + 1] if '--launch-nonce' in args else None
+intent = 'reg-rerun' if args[:1] == ['rerun'] else ''
+for index, word in enumerate(args):
+    option, _, value = word.partition('=')
+    if option in ('--intent', '--intent-file'):
+        value = value if _ else (args[index + 1] if index + 1 < len(args) else '')
+        if option == '--intent' and value != '-':
+            intent = value
+        else:
+            intent = (sys.stdin.read() if value == '-' else open(value).read()).strip()
+        break
 (folder / ('pid-' + intent)).write_text(str(os.getpid()))
 if intent.startswith('reg'):
     with sqlite3.connect(folder / 'state.sqlite') as db:
-        db.execute("INSERT INTO runs (id, status, repo_id, branch, intent, created_at, launch_nonce) VALUES (?, 'running', 'repo', 'main', ?, ?, ?)",
-                   ('run-' + intent, intent, int(time.time()), nonce))
+        db.execute("UPDATE runs SET status = 'cancelled' WHERE status = 'running' AND repo_id = 'repo' AND branch = 'main'")
+        db.execute("INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, 'running', 'repo', 'main', ?, ?)",
+                   ('run-' + intent, intent, int(time.time())))
 while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
 """)
         (nest / 'no-mistakes').chmod(0o700)
         env.update(PATH=str(nest) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
         return checkout
 
-    def row(db, run, intent, branch='main', repo_id='repo', nonce=None):
-        change(db, "INSERT INTO runs (id, status, repo_id, branch, intent, created_at, launch_nonce) VALUES (?, 'running', ?, ?, ?, ?, ?)",
-               (run, repo_id, branch, intent, int(time.time()), nonce))
+    def row(db, run, intent, branch, repo_id='repo'):
+        # A running row on BRANCH. The cases keep one running run per repository and branch, as the daemon does.
+        change(db, "INSERT INTO runs (id, status, repo_id, branch, intent, created_at) VALUES (?, 'running', ?, ?, ?, ?)",
+               (run, repo_id, branch, intent, int(time.time())))
 
     def launch_in(command, env, log, cwd):
         out, err = open(str(log) + '.stdout', 'w'), open(str(log) + '.stderr', 'w')
@@ -1603,37 +1617,46 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         records.append(dict(command=command, stdout=str(log) + '.stdout', stderr=str(log) + '.stderr'))
         return child
 
-    def own_row_binding():
-        # P5.lock: a pending reservation is ended by its own run's row only. With 6 cores (limit 2), a live, unregistered
-        # start A and a stranger's running row (same repository and branch, another intent) hold a probe start; A's own
-        # row ends A, so once the stranger's run
-        # ends the probe is admitted by itself while A's client is still alive.
-        folder, db, env = case('bind-own-row', cores=6)
+    def branch_coverage():
+        # P5.lock as amended by Main 3852 (replaces "a reservation ends by its own row only"): with 6 cores (limit 2), a
+        # live, unregistered start A on repo/main. (1) A counted run on repo/other covers nothing: a probe waits
+        # (counted=1 pending=1). (2) A's branch gets a counted run (A's own, registered) and repo/other's ends: A is covered,
+        # so a probe is admitted beside it (counted=1 pending=0). (3) That run turns CI-ready and repo/other gets a counted
+        # run again: A counts again, and a probe waits (counted=1 pending=1).
+        folder, db, env = case('bind-branch-coverage', cores=6)
         checkout = bound_repo(folder, db, env)
-        a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a', '--launch-nonce', 'nonce-a'], env, folder / 'a', checkout)
+        a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], env, folder / 'a', checkout)
         wait_for(lambda: (folder / 'pid-hold-a').exists(), 'A runs')
-        row(db, 'stranger', 'something else')
-        probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
-        wait_for(lambda: 'waiting: counted=1 limit=2 basis=fallback launched=0 pending=1' in (folder / 'probe.stderr').read_text(),
-                 'a stranger row of the same repository and branch ends no reservation')
-        assert not (folder / 'probe').exists()
-        row(db, 'own', 'hold-a', nonce='nonce-a')
-        time.sleep(1.0)
-        assert not (folder / 'probe').exists(), 'two counted runs (the stranger, A own row) hold the probe'
-        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'stranger'")
-        finish(probe)
-        assert a.poll() is None, 'A is still alive: its own row ended its reservation'
+        row(db, 'other', 'something else', 'other')
+        uncovered = 'waiting: counted=1 limit=2 basis=fallback launched=0 pending=1'
+        first = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'first')], env, folder / 'first')
+        wait_for(lambda: uncovered in (folder / 'first.stderr').read_text(), 'a run on another branch covers nothing')
+        harm('m3852-other-branch-covers', not (folder / 'first').exists(), (folder / 'first.stderr').read_text())
+        os.killpg(first.pid, signal.SIGKILL); first.wait()
+        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'other'")
+        row(db, 'own', 'hold-a', 'main')
+        second = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'second')], env, folder / 'second')
+        finish(second)
+        text = (folder / 'second.stderr').read_text()
+        harm('m3852-own-branch-double-charged', 'counted=1 limit=2 basis=fallback launched=0 pending=0' in text, text)
+        change(db, "UPDATE runs SET ci_ready_at = ? WHERE id = 'own'", (int(time.time()),))
+        row(db, 'other-2', 'something else', 'other')
+        third = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'third')], env, folder / 'third')
+        wait_for(lambda: uncovered in (folder / 'third.stderr').read_text(), 'a CI-ready run covers nothing')
+        harm('m3852-lapsed-coverage-kept', not (folder / 'third').exists(), (folder / 'third.stderr').read_text())
+        os.killpg(third.pid, signal.SIGKILL); third.wait()
+        assert a.poll() is None, 'A is alive throughout'
         (folder / 'release-hold-a').touch()
         finish(a)
 
     def started_run_charged_once():
-        # Main 2422 (R12-1): a start with no --launch-nonce whose client registers its own run (the bound repository,
-        # branch and intent) is charged once, by that row: with 6 cores (limit 2) a probe is admitted beside it while
-        # its client still runs (counted=1 pending=0). Control: before its row appears the same start is counted as
-        # pending, so a probe beside it and another counted run waits.
+        # Main 2422 (R12-1): a start whose client registers its own run on its repository and branch is charged once,
+        # by that run: with 6 cores (limit 2) a probe is admitted beside it while its client still runs (counted=1
+        # pending=0). Control: before its row appears the same start is counted as pending, so a probe beside it and
+        # another counted run (on repo/other) waits.
         folder, db, env = case('bind-charged-once', cores=6)
         checkout = bound_repo(folder, db, env)
-        row(db, 'other-run', 'something else')
+        row(db, 'other-run', 'something else', 'other')
         a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], env, folder / 'a', checkout)
         wait_for(lambda: (folder / 'pid-hold-a').exists(), 'A runs')
         early = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'early')], env, folder / 'early')
@@ -1642,36 +1665,78 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         assert not (folder / 'early').exists()
         change(db, "UPDATE runs SET status = 'completed' WHERE id = 'other-run'")
         finish(early)
-        row(db, 'run-hold-a', 'hold-a')
+        row(db, 'run-hold-a', 'hold-a', 'main')
         probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
         finish(probe)
         text = (folder / 'probe.stderr').read_text()
         harm('r12-1-charged-once', 'counted=1 limit=2 basis=fallback launched=0 pending=0' in text, 'the started run was charged twice', text)
-        assert a.poll() is None, 'A is still alive: its own row ended its reservation'
+        assert a.poll() is None, 'A is still alive: its run covers its reservation'
         (folder / 'release-hold-a').touch()
         finish(a)
 
-    def named_collision():
-        # P5.lock's named collision (R = 3 GiB, S = 8 GiB, budget 12 GiB): B claims through the interception and is killed
-        # after its push, so its reservation ends (K7); A is admitted and has not claimed; B's delayed row appears. The next
-        # decision counts B's row and A: 3 + 3 + 8 = 14 against 12, and waits. After A's own row appears and A's run ends,
-        # a start that fits is admitted by itself.
-        folder, db, env = case('bind-named-collision', measured=True, available=12 * GIB)
-        checkout = bound_repo(folder, db, env)
-        b = launch_in(mem_guard + ['bash', '-c', 'no-mistakes axi run --intent hold-b; sleep 60'], env, folder / 'b', checkout)
-        wait_for(lambda: (folder / 'pid-hold-b').exists(), 'B claims and runs')
-        os.kill(int((folder / 'pid-hold-b').read_text()), signal.SIGKILL)
-        a = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', 'sleep 30; no-mistakes axi run --intent hold-a --launch-nonce nonce-a'], env, folder / 'a', checkout)
-        wait_for(lambda: 'pipeline-start admitted' in (folder / 'a.stderr').read_text(), 'A admitted, not claimed')
-        row(db, 'run-hold-b', 'hold-b')
-        probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
-        wait_for(lambda: 'projected=%d ' % (14 * GIB) in (folder / 'probe.stderr').read_text(), 'B row and A both counted')
-        assert not (folder / 'probe').exists(), (folder / 'probe.stderr').read_text()
-        row(db, 'run-hold-a', 'hold-a', nonce='nonce-a')
-        os.killpg(a.pid, signal.SIGKILL); a.wait()
-        change(db, "UPDATE runs SET status = 'completed' WHERE id IN ('run-hold-a', 'run-hold-b')")
-        finish(probe)
-        os.killpg(b.pid, signal.SIGKILL); b.wait()
+    def every_route_charged_once():
+        # Main 3843 L1 (Main 3852): every route is charged once once its run registers: a rerun, an intent read from
+        # standard input and one read from a file, none of which a row could be matched to by intent or nonce. Each
+        # start's fake client registers its run on repo/main; a probe beside it is admitted with counted=1 pending=0
+        # (6 cores, limit 2). Before the row appears, each is counted as pending (counted=0 pending=1 on the probe's line).
+        for label, words, stdin in (('rerun', ['no-mistakes', 'rerun'], None),
+                                    ('stdin', ['no-mistakes', 'axi', 'run', '--intent', '-'], 'reg-stdin'),
+                                    ('file', ['no-mistakes', 'axi', 'run', '--intent-file=intent.txt'], None)):
+            folder, db, env = case('m3852-route-' + label, cores=6)
+            checkout = bound_repo(folder, db, env)
+            (checkout / 'intent.txt').write_text('reg-file\n')
+            name = {'rerun': 'reg-rerun', 'stdin': 'reg-stdin', 'file': 'reg-file'}[label]
+            source = None if stdin is None else open(str(folder / 'stdin.txt'), 'w+')
+            if source is not None:
+                source.write(stdin); source.flush(); source.seek(0)
+            out, err = open(str(folder / 'a.stdout'), 'w'), open(str(folder / 'a.stderr'), 'w')
+            a = subprocess.Popen(cli + ['pipeline-start', '--'] + words, env=env, stdin=source or subprocess.DEVNULL, stdout=out, stderr=err,
+                                 start_new_session=True, cwd=str(checkout))
+            out.close(); err.close()
+            children.append(a)
+            wait_for(lambda: (folder / ('pid-' + name)).exists(), label + ': the client runs')
+            def registered(db=db, run='run-' + name):
+                reader = sqlite3.connect('file:%s?mode=ro' % db, uri=True)
+                try:
+                    return reader.execute("SELECT 1 FROM runs WHERE id = ? AND status = 'running'", (run,)).fetchone() is not None
+                finally:
+                    reader.close()
+            wait_for(registered, label + ': its run registered')
+            probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
+            finish(probe)
+            text = (folder / 'probe.stderr').read_text()
+            harm('m3852-route-%s-double-charged' % label, 'counted=1 limit=2 basis=fallback launched=0 pending=0' in text, label, text)
+            (folder / ('release-' + name)).touch()
+            finish(a)
+            if source is not None:
+                source.close()
+
+    def named_collision_branch():
+        # P5.lock's named collision as amended by Main 3852 (R = 3 GiB, S = 8 GiB, budget 12 GiB): B claims through the
+        # interception on repo/main and is killed after its push, so its reservation ends (K7); A is admitted on
+        # repo/main and has not claimed; B's delayed row appears. On repo/main that run is the one A's client reattaches
+        # to or replaces, so it covers A: 3 + 8 = 11 against 12, admitted. Paired: the same delayed row on repo/other
+        # covers nothing: 3 + 3 + 8 = 14 against 12, and the probe waits.
+        for branch in ('main', 'other'):
+            folder, db, env = case('bind-named-collision-' + branch, measured=True, available=12 * GIB)
+            checkout = bound_repo(folder, db, env)
+            b = launch_in(mem_guard + ['bash', '-c', 'no-mistakes axi run --intent hold-b; sleep 60'], env, folder / 'b', checkout)
+            wait_for(lambda: (folder / 'pid-hold-b').exists(), 'B claims and runs')
+            os.kill(int((folder / 'pid-hold-b').read_text()), signal.SIGKILL)
+            a = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', 'sleep 30; no-mistakes axi run --intent hold-a'], env, folder / 'a', checkout)
+            wait_for(lambda: 'pipeline-start admitted' in (folder / 'a.stderr').read_text(), 'A admitted, not claimed')
+            row(db, 'run-hold-b', 'hold-b', branch)
+            probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
+            if branch == 'main':
+                finish(probe)
+                text = (folder / 'probe.stderr').read_text()
+                harm('m3852-collision-double-charged', 'projected=%d ' % (11 * GIB) in text, text)
+            else:
+                wait_for(lambda: 'projected=%d ' % (14 * GIB) in (folder / 'probe.stderr').read_text(), 'B row and A both counted')
+                harm('m3852-collision-other-branch-covers', not (folder / 'probe').exists(), (folder / 'probe.stderr').read_text())
+                os.killpg(probe.pid, signal.SIGKILL); probe.wait()
+            for child in (a, b):
+                os.killpg(child.pid, signal.SIGKILL); child.wait()
 
     def base_rule_from_line(text):
         """The base rule's decision recomputed from one admission or waiting line alone (P1, LIVE(a)).
@@ -1710,7 +1775,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
     def lines_name_checkout_pool_and_start():
         # P6(a): every admission and waiting line names the invoking checkout (the root of the deciding fm-cpu-pass.py),
         # the pool directory, and the start's repository and branch; two checkouts starting the same repository and
-        # branch record different invoking checkouts; the start's own row is named when it ends its reservation.
+        # branch record different invoking checkouts.
         folder, db, env = case('p6-lines', cores=3)
         command, checkout = client_start(folder, db, env, 'p6-a')
         other = checkout_copy(folder)
@@ -1720,12 +1785,11 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         change(db, "UPDATE runs SET status = 'completed' WHERE id = 'held'")
         wait_for(lambda: (folder / 'p6-a.started').exists(), 'the first starts')
         text = (folder / 'first.stderr').read_text()
-        for word in ('checkout=%s' % os.path.realpath(other), 'pool=%s' % (folder / 'pool'), 'start_repo=repo', 'start_branch=main'):
+        for word in ('checkout=%s' % os.path.realpath(other), 'pool=%s' % (folder / 'pool'), 'start_repo=repo', 'start_branch=p6-a'):
             assert word in text.split('waiting:')[1].splitlines()[0] and word in text.split('admitted:')[1].splitlines()[0], (word, text)
-        wait_for(lambda: 'registered: run p6-a' in (folder / 'first.stderr').read_text(), 'its own row is named')
         (folder / 'p6-a.release').touch()
         finish(first)
-        second = launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, 'p6-b')[0], env, folder / 'second', cwd=checkout)
+        second = launch(cli + ['pipeline-start', '--'] + client_start(folder, db, env, 'p6-b')[0], env, folder / 'second', cwd=folder / 'wt-p6-b')
         wait_for(lambda: (folder / 'p6-b.started').exists(), 'the second starts')
         assert 'checkout=%s' % os.path.realpath(repo) in (folder / 'second.stderr').read_text(), (folder / 'second.stderr').read_text()
         (folder / 'p6-b.release').touch()
@@ -1825,42 +1889,45 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                              env=lean, capture_output=True, text=True, timeout=30)
         assert out.returncode == 0 and (folder / 'ran').exists(), (out.returncode, out.stderr)
 
-    def row_never_releases_another():
-        # Main 1683 / review F3: starts A and B, both admitted, live and unregistered, with the same repository, branch
-        # and intent; B's row appears. With launch nonces B's row ends B only; with none it ends neither. A stays counted
-        # either way (6 cores, limit 2: a probe waits while A's reservation and B's run are counted).
-        for label, use_nonce in (('nonces', True), ('no-nonces', False)):
-            folder, db, env = case('m1683-owner-' + label, cores=6)
+    def one_run_covers_branch():
+        # Main 3852 (replaces "Main 1683 a row never releases another start"): starts A and B, both admitted, live and
+        # unregistered, on repo/main. The daemon keeps one active run there, which both clients reattach to or replace,
+        # so B's row on repo/main covers both: a probe is admitted (counted=1 pending=0; 6 cores, limit 2). Paired: the
+        # same row on repo/other covers neither: the probe waits (counted=1 pending=2).
+        for branch in ('main', 'other'):
+            folder, db, env = case('m3852-one-run-' + branch, cores=6)
             checkout = bound_repo(folder, db, env)
             starts = {}
             for who in ('a', 'b'):
-                extra = ['--launch-nonce', 'nonce-' + who] if use_nonce else []
-                starts[who] = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-same'] + extra,
+                starts[who] = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-' + who],
                                         env, folder / who, checkout)
                 wait_for(lambda: 'pipeline-start admitted' in (folder / (who + '.stderr')).read_text(), who + ' admitted')
-            row(db, 'run-b', 'hold-same', nonce='nonce-b' if use_nonce else None)
+            row(db, 'run-b', 'hold-b', branch)
             probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
-            expected = 'pending=%d' % (1 if use_nonce else 2)
-            wait_for(lambda: expected in (folder / 'probe.stderr').read_text(), label + ': A stays counted (' + expected + ')')
-            assert not (folder / 'probe').exists(), (label, (folder / 'probe.stderr').read_text())
-            for child in [probe] + list(starts.values()):
+            if branch == 'main':
+                finish(probe)
+                text = (folder / 'probe.stderr').read_text()
+                harm('m3852-one-run-double-charged', 'counted=1 limit=2 basis=fallback launched=0 pending=0' in text, text)
+            else:
+                wait_for(lambda: 'pending=2' in (folder / 'probe.stderr').read_text(), 'a row on another branch covers neither')
+                harm('m3852-other-branch-covers-two', not (folder / 'probe').exists(), (folder / 'probe.stderr').read_text())
+                os.killpg(probe.pid, signal.SIGKILL); probe.wait()
+            for child in starts.values():
                 os.killpg(child.pid, signal.SIGKILL); child.wait()
 
-    def outer_nonce_never_releases_nested_claimant():
-        # Main 1712 item 3 (review finding 3): the command's parsed client carries nonce a; a nested client the parser
-        # cannot see (through xargs) claims the reservation and carries nonce b. A row carrying nonce a (another client's)
-        # never releases the claimant's reservation: with 6 cores (limit 2) a probe waits while that row and the
-        # reservation are counted. Once the row's run ends, the probe is admitted beside the reservation.
-        folder, db, env = case('m1712-outer-nonce', cores=6)
+    def nested_claimant_own_branch():
+        # Main 1712 item 3 under Main 3852: a nested client the parser cannot see (through xargs) claims the reservation
+        # from repo/main. A counted run on repo/other never covers it: with 6 cores (limit 2) a probe waits while that run
+        # and the reservation are counted. Once that run ends, the probe is admitted beside the reservation.
+        folder, db, env = case('m1712-nested-own-branch', cores=6)
         checkout = bound_repo(folder, db, env)
-        line = ("printf 'n\\n' | xargs -n1 -I{} no-mistakes axi run --intent hold-b --launch-nonce nonce-b; "
-                "no-mistakes axi run --intent own --launch-nonce nonce-a")
+        line = "printf 'n\\n' | xargs -n1 -I{} no-mistakes axi run --intent hold-b; no-mistakes axi run --intent own"
         outer = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', line], env, folder / 'outer', checkout)
         wait_for(lambda: (folder / 'pid-hold-b').exists(), 'the nested client claims and runs')
-        row(db, 'run-a', 'another', nonce='nonce-a')
+        row(db, 'run-a', 'another', 'other')
         probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
         time.sleep(3)
-        harm('m1712-outer-nonce-real', not (folder / 'probe').exists(), 'a row of the outer nonce released the nested claimant', (folder / 'probe.stderr').read_text())
+        harm('m1712-other-branch-covers-claimant', not (folder / 'probe').exists(), (folder / 'probe.stderr').read_text())
         change(db, "UPDATE runs SET status = 'completed' WHERE id = 'run-a'")
         finish(probe)
         (folder / 'release-hold-b').touch()
@@ -1878,7 +1945,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             line = 'while [ ! -e %s ]; do sleep 0.05; done; no-mistakes axi run --intent hold-own' % go
             outer = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', line], env, folder / 'outer', checkout)
             wait_for(lambda: 'pipeline-start admitted' in (folder / 'outer.stderr').read_text(), label + ': the command is admitted')
-            row(db, 'stranger', 'something else')
+            row(db, 'stranger', 'something else', 'main')
             go.touch()
             if label == 'tight':
                 wait_for(lambda: ' pending=0 ' in (folder / 'outer.stderr').read_text() and 'waiting' in (folder / 'outer.stderr').read_text(),
@@ -1891,28 +1958,40 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             (folder / 'release-hold-own').touch()
             assert outer.wait(timeout=30) == 0, (label, (folder / 'outer.stderr').read_text())
 
-    def stranger_row_never_unlocks():
-        # Main 1712 item 3 (the base's stranger-row unlock, falsifier_base.py): start A is admitted and its client runs
-        # without registering; a stranger's row appears. The stranger's row is not A's, so A stays counted: with 6 cores
-        # (limit 2) a probe waits beside the stranger and A, and is admitted once the stranger ends.
-        folder, db, env = case('m1712-stranger-unlock', cores=6)
-        checkout = bound_repo(folder, db, env)
-        a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], env, folder / 'a', checkout)
-        wait_for(lambda: (folder / 'pid-hold-a').exists(), 'A runs')
-        row(db, 'stranger', 'something else')
-        probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
-        time.sleep(3)
-        harm('base-stranger-row', not (folder / 'probe').exists(), 'a stranger row released A', (folder / 'probe.stderr').read_text())
-        change(db, "UPDATE runs SET status = 'completed' WHERE id = 'stranger'")
-        finish(probe)
-        (folder / 'release-hold-a').touch()
-        finish(a)
+    def parked_run_covers_nothing():
+        # Main 3852 (replaces "Main 1712 a stranger row never releases an admitted start"): A is admitted on repo/main and
+        # its client runs without registering. A run on repo/main that is CI-ready, or awaiting an agent, is outside the
+        # counted set and covers nothing: beside a counted run on repo/other (6 cores, limit 2) a probe waits (counted=1
+        # pending=1). Paired: the same run on repo/main counted, and repo/other's ended, covers A: a probe is admitted
+        # (counted=1 pending=0).
+        for field in ('ci_ready_at', 'awaiting_agent_since'):
+            folder, db, env = case('m3852-parked-' + field.split('_')[0], cores=6)
+            checkout = bound_repo(folder, db, env)
+            a = launch_in(cli + ['pipeline-start', '--', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], env, folder / 'a', checkout)
+            wait_for(lambda: (folder / 'pid-hold-a').exists(), 'A runs')
+            row(db, 'parked', 'hold-a', 'main')
+            change(db, "UPDATE runs SET %s = ? WHERE id = 'parked'" % field, (int(time.time()),))
+            row(db, 'other', 'something else', 'other')
+            first = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'first')], env, folder / 'first')
+            wait_for(lambda: 'waiting: counted=1 limit=2 basis=fallback launched=0 pending=1' in (folder / 'first.stderr').read_text(),
+                     field + ': the run outside the counted set covers nothing')
+            harm('m3852-parked-run-covers', not (folder / 'first').exists(), field, (folder / 'first.stderr').read_text())
+            os.killpg(first.pid, signal.SIGKILL); first.wait()
+            change(db, "UPDATE runs SET %s = NULL WHERE id = 'parked'" % field)
+            change(db, "UPDATE runs SET status = 'completed' WHERE id = 'other'")
+            second = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'second')], env, folder / 'second')
+            finish(second)
+            text = (folder / 'second.stderr').read_text()
+            assert 'counted=1 limit=2 basis=fallback launched=0 pending=0' in text, ('control', field, text)
+            (folder / 'release-hold-a').touch()
+            finish(a)
 
     for name, body in (('P5.errors.fallback no A counts visible runs at R', no_term_counts_r),
                        ('P5.preempt.cancel a cancel before COMMAND begins', cancel_before_command),
-                       ('P5.lock a reservation ends by its own row only', own_row_binding),
-                       ('Main 2422 a started run is charged once by its own row', started_run_charged_once),
-                       ('P5.lock the named collision', named_collision),
+                       ('P5.lock a start is uncounted only while a counted run is on its branch', branch_coverage),
+                       ('Main 2422 a started run is charged once by its own run', started_run_charged_once),
+                       ('Main 3852 every route is charged once', every_route_charged_once),
+                       ('P5.lock the named collision under the branch rule', named_collision_branch),
                        ('P1 the line recomputes the base rule', p1_old_rule_recomputed),
                        ('P6(a) lines name the checkout, the pool and the start', lines_name_checkout_pool_and_start),
                        ('P6(a) the pool follows HOME and the override', pool_from_home),
@@ -1920,10 +1999,10 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                        ('B2Q1 a script start under any key is admitted', script_under_any_key),
                        ('B2Q2 an unplaceable interception runs other commands and says so', unplaceable_other_command),
                        ('B2Q2 mem-guard off macOS without python3 execs directly', mem_guard_without_python_off_macos),
-                       ('Main 1683 a row never releases another start', row_never_releases_another),
-                       ('Main 1712 a row of the outer nonce never releases a nested claimant', outer_nonce_never_releases_nested_claimant),
+                       ('Main 3852 one run covers every start on its branch, none on another', one_run_covers_branch),
+                       ('Main 1712 a nested claimant is covered only on its own branch', nested_claimant_own_branch),
                        ('Main 1712 a stranger row before the claim leaves the client its own decision', stranger_row_before_claim),
-                       ('Main 1712 a stranger row never releases an admitted start', stranger_row_never_unlocks)):
+                       ('Main 3852 a CI-ready or parked run on the start\'s branch covers nothing', parked_run_covers_nothing)):
         r28_case(name, body)
     (root / 'r28-admission.json').write_text(json.dumps(r28, indent=2))
     print(json.dumps(dict(r28=r28)), flush=True)
