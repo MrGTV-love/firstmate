@@ -77,7 +77,8 @@ Before any reader is dispatched the contract must be complete: a non-empty brief
 non-empty Definition Of Done (the brief's `## Definition Of Done (task)` section, the file its unfenced in-section
 `DoD file:` line names under data/, or data/dod/<task>.md, all read through bin/fm-dod-lib.sh's section reader) and
 that named file; otherwise the head is held as `review pack not built: contract source missing: <names>` and nothing runs.
-The protected-class decision reads every review row recorded for the exact head, whoever recorded it:
+The protected-class decision reads every review row recorded for the exact head, whoever recorded it
+(for a PASS verify carried from an earlier head, the rows of that reviewed head, whose change is the same):
 any yes, missing or malformed answer, any report that is gone or no longer matches its recorded digest,
 and any unreadable history holds the merge, and a later `no` never clears an earlier answer. A recorded
 routine PASS that verify accepts, with every exact-head report answering `no`, goes to the merge gate
@@ -852,7 +853,9 @@ def advance(home, task, url, meta, side):
             emit(home, task, side, sha, "captain-word", f"held: a captain merge word is recorded at {sha[:12]}; the merge is Main's",
                  f"a captain merge word is recorded at {sha[:12]}; the merge is Main's")
             return
-        merge(home, task, url, sha, side, meta)
+        # A PASS verify carried from an earlier head answers the protected-class question for this one:
+        # verify proved this head adds no change that read did not see.
+        merge(home, task, url, sha, side, meta, outcome.get("carried_from") or sha)
         return
     standing = latest_review(home, url)
     if standing and standing.get("head") == sha and standing.get("verdict") == "FAIL":
@@ -950,9 +953,9 @@ def protected_reasons(url, sha, meta):
     return sorted(set(reasons))
 
 
-def merge(home, task, url, sha, side, meta):
+def merge(home, task, url, sha, side, meta, read_sha=None):
     head = side.head(sha)
-    reasons = protected_reasons(url, sha, meta)
+    reasons = protected_reasons(url, read_sha or sha, meta)
     if reasons:
         # Not terminal: the evidence is read again every pass, so a readable report or a repaired history is judged anew.
         reason = "; ".join(reasons)

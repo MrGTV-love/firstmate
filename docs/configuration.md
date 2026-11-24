@@ -157,6 +157,7 @@ The regressions are [`tests/fm-review-record.test.sh`](../tests/fm-review-record
 The landing gate accepts an independent PASS only at the PR's live head, so taking in a newer base used to discard every read even when the PR's own change did not move.
 [`bin/fm-review-record.py`](../bin/fm-review-record.py)'s header owns the rule: when no review row names the live head, the newest review's head R carries to the live head H only if merging R into the base content H already holds (the merge base of the live forge base and H) with `git merge-tree --write-tree` gives a clean tree equal to H's tree.
 The reads at R are then judged by every existing rule, with authors derived at H; a captain-word never carries, and any read of H turns carry-over off.
+[`bin/fm-pr-auto-review.py`](../bin/fm-pr-auto-review.py) answers the protected-class question for a carried PASS from the review rows recorded at R, the head whose change H repeats.
 
 #### Guard harm-model reassessment
 
@@ -164,6 +165,8 @@ The exact-head rule protects merge authority from code reaching the base that no
 Carry-over judges that harm directly: an equal tree proves every byte H adds beyond base-branch content is a byte R added, so a merge or rebase of the base admits no unread line, and a missing object, a conflict or any difference refuses with the original head mismatch.
 A conflict resolution counts as new content even when it keeps the reviewed side, because a hand resolution is where an unread line most easily hides.
 The base content H holds is reachable from the live base branch, so it passed that branch's own landing gate.
+The proof trusts `--base` to be a commit on the PR's base branch, which both callers take from the live forge, and trusts the task worktree's object store, as author derivation already does.
+Any rewrite that keeps the reviewed tree, such as an amended message or a squash, also carries, because no content changed; a clean merge of a branch that is not on the base is unread content and refuses.
 The residual risk is an interaction between R and newer base content that the reader never saw together; required checks at the exact live head, which `bin/fm-pr-merge.sh` still demands, are the guard for that, as they were for any two PRs reviewed separately.
 Accepted carry-overs are disclosed as the fact `review carried from <R>` in verify's text output and as `carried_from` in `--json`.
 The regressions, including a sensitivity control that removes only the tree comparison and shows the unread change then passes, are in [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh).

@@ -111,8 +111,13 @@ above (FAIL standing, coverage of every author family, known newest reader,
 --review-only triggers), with authors derived at H; a captain-word never
 carries. An accepted carry-over prints the fact 'review carried from R: ...'
 and --json adds carried_from. A merge or rebase of the base into a reviewed PR
-therefore needs no new read; see docs/configuration.md 'Review carry-over
-across a base update' for the harm-model reassessment.
+therefore needs no new read, and neither does any rewrite that keeps the
+reviewed tree (an amended message, a squash, an empty commit); a merge of a
+branch that is not on the base is unread content and refuses. The proof trusts
+--base to be a commit on the PR's base branch (fm-pr-merge.sh and
+bin/fm-pr-auto-review.py pass the live forge's base SHA) and trusts the task
+worktree's object store; see docs/configuration.md 'Review carry-over across a
+base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
 kimi, llama, and the exact native Claude names opus, sonnet, haiku, which are

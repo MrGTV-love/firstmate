@@ -823,7 +823,42 @@ test_carry_over_refuses_a_missing_reviewed_object() {
   pass "a reviewed head that is not available locally cannot carry"
 }
 
+test_carry_over_refuses_a_branch_that_is_not_on_the_base() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-side-branch)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  # A side branch that never reached the base: a clean merge of it is still unread content.
+  cgit "$case_dir" checkout -q -b side "$BASE"
+  printf 'side\n' > "$case_dir/wt/side.txt"
+  cgit "$case_dir" add side.txt
+  cgit "$case_dir" commit -qm 'side work'
+  live=$(merge_trunk_into_pr "$case_dir")
+  cgit "$case_dir" merge -q --no-edit side
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a merged branch that is not on the base must refuse: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "side branch"
+  pass "a clean merge of a branch that is not on the base is unread content and refuses"
+}
+
+test_carry_over_accepts_a_same_tree_rewrite() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-rewrite)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  # Only the commit message changes: the content every read saw is unchanged, so the PASS stands.
+  cgit "$case_dir" checkout -q -b reworded "$REVIEWED"
+  cgit "$case_dir" commit -q --amend -m 'ship change, reworded'
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  out=$(verify_on "$case_dir" "$live" "$BASE") || rc=$?
+  expect_code 0 "$rc" "a same-tree rewrite must carry the PASS: $out"
+  pass "a rewrite that keeps the reviewed tree, such as an amended message, carries the PASS"
+}
+
 fm_test_run_cases \
+  test_carry_over_refuses_a_branch_that_is_not_on_the_base \
+  test_carry_over_accepts_a_same_tree_rewrite \
   test_carry_over_accepts_a_clean_merge_of_the_base \
   test_carry_over_accepts_a_clean_rebase \
   test_carry_over_refuses_an_unread_change \
