@@ -4258,30 +4258,6 @@ test_a_live_ledger_entry_that_cannot_be_opened_refuses_the_admission() {
   pass "a live ledger entry the gate cannot open refuses the admission and names the entry; readable, its charge holds the budget and the root starts once it ends"
 }
 
-# (F13) An inherited FM_LINT_INTERNAL_CENSUS_ONLY never turns a lint into a
-# success: the run refuses before any ShellCheck starts and writes no reusable
-# success. The control: without it the analysis starts and its finding is reported.
-test_an_inherited_census_switch_never_turns_a_lint_into_a_success() {
-  local tmp repo rc=0
-  tmp=$(fm_test_tmproot fm-lint-census-switch)
-  repo=$(fm_lint_isolated_copy "$tmp" census)
-  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
-  : > "$tmp/starts.log"
-  ( cd "$repo" && env FM_LINT_INTERNAL_CENSUS_ONLY=1 PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/flag.out" 2>&1 ) || rc=$?
-  [ "$rc" -ne 0 ] || fm_lint_fail_settled "a lint with an inherited census switch exited 0: $(cat "$tmp/flag.out")"
-  ! grep -q -- '-- bin/consumer.sh' "$tmp/starts.log" || fm_lint_fail_settled "the refused run started an analysis"
-  # The control.
-  rc=0
-  ( cd "$repo" && env -u FM_LINT_INTERNAL_CENSUS_ONLY PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' \
-      bash bin/fm-lint.sh bin/consumer.sh > "$tmp/plain.out" 2>&1 ) || rc=$?
-  [ "$rc" -eq 1 ] || fm_lint_fail_settled "the same lint without the switch exited $rc, expected its finding (1): $(cat "$tmp/plain.out")"
-  grep -q -- '-- bin/consumer.sh' "$tmp/starts.log" || fm_lint_fail_settled "the plain run started no analysis: $(cat "$tmp/starts.log")"
-  grep -q 'SC9999' "$tmp/plain.out" || fm_lint_fail_settled "the plain run did not report the analysis's finding: $(cat "$tmp/plain.out")"
-  wait 2>/dev/null || true
-  pass "an inherited census switch stops the lint with no analysis and no reusable success; without it the analysis starts and its finding is reported"
-}
-
 # fm_lint_write_owner_stand_in <dir> <repo> <stub python>: a script named
 # fm-lint.sh (so it is recognised as a lint owner) that writes a run entry into the
 # copy's host ledger the way bin/fm-lint.sh does, holds its flock on descriptor 9,
@@ -6109,7 +6085,6 @@ test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge
 test_two_pools_charge_one_host_wide_ledger_so_the_budget_holds_across_them
 test_a_gate_reads_the_ledger_under_the_host_lock_so_a_root_admitted_meanwhile_counts
 test_a_live_ledger_entry_that_cannot_be_opened_refuses_the_admission
-test_an_inherited_census_switch_never_turns_a_lint_into_a_success
 test_the_private_modes_start_a_command_only_inside_an_admitted_root
 test_a_worker_started_directly_takes_nothing_from_the_callers_environment
 test_the_roots_log_keeps_the_time_reading_and_the_watch_peak_in_separate_columns

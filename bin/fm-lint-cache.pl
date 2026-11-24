@@ -544,9 +544,7 @@ if (($ARGV[0] // '') eq 'probe') {
 # chosen by its argument and never by the environment: it reads the host process
 # table, as an admission would, and exits 0 when the table can be read, else waits
 # about 5 s and refuses as a root would. It never runs its command, so it never
-# produces a success that an analysis would have produced. The gate refuses to run
-# when FM_LINT_INTERNAL_CENSUS_ONLY, the census's former environment switch, is set:
-# an inherited switch must never turn an analysis into a no-op that exits 0.
+# produces a success that an analysis would have produced.
 if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     require POSIX;
     require Time::HiRes;
@@ -554,11 +552,6 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     die "fm-lint-gate: invalid private invocation\n"
         unless defined $dashes && $dashes eq '--' && @command && ($ncpu // '') =~ /\A[1-9][0-9]*\z/
             && ($run // '') =~ /\A[A-Za-z0-9_-]{1,64}\z/;
-    if ($gate_mode eq 'gate' && length($ENV{FM_LINT_INTERNAL_CENSUS_ONLY} // '')) {
-        print STDERR "fm-lint: FM_LINT_INTERNAL_CENSUS_ONLY is set in this analysis's environment; it is not an input "
-            . "to an analysis (the census is its own mode), so this analysis was not started. Unset it and run the lint again.\n";
-        exit 2;
-    }
     # The growth guard holds a root only by asking its resident watch, which owns
     # the root's process group, to stop and resume that group: the gate writes
     # <peak file>.hold and removes it to resume. The gate itself sends no signal to

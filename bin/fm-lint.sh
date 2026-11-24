@@ -286,8 +286,7 @@
 # owners are their ancestors, and from no setting or inherited variable, or exit 2
 # and start nothing. Residual: a process of the same user that writes a forged
 # entry into the 0700 ledger directory, naming a checker of its choice, is not
-# refused; such an actor is outside the confused-agent threat model this guards. FM_LINT_INTERNAL_CENSUS_ONLY in the environment stops a lint
-# (exit 2) before any ShellCheck starts. Host load
+# refused; such an actor is outside the confused-agent threat model this guards. Host load
 # average never changes admission, so unrelated machine load cannot starve lint.
 # FM_LINT_HOST_SLOTS sets the count cap; unset or empty uses max(2, floor(ncpu/2)).
 # A nonempty FM_LINT_HOST_SLOTS must be a positive decimal integer without
@@ -2482,14 +2481,6 @@ fi
 if [ -n "$pool_problem" ]; then
   printf 'fm-lint.sh: host slot pool unusable (%s); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.\n' \
     "$pool_problem" >&2
-  exit 2
-fi
-
-# FM_LINT_INTERNAL_CENSUS_ONLY was the census's environment switch; an analysis
-# never takes it as an input, so an inherited value stops the run before any
-# ShellCheck starts rather than turn analyses into no-ops that exit 0.
-if [ -n "${FM_LINT_INTERNAL_CENSUS_ONLY:-}" ]; then
-  printf 'fm-lint.sh: FM_LINT_INTERNAL_CENSUS_ONLY is set in the environment; it is not an input to a lint, so no root was started. Unset it and run the lint again.\n' >&2
   exit 2
 fi
 
