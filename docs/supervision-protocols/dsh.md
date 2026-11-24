@@ -28,7 +28,8 @@ The strongest verified equivalent is the shared guard plus at most one native fo
 A later external user message resets that bounded follow-up budget; DSH's own context messages do not.
 The plugin retires its own tracked process group on unload and never signals another home's watcher.
 Web plugin or HMR teardown does not resign a still-live primary; true Agent termination invokes the canonical exact-owned native lock release after scope disposal and registry detach.
-A failed release is recorded as `release-error` in `.dsh-primary-events.jsonl` and leaves the lock in place; it never blocks a later attachment.
+Any non-zero canonical release, whether a refusal or a real fault, is recorded as `release-error` with its stderr in `.dsh-primary-events.jsonl`, and a lock it could not remove stays paired with its sidecar.
+A failed release does not poison subsequent same-ID recovery on that server, while a different session remains subject to the live-foreign-owner refusal.
 A launch-owned TUI never treats a Web conversation identity inherited from its launching shell as its own: the plugin's commands drop inherited `DSH_PROFILE`, `DSH_SESSION_ID` and `DSH_SHELL`, and only an explicit Web attachment sets that identity.
 A same-id resumed Agent waits for that release before attaching, and stale termination callbacks cannot release its successor.
 Its shared owner-bound Perl watchdog also retires that private subtree when the native process dies without running disposal; it imposes no watcher lifetime deadline.
