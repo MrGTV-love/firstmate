@@ -6155,8 +6155,8 @@ agy_spawn_fail() {  # <detail>
 # supervision owns later turn failures.
 # The screen is then admitted only while this launch's own dsh-tui is alive:
 # a running, unstopped dsh-tui launcher whose argv carries this launch's
-# --patch path (fm_dsh_launch_alive), checked before and after the capture, so
-# a frame a dead launch left on screen above a shell cannot pass. Separately,
+# --patch path (fm_dsh_launch_alive), checked after the capture, so a frame a
+# dead launch left on screen above a shell cannot pass. Separately,
 # require the live composer shape the steering parser understands: a successful
 # version command is not proof that a changed frontend remains compatible.
 dsh_wait_for_start() {
@@ -6187,21 +6187,20 @@ dsh_wait_for_start() {
         ;;
       unaccepted) unaccepted=1 ;;
       busy | idle)
+        if fm_backend_visible_capture_supported "$BACKEND"; then
+          pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null) || pane=
+        else
+          pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null) || pane=
+        fi
+        # Checked after the capture: a launch that has exited never comes
+        # back under the same patch within this loop, so alive now means the
+        # screen just read was not left by a dead launch.
         if ! fm_dsh_launch_alive "$patch"; then
           DSH_START_ERROR="dsh: the launched dsh-tui process for $patch is not running"
+        elif parse_error=$(fm_composer_dsh_screen_check "$pane" "$identity" 2>&1); then
+          return 0
         else
-          if fm_backend_visible_capture_supported "$BACKEND"; then
-            pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null) || pane=
-          else
-            pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null) || pane=
-          fi
-          if ! fm_dsh_launch_alive "$patch"; then
-            DSH_START_ERROR="dsh: the launched dsh-tui process for $patch is not running"
-          elif parse_error=$(fm_composer_dsh_screen_check "$pane" "$identity" 2>&1); then
-            return 0
-          else
-            DSH_START_ERROR=${parse_error#error: }
-          fi
+          DSH_START_ERROR=${parse_error#error: }
         fi
         ;;
       unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;;

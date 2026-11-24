@@ -432,7 +432,7 @@ start_fake_dsh() {  # <launch-patch>
 stop_fake_dsh() {
   local pid
   while IFS= read -r pid; do
-    [ -n "$pid" ] && kill "$pid" 2>/dev/null
+    [ -n "$pid" ] && kill -CONT "$pid" 2>/dev/null && kill "$pid" 2>/dev/null
   done < "$FAKE_DSH_PIDS"
   : > "$FAKE_DSH_PIDS"
 }
@@ -460,11 +460,20 @@ while time.time() < deadline:
 else:
     sys.exit(1)
 bound = json.loads(binding.read_text())
-if not os.environ.get("FM_FAKE_DSH_DEAD"):
-    import subprocess
+# FM_FAKE_DSH_MODE shapes that process: live (default); dead (none);
+# impostor (a non-dsh process carrying the patch); other-patch (a dsh launcher
+# for another launch); stopped (this launch's launcher, parked by SIGSTOP).
+mode = os.environ.get("FM_FAKE_DSH_MODE", "live")
+if mode != "dead":
+    import signal, subprocess
     fake = Path(os.environ["FAKE_DSH_DIR"])
-    child = subprocess.Popen([str(fake / "node"), str(fake / "dsh-tui"), "--patch", str(Path(bound["root"]) / "launch.yml"), "60"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    patch = str(Path(bound["root"]) / "launch.yml")
+    argv = {"impostor": [sys.executable, str(fake / "dsh-tui"), "--patch", patch, "60"],
+            "other-patch": [str(fake / "node"), str(fake / "dsh-tui"), "--patch", patch + ".other", "60"]
+            }.get(mode, [str(fake / "node"), str(fake / "dsh-tui"), "--patch", patch, "60"])
+    child = subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    if mode == "stopped":
+        os.kill(child.pid, signal.SIGSTOP)
     with open(os.environ["FAKE_DSH_PIDS"], "a") as pids:
         pids.write(f"{child.pid}\n")
 store = Path(bound["root"]) / "dsh" / "sessions" / "workspace" / "session"
@@ -1092,28 +1101,28 @@ SH
 # The pre-usage status row proves a dsh composer only while this launch's own
 # dsh-tui is alive: the same accepted log and the same screen (that row flush
 # under the frame, blank rows below, as a dead launch leaves above an empty-PS1
-# shell) launch with the launch's dsh-tui running and refuse without it.
+# shell) launch with the launch's dsh-tui running, and refuse when it is gone,
+# when only a non-dsh process carries its patch path, when only another
+# launch's dsh-tui runs, or when its dsh-tui is stopped.
 test_fresh_status_row_needs_the_live_launch() {
-  local id out status
-  for alive in yes no; do
-    id=dsh-fresh-$alive
-    make_dsh_case "fresh-$alive" "$id"
+  local id out status mode
+  for mode in live dead impostor other-patch stopped; do
+    id=dsh-fresh-$mode
+    make_dsh_case "fresh-$mode" "$id"
     printf '%s\n' '  ╭──────────────────────────────╮' '  ⌸ ❯                          ⛶' '  ╰──────────────────────────────╯' \
       "   ${DSH_MODEL#deepseek/} · high · $(basename "$WT_DIR")" '' '' > "$CASE_DIR/screen"
-    if [ "$alive" = yes ]; then
-      out=$(FM_FAKE_DSH_EVENTS="$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
-      status=$?
+    out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_MODE=$mode FM_FAKE_DSH_EVENTS="$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl" \
+      run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+    status=$?
+    if [ "$mode" = live ]; then
       expect_code 0 "$status" "the pre-usage row of a live launch must prove its composer: $out"
     else
-      out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_DEAD=1 FM_FAKE_DSH_EVENTS="$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl" \
-        run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
-      status=$?
-      expect_code 1 "$status" "a frame left by a launch whose dsh-tui is gone must not prove a composer: $out"
-      assert_contains "$out" 'dsh: the launched dsh-tui process for' 'the refusal must name the missing launch process'
-      assert_contains "$out" 'is not running' 'the refusal must say the launch process is not running'
+      expect_code 1 "$status" "a frame without this launch's live dsh-tui ($mode) must not prove a composer: $out"
+      assert_contains "$out" 'dsh: the launched dsh-tui process for' "the $mode refusal must name the missing launch process"
+      assert_contains "$out" 'is not running' "the $mode refusal must say the launch process is not running"
     fi
   done
-  pass 'fm-spawn: a dsh pre-usage status row proves the composer only while the launch dsh-tui is running'
+  pass "fm-spawn: a dsh screen proves the composer only while this launch's own dsh-tui launcher is running"
 }
 
 test_exhausted_omp_replaces_deepseek_harness() {
