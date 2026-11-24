@@ -1,0 +1,2 @@
+ok - the root return takes its safety check again before each retry: a changed result stops the retry, an unchanged one retries
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.5H8Wik

@@ -1,0 +1,2 @@
+ok - a reused landing proof keeps the default ref it read: moved before the reuse, the final proof refuses as a retry; unchanged, it passes
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.GI7DBR

@@ -1,0 +1,2 @@
+ok - the preserve readback counts each ignored file once when Git lists a directory and a file inside it, and still refuses a changed payload
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.Rmdpjr

@@ -1,0 +1,2 @@
+ok - an unreadable active task record means its owner is unknown and the copy is refused; readable it owns the copy, absent it does not
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.dM4KNm
