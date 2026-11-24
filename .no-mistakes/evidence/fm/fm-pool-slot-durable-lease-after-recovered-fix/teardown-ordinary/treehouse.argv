@@ -1,0 +1,2 @@
+capabilities --json
+return /Users/charlesabrooker/tmp/fm-teardown-tests.TecBlT/unclaimed-release-ordinary-real/real-root/.treehouse/project-c73ffd/1/project --if-lease-holder task-x1 --if-lease-id d4240dca1b5986fbf8d4f0fe5dbadeed

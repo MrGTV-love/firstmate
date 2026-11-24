@@ -1,0 +1,5 @@
+sed 's/^  for start in protected old; do$/  for start in protected; do/' tests/fm-spawn-retained-copy.test.sh > tests/.nm-protected-only.test.sh
+1699c1699
+<   for start in protected old; do
+---
+>   for start in protected; do

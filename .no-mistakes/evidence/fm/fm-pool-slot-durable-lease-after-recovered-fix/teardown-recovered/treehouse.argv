@@ -1,0 +1,2 @@
+capabilities --json
+return /Users/charlesabrooker/tmp/fm-teardown-tests.TecBlT/unclaimed-release-recovered-real/real-root/.treehouse/project-96134f/1/project --if-lease-holder recovered: persistent quarantine (standin); verify before reuse

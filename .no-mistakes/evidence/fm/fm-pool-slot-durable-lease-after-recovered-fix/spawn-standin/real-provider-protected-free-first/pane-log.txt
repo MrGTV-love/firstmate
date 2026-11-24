@@ -1,0 +1,5 @@
+treehouse get
+cd -- '/Users/charlesabrooker/tmp/fm-spawn-retained-copy.Ug7U6F/real-provider-protected-free-first/real-root/.treehouse/project-d6ba3d/2/project'
+export GOTMPDIR=/tmp/fm-new-real-provider-protected-free-first/gotmp
+export COMPACT_ADVISER_DISABLE=1
+export FM_TASK_ID=new-real-provider-protected-free-first

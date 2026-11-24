@@ -1,0 +1,8 @@
+nested HEAD 16988f507dd7d0302930e44e3d83fb3a6494f092
+c9330a349414cd29f81b3a341d20d54ad7ca5799
+c9330a3 HEAD@{0}: 
+?? .claude/worktrees/nested-schema1-old/
+./.claude/worktrees/nested-schema1-old/.git 3384702494 119
+./.claude/worktrees/nested-schema1-old/README.md 2848608641 10
+./.claude/worktrees/nested-schema1-old/nested-owned.txt 142989900 23
+./README.md 2848608641 10

@@ -1,0 +1,3 @@
+recovered slot A: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.Ug7U6F/real-provider-protected-free-first/real-root/.treehouse/project-d6ba3d/1/project
+free slot B: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.Ug7U6F/real-provider-protected-free-first/real-root/.treehouse/project-d6ba3d/2/project
+slot the spawn own get chose: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.Ug7U6F/real-provider-protected-free-first/real-root/.treehouse/project-d6ba3d/2/project

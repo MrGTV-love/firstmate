@@ -1,0 +1,2 @@
+slot A (retiring holder enclosing slot): /Users/charlesabrooker/tmp/fm-teardown-tests.TecBlT/unclaimed-release-recovered-real/real-root/.treehouse/project-96134f/1/project
+sibling B (recovered quarantine holding a live nested copy): /Users/charlesabrooker/tmp/fm-teardown-tests.TecBlT/unclaimed-release-recovered-real/real-root/.treehouse/project-96134f/2/project

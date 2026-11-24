@@ -1,0 +1,25 @@
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-ordinary-real/real-root/.treehouse/project-2c18c2/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-ordinary-real/real-root/.treehouse/project-2c18c2/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-ordinary-real/real-root/.treehouse/project-2c18c2/1/project' to release it.
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-recovered-real/real-root/.treehouse/project-a9d080/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-recovered-real/real-root/.treehouse/project-a9d080/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-recovered-real/real-root/.treehouse/project-a9d080/1/project' to release it.
+🌳 Setting up worktree...
+treehouse: checked /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-recovered-id-real/real-root/.treehouse/project-ee1351/1/project: accepted: clean reusable copy
+🌳 Leased worktree at /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-recovered-id-real/real-root/.treehouse/project-ee1351/1/project. Run 'treehouse return /Users/charlesabrooker/tmp/fm-teardown-tests.seDywn/unclaimed-release-recovered-id-real/real-root/.treehouse/project-ee1351/1/project' to release it.
+ok - R3/R6: teardown without force returns the retiring holder's unclaimed enclosing slot by an exact conditional return and leaves the recovered sibling untouched
+ok - R4: a failure before or after the exact return converges on retry without a second reset, and a successor lease or changed lease id, before or after the verify, is never cleared
+ok - R5: each custody or proof condition leaves the unclaimed slot leased and unreset, moves no other work, and keeps the record and return-pending marker for a retry
+ok - on an unproven treehouse a recovered entry holding the reassociated copy refuses and keeps the record, the copy and the pool state, and an ordinary lease keeps the inert completion; no return and no marker either way
+ok - an ignored root file where the return target tracks a path refuses the unclaimed return before anything is removed, and an ignored file it keeps does not
+ok - an unlocked own nested copy with a unique ignored file is preserved before removal, or the route refuses with the copy and the file intact
+ok - an ordinary lease held by another task stays outside the unclaimed-slot route: no marker, no return, the copy and slot left as they were
+ok - a nested copy whose record names no slot (no history, an unrelated released_worktree, an unrelated prior_worktree) is returned only by the exact non-forced conditional return, with no --force in any git or treehouse command, and a failed first attempt leaves the marker and is rediscovered through the marker on retry
+ok - the final bind refuses a same-holder successor with a new lease id and another holder after the gate, with no cleanup and no provider call, and returns by the gate's own id when the lease is unchanged
+ok - the unclaimed route closes held, with no return, for this task's own copy the closeout driver kept under a durable recovered lease of a proven treehouse, on the first run and on a retry; an ordinary lease, an unproven provider and another task's held copy refuse and name the copy and whose it is
+ok - the unclaimed retire step leaves the own copy and a prior copy the closeout driver kept out of every run conclusion, agent retirement and reap, also when the record names the kept copy by an alias, and still retires the slot root and the plain prior copy
+ok - the held close leaves only processes inside the own copy the closeout driver kept out of its slot scan (real processes, real scan); a process elsewhere in the slot, and any process on the returned-slot path, still refuses
+ok - the retirement gate refuses before any retirement, launch-agent or process-reaping helper when a successor appears before or after the planning (different holder, or the same holder with a new lease id) or when the entry is still on the old holder (refused with no status run), and lets an unchanged lease and an interrupted release retire; another holder from the start stays outside the route
+ok - the unclaimed-slot route aborts the parked run and retires the launch agent rooted in the slot before it returns the slot
+ok - a slot root the read-only checks do not show as this task alone keeps its parked run and launch agent while the custody walk refuses
+exit=0

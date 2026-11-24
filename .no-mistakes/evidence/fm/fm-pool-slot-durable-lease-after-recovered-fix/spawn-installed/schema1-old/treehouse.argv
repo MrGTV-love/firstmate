@@ -1,0 +1,5 @@
+get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.ObpLJy/schema1-old/real-root --no-fetch --lease --lease-holder holder
+get --root /Users/charlesabrooker/tmp/fm-spawn-retained-copy.ObpLJy/schema1-old/real-root --no-fetch --lease --lease-holder spare
+return /Users/charlesabrooker/tmp/fm-spawn-retained-copy.ObpLJy/schema1-old/real-root/.treehouse/project-f08401/2/project --if-lease-holder spare
+--- setup argv above; guard argv below ---
+capabilities --json

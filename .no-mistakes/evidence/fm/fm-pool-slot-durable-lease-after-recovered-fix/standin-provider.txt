@@ -1,0 +1,8 @@
+LOCALLY PATCHED STAND-IN provider. Not a shipped build. No published MrGTV-love/treehouse branch (main and all 21 branches) reports schema_version 2 or recovered_quarantine_holder (checked cmd/capabilities.go on every branch via gh api on 2026-11-23).
+source: MrGTV-love/treehouse main b8ea2fd0883825abbad4bc19ab62d8a7219fcea8 (same commit as the installed binary)
+patch: standin-provider.patch (RecoveredLeaseHolder set to a new literal; capabilities schema 2 publishes it)
+build: go build -ldflags '-X main.version=v3.1.7-fm.b8ea2fd.standin-schema2' -o <worktree>/.nm-standin/treehouse .
+sha256: 2e4f4490315e730304a73822582c661e6a98db2f77fba9a7b113fa18ba9626ba
+capabilities --json: {"schema_version":2,"version":"v3.1.7-fm.b8ea2fd.standin-schema2","persistent_recovered_leases":true,"recovered_quarantine_holder":"recovered: persistent quarantine (standin); verify before reuse"}
+go test ./internal/pool/ -run Recovered: ok (82.677s) on the patched tree
+Never installed. Lived only at <worktree>/.nm-standin/treehouse and was deleted after the run.

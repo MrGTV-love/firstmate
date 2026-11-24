@@ -1,0 +1,5 @@
+total 0
+drwxr-xr-x@  4 charlesabrooker  staff  128 Nov 23 17:46 .
+drwxr-xr-x@ 21 charlesabrooker  staff  672 Nov 23 17:46 ..
+-rw-r--r--@  1 charlesabrooker  staff    0 Nov 23 17:45 .last-watcher-beat
+drwxr-xr-x@  2 charlesabrooker  staff   64 Nov 23 17:46 terminal-outcomes

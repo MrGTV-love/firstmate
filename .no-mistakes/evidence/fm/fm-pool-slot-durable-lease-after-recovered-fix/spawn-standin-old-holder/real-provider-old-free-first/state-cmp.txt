@@ -1,0 +1,4 @@
+pool state byte-identical after refusal: yes
+slot A copy fingerprint identical: yes
+/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6BiOgy/real-provider-old-free-first/pane-log:0
+/Users/charlesabrooker/tmp/fm-spawn-retained-copy.6BiOgy/real-provider-old-free-first/launch-log:0

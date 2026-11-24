@@ -1,0 +1,6 @@
+=== Orca-backend lab home, installed schema-1 treehouse on PATH (reduced run: FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip)
+(bootstrap exit 0)
+--- lines naming treehouse:
+(no treehouse line)
+--- every treehouse argv bootstrap ran:
+(end)

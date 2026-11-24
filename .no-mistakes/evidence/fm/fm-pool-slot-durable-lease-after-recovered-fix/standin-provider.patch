@@ -1,0 +1,50 @@
+diff --git a/cmd/capabilities.go b/cmd/capabilities.go
+index 5fbe562..33e3a42 100644
+--- a/cmd/capabilities.go
++++ b/cmd/capabilities.go
+@@ -5,12 +5,13 @@ import (
+ 	"fmt"
+ 	"os"
+ 
++	"github.com/kunchenguid/treehouse/v3/internal/pool"
+ 	"github.com/spf13/cobra"
+ )
+ 
+ // capabilitiesSchema is the version of the capabilities object itself. Bump it
+ // only when an existing field changes meaning; adding a field does not need it.
+-const capabilitiesSchema = 1
++const capabilitiesSchema = 2
+ 
+ // capabilitiesReport is the whole `treehouse capabilities --json` output. The
+ // field names are an interface other tools probe, so a test pins them.
+@@ -22,7 +23,8 @@ type capabilitiesReport struct {
+ 	// effect of another command: a recovered lease stays until a return
+ 	// names its slot. It is a statement about this build's behavior, never
+ 	// derived from the version string.
+-	PersistentRecoveredLeases bool `json:"persistent_recovered_leases"`
++	PersistentRecoveredLeases bool   `json:"persistent_recovered_leases"`
++	RecoveredQuarantineHolder string `json:"recovered_quarantine_holder"`
+ }
+ 
+ var capabilitiesCmd = &cobra.Command{
+@@ -51,6 +53,7 @@ process, and writes nothing, so it runs the same anywhere.`,
+ 			SchemaVersion:             capabilitiesSchema,
+ 			Version:                   version,
+ 			PersistentRecoveredLeases: true,
++			RecoveredQuarantineHolder: pool.RecoveredLeaseHolder,
+ 		}
+ 		data, err := json.Marshal(report)
+ 		if err != nil {
+diff --git a/internal/pool/state.go b/internal/pool/state.go
+index 5bac6e2..26ddf23 100644
+--- a/internal/pool/state.go
++++ b/internal/pool/state.go
+@@ -369,7 +369,7 @@ func recoverMissingStateEntries(poolDir string, s State) (State, error) {
+ // side effect of another. Only a `return` naming the slot releases one; bulk
+ // `return --all` leaves them alone. HandoffRecoveredLease can explicitly
+ // acknowledge a verified holder without releasing the slot.
+-const RecoveredLeaseHolder = "recovered: state file was corrupt or truncated; verify before reuse"
++const RecoveredLeaseHolder = "recovered: persistent quarantine (standin); verify before reuse"
+ 
+ // quarantineEntry builds the conservative entry both recovery scans write for a
+ // worktree whose reservation state was lost. It is leased under

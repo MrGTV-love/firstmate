@@ -1,0 +1,5 @@
+$ bin/fm-spawn.sh new-real-provider-protected-free-first ... (exit 0)
+warning: task new-real-provider-protected-free-first: /Users/charlesabrooker/tmp/fm-spawn-retained-copy.Ug7U6F/real-provider-protected-free-first/home/data/new-real-provider-protected-free-first/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for new-real-provider-protected-free-first: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned new-real-provider-protected-free-first harness=codex kind=scout window=firstmate:fm-new-real-provider-protected-free-first worktree=/Users/charlesabrooker/tmp/fm-spawn-retained-copy.Ug7U6F/real-provider-protected-free-first/real-root/.treehouse/project-d6ba3d/2/project
