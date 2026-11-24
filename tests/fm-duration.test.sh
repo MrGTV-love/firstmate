@@ -162,8 +162,9 @@ def override_run(key, command, **extra):
                           env=dict(env, **extra), cwd=workrepo, capture_output=True, text=True)
 
 
-# The only extreme that stops a silent command is a real stall: no output and
-# no process-tree CPU growth for the no-progress bound.
+# The only extreme that stops a silent command is a real stall: no output, no
+# runnable descendant and no process-tree CPU above the idle floor for the
+# no-progress bound.
 write_rows([sample('stall', 1) for _ in range(5)])
 stalled = override_run('stall', ['sleep', '30'], FM_DURATION_NO_PROGRESS_SECS='2')
 assert stalled.returncode == 124 and 'no_progress' in stalled.stderr, (stalled.returncode, stalled.stderr)
@@ -341,6 +342,99 @@ for share, key, trips in (('0.05', 'duty.below-floor', True), ('0.2', 'duty.abov
         assert duty_elapsed < 14, f'{key}: a child below the floor was not stopped: {duty_elapsed:.1f}s'
     else:
         assert duty_run.returncode == 0 and 'no_progress' not in duty_run.stderr and done.exists(), (key, duty_run.returncode, duty_run.stderr)
+
+# A sampler wrapper for the telemetry cases: FM_TEST_CLOCK scales the clock,
+# FM_TEST_BLIND=FROM:TO blinds tree_cpu between those real seconds after
+# start, and FM_TEST_NOT_RUNNABLE hides runnable state so CPU alone decides.
+sampler = tmp / 'sampler-run.py'
+sampler.write_text("""import importlib.util, os, sys, time
+real = time.monotonic
+start = real()
+factor = float(os.environ.get('FM_TEST_CLOCK', '1'))
+time.monotonic = lambda: real() * factor
+spec = importlib.util.spec_from_file_location('fm_duration', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules['fm_duration'] = module
+spec.loader.exec_module(module)
+blind_from, blind_to = map(float, os.environ.get('FM_TEST_BLIND', '-1:-1').split(':'))
+sampled = module.tree_cpu
+def tree_cpu(pid, observed):
+    cpu, runnable = sampled(pid, observed)
+    if blind_from <= real() - start < blind_to:
+        return None, False
+    return cpu, runnable and not os.environ.get('FM_TEST_NOT_RUNNABLE')
+module.tree_cpu = tree_cpu
+sys.argv = sys.argv[1:]
+sys.exit(module.main())
+""")
+
+
+def sampler_run(key, program, args, **extra):
+    begun = time.monotonic()
+    result = subprocess.run([sys.executable, str(sampler), str(helper), 'run', key, '--', sys.executable, '-c', program, *map(str, args)],
+                            env=dict(env, FM_TEST_NOT_RUNNABLE='1', **extra), cwd=workrepo, capture_output=True, text=True)
+    return result, time.monotonic() - begun
+
+
+# CPU spent while telemetry is blind counts. A silent child at about 40% of a
+# core is blinded from 2 to 12 real seconds under a 10x clock, a gap of 100
+# scaled seconds, longer than the 60 s window and the 60 s bound; when samples
+# return it must not be stopped, and it finishes at 18 real seconds.
+blind_done, blind_cpu = tmp / 'blind-gap.done', tmp / 'blind-gap.cpu'
+gap_child = duty.replace('done.touch()', 'done.touch()\npathlib.Path(sys.argv[4]).write_text(repr(time.process_time()))')
+gap, gap_elapsed = sampler_run('creep.blind-gap', gap_child, ['0.4', '18', blind_done, blind_cpu], FM_TEST_CLOCK='10', FM_TEST_BLIND='2:12',
+                               FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert gap.returncode == 0 and 'no_progress' not in gap.stderr and blind_done.exists(), (gap.returncode, gap.stderr)
+assert 'cpu_telemetry_unavailable' in gap.stderr and float(blind_cpu.read_text()) >= 3, (gap.stderr, blind_cpu.read_text() if blind_cpu.exists() else None)
+
+# CPU alone keeps a bursty silent child alive: runnable state is hidden at
+# every sample, and a 40% duty cycle stays well above the floor.
+bursty_done = tmp / 'bursty.done'
+bursty, _ = sampler_run('busy.bursty', duty, ['0.4', '12', bursty_done], FM_DURATION_NO_PROGRESS_SECS='4', FM_DURATION_ABSOLUTE_SECS='60')
+assert bursty.returncode == 0 and 'no_progress' not in bursty.stderr and bursty_done.exists(), (bursty.returncode, bursty.stderr)
+
+# The snapshot's process table survives a ps that rejects ucomm (busybox), keeps
+# at most 200 rows, keeps the newest 100 snapshots, and goes to stderr when
+# recording is off.
+no_ucomm = tmp / 'no-ucomm-bin'
+no_ucomm.mkdir()
+real_ps = shutil.which('ps')
+(no_ucomm / 'ps').write_text(f'#!/usr/bin/env bash\ncase "$*" in *ucomm*) echo "ps: bad -o argument ucomm" >&2; exit 1 ;; esac\nexec {shlex.quote(real_ps)} "$@"\n')
+(no_ucomm / 'ps').chmod(0o755)
+sleeper = 'import os, sys, time\nopen(sys.argv[1], "w").write(str(os.getpid()))\ntime.sleep(60)'
+fallback_pid = tmp / 'no-ucomm.pid'
+fallback = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.no-ucomm', '--', sys.executable, '-c', sleeper, str(fallback_pid)],
+                          env=dict(env, PATH=f'{no_ucomm}:{env["PATH"]}', FM_DURATION_ABSOLUTE_SECS='3'), cwd=workrepo, capture_output=True, text=True)
+fallback_snapshot = trip_snapshot(fallback.stderr, 'absolute_limit')
+assert 'process table unavailable' not in fallback_snapshot, fallback_snapshot
+assert any(line.split()[0] == fallback_pid.read_text() for line in fallback_snapshot.splitlines() if line[:1].isdigit()), fallback_snapshot
+
+many = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.rows', '--', 'bash', '-c', 'for i in $(seq 1 210); do sleep 60 & done; wait'],
+                      env=dict(env, FM_DURATION_ABSOLUTE_SECS='6'), cwd=workrepo, capture_output=True, text=True)
+rows_snapshot = trip_snapshot(many.stderr, 'absolute_limit')
+process_rows = [line for line in rows_snapshot.splitlines() if line[:1].isdigit()]
+truncated = re.search(r'^truncated: (\d+) more rows$', rows_snapshot, re.M)
+assert len(process_rows) == 200 and truncated and int(truncated.group(1)) >= 10, (len(process_rows), rows_snapshot[-300:])
+
+keep_table = tmp / 'keep' / 'durations.jsonl'
+trips = keep_table.parent / 'command-duration-trips'
+trips.mkdir(parents=True)
+for index in range(105):
+    old = trips / f'old.{index:03d}.txt'
+    old.write_text('old\n')
+    os.utime(old, (1_000_000 + index, 1_000_000 + index))
+kept = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.keep', '--', 'sleep', '30'],
+                      env=dict(env, FM_DURATION_FILE=str(keep_table), FM_DURATION_ABSOLUTE_SECS='2'), cwd=workrepo, capture_output=True, text=True)
+newest = re.search(r'snapshot=([^"]+)"', kept.stderr).group(1)
+remaining = sorted(path.name for path in trips.glob('*.txt'))
+assert len(remaining) == 100 and Path(newest).name in remaining, (len(remaining), newest)
+assert not any(f'old.{index:03d}.txt' in remaining for index in range(6)) and 'old.006.txt' in remaining, remaining[:8]
+
+off = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.off', '--', sys.executable, '-c', sleeper, str(tmp / 'off.pid')],
+                     env=dict(env, FM_DURATION_FILE='off', FM_DURATION_ABSOLUTE_SECS='2'), cwd=workrepo, capture_output=True, text=True)
+assert 'snapshot=unavailable (recording is off; rows on stderr)' in off.stderr, off.stderr
+assert 'columns: pid ppid stat cpu elapsed comm' in off.stderr, off.stderr
+assert any(line.split()[0] == (tmp / 'off.pid').read_text() for line in off.stderr.splitlines() if line[:1].isdigit()), off.stderr
 
 
 def wait_for(path):

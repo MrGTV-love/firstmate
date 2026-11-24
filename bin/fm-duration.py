@@ -129,6 +129,17 @@ command's process group only. Resources a command owns outside that group,
 such as Docker containers, networks and volumes that the Docker daemon holds,
 survive the stop, so such a command must stop and remove its own resources in
 its TERM handling or its owner's cleanup; run neither finds nor removes them.
+CPU spent while telemetry is blind is credited when samples return: the first
+complete sample after a gap is compared with the last one before it, so a gap
+never reads as idle time. The floor's owner is fm-repair, then Main once the
+repair session hands back: reassess it from the trip snapshots after the first
+5 real run trips, or at once after any reported false trip.
+Claim and tier: run's stops are containment of the command's own process group
+for a cooperative caller (Standard tier). Outside resources the command creates
+(Docker containers, networks and volumes, anything another daemon holds) are
+excluded from that claim by the policy owner's decision; their containment
+belongs to the command's owner, such as the C5 corpus driver, which must clean
+them up on its own stop.
 A no-mistakes.<step> key, a wrapped pipeline drive
 call whose client waits quietly on the shared daemon, is exempt from the
 no-progress stop and keeps only the 6 hour absolute stop; a cleanup that a
@@ -330,8 +341,10 @@ MIN_SAMPLES = 5  # sample-count policy: eligible samples before a measured limit
 KEEP_SAMPLES = 100  # sample-count policy: newest samples kept per host and key
 COMPACT_AT = 200  # sample-count policy: host/key sample rows that trigger compaction
 # run's lifetime is a progress rule, not a duration target: silence for this
-# long with no process-tree CPU growth, or this much wall clock overall, is the
-# only extreme that stops a command. Both have environment overrides for tests.
+# long with no runnable descendant and no process-tree CPU progress (for run,
+# CPU above the idle floor below; for keep-going, any growth), or this much
+# wall clock overall, is the only extreme that stops a command. Both have
+# environment overrides for tests.
 NO_PROGRESS_LIMIT = 900
 ABSOLUTE_LIMIT = 6 * 3600
 # run's idle CPU floor: sleeping processes keep accruing housekeeping CPU, so
@@ -838,11 +851,18 @@ def snapshot_rows(pid):
     a confinement that refuses ps, fm-proc-info.py supplies pid, ppid and state
     only (its command field is argv, so it is not read).
     """
-    try:
-        result, timed = proc_read(['ps', '-axo', 'pid=,ppid=,pgid=,stat=,time=,etime=,ucomm='], ['table', 'pid,ppid,pgid,stat'],
-                                  env=dict(os.environ, LC_ALL='C'))
-    except OSError:
-        return None
+    # ucomm is the kernel name on Darwin and procps; a ps that rejects it (busybox) falls back to
+    # comm off Darwin, where comm is that same kernel name, and to no name column on Darwin,
+    # where comm would be argv[0].
+    names = ['ucomm', 'comm'] if sys.platform != 'darwin' else ['ucomm', None]
+    for name in names:
+        columns = 'pid=,ppid=,pgid=,stat=,time=,etime=' + (f',{name}=' if name else '')
+        try:
+            result, timed = proc_read(['ps', '-axo', columns], ['table', 'pid,ppid,pgid,stat'], env=dict(os.environ, LC_ALL='C'))
+        except OSError:
+            return None
+        if not result.returncode or not timed:
+            break
     if result.returncode:
         return None
     table = {}
@@ -851,7 +871,7 @@ def snapshot_rows(pid):
         if len(fields) < (6 if timed else 4) or not fields[0].isdigit() or not fields[1].isdigit():
             continue
         if timed:
-            table[int(fields[0])] = (int(fields[1]), fields[2], fields[3], fields[4], fields[5], fields[6] if len(fields) > 6 else '')
+            table[int(fields[0])] = (int(fields[1]), fields[2], fields[3], fields[4], fields[5], fields[6] if len(fields) > 6 else '-')
         else:
             table[int(fields[0])] = (int(fields[1]), fields[2], fields[3], '-', '-', '-')
     children = collections.defaultdict(list)
@@ -1821,6 +1841,9 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
     observed_cpu = {}
     cpu_window = collections.deque()  # (time, tree CPU) samples inside the idle-floor window
     window_gain = 0.0
+    # The last complete sample before a blind stretch: CPU spent while telemetry was missing is
+    # credited against it, so a gap never reads as idle once samples return.
+    gap_base = None
     occurrence_id = str(uuid.uuid4())
     expired = False
     last_progress = started
@@ -1847,12 +1870,17 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
                 if blind and not warned_blind:
                     warned_blind = True
                     warn_blind_telemetry()
+                if blind and gap_base is None and cpu_window:
+                    gap_base = cpu_window[-1][1]
                 if sample is not None:
                     sampled_at = time.monotonic()
                     cpu_window.append((sampled_at, sample))
                     while cpu_window[0][0] < sampled_at - IDLE_CPU_WINDOW_SECS:
                         cpu_window.popleft()
                     window_gain = sample - cpu_window[0][1]
+                    if gap_base is not None:
+                        window_gain = max(window_gain, sample - gap_base)  # high-water gain across the gap
+                        gap_base = None
                     # keep-going keeps any growth as progress; run requires CPU above the idle floor.
                     cpu_progress = sample > previous_cpu if inactivity is not None else window_gain > IDLE_CPU_FLOOR_SECS
                 next_cpu_sample = time.monotonic() + cadence  # Observation, not a deadline.
