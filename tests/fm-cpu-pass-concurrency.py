@@ -1144,6 +1144,8 @@ def case_soak():
         burn.kill()
         burn.wait()
     expected = LANES * ROUNDS
+    workers_began, workers_ended = starts(world), ends(world)
+    logged_total, _ = logged_peaks(workers_began, workers_ended)
     waits = [item for item in decisions if 'waiting' in item[1]]
     admitted = [item for item in decisions if 'pipeline-start admitted: counted=0' in item[1]]
     status = json.loads(subprocess.run(['bash', tool('fm-cpu-pass.sh'), 'status', '--json'], env=world.env, capture_output=True, text=True, timeout=30).stdout)
@@ -1157,7 +1159,7 @@ def case_soak():
     capacity = [cause for cause in causes if cause not in ordering]
     case.measure(lanes=LANES, rounds_per_lane=ROUNDS, pool_size=N, background_burners_without_passes=BURNERS, forced_load_average=500,
                  window_seconds=round(elapsed, 1), sampled_max_workers_total=seen['peak_total'], sampled_max_passes_held=seen['peak_held'],
-                 samples=seen['samples'], sampler_gap_p99_ms=seen['gap_p99_ms'], sampler_gap_max_ms=seen['gap_max_ms'],
+                 samples=seen['samples'], sampler_gap_p99_ms=seen['gap_p99_ms'], sampler_gap_max_ms=seen['gap_max_ms'], logged_max_workers_total=logged_total,
                  heavy_completed='%d of %d' % (completed['heavy'], expected), brief_route_completed='%d of %d' % (completed['brief'], 2 * expected),
                  light_starts_completed='%d of %d' % (completed['light'], expected), light_starts_admitted_at_once_counted_0=len(admitted),
                  light_starts_with_a_wait_line=len(waits), admission_sleeps_waiting_for_another_start=len(ordering),
@@ -1166,7 +1168,14 @@ def case_soak():
     case.check(not failures, 'requests failed: %s' % failures[:3])
     case.check(seen['peak_total'] <= N, 'the soak ran %d workers together on a pool of %d' % (seen['peak_total'], N))
     case.check(completed == dict(heavy=expected, brief=2 * expected, light=expected), 'not every request completed: %s' % completed)
-    sampling_valid(case, seen, 'soak')
+    # Judged on the harm, as H3abc is (judge_nested): sampling_valid's 50 ms gap limit failed a soak whose every other check
+    # held when the host ran at load 95 on 18 CPUs (max gap 51 ms at base, 59 ms at the head of that day), while each soak
+    # worker lives at least FM_CONC_WORK CPU seconds. A worker the sampler never saw fails at any gap, and the cap is also
+    # counted from the workers' own start and end records.
+    workers_expected = expected * (len(names) + 2)
+    case.check(len(workers_began) == workers_expected, 'only %d of %d workers recorded their start' % (len(workers_began), workers_expected))
+    sampler_saw_every_worker(case, seen, ['%s.%d' % (group, pid) for group, pid, _ in workers_began], 'soak')
+    case.check(logged_total <= N, 'the soak ran %d workers together on a pool of %d by their own records' % (logged_total, N))
     case.check(len(admitted) == expected and not waits, 'a light start waited or was not admitted at once under load 500: %s' % waits[:2])
     case.check(not capacity, 'a light start slept for capacity or load although the count was below the limit: %s' % capacity[:3])
     case.check(status['held'] == 0 and not leftovers, 'the queue was not empty at the end: %s %s' % (status, leftovers))
