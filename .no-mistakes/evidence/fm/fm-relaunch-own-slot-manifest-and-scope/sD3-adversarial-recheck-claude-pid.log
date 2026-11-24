@@ -1,0 +1,14 @@
+== D1 re-check with the real claude pid: recorded manifest names another lifecycle state
+error: slot adoption refused: lifecycle_state_mismatch: manifest state is 'retired', not worktree_active; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task labaa23d5ccd7f2-worker: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern; preserve and reconcile it first; the running agent was not stopped
+claude before:  / after: 
+=> CHANGED
+manifest inventory: unchanged
+task record: byte-identical
+provisioner runs: 0
+(restored)
+
+-- correction: the pid helper above missed claude because its pid (28924) sorts before its parent shell (43806). Direct read after the refusal:
+28924 43806 Tue Nov 24 01:00:37 2026     claude
+=> claude 28924 started 01:00:37 (the F5 relaunch), before this D1 re-check (after 01:01), and is still the live agent: the refusal did not stop it.
+Tue Nov 24 01:02:33 CST 2026

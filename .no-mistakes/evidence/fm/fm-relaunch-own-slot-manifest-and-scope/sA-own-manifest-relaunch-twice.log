@@ -1,0 +1,60 @@
+== Scenario A: own-manifest relaunch twice (live lab, real claude worker, real fm-control.sh) ==
+-- meta slot lines before:
+branch=fm/labaa23d5ccd7f2-worker
+slot_manifest=/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+slot_base_sha=cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+slot_owned_path=src
+-- manifest inventory before:
+/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle ino=2169117268 mode=40700 size=96 sha=- mtime=1795502457012962649 ctime=1795502457012962649
+/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json ino=2169117269 mode=100600 size=370 sha=8cd3c63f805e07297880b3bdd8a8513b046a594cd1c36d4e4736acad2b1ac0d3 mtime=1795502457013086650 ctime=1795502457013086650
+== relaunch 1: bin/fm-control.sh labaa23d5ccd7f2-worker relaunch --note 'resume after the reboot'
+relaunch drift report for labaa23d5ccd7f2-worker: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+relaunch drift report for labaa23d5ccd7f2-worker: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for labaa23d5ccd7f2-worker: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched labaa23d5ccd7f2-worker harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-labaa23d5ccd7f2-worker worktree=/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern
+rc=0
+manifest inventory: IDENTICAL to before (inode/mode/size/sha/mtime/ctime)
+provisioner runs since start of scenario: 0
+-- meta slot lines after:
+branch=fm/labaa23d5ccd7f2-worker
+slot_manifest=/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+slot_base_sha=cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+slot_owned_path=src
+-- worker pane after relaunch 1:
+  New MCP server found in this project: graft
+  MCP servers may execute code or access system resources. All tool calls require approval. Learn more in the MCP documentation.
+    Use this MCP server
+    Use this and all future MCP servers in this project
+  ❯ Continue without using this MCP server
+  Enter to confirm · Esc to cancel
+== relaunch 2: bin/fm-control.sh labaa23d5ccd7f2-worker relaunch --note 'resume after the reboot'
+relaunch drift report for labaa23d5ccd7f2-worker: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+error: task labaa23d5ccd7f2-worker's composer state is 'unknown', not proven empty; refusing to type the /exit exit command because it could concatenate onto existing text. Clear the composer, then retry 'relaunch'
+error: relaunch of labaa23d5ccd7f2-worker failed while stopping the old agent, which is still running; its original instructions were restored
+rc=1
+manifest inventory: IDENTICAL to before (inode/mode/size/sha/mtime/ctime)
+provisioner runs since start of scenario: 0
+-- meta slot lines after:
+branch=fm/labaa23d5ccd7f2-worker
+slot_manifest=/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+slot_base_sha=cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+slot_owned_path=src
+-- worker pane after relaunch 2:
+  - I started no services.
+  I'll wait for Firstmate to tell me what to do next.
+✻ Crunched for 17s · done 12:45 AM
+❯ 
+  Sonnet 5.5 ░░░░░░░░░░ 6% 62k/1.0M fm/labaa23d5ccd7f2-worker vern:ecd5b664
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent

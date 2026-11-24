@@ -1,0 +1,18 @@
+== Baseline: same live worker, same record (own manifest recorded), lab bin/ switched to the base commit 87836f79b0b80036ea134ea42e0a27569773f04e
+lab bin/ now at 87836f79b0b80036ea134ea42e0a27569773f04e: yes
+slot_manifest=/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+slot_base_sha=cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+slot_owned_path=src
+claude before: 28924 43806 Tue Nov 24 01:00:37 2026     claude
+{"state": "BLOCKED", "reason": "manifest_exists", "blocked_reasons": ["manifest_exists"], "manifest_path": "/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json"}
+error: slot provisioner refused task labaa23d5ccd7f2-worker (exit 2); no agent or ship transition admitted; the copy is left exactly where it is (refs/heads/fm/labaa23d5ccd7f2-worker at 40b12156a6b9a83e8f2a60c58a963738767f027e); report: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/data/labaa23d5ccd7f2-worker/slot-provision-spawn.62450.json
+error: assigned copy /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern and endpoint firstmate:fm-labaa23d5ccd7f2-worker retained; no worker admitted
+error: the replacement agent for labaa23d5ccd7f2-worker could not be launched on claude
+error: labaa23d5ccd7f2-worker's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern
+claude after: 
+provisioner runs: 1
+["--repo-root", "/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern", "--worktree-path", "/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern", "--owner-id", "labaa23d5ccd7f2-worker", "--branch", "fm/labaa23d5ccd7f2-worker", "--base-sha", "cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709", "--owned-path", "src"]
+-- record recovery/slot lines:
+slot_manifest=/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+slot_base_sha=cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+slot_owned_path=src

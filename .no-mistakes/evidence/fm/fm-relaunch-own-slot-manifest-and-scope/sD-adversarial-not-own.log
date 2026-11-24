@@ -1,0 +1,23 @@
+== Scenario D1: recorded manifest names another branch (not this task's own)
+worker agent pid before: 43177 (treehouse)
+error: slot adoption refused: branch_mismatch: manifest branch is 'fm/someone-else', the task branch is 'fm/labaa23d5ccd7f2-worker'; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task labaa23d5ccd7f2-worker: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern; preserve and reconcile it first; the running agent was not stopped
+rc=1
+worker agent pid after: 43177 (treehouse)
+same live agent: not stopped
+manifest inventory: unchanged by the refusal
+task record: byte-identical
+provisioner runs: 0
+(restored the manifest bytes)
+
+== Scenario D2: another task's record names this copy as its worktree
+error: slot adoption refused: custody_other_record: task labpeer-other's record names this copy as its worktree; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task labaa23d5ccd7f2-worker: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern; preserve and reconcile it first; the running agent was not stopped
+rc=1
+worker agent pid before/after: 43177/43177 (treehouse)
+same live agent: not stopped
+task record: byte-identical
+provisioner runs: 0
+(removed the peer record)
+
+-- correction (added after the run): the "agent pid" above is the pane's treehouse wrapper (pid 43177), which never changes, so "same live agent" here is NOT proof that Claude kept running. This file proves only the named refusal, the byte-identical record and 0 provisioner runs.

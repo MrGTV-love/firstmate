@@ -1,0 +1,41 @@
+== Lab 2. D1': manifest names another branch; claude pid read directly
+error: slot adoption refused: branch_mismatch: manifest branch is 'fm/someone-else', the task branch is 'fm/lab11e8f062173c-worker'; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task lab11e8f062173c-worker: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fmlab.hCy8PZ/treehouse/.treehouse/vern-07e097/1/vern; preserve and reconcile it first; the running agent was not stopped
+claude before: 25228 (01:12:16) / after: 25228 (01:12:16)
+manifest inventory: unchanged
+task record: byte-identical
+provisioner runs so far: 0
+(manifest restored)
+
+== D2': another task's record names this copy; claude pid read directly
+error: slot adoption refused: custody_other_record: task labpeer-other's record names this copy as its worktree; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task lab11e8f062173c-worker: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fmlab.hCy8PZ/treehouse/.treehouse/vern-07e097/1/vern; preserve and reconcile it first; the running agent was not stopped
+claude before: 25228 (01:12:16) / after: 25228 (01:12:16)
+manifest inventory: unchanged
+task record: byte-identical
+provisioner runs so far: 0
+(peer record removed)
+
+== G: adopt route with a recorded scope path that is not tracked at the base (the d5 scope_not_tracked shape)
+lab input: 'newdir' added to the manifest owned_paths and to the record's slot_owned_path; the task commits newdir/work.txt
+newdir tracked at base? 0 entries
+-- what the fresh-admission provisioner says for this shape (direct run, new path so no manifest collision):
+{"state": "BLOCKED", "reason": "manifest_exists", "blocked_reasons": ["manifest_exists"], "manifest_path": "/Users/charlesabrooker/tmp/fmlab.hCy8PZ/home/projects/vern/.git/vernant-worktree-lifecycle/6a55a9d8b310caf6.json"}
+
+relaunch drift report for lab11e8f062173c-worker: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+relaunch drift report for lab11e8f062173c-worker: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+relaunched lab11e8f062173c-worker harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-lab11e8f062173c-worker worktree=/Users/charlesabrooker/tmp/fmlab.hCy8PZ/treehouse/.treehouse/vern-07e097/1/vern
+claude before: 25228 (01:12:16) / after: 6461 (01:14:25)
+manifest inventory: unchanged
+task record: changed (relaunch generation lines)
+provisioner runs so far: 0
+slot_manifest=/Users/charlesabrooker/tmp/fmlab.hCy8PZ/home/projects/vern/.git/vernant-worktree-lifecycle/6a55a9d8b310caf6.json
+slot_base_sha=ab3eb2d640237132f1e185cb0230a1f7030531e1
+slot_owned_path=src
+slot_owned_path=newdir
+(lab: dismissed the graft MCP dialog with its default)
+claude now: 6461 (01:14:25)
+
+-- note: the direct --check-manifest-only line above only probes the manifest path (create-only collision); it is not a scope check.

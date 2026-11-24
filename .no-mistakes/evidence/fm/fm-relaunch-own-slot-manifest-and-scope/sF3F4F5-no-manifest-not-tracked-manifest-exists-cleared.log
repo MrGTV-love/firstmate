@@ -1,0 +1,52 @@
+== lab input: restore README.md and docs/notes.txt to their base content in a new commit, so the task's net change is in-scope only
+src/owned.txt
+
+== F3: recorded scope names a path not tracked at the base (lab input: slot_owned_path=newdir added)
+error: slot provisioning refused: scope_not_tracked: newdir is not tracked at the base cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+error: refused relaunch of governed task labaa23d5ccd7f2-worker: its assigned copy /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+claude before: 84525 (started Nov 24) / after: 84525 (started Nov 24)
+=> same live claude: not stopped
+task record: byte-identical
+provisioner runs so far: 0
+
+== F4: in-scope only, and the task's old lifecycle record is still at the provisioner's create-only path
+-rw-------@ 1 charlesabrooker  staff  370 Nov 24 00:40 /Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it; "manifest_path": "/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json"
+error: refused relaunch of governed task labaa23d5ccd7f2-worker: its assigned copy /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+claude before: 84525 (started Nov 24) / after: 84525 (started Nov 24)
+=> same live claude: not stopped
+task record: byte-identical
+provisioner runs so far: 0
+
+== F5: the collision is cleared (lab moves the old record aside); one new attempt
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json", "worktree_path": "/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern", "owner_id": "labaa23d5ccd7f2-worker", "branch": "fm/labaa23d5ccd7f2-worker", "base_sha": "cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709", "owned_paths": ["src"], "lifecycle_state": "worktree_active", "repo_root": "/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern"}
+skill selection for labaa23d5ccd7f2-worker: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched labaa23d5ccd7f2-worker harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-labaa23d5ccd7f2-worker worktree=/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern
+claude before: 84525 (started Nov 24) / after: 
+=> claude CHANGED (relaunched)
+task record: CHANGED
+12c12,14
+< claude_session_id=6025ab8d-d275-421a-bc81-1810dae097f1
+---
+> claude_session_id=98503976-da8c-4f8b-bf8e-a8bf6f01486b
+> slot_manifest=/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+> slot_base_sha=cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+18,20c20,22
+< busy_gen=g1795503446.80126.12370
+< spawn_gen=s1795503446.64566.3184
+< control_relaunch_tx=59287.20261124T065718Z.17261
+---
+> busy_gen=g1795503634.20128.4979
+> spawn_gen=s1795503635.1728.18152
+> control_relaunch_tx=84516.20261124T070024Z.1253
+provisioner runs so far: 1
+-- record slot lines now:
+slot_manifest=/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+slot_base_sha=cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+slot_owned_path=src
+-- provisioner sentinel:
+["--repo-root", "/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern", "--worktree-path", "/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern", "--owner-id", "labaa23d5ccd7f2-worker", "--branch", "fm/labaa23d5ccd7f2-worker", "--base-sha", "cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709", "--owned-path", "src"]
+(lab: dismissed the graft MCP dialog with its default)

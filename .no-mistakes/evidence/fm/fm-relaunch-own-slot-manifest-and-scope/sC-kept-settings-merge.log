@@ -1,0 +1,16 @@
+== Scenario C: the worker edits its own .claude/settings.local.json, then an adopted relaunch
+worker-edited settings sha256: 20881b0877f1a5fecb3bbc11bc2c374e79cffa2bfd86bece308fe6d98823fd6e
+kept the worker's edited launch artifact .claude/settings.local.json byte for byte at .claude/settings.local.json.fm-kept.1795503130.0; the fresh wiring is written beside it
+merged the worker's kept hook and permission entries into the fresh wiring at /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern/.claude/settings.local.json; its other keys are not carried over
+relaunched labaa23d5ccd7f2-worker harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-labaa23d5ccd7f2-worker worktree=/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern
+rc=
+provisioner runs: 0
+kept copy: .claude/settings.local.json.fm-kept.1795503130.0
+kept copy: byte-identical to the worker's edited file
+active allow has lab-kept-allow: True
+active deny has lab-kept-deny: True
+active permissions.defaultMode: <absent>
+active disableAllHooks: <absent>
+active env: <absent>
+active hook events: ['PreToolUse', 'SessionEnd', 'Stop', 'StopFailure', 'UserPromptSubmit']
+(lab: dismissed the graft MCP dialog with its default)

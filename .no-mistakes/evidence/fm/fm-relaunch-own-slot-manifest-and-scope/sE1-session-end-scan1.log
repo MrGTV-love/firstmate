@@ -1,0 +1,9 @@
+== lab input: append a working status line so the task is an in-flight, unpaused session-end lane
+working [at=1795503414]: lab worker resumed work
+== scan 1
+scan-rc=0
+WAKE: check: labaa23d5ccd7f2-worker auto-relaunch failed after session-end: error: slot adoption refused: branch_mismatch: manifest branch is 'fm/someone-else', the task branch is 'fm/labaa23d5ccd7f2-worker'; no manifest, scope, record or copy was changed [refused: branch_mismatch: error: slot adoption refused: branch_mismatch: manifest branch is 'fm/someone-else', the task branch is 'fm/labaa23d5ccd7f2-worker'; no manifest, scope, record or copy was changed; not retried by the scan until its cause changes; bin/fm-control.sh labaa23d5ccd7f2-worker relaunch tries again]
+-- refusal memory: g1795503131.37450.27398	4	branch_mismatch	24447739170f14e906328ae72b11e8cb82581bc4ea68c37f1dae1cd690e967ad	
+-- attempt rows: 1795503418	attempt
+1795503420	failed
+-- pane command: zsh

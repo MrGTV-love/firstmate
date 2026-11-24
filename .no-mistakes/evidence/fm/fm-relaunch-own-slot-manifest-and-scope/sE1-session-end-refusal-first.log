@@ -1,0 +1,24 @@
+== Scenario E1: worker session ended by itself; recorded manifest now names another branch (refusal cause)
+busy record: v1 gen=g1795503131.37450.27398 seq=4 state=idle source=claude-hook event=session-end ts=1795503226
+pane command: zsh
+== watcher run 1 (real bin/fm-watch.sh in the lab)
+signal: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/labaa23d5ccd7f2-worker.status /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/labaa23d5ccd7f2-worker.turn-ended
+watcher-exit=0
+-- refusal memory file:
+ls: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/.session-end-refusal-labaa23d5ccd7f2-worker: No such file or directory
+-- attempt rows:
+cat: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/.session-end-relaunch-labaa23d5ccd7f2-worker: No such file or directory
+-- pane command after: zsh
+== watcher run e1-2
+check: rearm-resurface
+watcher-exit=0
+-- refusal memory: cat: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/.session-end-refusal-labaa23d5ccd7f2-worker: No such file or directory
+-- attempt rows: cat: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/.session-end-relaunch-labaa23d5ccd7f2-worker: No such file or directory
+== watcher run e1-3
+check: rearm-resurface
+watcher-exit=0
+-- refusal memory: cat: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/.session-end-refusal-labaa23d5ccd7f2-worker: No such file or directory
+-- attempt rows: cat: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/.session-end-relaunch-labaa23d5ccd7f2-worker: No such file or directory
+-- pane command after: zsh
+-- wake queue tail:
+(eval):11: no matches found: /Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/wake-queue*

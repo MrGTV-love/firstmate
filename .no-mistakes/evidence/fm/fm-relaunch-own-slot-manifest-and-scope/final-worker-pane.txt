@@ -1,0 +1,80 @@
+treehouse get
+charlesabrooker@Mac-Studio vern % treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern. Type 'exit' to return.
+charlesabrooker@Mac-Studio vern % bash -- '/Users/charlesabrooker/tmp/fmlab.u3n33b/home/data/labaa23d5ccd7f2-worker/.slot-provision.Hb44HG/run'
+charlesabrooker@Mac-Studio vern % cd -- '/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern'
+charlesabrooker@Mac-Studio vern % export GOTMPDIR=/tmp/fm-labaa23d5ccd7f2-worker/gotmp
+charlesabrooker@Mac-Studio vern % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio vern % export FM_TASK_ID=labaa23d5ccd7f2-worker
+charlesabrooker@Mac-Studio vern % . '/tmp/fm-labaa23d5ccd7f2-worker+2fda91e2cf0d3a1cf319b8bd8789df778474b131faa60410a2775b1bc470d0f2/launch.s1795502460.25337.8572.sh'
+
+Resume this session with:
+claude --resume 2d4262ea-a44c-4dcc-931b-78a3b237e126
+charlesabrooker@Mac-Studio vern % cd -- '/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern'
+charlesabrooker@Mac-Studio vern % export GOTMPDIR=/tmp/fm-labaa23d5ccd7f2-worker/gotmp
+charlesabrooker@Mac-Studio vern % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio vern % export FM_TASK_ID=labaa23d5ccd7f2-worker
+charlesabrooker@Mac-Studio vern % . '/tmp/fm-labaa23d5ccd7f2-worker+2fda91e2cf0d3a1cf319b8bd8789df778474b131faa60410a2775b1bc470d0f2/launch.s1795502644.92726.4757.sh'
+
+Resume this session with:
+
+ ▐▛███▛█   Claude Code v2.1.331
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Ultra
+ ▝▝   ▝▝   ~/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern
+
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fmlab.u3n33b/home/state/operational-inbox/1795503820-f2c066074cf0670b.msg' and handle its contents as Firstmate operational input.
+
+  Read 1 file, ran 2 shell commands
+
+⏺ I am parked.
+
+  - I checked the worktree. It is the right one: /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern.
+  - The branch is fm/labaa23d5ccd7f2-worker. It is clean.
+  - The steering inbox has no message files.
+  - I added one paused line to the status file.
+  - I made no edits and no commits. I started no services.
+
+  You do not need to do anything now.
+
+✻ Churned for 15s · done 1:04 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 6% 64k/1.0M fm/labaa23d5ccd7f2-worker vern:79a904d6
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent

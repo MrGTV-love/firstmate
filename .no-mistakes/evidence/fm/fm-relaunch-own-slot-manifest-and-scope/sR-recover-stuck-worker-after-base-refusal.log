@@ -1,0 +1,24 @@
+== Recovery of the stuck worker: lab bin/ restored to the change (5497d1084caf2adfbde381c6602d97c604840e8c); the worker has no running agent
+lab bin/ at 5497d1084caf2adfbde381c6602d97c604840e8c
+pane command: zsh
+slot_manifest=/Users/charlesabrooker/tmp/fmlab.u3n33b/home/projects/vern/.git/vernant-worktree-lifecycle/15d5d719c3d31c1e.json
+slot_base_sha=cf4c307c00a5ae0ef0c6e1c12248bfcbbad6a709
+slot_owned_path=src
+  drift: uncertain,ignored .claude/settings.local.json.fm-kept.1795503130.0
+  drift: proven,reverted-to-base README.md
+  drift: proven,reverted-to-base docs/notes.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for labaa23d5ccd7f2-worker: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched labaa23d5ccd7f2-worker harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-labaa23d5ccd7f2-worker worktree=/Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern
+manifest inventory: IDENTICAL
+provisioner runs: 0
+(lab: dismissed the graft MCP dialog with its default)
+claude now: 52937 43806 Tue Nov 24 01:03:42 2026     claude
+-- worker pane:
+✻ Churned for 15s · done 1:04 AM
+                                                                                                                      tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+❯ 
+  Sonnet 5.5 ░░░░░░░░░░ 6% 64k/1.0M fm/labaa23d5ccd7f2-worker vern:79a904d6
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent

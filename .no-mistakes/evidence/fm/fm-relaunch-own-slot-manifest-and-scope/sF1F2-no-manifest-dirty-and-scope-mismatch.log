@@ -1,0 +1,35 @@
+== Scenario F: no-manifest route (lab input: slot_manifest and slot_base_sha removed from the record; scope src kept)
+branch=fm/labaa23d5ccd7f2-worker
+slot_owned_path=src
+-- copy: committed out-of-scope docs/notes.txt; uncommitted README.md
+ M README.md
+
+== F1: dirty tree
+error: slot provisioning refused: dirty_worktree; preserve and reconcile the scratch state before retrying
+relaunch drift report for labaa23d5ccd7f2-worker: 3 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored .claude/settings.local.json.fm-kept.1795503130.0
+  drift: proven README.md
+  drift: proven docs/notes.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+error: refused relaunch of governed task labaa23d5ccd7f2-worker: its assigned copy /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+rc=1
+agent before/after: 43177/43177 - same live agent, not stopped
+task record: byte-identical
+provisioner runs so far: 0
+
+== F2: clean tree, own out-of-scope commits (lab commits the README edit)
+error: slot provisioning refused: scope_mismatch: README.md, docs/notes.txt changed outside the recorded scope
+relaunch drift report for labaa23d5ccd7f2-worker: 3 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored .claude/settings.local.json.fm-kept.1795503130.0
+  drift: proven README.md
+  drift: proven docs/notes.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+error: refused relaunch of governed task labaa23d5ccd7f2-worker: its assigned copy /Users/charlesabrooker/tmp/fmlab.u3n33b/treehouse/.treehouse/vern-38ee1c/1/vern cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+rc=1
+agent before/after: 43177/43177 - same live agent, not stopped
+task record: byte-identical
+provisioner runs so far: 0
+
+-- correction (added after the run): the "agent pid" above is the pane's treehouse wrapper (pid 43177), which never changes, so "same live agent" here is NOT proof that Claude kept running. This file proves only the named refusal, the byte-identical record and 0 provisioner runs.
+
+-- note: F1/F2 ran while claude pid 84525 (started 00:57:28) was the agent; F3/F4 later read that same pid 84525 directly, so 84525 survived F1 and F2 as well.

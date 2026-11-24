@@ -1,0 +1,10 @@
+lab: /Users/charlesabrooker/tmp/fmlab.u3n33b (tear down with: bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fmlab.u3n33b)
+tree: 5497d1084caf2adfbde381c6602d97c604840e8c from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M85Z2DHW1E5DRKCR3JA3RPEP
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 66489 in /Users/charlesabrooker/tmp/fmlab.u3n33b/home
+fail probe: no LABREADY-aa23d5ccd7f2 reply in window main (model refused, turn still running, or a dialog is open)
+ok trust: /Users/charlesabrooker/tmp/fmlab.u3n33b/home is trusted in the Claude store
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+not ready after 600s; the lab is left up for inspection: bin/fm-live-lab.sh pane /Users/charlesabrooker/tmp/fmlab.u3n33b, then bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fmlab.u3n33b

@@ -1,0 +1,7 @@
+local-only source: local=main@ab3eb2d640237132f1e185cb0230a1f7030531e1 origin=main@ab3eb2d640237132f1e185cb0230a1f7030531e1 selected=origin/main@ab3eb2d640237132f1e185cb0230a1f7030531e1
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fmlab.hCy8PZ/home/projects/vern/.git/vernant-worktree-lifecycle/6a55a9d8b310caf6.json", "worktree_path": "/Users/charlesabrooker/tmp/fmlab.hCy8PZ/treehouse/.treehouse/vern-07e097/1/vern", "owner_id": "lab11e8f062173c-worker", "branch": "fm/lab11e8f062173c-worker", "base_sha": "ab3eb2d640237132f1e185cb0230a1f7030531e1", "owned_paths": ["src"], "lifecycle_state": "worktree_active", "repo_root": "/Users/charlesabrooker/tmp/fmlab.hCy8PZ/home/projects/vern"}
+skill selection for lab11e8f062173c-worker: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned lab11e8f062173c-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab11e8f062173c-worker worktree=/Users/charlesabrooker/tmp/fmlab.hCy8PZ/treehouse/.treehouse/vern-07e097/1/vern
