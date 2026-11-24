@@ -1339,9 +1339,9 @@ test_proven_capability_does_not_relax_other_refusals() {
     esac
     install_capability_treehouse proven
     assert_retained_refusal "$name" "contains task holder's current copy"
-    # An unleased slot's own currency check may read pool-dir or status; the
-    # other two shapes never reach a pool command.
-    [ "$shape" = unleased ] || [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$shape: the guard ran a pool command"
+    # The guard never runs status, lease or get to judge a candidate, proven or not;
+    # an unleased slot's currency check reads pool-dir at most.
+    [ ! -e "$CASE_DIR/treehouse-forbidden" ] || fail "$shape: the guard ran a pool command"
   done
   pass "a proven capability relaxes only the recovered lease: unleased, missing, and unreadable entries still refuse"
 }

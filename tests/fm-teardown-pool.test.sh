@@ -4994,6 +4994,13 @@ test_unclaimed_release_retry_after_return_leaves_a_successor_alone() {
         rc=0
         out=$(unc_run_teardown "$case_dir") || rc=$?
         [ "$rc" -ne 0 ] || fail "$provider $history $mode: teardown reported success with a successor on the slot"$'\n'"$out"
+        if [ "$mode" = successor-takes ]; then
+          assert_contains "$out" "$UNC_A, which encloses task task-x1's nested copy and carries no slot claim, was returned: the provider accepted the exact conditional return and the return-pending marker records it" \
+            "$provider $history $mode: the readback refusal does not say the slot was returned"
+          assert_contains "$out" "a plain re-run of this teardown retires the record without touching the slot" \
+            "$provider $history $mode: the readback refusal does not name the plain re-run"
+          ! grep -F "was not returned" <<<"$out" >/dev/null || fail "$provider $history $mode: the refusal says a returned slot was not returned"$'\n'"$out"
+        fi
         assert_present "$case_dir/state/task-x1.meta" "$provider $history $mode: the record was retired before the readback held"
         assert_present "$marker" "$provider $history $mode: the return-pending marker was dropped"
         [ ! -e "$UNC_NESTED" ] || fail "$provider $history $mode: the task's own nested copy survived its cleanup"

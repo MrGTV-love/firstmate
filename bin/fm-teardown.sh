@@ -5393,9 +5393,13 @@ teardown_unclaimed_retire_gate() {
 
 # Run one phase; the only place the route reports a refusal.
 teardown_unclaimed_step() {  # prove | release
+  local outcome
   TEARDOWN_UNCLAIMED_WHY=
   "teardown_unclaimed_slot_$1" && return 0
-  echo "REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, was not returned${TEARDOWN_UNCLAIMED_WHY:+: $TEARDOWN_UNCLAIMED_WHY}; nothing in it was reset or moved by this route, and task $ID's record and return-pending marker are kept for a retry." >&2
+  outcome="was not returned${TEARDOWN_UNCLAIMED_WHY:+: $TEARDOWN_UNCLAIMED_WHY}; nothing in it was reset or moved by this route"
+  [ -z "$TEARDOWN_UNCLAIMED_RETURNED" ] \
+    || outcome="was returned: the provider accepted the exact conditional return and the return-pending marker records it, but ${TEARDOWN_UNCLAIMED_WHY:-a later step failed}; a plain re-run of this teardown retires the record without touching the slot"
+  echo "REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, $outcome, and task $ID's record and return-pending marker are kept for a retry." >&2
   return 1
 }
 
