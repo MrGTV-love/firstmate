@@ -152,6 +152,22 @@ That record is short-lived and is not an archive: the merge poll in `bin/fm-watc
 A portable authenticated run-author evidence carrier needs a separate producer, transfer, trust and replay contract and is not provided by this relief.
 The regressions are [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh) and [`tests/fm-pr-merge.test.sh`](../tests/fm-pr-merge.test.sh).
 
+### Review carry-over across a base update
+
+The landing gate accepts an independent PASS only at the PR's live head, so taking in a newer base used to discard every read even when the PR's own change did not move.
+[`bin/fm-review-record.py`](../bin/fm-review-record.py)'s header owns the rule: when no review row names the live head, the newest review's head R carries to the live head H only if merging R into the base content H already holds (the merge base of the live forge base and H) with `git merge-tree --write-tree` gives a clean tree equal to H's tree.
+The reads at R are then judged by every existing rule, with authors derived at H; a captain-word never carries, and any read of H turns carry-over off.
+
+#### Guard harm-model reassessment
+
+The exact-head rule protects merge authority from code reaching the base that no independent different-family reader read.
+Carry-over judges that harm directly: an equal tree proves every byte H adds beyond base-branch content is a byte R added, so a merge or rebase of the base admits no unread line, and a missing object, a conflict or any difference refuses with the original head mismatch.
+A conflict resolution counts as new content even when it keeps the reviewed side, because a hand resolution is where an unread line most easily hides.
+The base content H holds is reachable from the live base branch, so it passed that branch's own landing gate.
+The residual risk is an interaction between R and newer base content that the reader never saw together; required checks at the exact live head, which `bin/fm-pr-merge.sh` still demands, are the guard for that, as they were for any two PRs reviewed separately.
+Accepted carry-overs are disclosed as the fact `review carried from <R>` in verify's text output and as `carried_from` in `--json`.
+The regressions, including a sensitivity control that removes only the tree comparison and shows the unread change then passes, are in [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh).
+
 ### Friction ledger
 
 The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev guard pre-tool refusals in the explicit owning `FM_HOME/state/friction.jsonl`.

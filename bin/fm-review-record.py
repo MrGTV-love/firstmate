@@ -100,6 +100,19 @@ narrow, but do not eliminate, that risk. See docs/configuration.md's
 'Unrecorded pipeline author families' harm-model reassessment.
 Exact-head binding, report validation, captain-word/away rules and every live
 forge/hold check remain mandatory.
+Review carry-over: when the newest review names an earlier head R, no review
+row names the live head H, and no captain-word at H applies, verify asks whether
+H adds anything no read covered. It takes P, the merge base of the live --base
+and H (base-branch content H already contains), merges R into P with
+git merge-tree --write-tree, and requires that tree to equal H's tree exactly.
+A missing object, a conflict, or any byte of difference refuses with the usual
+head mismatch plus the reason. Only then are the reads at R judged by every rule
+above (FAIL standing, coverage of every author family, known newest reader,
+--review-only triggers), with authors derived at H; a captain-word never
+carries. An accepted carry-over prints the fact 'review carried from R: ...'
+and --json adds carried_from. A merge or rebase of the base into a reviewed PR
+therefore needs no new read; see docs/configuration.md 'Review carry-over
+across a base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
 kimi, llama, and the exact native Claude names opus, sonnet, haiku, which are
@@ -470,13 +483,50 @@ def derived_authors(home, pr, head, task, base):
     return task, groups
 
 
-def verify(records, rows, head, home, pr, task, base, review_only=False, plan=False):
+CARRIED_FACT = "review carried from {head}: the live head is that reviewed change merged cleanly with its base"
+
+
+def carry_over_refusal(home, task, head, reviewed, base):
+    """None when the live head's tree is exactly the reviewed head merged with base content.
+
+    The base content is the merge base of the live forge base and the live head,
+    which is reachable from the base branch. Any extra line, conflict resolution
+    or missing object returns the reason the reviewed PASS cannot stand for head.
+    """
+    _, meta = task_metadata(home, task)
+    worktree = Path(nonempty(meta.get("worktree"), "task worktree"))
+
+    def run(*args):
+        return subprocess.run(["git", "-C", str(worktree), *args], capture_output=True, text=True,
+                              check=False, env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"})
+
+    for ref in (head, reviewed, base):
+        if run("cat-file", "-e", f"{ref}^{{commit}}").returncode:
+            return f"commit {ref} is not available in the task worktree"
+    point = run("merge-base", base, head)
+    if point.returncode or not point.stdout.strip():
+        return f"the live head {head} shares no merge base with base {base}"
+    merged = run("merge-tree", "--write-tree", "--no-messages", point.stdout.strip(), reviewed)
+    if merged.returncode:
+        return "the reviewed head does not merge cleanly with the base content the live head contains"
+    live = run("rev-parse", "--verify", f"{head}^{{tree}}")
+    if live.returncode:
+        return f"cannot read the tree of live head {head}"
+    if merged.stdout.split("\n", 1)[0].strip() != live.stdout.strip():
+        return "the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read"
+    return None
+
+
+def verify(records, rows, head, home, pr, task, base, review_only=False, plan=False, reviewed=None):
     word = records["captain-word"]
     review = records["review"]
-    at_word = not (review_only or plan) and word is not None and word["head"] == head
+    # reviewed names the head whose reads stand for the live head; it differs only
+    # when the carry-over proof below has shown the live head adds no unread change.
+    read_head = reviewed or head
+    at_word = not (review_only or plan or reviewed) and word is not None and word["head"] == head
     start = max(i for i, row in enumerate(rows) if row["kind"] == "captain-word") + 1 if at_word else 0
     fails = [i for i in range(start, len(rows)) if rows[i]["kind"] == "review"
-             and rows[i]["head"] == head and rows[i]["verdict"] == "FAIL"]
+             and rows[i]["head"] == read_head and rows[i]["verdict"] == "FAIL"]
     if at_word and not fails:
         return "captain-word", word
     if not at_word and not plan:
@@ -484,8 +534,20 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
             raise VerificationError(f"no independent review record at live head {head}; --review-only requires a PASS recorded with fm-review-record.py review, and a captain-word is not a substitute")
         if review is None:
             raise VerificationError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
-        if review["head"] != head:
-            raise VerificationError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
+        if review["head"] != read_head:
+            mismatch = f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge"
+            if reviewed or any(row["kind"] == "review" and row["head"] == head for row in rows):
+                raise VerificationError(mismatch)
+            refusal = carry_over_refusal(home, task, head, review["head"], base)
+            if refusal:
+                raise VerificationError(f"{mismatch} (no carry-over: {refusal})")
+            try:
+                basis, evidence = verify({**records, "captain-word": None}, rows, head, home, pr, task, base,
+                                         review_only, reviewed=review["head"])
+            except VerificationError as exc:
+                raise VerificationError(f"{mismatch} (no carry-over: the reads at {review['head']} do not qualify: {exc})") from exc
+            return basis, {**evidence, "carried_from": review["head"],
+                           "facts": [*evidence.get("facts", []), CARRIED_FACT.format(head=review["head"])]}
     _, derived = derived_authors(home, pr, head, task, base)
     groups = {group: list(authors) for group, authors in derived.items()}
     derived_families = {a["family"] for authors in derived.values() for a in authors}
@@ -498,7 +560,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
                  else model(a["model"], "author_groups model")} for a in authors]
 
     def passes_at_head(window):
-        return [row for row in window if row["kind"] == "review" and row["head"] == head and row["verdict"] == "PASS"]
+        return [row for row in window if row["kind"] == "review" and row["head"] == read_head and row["verdict"] == "PASS"]
 
     passes = passes_at_head(rows)
     # Typed groups can only add author constraints, never erase the derived ones.
@@ -583,7 +645,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
             missing = uncovered(group, authors, passes_at_head(rows[index + 1:]))
             if not missing:
                 continue
-            reason = (f"verdict is FAIL at live head {head} (reader {failed['reader_model']}, report {failed['report']}); "
+            reason = (f"verdict is FAIL at {'live head ' + head if read_head == head else read_head} (reader {failed['reader_model']}, report {failed['report']}); "
                       f"no later exact-head PASS covers group {group}, family {','.join(missing)}, that this FAIL read; ")
             if "unknown" in missing:
                 raise VerificationError(f"{reason}{unknown_need(group, 'later ')}, set each read's actual trigger answers and local report, then record each with: {env} {review_command(unknown_reader_placeholder(group), [group], {**groups, group: authors})}; or {captain_help}")
@@ -635,6 +697,8 @@ def verification_json(pr, head, basis, row):
             report=row["report"])
         if isinstance(row.get("report_sha256"), str) and row["report_sha256"]:
             evidence["report_sha256"] = row["report_sha256"]
+        if row.get("carried_from"):
+            evidence["carried_from"] = row["carried_from"]
     if row.get("facts"):
         evidence["facts"] = row["facts"]
     return evidence
