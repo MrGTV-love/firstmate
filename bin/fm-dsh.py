@@ -33,8 +33,8 @@ preferred-model OPERATOR_HOME prints, as deepseek/<id>, the operator's persisted
 dsh-tui /model choice in OPERATOR_HOME/.dsh-tui/model.json, and fails unless it
 is a concrete deepseek-official model.
 session-file STATE ID prints the live depth-zero session log.
-position STATE ID prints the live session log and its last durable seq as JSON,
-or nothing before the launch has a log.
+position STATE ID prints the live session log, its last durable seq and its
+committed byte offset as JSON, or nothing before the launch has a log.
 state STATE ID [--since POSITION] folds only the newest depth-zero session in
 that launch's plain JSONL store, from its newest turn/start (or the last MiB,
 whichever reaches further back), however large that turn is. Each session
@@ -47,11 +47,14 @@ data, or data that fails one of
 those checks, prints "unknown: <the failed check>". With --since, anything
 recorded at or before POSITION is history: a turn must have started beyond
 it, or the state is unknown.
-start-state STATE ID [--since POSITION] is the launch start proof: the same
-fold, except that a turn which ended in error (turn/end reason error) with
-every assistant attempt finishing in error prints "failed: <provider text>",
-and a busy turn prints "unaccepted" until it records an assistant/message, the
-step's committed response, which a rejected request never writes.
+start-state STATE ID [--since POSITION] is the launch start proof, judged on
+the FIRST turn that started beyond POSITION (a later turn never stands in for
+it). It prints "failed: <provider text>" (or "failed" with no text) when that
+turn ended with turn/end reason error, whatever its attempts were;
+"ended-unaccepted: <reason>" when it ended any other way without an
+assistant/message, the step's committed response that a rejected request
+never writes; "idle" when it ended after one; and "busy" or "unaccepted" while
+it runs with or without one.
 route MODEL [PROVIDER] prints the default model-family adapter. DeepSeek is
 matched as omp resolves it: provider deepseek, or a deepseek/ model prefix,
 trimmed and case-insensitive.
@@ -304,6 +307,30 @@ def last_turn_start(stream, committed):
     return 0
 
 
+def checked_events(stream, last_seq=-1):
+    # Committed events from the stream's position, each admitted by behavior:
+    # a JSON object with a type and, past the session header, a strictly
+    # increasing integer seq. An incomplete final append is not yet committed.
+    for line in stream:
+        if not line.endswith(b"\n"):
+            break
+        try:
+            event = json.loads(line)
+        except ValueError:
+            raise ValueError(f"dsh session log has an unparseable event after seq {last_seq}") from None
+        if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+            raise ValueError(f"dsh session log has an event without a type after seq {last_seq}")
+        if event["type"] == "session":
+            continue
+        seq = event.get("seq")
+        if not isinstance(seq, int):
+            raise ValueError(f"dsh session log has a {event['type']} event without an integer seq after seq {last_seq}")
+        if seq <= last_seq:
+            raise ValueError(f"dsh session log has a non-monotonic sequence: seq {seq} after {last_seq}")
+        last_seq = seq
+        yield event
+
+
 def fold(path):
     with path.open("rb") as stream:
         stream.seek(0, os.SEEK_END)
@@ -315,93 +342,118 @@ def fold(path):
             stream.readline()
         result = "unknown"
         last_seq = started = -1
-        failure = attempt_error = None
-        attempt_ok = accepted = False
-        for line in stream:
-            if not line.endswith(b"\n"):
-                break  # An incomplete append is not a committed event.
-            try:
-                event = json.loads(line)
-            except ValueError:
-                raise ValueError(f"dsh session log has an unparseable event after seq {last_seq}") from None
-            if not isinstance(event, dict) or not isinstance(event.get("type"), str):
-                raise ValueError(f"dsh session log has an event without a type after seq {last_seq}")
-            if event["type"] == "session":
-                continue
-            seq = event.get("seq")
-            if not isinstance(seq, int):
-                raise ValueError(f"dsh session log has a {event['type']} event without an integer seq after seq {last_seq}")
-            if seq <= last_seq:
-                raise ValueError(f"dsh session log has a non-monotonic sequence: seq {seq} after {last_seq}")
-            last_seq = seq
-            if event.get("type") == "turn/start":
+        for event in checked_events(stream):
+            last_seq = event["seq"]
+            if event["type"] == "turn/start":
                 result = "busy"
-                started = seq
-                failure = attempt_error = None
-                attempt_ok = accepted = False
-            elif event.get("type") == "assistant/message":
-                # A step's committed response: the provider accepted the
-                # request. A rejected request writes only assistant/attempt.
-                accepted = attempt_ok = True
-            elif event.get("type") == "assistant/attempt":
-                for kind, message in attempt_finishes(event):
-                    if kind == "error":
-                        attempt_error = message
-                    else:
-                        attempt_ok = True
-            elif event.get("type") == "turn/end":
+                started = last_seq
+            elif event["type"] == "turn/end":
                 result = "idle"
-                reason = (event.get("data") or {}).get("reason") or {}
-                if isinstance(reason, dict) and reason.get("kind") == "error" \
-                        and attempt_error is not None and not attempt_ok:
-                    error = reason.get("error") if isinstance(reason.get("error"), dict) else {}
-                    failure = error.get("message") or attempt_error
-        return result, last_seq, started, failure, accepted
-
-
-def attempt_finishes(event):
-    # Each finish chunk of an assistant attempt, as (reason kind, failure text).
-    stream = (event.get("data") or {}).get("stream")
-    for item in stream if isinstance(stream, list) else []:
-        chunk = item.get("chunk") if isinstance(item, dict) else None
-        if not isinstance(chunk, dict) or chunk.get("type") != "finish":
-            continue
-        reason = chunk.get("reason") if isinstance(chunk.get("reason"), dict) else {}
-        failure = reason.get("failure") if isinstance(reason.get("failure"), dict) else {}
-        yield reason.get("kind"), failure.get("message") or ""
+        return result, last_seq, started
 
 
 def turn_state(state, task, since=None):
     path = live_log(state, task)
     if path is None:
         raise ValueError("no depth-zero dsh session log yet")
-    result, _, started, failure, accepted = fold(path)
+    result, _, started = fold(path)
     if result == "unknown":
         raise ValueError("dsh session log has no turn/start or turn/end yet")
     if since is not None and started <= (since[1] if since[0] == str(path) else -1):
         raise ValueError("no turn started beyond the launch position")
-    return result, failure, accepted
+    return result
+
+
+def attempt_errors(event):
+    # The failure text of each error finish chunk of an assistant attempt.
+    stream = (event.get("data") or {}).get("stream")
+    for item in stream if isinstance(stream, list) else []:
+        chunk = item.get("chunk") if isinstance(item, dict) else None
+        if not isinstance(chunk, dict) or chunk.get("type") != "finish":
+            continue
+        reason = chunk.get("reason") if isinstance(chunk.get("reason"), dict) else {}
+        if reason.get("kind") == "error":
+            failure = reason.get("failure") if isinstance(reason.get("failure"), dict) else {}
+            yield failure.get("message") or ""
+
+
+def first_turn(path, since):
+    # The first turn that started beyond the launch position SINCE
+    # ([log, seq] or [log, seq, byte offset]); the whole log when SINCE names
+    # another log or none. Returns None before that turn starts, else
+    # (ended, end reason kind, provider error text, accepted), where accepted
+    # means the turn recorded an assistant/message, a step's committed
+    # response, which a rejected request never writes.
+    floor, offset = -1, 0
+    if since is not None and since[0] == str(path):
+        floor = since[1]
+        if len(since) > 2 and isinstance(since[2], int) and since[2] >= 0:
+            offset = since[2]
+    with path.open("rb") as stream:
+        stream.seek(0, os.SEEK_END)
+        if offset > stream.tell():
+            raise ValueError("dsh session log is shorter than the launch position")
+        stream.seek(offset)
+        if offset:
+            stream.seek(offset - 1)
+            if stream.read(1) != b"\n":
+                raise ValueError("the launch position is not an event boundary")
+        started = accepted = False
+        attempt_error = ""
+        for event in checked_events(stream):
+            if event["seq"] <= floor:
+                continue
+            kind = event["type"]
+            if not started:
+                started = kind == "turn/start"
+                continue
+            if kind == "turn/start":
+                # A turn/start before this turn's end still ends this turn.
+                return True, "superseded", "", accepted
+            if kind == "assistant/message":
+                accepted = True
+            elif kind == "assistant/attempt":
+                for message in attempt_errors(event):
+                    attempt_error = message or attempt_error
+            elif kind == "turn/end":
+                reason = (event.get("data") or {}).get("reason")
+                reason = reason if isinstance(reason, dict) else {}
+                error = reason.get("error") if isinstance(reason.get("error"), dict) else {}
+                text = error.get("message") or reason.get("message") or attempt_error
+                return True, str(reason.get("kind") or "unspecified"), str(text or ""), accepted
+        return (False, "", "", accepted) if started else None
 
 
 def start_state(state, task, since=None):
-    # The launch's start proof for the newest turn beyond the launch position:
-    # failed when it ended in error with no attempt that finished any other
-    # way (the provider's text kept, on one line); idle once it ended
-    # otherwise; busy only once the provider accepted the request (an
-    # assistant/message); unaccepted while busy without one.
-    result, failure, accepted = turn_state(state, task, since)
-    if result == "idle" and failure is not None:
-        return "failed: " + (" ".join(str(failure).split("\n")).strip() or "the turn ended in error with no provider text")
-    if result == "busy" and not accepted:
-        return "unaccepted"
-    return result
+    # The launch's start proof, judged on the first turn beyond the launch
+    # position, never a later one:
+    #   failed: <text> | failed   it ended with reason error, whatever its attempts
+    #   ended-unaccepted: <kind>  it ended any other way without an assistant/message
+    #   idle                      it ended after the provider accepted it
+    #   busy | unaccepted         it is running, with or without that acceptance
+    path = live_log(state, task)
+    if path is None:
+        raise ValueError("no depth-zero dsh session log yet")
+    turn = first_turn(path, since)
+    if turn is None:
+        raise ValueError("no turn started beyond the launch position")
+    ended, kind, text, accepted = turn
+    if ended and kind == "error":
+        text = " ".join(text.split())
+        return f"failed: {text}" if text else "failed"
+    if ended:
+        return "idle" if accepted else f"ended-unaccepted: {kind}"
+    return "busy" if accepted else "unaccepted"
 
 
 def position(state, task):
     path = live_log(state, task)
     if path is None:
         return None
-    return [str(path), fold(path)[1]]
+    with path.open("rb") as stream:
+        stream.seek(0, os.SEEK_END)
+        offset = committed_size(stream, stream.tell())
+    return [str(path), fold(path)[1], offset]
 
 
 def resume(args, primary_root=None):
@@ -554,7 +606,7 @@ def main():
             try:
                 since = json.loads(args.since) if args.since else None
                 if args.command == "state":
-                    print(turn_state(args.state, args.task, since)[0])
+                    print(turn_state(args.state, args.task, since))
                 else:
                     print(start_state(args.state, args.task, since))
             except KeyError as error:

@@ -1930,10 +1930,12 @@ _fm_composer_dsh_effort_cell() {  # <cell> <configured-or-empty>
 # _fm_composer_row_is_dsh_fresh_status: 0 when the trimmed row is the launch's
 # own pre-usage status row: its model, an effort cell, and its cwd basename,
 # joined by ` · `. A configured effort requires the effort cell; with none the
-# cell may be absent. The identity comes only from the caller's caps, held in
-# the classifier entry point's local _fm_composer_dsh_expect.
+# cell may be absent. The cwd is compared literally, as dsh-tui renders the
+# basename (spaces, Unicode and middle dots included), whole or cut by `…`.
+# The identity comes only from the caller's caps, held in the classifier entry
+# point's local _fm_composer_dsh_expect.
 _fm_composer_row_is_dsh_fresh_status() {  # <trimmed-row>
-  local rest=$1 cell cells=() model effort cwd label known=0
+  local row=$1 rest model effort cwd label known=0 head tail cell2 cwd_cell
   [ -n "${_fm_composer_dsh_expect:-}" ] || return 1
   # Split by hand: tab is IFS whitespace, so `read` would collapse an empty
   # effort field into the cwd.
@@ -1942,30 +1944,47 @@ _fm_composer_row_is_dsh_fresh_status() {  # <trimmed-row>
   rest=${_fm_composer_dsh_expect#*$'\t'}
   effort=${rest%%$'\t'*}
   cwd=${rest#*$'\t'}
-  rest=$1
   [[ $model =~ ^[A-Za-z0-9][A-Za-z0-9._:+-]*$ ]] || return 1
-  [[ $cwd =~ ^[A-Za-z0-9._@+-]+$ ]] || return 1
+  case "$cwd" in '' | *$'\t'* | *$'\n'*) return 1 ;; esac
+  fm_composer_normalize_trim_var cwd
+  [ -n "$cwd" ] || return 1
   if [ -n "$effort" ]; then
     for label in $FM_COMPOSER_DSH_EFFORT_LABELS; do [ "$label" != "$effort" ] || known=1; done
     [ "$known" = 1 ] || return 1
   fi
-  while :; do
-    case "$rest" in
-      *' · '*) cell=${rest%% · *}; rest=${rest#* · } ;;
-      *) cell=$rest; rest= ;;
-    esac
-    fm_composer_normalize_trim_var cell
-    case "$cell" in '' | *'·'*) return 1 ;; esac
-    cells+=("$cell")
-    [ -n "$rest" ] || break
-  done
-  _fm_composer_dsh_cell_is "${cells[0]}" "$model" || return 1
-  _fm_composer_dsh_cell_is "${cells[${#cells[@]}-1]}" "$cwd" || return 1
-  case "${#cells[@]}" in
-    3) _fm_composer_dsh_effort_cell "${cells[1]}" "$effort" ;;
-    2) [ -z "$effort" ] ;;
-    *) return 1 ;;
-  esac
+  case "$row" in *' · '*) ;; *) return 1 ;; esac
+  head=${row%% · *}
+  tail=${row#* · }
+  fm_composer_normalize_trim_var head
+  case "$head" in '' | *'·'*) return 1 ;; esac
+  _fm_composer_dsh_cell_is "$head" "$model" || return 1
+  # Without a configured effort the rest may be the cwd alone.
+  cwd_cell=$tail
+  fm_composer_normalize_trim_var cwd_cell
+  if [ -z "$effort" ] && _fm_composer_dsh_cwd_cell_is "$cwd_cell" "$cwd"; then
+    return 0
+  fi
+  case "$tail" in *' · '*) ;; *) return 1 ;; esac
+  cell2=${tail%% · *}
+  cwd_cell=${tail#* · }
+  fm_composer_normalize_trim_var cell2
+  fm_composer_normalize_trim_var cwd_cell
+  case "$cell2" in '' | *'·'*) return 1 ;; esac
+  _fm_composer_dsh_effort_cell "$cell2" "$effort" || return 1
+  _fm_composer_dsh_cwd_cell_is "$cwd_cell" "$cwd"
+}
+
+# _fm_composer_dsh_cwd_cell_is: 0 when the rendered cwd cell is exactly the
+# bound basename, or a non-empty prefix of it ending in dsh's `…`.
+_fm_composer_dsh_cwd_cell_is() {  # <cell> <basename>
+  local cell=$1 cwd=$2 stem
+  [ "$cell" = "$cwd" ] && return 0
+  stem=${cell%…}
+  [ "$stem" != "$cell" ] || return 1
+  fm_composer_normalize_trim_var stem
+  [ -n "$stem" ] && [ "$stem" != "$cwd" ] || return 1
+  case "$cwd" in "$stem"?*) return 0 ;; esac
+  return 1
 }
 
 # _fm_composer_dsh_fresh_tail: 0 when every row below dsh's pre-usage status
@@ -2578,13 +2597,23 @@ _fm_composer_select_cursorless() {
         break
       done
     fi
-    raw=$(_fm_composer_screen_row "$next" "$plain")
-    trimmed=$raw
-    fm_composer_normalize_trim_var trimmed
-    if [ -n "$trimmed" ] && ! fm_composer_row_has_edge "$trimmed"; then
-      FM_COMPOSER_SELECTED_KIND=
-      return 1
-    fi
+    # The first row past the envelope's furniture must be blank or an edge.
+    # A dsh box is held to its whole screen: every real dsh-tui capture leaves
+    # only blank rows below its furniture, so any other text further down,
+    # even after blank rows, is a lower live surface (a shell under a stale
+    # frame). Other harnesses keep the first-row rule, because some draw a
+    # legitimate footer after a blank row (Grok's `Shift+Tab:mode` hints).
+    _fm_composer_rows_load "$plain"
+    while [ "$next" -lt "${#_FM_COMPOSER_ROWS[@]}" ]; do
+      trimmed=${_FM_COMPOSER_ROWS[$next]}
+      fm_composer_normalize_trim_var trimmed
+      if [ -n "$trimmed" ] && ! fm_composer_row_has_edge "$trimmed"; then
+        FM_COMPOSER_SELECTED_KIND=
+        return 1
+      fi
+      [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_DSH" = 1 ] || break
+      next=$((next + 1))
+    done
   fi
   [ -n "$FM_COMPOSER_SELECTED_KIND" ]
 }

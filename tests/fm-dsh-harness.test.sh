@@ -108,7 +108,8 @@ assert call('session-file',state,'task') == str(log)
 # A resumed launch already holds the earlier conversation, so the start proof
 # is a turn that began beyond the position taken before launch.
 where = call('position',state,'task')
-assert json.loads(where) == [str(log), 2]
+assert json.loads(where)[:2] == [str(log), 2]
+assert json.loads(where)[2] == log.stat().st_size, 'the position carries the committed byte offset'
 unknown(state,'task','--since',where, check='no turn started beyond the launch position')
 put([start,end,{'type':'turn/start','seq':3}])
 assert call('state',state,'task','--since',where) == 'busy'
@@ -145,11 +146,11 @@ second = {'type':'turn/start','seq':3}
 body = [{'type':'tool','seq':4 + n,'payload':big} for n in range(4)]
 put([start,end,second,*body])
 assert call('state',state,'task') == 'busy', 'an oversized turn is still busy'
-assert json.loads(call('position',state,'task')) == [str(log), 7]
+assert json.loads(call('position',state,'task'))[:2] == [str(log), 7]
 assert call('state',state,'task','--since',where) == 'busy', 'an oversized new turn passes the start proof'
 put([start,end,second,*body], '{"type":"tool","seq":8,"payload":"' + big * 2)
 assert call('state',state,'task') == 'busy', 'an oversized incomplete append is not committed'
-assert json.loads(call('position',state,'task')) == [str(log), 7]
+assert json.loads(call('position',state,'task'))[:2] == [str(log), 7]
 put([start,end,second,*body,{'type':'turn/end','seq':8}])
 assert call('state',state,'task') == 'idle'
 assert call('state',state,'task','--since',where) == 'idle'
@@ -174,10 +175,10 @@ assert call('state',state,'task') == 'busy', 'a well-formed newer log generation
 assert call('session-file',state,'task') == str(v5)
 v5.write_text(v5.read_text()+json.dumps({'type':'turn/end','seq':2,'data':{'turn':1}})+'\n')
 assert call('state',state,'task') == 'idle'
-assert json.loads(call('position',state,'task')) == [str(v5), 2]
+assert json.loads(call('position',state,'task'))[:2] == [str(v5), 2]
 for torn in ('', '{"type":"session","version":5,"id":"'):
     v5.write_text(torn)
-    assert json.loads(call('position',state,'task')) == [str(log), 2], 'an uncommitted newer header must leave the older log live'
+    assert json.loads(call('position',state,'task'))[:2] == [str(log), 2], 'an uncommitted newer header must leave the older log live'
     assert call('state',state,'task') == 'idle', 'an uncommitted newer header must not hide the older log'
 v5.write_text(json.dumps({'type':'snapshot','version':5})+'\n')
 unknown(state,'task', check='does not open with a session header')
@@ -435,57 +436,72 @@ printf 'ok - dsh frame proves empty, typed draft, and busy-hint furniture; incom
 # starts below the banner rows that carry home paths. The configured effort was
 # `xhigh` (that route renders `high`) or none (dsh still rendered `high`).
 dsh_fx() { cat "$ROOT/tests/fixtures/dsh-tui-0.16.1-$1.ansi"; }
-# The start proof reads the first turn's outcome: a real launch's turn-error log
-# fails with the provider's text, its opening events are busy, and a synthetic
-# copy with only the two finish reasons changed is idle. The busy classifier's
-# own `state` still reads a finished error turn as idle.
-dsh_start_log() {  # <events-file> -> prints start-state and state for it
-  local dir=$TMP/start-$RANDOM
+# The start proof judges the FIRST turn beyond the launch position. The real
+# launch's turn-error log fails with the provider's text; a real accepted first
+# step (trimmed to event types, seq, time and its assistant/message usage and
+# finish) is busy; the completed log is that step plus a synthetic step/end and
+# completed turn/end. The busy classifier's own `state` still reads the newest
+# turn and is unchanged.
+dsh_start_log() {  # <events-file> [since-json] -> prints start-state and state for it
+  local dir=$TMP/start-$RANDOM log
   mkdir -p "$dir/root/dsh/sessions/workspace/session" "$dir/state"
   printf '{"root": "%s", "cwd": "/w", "generation": "g1", "model": "m", "effort": ""}' "$dir/root" > "$dir/state/t.dsh-session"
-  { printf '{"type": "session", "version": 4, "id": "8578f75e-697c-461f-b778-227432316ca2", "cwd": "/w", "delegationDepth": 0}\n'; cat "$1"; } \
-    > "$dir/root/dsh/sessions/workspace/session/session.v4.jsonl"
-  python3 "$ROOT/bin/fm-dsh.py" start-state "$dir/state" t
+  log=$dir/root/dsh/sessions/workspace/session/session.v4.jsonl
+  { printf '{"type": "session", "version": 4, "id": "8578f75e-697c-461f-b778-227432316ca2", "cwd": "/w", "delegationDepth": 0}\n'; cat "$1"; } > "$log"
+  python3 "$ROOT/bin/fm-dsh.py" start-state "$dir/state" t ${2:+--since "${2//@LOG@/$log}"}
   python3 "$ROOT/bin/fm-dsh.py" state "$dir/state" t
 }
+dsh_start_expect() {  # <label> <want-start-state> <want-state> <events-file> [since-json]
+  local got
+  got=$(dsh_start_log "$4" "${5:-}")
+  [ "$got" = "$(printf '%s\n%s' "$2" "$3")" ] || { echo "$1: expected '$2' / '$3', got: $got" >&2; exit 1; }
+}
 dsh_turn_error="$ROOT/tests/fixtures/dsh-session-turn-error.jsonl"
-[ "$(dsh_start_log "$dsh_turn_error")" = "$(printf '%s\n%s' 'failed: The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017. (request_id: 15009da4-da63-49a1-9307-efa3a7e9675a)' idle)" ] \
-  || { echo "a turn-error first turn must fail the start proof: $(dsh_start_log "$dsh_turn_error")" >&2; exit 1; }
-# A running first turn counts as started only once the provider accepted the
-# request: the real rejected turn's opening events (up to its failed attempt)
-# are `unaccepted`, and a real accepted first step, trimmed to event types and
-# its assistant/message usage and finish, is `busy`. `state` reads both busy.
+dsh_accepted="$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl"
+dsh_completed="$ROOT/tests/fixtures/dsh-session-completed-synthetic.jsonl"
+dsh_error_text='The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017. (request_id: 15009da4-da63-49a1-9307-efa3a7e9675a)'
+dsh_start_expect 'a turn-error first turn' "failed: $dsh_error_text" idle "$dsh_turn_error"
+# A running first turn counts only once the provider accepted the request: the
+# real rejected turn's opening events (up to its failed attempt) are
+# `unaccepted`, and the real accepted step is `busy`.
 head -n 4 "$dsh_turn_error" > "$TMP/start-busy.jsonl"
-[ "$(dsh_start_log "$TMP/start-busy.jsonl")" = "$(printf 'unaccepted\nbusy')" ] \
-  || { echo "a running first turn the provider has not accepted must read unaccepted: $(dsh_start_log "$TMP/start-busy.jsonl")" >&2; exit 1; }
-[ "$(dsh_start_log "$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl")" = "$(printf 'busy\nbusy')" ] \
-  || { echo 'a running first turn with an assistant/message must read busy' >&2; exit 1; }
-# Acceptance belongs to its own turn: a later turn starts unaccepted again.
-{ cat "$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl"
-  printf '%s\n' '{"type": "turn/end", "seq": 20, "data": {"turn": 1, "reason": {"kind": "completed"}}}' \
-    '{"type": "turn/start", "seq": 21, "data": {"turn": 2}}'; } > "$TMP/start-reaccept.jsonl"
-[ "$(dsh_start_log "$TMP/start-reaccept.jsonl")" = "$(printf 'unaccepted\nbusy')" ] \
-  || { echo "an earlier turn's acceptance must not carry into a later turn" >&2; exit 1; }
-[ "$(dsh_start_log "$ROOT/tests/fixtures/dsh-session-completed-synthetic.jsonl")" = "$(printf 'idle\nidle')" ] \
-  || { echo 'a completed first turn must read idle' >&2; exit 1; }
-# Synthetic edits of the real log: an earlier attempt that finished normally,
-# or an error turn/end with no assistant attempt at all, is not the rejected
-# first turn the start proof refuses.
-{ head -n 2 "$dsh_turn_error"
-  printf '%s\n' '{"type": "assistant/attempt", "seq": 15, "data": {"turn": 1, "step": 1, "stream": [{"type": "chunk", "chunk": {"type": "finish", "reason": {"kind": "completed"}}}]}}'
-  tail -n 3 "$dsh_turn_error"; } > "$TMP/start-mixed.jsonl"
-[ "$(dsh_start_log "$TMP/start-mixed.jsonl")" = "$(printf 'idle\nidle')" ] \
-  || { echo 'a turn with a successful attempt must not fail the start proof' >&2; exit 1; }
+dsh_start_expect 'a running first turn the provider has not accepted' unaccepted busy "$TMP/start-busy.jsonl"
+dsh_start_expect 'a running first turn with an assistant/message' busy busy "$dsh_accepted"
+dsh_start_expect 'a completed first turn after an assistant/message' idle idle "$dsh_completed"
+# Any turn/end with reason error fails the first turn, whatever its attempts:
+# with no assistant/attempt at all, or after the provider already answered.
 grep -v '"assistant/attempt"' "$dsh_turn_error" > "$TMP/start-no-attempt.jsonl"
-[ "$(dsh_start_log "$TMP/start-no-attempt.jsonl")" = "$(printf 'idle\nidle')" ] \
-  || { echo 'an error turn/end without an errored attempt must not fail the start proof' >&2; exit 1; }
-# Only the newest turn counts: an earlier turn's errored attempt does not
-# carry into a later turn.
+dsh_start_expect 'an error turn/end with no errored attempt' "failed: $dsh_error_text" idle "$TMP/start-no-attempt.jsonl"
+{ cat "$dsh_accepted"
+  printf '%s\n' '{"type": "turn/end", "seq": 20, "data": {"turn": 1, "reason": {"kind": "error", "error": {"message": "stream reset by peer"}}}}'; } > "$TMP/start-accepted-error.jsonl"
+dsh_start_expect 'an error turn/end after an assistant/message' 'failed: stream reset by peer' idle "$TMP/start-accepted-error.jsonl"
+{ cat "$dsh_accepted"
+  printf '%s\n' '{"type": "turn/end", "seq": 20, "data": {"turn": 1, "reason": {"kind": "error"}}}'; } > "$TMP/start-silent-error.jsonl"
+dsh_start_expect 'an error turn/end with no provider text' failed idle "$TMP/start-silent-error.jsonl"
+# A first turn that ends any other way without an assistant/message was never
+# accepted, so it cannot admit the launch.
+{ head -n 2 "$dsh_turn_error"
+  printf '%s\n' '{"type": "turn/end", "seq": 18, "data": {"turn": 1, "reason": {"kind": "aborted"}}}'; } > "$TMP/start-aborted.jsonl"
+dsh_start_expect 'an aborted first turn without acceptance' 'ended-unaccepted: aborted' idle "$TMP/start-aborted.jsonl"
+# The first turn beyond the launch position is judged, never a later one: a
+# later accepted turn cannot hide the first turn's error or its lack of
+# acceptance, while `state` follows the newest turn.
 { cat "$dsh_turn_error"
-  printf '%s\n' '{"type": "turn/start", "seq": 19, "data": {"turn": 2}}' \
-    '{"type": "turn/end", "seq": 20, "data": {"turn": 2, "reason": {"kind": "error", "error": {"message": "later"}}}}'; } > "$TMP/start-second.jsonl"
-[ "$(dsh_start_log "$TMP/start-second.jsonl")" = "$(printf 'idle\nidle')" ] \
-  || { echo "an earlier turn's errored attempt must not fail a later turn" >&2; exit 1; }
+  printf '%s\n' '{"type": "turn/start", "seq": 19, "data": {"turn": 2}}' '{"type": "assistant/message", "seq": 20, "data": {"turn": 2, "step": 1}}'; } > "$TMP/start-later-accepted.jsonl"
+dsh_start_expect 'a later accepted turn after a failed first turn' "failed: $dsh_error_text" busy "$TMP/start-later-accepted.jsonl"
+{ head -n 2 "$dsh_turn_error"
+  printf '%s\n' '{"type": "turn/start", "seq": 19, "data": {"turn": 2}}' '{"type": "assistant/message", "seq": 20, "data": {"turn": 2, "step": 1}}'; } > "$TMP/start-superseded.jsonl"
+dsh_start_expect 'a later accepted turn after an unaccepted first turn' 'ended-unaccepted: superseded' busy "$TMP/start-superseded.jsonl"
+# A launch position from an earlier conversation in the same log scopes the
+# proof to what came after it: the earlier failed turn is history, by seq alone
+# or by seq and committed byte offset.
+{ cat "$dsh_turn_error"
+  printf '%s\n' '{"type": "turn/start", "seq": 19, "data": {"turn": 2}}'; } > "$TMP/start-resumed.jsonl"
+dsh_start_expect 'a resumed launch past an earlier failed turn' unaccepted busy "$TMP/start-resumed.jsonl" '["@LOG@", 18]'
+dsh_offset=$(($(wc -c < "$dsh_turn_error") + $(printf '%s\n' '{"type": "session", "version": 4, "id": "8578f75e-697c-461f-b778-227432316ca2", "cwd": "/w", "delegationDepth": 0}' | wc -c)))
+dsh_start_expect 'a resumed launch read from its byte offset' unaccepted busy "$TMP/start-resumed.jsonl" "[\"@LOG@\", 18, $dsh_offset]"
+dsh_start_expect 'no turn yet beyond the launch position' 'unknown: no turn started beyond the launch position' \
+  idle "$dsh_turn_error" '["@LOG@", 18]'
 # fm-spawn reads the launch identity from the binding prepare recorded.
 mkdir -p "$TMP/identity"
 printf '{"root": "/r", "cwd": "/w/fm/plaindir", "generation": "g1", "model": "deepseek-v4.1-flash-1017", "effort": "xhigh"}' > "$TMP/identity/t.dsh-session"
@@ -580,7 +596,28 @@ got=$(dsh_verdict "$dsh_generic")
 if fm_composer_dsh_screen_check "$dsh_generic" "$dsh_id_plain" 2>/dev/null; then
   echo 'an empty composer without the dsh frame must fail the dsh launch check' >&2; exit 1
 fi
-dsh_refuse 'fresh dsh row under a box that is not dsh' "$dsh_id_plain" "$(printf '%s\n' "$dsh_generic" "$dsh_fresh_row")"
+# A dsh box is held to its whole screen: past its furniture, any text further
+# down, even after blank rows, is a lower live surface. This holds with no
+# launch identity (the shared classifier every consumer reads) and with one.
+for tail in 'esc to interrupt' '6.5k/1.0M 0.7%' 'deepseek-v4-fla… · hi… · cache 96.… ·  ≈$0.0010 id ·  scratch-co…  ctx 0.7% (6.5k/1.0m)'; do
+  got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" "   $tail" '' 'user@host work % echo hello')")
+  [ "$got" = unknown ] || { echo "a shell row after a blank below dsh furniture '$tail' must not be a composer, got $got" >&2; exit 1; }
+done
+got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" '' '' 'user@host work % echo hello')")
+[ "$got" = unknown ] || { echo "a shell row after blank rows below a dsh box must not be a composer, got $got" >&2; exit 1; }
+got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" '   esc to interrupt' '' '')")
+[ "$got" = empty ] || { echo "dsh furniture followed only by blank rows must stay empty, got $got" >&2; exit 1; }
+# The cwd cell is the bound basename taken literally, as dsh-tui renders it,
+# whole or cut by its `…`; another directory still refuses.
+dsh_id_spaced=$(printf 'deepseek-flash\thigh\tmy project')
+dsh_expect empty 'a cwd basename with a space' "$dsh_id_spaced" "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-flash · high · my project')"
+dsh_expect empty 'a truncated cwd basename with a space' "$dsh_id_spaced" "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-flash · high · my pro…')"
+dsh_expect empty 'a Unicode cwd basename holding a middle dot' "$(printf 'deepseek-flash\thigh\tprojé · 日本')" \
+  "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-flash · high · projé · 日本')"
+dsh_expect empty 'a two-cell row with a spaced cwd and no effort' "$(printf 'deepseek-flash\t\tmy project')" \
+  "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-flash · my project')"
+dsh_refuse 'another directory than the spaced cwd' "$dsh_id_spaced" "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-flash · high · my projects')"
+dsh_refuse 'a truncation that is not a prefix of the cwd' "$dsh_id_spaced" "$(printf '%s\n' "$dsh_fresh_box" '   deepseek-flash · high · other…')"
 printf 'ok - real fresh and launch dsh-tui screens prove empty or typed draft through the launch-identity status row, which is accepted only as flush last furniture\n'
 # shellcheck source=bin/fm-control-lib.sh
 . "$ROOT/bin/fm-control-lib.sh"

@@ -414,9 +414,34 @@ SH
   chmod +x "$1/dsh-tui" "$1/dsh"
 }
 
+# The spawn admits a screen only while this launch's own dsh-tui launcher is
+# alive: a process shaped like `node .../dsh-tui --patch <launch patch>`. The
+# fake is the real Python interpreter reached through a symlink named `node`,
+# running a script named `dsh-tui` that sleeps, so ps shows that exact argv.
+FAKE_DSH_DIR=$TMP_ROOT/fake-dsh
+FAKE_DSH_PIDS=$TMP_ROOT/fake-dsh.pids
+mkdir -p "$FAKE_DSH_DIR"
+ln -s "$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))')" "$FAKE_DSH_DIR/node"
+printf 'import sys, time\ntime.sleep(float(sys.argv[-1]))\n' > "$FAKE_DSH_DIR/dsh-tui"
+: > "$FAKE_DSH_PIDS"
+export FAKE_DSH_DIR FAKE_DSH_PIDS
+start_fake_dsh() {  # <launch-patch>
+  "$FAKE_DSH_DIR/node" "$FAKE_DSH_DIR/dsh-tui" --patch "$1" 60 >/dev/null 2>&1 &
+  printf '%s\n' "$!" >> "$FAKE_DSH_PIDS"
+}
+stop_fake_dsh() {
+  local pid
+  while IFS= read -r pid; do
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null
+  done < "$FAKE_DSH_PIDS"
+  : > "$FAKE_DSH_PIDS"
+}
+trap 'stop_fake_dsh; fm_test_cleanup' EXIT
+
 # A session-log writer standing in for the TUI: once the launch command has been
 # sent it records the opening turn in the bound launch store, which is the
-# start proof the spawn waits for.
+# start proof the spawn waits for, and starts the fake launcher for that
+# launch's patch unless FM_FAKE_DSH_DEAD is set.
 cat > "$TMP_ROOT/dsh-session-writer.py" <<'PY'
 import json
 import os
@@ -435,6 +460,13 @@ while time.time() < deadline:
 else:
     sys.exit(1)
 bound = json.loads(binding.read_text())
+if not os.environ.get("FM_FAKE_DSH_DEAD"):
+    import subprocess
+    fake = Path(os.environ["FAKE_DSH_DIR"])
+    child = subprocess.Popen([str(fake / "node"), str(fake / "dsh-tui"), "--patch", str(Path(bound["root"]) / "launch.yml"), "60"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    with open(os.environ["FAKE_DSH_PIDS"], "a") as pids:
+        pids.write(f"{child.pid}\n")
 store = Path(bound["root"]) / "dsh" / "sessions" / "workspace" / "session"
 store.mkdir(parents=True, exist_ok=True)
 header = {"type": "session", "version": 4, "id": str(uuid.uuid4()), "cwd": bound["cwd"], "delegationDepth": 0}
@@ -443,12 +475,21 @@ events = Path(os.environ["FM_FAKE_DSH_EVENTS"]).read_text() if os.environ.get("F
     else json.dumps({"type": "turn/start", "seq": 1}) + "\n" + json.dumps({"type": "assistant/message", "seq": 2}) + "\n"
 log = store / "session.v4.jsonl"
 log.write_text(json.dumps(header) + "\n" + events)
-# FM_FAKE_DSH_LATER is appended after FM_FAKE_DSH_LATER_DELAY seconds, so the
-# spawn first reads the earlier events alone.
+# FM_FAKE_DSH_LATER is appended only once the spawn has provably polled the
+# earlier events: FM_FAKE_DSH_SYNC_LOG gains a line each time the spawn's start
+# loop sleeps between polls, and two new lines after the write mean at least one
+# poll began after it. The marker <launch>.observed-busy records that.
 if os.environ.get("FM_FAKE_DSH_LATER"):
-    time.sleep(float(os.environ.get("FM_FAKE_DSH_LATER_DELAY", "1")))
-    with log.open("a") as stream:
-        stream.write(Path(os.environ["FM_FAKE_DSH_LATER"]).read_text())
+    sync = Path(os.environ["FM_FAKE_DSH_SYNC_LOG"])
+    def polls():
+        return len(sync.read_text().splitlines()) if sync.exists() else 0
+    first = polls()
+    while time.time() < deadline and polls() < first + 2:
+        time.sleep(0.01)
+    if polls() >= first + 2:
+        Path(launch + ".observed-busy").write_text(f"{first} {polls()}\n")
+        with log.open("a") as stream:
+            stream.write(Path(os.environ["FM_FAKE_DSH_LATER"]).read_text())
 PY
 
 make_dsh_case() {  # <name> <id> [crew-harness]
@@ -481,11 +522,12 @@ run_dsh_spawn() {  # <id> <spawn-args...>
   shift
   python3 "$TMP_ROOT/dsh-session-writer.py" "$HOME_DIR/state" "$id" "$LAUNCH_LOG" &
   writer=$!
-  out=$(DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="${FM_FAKE_CAPTURE_FILE:-$CASE_DIR/screen}" \
-    fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" "$@")
+  out=$(DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=${FM_DSH_START_POLL_INTERVAL:-0.05} FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="${FM_FAKE_CAPTURE_FILE:-$CASE_DIR/screen}" \
+    fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "${DSH_EXTRA_BIN:+$DSH_EXTRA_BIN:}$FAKEBIN_DIR" "$id" "$PROJ_DIR" "$@")
   status=$?
   kill "$writer" 2>/dev/null
   wait "$writer" 2>/dev/null
+  stop_fake_dsh
   printf '%s' "$out"
   return "$status"
 }
@@ -666,6 +708,7 @@ mirror_spawn() {  # <dsh-home> <id> -> spawn output
   status=$?
   kill "$writer" 2>/dev/null
   wait "$writer" 2>/dev/null
+  stop_fake_dsh
   printf '%s' "$out"
   return "$status"
 }
@@ -712,6 +755,7 @@ secondmate_spawn() {  # <id> [spawn-args...] -> spawn output
   status=$?
   kill "$writer" 2>/dev/null
   wait "$writer" 2>/dev/null
+  stop_fake_dsh
   printf '%s' "$out"
   return "$status"
 }
@@ -787,6 +831,7 @@ with open(log, "a") as stream:
                  + json.dumps({"type": "assistant/message", "seq": seq + 2}) + "\n")
 PY
     writer=$!
+    start_fake_dsh "$generation/launch.yml"
     # shellcheck disable=SC2086 # each case is a deliberate word list of flags
     out=$(DSH_HOME="$primary/dsh" FM_DSH_SOURCE_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux \
       FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
@@ -795,6 +840,7 @@ PY
     status=$?
     kill "$writer" 2>/dev/null
     wait "$writer" 2>/dev/null
+    stop_fake_dsh
     seq=$((seq + 3))
     expect_code 0 "$status" "a dsh secondmate relaunch '$args' must resume it: $out"
     assert_grep "model=$DSH_MODEL" "$HOME_DIR/state/$id.meta" "relaunch '$args' must keep the recorded model, not the primary's"
@@ -857,6 +903,7 @@ with open(log, "a") as stream:
                  + json.dumps({"type": "assistant/message", "seq": 5}) + "\n")
 PY
   writer=$!
+  start_fake_dsh "$generation/launch.yml"
   out=$(DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 \
     FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
     FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$HOME_DIR/state/$id.meta")" \
@@ -864,6 +911,7 @@ PY
   status=$?
   kill "$writer" 2>/dev/null
   wait "$writer" 2>/dev/null
+  stop_fake_dsh
   expect_code 0 "$status" "a ship relaunch past uncommitted subagent and newer-version headers must resume: $out"
   assert_equals "$generation" "$(jq -r .root "$binding")" "the relaunch must resume the bound generation"
   assert_equals "$(basename "$generation")" "$(ls "$HOME_DIR/state/$id.dsh")" "the relaunch must neither delete nor add a generation"
@@ -968,22 +1016,34 @@ test_unrecognized_dsh_screen_refuses_launch() {
 }
 
 # The first turn's own outcome is part of the start proof. The turn-error log
-# is a real launch's, trimmed to its turn events, replayed so the spawn first
-# reads it busy and only later reads its turn/end. The accepted log is a real
-# successful first step trimmed to event types, seq and time plus the
-# assistant/message usage and finish (content stripped). The completed log
-# changes only the turn-error log's two finish reasons (synthetic).
+# is a real launch's, trimmed to its turn events, replayed so the spawn polls it
+# busy before its turn/end lands: a `sleep` wrapper records each pause of the
+# start loop (distinguished by its interval), and the writer appends the end
+# only after two such pauses follow the write, leaving a marker the test
+# asserts. The accepted log is a real successful first step trimmed to event
+# types, seq and time plus the assistant/message usage and finish; the
+# completed log adds a synthetic step/end and completed turn/end to it.
 test_first_turn_error_refuses_launch() {
-  local id out status fixtures=$ROOT/tests/fixtures
+  local id out status fixtures=$ROOT/tests/fixtures sync_bin
   id=dsh-turn-error
   make_dsh_case turn-error "$id"
   head -n 4 "$fixtures/dsh-session-turn-error.jsonl" > "$CASE_DIR/opening.jsonl"
   tail -n 1 "$fixtures/dsh-session-turn-error.jsonl" > "$CASE_DIR/closing.jsonl"
+  sync_bin=$CASE_DIR/sync-bin
+  mkdir -p "$sync_bin"
+  cat > "$sync_bin/sleep" <<SH
+#!/bin/sh
+[ "\$1" = 0.051 ] && printf 'poll\\n' >> "$CASE_DIR/polls.log"
+exec /bin/sleep "\$@"
+SH
+  chmod +x "$sync_bin/sleep"
   # The case's default screen is a composer the check proves empty, so only
   # the acceptance rule keeps the busy window from passing.
-  out=$(FM_DSH_START_POLLS=60 FM_FAKE_DSH_EVENTS="$CASE_DIR/opening.jsonl" FM_FAKE_DSH_LATER="$CASE_DIR/closing.jsonl" \
-    FM_FAKE_DSH_LATER_DELAY=1 run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  out=$(DSH_EXTRA_BIN=$sync_bin FM_DSH_START_POLL_INTERVAL=0.051 FM_DSH_START_POLLS=600 \
+    FM_FAKE_DSH_EVENTS="$CASE_DIR/opening.jsonl" FM_FAKE_DSH_LATER="$CASE_DIR/closing.jsonl" FM_FAKE_DSH_SYNC_LOG="$CASE_DIR/polls.log" \
+    run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
   status=$?
+  [ -s "$LAUNCH_LOG.observed-busy" ] || fail "the spawn must have polled the busy, unaccepted first turn before its turn/end: $out"
   expect_code 1 "$status" "a first turn that ended in error must refuse the launch, even after it was read busy: $out"
   assert_contains "$out" 'dsh: first turn failed: The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017. (request_id: 15009da4-da63-49a1-9307-efa3a7e9675a)' \
     'the refusal must carry the provider text verbatim'
@@ -998,6 +1058,24 @@ test_first_turn_error_refuses_launch() {
   expect_code 1 "$status" "a first turn the provider never accepted must refuse the launch: $out"
   assert_contains "$out" 'dsh: first turn not accepted by the provider within 0.5s' 'the refusal must name the unaccepted turn and the window'
   assert_not_contains "$out" 'could not parse the composer frame' 'an unaccepted first turn must not be reported as an unreadable composer'
+  # A first turn that ended without acceptance refuses at once, by name.
+  id=dsh-turn-aborted
+  make_dsh_case turn-aborted "$id"
+  { head -n 2 "$fixtures/dsh-session-turn-error.jsonl"
+    printf '%s\n' '{"type": "turn/end", "seq": 18, "data": {"turn": 1, "reason": {"kind": "aborted"}}}'; } > "$CASE_DIR/aborted.jsonl"
+  out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_EVENTS="$CASE_DIR/aborted.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  status=$?
+  expect_code 1 "$status" "a first turn that ended without acceptance must refuse the launch: $out"
+  assert_contains "$out" 'dsh: first turn not accepted by the provider: it ended (aborted) without a response' 'the refusal must name the unaccepted end'
+  # A later accepted turn cannot hide the first turn's error.
+  id=dsh-turn-later
+  make_dsh_case turn-later "$id"
+  { cat "$fixtures/dsh-session-turn-error.jsonl"
+    printf '%s\n' '{"type": "turn/start", "seq": 19, "data": {"turn": 2}}' '{"type": "assistant/message", "seq": 20, "data": {"turn": 2, "step": 1}}'; } > "$CASE_DIR/later.jsonl"
+  out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_EVENTS="$CASE_DIR/later.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  status=$?
+  expect_code 1 "$status" "a later accepted turn must not hide the first turn's error: $out"
+  assert_contains "$out" 'dsh: first turn failed: The supported API model names' 'the refusal must name the first turn'
   id=dsh-turn-accepted
   make_dsh_case turn-accepted "$id"
   out=$(FM_FAKE_DSH_EVENTS="$fixtures/dsh-session-accepted-busy.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
@@ -1008,7 +1086,34 @@ test_first_turn_error_refuses_launch() {
   out=$(FM_FAKE_DSH_EVENTS="$fixtures/dsh-session-completed-synthetic.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
   status=$?
   expect_code 0 "$status" "a first turn that completed must launch: $out"
-  pass 'fm-spawn: a dsh first turn launches once the provider accepted it or it completed; an errored or never-accepted turn refuses by name'
+  pass 'fm-spawn: a dsh first turn launches once the provider accepted it; an errored, unaccepted or superseded first turn refuses by name'
+}
+
+# The pre-usage status row proves a dsh composer only while this launch's own
+# dsh-tui is alive: the same accepted log and the same screen (that row flush
+# under the frame, blank rows below, as a dead launch leaves above an empty-PS1
+# shell) launch with the launch's dsh-tui running and refuse without it.
+test_fresh_status_row_needs_the_live_launch() {
+  local id out status
+  for alive in yes no; do
+    id=dsh-fresh-$alive
+    make_dsh_case "fresh-$alive" "$id"
+    printf '%s\n' '  ╭──────────────────────────────╮' '  ⌸ ❯                          ⛶' '  ╰──────────────────────────────╯' \
+      "   ${DSH_MODEL#deepseek/} · high · $(basename "$WT_DIR")" '' '' > "$CASE_DIR/screen"
+    if [ "$alive" = yes ]; then
+      out=$(FM_FAKE_DSH_EVENTS="$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl" run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+      status=$?
+      expect_code 0 "$status" "the pre-usage row of a live launch must prove its composer: $out"
+    else
+      out=$(FM_DSH_START_POLLS=10 FM_FAKE_DSH_DEAD=1 FM_FAKE_DSH_EVENTS="$ROOT/tests/fixtures/dsh-session-accepted-busy.jsonl" \
+        run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+      status=$?
+      expect_code 1 "$status" "a frame left by a launch whose dsh-tui is gone must not prove a composer: $out"
+      assert_contains "$out" 'dsh: the launched dsh-tui process for' 'the refusal must name the missing launch process'
+      assert_contains "$out" 'is not running' 'the refusal must say the launch process is not running'
+    fi
+  done
+  pass 'fm-spawn: a dsh pre-usage status row proves the composer only while the launch dsh-tui is running'
 }
 
 test_exhausted_omp_replaces_deepseek_harness() {
@@ -1129,5 +1234,6 @@ test_deepseek_cannot_launch_on_omp
 test_omp_default_cannot_hide_a_deepseek_route
 test_unrecognized_dsh_screen_refuses_launch
 test_first_turn_error_refuses_launch
+test_fresh_status_row_needs_the_live_launch
 test_exhausted_omp_replaces_deepseek_harness
 test_live_guard_refuses_missing_lab_inputs
