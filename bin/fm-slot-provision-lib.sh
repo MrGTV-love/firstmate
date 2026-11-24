@@ -527,6 +527,13 @@ fm_slot_adopt_route() { # <meta> <relocating 0|1>
   [ "$(fm_meta_get "$1" recovery)" != slot-provision-refused ]
 }
 
+# 0 when a relaunch of <meta>'s task may run the primary clone's verified provisioner for a copy that predates it (D7):
+# every relaunch except the recovery of a first provisioning that was refused, which keeps its prior behavior (D4(c))
+# and so still requires the script in the assigned copy.
+fm_slot_primary_route_allowed() { # <meta>
+  [ "$(fm_meta_get "$1" recovery)" != slot-provision-refused ]
+}
+
 fm_slot_adopt_refuse() { # <reason> <detail>
   local changed='no manifest, scope, record or copy was changed'
   if [ "${FM_SLOT_ADOPT_WIRED:-0}" = 1 ]; then

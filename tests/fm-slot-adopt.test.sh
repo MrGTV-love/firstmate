@@ -267,6 +267,28 @@ test_a_refused_provision_leaves_no_export_directory() {
   pass "provision: a refused provision after the verified export leaves no export or bytecode directory"
 }
 
+# D4(c): the recovery of a refused first provisioning keeps its prior behavior: it never takes the primary clone's
+# provisioner for a prepared copy that lacks the script, while every other relaunch may.
+test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner() {
+  local out rc
+  make_primary recovery-route
+  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" HEAD
+  git -C "$P_DIR/copy" rm -rq scripts
+  git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'prepared copy has no provisioner'
+  printf 'kind=ship\nrecovery=slot-provision-refused\n' >"$P_DIR/recovery.meta"
+  printf 'kind=ship\n' >"$P_DIR/ordinary.meta"
+  fm_slot_primary_route_allowed "$P_DIR/ordinary.meta" || fail 'an ordinary relaunch was denied the primary provisioner route'
+  if fm_slot_primary_route_allowed "$P_DIR/recovery.meta"; then fail 'the recovery of a refused first provisioning was allowed the primary provisioner route'; fi
+  # the flag fm-spawn sets from that answer: the recovery refuses the missing copy-local script as before
+  out=$(FM_SLOT_PRIMARY_PROVISIONER=0 fm_slot_provision true "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/report.json" '' '' README.md 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "a recovery without the route was admitted: $out"
+  assert_contains "$out" 'slot provisioner is missing from assigned copy' 'the recovery did not refuse the missing copy-local script'
+  # the paired control: the route flag set for an ordinary relaunch gets past that check
+  out=$(FM_SLOT_PRIMARY_PROVISIONER=1 fm_slot_provision true "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/report.json" '' '' README.md 2>&1) || true
+  case "$out" in *'missing from assigned copy'*) fail "the ordinary route was refused for the missing script: $out" ;; esac
+  pass "provision: a refused-first-provisioning recovery refuses the missing copy-local provisioner; an ordinary relaunch takes the primary one"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
@@ -276,6 +298,7 @@ test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run
 test_a_second_adoption_refusal_says_the_wiring_and_record_were_written
 test_a_refused_provision_leaves_no_export_directory
+test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

@@ -6850,7 +6850,7 @@ spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
   [ "$rc" -le 255 ] || { echo 'error: assigned-copy provisioner completion status is out of range' >&2; return 1; }
   return "$rc"
 }
-[ "$RELAUNCH" -eq 0 ] || FM_SLOT_PRIMARY_PROVISIONER=1
+[ "$RELAUNCH" -eq 0 ] || ! fm_slot_primary_route_allowed "$RELAUNCH_META" || FM_SLOT_PRIMARY_PROVISIONER=1
 if [ "$SLOT_GOVERNED" = 1 ] && [ "$SLOT_ADOPT" = 1 ]; then
   fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
   fm_slot_drift_report "$WT" "$ID" "$BRANCH" "$FM_SLOT_BASE_SHA" "${SLOT_OWNED_PATHS[@]}"
