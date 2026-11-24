@@ -29,7 +29,13 @@ unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
 . "$ROOT/bin/fm-backend.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-spawn-git-hook-carrier)
-trap fm_test_cleanup EXIT
+# Every spawn here leaves its task temp root and launch directory in /tmp.
+carrier_cleanup() {
+  rm -rf /tmp/fm-carrier-*-"$$" /tmp/fm-carrier-*-"$$"+* 2>/dev/null || :
+  chmod -R u+w "$TMP_ROOT" 2>/dev/null || :
+  fm_test_cleanup
+}
+trap carrier_cleanup EXIT
 export FM_GUARD_EVENT_LOG="$TMP_ROOT/guard-events.jsonl"
 fm_git_identity 'Carrier Tests' 'carrier@example.invalid'
 
