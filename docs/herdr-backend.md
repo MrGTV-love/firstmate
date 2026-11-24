@@ -811,6 +811,9 @@ It uses the shared harness-process classifier in `bin/fm-agent-process-lib.sh`, 
 | A foreground holding anything else after the bounded settle window, or a shells-only foreground with a Bun descendant that may be the installed omp ([identity rule](agent-control.md)) | `live`: registration retains authority | `unknown`: registration absence does not identify the process |
 | An unreadable, malformed, or mismatched process view | `unknown` | `unknown` |
 
+A Bun descendant is positively not omp only when its raw arguments show it: argv[0] not a bun, no script argument, a script argument whose name is not `cli.ts` (relative ones included, such as `bun run dev`, `bun test`, `bun dev` or `bun x`), or an absolute `cli.ts` outside a `src` directory.
+A relative `cli.ts` or `src/cli.ts` script argument is unresolved, so that descendant keeps the pane occupied.
+
 The settle window exists because an idle shell transiently hosts prompt helpers such as starship in its foreground group.
 The first agent or shell sample in that window decides.
 

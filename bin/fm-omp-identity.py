@@ -22,8 +22,11 @@ may have changed since the process loaded it: every realpath, lstat and package.
 the marker files, and the path string the kernel reports for the executable (it follows
 a rename of any directory above the file). "Positively another program" (Foreign, and
 so `writer` exit 1, "unrelated" and "agent-free") rests only on the first kind: argv[0]
-whose basename is not bun, no script argument, or a raw argv[1] that is lexically not a
-cli.ts in a src directory. A script path resolved after launch can never prove it:
+whose basename is not bun, no script argument, a raw argv[1] whose basename is not cli.ts
+(a relative one too, such as the `run`, `test`, `dev` or `x` of `bun run dev`, `bun test`,
+`bun dev` or `bun x`), or an absolute raw argv[1] that is a cli.ts outside a src directory.
+A relative raw argv[1] named cli.ts (`cli.ts`, `src/cli.ts`) is unresolved: the raw
+arguments cannot place it. A script path resolved after launch can never prove it:
 a link retargeted after the process loaded its script changes what the path resolves to,
 not what the process loaded. The named residual is the opposite case: a process that
 loaded the entry through a link with another name (raw argv[1] `/x/foo.ts`) reads as
@@ -604,9 +607,11 @@ def decide(facts):
         raise Foreign("argv[0] is not a bun")
     if len(argv) < 2:
         raise Foreign("the runtime runs no script")
+    if os.path.basename(argv[1]) != "cli.ts":
+        raise Foreign("the script argument is not a cli.ts")
     if not os.path.isabs(argv[1]):
-        raise Unresolved("the script argument is not an absolute path")
-    if os.path.basename(argv[1]) != "cli.ts" or os.path.basename(os.path.dirname(argv[1])) != "src":
+        raise Unresolved("the script argument is a relative cli.ts, which the raw arguments cannot place")
+    if os.path.basename(os.path.dirname(argv[1])) != "src":
         raise Foreign("the script argument is not a cli.ts in a src directory")
     # From here on only Refused or Unresolved: what the files say now never proves a program foreign.
     script_real = _settled(evidence.get("script_real"), "the script path")

@@ -628,6 +628,44 @@ PY
   pass "helper failure: a crash, a TypeError or a missing python3 is may-own in the writer check and never admits an adoption"
 }
 
+test_a_relative_script_argument_is_foreign_unless_it_names_cli_ts() {
+  local t="$TMP/relative" dir="$TMP/relative/wt" here=$PWD pid out rc
+  mkdir -p "$t/fb" "$dir/src"; cp "$BUN" "$t/fb/bun"; cp "$BUN" "$t/fb/bunx"; : > "$dir/src/cli.ts"
+  # shellcheck source=bin/backends/herdr.sh
+  . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/backends/herdr.sh"
+  fm_backend_herdr_cli() {
+    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p1","shell_pid":4242,"foreground_process_group_id":4242,"foreground_processes":[{"pid":4242,"name":"zsh","argv0":"zsh","argv":["zsh"]}]}}}'
+  }
+  cat > "$t/ps" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *-axo*) printf '4242 1 zsh\n%s 4242 %s\n' "$WALK_PID" "$WALK_COMM" ;;
+  *-p*-o\ args=*) printf '%s\n' "$WALK_ARGS" ;;
+esac
+SH
+  chmod +x "$t/ps"
+  relative() { # <writer-exit> <interactive-exit> <walk> <description> -- <argv...>
+    local writer=$1 interactive=$2 state=$3 description=$4
+    shift 5
+    cd "$dir" || fail "relative: cannot enter the worktree"; spawn tty "$1" "$@"; pid=$SPAWNED; cd "$here" || fail "relative: cannot return"
+    rc=0; python3 -I "$IDENT" writer "$pid" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq "$writer" ] || fail "relative: $description: expected writer exit $writer, got $rc"
+    rc=0; python3 -I "$IDENT" interactive "$pid" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq "$interactive" ] || fail "relative: $description: expected interactive exit $interactive, got $rc"
+    out=$(FM_HERDR_PS_BIN="$t/ps" WALK_PID=$pid WALK_COMM="$1" WALK_ARGS="$*" fm_backend_herdr_pane_process_state_sample fmtest w1:p1)
+    [ "$out" = "$state" ] || fail "relative: $description: expected the walk to read $state, got $out"
+  }
+  relative 1 1 shell "bun run dev is another program" -- "$t/fb/bun" run dev
+  relative 1 1 shell "bun test is another program" -- "$t/fb/bun" test
+  relative 1 1 shell "bun dev is another program" -- "$t/fb/bun" dev
+  relative 1 1 shell "bun x is another program" -- "$t/fb/bun" x cowsay
+  relative 1 1 shell "bunx is another program" -- "$t/fb/bunx" cowsay
+  relative 0 2 other "a relative src/cli.ts cannot be placed" -- "$t/fb/bun" src/cli.ts --no-title
+  relative 0 2 other "a relative cli.ts cannot be placed" -- "$t/fb/bun" cli.ts --no-title
+  relative 1 1 shell "an absolute cli.ts outside a src directory is another program" -- "$t/fb/bun" "$dir/cli.ts"
+  pass "relative script argument: a relative argument not named cli.ts is another program, and a relative cli.ts or src/cli.ts stays unresolved"
+}
+
 # --- 7. the Herdr descendant walk ---------------------------------------------------
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free() {
   local dir="$TMP/walk" bunpid foreignpid out oldbun oldscript oldpid
@@ -938,6 +976,7 @@ test_fail_closed_runs_recover_when_the_evidence_returns
 test_record_writer_check_fails_open_and_adoption_target_fails_closed
 test_verdict_does_not_depend_on_the_omp_on_path
 test_a_helper_failure_is_never_proof_of_no_writer
+test_a_relative_script_argument_is_foreign_unless_it_names_cli_ts
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free
 test_production_ignores_fm_omp_installed_root
 test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable

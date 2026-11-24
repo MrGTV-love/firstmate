@@ -1562,6 +1562,7 @@ if [ "$VERB" = adopt ]; then
     || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"
   if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_may_own_record "$adoption_recorded_pid"; then
     echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
+    echo "adopt note: a live Bun process counts as a possible omp writer unless its raw arguments prove another program: argv[0] not a bun, no script argument, a script argument whose name is not cli.ts (bun run dev, bun test, bun dev or bun x), or an absolute cli.ts outside a src directory; a relative cli.ts or src/cli.ts script argument is unresolved, so it keeps this record" >&2
     exit 1
   fi
   # Only a positively readable unpinned process cannot run the extension's
