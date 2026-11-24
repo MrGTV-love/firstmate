@@ -1,0 +1,29 @@
+##### restart of a MANAGED mate (stand-in claude with FM_SPAWN_GEN = record spawn_gen, cwd = home), FM_SECONDMATE_PERSIST_WAIT=20; the stand-in never answers
+
+========== head (pane w2:p1, herdr status idle)
+$ FM_SECONDMATE_PERSIST_WAIT=20 bin/fm-secondmate-restart.sh labsm
+nudged: labsm: it did not confirm within 20s that its open work is written down, so its conversation was not spent
+summary: 0 of 1 restarted, 1 nudged, 0 unreached
+rc=3
+records created/changed:
+  state/labsm.inbox/001.msg
+  state/pending-replies/5f2ed0848654a670
+  state/pending-replies/d43380c9ff4d6951
+  state/labsm.inbox/002.msg
+--- pane text after head:
+charlesabrooker@Mac-Studio fm-labsm.Fs6ZcB % exec env FM_SPAWN_GEN=1795470001-labsm /Users/charlesabrooker/tmp/fm-lab.L
+PGbOO/fx/bin/claude --resume 77777777-2222-3333-4444-555555555555
+
+========== base (pane w3:p1, herdr status idle)
+$ FM_SECONDMATE_PERSIST_WAIT=20 bin/fm-secondmate-restart.sh labsm
+nudged: labsm: it did not confirm within 20s that its open work is written down, so its conversation was not spent
+summary: 0 of 1 restarted, 1 nudged, 0 unreached
+rc=3
+records created/changed:
+  state/labsm.inbox/001.msg
+  state/pending-replies/c51b12dc41606b60
+  state/pending-replies/d5b38c0d6ea601fc
+  state/labsm.inbox/002.msg
+--- pane text after base:
+charlesabrooker@Mac-Studio fm-labsm.Fs6ZcB % exec env FM_SPAWN_GEN=1795470001-labsm /Users/charlesabrooker/tmp/fm-lab.L
+PGbOO/fx/bin/claude --resume 77777777-2222-3333-4444-555555555555

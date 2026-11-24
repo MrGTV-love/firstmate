@@ -1,0 +1,7 @@
+##### host-local attribution verb (the remote restart's host check), run as a host would: FM_HOME=<seeded secondmate home>, record in state/parent-route/, same live wrapper lane
+[head] $ FM_HOME=<smh> bin/fm-remote-secondmate-control.sh attribution labsm fm-lab-attrib2-28374-12390:w1:p1
+attribution=refuse: remote secondmate labsm endpoint is recorded in Herdr session 'fm-lab-attrib2-28374-12390', expected 'fm-remote'; refusing access until it is explicitly migrated
+rc=0
+[base] $ FM_HOME=<smh> bin/fm-remote-secondmate-control.sh attribution labsm fm-lab-attrib2-28374-12390:w1:p1
+error: unknown command: attribution
+rc=1

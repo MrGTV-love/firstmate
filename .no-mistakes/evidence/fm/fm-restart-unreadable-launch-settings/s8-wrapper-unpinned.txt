@@ -1,0 +1,59 @@
+##### TeamClaude wrapper layout, unpinned (d1 shape) in real Herdr lab pane fm-lab-attrib2-28374-12390:w1:p1
+foreground: node .../teamclaude run -- --resume 6666...; child claude --resume 6666... (same pgid); no FM_SPAWN_GEN; cwd = recorded home
+
+========== head
+$ bin/fm-reboot-recover.sh recover
+REBOOT_RECOVERY: labsm: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+rc=1
+$ bin/fm-control.sh labsm interrupt
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+rc=1
+$ bin/fm-control.sh labsm exit
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+rc=1
+$ bin/fm-control.sh labsm stay
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+rc=1
+$ bin/fm-control.sh labsm relaunch --note "keep the lane"
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+rc=1
+$ FM_SECONDMATE_PERSIST_WAIT=20 bin/fm-secondmate-restart.sh labsm
+unreached: labsm: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+rc=3
+records: unchanged (no pending-reply, inbox or task-state file created or changed)
+--- pane text after head (cat -v; a sent key would show as ^[ or text):
+charlesabrooker@Mac-Studio fm-labsm.Fs6ZcB % exec env -u FM_SPAWN_GEN /opt/homebrew/bin/node /Users/charlesabrooker/tmp
+/fm-lab.LPGbOO/fx/bin/teamclaude run -- --resume 66666666-2222-3333-4444-555555555555
+
+========== base
+$ bin/fm-reboot-recover.sh recover
+REBOOT_RECOVERY: labsm: live launch settings are unreadable; no lifecycle action taken
+rc=1
+$ bin/fm-control.sh labsm interrupt
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+$ bin/fm-control.sh labsm exit
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+$ bin/fm-control.sh labsm stay
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+$ bin/fm-control.sh labsm relaunch --note "keep the lane"
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+rc=1
+$ FM_SECONDMATE_PERSIST_WAIT=20 bin/fm-secondmate-restart.sh labsm
+nudged: labsm: it did not confirm within 20s that its open work is written down, so its conversation was not spent
+summary: 0 of 1 restarted, 1 nudged, 0 unreached
+rc=3
+records CHANGED:
+0a1,2
+> 080810e4e785315f837ff92a5579410ac84a5f7d5fa2150bfa3bf870c112c0f4  state/labsm.inbox/001.msg
+> 5e0b485b2d7f90da849c9dfee0376ee2b9e64ce15fcafce49bbfb5a714081000  state/pending-replies/21433140732debcf
+1a4
+> 76d9de2ccb45814767fe87e1b2d37c3e3d04032430e73379d7034b42cb802b9c  state/pending-replies/4c2d3a4e693cd2f5
+2a6
+> efb16aabee6bb1ab7f32070a0a3d7e3d25cc150e7a608291fbd29d92cd3b0454  state/labsm.inbox/002.msg
+--- pane text after base (cat -v; a sent key would show as ^[ or text):
+charlesabrooker@Mac-Studio fm-labsm.Fs6ZcB % exec env -u FM_SPAWN_GEN /opt/homebrew/bin/node /Users/charlesabrooker/tmp
+/fm-lab.LPGbOO/fx/bin/teamclaude run -- --resume 66666666-2222-3333-4444-555555555555

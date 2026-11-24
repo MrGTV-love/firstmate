@@ -1,0 +1,8 @@
+##### HEAD: bin/fm-secondmate-restart.sh labsm  (lab secondmate, live unpinned fake claude in fm-lab-attrib-39153-21193:w4:p1)
+unreached: labsm: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+rc=3
+records: unchanged (no pending-reply, inbox or task-state file created or changed)
+### pane text after
+charlesabrooker@Mac-Studio smh % exec env -u FM_SPAWN_GEN /Users/charlesabrooker/tmp/fm-lab.shckec/fx/bin/claude --resu
+me 22222222-2222-3333-4444-555555555555

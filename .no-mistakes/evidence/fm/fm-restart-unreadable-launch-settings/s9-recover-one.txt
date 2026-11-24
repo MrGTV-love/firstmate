@@ -1,0 +1,25 @@
+##### bounded sweep notice suppression, same unpinned wrapper lane
+
+========== head
+$ bin/fm-reboot-recover.sh recover --one   (1st)
+REBOOT_RECOVERY: labsm: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+rc=1
+notice: unmanaged fm-lab-attrib2-28374-12390:w1:p1 16779 Mon Nov 23 17:49:04 2026
+cursor: labsm
+$ bin/fm-reboot-recover.sh recover --one   (2nd)
+rc=0
+$ bin/fm-reboot-recover.sh recover   (unbounded, after)
+REBOOT_RECOVERY: labsm: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labsm relaunch", or decide the lane by hand
+rc=1
+
+========== base
+$ bin/fm-reboot-recover.sh recover --one   (1st)
+REBOOT_RECOVERY: labsm: live launch settings are unreadable; no lifecycle action taken
+rc=1
+notice: launch-unreadable fm-lab-attrib2-28374-12390:w1:p1 16779 Mon Nov 23 17:49:04 2026
+cursor: labsm
+$ bin/fm-reboot-recover.sh recover --one   (2nd)
+rc=0
+$ bin/fm-reboot-recover.sh recover   (unbounded, after)
+REBOOT_RECOVERY: labsm: live launch settings are unreadable; no lifecycle action taken
+rc=1

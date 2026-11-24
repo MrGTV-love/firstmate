@@ -1,0 +1,39 @@
+NOTE: the first HEAD relaunch below refused because the pane's login shell was still running 'pyenv-rehash' (an unrelated foreground program, so the agent state read 'unreadable'); the BASE run came later, after that step ended and the pane was shell-only. That first head/base difference is a timing artifact of the lab shell, not a code difference. The last HEAD run, on the same shell-only pane, proceeds exactly like BASE (both then fail on this fixture's secondmate home being inside the lab home; s7 fixes that layout).
+
+##### HEAD: lane stopped by hand (pane wC:p1 has only its login shell), then the named next action
+{"pid":5358,"name":"sleep"}
+{"pid":94944,"name":"bash"}
+$ bin/fm-control.sh labsm relaunch --note "lab relaunch"
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+rc=1
+### record after
+window=fm-lab-attrib-39153-21193:wC:p1
+spawn_gen=1795470001-labsm
+launch_proof=env-v1
+
+### herdr agent get wC:p1
+{"code":"agent_not_found","message":"agent target wC:p1 not found"}
+### BASE same pane: bin/fm-control.sh labsm relaunch
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.shckec/base/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: secondmate home cannot be inside the active firstmate home: /Users/charlesabrooker/tmp/fm-lab.shckec/fx/smh
+error: the replacement agent for labsm could not be launched on claude
+error: labsm's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-lab.shckec/fx/smh
+rc=1
+### HEAD: bin/fm-reboot-recover.sh recover on same pane
+rc=0
+### pane text (no launch command typed)
+t overwrite existing file
+charlesabrooker@Mac-Studio smh % :
+charlesabrooker@Mac-Studio smh %
+
+### HEAD again, pane now shell-only:
+[{"pid":94401,"name":"zsh"}]
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: secondmate home cannot be inside the active firstmate home: /Users/charlesabrooker/tmp/fm-lab.shckec/fx/smh
+error: the replacement agent for labsm could not be launched on claude
+error: labsm's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-lab.shckec/fx/smh
+rc=1
+### pane text
+charlesabrooker@Mac-Studio smh % :
+charlesabrooker@Mac-Studio smh %

@@ -1,0 +1,20 @@
+##### head: fake claude with FM_SPAWN_GEN matching spawn_gen, cwd = recorded worktree, pane w3:p1
+$ bin/fm-reboot-recover.sh recover
+rc=0
+$ bin/fm-control.sh labt interrupt
+interrupt-delivered labt harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+rc=0
+### pane text after head interrupt
+/claude --resume 11111111-2222-3333-4444-555555555555
+^[
+
+##### base: fake claude with FM_SPAWN_GEN matching spawn_gen, cwd = recorded worktree, pane w3:p1
+$ bin/fm-reboot-recover.sh recover
+rc=0
+$ bin/fm-control.sh labt interrupt
+interrupt-delivered labt harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+rc=0
+### pane text after base interrupt
+/claude --resume 11111111-2222-3333-4444-555555555555
+^[^[
+

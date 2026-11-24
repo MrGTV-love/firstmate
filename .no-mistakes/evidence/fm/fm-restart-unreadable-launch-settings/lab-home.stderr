@@ -1,0 +1,6 @@
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.shckec
+export TMUX_TMPDIR=/tmp/fml.O8l6aB
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M857CG14QQD228S4C95MEE9V/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.shckec && rm -rf /Users/charlesabrooker/tmp/fm-lab.shckec
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.LPGbOO
+export TMUX_TMPDIR=/tmp/fml.zXPqLz
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M857CG14QQD228S4C95MEE9V/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.LPGbOO && rm -rf /Users/charlesabrooker/tmp/fm-lab.LPGbOO

@@ -1,0 +1,25 @@
+##### head: fake claude started with env -i (no PATH, no HOME) in pane w2:p1
+$ bin/fm-reboot-recover.sh recover
+REBOOT_RECOVERY: labt: live launch settings are unreadable; no lifecycle action taken; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+rc=1
+$ bin/fm-control.sh labt interrupt
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+rc=1
+$ bin/fm-control.sh labt exit
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+rc=1
+
+##### base: fake claude started with env -i (no PATH, no HOME) in pane w2:p1
+$ bin/fm-reboot-recover.sh recover
+REBOOT_RECOVERY: labt: live launch settings are unreadable; no lifecycle action taken
+rc=1
+$ bin/fm-control.sh labt interrupt
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+$ bin/fm-control.sh labt exit
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+
+### pane text after (no typed input)
+charlesabrooker@Mac-Studio wt % exec env -i /Users/charlesabrooker/tmp/fm-lab.shckec/fx/bin/claude --resume 11111111-22
+22-3333-4444-555555555555

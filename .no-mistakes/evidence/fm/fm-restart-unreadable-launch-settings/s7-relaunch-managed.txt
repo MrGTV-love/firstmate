@@ -1,0 +1,22 @@
+
+##### HEAD full relaunch: secondmate home outside the lab home, pane wD:p1 shell-only (agent stopped by hand)
+fg before: ["zsh"]
+$ bin/fm-control.sh labsm relaunch --note "lab relaunch"
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: secondmate labsm sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /Users/charlesabrooker/tmp/fm-labsm.AmSsfg/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /Users/charlesabrooker/tmp/fm-labsm.AmSsfg/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched labsm harness=claude from=claude model=default effort=default backend=herdr endpoint=fm-lab-attrib-39153-21193:wD:p1 worktree=/Users/charlesabrooker/tmp/fm-labsm.AmSsfg
+rc=0
+### record after
+window=fm-lab-attrib-39153-21193:wD:p1
+spawn_gen=s1795477450.80574.4574
+launch_proof=env-v1
+### verdict after
+managed
+### live agent pin
+pid=92689
+FM_SPAWN_GEN=s1795477450.80574.4574
+
+### after relaunch: $ bin/fm-reboot-recover.sh recover
+rc=0 (no line for labsm: managed lane is silent)

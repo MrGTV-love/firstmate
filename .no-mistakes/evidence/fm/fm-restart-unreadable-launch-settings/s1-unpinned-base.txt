@@ -1,0 +1,29 @@
+### BASE 87836f79b (extracted with git archive), same live lab agent
+$ bin/fm-reboot-recover.sh recover
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+REBOOT_RECOVERY: labt: live launch settings are unreadable; no lifecycle action taken
+rc=1
+
+$ bin/fm-control.sh labt interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+
+$ bin/fm-control.sh labt exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+
+$ bin/fm-control.sh labt stay
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+
+$ bin/fm-control.sh labt relaunch --note "keep the lane"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+rc=1
+
+### pane text after
+charlesabrooker@Mac-Studio wt % exec env -u FM_SPAWN_GEN /Users/charlesabrooker/tmp/fm-lab.shckec/fx/bin/claude --resum
+e 11111111-2222-3333-4444-555555555555

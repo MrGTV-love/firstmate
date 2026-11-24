@@ -1,0 +1,65 @@
+########## CASE pinned-elsewhere: FM_SPAWN_GEN=other-generation
+(herdr agent status: idle)
+[head] $ bin/fm-reboot-recover.sh recover
+REBOOT_RECOVERY: labsm: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; no lifecycle action taken; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+rc=1
+[head] $ bin/fm-control.sh labsm interrupt
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+rc=1
+[head] pane text:
+charlesabrooker@Mac-Studio smh % exec env FM_SPAWN_GEN=1795460000-othergen /Users/charlesabrooker/tmp/fm-lab.shckec/fx/
+bin/claude --resume 33333333-2222-3333-4444-555555555555
+[base] $ bin/fm-reboot-recover.sh recover
+REBOOT_RECOVERY: labsm: live launch settings are unreadable; no lifecycle action taken
+rc=1
+[base] $ bin/fm-control.sh labsm interrupt
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+[base] pane text:
+charlesabrooker@Mac-Studio smh % exec env FM_SPAWN_GEN=1795460000-othergen /Users/charlesabrooker/tmp/fm-lab.shckec/fx/
+bin/claude --resume 33333333-2222-3333-4444-555555555555
+
+########## CASE legacy record (no launch_proof line), unpinned claude
+(herdr agent status: idle)
+[head] $ bin/fm-reboot-recover.sh recover
+rc=0
+[head] $ bin/fm-control.sh labsm interrupt
+interrupt-delivered labsm harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+rc=0
+[head] pane text:
+me 44444444-2222-3333-4444-555555555555
+^[
+[base] $ bin/fm-reboot-recover.sh recover
+rc=0
+[base] $ bin/fm-control.sh labsm interrupt
+interrupt-delivered labsm harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+rc=0
+[base] pane text:
+me 44444444-2222-3333-4444-555555555555
+^[^[
+
+########## CASE shared slot: matching pin, but a second live record (labpeer) names the same worktree/home
+(herdr agent status: idle)
+[head] $ bin/fm-reboot-recover.sh recover
+REBOOT_RECOVERY: labsm: another task record (labpeer.meta) claims this pane, this home or worktree, or a worktree around the agent's working directory; no lifecycle action taken; something other than this task's own agent tree, directory or record shares its pane; Main inspects the pane and decides the lane by hand
+rc=1
+[head] $ bin/fm-control.sh labsm interrupt
+error: task labsm cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: another task record (labpeer.meta) claims this pane, this home or worktree, or a worktree around the agent's working directory; something other than this task's own agent tree, directory or record shares its pane; Main inspects the pane and decides the lane by hand
+rc=1
+[head] pane text:
+charlesabrooker@Mac-Studio smh % exec env FM_SPAWN_GEN=1795470001-labsm /Users/charlesabrooker/tmp/fm-lab.shckec/fx/bin
+/claude --resume 55555555-2222-3333-4444-555555555555
+[base] $ bin/fm-reboot-recover.sh recover
+rc=0
+[base] $ bin/fm-control.sh labsm interrupt
+interrupt-delivered labsm harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+rc=0
+[base] pane text:
+/claude --resume 55555555-2222-3333-4444-555555555555
+^[
+[head] same agent after the peer record is gone (the reassociated state):
+interrupt-delivered labsm harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+rc=0
+[head] pane text:
+/claude --resume 55555555-2222-3333-4444-555555555555
+^[^[

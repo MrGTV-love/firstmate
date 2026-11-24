@@ -1,0 +1,50 @@
+NOTE: the two 'jq: parse error' lines are a capture mistake in this run ('pane read' prints plain text). The pane text for the same refused run is in s1-unpinned-base.txt (read after the head and base runs: only the exec line, no typed text or ^[). The wrapper-layout run s8-wrapper-unpinned.txt has a clean pane capture.
+
+### verdict (fm_launch_proof_herdr, lab session fm-lab-attrib-39153-21193, pane w1:p1, fake claude with readable env and no FM_SPAWN_GEN)
+unmanaged
+live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labt relaunch", or decide the lane by hand rc=1
+
+### pane text before
+jq: parse error: Invalid numeric literal at line 1, column 27
+
+$ FM_HOME=<lab> bin/fm-reboot-recover.sh recover
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+REBOOT_RECOVERY: labt: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labt relaunch", or decide the lane by hand
+rc=1
+
+$ bin/fm-control.sh labt interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labt relaunch", or decide the lane by hand
+rc=1
+
+$ bin/fm-control.sh labt exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labt relaunch", or decide the lane by hand
+rc=1
+
+$ bin/fm-control.sh labt stay
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labt relaunch", or decide the lane by hand
+rc=1
+
+$ bin/fm-control.sh labt relaunch --note "keep the lane"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: task labt cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labt relaunch", or decide the lane by hand
+rc=1
+
+$ bin/fm-control.sh labt adopt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.shckec
+error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh labt relaunch"; nothing was changed
+rc=1
+
+### pane text after
+jq: parse error: Invalid numeric literal at line 1, column 27
+### pane process after
+{"pid":7279,"name":"claude","argv":["/Users/charlesabrooker/tmp/fm-lab.shckec/fx/bin/claude","--resume","11111111-2222-3333-4444-555555555555"]}
+### state dir after
+total 24
+drwxr-xr-x@ 5 charlesabrooker  staff   160 Nov 23 17:20 .
+drwx------@ 8 charlesabrooker  staff   256 Nov 23 17:17 ..
+-rw-------@ 1 charlesabrooker  staff    16 Nov 23 17:16 .fm-lab-tmux-dir
+-rw-r--r--@ 1 charlesabrooker  staff  1869 Nov 23 17:20 guard-events.jsonl
+-rw-r--r--@ 1 charlesabrooker  staff   438 Nov 23 17:19 labt.meta

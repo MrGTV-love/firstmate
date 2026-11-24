@@ -1,0 +1,21 @@
+charlesabrooker@Mac-Studio fm-labsm.AmSsfg % export GOTMPDIR=/tmp/fm-labsm/gotmp
+charlesabrooker@Mac-Studio fm-labsm.AmSsfg % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio fm-labsm.AmSsfg % . '/tmp/fm-labsm+9e9d347b844a293f44e2f9c3c76cd942126095f30112d5138a45af377
+9049385/launch.s1795477450.80574.4574.sh'
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Adding a new directory:
+
+ /Users/charlesabrooker/tmp/fm-lab.shckec/state/labsm.inbox
+
+ This session hasn't worked here before. Is this a directory you created or one you trust?
+ Claude Code'll be able to read, edit, and execute files here. Its skills, commands, and agents load and can run
+ commands, and so can the git settings of its repository. Your answer holds for this session. Starting Claude Code in
+ this directory and trusting it there lasts, and covers its whole repository or everything below it.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, add it
+
+ Enter to confirm · Esc to cancel

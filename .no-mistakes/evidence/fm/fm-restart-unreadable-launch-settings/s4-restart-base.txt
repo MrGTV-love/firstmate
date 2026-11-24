@@ -1,0 +1,13 @@
+##### BASE 87836f79b: bin/fm-secondmate-restart.sh labsm  (same lab secondmate, live unpinned fake claude in fm-lab-attrib-39153-21193:w4:p1)
+/Users/charlesabrooker/tmp/fm-lab.shckec/base/bin/fm-secondmate-restart.sh: line 379: 47700 Terminated: 15          sleep "$next_wait"
+rc=124
+records CHANGED:
+4a5,7
+> 8c40be4a4e662bea4bfa4ee40ca3b0ea03e0af97893535e7b2995279118d7e64  state/.guard-watcher-stale-banner
+> c29bbf175813863139fa833794d87724b72ff1400529614966482761bf9cae16  state/labsm.inbox/001.msg
+> d25871a997fc0bb85474ebdb155f06263ab7316508c15496a75bd763e83d05a6  state/pending-replies/7f77e2576f755019
+### pane text after
+exec env -u FM_SPAWN_GEN /Users/charlesabrooker/tmp/fm-lab.shckec/fx/bin/claude --resume 22222222-2222-3333-4444-555555
+555555
+charlesabrooker@Mac-Studio smh % exec env -u FM_SPAWN_GEN /Users/charlesabrooker/tmp/fm-lab.shckec/fx/bin/claude --resu
+me 22222222-2222-3333-4444-555555555555

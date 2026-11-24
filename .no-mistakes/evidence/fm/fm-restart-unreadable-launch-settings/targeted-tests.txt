@@ -1,0 +1,6 @@
+ok - claude restore: no adoption route; every consumer refuses with the named reason and never names adopt
+ok - claude restore: the restart decides attribution before any pending reply, inbox write, request or nudge
+ok - claude restore: a lane stopped by hand relaunches with a new pin and reads managed
+ok - remote attribution: the host verb prints one decision line from the one verdict owner
+ok - restart: a backend load failure, an invalid endpoint or an unreadable state refuses as unreached
+rc=0
