@@ -6170,7 +6170,7 @@ dsh_wait_for_start() {
   # dsh's pre-usage status row; with no readable binding that row stays unproven.
   identity=$(python3 "$SCRIPT_DIR/fm-dsh.py" status-identity "$STATE_REAL" "$ID" 2>/dev/null) || identity=
   while [ "$i" -lt "$max" ]; do
-    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" start-state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
+    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" start-state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state='unknown: bin/fm-dsh.py start-state failed'
     unaccepted=0
     case "$state" in
       failed:*)

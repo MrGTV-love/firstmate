@@ -21,6 +21,13 @@
 #   4. config/session-launch-policy=omp-or-tc admits the dsh-tui DeepSeek adapter.
 #   5. The busy verdict follows the launch's own session log and the tmux
 #      liveness probe counts dsh as an agent.
+#   6. The start proof judges the first turn beyond the launch position: it
+#      starts the launch only once the provider accepted it (an
+#      assistant/message); an error turn/end refuses with the provider text,
+#      an end without acceptance or a window that ends first refuses as not
+#      accepted, and a failed poll names its own cause.
+#   7. A screen proves the composer only while this launch's own dsh-tui
+#      launcher, carrying its --patch path, is running and not stopped.
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -1098,6 +1105,26 @@ SH
   pass 'fm-spawn: a dsh first turn launches once the provider accepted it; an errored, unaccepted or superseded first turn refuses by name'
 }
 
+# A start-state poll that itself fails names that cause, rather than keeping an
+# earlier poll's or none: a python3 wrapper fails only the start-state call.
+test_failed_start_poll_names_its_cause() {
+  local id=dsh-poll-crash out status bin
+  make_dsh_case poll-crash "$id"
+  bin=$CASE_DIR/crash-bin
+  mkdir -p "$bin"
+  cat > "$bin/python3" <<SH
+#!/bin/sh
+case " \$* " in *" start-state "*) exit 1 ;; esac
+exec "$(command -v python3)" "\$@"
+SH
+  chmod +x "$bin/python3"
+  out=$(DSH_EXTRA_BIN=$bin FM_DSH_START_POLLS=5 run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  status=$?
+  expect_code 1 "$status" "a launch whose start-state poll fails must refuse: $out"
+  assert_contains "$out" 'dsh-tui session log: bin/fm-dsh.py start-state failed' 'the refusal must name the failed poll'
+  pass 'fm-spawn: a failed dsh start-state poll refuses with its own cause'
+}
+
 # The pre-usage status row proves a dsh composer only while this launch's own
 # dsh-tui is alive: the same accepted log and the same screen (that row flush
 # under the frame, blank rows below, as a dead launch leaves above an empty-PS1
@@ -1244,5 +1271,6 @@ test_omp_default_cannot_hide_a_deepseek_route
 test_unrecognized_dsh_screen_refuses_launch
 test_first_turn_error_refuses_launch
 test_fresh_status_row_needs_the_live_launch
+test_failed_start_poll_names_its_cause
 test_exhausted_omp_replaces_deepseek_harness
 test_live_guard_refuses_missing_lab_inputs
