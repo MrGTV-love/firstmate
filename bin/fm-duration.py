@@ -150,9 +150,11 @@ then waits for the leader to exit, with no guessed grace number, so a leader's
 own TERM cleanup runs for as long as it keeps making progress. SIGKILL goes to
 the group only when the leader has exited and group members remain, on a second
 forwarded signal, when the cleanup shows no output and no process-tree CPU
-progress for the same no-progress interval (counted from the stop, or from the
-cleanup's last progress), or when the cleanup itself has run for the same
-absolute limit. A true no-progress or absolute stop still records a timed-out
+progress (for run, CPU above the same idle floor) for the same no-progress
+interval (counted from the stop, or from the cleanup's last progress), or when
+the cleanup itself has run for the same absolute limit. A TERM cleanup that
+waits quietly on another owner, such as a Docker teardown blocked on the
+daemon, should therefore print progress while it waits. A true no-progress or absolute stop still records a timed-out
 sample, so repeated stops file the same repair work as any other real limit.
 run exports FM_DURATION_MANAGED_KEY so a self-instrumented command with the same
 key leaves its one complete wall-time sample to the outer runner.
