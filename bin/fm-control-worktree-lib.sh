@@ -82,7 +82,7 @@ fm_control_worktree_registered_head() {  # <git-common-dir> <path>
 fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   local meta=$1 id=$2 state=$3 dest=$4
   local kind old probe parent real top project common project_common git_dir branch checked
-  local head='' evidence='' journal other_meta owned status source i owner_home this_home s field remedy
+  local head='' evidence='' journal other_meta owned status source i s field remedy
   local -a heads=() sources=()
 
   kind=$(fm_meta_get "$meta" kind)
@@ -308,9 +308,7 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   case "$FM_TREEHOUSE_SLOT_OWNER" in
     absent) ;;
     mine)
-      owner_home=$(cd "$FM_TREEHOUSE_SLOT_OWNER_HOME" 2>/dev/null && pwd -P) || owner_home=
-      this_home=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || this_home=
-      if [ -z "$FM_TREEHOUSE_SLOT_OWNER_HOME" ] || [ -z "$this_home" ] || [ "$owner_home" != "$this_home" ]; then
+      if ! fm_treehouse_slot_claim_home_is_this_home; then
         echo "error: the pool slot $dest is claimed by task $id of home $FM_TREEHOUSE_SLOT_OWNER_HOME, not this home" >&2
         return 1
       fi
