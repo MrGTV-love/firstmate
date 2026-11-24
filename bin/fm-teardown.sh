@@ -335,8 +335,8 @@
 # proofs again, then scans for processes in the copy, reads its HEAD and, when a
 # bundle proved it, the record and stored bundle again, reads the lock and the
 # process table once more immediately before the unlock, preserves the copy's
-# ignored files with the .claude and .opencode trees whole (#380's retained
-# population; logs and evidence are archived, never deleted) in
+# ignored files with the .claude and .opencode trees whole (logs and evidence
+# are archived, never deleted) in
 # data/<task>/nested-copy-preserved, and then releases the
 # lock itself with a non-forced git worktree unlock followed by a non-forced git
 # worktree remove; a removal that fails puts the lock back and says it is back

@@ -467,11 +467,13 @@ teardown_print_entry() {  # <copy> <entry>
 # kept whole, a regenerable-looking name (.cache) included, because the driver's
 # archive and the acceptance text cover that whole population (the ordinary
 # preservation skips those two trees and the retained route preserves and
-# verifies them itself). Each entry is ended by a NUL byte, so any name Git can
+# verifies them itself). The direct release of a dead launcher's lock names a
+# fourth mode, with-claude: the list above, with every ignored entry at or under
+# .claude and .opencode added whole (Main 3851). Each entry is ended by a NUL byte, so any name Git can
 # list keeps its exact bytes; a failed listing or scan fails the call.
-teardown_preservable_ignored_z() {  # <copy> [all|releasable|retained]
+teardown_preservable_ignored_z() {  # <copy> [all|releasable|retained|with-claude]
   local copy=$1 mode=${2:-} listing entry name child rc=0 emit=teardown_entry_without_regenerable
-  case "$mode" in '') emit=teardown_print_entry ;; all|releasable|retained) ;; *) return 1 ;; esac
+  case "$mode" in ''|with-claude) emit=teardown_print_entry ;; all|releasable|retained) ;; *) return 1 ;; esac
   listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
   git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z >"$listing" 2>/dev/null || rc=$?
   if [ "$rc" = 0 ]; then
@@ -485,6 +487,11 @@ teardown_preservable_ignored_z() {  # <copy> [all|releasable|retained]
         fi
         "$emit" "$copy" "$entry" || { rc=1; break; }
         continue
+      fi
+      if [ "$mode" = with-claude ]; then
+        case "$entry" in
+          .claude|.claude/*|.opencode|.opencode/*) teardown_print_entry "$copy" "$entry" || { rc=1; break; }; continue ;;
+        esac
       fi
       [ ! -L "$copy/$entry" ] || continue
       ! teardown_graft_generated "$copy" "$entry" || continue
@@ -1053,7 +1060,7 @@ teardown_removal_dirty_status() {  # <porcelain-status> <copy> [<nested-copy>...
 # is a real directory outside every removal root and each payload file's real
 # directory lies inside it. Every listing and scan is checked, so one that fails
 # refuses. Reads the preserved payload itself, never only the manifest.
-teardown_ignored_preserved_current() {  # <copy> [all|releasable|retained]
+teardown_ignored_preserved_current() {  # <copy> [all|releasable|with-claude]
   local copy=$1 mode=${2:-} list files rc=0
   list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
   files=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { rm -f "$list"; TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
@@ -1125,9 +1132,9 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 #   - the bundle that admitted the whole cleanup, when one did, is unchanged;
 #   - ignored files: none outside the preserve allow-list (refuse), or all of
 #     them preserved again outside every removal root and the preserved payload
-#     matched by SHA-256 to the manifest and to the copy (preserve; retained
-#     does the same for #380's retained population, the .claude and .opencode
-#     trees whole, on a foreign copy's direct release), or, for an
+#     matched by SHA-256 to the manifest and to the copy (preserve; with-claude
+#     does the same for that list with the .claude and .opencode trees whole
+#     added, on a foreign copy's direct release), or, for an
 #     own nested copy Vernant's lock holds (before its driver call and on its
 #     direct release), the preserve #380's teardown_own_preserve chose
 #     (TEARDOWN_PRESERVE_DIR) lies outside every removal root and still holds
@@ -1148,7 +1155,7 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 # re-run cannot help; empty when a re-run for a fresh proof can).
 TEARDOWN_FINAL_WHY=
 TEARDOWN_FINAL_STABLE=
-teardown_removal_final_proof() {  # <copy> <preserve|retained|refuse|own|own-retained> <locked|unlocked> [<launcher-pid> <lock-mtime> [forced]]
+teardown_removal_final_proof() {  # <copy> <preserve|with-claude|refuse|own|own-retained> <locked|unlocked> [<launcher-pid> <lock-mtime> [forced]]
   local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} forced=${6:-} head status unique canonical i latest found=0 rc=0 snap ref now work population held
   TEARDOWN_FINAL_WHY=
   TEARDOWN_FINAL_STABLE=
@@ -1234,7 +1241,7 @@ teardown_removal_final_proof() {  # <copy> <preserve|retained|refuse|own|own-ret
       fi
       rm -f "$unique"
       ;;
-    preserve|retained)
+    preserve|with-claude)
       if ! teardown_preserve_ignored "$copy" "${ignored#preserve}" || ! teardown_ignored_preserved_current "$copy" "${ignored#preserve}"; then
         TEARDOWN_FINAL_WHY="its ignored files could not be preserved and verified outside every removal root (${TEARDOWN_PRESERVE_WHY:-preservation failed})"
         return 1
@@ -1451,7 +1458,7 @@ teardown_preserve_plan() {
 # cannot be listed, copied, hashed, published or verified, and the caller then
 # refuses the copy rather than removing unpreserved content.
 TEARDOWN_PRESERVE_WHY=
-teardown_preserve_ignored() {  # <copy> [all|releasable|retained]
+teardown_preserve_ignored() {  # <copy> [all|releasable|with-claude]
   local copy=$1 mode=${2:-} root dest stage aside='' failed list hash why
   TEARDOWN_PRESERVE_WHY=
   list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
@@ -2477,7 +2484,7 @@ teardown_launcher_gone() {  # <pid> <lock-file>
 # Returns 1 with TEARDOWN_RELEASE_WHY naming the fact that kept the copy.
 TEARDOWN_RELEASE_WHY=
 teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
-  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap final_mode=retained
+  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap final_mode=with-claude
   TEARDOWN_RELEASE_WHY=
   # Main 1843: an Orca-backed task keeps base behaviour, which has no direct release.
   if [ "${BACKEND:-}" = orca ] || [ "${TEARDOWN_CLEANUP_RECOVERY:-}" = orca ]; then
@@ -2553,7 +2560,7 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
       TEARDOWN_RELEASE_WHY="its ignored files, the .claude and .opencode trees whole included, could not be preserved in ${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved} outside every removal root"
       return 1
     fi
-  elif ! teardown_preserve_ignored "$copy" retained; then
+  elif ! teardown_preserve_ignored "$copy" with-claude; then
     TEARDOWN_RELEASE_WHY="its ignored files, the .claude and .opencode trees whole included, could not be preserved in $DATA/$ID/nested-copy-preserved outside every removal root (${TEARDOWN_PRESERVE_WHY:-preservation failed})"
     return 1
   fi
@@ -2570,14 +2577,14 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   git -C "$slot" worktree unlock "$copy" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='git worktree unlock failed'; return 1; }
   # The final proof runs after the last unlock and the remove is the very next
   # action; a failed proof puts the lock back and refuses. Logs and evidence are
-  # archived, never deleted (Main 3851): the retained population (#380's retained
-  # mode, the .claude and .opencode trees whole) is preserved before the release.
-  # An own nested copy's is copied into the preserve #380's dispose chose before
+  # archived, never deleted (Main 3851): the ignored files, the .claude and
+  # .opencode trees whole included, are preserved before the release.
+  # An own nested copy's are copied into the preserve #380's dispose chose before
   # the driver (teardown_own_preserve_widen, never over a byte it holds), and the
   # proof checks that preserve, the .claude and .opencode trees whole included,
   # and leaves it in place (own-retained), never rebuilding,
   # moving or replacing it (Main 3529 Ruling 2, Main 3556 F1); a foreign copy's
-  # is preserved again here (retained).
+  # are preserved again here (with-claude).
   [ "$kind" != 'own nested' ] || final_mode='own-retained'
   if ! teardown_removal_final_proof "$copy" "$final_mode" locked "$pid" "$mtime"; then
     git -C "$slot" worktree lock --reason "$lock" "$copy" >/dev/null 2>&1 || true

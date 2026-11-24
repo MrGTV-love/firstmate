@@ -9190,7 +9190,8 @@ BODY
 # unlock and remove run. Logs and evidence are archived, never deleted. R7-1: a
 # .claude file that appears in an own nested copy after that preserve, just
 # before the unlock, refuses at the final proof: the lock goes back on and the
-# copy is not removed.
+# copy is not removed. R8-1: the copy's other ignored files, a top-level .cache
+# that #380's retained list leaves out included, are preserved and verified too.
 test_pr400_direct_release_preserves_claude_and_opencode() {
   local body=$TMP_ROOT/pr400-body-direct-retained.sh
   cat > "$body" <<'BODY'
@@ -9212,10 +9213,11 @@ for shape in foreign own-nested own-late; do
   kind='own nested'
   [ "$shape" != foreign ] || kind=foreign
   r5_repo "$shape"
-  printf '/.claude/\n/.opencode/\n/notes/\n' > "$repo/.gitignore"
+  printf '/.claude/\n/.opencode/\n/notes/\n/.cache/\n' > "$repo/.gitignore"
   git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
   git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
-  mkdir -p "$copy/.claude/channel-outbox" "$copy/.opencode/state" "$copy/notes"
+  mkdir -p "$copy/.claude/channel-outbox" "$copy/.opencode/state" "$copy/notes" "$copy/.cache"
+  printf 'run\n' > "$copy/.cache/run.bin"
   printf 'one\n' > "$copy/.claude/channel-outbox/a.jsonl"
   printf 'evidence\n' > "$copy/.opencode/state/log.json"
   printf 'only here\n' > "$copy/notes/unique.dat"
@@ -9229,7 +9231,7 @@ for shape in foreign own-nested own-late; do
   unset -f git
   dest=${TEARDOWN_PRESERVE_DIR:-$(r5_dest "$copy")}
   kept=
-  for f in .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat; do
+  for f in .cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat; do
     sum=$(teardown_ignored_sha256 "$copy/$f")
     if [ "$(teardown_ignored_sha256 "$dest/files/$f" 2>/dev/null)" = "$sum" ] && grep -qxF "$sum  $f" "$dest/meta/SHA256SUMS"; then
       kept+=" $f"
@@ -9243,9 +9245,9 @@ for shape in foreign own-nested own-late; do
 done
 BODY
   r5_harness direct-retained "$body"
-  r5_expect 'foreign release=0 why=none kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone' 'pr400-direct-retained: a foreign copy was not released and removed with its .claude and .opencode files preserved'
-  r5_expect 'own-nested release=0 why=none kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone' 'pr400-direct-retained: an own nested copy was not released and removed with its .claude and .opencode files preserved'
-  r5_expect 'own-late release=1 why=late-refused-restored kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock  late=in-copy' 'pr400-direct-retained: a .claude file that appeared after the own preserve was removed unpreserved, or the lock was not put back'
+  r5_expect 'foreign release=0 why=none kept=.cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone' 'pr400-direct-retained: a foreign copy was not released and removed with its .claude and .opencode files preserved'
+  r5_expect 'own-nested release=0 why=none kept=.cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone' 'pr400-direct-retained: an own nested copy was not released and removed with its .claude and .opencode files preserved'
+  r5_expect 'own-late release=1 why=late-refused-restored kept=.cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock  late=in-copy' 'pr400-direct-retained: a .claude file that appeared after the own preserve was removed unpreserved, or the lock was not put back'
   pass 'the direct release of a dead launcher'"'"'s lock preserves the .claude and .opencode trees whole, byte for byte with their SHA256SUMS lines, for a foreign and an own nested copy, before it unlocks and removes; a .claude file that appears in an own copy after its preserve refuses and the lock goes back on'
 }
 
