@@ -1255,6 +1255,51 @@ test_successor_relaunch_refuses_a_scout_branch_another_task_records() {
   pass "successor: a governed scout relaunch onto another task's recorded successor refuses and changes nothing, and otherwise relaunches as before"
 }
 
+# A relaunch through fm-control.sh that must refuse because the branch the launch would
+# take is another task's recorded successor: the refusal comes before the stop, so the
+# agent still runs, no lifecycle input was sent, the record is unchanged, no relaunch
+# transaction was opened, and a deny event names the ref.
+expect_relaunch_refused_before_stop() {  # <case-dir> <task-id> <claimant> <ref> <relaunch-args...>
+  local dir=$1 tid=$2 claimant=$3 ref=$4 out rc
+  shift 4
+  : > "$dir/fake/literal"
+  : > "$dir/fake/keys"
+  cp -p "$dir/home/state/$tid.meta" "$dir/relaunch.before"
+  : > "$FM_GUARD_EVENT_LOG"
+  rc=0; out=$(NM_HOME="$dir/nm" run_control "$dir" "$tid" relaunch "$@") || rc=$?
+  expect_code 1 "$rc" "the relaunch of $tid onto another task's recorded successor must refuse"$'\n'"$out"
+  assert_contains "$out" "task $claimant records refs/heads/$ref as its successor branch" "the refusal must name the recording task and the ref"
+  assert_contains "$out" "refused before stopping the running agent" "the refusal must come before the stop"
+  [ ! -s "$dir/fake/literal" ] && [ ! -s "$dir/fake/keys" ] || fail "the refused relaunch sent lifecycle input to the running agent: $(cat "$dir/fake/literal" "$dir/fake/keys")"
+  assert_equals claude "$(cat "$dir/fake/command")" "the running agent must still run"
+  cmp -s "$dir/relaunch.before" "$dir/home/state/$tid.meta" || fail "the refused relaunch changed the task record"
+  [ ! -e "$dir/home/state/$tid.control-relaunch" ] || fail "the refused relaunch opened a relaunch transaction"
+  [ -n "$(jq -c --arg b "$ref" 'select(.guard == "successor-branch-admission" and .rule == "relaunch" and .decision == "deny" and .successor == $b)' "$FM_GUARD_EVENT_LOG")" ] \
+    || fail "the refused relaunch wrote no successor-branch-admission deny event naming the ref"
+}
+
+# review-1: fm-control.sh relaunch checks the branch the launch will take before it
+# stops the running agent. A live scout that a relaunch brings under slot governance
+# would take fm/<id>, which task X records as its successor; a ship whose record names
+# no branch would take its default fm/<id>, which another task records. Both refuse
+# before the stop. The ship case's claimant record is written by hand: the real verb
+# admits a successor only in its own task's name family, and the relaunch reads only
+# that record's successor_branch= line.
+test_successor_fm_control_relaunch_refuses_a_claimed_branch_before_stopping() {
+  local id=suc-prestop dir out rc sid=suc-prestop-ship
+  dir=$(new_successor_case prestop "$id")
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --tip "$(tip_of "$dir" "fm/$id")" --note "successor before the scout relaunch") || rc=$?
+  expect_code 0 "$rc" "recording should succeed"$'\n'"$out"
+  make_relaunch_scout "$dir" "$id-v2"
+  printf 'claude' > "$dir/fake/command"
+  expect_relaunch_refused_before_stop "$dir" "$id-v2" "$id" "fm/$id-v2" --owned-path scripts --note "apply the slot scope"
+  dir=$(new_case prestop-ship "$sid")
+  add_ship_task "$dir" "$sid" claude
+  printf 'kind=ship\nbranch=fm/owner-%s\nsuccessor_branch=fm/%s\n' "$sid" "$sid" > "$dir/home/state/owner-$sid.meta"
+  expect_relaunch_refused_before_stop "$dir" "$sid" "owner-$sid" "fm/$sid" --note "a plain relaunch"
+  pass "successor: fm-control relaunch refuses a scout or ship branch another task records as its successor before it stops the running agent"
+}
+
 # F6 (d): the receipt says what the launch will do for a launch that no profile governs.
 test_successor_receipt_matches_what_the_launch_will_do() {
   local id=suc-receipt2 dir out rc
@@ -1294,6 +1339,7 @@ test_successor_event_log_failure_changes_neither_a_refusal_nor_a_record
 test_successor_fresh_spawn_refuses_a_branch_another_task_records
 test_successor_promotion_refuses_a_branch_another_task_records
 test_successor_relaunch_refuses_a_scout_branch_another_task_records
+test_successor_fm_control_relaunch_refuses_a_claimed_branch_before_stopping
 test_successor_reads_the_note_file_only_after_admission
 test_successor_keeps_the_composer_dialog_file
 test_successor_note_cannot_add_a_ship_branch_line

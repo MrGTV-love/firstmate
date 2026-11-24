@@ -19,7 +19,8 @@
 #
 # Every launch by bin/fm-spawn.sh (a fresh spawn or a relaunch, of a ship or a
 # scout, before its branch reaches a slot preparation, a task record or a write
-# profile), a reassociation (bin/fm-control.sh) and a promotion
+# profile), a relaunch by bin/fm-control.sh (before it stops the running agent),
+# a reassociation (bin/fm-control.sh) and a promotion
 # (bin/fm-promote.sh) of another task ask fm_successor_claimant whether some task's record already
 # names their branch as its successor_branch=, and refuse when one does, so no
 # later task takes over a recorded successor ref.

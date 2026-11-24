@@ -2360,18 +2360,21 @@ fm_task_id_creation_valid "$ID" || {
   echo "error: invalid task id" >&2
   exit 2
 }
-# No spawn or relaunch takes a branch another task records as its successor: every
-# point where a launch fixes its branch, and the last point before the branch reaches
-# a slot preparation, a task record or a write profile, asks here first. A refusal
-# clears BRANCH so no cleanup record carries the claimed ref.
+# No spawn or relaunch takes a branch another task records as its successor: the
+# points where a launch first fixes its branch, and one final point before the branch
+# reaches a task record or a write profile, ask here. A refusal clears BRANCH so no
+# cleanup record carries the claimed ref. fm-control.sh relaunch runs the same check
+# before it stops the running agent, so on a relaunch this one is the final check.
 spawn_refuse_claimed_branch() {  # <branch>
-  local branch=$1 claimant
+  local branch=$1 claimant remedy
   fm_local_firstmate_state_dirs "$STATE" tolerant
   claimant=$(fm_successor_claimant "$branch" "$STATE/$ID.meta" "${FM_LOCAL_FIRSTMATE_STATES[@]}") || return 0
   BRANCH=
   "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule spawn --task "$ID" \
     --source-ok true --successor "$branch" 2>/dev/null || true
-  echo "error: spawn refused: task $claimant records refs/heads/$branch as its successor branch, so task $ID may not take that branch; nothing was changed. Spawn this task under another id or --branch-prefix, or let Main end task $claimant's succession first" >&2
+  remedy="Spawn this task under another id or --branch-prefix, or let Main end task $claimant's succession first"
+  [ "$RELAUNCH" -eq 0 ] || remedy="Ask Main to end task $claimant's succession, or reassociate task $ID onto another branch, before relaunching it"
+  echo "error: spawn refused: task $claimant records refs/heads/$branch as its successor branch, so task $ID may not take that branch; this launch wrote no task record, no refs/heads/$branch and no write profile. $remedy" >&2
   exit 1
 }
 # A slot-governed launch whose record names no branch takes fm/<id>.
@@ -6567,7 +6570,6 @@ fi
 # ordinary acquisition-abort cleanup must not release its lease or remove it.
 spawn_slot_refused() {
   local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path update_recovery=0 fresh_ref='' adopt_scope=0 record_prepared=0
-  spawn_refuse_claimed_branch "${BRANCH:-fm/$ID}"
   [ "$BACKEND" != orca ] || window=$W
   fm_slot_proof_drop
   SPAWN_TREEHOUSE_ABORT_TARGET=
@@ -6688,7 +6690,7 @@ if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
     spawn_refuse_claimed_branch "${BRANCH:-fm/$ID}"
     fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1 || {
       SLOT_GOVERNED=1
-      spawn_take_slot_branch
+      BRANCH=${BRANCH:-fm/$ID}
       fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || true
       spawn_slot_refused
     }
@@ -6705,7 +6707,7 @@ if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
       spawn_try_skip "$spawn_proof_rc" && continue
       if fm_slot_required "$PROJ_ABS" "$WT"; then
         SLOT_GOVERNED=1
-        spawn_take_slot_branch
+        BRANCH=${BRANCH:-fm/$ID}
         spawn_slot_refused
       fi
       # An unknown (could not tell) is never skipped past: the copy is leased where it stands and the spawn is refused.
@@ -6719,8 +6721,8 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   if [ "$RELAUNCH" -eq 1 ]; then
     while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$RELAUNCH_META")
   fi
-  fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
   spawn_take_slot_branch
+  fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
   if [ "$RELAUNCH" -eq 0 ]; then
     SLOT_FRESH_BASE=1
     fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
@@ -6770,10 +6772,9 @@ done
 # Keep early governance sticky (including when freshness removes its owner),
 # but require the same explicit scope and preparation for a newly governed copy.
 if [ "$KIND" != secondmate ] && [ "$SLOT_GOVERNED" = 0 ] && fm_slot_required "$PROJ_ABS" "$WT"; then
-  [ "$RELAUNCH" -eq 1 ] || spawn_refuse_claimed_branch "${BRANCH:-fm/$ID}"
+  spawn_take_slot_branch
   SLOT_GOVERNED=1
   fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
-  spawn_take_slot_branch
   fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
 fi
 [ -z "${BRANCH:-}" ] || spawn_refuse_claimed_branch "$BRANCH"

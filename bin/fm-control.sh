@@ -3162,6 +3162,26 @@ relaunch_successor_admission() {  # <project> <copy>
     || relaunch_successor_refuse "$successor" "$proof"
 }
 
+# The branch fm-spawn.sh will give the relaunched task must not be one another task
+# records as its successor: fm-spawn.sh refuses it, so the check runs here before
+# anything is stopped. A ship takes its branch= or fm/<id>; a slot-governed scout takes
+# its branch= or fm/<id>; any other launch takes no branch and is not checked.
+relaunch_claimed_branch_admission() {  # <slot-governed 0|1>
+  local branch claimant
+  branch=$(fm_meta_get "$META" branch)
+  case "$KIND" in
+    ship) ;;
+    scout) [ "$1" = 1 ] || return 0 ;;
+    *) return 0 ;;
+  esac
+  [ -n "$branch" ] || branch="fm/$ID"
+  fm_local_firstmate_state_dirs "$STATE" tolerant
+  claimant=$(fm_successor_claimant "$branch" "$META" "${FM_LOCAL_FIRSTMATE_STATES[@]}") || return 0
+  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule relaunch --task "$ID" \
+    --source-ok true --successor "$branch" 2>/dev/null || true
+  die "relaunch refused: task $claimant records refs/heads/$branch as its successor branch, and the relaunch of task $ID would take that branch; refused before stopping the running agent, so nothing was changed. Ask Main to end task $claimant's succession, or reassociate task $ID onto another branch, before relaunching it"
+}
+
 relaunch_successor_refuse() {  # <successor> <message>
   "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule relaunch --task "$ID" \
     --source-ok true --successor "$1" 2>/dev/null || true
@@ -3285,6 +3305,7 @@ do_relaunch() {
       || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
   fi
   relaunch_successor_admission "$slot_project" "$slot_copy"
+  relaunch_claimed_branch_admission "$slot_governed"
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
     [ -n "$secondmate_home" ] || secondmate_home=$WT
