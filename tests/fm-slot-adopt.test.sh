@@ -477,6 +477,28 @@ test_firstmate_written_wiring_is_not_reported_as_drift() {
   pass "drift: wiring recorded in state/<id>.wiring-sha is not listed; the task's own change still is"
 }
 
+# An adopted relaunch keeps a worker-edited launch artifact as <recorded path>.fm-kept.<time>.<n> beside the fresh wiring;
+# that kept copy is Firstmate's, so it is not the task's drift either.
+test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift() {
+  local out exclude
+  make_world drift-kept
+  mkdir -p "$W_SLOT/.claude"
+  printf '{}\n' >"$W_SLOT/.claude/settings.local.json"
+  printf '{"edited":1}\n' >"$W_SLOT/.claude/settings.local.json.fm-kept.1795.0"
+  exclude=$(git -C "$W_SLOT" rev-parse --path-format=absolute --git-path info/exclude)
+  mkdir -p "$(dirname "$exclude")"
+  printf '.claude/settings.local.json\n.claude/settings.local.json.fm-kept.*\n' >>"$exclude"
+  printf 'abc:100000:600 .claude/settings.local.json merged\n' >"$W_STATE/t.wiring-sha"
+  out=$(STATE=$W_STATE drift)
+  assert_contains "$out" 'no out-of-scope path changed' "Firstmate's kept copy of recorded wiring was reported as drift: $out"
+  case "$out" in *fm-kept*) fail "the kept copy was listed as the task's drift: $out" ;; esac
+  printf '{}\n' >"$W_SLOT/.claude/other.json"
+  printf '.claude/other.json\n' >>"$exclude"
+  out=$(STATE=$W_STATE drift)
+  assert_contains "$out" 'drift: uncertain,ignored .claude/other.json' 'an unrecorded ignored file beside the kept copy disappeared from the report'
+  pass "drift: a .fm-kept.<time>.<n> copy of recorded wiring is not listed; an unrecorded ignored file still is"
+}
+
 # B1 (exact-head read of 6acb4545): a governed task's own valid manifest is adopted. The record check must not overwrite
 # the manifest verdict, so the repository root the adoption judged is the manifest's own repo root, not the word ok.
 test_a_governed_tasks_own_manifest_is_adopted_with_the_manifest_repo_root() {
@@ -522,6 +544,7 @@ test_a_hidden_symlink_retarget_is_task_drift
 test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not
 test_a_path_that_arrives_only_through_a_merged_peer_branch_is_uncertain_not_proven
 test_firstmate_written_wiring_is_not_reported_as_drift
+test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run

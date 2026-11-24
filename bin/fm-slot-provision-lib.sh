@@ -846,6 +846,7 @@ fm_slot_adopt_sibling_claim() { # <slot> <copy> <state-dir>
 
 FM_SLOT_DRIFT_PY=$(cat <<'FMDRIFTPY'
 import os
+import re
 import subprocess
 import sys
 
@@ -901,8 +902,13 @@ if record_file and os.path.isfile(record_file):
                 recorded.add(parts[1])
 
 
+def written(path):
+    kept = re.fullmatch(rb"(.+)\.fm-kept\.[0-9]+\.[0-9]+", path, re.S)
+    return path in recorded or bool(kept and kept.group(1) in recorded)
+
+
 def wiring_only(path):
-    if path in recorded:
+    if written(path):
         return True
     full = os.path.join(os.fsencode(copy), path)
     if not os.path.isdir(full) or os.path.islink(full):
@@ -912,7 +918,7 @@ def wiring_only(path):
         for name in files:
             found = True
             rel = os.path.relpath(os.path.join(base_dir, name), os.fsencode(copy))
-            if rel not in recorded:
+            if not written(rel):
                 return False
     return found
 
