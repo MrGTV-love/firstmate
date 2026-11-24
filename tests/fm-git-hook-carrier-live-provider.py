@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Private scripted Anthropic Messages provider for the Git hook carrier live guard.
+"""Private scripted model provider for the Git hook carrier live guard.
 
 Usage: fm-git-hook-carrier-live-provider.py <lab-dir>
 
-Writes the bound port to <lab-dir>/port and appends every request body to
-<lab-dir>/requests.jsonl. A request that offers a Bash tool and carries no tool
-result yet is answered with one Bash tool call running the command in
-<lab-dir>/command; a request carrying that tool's result, and any side request
-without a Bash tool, is answered with a short end-of-turn text. No model is
-called and nothing leaves the loopback interface.
+Serves the Anthropic Messages API (/v1/messages) and the OpenAI Responses API
+(/v1/responses). Writes the bound port to <lab-dir>/port and appends a summary
+of every request to <lab-dir>/requests.jsonl. A request that offers a shell
+tool (Bash, or bash) and carries no tool result yet is answered with one call
+of that tool running the command in <lab-dir>/command; a request carrying that
+tool's result, and any side request without a shell tool, is answered with a
+short end-of-turn text. No model is called and nothing leaves the loopback
+interface.
 """
 import json
 import pathlib
@@ -41,8 +43,46 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.reply_json({}, 404)
 
+    def openai_responses(self, body):
+        items = body.get('input', [])
+        done = any(isinstance(i, dict) and i.get('type') == 'function_call_output' for i in items)
+        tool = next((t for t in body.get('tools', []) if t.get('name') == 'bash'), None)
+        with (lab / 'requests.jsonl').open('a') as log:
+            log.write(json.dumps({'path': self.path, 'tools': [t.get('name') for t in body.get('tools', [])],
+                                  'tool_result': done}) + '\n')
+        if tool is not None and not done:
+            args = json.dumps({'command': (lab / 'command').read_text().strip()})
+            item = {'type': 'function_call', 'id': 'fc_fm_carrier', 'call_id': 'call_fm_carrier',
+                    'name': 'bash', 'arguments': args, 'status': 'completed'}
+        else:
+            item = {'type': 'message', 'id': 'm_fm_carrier', 'role': 'assistant', 'status': 'completed',
+                    'content': [{'type': 'output_text', 'text': 'carrier probe finished', 'annotations': []}]}
+        events = [{'type': 'response.created', 'response': {'id': 'r_fm_carrier', 'status': 'in_progress'}},
+                  {'type': 'response.output_item.added', 'output_index': 0,
+                   'item': dict(item, status='in_progress', **({'arguments': ''} if item['type'] == 'function_call' else {'content': []}))}]
+        if item['type'] == 'function_call':
+            events += [{'type': 'response.function_call_arguments.delta', 'output_index': 0, 'item_id': item['id'], 'delta': item['arguments']},
+                       {'type': 'response.function_call_arguments.done', 'output_index': 0, 'item_id': item['id'], 'arguments': item['arguments']}]
+        else:
+            events += [{'type': 'response.content_part.added', 'output_index': 0, 'item_id': item['id'], 'content_index': 0,
+                        'part': {'type': 'output_text', 'text': ''}},
+                       {'type': 'response.output_text.delta', 'output_index': 0, 'item_id': item['id'], 'content_index': 0,
+                        'delta': 'carrier probe finished'}]
+        events += [{'type': 'response.output_item.done', 'output_index': 0, 'item': item},
+                   {'type': 'response.completed', 'response': {'id': 'r_fm_carrier', 'status': 'completed', 'output': [item],
+                                                              'usage': {'input_tokens': 1, 'output_tokens': 1, 'total_tokens': 2}}}]
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.end_headers()
+        for value in events:
+            self.wfile.write(('data: ' + json.dumps(value) + '\n\n').encode())
+        self.wfile.write(b'data: [DONE]\n\n')
+        self.wfile.flush()
+
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+        if self.path.split('?')[0].endswith('/responses'):
+            return self.openai_responses(body)
         with (lab / 'requests.jsonl').open('a') as log:
             log.write(json.dumps({'path': self.path, 'tools': [t.get('name') for t in body.get('tools', [])],
                                   'tool_result': has_tool_result(body)}) + '\n')
