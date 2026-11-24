@@ -6466,6 +6466,12 @@ spawn_try_skip() { # <rc of the failed slot step>
   spawn_skip_copy || return 1
   spawn_acquire_pool_slot
 }
+# A tmux endpoint in a marked lab home: record the shell leading its session
+# before anything is typed into it, so the lab's teardown can end what it starts
+# (bin/fm-lab-home.sh header, "Lab processes").
+if [ "$BACKEND" = tmux ] && fm_gate_lab_home "$FM_HOME"; then
+  "$SCRIPT_DIR/fm-lab-home.sh" record-launch "$FM_HOME" "$ID" "$(spawn_pane_pid)" || exit 1
+fi
 if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$RELAUNCH" -eq 1 ]; then

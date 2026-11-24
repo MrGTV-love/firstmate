@@ -6,6 +6,8 @@
   "beyond_audit_active": [
     "turnend-ask-gate",
     "live-lab-processes-stopped-before-remove",
+    "lab-home-processes-reaped-before-remove",
+    "lab-home-launch-recorded",
     "merge-local-ff-only",
     "merge-unproved-outcome",
     "close-at-merge-body-refused",
@@ -5034,7 +5036,7 @@
       "invariant": "Lab home operations target only a directory carrying the lab marker and state directory.",
       "layer": "runtime-block",
       "source": "the lab marker, canonical Git containment and the recorded tmux directory's mode, uid and socket liveness; existing decision points: site:bin/fm-lab-home.sh:d4d6d85d91",
-      "trigger": "tmux-dir or teardown on a directory that lacks the .fm-lab-home marker and state/",
+      "trigger": "tmux-dir, record-launch or teardown on a directory that lacks the .fm-lab-home marker and state/",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Create a fresh disposable home with bash bin/fm-lab-home.sh env; for an existing lab preserve its socket directory until its owner confirms private servers stopped, then retry bash bin/fm-lab-home.sh teardown <lab-home>.",
@@ -5054,7 +5056,7 @@
         {
           "file": "bin/fm-lab-home.sh",
           "match": "|| { fm_lab_home_error \"refusing '$dir': not a marked lab home\"; exit 1; }",
-          "count": 2
+          "count": 3
         }
       ]
     },
@@ -5175,6 +5177,79 @@
         {
           "file": "bin/fm-lab-home.sh",
           "match": "fm_lab_home_error \"refusing teardown: cannot confirm the lab tmux server has stopped (tmux probe exit=$probe_status)\""
+        }
+      ]
+    },
+    {
+      "id": "lab-home-processes-reaped-before-remove",
+      "version": "1",
+      "owner": "bin/fm-lab-home.sh",
+      "invariant": "Lab socket storage and its launch record remain until every process in a recorded lab session has ended.",
+      "layer": "runtime-block",
+      "source": "state/.fm-lab-launches session leaders with their recorded identity digests, the live process table and each process's kernel session id",
+      "trigger": "teardown while a process in a recorded session survives TERM and KILL, or while the launch record, process table or a session id cannot be read",
+      "remedy": "Preserve the lab home and its socket directory, end or explain each named process with its owner, then retry bash bin/fm-lab-home.sh teardown <lab-home>; a fresh lab comes from bash bin/fm-lab-home.sh env.",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-spawn-acquisition-cleanup.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-lab-home.sh",
+          "match": "fm_lab_home_error \"refusing teardown: cannot load the process identity reader\""
+        },
+        {
+          "file": "bin/fm-lab-home.sh",
+          "match": "fm_lab_home_error \"refusing teardown: the lab launch record $(fm_lab_home_launch_record \"$dir\") is unreadable\""
+        },
+        {
+          "file": "bin/fm-lab-home.sh",
+          "match": "fm_lab_home_error \"refusing teardown: cannot read the process list or session ids"
+        },
+        {
+          "file": "bin/fm-lab-home.sh",
+          "match": "fm_lab_home_error \"refusing teardown: lab processes did not exit after TERM and KILL (pid ppid command):$details\""
+        }
+      ]
+    },
+    {
+      "id": "lab-home-launch-recorded",
+      "version": "1",
+      "owner": "bin/fm-lab-home.sh",
+      "invariant": "A tmux worker launches in a lab home only after its endpoint session leader is recorded for teardown.",
+      "layer": "runtime-block",
+      "source": "the endpoint pane shell pid that bin/fm-spawn.sh reads from tmux, its fm_pid_identity, and an append to state/.fm-lab-launches",
+      "trigger": "record-launch with an unreadable or invalid pane shell pid, an unreadable identity, or an unwritable launch record",
+      "remedy": "Keep the endpoint unlaunched; make its tmux pane shell readable and the lab state directory writable, then retry bash bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on-or-off> in the lab home.",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-spawn-acquisition-cleanup.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-lab-home.sh",
+          "match": "fm_lab_home_error \"refusing to launch task $id in lab '$dir':",
+          "count": 3
         }
       ]
     },
