@@ -2566,19 +2566,16 @@ _fm_composer_select_cursorless() {
     # separator, and adds `esc to interrupt` while a turn runs. They are
     # furniture, not the lower live shape that would make this box stale.
     # The pre-usage status row is accepted only flush under the border and
-    # only as the screen's last furniture, which consumes the rest of it. Once
-    # that row is present its rule alone decides, so the furniture loop below
-    # never reconsiders the rows it refused. Neither reads FM_BUSY_REGEX.
+    # only as the screen's last furniture, which consumes the rest of it. When
+    # its tail fails, the row is not furniture to the loop below either, so
+    # the whole-screen rule after it refuses the frame. Neither reads
+    # FM_BUSY_REGEX.
     if [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_DSH" = 1 ]; then
       if [ "$next" = $((boundary + 1)) ]; then
         raw=$(_fm_composer_screen_row "$next" "$plain")
         trimmed=$raw
         fm_composer_normalize_trim_var trimmed
-        if _fm_composer_row_is_dsh_fresh_status "$trimmed"; then
-          if ! _fm_composer_dsh_fresh_tail "$plain" "$boundary"; then
-            FM_COMPOSER_SELECTED_KIND=
-            return 1
-          fi
+        if _fm_composer_row_is_dsh_fresh_status "$trimmed" && _fm_composer_dsh_fresh_tail "$plain" "$boundary"; then
           _fm_composer_rows_load "$plain"
           next=${#_FM_COMPOSER_ROWS[@]}
         fi
