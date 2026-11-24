@@ -155,6 +155,26 @@ os.unlink(final)
 sampler = root / 'sampler.py'
 sampler.write_text('''import fcntl, json, os, sys, time
 alive, stop, out, pool, size = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+blind = float(sys.argv[6]) if len(sys.argv) > 6 else 0.0  # test-only: the miss control's margin in seconds (unseen_end)
+blind_window = None
+def records(name):
+    rows = {}
+    try:
+        lines = open(os.path.join(alive, name)).read().splitlines()
+    except OSError:
+        return rows
+    for line in lines:
+        fields = line.split()
+        try:
+            rows[(fields[0], fields[1])] = float(fields[2])
+        except (IndexError, ValueError):
+            pass  # a line still being written
+    return rows
+def unseen_end(since):
+    """True once a worker that recorded its start at SINCE or later has recorded its end: read from the workers' own
+    records only, never from a marker, so the sampler stays blind while it waits."""
+    begun, ended = records('starts.log'), records('ends.log')
+    return any(stamp >= since and worker in ended for worker, stamp in begun.items())
 def locked(path):
     try:
         fd = os.open(path, os.O_RDWR)
@@ -195,11 +215,19 @@ while not os.path.exists(stop):
     for group, count in groups.items():
         peak_group[group] = max(peak_group.get(group, 0), count)
     samples += 1
+    if blind and sighted and blind_window is None:
+        # Stop looking from the first sighting until a worker that started at least BLIND seconds later has ended (or the
+        # run stops), so whole workers live unseen however slow the host is. time.time() is the workers' record clock.
+        begin = time.time()
+        while not unseen_end(begin + blind) and not os.path.exists(stop):
+            time.sleep(0.05)
+        blind_window = [begin, time.time()]
     time.sleep(0.02)
 gaps.sort()
 json.dump(dict(peak_total=peak_total, peak_group=peak_group, peak_held=peak_held, samples=samples,
                gap_p99_ms=round(gaps[int(len(gaps) * 0.99) - 1] * 1000) if gaps else 0,
-               gap_max_ms=round(gaps[-1] * 1000) if gaps else 0, labels=sorted(labels), workers_seen=sorted(sighted)), open(out, 'w'))
+               gap_max_ms=round(gaps[-1] * 1000) if gaps else 0, labels=sorted(labels), workers_seen=sorted(sighted),
+               blind_window=blind_window), open(out, 'w'))
 ''')
 
 burner = root / 'burner.py'
@@ -256,11 +284,11 @@ class World:
     def work(self, group, seconds):
         return [python, str(worker), str(self.alive), group, str(seconds)]
 
-    def sample_start(self):
+    def sample_start(self, blind=0.0):
         stop = self.folder / 'sampler.stop'
         stop.unlink(missing_ok=True)
         self.sampling = subprocess.Popen([python, str(sampler), str(self.alive), str(stop), str(self.folder / 'sampler.json'),
-                                          str(self.pool), str(self.cores)])
+                                          str(self.pool), str(self.cores), str(blind)])
         time.sleep(0.15)
 
     def sample_stop(self):
@@ -411,21 +439,28 @@ def nested_repo(world, outer, inner, seconds):
 
 
 # --------------------------------------------------------------------------------------
-def case_nested():
-    """H3 a-c: K outer runners holding p passes each, each running an inner runner that asks for more."""
-    case = Case('H3abc', 'nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size %d' % N)
-    world = World('nested')
+def nested_run(name, blind=0.0):
+    """H3 a-c's scenario: K outer runners holding p passes each, each running an inner runner that asks for more.
+
+    BLIND > 0 blinds the real sampler once, from its first sighting until a worker that started BLIND seconds later has ended
+    (the miss control)."""
+    world = World(name)
     p, K = N // 2, 3
     names = isolated_scripts(8)
     path = runner_repo(world, names, 0.35)
-    world.sample_start()
+    world.sample_start(blind)
     outers = [world.launch('outer%d' % i, ['bash', tool('fm-cpu-pass.sh'), 'run', '--passes', str(p), '--label', 'outer%d' % i, '--',
                                           'bash', '-c', 'cd "$1" && shift && exec bin/fm-test-run.sh --jobs 6 "$@"', '_', str(path)]
-                           + ['tests/' + name for name in names], extra=dict(FM_CONC_GROUP='outer%d' % i)) for i in range(K)]
+                           + ['tests/' + name_ for name_ in names], extra=dict(FM_CONC_GROUP='outer%d' % i)) for i in range(K)]
     codes = wait_all(outers)
     seen = world.sample_stop()
-    began, ended = starts(world), ends(world)
-    logged_total, logged_per_outer = logged_peaks(began, ended)
+    return dict(world=world, p=p, K=K, names=names, codes=codes, seen=seen, began=starts(world), ended=ends(world))
+
+
+def judge_nested(case, run, label):
+    """H3abc's verdict on one nested run."""
+    world, p, K, names, codes, seen, began = (run[key] for key in ('world', 'p', 'K', 'names', 'codes', 'seen', 'began'))
+    logged_total, logged_per_outer = logged_peaks(began, run['ended'])
     case.measure(outer_runners=K, passes_each=p, pool_size=N, inner_jobs_requested=6, scripts_each=len(names),
                  sampled_max_workers_total=seen['peak_total'], sampled_max_per_outer=seen['peak_group'],
                  sampled_max_passes_held=seen['peak_held'], samples=seen['samples'], sampler_gap_p99_ms=seen['gap_p99_ms'],
@@ -434,9 +469,9 @@ def case_nested():
     # This case judges the sampler on the harm itself, not on sampling_valid's 50 ms gap limit, which a healthy sampler crossed
     # on a CI runner (p99 20 ms, max 55 ms) while every worker it watches lives at least 350 ms: a worker it never saw fails
     # at any gap, and the worker cap is also counted from the workers' own records, so no gap length decides whether an
-    # overlap of their busy loops is seen.
+    # overlap of their busy loops is seen. The H3abc miss control runs this verdict on a really blinded sampler.
     case.check(len(began) == K * len(names), 'only %d of %d workers recorded their start' % (len(began), K * len(names)))
-    sampler_saw_every_worker(case, seen, ['%s.%d' % (group, pid) for group, pid, _ in began], 'nested')
+    sampler_saw_every_worker(case, seen, ['%s.%d' % (group, pid) for group, pid, _ in began], label)
     case.check(logged_total <= N, 'workers busy together by their own records %d exceed the pool size %d' % (logged_total, N))
     for group, peak in logged_per_outer.items():
         case.check(peak <= p, '%s ran %d workers together inside %d passes by their own records' % (group, peak, p))
@@ -450,6 +485,49 @@ def case_nested():
         reduced = world.text('outer%d' % i).count('reducing --jobs 6 to inherited FM_CPU_PASS_HELD=%d' % p)
         case.check(reduced == 1, 'outer%d printed %d reduction notices instead of 1' % (i, reduced))
         case.check(world.text('outer%d' % i, 'out').count('exit=0') == len(names), 'outer%d did not finish every script' % i)
+
+
+def case_nested():
+    """H3 a-c: K outer runners holding p passes each, each running an inner runner that asks for more."""
+    case = Case('H3abc', 'nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size %d' % N)
+    judge_nested(case, nested_run('nested'), 'nested')
+    return case
+
+
+# The sampler marks a worker seen when it finds its marker locked. A worker locks its marker a moment before it records its
+# start, so one that recorded its start within this margin after the sampler stopped looking may still have been seen;
+# from the margin on, a worker whose start and end both fall while the sampler is not looking was never seen.
+MISS_MARGIN_SECONDS = 0.25
+
+
+def case_nested_miss_control():
+    """H3abc control: a real nested run whose real sampler stops looking fails H3abc's verdict, which names the unseen
+    workers; the same run with the sampler looking throughout passes. The sampler stays blind until a worker that started
+    MISS_MARGIN_SECONDS or more into the blindness has ended, so the run is short on a fast host and still holds on a slow one."""
+    case = Case('H3abc miss control', 'the nested run with its sampler blinded from its first sighting until a worker that started %g s later has ended, then not blinded: H3abc must name every worker that lived wholly unseen, name no worker the sampler could see, and pass the run not blinded' % MISS_MARGIN_SECONDS)
+    for label, blind in (('blinded', MISS_MARGIN_SECONDS), ('not-blinded', 0.0)):
+        run = nested_run('nested-' + label, blind)
+        verdict = Case('H3abc', label)
+        judge_nested(verdict, run, label)
+        prefix = '%s: the sampler never saw ' % label
+        named = sorted(set(' '.join(message.split(': ')[-1] for message in verdict.violations if message.startswith(prefix)).split()))
+        window = run['seen'].get('blind_window')
+        life = {'%s.%d' % (group, pid): [stamp, None] for group, pid, stamp in run['began']}
+        for group, pid, stamp in run['ended']:
+            life.setdefault('%s.%d' % (group, pid), [None, None])[1] = stamp
+        unseen = sorted(worker for worker, (begun, done) in life.items()
+                        if window and begun is not None and done is not None and begun >= window[0] + MISS_MARGIN_SECONDS and done <= window[1])
+        touching = sorted(worker for worker, (begun, done) in life.items() if window and begun is not None and begun <= window[1] and (done is None or done >= window[0]))
+        case.measure(**{label + '_blind_window_s': round(window[1] - window[0], 3) if window else None, label + '_workers': len(life),
+                        label + '_lived_wholly_unseen': unseen, label + '_named_missed': named, label + '_verdict': verdict.violations})
+        if blind:
+            case.check(window, 'blinded: the sampler never stopped looking')
+            case.check(unseen, 'blinded: no worker lived wholly unseen (the run ended first), so the control proves nothing')
+            case.check(set(unseen) <= set(named), 'blinded: H3abc did not name every worker that lived wholly unseen: missing %s' % sorted(set(unseen) - set(named)))
+            case.check(set(named) <= set(touching), 'blinded: H3abc named a worker that lived only while the sampler was looking: %s' % sorted(set(named) - set(touching)))
+        else:
+            case.check(window is None and not named, 'not-blinded: the sampler was blinded or missed %s' % named)
+            case.check(not verdict.violations, 'not-blinded: the normal nested run failed H3abc: %s' % verdict.violations)
     return case
 
 
@@ -2034,7 +2112,7 @@ def case_proof_contention():
     return case
 
 
-CASES = [case_nested, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_missing_helper_counts, case_proof_contention, case_proof_own_interval, case_async_cycle, case_gate_chain_cycle, case_multiholder_cycle, case_cycle_tail, case_mixed_version_records, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
+CASES = [case_nested, case_nested_miss_control, case_nested_two_level, case_nested_other_key, case_sibling_runners, case_mixed_cycle, case_lease_slot_cycle, case_holder_killed, case_one_candidate_proof, case_unusable_modes, case_guard_unavailable, case_guard_pipe_window, case_degrade_nested, case_pass_count_bounds, case_missing_helper_counts, case_proof_contention, case_proof_own_interval, case_async_cycle, case_gate_chain_cycle, case_multiholder_cycle, case_cycle_tail, case_mixed_version_records, case_shell_between_waits, case_one_reservation, case_jobs_clamp, case_duration_sample, case_padded_marker, case_key_guard, case_cross_key, case_malformed, case_brief_route, case_runner_holder, case_lint, case_isolation_proof, case_waiting, case_burst_drain, case_drain, case_wait_cause_control, case_same_class_order, case_sampler_control, case_soak]
 
 
 def main():
