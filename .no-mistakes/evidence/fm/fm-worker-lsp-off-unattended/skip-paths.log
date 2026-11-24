@@ -1,0 +1,6 @@
+skip: live: disabled by FM_LIVE=0
+exit=0
+-- own switch FM_OMP_LSP_OVERLAY_LIVE=0 (must NOT skip; first line only, then stopped):
+ok - no overlay: omp offers the lsp tool and starts a language server on a write
+Terminated: 15
+exit=124 (124 = still running after 60s, so it did not skip)

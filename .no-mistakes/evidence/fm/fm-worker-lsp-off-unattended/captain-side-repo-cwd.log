@@ -1,0 +1,11 @@
+## captain-side: omp in the firstmate worktree, no --config, asks for lsp tool
+cwd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87574A270JTH7XJTBVF50QV
+exit=0 (0 = lsp tool accepted)
+
+## same, with the session overlay (fleet), for contrast
+exit=2
+Error: Built-in tool unavailable in this session: lsp.
+Run `omp --help` for available flags.
+
+## git status after:
+(end)

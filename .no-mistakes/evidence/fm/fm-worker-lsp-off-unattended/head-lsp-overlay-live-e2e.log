@@ -1,0 +1,6 @@
+omp/19.1.1
+ok - no overlay: omp offers the lsp tool and starts a language server on a write
+ok - session overlay alone (secondmate launch): no lsp tool and no language server
+ok - worker overlay alone: no lsp tool and no language server
+ok - session then worker overlay (crewmate and scout launch): no lsp tool and no language server
+bash tests/fm-omp-lsp-overlay-live-e2e.test.sh  9.34s user 4.00s system 8% cpu 2:31.04 total

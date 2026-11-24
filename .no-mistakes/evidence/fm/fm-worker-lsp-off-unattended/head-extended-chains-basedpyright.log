@@ -1,0 +1,21 @@
+omp/19.1.1
+/Users/charlesabrooker/.local/share/uv/tools/basedpyright/lib/python3.12/site-packages/basedpyright/dist/pyright-langserver.js:28272
+ok - no overlay: omp offers the lsp tool and starts a language server on a write
+ok - session overlay alone (secondmate launch): no lsp tool and no language server
+ok - worker overlay alone: no lsp tool and no language server
+ok - session then worker overlay (crewmate and scout launch): no lsp tool and no language server
+ok - full crewmate chain (session, worker, per-worker fallback yml, --no-title): no lsp tool and no language server
+ok - no-helpers crewmate chain (plus fm-no-helpers-overlay, --no-extensions --no-skills --no-rules): no lsp tool and no language server
+# bpcontrol omp descendants:
+86922 /Users/charlesabrooker/.bun/bin/omp __omp_worker_daemon
+87648 /Users/charlesabrooker/.local/share/uv/tools/basedpyright/bin/python /Users/charlesabrooker/.local/bin/basedpyright-langserver --stdio
+87788 /Users/charlesabrooker/.local/share/uv/tools/basedpyright/lib/python3.12/site-packages/nodejs_wheel/bin/node /Users/charlesabrooker/.local/share/uv/tools/basedpyright/lib/python3.12/site-package
+87655 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/ruff server
+ok - real basedpyright control (no overlay): check above shows whether basedpyright ran
+# bpcrew omp descendants:
+74790 /Users/charlesabrooker/.bun/bin/omp __omp_worker_daemon
+ok - real basedpyright, full crewmate chain: no basedpyright process under omp
+# bpsecond omp descendants:
+55228 /Users/charlesabrooker/.bun/bin/omp __omp_worker_daemon
+ok - real basedpyright, secondmate chain: no basedpyright process under omp
+exit=0

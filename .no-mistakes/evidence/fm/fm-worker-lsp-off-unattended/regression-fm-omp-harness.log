@@ -1,0 +1,40 @@
+ok - .omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement
+ok - fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch
+ok - launch-model history preserves both families across relaunch
+ok - omp ship native fallback stand-ins are ship author evidence
+ok - default fallback overlay matches pre-change bytes
+ok - fixed-family empties native chains, survives relaunch, and is dropped on promotion
+ok - fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op
+ok - omp explicit shutdown logs its retirement expiry; readiness has no wall-clock cutoff
+ok - .omp watch extension: other restoration has its own failure reason and arm count
+ok - .omp watch extension: missing restoration has its own failure reason and arm count
+ok - .omp watch extension: exhausted restoration has its own failure reason and arm count
+ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled replay delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled foreign-late delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled foreign-never delivery preserves continuity and wake ownership
+ok - fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry
+ok - session lock and tmux liveness: omp is anchored, decoys stay out
+ok - fm-spawn refuses omp openai and openrouter routes before any worker launches
+ok - raw omp model flags refuse API billing and preserve subscription and non-model arguments
+ok - fallback admission excludes API-billed destinations from selection and native chains
+ok - fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension
+ok - no-helper posture rejects other runtimes and supervisor sessions before publishing or launching
+ok - no-helper launch, emptied fallback, record, relaunch inheritance and invalid-record refusal hold
+ok - no-helper omp launch refuses ultra effort before publishing or launching
+ok - every canonical omp ship and scout launch and relaunch disables titles and routes smol and tiny to the worker's own model with scalar roles only
+ok - omp ship and scout launches select replace edit mode only in the worker process
+ok - real omp spawns give firstmate alone, without no-helpers, native find, and a judge credential, and no write sends a guard request
+ok - launch preserves healthy pooled accounts and uses only the selected rule's stand-in
+ok - native chains preserve fallback order and shared launch policy
+ok - retired fallback refusal covers launch-time selection and runtime chains
+ok - typed route class and effort constrain launch stand-ins while manual routes are unchanged
+ok - stale unrelated dispatch rules do not block a launch
+ok - strongest-model exhaustion neither spends saved resets nor weakens or discards the task
+ok - fm-spawn: omp model validation is scoped to providers the listing can prove
+ok - fm-spawn: an omp launch with no model refuses a missing or unlisted default role and names the remedy
+ok - fm-spawn: global role inspection is read-only, unlayered, and honors PI_CODING_AGENT_DIR
+ok - fm-spawn: raw omp launches validate the default only without an effective model override
+ok - fm-spawn: raw role and catalog inspection honor the actual launch directory and uncertain evidence passes through
+ok - fm-spawn: omp profile flags, assignments, and invoking environment pass through without default-role catalog probes
