@@ -1233,6 +1233,10 @@ test_successor_relaunch_refuses_a_scout_branch_another_task_records() {
   rc=0; out=$(run_spawn "$dir" "$id-v2" --relaunch --harness claude --owned-path scripts) || rc=$?
   expect_code 1 "$rc" "a scout relaunch onto another task's recorded successor must refuse"$'\n'"$out"
   assert_contains "$out" "task $id records refs/heads/fm/$id-v2 as its successor branch" "the refusal must name the recording task and the ref"
+  assert_contains "$out" "Ask Main to end task $id's succession before relaunching task $id-v2" "a scout's launch refusal must name the step that frees the ref"
+  case "$out" in
+    *reassociate*) fail "a scout's launch refusal offered reassociation, which sets branch= for a ship only: $out" ;;
+  esac
   cmp -s "$dir/scout.before" "$dir/home/state/$id-v2.meta" || fail "the refused relaunch changed the scout record"
   fp "$dir/wt-scout" | cmp -s - "$dir/scout-copy.before" || fail "the refused relaunch changed the scout's copy"
   [ "$(git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)')" = "$refs_before" ] || fail "the refused relaunch changed a branch or ref"
@@ -1252,7 +1256,22 @@ test_successor_relaunch_refuses_a_scout_branch_another_task_records() {
   other_meta=$(sed "s#$dir#CASE#g" "$dir/home/state/$id-v3.meta")
   assert_equals "$base" "$other" "a recorded successor the scout does not take must not change what its relaunch prints or returns"
   assert_equals "$base_meta" "$other_meta" "a recorded successor the scout does not take must not change the record its relaunch leaves"
-  pass "successor: a governed scout relaunch onto another task's recorded successor refuses and changes nothing, and otherwise relaunches as before"
+  # The ship half: a ship relaunch whose default fm/<id> another task records refuses
+  # at the launch owner's final check and offers the reassociation a ship can use. The
+  # claimant's record is written by hand: the real verb admits a successor only in its
+  # own task's name family, and the launch reads only its successor_branch= line.
+  local sid=suc-relaunch-ship
+  dir=$(new_case relaunch-ship "$sid")
+  add_ship_task "$dir" "$sid" claude
+  printf 'kind=ship\nbranch=fm/owner-%s\nsuccessor_branch=fm/%s\n' "$sid" "$sid" > "$dir/home/state/owner-$sid.meta"
+  printf 'zsh' > "$dir/fake/command"
+  cp -p "$dir/home/state/$sid.meta" "$dir/ship.before"
+  rc=0; out=$(run_spawn "$dir" "$sid" --relaunch --harness claude) || rc=$?
+  expect_code 1 "$rc" "a ship relaunch onto another task's recorded successor must refuse"$'\n'"$out"
+  cmp -s "$dir/ship.before" "$dir/home/state/$sid.meta" || fail "the refused ship relaunch changed the task record"
+  assert_contains "$out" "task owner-$sid records refs/heads/fm/$sid as its successor branch" "the ship refusal must name the recording task and the ref"
+  assert_contains "$out" "reassociate task $sid onto another branch" "a ship's launch refusal must offer reassociation onto another branch"
+  pass "successor: a governed scout relaunch onto another task's recorded successor refuses and changes nothing, and otherwise relaunches as before; the launch owner's refusal offers a scout only the end of the succession and a ship also reassociation"
 }
 
 # A relaunch through fm-control.sh that must refuse because the branch the launch would
