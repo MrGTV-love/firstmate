@@ -301,17 +301,21 @@ sys.exit(module.main())
 
 # The C5 shape: a real CPU burst, then creep. The burst is progress while it is
 # inside the trailing window; once the window slides past it the creep alone
-# is idle. Under the 30x clock the 60 s window is 2 real seconds and the 30 s
-# bound 1, so the stop lands a few real seconds after the burst ends.
-burst = creep.replace('while True:', 'while time.process_time() < 1.5:\n    pass\nwhile True:', 1)
+# is idle. Under a 10x clock the 60 s window is 6 real seconds, about six CPU
+# samples (one per real second), and the 30 s bound 3, so the stop lands about
+# nine real seconds after the 3 s burst ends; a window that never slid past the
+# burst would hold the clock until the 60 real second absolute limit.
+tenfold_clock = tmp / 'tenfold-clock-run.py'
+tenfold_clock.write_text(scaled_clock.read_text().replace('real() * 30', 'real() * 10'))
+burst = creep.replace('while True:', 'while time.process_time() < 3:\n    pass\nwhile True:', 1)
 burst_cpu, burst_pid = tmp / 'burst.cpu', tmp / 'burst.pid'
 begun = time.monotonic()
-bursted = subprocess.run([sys.executable, str(scaled_clock), str(helper), 'run', 'creep.burst', '--', sys.executable, '-c', burst, str(burst_cpu), str(burst_pid)],
-                         env=dict(env, FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='900'), cwd=workrepo, capture_output=True, text=True)
+bursted = subprocess.run([sys.executable, str(tenfold_clock), str(helper), 'run', 'creep.burst', '--', sys.executable, '-c', burst, str(burst_cpu), str(burst_pid)],
+                         env=dict(env, FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='600'), cwd=workrepo, capture_output=True, text=True)
 bursted_elapsed = time.monotonic() - begun
 assert bursted.returncode == 124 and 'no_progress' in bursted.stderr and 'absolute_limit' not in bursted.stderr, (bursted.returncode, bursted.stderr)
-assert bursted_elapsed < 20, f'a past CPU burst held off the no-progress stop: {bursted_elapsed:.1f}s'
-assert float(burst_cpu.read_text()) >= 1.5, burst_cpu.read_text()
+assert bursted_elapsed < 40, f'a past CPU burst held off the no-progress stop: {bursted_elapsed:.1f}s'
+assert float(burst_cpu.read_text()) >= 3, burst_cpu.read_text()
 
 
 def wait_for(path):
