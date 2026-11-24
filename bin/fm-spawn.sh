@@ -6856,6 +6856,10 @@ if [ "$SLOT_GOVERNED" = 1 ] && [ "$SLOT_ADOPT" = 1 ]; then
   fm_slot_drift_report "$WT" "$ID" "$BRANCH" "$FM_SLOT_BASE_SHA" "${SLOT_OWNED_PATHS[@]}"
   render_launch_brief || exit 1
 elif [ "$SLOT_GOVERNED" = 1 ]; then
+  # A relaunch that provisions a manifest on its own copy asks the adoption's custody owner first: a clean copy another
+  # task holds is refused by name and the provisioner is not run (D7 (e)). A fresh spawn and a relocation keep their routes.
+  [ "$RELAUNCH" -eq 0 ] || [ "$RELAUNCH_RELOCATING" = 1 ] ||
+    fm_slot_provision_custody "$PROJ_ABS" "$WT" "$ID" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
   fm_slot_provision spawn_slot_run_in_pane "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
     "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "$SLOT_SOURCE_REF" "$SLOT_SOURCE_SHA" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused
   render_launch_brief || exit 1
@@ -8701,6 +8705,9 @@ sleep 0.3
 if [ "$SLOT_ADOPT" = 1 ]; then
   FM_SLOT_ADOPT_WIRED=1
   fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+elif [ "$SLOT_GOVERNED" = 1 ] && [ "$RELAUNCH" -eq 1 ] && [ "$RELAUNCH_RELOCATING" != 1 ]; then
+  # The provisioning route's custody, judged once more immediately before the launch is delivered (D7 (e)).
+  fm_slot_provision_custody "$PROJ_ABS" "$WT" "$ID" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
 fi
 spawn_send_or_abort "launch command" spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3

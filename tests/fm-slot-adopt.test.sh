@@ -219,6 +219,8 @@ test_old_copy_preflight_asks_the_provisioner_that_would_really_run() {
   git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
   git -C "$P_DIR/copy" update-ref refs/remotes/origin/main "$(git -C "$P_DIR/copy" rev-parse HEAD)"
   printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy" "$P_PROJ" >"$P_DIR/t.meta"
+  mkdir -p "$P_DIR/home/state" "$P_DIR/home/data"
+  export FM_HOME="$P_DIR/home"
   [ ! -e "$P_DIR/copy/scripts/git-stability/provision_existing_slot.py" ] || fail 'the fixture copy still has the provisioner'
   out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
   [ "$rc" -eq 0 ] || fail "a clean old copy was refused by the preflight: $out"
@@ -309,7 +311,8 @@ test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named
   git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
   git -C "$P_DIR/copy" update-ref refs/remotes/origin/main "$(git -C "$P_DIR/copy" rev-parse HEAD)"
   printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy" "$P_PROJ" >"$P_DIR/t.meta"
-  mkdir -p "$P_DIR/durable" "$P_DIR/hookstate/worktree-lifecycle"
+  mkdir -p "$P_DIR/home/state" "$P_DIR/home/data" "$P_DIR/durable" "$P_DIR/hookstate/worktree-lifecycle"
+  export FM_HOME="$P_DIR/home"
   digest=$(python3 -c 'import hashlib,os,sys; print(hashlib.sha256(os.path.realpath(sys.argv[1]).encode()).hexdigest()[:16])' "$P_DIR/copy")
   export WORKTREE_LIFECYCLE_STORE_DIR="$P_DIR/durable" CODEX_HOOK_STATE_DIR="$P_DIR/hookstate"
   out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
@@ -370,6 +373,37 @@ test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name() {
   pass "adoption: a shadowed legacy pointer and a disagreeing legacy record are refused by name; the durable pointer, alone or with an agreeing legacy record, is admitted"
 }
 
+# D7 (e): the no-manifest route asks the adoption's custody owner before it provisions: a clean copy another task's
+# record names is refused by name before the stop, and the own copy is admitted.
+test_the_no_manifest_route_consults_copy_custody() {
+  local out rc
+  make_primary noman-custody
+  git clone --quiet --bare "$P_PROJ" "$P_DIR/origin.git"
+  git -C "$P_PROJ" remote add origin "file://$P_DIR/origin.git"
+  git -C "$P_PROJ" fetch --quiet origin
+  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" origin/main
+  git -C "$P_DIR/copy" rm -rq scripts
+  git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
+  git -C "$P_DIR/copy" update-ref refs/remotes/origin/main "$(git -C "$P_DIR/copy" rev-parse HEAD)"
+  mkdir -p "$P_DIR/home/state" "$P_DIR/home/data"
+  export FM_HOME="$P_DIR/home"
+  printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy" "$P_PROJ" >"$P_DIR/home/state/t.meta"
+  out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/home/state/t.meta" README.md 2>&1); rc=$?
+  case "$out" in *custody_*) fail "the own copy was refused by custody: $out" ;; esac
+  # a paused task's record that names the same copy, with no lifecycle manifest anywhere
+  printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy" "$P_PROJ" >"$P_DIR/home/state/other.meta"
+  out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/home/state/t.meta" README.md 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "a clean copy another task's record names reached the provisioner: $out"
+  assert_contains "$out" 'slot provisioning refused: custody_other_record' 'the foreign holder was not refused by name on the provisioning route'
+  # the spawn-side entry point gives the same verdict
+  out=$(fm_slot_provision_custody "$P_PROJ" "$P_DIR/copy" t "$P_DIR/home/state/t.meta" "$P_DIR/home/state" 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "the spawn-side custody consult admitted a copy another task's record names: $out"
+  rm -f "$P_DIR/home/state/other.meta"
+  out=$(fm_slot_provision_custody "$P_PROJ" "$P_DIR/copy" t "$P_DIR/home/state/t.meta" "$P_DIR/home/state" 2>&1); rc=$?
+  [ "$rc" -eq 0 ] || fail "the own copy was refused by the spawn-side custody consult: $out"
+  pass "no-manifest route: a clean copy another task's record names is refused by name before provisioning; the own copy is admitted"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
@@ -382,6 +416,7 @@ test_a_second_adoption_refusal_says_the_wiring_and_record_were_written
 test_a_refused_provision_leaves_no_export_directory
 test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner
 test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named
+test_the_no_manifest_route_consults_copy_custody
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

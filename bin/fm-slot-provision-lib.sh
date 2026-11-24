@@ -423,6 +423,9 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
     esac
     return 1
   fi
+  # Creating a manifest on a copy is a provisioning act: a clean copy another task holds is named before the stop, and
+  # again before the provisioner runs and before the launch is delivered (fm-spawn.sh), with the adoption's custody owner.
+  fm_slot_provision_custody "$project" "$copy" "$id" "$meta" "$(dirname "$meta")" || return 1
   [ -z "$(fm_meta_get "$meta" slot_source_ref)" ] || return 0
   base=$(git -C "$copy" merge-base origin/main HEAD 2>/dev/null) || return 0
   for path in "$@"; do
@@ -584,6 +587,14 @@ fm_slot_primary_route_allowed() { # <meta>
   [ "$(fm_meta_get "$1" recovery)" != slot-provision-refused ]
 }
 
+# The custody decision of a relaunch that provisions a manifest on its own copy (no recorded manifest): named by the same
+# refusal prefix as the other provisioning refusals, so the session-end reader classifies it. Returns 0 or 1.
+fm_slot_provision_custody() { # <project> <copy> <task-id> <meta> <state-dir>
+  fm_slot_custody_check "$@" && return 0
+  echo "error: slot provisioning refused: $FM_SLOT_CUSTODY_REASON: $FM_SLOT_CUSTODY_DETAIL; no manifest, scope, record or copy was changed" >&2
+  return 1
+}
+
 fm_slot_adopt_refuse() { # <reason> <detail>
   local changed='no manifest, scope, record or copy was changed'
   if [ "${FM_SLOT_ADOPT_WIRED:-0}" = 1 ]; then
@@ -676,12 +687,54 @@ print("ok")
 PY
 }
 
+# The copy-custody decision, one for every route that provisions or adopts a manifest on a copy: the existing owners'
+# verdict passed through and fail-closed (another task's record naming this copy, an unreadable home or record, and a
+# pool-slot claim that is not provably this task's). Returns 0, or 1 with FM_SLOT_CUSTODY_REASON and
+# FM_SLOT_CUSTODY_DETAIL set; reads only.
+FM_SLOT_CUSTODY_REASON=
+FM_SLOT_CUSTODY_DETAIL=
+fm_slot_custody_fail() { # <reason> <detail>
+  FM_SLOT_CUSTODY_REASON=$1
+  FM_SLOT_CUSTODY_DETAIL=$2
+  return 1
+}
+fm_slot_custody_check() { # <project> <copy> <task-id> <meta> <state-dir>
+  local project=$1 copy=$2 id=$3 meta=$4 state=$5 real_copy slot rc=0
+  FM_SLOT_CUSTODY_REASON=
+  FM_SLOT_CUSTODY_DETAIL=
+  real_copy=$(CDPATH='' cd -- "$copy" 2>/dev/null && pwd -P) || { fm_slot_custody_fail copy_unreadable "$copy"; return 1; }
+  fm_task_copy_other_record "$meta" "$state" "$copy" || rc=$?
+  case "$rc" in
+    0) fm_slot_custody_fail custody_other_record "task $FM_TASK_COPY_OTHER_ID's record names this copy as its $FM_TASK_COPY_OTHER_FIELD"; return 1 ;;
+    1) ;;
+    *) fm_slot_custody_fail custody_unreadable 'a registered home or task record could not be read, so no other holder is proved absent'; return 1 ;;
+  esac
+  slot=$(fm_task_copy_enclosing_pool_slot "$project" "$real_copy") || slot=
+  [ -n "$slot" ] || { fm_treehouse_pool_slot "$project" "$real_copy" && slot=$real_copy; } || slot=
+  if [ -n "$slot" ]; then
+    fm_treehouse_slot_owner_state "$slot" "$id"
+    case "$FM_TREEHOUSE_SLOT_OWNER" in
+      absent) ;;
+      mine)
+        # A claim for this task ID from another home is not this task's own (the relocation path's rule).
+        fm_treehouse_slot_claim_home_is_this_home || {
+          fm_slot_custody_fail custody_slot_claim "pool slot $slot is claimed for task $id by another home (${FM_TREEHOUSE_SLOT_OWNER_HOME:-no home recorded})"
+          return 1
+        } ;;
+      other)
+        fm_slot_adopt_sibling_claim "$slot" "$real_copy" "$state" ||
+          { fm_slot_custody_fail custody_slot_claim "pool slot $slot is claimed by task $FM_TREEHOUSE_SLOT_OWNER_ID"; return 1; } ;;
+      *) fm_slot_custody_fail custody_slot_claim "the owner claim of pool slot $slot cannot be read"; return 1 ;;
+    esac
+  fi
+}
+
 # Judge the recorded manifest against the task's own record, copy and branch. Returns 0 and sets
 # FM_SLOT_MANIFEST, FM_SLOT_BASE_SHA, FM_SLOT_BASE_REF and FM_SLOT_ADOPTED=1 only when every check holds;
 # otherwise prints the refusal by name and returns 1.
 fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
   local project=$1 copy=$2 id=$3 branch=$4 meta=$5 state=$6
-  local manifest base ref common slot_common real_copy root verdict line git_head head_name marker slot rc records
+  local manifest base ref common slot_common real_copy root verdict line git_head head_name marker records
   local -a scope=()
   FM_SLOT_ADOPTED=0
   manifest=$(fm_meta_get "$meta" slot_manifest)
@@ -732,33 +785,8 @@ fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
       return 1
     }
   fi
-  # Custody is the existing owners' verdict, passed through and fail-closed: another task's record naming this
-  # copy, an unreadable home or record, and a pool-slot claim that is not provably this task's refuse by name.
-  rc=0
-  fm_task_copy_other_record "$meta" "$state" "$copy" || rc=$?
-  case "$rc" in
-    0) fm_slot_adopt_refuse custody_other_record "task $FM_TASK_COPY_OTHER_ID's record names this copy as its $FM_TASK_COPY_OTHER_FIELD"; return 1 ;;
-    1) ;;
-    *) fm_slot_adopt_refuse custody_unreadable 'a registered home or task record could not be read, so no other holder is proved absent'; return 1 ;;
-  esac
-  slot=$(fm_task_copy_enclosing_pool_slot "$project" "$real_copy") || slot=
-  [ -n "$slot" ] || { fm_treehouse_pool_slot "$project" "$real_copy" && slot=$real_copy; } || slot=
-  if [ -n "$slot" ]; then
-    fm_treehouse_slot_owner_state "$slot" "$id"
-    case "$FM_TREEHOUSE_SLOT_OWNER" in
-      absent) ;;
-      mine)
-        # A claim for this task ID from another home is not this task's own (the relocation path's rule).
-        fm_treehouse_slot_claim_home_is_this_home || {
-          fm_slot_adopt_refuse custody_slot_claim "pool slot $slot is claimed for task $id by another home (${FM_TREEHOUSE_SLOT_OWNER_HOME:-no home recorded})"
-          return 1
-        } ;;
-      other)
-        fm_slot_adopt_sibling_claim "$slot" "$real_copy" "$state" ||
-          { fm_slot_adopt_refuse custody_slot_claim "pool slot $slot is claimed by task $FM_TREEHOUSE_SLOT_OWNER_ID"; return 1; } ;;
-      *) fm_slot_adopt_refuse custody_slot_claim "the owner claim of pool slot $slot cannot be read"; return 1 ;;
-    esac
-  fi
+  fm_slot_custody_check "$project" "$copy" "$id" "$meta" "$state" ||
+    { fm_slot_adopt_refuse "$FM_SLOT_CUSTODY_REASON" "$FM_SLOT_CUSTODY_DETAIL"; return 1; }
   FM_SLOT_MANIFEST=$manifest
   FM_SLOT_BASE_SHA=$base
   FM_SLOT_BASE_REF=$ref
