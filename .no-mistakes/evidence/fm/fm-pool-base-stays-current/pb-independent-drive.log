@@ -1,0 +1,55 @@
+
+== PB1/PB2 happy path: local main ahead of origin/main, fm-pool-base behind
+
+origin/main=ffafb75976a010e9d061ba202892099a3d8ce54d local main=f98080d81012461a6efa8f18bfdd1857ec1d6160 fm-pool-base(before)=187c9b9d560f67c81af78060f2c0d6bc1f8eaf81
+fixture: local main strictly ahead of origin/main: yes
+
+== control: real treehouse get BEFORE the step (shows the bug the change fixes)
+copy=/private/tmp/pbdrv/scn.DzQS/a/pool/.treehouse/repo-3c516a/1/repo HEAD=187c9b9d560f67c81af78060f2c0d6bc1f8eaf81 (stale fm-pool-base=187c9b9d560f67c81af78060f2c0d6bc1f8eaf81, origin=ffafb75976a010e9d061ba202892099a3d8ce54d)
+fm-pool-base: advanced 187c9b9d560f67c81af78060f2c0d6bc1f8eaf81 to origin default ffafb75976a010e9d061ba202892099a3d8ce54d
+rc=0
+ref diff after step:
+1c1
+< refs/heads/fm-pool-base 187c9b9d560f67c81af78060f2c0d6bc1f8eaf81
+---
+> refs/heads/fm-pool-base ffafb75976a010e9d061ba202892099a3d8ce54d
+fm-pool-base(after)=ffafb75976a010e9d061ba202892099a3d8ce54d expected=ffafb75976a010e9d061ba202892099a3d8ce54d
+reflog:
+ffafb75976a010e9d061ba202892099a3d8ce54d fm-pool-base: fast-forward to the origin default
+187c9b9d560f67c81af78060f2c0d6bc1f8eaf81 branch: Created from main
+
+== PB2 second step with nothing new
+rc=0
+no ref changed
+
+== PB1 real treehouse get AFTER the step
+copy=/private/tmp/pbdrv/scn.DzQS/a/pool/.treehouse/repo-3c516a/1/repo HEAD=ffafb75976a010e9d061ba202892099a3d8ce54d
+PASS copy HEAD == origin/main
+local main untouched
+
+== PB3 adversarial cases (each must refuse, rc=1, refs byte-identical)
+
+ahead          rc=1 refs-identical=yes msg=error: fm-pool-base refused (ahead): fm-pool-base (525dbd41a4f6ec34506e62783519c341ad4522fe) holds commits the origin default (d21feb91335e1d3d43fb3eecb5d94fd299d9bc99) lacks [fm-pool-base: 525dbd41a4f6ec34506e62783519c341ad4522fe; origin default: d21feb91335e1d3d43fb3eecb5d94fd299d9bc99]; every ref is as it was
+
+diverged       rc=1 refs-identical=yes msg=error: fm-pool-base refused (diverged): fm-pool-base (1429fe47ac4d0fe619060b2b0f2dbfd698f97db7) and the origin default (33555bab1bb943b83f20b9175300da1798cd3b7c) each hold commits the other lacks [fm-pool-base: 1429fe47ac4d0fe619060b2b0f2dbfd698f97db7; origin default: 33555bab1bb943b83f20b9175300da1798cd3b7c]; every ref is as it was
+
+absent         rc=1 refs-identical=yes msg=error: fm-pool-base refused (absent): the treehouse config of /tmp/pbdrv/scn.DzQS/ab/repo names fm-pool-base as the pool base, but the branch does not exist; the repository's owner creates it at the origin default c0bb9e6c473155e90f0571685ee5b5225c23058e [fm-pool-base: absent; origin default: c0bb9e6c473155e90f0571685ee5b5225c23058e]; every ref is as it was
+  absent: not created
+
+origin_missing rc=1 refs-identical=yes msg=error: fm-pool-base refused (origin_missing): /tmp/pbdrv/scn.DzQS/om/repo has no origin remote, so there is no origin default to follow [fm-pool-base: a82cbb62c0feb3cea90af7b5884e4cc84352190a; origin default: unavailable]; every ref is as it was
+
+origin_unread  rc=1 refs-identical=yes msg=error: fm-pool-base refused (origin_unreadable): the origin default of /tmp/pbdrv/scn.DzQS/ou/repo could not be read [fm-pool-base: 0ec15d3aa4e6568c693d1038c76e249ef2835693; origin default: unavailable]; every ref is as it was
+origin_notcommit rc=1 refs-identical=yes msg=error: fm-pool-base refused (origin_unreadable): origin default 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef' is not a commit in /tmp/pbdrv/scn.DzQS/ou/repo [fm-pool-base: 0ec15d3aa4e6568c693d1038c76e249ef2835693; origin default: unavailable]; every ref is as it was
+
+checked_out    rc=1 refs-identical=yes msg=error: fm-pool-base refused (checked_out): fm-pool-base (0ec15d3aa4e6568c693d1038c76e249ef2835693) is checked out in a worktree, so it is not moved to origin default 7728b43618284c6f5213551ccc8c004c72719210 [fm-pool-base: 0ec15d3aa4e6568c693d1038c76e249ef2835693; origin default: 7728b43618284c6f5213551ccc8c004c72719210]; every ref is as it was
+
+config_bad     rc=1 refs-identical=yes msg=error: fm-pool-base refused (config_unreadable): the treehouse config of /tmp/pbdrv/scn.DzQS/cu/repo cannot be read or parsed, so it is unknown whether the pool uses fm-pool-base [fm-pool-base: b5ee9f5d02a7cdc12856b8ef5e2525d16d5de44b; origin default: unavailable]; every ref is as it was
+
+== PB4 home whose config does not name fm-pool-base: step does nothing
+
+not_named      rc=0 refs-identical=yes msg=
+
+no_config      rc=0 refs-identical=yes msg=
+
+== cleanup
+removed /tmp/pbdrv/scn.DzQS

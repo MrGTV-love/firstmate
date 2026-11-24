@@ -1,0 +1,17 @@
+ok - an absent fm-pool-base is refused as absent and never created, a current one is left alone, and an unnamed one is no business of the step
+ok - the treehouse config is read from the main checkout, else the user config, and an unreadable one refuses
+ok - fm-pool-base advances to the new origin default by compare-and-set and a second step changes nothing
+ok - every unsafe fm-pool-base case is refused with its reason, both values and the commits, and no ref moves
+ok - a worktree that takes fm-pool-base while it moves is never left with files out of step with its HEAD
+# real treehouse, local main strictly ahead: origin/main=30bad15b3642608e5d7902740ef3de6829942437 local main=4bad5bbeafb533335d4389f8f6abbabdda3ce6f3
+slot=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hFQCEw/pb-real/pool-root/.treehouse/repo-4d86d8/1/repo
+head_at_get=30bad15b3642608e5d7902740ef3de6829942437
+pool_base_at_get=30bad15b3642608e5d7902740ef3de6829942437
+ok - a copy cut by the real treehouse is at the advanced origin default while local main is strictly ahead
+ok - a task that names a base branch still has fm-pool-base moved to the origin default, and still starts from that branch
+ok - a spawn whose treehouse config cannot be read is refused before any copy is taken and no ref moves
+ok - a spawn moves only fm-pool-base, and moves nothing when the home does not name it
+ok - a spawn over a diverged fm-pool-base is refused before any copy is taken and no ref moves
+ok - a spawn over an absent fm-pool-base is refused before any copy is taken and creates nothing
+ok - an offline origin with the project at capacity defers with exit 75 before the pool-base refusal, and moves no ref
+ok - an offline origin with host memory refusing defers with exit 75 before the pool-base refusal, and moves no ref
