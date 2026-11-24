@@ -13,8 +13,8 @@ head and never waits: a read runs detached and a later pass collects it.
 
 A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitHub pr=:
   1. reads the PR once through `gh pr view`; a closed or merged PR ends the work, an unreadable forge
-     changes nothing, and a new head starts a new sequence, so a PASS recorded for an older head is
-     never counted (bin/fm-review-record.py binds every record to its exact head);
+     changes nothing, and a new head starts a new sequence, so a PASS recorded for an older head counts
+     only when bin/fm-review-record.py verify carries it across a clean base update (step 4);
   2. collects the reads it requested earlier for the live head: a finished report is recorded through
      `fm-review-record.py review`, an INCOMPLETE report is held, a FAIL that cannot be recorded still
      ends the head at fail, and a crashed, unusable or nonzero-exit read burns that model for the head
@@ -437,7 +437,12 @@ def author_plan(home, task, url, sha, base):
     return plan, ""
 
 
-def ensure_objects(meta, sha, base):
+def ensure_objects(meta, sha, base, reviewed=None):
+    """Fetch the base, the live head and the newest reviewed head when they are missing.
+
+    The reviewed head is needed only for verify's carry-over proof after a rebase or other
+    rewrite; it is fetched separately so a forge that no longer serves it costs nothing else.
+    """
     worktree = meta.get("worktree", "")
     if not worktree or not os.path.isdir(worktree):
         return
@@ -445,6 +450,8 @@ def ensure_objects(meta, sha, base):
                if run(["git", "-C", worktree, "cat-file", "-e", f"{ref}^{{commit}}"]).returncode]
     if missing:
         run(["git", "-C", worktree, "fetch", "--quiet", "origin", *missing])
+    if reviewed and reviewed != sha and run(["git", "-C", worktree, "cat-file", "-e", f"{reviewed}^{{commit}}"]).returncode:
+        run(["git", "-C", worktree, "fetch", "--quiet", "origin", reviewed])
 
 
 def verify(home, task, url, sha, base):
@@ -838,7 +845,8 @@ def advance(home, task, url, meta, side):
         emit(home, task, side, sha, "left-queue", f"held: {url} at {sha[:12]} left the merge queue and is still open; the merge is Main's",
              f"{url} left the merge queue at {sha[:12]} and is still open; not queued again, Main decides why and whether to merge it")
         return
-    ensure_objects(meta, sha, base)
+    newest = latest_review(home, url) or {}
+    ensure_objects(meta, sha, base, newest.get("head") if isinstance(newest.get("head"), str) else None)
     if collect(home, task, url, sha, base, side, meta) or head.get("outcome"):
         return
     reason = ready_reason(url, view)
@@ -920,7 +928,9 @@ def advance(home, task, url, meta, side):
 
 
 def protected_reasons(url, sha, meta):
-    """Why this head is not a routine merge; empty only when every exact-head recorded review answers `Protected class: no`.
+    """Why this head is not a routine merge; empty only when every review recorded at sha answers `Protected class: no`.
+
+    For a PASS verify carried from an earlier head, the caller passes that reviewed head as sha.
 
     Every review row recorded for the head counts, whoever wrote it and in whatever order: an answer of yes,
     a missing or malformed answer, a report that is gone, changed since it was recorded or does not match
@@ -976,7 +986,8 @@ def merge(home, task, url, sha, side, meta, read_sha=None):
     if done.returncode == 0:
         head["outcome"] = {"kind": "merged", "detail": url}
         phase(side, sha, "merged", url)
-        emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}")
+        carried = f" on the PASS carried from {read_sha[:12]}" if read_sha and read_sha != sha else ""
+        emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried}")
         return
     output = [line.strip() for line in (done.stderr + done.stdout).splitlines() if line.strip()]
     errors = [line for line in output if line.startswith("error:")]

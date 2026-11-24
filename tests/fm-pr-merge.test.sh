@@ -3144,6 +3144,7 @@ test_auto_review_carries_a_pass_across_a_clean_base_update() {
     if [ "$scenario" = clean ]; then
       expect_code 1 "$(auto_calls "$case_dir")" "carry-clean: a clean base update requests no new read"
       expect_code 1 "$(auto_reviews "$case_dir")" "carry-clean: no new verdict is needed"
+      assert_grep "on the PASS carried from $(auto_sha "$case_dir" h1 | cut -c1-12)" "$(auto_event_file "$case_dir")" "carry-clean: the merged event names the carried head"
     else
       expect_code 2 "$(auto_calls "$case_dir")" "carry-unread: an update hiding an unread line is read again"
       expect_code 2 "$(auto_reviews "$case_dir")" "carry-unread: the new head's own PASS is recorded"

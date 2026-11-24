@@ -101,9 +101,9 @@ narrow, but do not eliminate, that risk. See docs/configuration.md's
 Exact-head binding, report validation, captain-word/away rules and every live
 forge/hold check remain mandatory.
 Review carry-over: when the newest review names an earlier head R, no review
-row names the live head H or any head other than R after R's first review row
-(so row order can never skip a FAIL at a later head), and no captain-word at H
-applies, verify asks whether
+row names the live head H, every other head with a review row is an ancestor
+of R (an earlier version R builds on, so no row order can skip a FAIL at a later
+version of the change), and no captain-word at H applies, verify asks whether
 H adds anything no read covered. It takes P, the merge base of the live --base
 and H (base-branch content H already contains), merges R into P with
 git merge-tree --write-tree, and requires that tree to equal H's tree exactly.
@@ -112,13 +112,16 @@ head mismatch plus the reason. Only then are the reads at R judged by every rule
 above (FAIL standing, coverage of every author family, known newest reader,
 --review-only triggers), with authors derived at H; a captain-word never
 carries. An accepted carry-over prints the fact 'review carried from R: ...'
-and --json adds carried_from. A merge or rebase of the base into a reviewed PR
+and --json adds carried_from; its at is R's verdict time. Callers that
+consume verify: bin/fm-pr-merge.sh, bin/fm-pr-auto-review.py and
+bin/fm_open_loops.py. plan still answers for the exact head only; the
+auto-review lane asks verify first, so plan runs only when carry-over refused. A merge or rebase of the base into a reviewed PR
 therefore needs no new read, and neither does any rewrite that keeps the
 reviewed tree (an amended message, a squash, an empty commit); a merge of a
 branch that is not on the base is unread content and refuses. The proof trusts
---base to be a commit on the PR's base branch (fm-pr-merge.sh and
-bin/fm-pr-auto-review.py pass the live forge's base SHA) and trusts the task
-worktree's object store; see docs/configuration.md 'Review carry-over across a
+--base to be a commit on the PR's base branch (every caller passes the live
+forge's base SHA; GitLab's is its stored merge base) and trusts the task
+worktree's object store and git config; see docs/configuration.md 'Review carry-over across a
 base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
@@ -203,6 +206,7 @@ import sqlite3
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 BIN = Path(__file__).resolve().parent
@@ -493,29 +497,46 @@ def derived_authors(home, pr, head, task, base):
 CARRIED_FACT = "review carried from {head}: the live head is that reviewed change merged cleanly with its base"
 
 
-def carry_over_refusal(home, task, head, reviewed, base):
+def carry_over_refusal(home, task, head, reviewed, base, others):
     """None when the live head's tree is exactly the reviewed head merged with base content.
 
     The base content is the merge base of the live forge base and the live head,
-    which is reachable from the base branch. Any extra line, conflict resolution
-    or missing object returns the reason the reviewed PASS cannot stand for head.
+    which is reachable from the base branch. Every other head in others (heads
+    with review rows) must be an ancestor of the reviewed head, so no read of a
+    later version of the change, such as a FAIL, can be skipped. Any extra line,
+    conflict resolution, unreadable object or failed computation returns the
+    reason the reviewed PASS cannot stand for head.
     """
     _, meta = task_metadata(home, task)
     worktree = Path(nonempty(meta.get("worktree"), "task worktree"))
+    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
 
-    def run(*args):
+    def run(*args, extra=None):
         return subprocess.run(["git", "-C", str(worktree), *args], capture_output=True, text=True,
-                              check=False, env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"})
+                              check=False, env={**env, **(extra or {})})
 
     for ref in (head, reviewed, base):
         if run("cat-file", "-e", f"{ref}^{{commit}}").returncode:
             return f"commit {ref} is not available in the task worktree"
+    for other in sorted(others):
+        if run("cat-file", "-e", f"{other}^{{commit}}").returncode:
+            return f"a review row names head {other}, which is not available to prove the reviewed head builds on it"
+        if run("merge-base", "--is-ancestor", other, reviewed).returncode:
+            return f"a review row names head {other}, which the reviewed head does not build on, so its reads may judge this change"
     point = run("merge-base", base, head)
     if point.returncode or not point.stdout.strip():
         return f"the live head {head} shares no merge base with base {base}"
-    merged = run("merge-tree", "--write-tree", "--no-messages", point.stdout.strip(), reviewed)
-    if merged.returncode:
+    objects = run("rev-parse", "--path-format=absolute", "--git-path", "objects")
+    if objects.returncode or not objects.stdout.strip():
+        return "cannot locate the task worktree's object store"
+    # merge-tree writes the merged trees as objects; keep them out of the task's store.
+    with tempfile.TemporaryDirectory(prefix="fm-review-carry-") as scratch:
+        merged = run("merge-tree", "--write-tree", "--no-messages", point.stdout.strip(), reviewed,
+                     extra={"GIT_OBJECT_DIRECTORY": scratch, "GIT_ALTERNATE_OBJECT_DIRECTORIES": objects.stdout.strip()})
+    if merged.returncode == 1:
         return "the reviewed head does not merge cleanly with the base content the live head contains"
+    if merged.returncode:
+        return f"git merge-tree could not compute the merge (exit {merged.returncode}): {merged.stderr.strip()[:160]}"
     live = run("rev-parse", "--verify", f"{head}^{{tree}}")
     if live.returncode:
         return f"cannot read the tree of live head {head}"
@@ -543,13 +564,11 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
             raise VerificationError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
         if review["head"] != read_head:
             mismatch = f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge"
-            first = min(i for i, row in enumerate(rows) if row["kind"] == "review" and row["head"] == review["head"])
-            # Any read of the live head, or of another head after R was first read, means some
-            # head after R had its own reads (possibly a FAIL), so R no longer speaks for H.
-            if reviewed or any(row["kind"] == "review" and (row["head"] == head or (i > first and row["head"] != review["head"]))
-                               for i, row in enumerate(rows)):
+            # A read of the live head always speaks for it, so carry-over never overrides one.
+            if reviewed or any(row["kind"] == "review" and row["head"] == head for row in rows):
                 raise VerificationError(mismatch)
-            refusal = carry_over_refusal(home, task, head, review["head"], base)
+            others = {row["head"] for row in rows if row["kind"] == "review" and row["head"] != review["head"]}
+            refusal = carry_over_refusal(home, task, head, review["head"], base, others)
             if refusal:
                 raise VerificationError(f"{mismatch} (no carry-over: {refusal})")
             try:

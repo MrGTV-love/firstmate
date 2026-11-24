@@ -877,8 +877,87 @@ test_carry_over_refuses_after_a_later_head_was_read() {
   pass "a read of any later head turns carry-over off, so row order cannot skip a FAIL"
 }
 
+test_carry_over_refuses_after_a_fail_recorded_before_the_pass() {
+  # GLM-5.4 review finding 1: a FAIL at a clean update H1 recorded BEFORE R's
+  # first PASS, then a later clean update H2 (or a same-tree reword of H1).
+  local variant case_dir h1 live out rc
+  for variant in update reword; do
+    case_dir=$(make_carry_case "carry-fail-first-$variant")
+    carry_refs "$case_dir"
+    h1=$(merge_trunk_into_pr "$case_dir")
+    record_review "$case_dir" "$h1" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at H1"
+    record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+    if [ "$variant" = update ]; then
+      cgit "$case_dir" checkout -q trunk
+      printf 'more\n' > "$case_dir/wt/more.txt"
+      cgit "$case_dir" add more.txt
+      cgit "$case_dir" commit -qm 'base moves again'
+      TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+      live=$(merge_trunk_into_pr "$case_dir")
+    else
+      cgit "$case_dir" checkout -q pr
+      cgit "$case_dir" commit -q --amend -m 'reworded update merge'
+      live=$(cgit "$case_dir" rev-parse HEAD)
+    fi
+    rc=0
+    out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    expect_code 1 "$rc" "$variant: a FAIL recorded before R's PASS must not be skipped: $out"
+    expect_not_qualified "$out" "head mismatch" "$variant: FAIL before PASS"
+    rc=0
+    out=$(verify_on "$case_dir" "$live" "$TRUNK" --review-only --json) || rc=$?
+    expect_code 1 "$rc" "$variant: --review-only must refuse too: $out"
+  done
+  pass "a read of any head that is not an ancestor of R turns carry-over off, whatever the row order"
+}
+
+test_carry_over_allows_reads_of_heads_r_was_built_on() {
+  # The legitimate path: a FAIL at an earlier head, fixed by commits on top
+  # (R descends from it), PASS at R, then a clean base update.
+  local case_dir h0 live out rc=0
+  case_dir=$(make_carry_case carry-fail-then-fix)
+  cgit "$case_dir" checkout -q pr
+  h0=$(cgit "$case_dir" rev-parse HEAD)
+  record_review "$case_dir" "$h0" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at H0"
+  printf 'fixed\n' >> "$case_dir/wt/app.txt"
+  cgit "$case_dir" commit -qam 'fix the FAIL'
+  REVIEWED=$(cgit "$case_dir" rev-parse HEAD)
+  TRUNK=$(cgit "$case_dir" rev-parse trunk)
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK") || rc=$?
+  expect_code 0 "$rc" "a FAIL at a head R was built on must not block carrying R's PASS: $out"
+  pass "reads of earlier heads that R builds on leave carry-over available"
+}
+
+test_carry_over_writes_nothing_to_the_task_object_store() {
+  # GLM-5.4 review finding 4: the proof's merged trees must not land in the task's store.
+  local case_dir live before after out rc=0
+  case_dir=$(make_carry_case carry-readonly)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  # A different update than the one committed, so the proof must build a tree the store lacks.
+  cgit "$case_dir" checkout -q trunk
+  printf 'later\n' > "$case_dir/wt/later.txt"
+  cgit "$case_dir" add later.txt
+  cgit "$case_dir" commit -qm 'base moves again'
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit trunk
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" checkout -q --detach "$REVIEWED"
+  before=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
+  out=$(verify_on "$case_dir" "$live" "$(cgit "$case_dir" rev-parse trunk)") || rc=$?
+  after=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
+  expect_code 0 "$rc" "the clean update must carry: $out"
+  assert_equals "$before" "$after" "verify must not add objects to the task worktree's store"
+  pass "the carry-over proof writes its merged trees to scratch, never the task's object store"
+}
+
 fm_test_run_cases \
   test_carry_over_refuses_a_branch_that_is_not_on_the_base \
+  test_carry_over_writes_nothing_to_the_task_object_store \
+  test_carry_over_refuses_after_a_fail_recorded_before_the_pass \
+  test_carry_over_allows_reads_of_heads_r_was_built_on \
   test_carry_over_refuses_after_a_later_head_was_read \
   test_carry_over_accepts_a_same_tree_rewrite \
   test_carry_over_accepts_a_clean_merge_of_the_base \
