@@ -16,7 +16,10 @@
 #   - an allowlisted violation passes, and removing the violation makes that
 #     same entry stale, so the allowlist can only shrink
 #   - report mode exits 0 while still printing the violation
-#   - new-or-touched mode ignores an untouched offending guard
+#   - new-or-touched mode ignores an untouched offending guard, even for numeric-looking ids
+#   - a touched offending id still fails until the offending field is corrected
+#   - a touched guard that shares an invariant fails by its own id, and an unreadable base fails closed
+#   - a duplicate id added before its original fails by that literal id, and correcting the id clears it
 #   - a retired guard that is still registered fails
 #   - --counts excludes active guards named in beyond_audit_active and beyond_audit_retired points
 #   - every refusal-site signature (marker, message, helper call, hook deny, guard event) is found
@@ -38,8 +41,11 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 LINT="$ROOT/bin/fm-guard-lint.sh"
-TMP=$(fm_test_tmproot fm-guard-lint)
+TMP=$(fm_test_tmproot fm-guard-lint) || exit 1
 trap 'fm_test_cleanup' EXIT
+# A checker invocation without an explicit log must never inherit a live home.
+export FM_HOME="$TMP/guard-home"
+unset FM_GUARD_EVENT_LOG FM_GUARD_LINT_EVENT_ACTOR FM_TASK_ID
 
 # fixture <name> -> echoes a fresh root with a valid single-guard registry and
 # the files its owner and test paths name.
@@ -265,6 +271,139 @@ mutate "$NAT" '(.guards[] | select(.id == "gnew") | .remedy) = "a pointer with n
 out=$("$LINT" --root "$NAT" --mode new-or-touched --base HEAD 2>&1) && fail "new-or-touched must fail for a touched guard"
 printf '%s\n' "$out" | grep -q 'VIOLATION R2 gnew' || fail "expected the touched guard to fail, got: $out"
 pass "new-or-touched fails for a touched guard"
+
+SHARED=$(fixture shared_newortouched)
+git -C "$SHARED" init -q
+git -C "$SHARED" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$SHARED" -c user.email=t@example.invalid -c user.name=t commit -qm base
+mutate "$SHARED" '.guards += [(.guards[0] | .id = "gshared" | .invariant = "a second invariant" | .owner = "bin/gguard2.sh" | .test = "tests/gguard2.test.sh")]'
+: >"$SHARED/bin/gguard2.sh"; : >"$SHARED/tests/gguard2.test.sh"
+"$LINT" --root "$SHARED" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "a touched guard with a distinct invariant must pass"
+pass "new-or-touched passes a touched guard with a distinct invariant"
+
+mutate "$SHARED" '(.guards[] | select(.id == "gshared") | .invariant) = "a fixture invariant"'
+out=$("$LINT" --root "$SHARED" --mode new-or-touched --base HEAD 2>&1) && fail "a touched guard sharing an invariant must fail"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 gshared: invariant shared with: gguard$' \
+  || fail "expected the shared invariant attributed to the touched id gshared, got: $out"
+pass "new-or-touched refuses a touched guard that shares an invariant by its own id"
+
+mutate "$SHARED" '(.guards[] | select(.id == "gshared") | .invariant) = "a second invariant"'
+"$LINT" --root "$SHARED" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "correcting only the shared invariant must clear the same edit"
+pass "new-or-touched passes the same edit after correcting the shared invariant"
+
+UNREADABLE=$(fixture unreadable_base)
+cp "$UNREADABLE/docs/guards/registry.json" "$TMP/unreadable-current.json"
+printf '{"schema_version":1,"system":"firstmate","audited":1,"excluded":[],"guards":["unreadable"]}\n' >"$UNREADABLE/docs/guards/registry.json"
+git -C "$UNREADABLE" init -q
+git -C "$UNREADABLE" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$UNREADABLE" -c user.email=t@example.invalid -c user.name=t commit -qm base
+cp "$TMP/unreadable-current.json" "$UNREADABLE/docs/guards/registry.json"
+rc=0
+out=$(FM_GUARD_EVENT_LOG="$UNREADABLE/events.jsonl" "$LINT" --root "$UNREADABLE" --mode new-or-touched --base HEAD 2>&1) || rc=$?
+[ "$rc" -eq 1 ] || fail "an unreadable base registry must fail new-or-touched closed, got exit $rc: $out"
+printf '%s\n' "$out" | grep -q "^error: touched-registry comparison against 'HEAD' failed" \
+  || fail "expected the touched-registry comparison diagnostic, got: $out"
+jq -es 'map(select(.guard == "guard-lint-touched-registry"))
+  | (map(.decision) == ["error"]) and (.[0].source_ok == false)' "$UNREADABLE/events.jsonl" >/dev/null \
+  || fail "expected one error touched-registry event with source_ok false"
+pass "new-or-touched fails closed when the base registry cannot be compared"
+
+LITERAL_NAT=$(fixture literal_newortouched)
+mutate "$LITERAL_NAT" '.guards[0] |= (.id = "01" | .fail_direction = "unspecified")
+  | .guards += [(.guards[0] | .id = "1" | .invariant = "a second invariant" | .fail_direction = "closed")]'
+literal_registry=docs/guards/registry.json
+literal_log="$LITERAL_NAT/guard-events.jsonl"
+literal_home="$TMP/literal-event-home"
+literal_default_log="$literal_home/state/guard-events.jsonl"
+mkdir -p "$literal_home/state" "$LITERAL_NAT/state"
+literal_base=$(
+  builtin cd "$LITERAL_NAT" && git init -q --template= &&
+  git add -- "$literal_registry" && tree=$(git write-tree) &&
+  git -c user.email=t@example.invalid -c user.name=t commit-tree "$tree" -m base
+) || fail "could not create the literal id fixture base"
+
+mutate "$LITERAL_NAT" '(.guards[] | select(.id == "01") | .source) += " with updated wording"'
+literal_rc=0
+out=$(FM_HOME="$literal_home" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) || literal_rc=$?
+literal_message="fail_direction 'unspecified' is not closed or open"
+if [ "$literal_rc" -ne 1 ] ||
+  ! jq -es --arg message "$literal_message" 'length == 1 and .[0].findings == [{rule:"R4", id:"01", message:$message}]' \
+    <<< "$out" >/dev/null; then
+  fail "editing offending id 01 must exit 1 with its sole R4 finding in one JSON document, got exit $literal_rc: $out"
+fi
+pass "new-or-touched fails when offending literal id 01 itself is edited"
+
+# A regular file cannot host a log beneath it; keep both the result and diagnostic.
+: >"$LITERAL_NAT/not-a-directory"
+unavailable_rc=0
+unavailable_out=$(FM_HOME="$literal_home" FM_GUARD_EVENT_LOG="$LITERAL_NAT/not-a-directory/events.jsonl" \
+  run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) || unavailable_rc=$?
+if [ "$unavailable_rc" -ne "$literal_rc" ] || [ "$unavailable_out" != "$out" ]; then
+  fail "an unavailable event log changed the touched refusal, got exit $unavailable_rc: $unavailable_out"
+fi
+pass "an unavailable event log does not change the touched refusal"
+
+# Keep the attempted source edit; change only the offending field in that same row.
+mutate "$LITERAL_NAT" '(.guards[] | select(.id == "01") | .fail_direction) = "closed"'
+out=$(FM_HOME="$literal_home" run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
+  || fail "correcting only id 01's fail direction must clear the same edit (exit $?): $out"
+jq -es 'length == 1 and .[0].findings == []' <<< "$out" >/dev/null \
+  || fail "expected no findings or touched diagnostics after correcting the field, got: $out"
+pass "new-or-touched passes the same edit after correcting the offending field"
+
+[ -f "$literal_default_log" ] || fail "the established private home received no default decision records"
+jq -es --arg base "$literal_base" '
+    map(.decision) == ["deny", "allow"]
+    and all(.[]; .guard == "guard-lint-touched-registry" and .actor == "main"
+      and .source_ok and .opportunity and .base == $base)
+  ' "$literal_default_log" >/dev/null || fail "expected default home records for the refusal and recovery only"
+[ ! -e "$LITERAL_NAT/state/guard-events.jsonl" ] || fail "the registry root received the caller home's records"
+missing_home_out=$(run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
+  || fail "a missing home changed the corrected verdict"
+if [ "$missing_home_out" != "$out" ] || [ -e "$FM_HOME" ]; then
+  fail "a missing home changed the corrected output or was created"
+fi
+pass "new-or-touched records in the established home without creating a missing home"
+
+git -C "$LITERAL_NAT" show "$literal_base:$literal_registry" >"$LITERAL_NAT/$literal_registry" \
+  || fail "could not restore the literal id fixture base"
+mutate "$LITERAL_NAT" '(.guards[] | select(.id == "1") | .source) += " with updated wording"'
+out=$(FM_HOME="$literal_home" FM_GUARD_EVENT_LOG="$literal_log" FM_GUARD_LINT_EVENT_ACTOR=gate \
+  run_lint "$LITERAL_NAT" --mode new-or-touched --base "$literal_base" --json) \
+  || fail "editing only valid id 1 must not fail for untouched id 01 (exit $?): $out"
+jq -es --arg message "$literal_message" 'length == 1 and .[0].findings == [{rule:"R4", id:"01", message:$message}]' \
+  <<< "$out" >/dev/null \
+  || fail "expected only the existing R4 finding in the summary, not a touched diagnostic, got: $out"
+pass "new-or-touched passes an edit to valid id 1 despite untouched debt on id 01"
+
+jq -es --arg base "$literal_base" '
+    length == 1 and all(.[]; .guard == "guard-lint-touched-registry" and .actor == "gate"
+      and .decision == "allow" and .source_ok and .opportunity and .base == $base)
+  ' "$literal_log" >/dev/null || fail "expected one gate decision in the explicit log"
+jq -es 'length == 2' "$literal_default_log" >/dev/null || fail "the explicit log did not supersede the default log"
+[ ! -e "$LITERAL_NAT/state/guard-events.jsonl" ] || fail "the registry root received the gate's records"
+pass "new-or-touched records a gate decision only in the explicit log"
+
+DUP_NAT=$(fixture duplicate_newortouched)
+git -C "$DUP_NAT" init -q
+git -C "$DUP_NAT" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$DUP_NAT" -c user.email=t@example.invalid -c user.name=t commit -qm base
+: >"$DUP_NAT/bin/gguard2.sh"; : >"$DUP_NAT/tests/gguard2.test.sh"
+mutate "$DUP_NAT" '.guards = [(.guards[0] | .invariant = "a duplicate invariant" | .owner = "bin/gguard2.sh" | .test = "tests/gguard2.test.sh")] + .guards'
+dup_rc=0
+out=$("$LINT" --root "$DUP_NAT" --mode new-or-touched --base HEAD --json 2>/dev/null) || dup_rc=$?
+if [ "$dup_rc" -ne 1 ] ||
+  ! jq -es 'length == 1 and .[0].findings == [{rule:"R1", id:"gguard", message:"duplicate guard id"}]' <<< "$out" >/dev/null; then
+  fail "adding a duplicate id before the original must exit 1 with its R1 finding in one JSON document, got exit $dup_rc: $out"
+fi
+pass "new-or-touched refuses an added duplicate id before the original"
+
+mutate "$DUP_NAT" '.guards[0].id = "gfixed"'
+"$LINT" --root "$DUP_NAT" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
+  || fail "correcting only the duplicate id must clear the same edit"
+pass "new-or-touched passes the same edit after correcting the duplicate id"
 
 # --- malformed input --------------------------------------------------------
 BROKEN=$(fixture broken)
@@ -784,8 +923,11 @@ git -C "$NEWSITE" init -q
 git -C "$NEWSITE" -c user.email=t@example.invalid -c user.name=t add -A
 git -C "$NEWSITE" -c user.email=t@example.invalid -c user.name=t commit -qm base
 printf 'echo "REFUSED: a brand new refusal" >&2\n' >"$NEWSITE/bin/gnew.sh"
-out=$("$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD 2>&1) && fail "a new unmapped site must fail new-or-touched: $out"
+out=$(FM_GUARD_EVENT_LOG="$NEWSITE/guard-events.jsonl" "$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD 2>&1) \
+  && fail "a new unmapped site must fail new-or-touched: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION S1 site:bin/gnew.sh' || fail "expected S1 for the new site, got: $out"
+jq -es 'map(select(.guard == "guard-lint-touched-registry") | .decision) == ["allow"]' \
+  "$NEWSITE/guard-events.jsonl" >/dev/null || fail "an S1 refusal must not be recorded as a touched-registry refusal"
 pass "new-or-touched fails a new refusal site that maps to nothing"
 mutate "$NEWSITE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a brand new refusal"}]'
 "$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD >/dev/null 2>&1 \

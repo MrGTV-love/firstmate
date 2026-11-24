@@ -162,7 +162,8 @@
     "check-event-output-integrity",
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
-    "teardown-entry-preflight"
+    "teardown-entry-preflight",
+    "guard-lint-touched-registry"
   ],
   "guards": [
     {
@@ -7557,6 +7558,35 @@
         }
       ],
       "layer_note": "Registers the existing per-line protection, not a new refusal or permission. test_malformed_check_events_keep_delivery_and_cadence drives the real watcher with missing delimiters, invalid identities, valid events and ordinary state; it checks malformed payload exclusion and reported counts while valid delivery, coalescing and cadence continue. The site mapping preserves S1/S2 visibility rather than removing refusal vocabulary from the scan."
+    },
+    {
+      "id": "guard-lint-touched-registry",
+      "version": "1",
+      "owner": "bin/fm-guard-lint.sh",
+      "sites": [
+        {"file": "bin/fm-guard-lint.sh", "match": "fm-guard-event.sh\" guard-lint-touched-registry"}
+      ],
+      "invariant": "An unallowlisted finding on an added or edited registry entry blocks new-or-touched lint by that entry's literal ID.",
+      "layer": "machine-check",
+      "source": "The working docs/guards/registry.json, the Git blob at the same path at --base, and the unallowlisted findings computed by bin/fm-guard-lint.sh.",
+      "trigger": "In new-or-touched mode an unallowlisted finding has the same literal ID as a guard absent from --base, or whose complete rows for that ID (duplicates counted, row order ignored) differ from the base rows for that ID.",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "fail_direction_note": "An unavailable base registry blob or an unreadable current guards array prevents a clean invocation. This check does not validate the contents of the historical blob.",
+      "remedy": "Keep the intended edit, correct the field identified in the touched guard's finding, then rerun bin/fm-guard-lint.sh --mode new-or-touched --base <same-base-ref>.",
+      "budget": 1,
+      "budget_reason": "One verdict per invocation; no cross-invocation counter or escalation is implemented for this check.",
+      "telemetry": "One best-effort guard-lint-touched-registry event per reached literal-ID stage through bin/fm-guard-event.sh: deny for a matched finding, allow for no match, or error with source_ok false if the stage could not be evaluated. The writer uses the explicit log or the established caller home's default log. The pull-request CI step uses a runner-temporary log with actor gate and retains it as an artifact. An unavailable sink does not change lint output or verdict; later site and allowlist checks can still fail lint.",
+      "test": "tests/fm-guard-lint.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active"
     }
   ],
   "excluded": [

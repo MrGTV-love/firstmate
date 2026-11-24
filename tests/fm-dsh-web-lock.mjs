@@ -92,6 +92,21 @@ if (!process.env.FM_NATIVE_LOCK_FIXTURE) {
   assert.equal(readFileSync(lock, 'utf8').trim(), String(process.pid), 'canonical acquire reclaims the dead old server pid');
   assert.equal(readFileSync(sidecar, 'utf8').trim(), 'dsh-web:native-A');
   assert.equal(owned().status, 0);
+  // A real removal failure keeps the exact pair, so the same ID still owns it.
+  // The stand-in rm fails like an immutable lock file: it keeps going past the
+  // operand it cannot remove, then exits 1.
+  const faulty = join(root, 'faulty-rm');
+  mkdirSync(faulty);
+  writeFileSync(join(faulty, 'rm'), '#!/usr/bin/env bash\nstatus=0\nfor target in "$@"; do\n  case "$target" in\n    -*) ;;\n    */state/.lock) echo "rm: $target: Operation not permitted" >&2; status=1 ;;\n    *) /bin/rm -f "$target" ;;\n  esac\ndone\nexit "$status"\n', {mode: 0o755});
+  const paired = readFileSync(lock, 'utf8') + readFileSync(sidecar, 'utf8');
+  result = release({PATH: `${faulty}:${process.env.PATH}`});
+  assert.equal(result.status, 1, 'the failed removal must exit 1');
+  assert.match(result.stderr, /Operation not permitted/);
+  assert(existsSync(sidecar), 'a failed lock removal must not remove the sidecar');
+  assert.equal(readFileSync(lock, 'utf8') + readFileSync(sidecar, 'utf8'), paired, 'a failed lock removal must keep the exact pair');
+  assert.equal(owned().status, 0, 'the same ID still owns its pair after a failed removal');
+  assert.equal(acquire().status, 0, 'the same ID reconfirms after a failed removal');
+  assert.notEqual(acquire({DSH_SESSION_ID: 'native-sibling'}).status, 0, 'a different session stays refused after a failed removal');
   assert.equal(release().status, 0);
   // A live foreign Claude lock remains byte-identical; this stands for the real handoff prerequisite.
   writeFileSync(lock, process.env.FM_NATIVE_FOREIGN_PID + '\n');
@@ -104,5 +119,5 @@ if (!process.env.FM_NATIVE_LOCK_FIXTURE) {
   assert.notEqual(release().status, 0, 'native cleanup must not release a live foreign owner');
   assert.equal(readFileSync(lock, 'utf8'), process.env.FM_NATIVE_FOREIGN_PID + '\n');
   assert.equal(readFileSync(sidecar, 'utf8'), 'foreign-claude-session\n');
-  console.log('ok - canonical native acquire/reconfirm/owned-release, next-primary progress, same-PID sibling/child refusal, stale-release refusal, dead old-server same-ID reclaim, closer-harness rejection, foreign owner preserved');
+  console.log('ok - canonical native acquire/reconfirm/owned-release, next-primary progress, same-PID sibling/child refusal, stale-release refusal, dead old-server same-ID reclaim, failed removal keeps the pair and same-ID recovery, closer-harness rejection, foreign owner preserved');
 }
