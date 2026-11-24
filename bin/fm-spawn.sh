@@ -666,7 +666,9 @@
 #   and toolchain home paths, the selected harness's store selectors, Claude's provider selectors and
 #   companions from bin/fm-worker-account-lib.sh, DSH's key name from
 #   bin/fm-dsh.py, the pane's numbered GIT_CONFIG entries and (after
-#   --allow-api-key) the Anthropic key names. /usr/bin/env -i starts the pane's
+#   --allow-api-key) the Anthropic key names. The pane's GIT_CONFIG_PARAMETERS
+#   is not kept by default; the task Git hook carrier below re-adds its own
+#   rows inside the filtered shell. /usr/bin/env -i starts the pane's
 #   own shell with only these names, dropping even readonly exports and names
 #   that are not shell identifiers. No other secret-valued name is kept.
 #   A present readable regular file replaces that whole default set with exactly
@@ -877,21 +879,40 @@
 # ~/.cursor/cli-config.json attribution-off is not durable (it does not travel
 # with this repo, defaults back to on when unset, and only feeds the CLI's
 # request to the server, so it suppresses the trailer rather than preventing
-# it). Every spawn installs state/<id>.git-hooks as a GIT_CONFIG core.hooksPath
-# for the pane: pre-commit and pre-push inspect credentials locally, while
-# commit-msg strips known AI trailers unless config/keep-ai-trailers is present,
-# for every launched runtime, Claude included as defense in depth. bin/fm-git-strip-ai-trailers.sh
-# owns the identities, the hook install, and chaining the repository git is
-# actually running in so a project husky hook still runs. Author identity is
-# not rewritten. Every launch reconciles numbered GIT_CONFIG entries in the
-# persistent destination shell before the clean-environment boundary,
-# without changing shell selection. It removes only core.hooksPath entries equal
-# to this task's generated directory, compacts survivors in order, and appends
-# this task's override on every launch. Unrelated entries and
-# operator hooksPath overrides remain in the pane and reach the worker by
-# default; an allowlist file instead governs which reach it. Reconciliation
-# repeats inside the filtered launch shell so credential checks still select
-# the generated hooks after env -i.
+# it). Every spawn installs state/<id>.git-hooks, whose hooks inspect
+# credentials locally at commit and push and, unless config/keep-ai-trailers is
+# present, strip known AI trailers at commit-msg, for every launched runtime,
+# Claude included as defense in depth. bin/fm-git-strip-ai-trailers.sh owns the
+# identities, the hook scripts, their rows, and the legacy carrier's chaining of
+# the repository's own hooks. Author identity is not rewritten.
+# Task Git hook carrier. Every launch selects one of two carriers inside each
+# shell that starts the worker: the persistent destination shell before the
+# clean-environment boundary, and the filtered launch shell after env -i, with
+# the pane's own PATH, so the git probed is the git the worker gets.
+#   config: the rows hook.fm-strip and hook.fm-scan-commit on commit-msg and
+#     hook.fm-scan-push on pre-push, appended to GIT_CONFIG_PARAMETERS and
+#     recorded exactly in FM_GIT_HOOK_ROWS. The repository's core.hooksPath
+#     stays in force, so its hooks, reference-transaction included, run
+#     natively. Selected only when the harness is in GIT_HOOKS_CONFIG_HARNESSES
+#     and `git hook list` on the composed rows names every fm hook.
+#   legacy: this task's directory as a numbered GIT_CONFIG core.hooksPath
+#     entry, verified with `git config --get core.hooksPath` against the same
+#     git; every other launch.
+# Each selection first removes this task's previous carrier of either kind:
+# every exact occurrence of FM_GIT_HOOK_ROWS and of this launch's rows in
+# GIT_CONFIG_PARAMETERS, and every numbered core.hooksPath entry equal to this
+# task's directory, compacting the survivors in order. Unrelated entries,
+# operator parameters and operator hooksPath overrides stay in the pane and
+# reach the worker by default; an allowlist file instead governs which reach
+# it, and bin/fm-worker-env.py keeps GIT_CONFIG_PARAMETERS and FM_GIT_HOOK_ROWS
+# together or not at all. The launch refuses to start the worker when git does
+# not resolve on the pane PATH, GIT_CONFIG_COUNT is not a number,
+# GIT_CONFIG_PARAMETERS is malformed, or the git honours neither carrier; the
+# refusing shell records its reason in the task temp root and fm-spawn fails
+# the spawn on it before typing anything more into the endpoint. A harness
+# joins GIT_HOOKS_CONFIG_HARNESSES only after
+# tests/fm-git-hook-carrier-live-e2e.test.sh proves the rows survive into its
+# tool shell (recorded in docs/verification/runtime-backends.md).
 # Publishing the record and moving this home's backlog item to In flight are one
 # step, not two: bin/fm-backlog-transition-lib.sh owns that invariant, and this
 # script performs the transition under the task's own meta lock before it reports
@@ -7705,15 +7726,14 @@ EOF
     ;;
   esac
 
-# Per-task git hooksPath for local credential checks and AI trailer stripping.
+# Per-task Git hooks for local credential checks and AI trailer stripping.
 # Installed for every kind, including secondmate; keeping trailers disables
 # only the commit-msg strip, not the credential checks. Cursor and other non-Claude runtimes inject the trailer
-# after the typed message, so the typed message is not the object. The pane
-# always receives this directory via GIT_CONFIG_* below, which
-# overrides a project's husky core.hooksPath without rewriting it; the installer
-# chains the previous hooks so they still run. Real secondmate
-# homes are firstmate clones; a launch whose worktree is not git fails closed
-# rather than shipping a runtime that cannot check credentials or strip.
+# after the typed message, so the typed message is not the object. The launch
+# selects the carrier that brings them to the worker (header: "Task Git hook
+# carrier"). Real secondmate homes are firstmate clones; a launch whose
+# worktree is not git fails closed rather than shipping a runtime that cannot
+# check credentials or strip.
 GIT_HOOKS_DIR="$STATE_REAL/$ID.git-hooks"
 "$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" install "$GIT_HOOKS_DIR" "$WT" "$KEEP_AI_TRAILERS" || {
   echo "error: could not install the task Git hooks for $ID" >&2

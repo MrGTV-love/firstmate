@@ -163,6 +163,30 @@ Trace probes observe enabled and reused carriers, disabled-relaunch clearing, cl
 The private Bash/ksh tmux fixture also proves the allowlisted strip-to-keep transition clears the persistent pane's obsolete task override while preserving unrelated Git entries and operator routing.
 The relaunch suite emitted two non-fatal BSD `sed` diagnostics in its Pi-session case; this run is focused local evidence, not a rerun of the entire portable CI shard.
 
+## Task Git hook carrier in the worker tool shell
+
+A harness joins `GIT_HOOKS_CONFIG_HARNESSES` in [`bin/fm-spawn.sh`](../../bin/fm-spawn.sh), and so runs the config carrier, only after `tests/fm-git-hook-carrier-live-e2e.test.sh` passes for it.
+The guard replays the launch text `fm-spawn.sh` stages in a private tmux pane with the installed harness first on PATH; a private scripted provider on loopback makes the harness run one Bash tool call that commits and pushes in the task worktree.
+It reads HEAD, the bare remote's refs, the commit body and git's `GIT_TRACE`, never the hooks' own status.
+Its control launches the same text through a fixture wrapper that removes `GIT_CONFIG_PARAMETERS` at the harness boundary, and must see the credential commit and the AI trailer land.
+No model tokens are spent and the harness store is a scratch directory with a throwaway key.
+
+Verified 2026-11-24 on Darwin arm64, Apple Git 2.54.0, tmux, Claude Code 2.1.331, under `seatbelt-v1` write confinement:
+
+```sh
+FM_GIT_HOOK_CARRIER_LIVE=1 bash tests/fm-git-hook-carrier-live-e2e.test.sh
+```
+
+```text
+# live claude version: 2.1.331 (Claude Code)
+ok - claude (2.1.331 (Claude Code)): the config carrier survives into the Bash tool shell; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control: with the carrier removed at the harness boundary the credential commit and AI trailer land
+# all fm-git-hook-carrier-live tests passed
+```
+
+Only `claude` is listed; every other harness stays on the legacy carrier until this guard passes for it.
+Inside `seatbelt-v1` confinement a process cannot execute the setuid `/bin/ps`, so a repository hook that identifies its calling git through `ps`, such as a `reference-transaction` guard, sees no caller there; `tests/fm-spawn-git-hook-carrier.test.sh` records that observation.
+
 ## Fleet model-index catalog discovery
 
 The [configuration contract](../configuration.md#fleet-model-index-configmodel-indexjson) owns role selection and retirement policy.

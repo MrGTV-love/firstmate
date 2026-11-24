@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# Live guard for the task Git hook carrier inside a real harness's tool shell
+# (live-harness-optin family; the in-pane case H1 of the carrier design).
+#
+# bin/fm-spawn.sh selects the config carrier (GIT_CONFIG_PARAMETERS hook rows)
+# only for harnesses listed in GIT_HOOKS_CONFIG_HARNESSES, because a selector in
+# the launch shell cannot see whether the harness later drops the variable when
+# it builds a tool shell. This guard is the proof for one harness: the real
+# launch text fm-spawn stages is replayed in a private tmux pane with the real
+# harness binary first on PATH, and a private scripted provider on loopback
+# makes the harness run one Bash tool call that drives git in the task
+# worktree. The verdict is read from effects only: HEAD, the bare remote's refs,
+# the commit body and git's GIT_TRACE of which hook commands ran.
+#
+# Cases, per installed harness:
+#   carrier  - the worker's tool shell refuses a credential commit and a
+#              --no-verify credential push, lands a clean commit and push, and
+#              strips an AI trailer; GIT_TRACE shows the carrier's hooks.
+#   control  - the same launch through a fixture wrapper that removes the
+#              carrier variable at the harness boundary: the credential commit
+#              and the trailer land, so the carrier case is not vacuous.
+# No model tokens are spent and no operator credential store is touched: the
+# harness config directory is a scratch one with a throwaway key.
+# Refresh docs/verification/runtime-backends.md ("Task Git hook carrier in the
+# worker tool shell") from this guard's output after any harness upgrade.
+set -u
+
+# shellcheck source=tests/lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+# shellcheck source=bin/fm-backend.sh
+. "$ROOT/bin/fm-backend.sh"
+
+fm_live_gate opt-in FM_GIT_HOOK_CARRIER_LIVE tmux claude python3 jq curl
+
+unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS FM_GIT_HOOK_ROWS FM_GIT_HOOK_MODE CLAUDECODE TMUX
+REAL_TMUX=$(command -v tmux)
+CLAUDE_BIN=$(command -v claude)
+VERSION=$("$CLAUDE_BIN" --version 2>&1) || fail "claude --version failed: $VERSION"
+printf '# live claude version: %s\n' "$VERSION"
+LAB=$(fm_test_tmproot fm-git-hook-carrier-live) || fail "no lab directory"
+SOCKET="fm-carrier-live-$$"
+PROVIDER_PID=
+live_cleanup() {
+  "$REAL_TMUX" -L "$SOCKET" kill-server >/dev/null 2>&1 || :
+  [ -z "$PROVIDER_PID" ] || kill "$PROVIDER_PID" 2>/dev/null || :
+  rm -rf /tmp/fm-carrier-live-*-"$$" /tmp/fm-carrier-live-*-"$$"+* 2>/dev/null || :
+  chmod -R u+w "$LAB" 2>/dev/null || :
+  fm_test_cleanup
+}
+trap live_cleanup EXIT
+
+python3 -I "$ROOT/tests/fm-git-hook-carrier-live-provider.py" "$LAB" > "$LAB/provider.out" 2>&1 &
+PROVIDER_PID=$!
+fm_test_wait_until --while-alive "$PROVIDER_PID" -- test -s "$LAB/port" || fail "private provider did not start"
+BASE_URL="http://127.0.0.1:$(cat "$LAB/port")"
+KEY=sk-ant-fm-carrier-live-throwaway-key
+
+# The probe the harness's Bash tool runs: <obs-dir> <worktree> <origin> <branch>.
+cat > "$LAB/probe.sh" <<'SH'
+#!/bin/sh
+obs=$1 wt=$2 origin=$3 branch=$4
+mkdir -p "$obs"
+emit() { printf '%s=%s\n' "$1" "$2" >> "$obs/result"; }
+cd "$wt" || exit 9
+export GIT_AUTHOR_NAME=worker GIT_AUTHOR_EMAIL=worker@example.invalid GIT_COMMITTER_NAME=worker GIT_COMMITTER_EMAIL=worker@example.invalid
+git checkout -q "$branch" 2>/dev/null || git checkout -q -b "$branch"
+subject() { git log -1 --format=%s; }
+landed() { if [ "$(subject)" = "$1" ]; then echo landed; else echo refused; fi; }
+remote_has() { if git --git-dir="$origin" rev-parse -q --verify "refs/heads/$1" >/dev/null; then echo yes; else echo no; fi; }
+emit confinement "${FM_WRITE_CONFINEMENT-none}"
+emit gcp_rows "$(printf '%s' "${GIT_CONFIG_PARAMETERS-}" | grep -o "'hook.fm-scan-commit.event'" | wc -l | tr -d ' ')"
+emit hookspath "$(git config --show-scope --get core.hooksPath | tr '\t' ' ')"
+cred=$(printf 'AKIA%s' ZZZZZZZZZZZZZZZZ)
+printf '%s\n' "$cred" > leak; git add leak
+GIT_TRACE="$obs/trace.cred" git commit -q -m leak 2>/dev/null
+emit cred_commit "$(landed leak)"
+[ "$(subject)" != leak ] || git reset -q --hard HEAD~1
+git reset -q --hard HEAD; git clean -qfd
+printf 'w\n' > w; git add w
+GIT_TRACE="$obs/trace.clean" git commit -q -m clean -m 'Co-Authored-By: Claude <noreply@anthropic.com>' 2>/dev/null
+emit clean_commit "$(landed clean)"
+emit clean_trailer "$(git log -1 --format=%B | grep -ci co-authored-by)"
+GIT_TRACE="$obs/trace.push" git push -q origin "HEAD:refs/heads/probe-clean" 2>/dev/null
+emit clean_push "$(remote_has probe-clean)"
+printf '%s\n' "$cred" > leak2; git add leak2; git commit -q --no-verify -m leak2
+git push -q origin "HEAD:refs/heads/probe-credpush" 2>/dev/null
+emit cred_push "$(remote_has probe-credpush)"
+emit done yes
+SH
+chmod +x "$LAB/probe.sh"
+
+# A harness wrapper that drops the carrier at the harness boundary: the
+# sensitivity control's injected fault, never used outside this fixture.
+mkdir -p "$LAB/strip-bin"
+printf '#!/bin/sh\nexec env -u GIT_CONFIG_PARAMETERS -u FM_GIT_HOOK_ROWS %s "$@"\n' "$CLAUDE_BIN" > "$LAB/strip-bin/claude"
+chmod +x "$LAB/strip-bin/claude"
+
+# run_case <name> <extra-path-or-empty>: one real spawn's launch, replayed.
+run_case() {
+  local name=$1 extra_path=$2 dir home proj wt fakebin id cfg out status branch n pane_path
+  dir="$LAB/$name"
+  home="$dir/home"
+  proj="$dir/project"
+  wt="$dir/wt"
+  cfg="$dir/claude"
+  id="carrier-live-$name-$$"
+  mkdir -p "$dir" "$cfg" "$dir/os-home"
+  fakebin=$(fm_test_make_spawn_fakebin "$dir/fake")
+  fm_test_spawn_home "$home" claude
+  fm_test_spawn_brief "$home" "$id"
+  fm_git_worktree "$proj" "$wt" "fixture-$name"
+  # Trusted as an operator's store already trusts them: the task copy, and the
+  # home and checkout the launch adds with --add-dir.
+  jq -n --arg key "${KEY: -20}" --arg wt "$wt" --arg wtreal "$(cd "$wt" && pwd -P)" \
+    --arg home "$home" --arg homereal "$(cd "$home" && pwd -P)" --arg root "$ROOT" \
+    '{hasCompletedOnboarding:true,theme:"dark",numStartups:5,bypassPermissionsModeAccepted:true,
+      customApiKeyResponses:{approved:[$key],rejected:[]},
+      projects:{($wt):{hasTrustDialogAccepted:true,hasCompletedProjectOnboarding:true},
+                ($wtreal):{hasTrustDialogAccepted:true,hasCompletedProjectOnboarding:true},
+                ($home):{hasTrustDialogAccepted:true,hasCompletedProjectOnboarding:true},
+                ($homereal):{hasTrustDialogAccepted:true,hasCompletedProjectOnboarding:true},
+                ($root):{hasTrustDialogAccepted:true,hasCompletedProjectOnboarding:true}}}' > "$cfg/.claude.json"
+  printf '{"skipDangerousModePermissionPrompt":true}\n' > "$cfg/settings.json"
+  : > "$dir/launch.log"
+  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$cfg" FM_FAKE_LAUNCH_LOG="$dir/launch.log" PATH="${CLAUDE_BIN%/*}:$PATH" \
+    fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" --mode no-mistakes --yolo off --harness claude --allow-api-key)
+  status=$?
+  [ "$status" -eq 0 ] || fail "$name: spawn failed: $out"
+  branch=$(fm_meta_get "$home/state/$id.meta" branch)
+  [ -n "$branch" ] || fail "$name: spawn recorded no branch"
+  printf '%s' "sh '$LAB/probe.sh' '$dir/obs' '$wt' '$proj.origin.git' '$branch'" > "$LAB/command"
+  cp "$dir/launch.log" "$dir/launch.sh"
+  pane_path="${extra_path:+$extra_path:}${CLAUDE_BIN%/*}:/usr/bin:/bin:/usr/sbin:/sbin"
+  "$REAL_TMUX" -L "$SOCKET" -f /dev/null new-session -d -s "$name" -x 200 -y 50 -c "$wt" -- \
+    env -i HOME="$dir/os-home" PATH="$pane_path" TERM=xterm-256color LANG=en_US.UTF-8 \
+    ANTHROPIC_BASE_URL="$BASE_URL" ANTHROPIC_API_KEY="$KEY" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+    DISABLE_AUTOUPDATER=1 /bin/bash --noprofile --norc -i || fail "$name: cannot start the private tmux pane"
+  sleep 1
+  "$REAL_TMUX" -L "$SOCKET" send-keys -t "$name" ". '$dir/launch.sh'" Enter
+  for n in $(seq 1 240); do
+    grep -qx done=yes "$dir/obs/result" 2>/dev/null && break
+    sleep 0.5
+  done
+  CASE_PANE=$("$REAL_TMUX" -L "$SOCKET" capture-pane -p -t "$name" -S -60 2>/dev/null || true)
+  "$REAL_TMUX" -L "$SOCKET" kill-session -t "$name" >/dev/null 2>&1 || :
+  CASE_DIR=$dir
+  grep -qx done=yes "$dir/obs/result" 2>/dev/null || {
+    printf '%s\n' "$CASE_PANE" >&2
+    tail -n 5 "$LAB/requests.jsonl" >&2 2>/dev/null
+    fail "$name: the harness never ran the probe through its Bash tool ($VERSION)"
+  }
+}
+
+obs() { sed -n "s/^$2=//p" "$1/obs/result" | tail -n 1; }
+trace_has() { grep -F "run_command:" "$1/obs/trace.$2" 2>/dev/null | grep -qF "$3"; }
+
+run_case carrier ''
+case "$(obs "$CASE_DIR" hookspath)" in
+  *git-hooks*) fail "carrier: the tool shell runs the legacy carrier, not the config carrier ($VERSION)" ;;
+esac
+assert_equals 1 "$(obs "$CASE_DIR" gcp_rows)" "carrier: the tool shell lost the hook rows ($VERSION)"
+if [ "$(uname -s)" = Darwin ]; then
+  assert_equals seatbelt-v1 "$(obs "$CASE_DIR" confinement)" "carrier: the probe did not run under the fleet's write confinement"
+fi
+grep -q '"tool_result": true' "$LAB/requests.jsonl" || fail "carrier: the harness never returned a Bash tool result to the provider"
+assert_equals refused "$(obs "$CASE_DIR" cred_commit)" "carrier: a credential commit landed through the harness's tool shell ($VERSION)"
+assert_equals landed "$(obs "$CASE_DIR" clean_commit)" "carrier: a clean commit was refused ($VERSION)"
+assert_equals 0 "$(obs "$CASE_DIR" clean_trailer)" "carrier: an AI trailer reached the commit object ($VERSION)"
+assert_equals yes "$(obs "$CASE_DIR" clean_push)" "carrier: a clean push did not land ($VERSION)"
+assert_equals no "$(obs "$CASE_DIR" cred_push)" "carrier: a --no-verify credential push landed ($VERSION)"
+trace_has "$CASE_DIR" clean fm-scan-commit || fail "carrier: git did not run fm-scan-commit at commit ($VERSION)"
+trace_has "$CASE_DIR" clean fm-strip || fail "carrier: git did not run fm-strip at commit ($VERSION)"
+trace_has "$CASE_DIR" push fm-scan-push || fail "carrier: git did not run fm-scan-push at push ($VERSION)"
+pass "claude ($VERSION): the config carrier survives into the Bash tool shell; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped"
+
+run_case control "$LAB/strip-bin"
+assert_equals 0 "$(obs "$CASE_DIR" gcp_rows)" "control: the wrapper did not remove the carrier"
+assert_equals landed "$(obs "$CASE_DIR" cred_commit)" "control: a credential commit was refused with the carrier removed, so the carrier case proves nothing"
+assert_equals 1 "$(obs "$CASE_DIR" clean_trailer)" "control: the trailer was stripped with the carrier removed"
+! trace_has "$CASE_DIR" clean fm-scan-commit || fail "control: fm-scan-commit ran with the carrier removed"
+pass "control: with the carrier removed at the harness boundary the credential commit and AI trailer land"
+
+echo "# all fm-git-hook-carrier-live tests passed"
