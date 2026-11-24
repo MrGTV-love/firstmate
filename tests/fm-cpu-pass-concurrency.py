@@ -217,10 +217,13 @@ while not os.path.exists(stop):
     samples += 1
     if blind and sighted and blind_window is None:
         # Stop looking from the first sighting until a worker that started at least BLIND seconds later has ended (or the
-        # run stops), so whole workers live unseen however slow the host is. time.time() is the workers' record clock.
+        # run stops), so whole workers live unseen however slow the host is, then stay blind BLIND seconds more, so the
+        # worker that ended the wait has removed its marker before the sampler looks again. time.time() is the workers'
+        # record clock.
         begin = time.time()
         while not unseen_end(begin + blind) and not os.path.exists(stop):
             time.sleep(0.05)
+        time.sleep(blind)
         blind_window = [begin, time.time()]
     time.sleep(0.02)
 gaps.sort()
@@ -495,16 +498,18 @@ def case_nested():
 
 
 # The sampler marks a worker seen when it finds its marker locked. A worker locks its marker a moment before it records its
-# start, so one that recorded its start within this margin after the sampler stopped looking may still have been seen;
-# from the margin on, a worker whose start and end both fall while the sampler is not looking was never seen.
+# start and removes it a moment after it records its end, so one whose start record falls within this margin after the
+# sampler stopped looking, or whose end record falls within it before the sampler looks again, may still have been seen;
+# a worker whose start and end records both fall inside the margins was never seen.
 MISS_MARGIN_SECONDS = 0.25
 
 
 def case_nested_miss_control():
     """H3abc control: a real nested run whose real sampler stops looking fails H3abc's verdict, which names the unseen
     workers; the same run with the sampler looking throughout passes. The sampler stays blind until a worker that started
-    MISS_MARGIN_SECONDS or more into the blindness has ended, so the run is short on a fast host and still holds on a slow one."""
-    case = Case('H3abc miss control', 'the nested run with its sampler blinded from its first sighting until a worker that started %g s later has ended, then not blinded: H3abc must name every worker that lived wholly unseen, name no worker the sampler could see, and pass the run not blinded' % MISS_MARGIN_SECONDS)
+    MISS_MARGIN_SECONDS or more into the blindness has ended, and MISS_MARGIN_SECONDS more, so the run is short on a fast
+    host and still holds on a slow one."""
+    case = Case('H3abc miss control', 'the nested run with its sampler blinded from its first sighting until %g s after a worker that started %g s later has ended, then not blinded: H3abc must name every worker that lived wholly unseen, name no worker the sampler could see, and pass the run not blinded' % (MISS_MARGIN_SECONDS, MISS_MARGIN_SECONDS))
     for label, blind in (('blinded', MISS_MARGIN_SECONDS), ('not-blinded', 0.0)):
         run = nested_run('nested-' + label, blind)
         verdict = Case('H3abc', label)
@@ -516,13 +521,13 @@ def case_nested_miss_control():
         for group, pid, stamp in run['ended']:
             life.setdefault('%s.%d' % (group, pid), [None, None])[1] = stamp
         unseen = sorted(worker for worker, (begun, done) in life.items()
-                        if window and begun is not None and done is not None and begun >= window[0] + MISS_MARGIN_SECONDS and done <= window[1])
+                        if window and begun is not None and done is not None and begun >= window[0] + MISS_MARGIN_SECONDS and done <= window[1] - MISS_MARGIN_SECONDS)
         touching = sorted(worker for worker, (begun, done) in life.items() if window and begun is not None and begun <= window[1] and (done is None or done >= window[0]))
         case.measure(**{label + '_blind_window_s': round(window[1] - window[0], 3) if window else None, label + '_workers': len(life),
                         label + '_lived_wholly_unseen': unseen, label + '_named_missed': named, label + '_verdict': verdict.violations})
         if blind:
             case.check(window, 'blinded: the sampler never stopped looking')
-            case.check(unseen, 'blinded: no worker lived wholly unseen (the run ended first), so the control proves nothing')
+            case.check(unseen, 'blinded: no worker recorded both its start and its end inside the blind window\'s margins, so the control proves nothing')
             case.check(set(unseen) <= set(named), 'blinded: H3abc did not name every worker that lived wholly unseen: missing %s' % sorted(set(unseen) - set(named)))
             case.check(set(named) <= set(touching), 'blinded: H3abc named a worker that lived only while the sampler was looking: %s' % sorted(set(named) - set(touching)))
         else:
