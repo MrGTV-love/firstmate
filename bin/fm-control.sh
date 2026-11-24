@@ -2846,6 +2846,11 @@ do_relaunch() {
       if [ "${#slot_scope[@]}" -eq 0 ]; then
         while IFS= read -r owned_path; do slot_scope+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
       fi
+      # Creating a manifest on a copy is a provisioning act: a clean copy another task holds is named before the stop
+      # (a relocation's destination is judged by its own route), and again by fm-spawn.sh before the provisioner runs and
+      # before the launch is delivered, with the adoption's custody owner.
+      [ "$RELOCATING" != 0 ] || fm_slot_provision_custody "$slot_project" "$slot_copy" "$ID" "$META" "$STATE" \
+        || die "refused relaunch of governed task $ID: its assigned copy $slot_copy is held by another record or claim; preserve and reconcile it first; the running agent was not stopped"
       fm_slot_foresee_refusals "$slot_project" "$slot_copy" "$ID" "$slot_branch" "$META" "${slot_scope[@]}" \
         || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
     fi

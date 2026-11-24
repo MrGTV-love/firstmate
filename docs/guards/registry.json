@@ -5509,7 +5509,7 @@
         {"file": "bin/fm-spawn.sh", "match": "could not record the refused slot checkpoint"},
         {"file": "bin/fm-spawn.sh", "match": "could not be confirmed stopped"},
         {"file": "bin/fm-control.sh", "match": "refused invalid --owned-path"},
-        {"file": "bin/fm-control.sh", "match": "refused relaunch of governed task", "count": 3}
+        {"file": "bin/fm-control.sh", "match": "refused relaunch of governed task", "count": 4}
       ],
       "invariant": "a governed assigned copy never admits a worker or ship transition without a matching PASS attestation from the project provisioner",
       "layer": "runtime-block",

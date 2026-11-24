@@ -445,9 +445,6 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
     esac
     return 1
   fi
-  # Creating a manifest on a copy is a provisioning act: a clean copy another task holds is named before the stop, and
-  # again before the provisioner runs and before the launch is delivered (fm-spawn.sh), with the adoption's custody owner.
-  fm_slot_provision_custody "$project" "$copy" "$id" "$meta" "$(dirname "$meta")" || return 1
   [ -z "$(fm_meta_get "$meta" slot_source_ref)" ] || return 0
   base=$(git -C "$copy" merge-base origin/main HEAD 2>/dev/null) || return 0
   for path in "$@"; do
