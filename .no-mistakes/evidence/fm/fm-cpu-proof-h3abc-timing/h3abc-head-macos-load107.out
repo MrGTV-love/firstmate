@@ -1,0 +1,26 @@
+16:48  up 7 days,  4:20, 2 users, load averages: 106.80 88.85 94.70
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer2': 1, 'outer1': 1}
+  sampled_max_passes_held = 2
+  samples = 1464
+  sampler_gap_p99_ms = 453
+  sampler_gap_max_ms = 856
+  logged_max_workers_total = 2
+  logged_max_per_outer = {'outer2': 1, 'outer1': 1}
+  sampler_gap_p99_max_ms[nested] = 453/856
+  workers_started/seen_by_sampler[nested] = 16/16
+  VIOLATION: an outer runner failed: ['timeout', 0, 0] ['fm-cpu-pass: waiting 2s for 1 CPU pass(es) for outer0: all passes in use; pool size 2; holders: pid=14714 passes=1 since=1795560523 label=outer2; pid=14651 passes=1 since=1795560523 label=outer1\nfm-cpu-pass: waiting 62s for 1 CPU pass(es) for outer0: all passes in use; pool size 2; holders: pid=14714 passes=1 since=1795560523 label=outer2; pid=14651 passes=1 since=1795560523 label=outer1\nfm-cpu-pass: waiting 122s for 1 CPU pass(es) for outer0: all passes in use; pool size 2; holders: pid=14714 passes=1 since=1795560523 label=outer2; pid=14651 passes=1 since=1795560523 label=outer1\n', 'fm-test-run: reducing --jobs 6 to inherited FM_CPU_PASS_HELD=1\n', 'fm-test-run: reducing --jobs 6 to inherited FM_CPU_PASS_HELD=1\n']
+  VIOLATION: only 16 of 24 workers recorded their start
+  VIOLATION: a sampler that saw no worker of some outer runner proves nothing: {'peak_total': 2, 'peak_group': {'outer2': 1, 'outer1': 1}, 'peak_held': 2, 'samples': 1464, 'gap_p99_ms': 453, 'gap_max_ms': 856, 'labels': ['outer1', 'outer2'], 'workers_seen': ['outer1.14347', 'outer1.18013', 'outer1.2605', 'outer1.50051', 'outer1.69749', 'outer1.75319', 'outer1.77199', 'outer1.96678', 'outer2.13497', 'outer2.14641', 'outer2.17043', 'outer2.21203', 'outer2.40620', 'outer2.68155', 'outer2.80533', 'outer2.84422'], 'blind_window': None}
+  VIOLATION: outer0 printed 0 reduction notices instead of 1
+  VIOLATION: outer0 did not finish every script
+  RESULT: FAIL
+SUMMARY: 1 cases, 1 failed: H3abc
+python3 tests/fm-cpu-pass-concurrency.py "$PWD" "$T" "$(command -v python3)"   6.17s user 8.23s system 4% cpu 5:04.28 total
+exit=1

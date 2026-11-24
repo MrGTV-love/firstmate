@@ -1,0 +1,69 @@
+### base + injected 35 ms pause, try 1
+linux: Linux aarch64 nproc=18 load=0.55 0.49 0.82
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer1': 1, 'outer0': 1, 'outer2': 1}
+  sampled_max_passes_held = 2
+  samples = 367
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 66
+  sampler_gap_p99_max_ms[nested] = 30/66
+  VIOLATION: nested: the sampler skipped too long (p99 gap 30 ms, max gap 66 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+SUMMARY: 1 cases, 1 failed: H3abc
+exit=1
+
+real	0m8.882s
+user	0m6.356s
+sys	0m6.578s
+### base + injected 35 ms pause, try 2
+linux: Linux aarch64 nproc=18 load=0.71 0.53 0.83
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer1': 1, 'outer0': 1, 'outer2': 1}
+  sampled_max_passes_held = 2
+  samples = 376
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 56
+  sampler_gap_p99_max_ms[nested] = 30/56
+  VIOLATION: nested: the sampler skipped too long (p99 gap 30 ms, max gap 56 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+SUMMARY: 1 cases, 1 failed: H3abc
+exit=1
+
+real	0m8.851s
+user	0m6.279s
+sys	0m6.629s
+### base + injected 35 ms pause, try 3
+linux: Linux aarch64 nproc=18 load=1.40 0.68 0.87
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer2': 1, 'outer1': 1, 'outer0': 1}
+  sampled_max_passes_held = 2
+  samples = 366
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 57
+  sampler_gap_p99_max_ms[nested] = 30/57
+  VIOLATION: nested: the sampler skipped too long (p99 gap 30 ms, max gap 57 ms): it may have missed a short-lived worker
+  RESULT: FAIL
+SUMMARY: 1 cases, 1 failed: H3abc
+
+real	0m8.835s
+user	0m6.439s
+sys	0m6.545s
+exit=1

@@ -1,0 +1,35 @@
+### head + injected 3 s sampler blackout (real miss), H7a soak
+linux: Linux aarch64 nproc=18 load=2.20 1.40 1.12
+CASE H7a: sandbox soak: 4 lanes x 5 rounds, pool size 2, 1 pass-less burners, forced load 500
+  lanes = 4
+  rounds_per_lane = 5
+  pool_size = 2
+  background_burners_without_passes = 1
+  forced_load_average = 500
+  window_seconds = 20.8
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  samples = 808
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 3021
+  logged_max_workers_total = 2
+  heavy_completed = 20 of 20
+  brief_route_completed = 40 of 40
+  light_starts_completed = 20 of 20
+  light_starts_admitted_at_once_counted_0 = 20
+  light_starts_with_a_wait_line = 0
+  admission_sleeps_waiting_for_another_start = 0
+  admission_sleeps_waiting_for_capacity_or_load = 0
+  sample_light_start_record = fm-cpu-pass: pipeline-start admitted: counted=0 limit=1 basis=fallback priority=other
+  final_status = held=0 free=2
+  final_queue_entries = []
+  sampler_gap_p99_max_ms[soak] = 30/3021
+  workers_started/seen_by_sampler[soak] = 120/106
+  VIOLATION: soak: the sampler never saw 14 of 120 workers while they lived: it missed a short-lived worker: brief0.322 brief1.411 brief2.439 brief3.384 heavy0.181 heavy0.228 heavy0.273 heavy2.184 heavy2.230 heavy2.276 heavy3.361 heavy3.388 heavy3.415 heavy3.442
+  RESULT: FAIL
+SUMMARY: 1 cases, 1 failed: H7a
+
+real	0m21.059s
+user	0m42.803s
+sys	0m16.779s
+exit=1

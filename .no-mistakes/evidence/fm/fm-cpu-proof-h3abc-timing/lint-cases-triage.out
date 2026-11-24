@@ -1,0 +1,50 @@
+### base, same container (no git metadata), lint cases
+linux: Linux aarch64 nproc=18 load=1.38 1.64 1.27
+CASE H3 padded marker: FM_CPU_PASS_HELD=001 inside one genuinely held pass limits every participant to one worker
+  proof_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  proof_sampled_max_workers = 1
+  lint_sampled_max_shellchecks = 1
+  runner_sampled_max_workers = 1
+  VIOLATION: lint failed: fm-lint.sh: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+
+  RESULT: FAIL
+CASE H2 lint: two lint runs (--jobs 2) of 4 cold roots each, ShellCheck stub is a busy loop, pool size 2
+  lint_runs = 2
+  jobs_each = 2
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-lint /tmp/fm-conc/concurrency-7z019wu9/lint/root0-0.sh', 'fm-lint /tmp/fm-conc/concurrency-7z019wu9/lint/root0-1.sh', 'fm-lint /tmp/fm-conc/concurrency-7z019wu9/lint/root0-2.sh', 'fm-lint /tmp/fm-conc/concurrency-7z019wu9/lint/root0-3.sh', 'fm-lint /tmp/fm-conc/concurrency-7z019wu9/lint/root1-0.sh', 'fm-lint /tmp/fm-conc/concurrency-7z019wu9/lint/root1-1.sh', 'fm-lint /tmp/fm-conc/concurrency-7z019wu9/lint/root1-2.sh', 'fm-lint /tmp/fm-conc/concurrency-7z019wu9/lint/root1-3.sh']
+  nested_lint_inside_one_pass_max_workers = 1
+  VIOLATION: a lint run failed: [1, 1] ['fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\nerror: "no comparison base; pass --base REF"\n', 'fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)\nfm-lint.sh: full ShellCheck extended analysis enabled\nerror: "no comparison base; pass --base REF"\n']
+  VIOLATION: a lint run inside one pass ran 1 ShellChecks together: fm-lint.sh: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+
+  RESULT: FAIL
+SUMMARY: 2 cases, 2 failed: H3 padded marker, H2 lint
+exit=1
+
+real	0m13.693s
+user	0m7.146s
+sys	0m7.961s
+### head, container copy with a git repo and an origin/main ref, lint cases
+CASE H3 padded marker: FM_CPU_PASS_HELD=001 inside one genuinely held pass limits every participant to one worker
+  proof_markers = ['FM_ISOLATION_BEGIN planned=1', 'FM_ISOLATION_SUMMARY concurrency=1']
+  proof_sampled_max_workers = 1
+  lint_sampled_max_shellchecks = 1
+  runner_sampled_max_workers = 1
+  RESULT: PASS
+CASE H2 lint: two lint runs (--jobs 2) of 4 cold roots each, ShellCheck stub is a busy loop, pool size 2
+  lint_runs = 2
+  jobs_each = 2
+  pool_size = 2
+  sampled_max_workers_total = 2
+  sampled_max_passes_held = 2
+  holder_labels = ['fm-lint /tmp/fm-conc/concurrency-6yhk5d37/lint/root0-0.sh', 'fm-lint /tmp/fm-conc/concurrency-6yhk5d37/lint/root0-1.sh', 'fm-lint /tmp/fm-conc/concurrency-6yhk5d37/lint/root0-2.sh', 'fm-lint /tmp/fm-conc/concurrency-6yhk5d37/lint/root0-3.sh', 'fm-lint /tmp/fm-conc/concurrency-6yhk5d37/lint/root1-0.sh', 'fm-lint /tmp/fm-conc/concurrency-6yhk5d37/lint/root1-1.sh', 'fm-lint /tmp/fm-conc/concurrency-6yhk5d37/lint/root1-2.sh', 'fm-lint /tmp/fm-conc/concurrency-6yhk5d37/lint/root1-3.sh']
+  nested_lint_inside_one_pass_max_workers = 1
+  RESULT: PASS
+SUMMARY: 2 cases, 0 failed
+exit=0

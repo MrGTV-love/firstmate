@@ -1,0 +1,57 @@
+### head + injected 3 s sampler blackout (real miss), H3abc
+linux: Linux aarch64 nproc=18 load=1.23 0.84 0.92
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer1': 1, 'outer2': 1, 'outer0': 1}
+  sampled_max_passes_held = 2
+  samples = 243
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 3021
+  logged_max_workers_total = 2
+  logged_max_per_outer = {'outer1': 1, 'outer2': 1, 'outer0': 1}
+  sampler_gap_p99_max_ms[nested] = 30/3021
+  workers_started/seen_by_sampler[nested] = 24/14
+  VIOLATION: nested: the sampler never saw 10 of 24 workers while they lived: it missed a short-lived worker: outer1.197 outer1.240 outer1.287 outer1.333 outer1.379 outer2.194 outer2.243 outer2.289 outer2.335 outer2.381
+  RESULT: FAIL
+SUMMARY: 1 cases, 1 failed: H3abc
+
+real	0m8.847s
+user	0m6.400s
+sys	0m6.558s
+exit=1
+### head, H3abc miss control (real blinded sampler)
+linux: Linux aarch64 nproc=18 load=1.61 0.95 0.95
+CASE H3abc miss control: the nested run with its sampler blinded from its first sighting until 0.25 s after a worker that started 0.25 s later has ended: H3abc must name every worker that lived wholly unseen and name no worker the sampler could see
+  blind_window_s = 1.119
+  workers = 24
+  lived_wholly_unseen = ['outer1.194']
+  named_missed = ['outer0.151', 'outer0.197', 'outer1.194']
+  verdict = ['blinded: the sampler never saw 3 of 24 workers while they lived: it missed a short-lived worker: outer0.151 outer0.197 outer1.194']
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+
+real	0m8.832s
+user	0m6.486s
+sys	0m6.466s
+exit=0
+### mutant: judge_nested no longer checks for missed workers, H3abc miss control
+linux: Linux aarch64 nproc=18 load=1.69 0.98 0.97
+CASE H3abc miss control: the nested run with its sampler blinded from its first sighting until 0.25 s after a worker that started 0.25 s later has ended: H3abc must name every worker that lived wholly unseen and name no worker the sampler could see
+  blind_window_s = 1.128
+  workers = 24
+  lived_wholly_unseen = ['outer0.195', 'outer2.197']
+  named_missed = []
+  verdict = []
+  VIOLATION: blinded: H3abc did not name every worker that lived wholly unseen: missing ['outer0.195', 'outer2.197']
+  RESULT: FAIL
+SUMMARY: 1 cases, 1 failed: H3abc miss control
+
+real	0m8.834s
+user	0m6.444s
+sys	0m6.558s
+exit=1

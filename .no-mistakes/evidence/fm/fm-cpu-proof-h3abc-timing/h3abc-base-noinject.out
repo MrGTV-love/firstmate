@@ -1,0 +1,22 @@
+### base, no injection (control)
+linux: Linux aarch64 nproc=18 load=0.88 0.94 0.96
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer0': 1, 'outer2': 1, 'outer1': 1}
+  sampled_max_passes_held = 2
+  samples = 385
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 33
+  sampler_gap_p99_max_ms[nested] = 30/33
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+exit=0
+
+real	0m8.794s
+user	0m6.308s
+sys	0m6.440s

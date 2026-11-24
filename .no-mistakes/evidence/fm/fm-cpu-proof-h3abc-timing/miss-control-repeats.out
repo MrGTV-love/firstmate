@@ -1,0 +1,75 @@
+### head miss control, repeat 1
+linux: Linux aarch64 nproc=18 load=2.24 1.22 1.05
+CASE H3abc miss control: the nested run with its sampler blinded from its first sighting until 0.25 s after a worker that started 0.25 s later has ended: H3abc must name every worker that lived wholly unseen and name no worker the sampler could see
+  blind_window_s = 1.111
+  workers = 24
+  lived_wholly_unseen = ['outer0.195', 'outer1.197']
+  named_missed = ['outer0.195', 'outer1.197']
+  verdict = ['blinded: the sampler never saw 2 of 24 workers while they lived: it missed a short-lived worker: outer0.195 outer1.197']
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+
+real	0m8.788s
+user	0m6.310s
+sys	0m6.475s
+exit=0
+### head miss control, repeat 2
+linux: Linux aarch64 nproc=18 load=2.13 1.23 1.05
+CASE H3abc miss control: the nested run with its sampler blinded from its first sighting until 0.25 s after a worker that started 0.25 s later has ended: H3abc must name every worker that lived wholly unseen and name no worker the sampler could see
+  blind_window_s = 1.153
+  workers = 24
+  lived_wholly_unseen = ['outer0.195', 'outer1.197']
+  named_missed = ['outer0.195', 'outer1.151', 'outer1.197']
+  verdict = ['blinded: the sampler never saw 3 of 24 workers while they lived: it missed a short-lived worker: outer0.195 outer1.151 outer1.197']
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+
+real	0m8.740s
+user	0m6.271s
+sys	0m6.477s
+exit=0
+### head miss control, repeat 3
+linux: Linux aarch64 nproc=18 load=2.04 1.24 1.06
+CASE H3abc miss control: the nested run with its sampler blinded from its first sighting until 0.25 s after a worker that started 0.25 s later has ended: H3abc must name every worker that lived wholly unseen and name no worker the sampler could see
+  blind_window_s = 1.133
+  workers = 24
+  lived_wholly_unseen = ['outer0.196', 'outer2.194']
+  named_missed = ['outer0.196', 'outer2.194']
+  verdict = ['blinded: the sampler never saw 2 of 24 workers while they lived: it missed a short-lived worker: outer0.196 outer2.194']
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+exit=0
+
+real	0m8.764s
+user	0m6.300s
+sys	0m6.514s
+### head miss control, repeat 4
+linux: Linux aarch64 nproc=18 load=2.12 1.28 1.07
+CASE H3abc miss control: the nested run with its sampler blinded from its first sighting until 0.25 s after a worker that started 0.25 s later has ended: H3abc must name every worker that lived wholly unseen and name no worker the sampler could see
+  blind_window_s = 1.12
+  workers = 24
+  lived_wholly_unseen = ['outer0.194', 'outer2.197']
+  named_missed = ['outer0.194', 'outer2.197']
+  verdict = ['blinded: the sampler never saw 2 of 24 workers while they lived: it missed a short-lived worker: outer0.194 outer2.197']
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+
+real	0m8.810s
+user	0m6.286s
+sys	0m6.507s
+exit=0
+### head miss control, repeat 5
+linux: Linux aarch64 nproc=18 load=2.10 1.31 1.08
+CASE H3abc miss control: the nested run with its sampler blinded from its first sighting until 0.25 s after a worker that started 0.25 s later has ended: H3abc must name every worker that lived wholly unseen and name no worker the sampler could see
+  blind_window_s = 1.116
+  workers = 24
+  lived_wholly_unseen = ['outer0.194', 'outer1.197']
+  named_missed = ['outer0.194', 'outer1.197']
+  verdict = ['blinded: the sampler never saw 2 of 24 workers while they lived: it missed a short-lived worker: outer0.194 outer1.197']
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+
+real	0m8.762s
+user	0m6.318s
+sys	0m6.462s
+exit=0

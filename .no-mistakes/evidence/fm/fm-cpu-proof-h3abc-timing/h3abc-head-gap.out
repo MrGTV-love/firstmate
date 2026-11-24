@@ -1,0 +1,75 @@
+### head + injected 35 ms pause, try 1
+linux: Linux aarch64 nproc=18 load=2.13 0.86 0.93
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer0': 1, 'outer2': 1, 'outer1': 1}
+  sampled_max_passes_held = 2
+  samples = 365
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 58
+  logged_max_workers_total = 2
+  logged_max_per_outer = {'outer2': 1, 'outer0': 1, 'outer1': 1}
+  sampler_gap_p99_max_ms[nested] = 30/58
+  workers_started/seen_by_sampler[nested] = 24/24
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+
+real	0m8.793s
+user	0m6.340s
+sys	0m6.544s
+exit=0
+### head + injected 35 ms pause, try 2
+linux: Linux aarch64 nproc=18 load=2.03 0.88 0.94
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer0': 1, 'outer1': 1, 'outer2': 1}
+  sampled_max_passes_held = 2
+  samples = 358
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 67
+  logged_max_workers_total = 2
+  logged_max_per_outer = {'outer0': 1, 'outer1': 1, 'outer2': 1}
+  sampler_gap_p99_max_ms[nested] = 30/67
+  workers_started/seen_by_sampler[nested] = 24/24
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+
+real	0m8.846s
+user	0m6.444s
+sys	0m6.422s
+exit=0
+### head + injected 35 ms pause, try 3
+linux: Linux aarch64 nproc=18 load=1.95 0.90 0.94
+CASE H3abc: nested runners: K outer runners x p passes, inner --jobs 6 over 8 scripts, pool size 2
+  outer_runners = 3
+  passes_each = 1
+  pool_size = 2
+  inner_jobs_requested = 6
+  scripts_each = 8
+  sampled_max_workers_total = 2
+  sampled_max_per_outer = {'outer1': 1, 'outer2': 1, 'outer0': 1}
+  sampled_max_passes_held = 2
+  samples = 379
+  sampler_gap_p99_ms = 30
+  sampler_gap_max_ms = 57
+  logged_max_workers_total = 2
+  logged_max_per_outer = {'outer1': 1, 'outer2': 1, 'outer0': 1}
+  sampler_gap_p99_max_ms[nested] = 30/57
+  workers_started/seen_by_sampler[nested] = 24/24
+  RESULT: PASS
+SUMMARY: 1 cases, 0 failed
+
+real	0m8.880s
+user	0m6.381s
+sys	0m6.515s
+exit=0
