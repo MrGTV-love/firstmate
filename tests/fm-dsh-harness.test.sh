@@ -599,7 +599,7 @@ fi
 # A dsh box is held to its whole screen: past its furniture, any text further
 # down, even after blank rows, is a lower live surface. This holds with no
 # launch identity (the shared classifier every consumer reads) and with one.
-for tail in 'esc to interrupt' '6.5k/1.0M 0.7%' 'deepseek-v4-fla… · hi… · cache 96.… ·  ≈$0.0010 id ·  scratch-co…  ctx 0.7% (6.5k/1.0m)'; do
+for tail in 'esc to interrupt' '6.5k/1.0M 0.7%' "$dsh_status"; do
   got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" "   $tail" '' 'user@host work % echo hello')")
   [ "$got" = unknown ] || { echo "a shell row after a blank below dsh furniture '$tail' must not be a composer, got $got" >&2; exit 1; }
 done
