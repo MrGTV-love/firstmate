@@ -181,6 +181,13 @@ fm_session_end_refusal_path() {  # <state-dir> <id>
   printf '%s/.session-end-refusal-%s' "$1" "$2"
 }
 
+# A successful relaunch of the task ends the earlier refusal episode (D6(d)): its own refusal memory goes, and no other
+# task's file is named by the id check. bin/fm-control.sh relaunch calls this once the replacement agent is confirmed.
+fm_session_end_refusal_clear() {  # <state-dir> <id>
+  case "$2" in ''|*[!A-Za-z0-9._-]*) return 0 ;; esac
+  rm -f -- "$(fm_session_end_refusal_path "$1" "$2")"
+}
+
 # The reason name of a refusal-shaped relaunch outcome, or nothing for an outcome that is not a refusal.
 # A refusal whose reason cannot be named is "unclassified": it is still treated as unchanged.
 fm_session_end_refusal_reason() {  # <control-output>

@@ -397,6 +397,29 @@ test_adopt_says_loudly_that_an_edited_plugin_is_set_aside_and_not_active() {
   pass "fm-control relaunch: an edited plugin is set aside with one loud line naming its path; an unchanged one draws none"
 }
 
+# D6(d): the task's own successful relaunch ends its earlier session-end refusal episode, so its refusal memory goes; a
+# refused relaunch keeps it, and another task's memory file is never touched.
+test_a_successful_relaunch_clears_only_its_own_session_end_refusal_memory() {
+  local id=adoptrefusal out rc own other stranger
+  make_adopt_case adopt-refusal-memory "$id" src
+  own="$ADOPT_DIR/home/state/.session-end-refusal-$id"
+  other="$ADOPT_DIR/home/state/.session-end-refusal-someone-else"
+  stranger="$ADOPT_DIR/home/state/stranger.meta"
+  printf '1\t1\tbranch_not_checked_out\tfingerprint\t\n' > "$own"
+  printf '1\t1\tbranch_not_checked_out\tfingerprint\t\n' > "$other"
+  printf 'window=fmses:fm-stranger\nendpoint_task_id=stranger\nworktree=%s\nproject=%s\nharness=claude\nkind=ship\n' \
+    "$ADOPT_DIR/wt" "$ADOPT_DIR/proj" > "$stranger"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 1 "$rc" "a relaunch of a copy another task records must be refused"$'\n'"$out"
+  [ -f "$own" ] || fail 'a refused relaunch removed the refusal memory'
+  rm -f "$stranger"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "the relaunch must be admitted once the condition is cleared"$'\n'"$out"
+  [ ! -e "$own" ] || fail 'a successful relaunch left the task its own refusal memory'
+  [ -f "$other" ] || fail "a successful relaunch removed another task's refusal memory"
+  pass "fm-control relaunch: a successful relaunch clears the task's own session-end refusal memory and no other"
+}
+
 control_relaunch_test_cases=(
 test_manifest_inventory_oracle_rejects_both_mutants
 test_adopt_relaunch_keeps_the_manifest_and_survives_a_second_relaunch
@@ -410,6 +433,7 @@ test_adopt_keeps_worker_override_keys_out_of_the_active_file
 test_adopt_carries_only_the_worker_rule_lists_into_the_active_file
 test_adopt_keeps_the_staged_and_committed_protections_of_a_cut_off_tracked_settings_file
 test_adopt_says_loudly_that_an_edited_plugin_is_set_aside_and_not_active
+test_a_successful_relaunch_clears_only_its_own_session_end_refusal_memory
 )
 
 control_relaunch_run "$@"
