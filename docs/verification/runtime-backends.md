@@ -4047,6 +4047,23 @@ No earlier provider-written event exists in the durable log: dsh writes the stre
 The spawn polls an unaccepted turn again and, if it is still unaccepted when the start window ends, refuses with `dsh: first turn not accepted by the provider within <N>s`; a first step that takes longer than the window (60 seconds by default) is refused the same way.
 A turn that errs after the start proof has returned for an accepted first turn is outside it; supervision owns later turn failures.
 The trimmed captures are the `tests/fixtures/dsh-tui-0.16.1-fresh-*.ansi` and `tests/fixtures/dsh-tui-0.16.1-launch-*.ansi` regressions in `tests/fm-dsh-harness.test.sh`; no successful turn was captured on this version.
+On 2026-11-24, on macOS arm64 with `dsh-tui` 0.16.1 and DSH CLI 0.2.1-rc.2, one live run of the lifecycle guard on `deepseek/deepseek-flash` (from a scratch operator home whose `.dsh-tui/model.json` names it), against a disposable lab project and linked copy, passed:
+
+```sh
+FM_DSH_LIVE=1 FM_DSH_EVIDENCE_DIR=<scratch> FM_DSH_LAB_PROJECT=<scratch project> FM_DSH_LAB_COPY=<its linked copy> \
+  FM_DSH_OPERATOR_HOME=<scratch operator home> bin/fm-test-run.sh tests/fm-dsh-live-e2e.test.sh
+```
+
+```text
+ok - live dsh-tui ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+ok - live dsh-tui scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+cleanup_exit=0
+FM_TEST_END ... tests/fm-dsh-live-e2e.test.sh exit=0 duration_ms=228418
+```
+
+Both spawns and both same-endpoint relaunches passed the start proof, the launch-process check and the composer check through the Herdr visible read.
+A read-only `ps` sample every 2 seconds showed each launch as `node /opt/homebrew/bin/dsh-tui --patch <launch patch> -- <brief>`, its profile copy `node .../@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch <launch patch> ...` and `node /opt/homebrew/bin/dsh --profile dsh-tui --patch <launch patch> ...`; the first two are the launcher shape `fm_dsh_launch_alive` accepts.
+In each first turn the first `assistant/message` came 3.82 and 2.23 seconds after `turn/start` and the turn ended after about 51 and 55 seconds, and the guard read the turn busy right after the spawn returned, so the spawn admitted an accepted, still-busy first turn.
 The launcher and CLI must resolve and their version commands must exit successfully; no release string is compared.
 The actual frontend must then provide a recognizable DSH composer and a new durable turn, so a changed frontend refuses with a diagnostic naming the unreadable composer rather than being accepted because of its version.
 No screen-based DSH quota parser exists: dispatch quota uses structured snapshots and the DSH busy classifier reads its durable session log.
