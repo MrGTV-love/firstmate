@@ -137,12 +137,32 @@ test_manifest_exists_refusal_names_the_collision_the_memory_hashes() {
   pass "fm-control relaunch: the manifest_exists refusal names the collision file and a cleared collision changes the refusal memory"
 }
 
+# D7 (e): a clean copy another task's record names is refused by name before the agent is stopped and before the provisioner
+# runs, through the real control and spawn path; the same shape without the foreign record is admitted.
+test_a_copy_another_task_records_is_refused_before_the_stop_on_the_provisioning_route() {
+  local id=foresee-held out rc before other
+  make_noman_case foresee-held "$id" 1 src
+  other="$ADOPT_DIR/home/state/stranger.meta"
+  printf 'window=fmses:fm-stranger\nendpoint_task_id=stranger\nworktree=%s\nproject=%s\nharness=claude\nkind=ship\n' \
+    "$ADOPT_DIR/wt" "$ADOPT_DIR/proj" > "$other"
+  before=$(cat "$ADOPT_META")
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  assert_refused_before_stop "$ADOPT_DIR" "$id" custody_other_record 'a copy another task records, on the provisioning route' "$out" "$rc" "$before"
+  assert_contains "$out" 'stranger' 'the refusal did not name the other task'
+  [ ! -e "$ADOPT_MANIFEST" ] || fail 'a manifest was created on a copy another task holds'
+  rm -f "$other"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "the same copy with no foreign record must be admitted"$'\n'"$out"
+  pass "fm-control relaunch: a copy another task records is refused before the stop on the provisioning route; the own copy is provisioned"
+}
+
 control_relaunch_test_cases=(
 test_old_copy_is_provisioned_by_the_primary_clone_then_adopted
 test_primary_provisioner_must_match_the_default_tip
 test_foreseen_refusals_come_before_the_stop
 test_committed_out_of_scope_refusal_names_every_path_and_the_report
 test_manifest_exists_refusal_names_the_collision_the_memory_hashes
+test_a_copy_another_task_records_is_refused_before_the_stop_on_the_provisioning_route
 )
 
 control_relaunch_run "$@"
