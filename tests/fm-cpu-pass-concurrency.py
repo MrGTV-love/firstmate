@@ -169,7 +169,7 @@ def locked(path):
             return True, os.pread(fd, 400, 0).decode('utf-8', 'replace').strip()
     finally:
         os.close(fd)
-peak_total, peak_group, peak_held, samples, gaps, labels = 0, {}, 0, 0, [], set()
+peak_total, peak_group, peak_held, samples, gaps, labels, sighted = 0, {}, 0, 0, [], set(), set()
 last = time.monotonic()
 while not os.path.exists(stop):
     now = time.monotonic()
@@ -180,6 +180,7 @@ while not os.path.exists(stop):
         if name.startswith('.') or '.' not in name or name.endswith('.log'):
             continue
         if locked(os.path.join(alive, name))[0]:
+            sighted.add(name)
             groups[name.split('.')[0]] = groups.get(name.split('.')[0], 0) + 1
     held = 0
     for index in range(size):
@@ -198,7 +199,7 @@ while not os.path.exists(stop):
 gaps.sort()
 json.dump(dict(peak_total=peak_total, peak_group=peak_group, peak_held=peak_held, samples=samples,
                gap_p99_ms=round(gaps[int(len(gaps) * 0.99) - 1] * 1000) if gaps else 0,
-               gap_max_ms=round(gaps[-1] * 1000) if gaps else 0, labels=sorted(labels)), open(out, 'w'))
+               gap_max_ms=round(gaps[-1] * 1000) if gaps else 0, labels=sorted(labels), workers_seen=sorted(sighted)), open(out, 'w'))
 ''')
 
 burner = root / 'burner.py'
@@ -304,6 +305,40 @@ def sampling_valid(case, seen, label):
                '%s: the sampler skipped too long (p99 gap %d ms, max gap %d ms): it may have missed a short-lived worker' % (label, seen['gap_p99_ms'], seen['gap_max_ms']))
 
 
+def sampler_saw_every_worker(case, seen, started, label):
+    """The harm sampling_valid's gap limit stands for, judged on the run itself: a started worker the sampler never saw locked.
+
+    STARTED names each worker that recorded its start ('<group>.<pid>', its marker name). The gaps are still printed,
+    but no gap length decides: a long gap that missed no worker hid nothing, and one missed worker fails at any gap.
+    """
+    missed = sorted(set(started) - set(seen.get('workers_seen', ())))
+    case.measure(**{'sampler_gap_p99_max_ms[%s]' % label: '%d/%d' % (seen['gap_p99_ms'], seen['gap_max_ms']),
+                    'workers_started/seen_by_sampler[%s]' % label: '%d/%d' % (len(started), len(started) - len(missed))})
+    case.check(started, '%s: no worker recorded its start, so a sampler that missed none proves nothing' % label)
+    case.check(not missed, '%s: the sampler never saw %d of %d workers while they lived: it missed a short-lived worker: %s'
+               % (label, len(missed), len(started), ' '.join(missed)))
+
+
+def logged_peaks(began, ended):
+    """The most workers busy together, in total and per group, from each worker's own start and end records.
+
+    A worker records its start after it locks its marker and its end before it removes it, so each logged span holds its
+    whole busy loop and lies inside the time its marker is locked: a logged overlap is a real one, and this count does not
+    depend on how often a sampler looked. A worker with no end record counts as busy to the end.
+    """
+    finish = {(group, pid): stamp for group, pid, stamp in ended}
+    events = []
+    for group, pid, stamp in began:
+        events.append((stamp, 1, group))
+        events.append((finish.get((group, pid), float('inf')), -1, group))
+    total, peak, busy, peak_group = 0, 0, {}, {}
+    for _, step, group in sorted(events, key=lambda event: (event[0], event[1])):  # at one stamp, an end counts first
+        total += step
+        busy[group] = busy.get(group, 0) + step
+        peak, peak_group[group] = max(peak, total), max(peak_group.get(group, 0), busy[group])
+    return peak, peak_group
+
+
 def ends(world):
     log = world.alive / 'ends.log'
     rows = [line.split() for line in log.read_text().splitlines()] if log.exists() else []
@@ -389,12 +424,22 @@ def case_nested():
                            + ['tests/' + name for name in names], extra=dict(FM_CONC_GROUP='outer%d' % i)) for i in range(K)]
     codes = wait_all(outers)
     seen = world.sample_stop()
+    began, ended = starts(world), ends(world)
+    logged_total, logged_per_outer = logged_peaks(began, ended)
     case.measure(outer_runners=K, passes_each=p, pool_size=N, inner_jobs_requested=6, scripts_each=len(names),
                  sampled_max_workers_total=seen['peak_total'], sampled_max_per_outer=seen['peak_group'],
                  sampled_max_passes_held=seen['peak_held'], samples=seen['samples'], sampler_gap_p99_ms=seen['gap_p99_ms'],
-                 sampler_gap_max_ms=seen['gap_max_ms'])
+                 sampler_gap_max_ms=seen['gap_max_ms'], logged_max_workers_total=logged_total, logged_max_per_outer=logged_per_outer)
     case.check(codes == [0] * K, 'an outer runner failed: %s %s' % (codes, [world.text('outer%d' % i) for i in range(K)]))
-    sampling_valid(case, seen, 'nested')
+    # This case judges the sampler on the harm itself, not on sampling_valid's 50 ms gap limit, which a healthy sampler crossed
+    # on a CI runner (p99 20 ms, max 55 ms) while every worker it watches lives at least 350 ms: a worker it never saw fails
+    # at any gap, and the worker cap is also counted from the workers' own records, so no gap length decides whether an
+    # overlap of their busy loops is seen.
+    case.check(len(began) == K * len(names), 'only %d of %d workers recorded their start' % (len(began), K * len(names)))
+    sampler_saw_every_worker(case, seen, ['%s.%d' % (group, pid) for group, pid, _ in began], 'nested')
+    case.check(logged_total <= N, 'workers busy together by their own records %d exceed the pool size %d' % (logged_total, N))
+    for group, peak in logged_per_outer.items():
+        case.check(peak <= p, '%s ran %d workers together inside %d passes by their own records' % (group, peak, p))
     case.check(seen['peak_total'] <= N, 'workers alive together %d exceed the pool size %d' % (seen['peak_total'], N))
     case.check(seen['peak_total'] > 0 and sum(1 for g in seen['peak_group'] if g.startswith('outer')) == K, 'a sampler that saw no worker of some outer runner proves nothing: %s' % seen)
     for group, peak in seen['peak_group'].items():
@@ -1080,7 +1125,7 @@ def case_wait_cause_control():
 
 def case_sampler_control():
     """Controls for the validators the other cases rely on: each one must reject the input it exists to reject."""
-    case = Case('validator controls', 'sampling_valid rejects a blind or slow sampler')
+    case = Case('validator controls', 'sampling_valid rejects a blind or slow sampler; H3abc rejects a sampler that missed a worker at any gap and counts overlaps from the records')
     blind = Case('x', 'x')
     sampling_valid(blind, dict(peak_total=0, gap_p99_ms=20, gap_max_ms=30), 'blind')
     slow = Case('x', 'x')
@@ -1094,6 +1139,25 @@ def case_sampler_control():
     case.check(len(slow.violations) == 1, 'a sampler that skipped for seconds was accepted')
     case.check(len(cadence.violations) == 1, 'a sampler slower than the 50 ms cadence the contract asks for was accepted')
     case.check(not sound.violations, 'a sound sampler was rejected: %s' % sound.violations)
+    # H3abc's record from CI run 45443474914: p99 gap 20 ms, max gap 55 ms, and every one of its 24 workers lived 350 ms or more.
+    workers = ['outer%d.%d' % (outer, 100 * outer + script) for outer in range(3) for script in range(8)]
+    ci_run = Case('x', 'x')
+    sampler_saw_every_worker(ci_run, dict(gap_p99_ms=20, gap_max_ms=55, workers_seen=workers), workers, 'ci-55ms')
+    missed = Case('x', 'x')
+    sampler_saw_every_worker(missed, dict(gap_p99_ms=20, gap_max_ms=20, workers_seen=workers[:-1]), workers, 'missed')
+    idle = Case('x', 'x')
+    sampler_saw_every_worker(idle, dict(gap_p99_ms=20, gap_max_ms=20, workers_seen=[]), [], 'none-started')
+    overlap = logged_peaks([('a', 1, 0.0), ('a', 2, 0.5), ('b', 3, 0.9)], [('a', 1, 1.0), ('a', 2, 1.0), ('b', 3, 1.0)])
+    back_to_back = logged_peaks([('a', 1, 0.0), ('a', 2, 1.0)], [('a', 1, 1.0), ('a', 2, 2.0)])
+    unended = logged_peaks([('a', 1, 0.0), ('a', 2, 5.0)], [])
+    case.measure(ci_55ms_record_violations=len(ci_run.violations), missed_worker_violations=missed.violations,
+                 logged_peaks_overlap_back_to_back_unended=[overlap, back_to_back, unended])
+    case.check(not ci_run.violations, 'H3abc rejected the healthy CI record whose only fault was a 55 ms gap: %s' % ci_run.violations)
+    case.check(len(missed.violations) == 1 and workers[-1] in missed.violations[0], 'a sampler that missed a worker at a 20 ms cadence was accepted: %s' % missed.violations)
+    case.check(len(idle.violations) == 1, 'a run in which no worker started was accepted as missing none')
+    case.check(overlap == (3, {'a': 2, 'b': 1}), 'three overlapping records were counted as %s' % (overlap,))
+    case.check(back_to_back == (1, {'a': 1}), 'a record that starts as another ends was counted as an overlap: %s' % (back_to_back,))
+    case.check(unended == (2, {'a': 2}), 'a record with no end was not counted as busy to the end: %s' % (unended,))
     return case
 
 
