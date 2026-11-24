@@ -165,7 +165,9 @@ The exact-head rule protects merge authority from code reaching the base that no
 Carry-over judges that harm directly: an equal tree proves every byte H adds beyond base-branch content is a byte R added, so a merge or rebase of the base admits no unread line, and a missing object, a conflict or any difference refuses with the original head mismatch.
 A conflict resolution counts as new content even when it keeps the reviewed side, because a hand resolution is where an unread line most easily hides.
 The base content H holds is reachable from the live base branch, so it passed that branch's own landing gate.
-The proof trusts `--base` to be a commit on the PR's base branch, which both callers take from the live forge, and trusts the task worktree's object store, as author derivation already does.
+The proof trusts `--base` to be a commit on the PR's base branch, which both callers take from the live forge (GitHub `baseRefOid`, GitLab `diff_refs.base_sha`, Forgejo `.base.sha`), and trusts the task worktree's object store, as author derivation already does.
+A base older than the base content the live head holds makes the trees differ, so it refuses rather than carries; the regressions exercise GitHub only.
+A carried PASS also requires that no review row names the live head, or any head other than R after R was first read, so a FAIL recorded at an intermediate head cannot be skipped by a later PASS of R.
 Any rewrite that keeps the reviewed tree, such as an amended message or a squash, also carries, because no content changed; a clean merge of a branch that is not on the base is unread content and refuses.
 The residual risk is an interaction between R and newer base content that the reader never saw together; required checks at the exact live head, which `bin/fm-pr-merge.sh` still demands, are the guard for that, as they were for any two PRs reviewed separately.
 Accepted carry-overs are disclosed as the fact `review carried from <R>` in verify's text output and as `carried_from` in `--json`.

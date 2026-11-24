@@ -27,7 +27,8 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
      own, never the aggregate state alone) and every check the base branch requires has reported. This is
      a fail-closed prefilter for spending a read, never the merge gate: bin/fm-pr-merge.sh re-reads every
      condition live and stays the only authority;
-  4. asks `fm-review-record.py verify --json`. A qualifying independent-review PASS goes to
+  4. asks `fm-review-record.py verify --json`. A qualifying independent-review PASS, including one verify
+     carried from an earlier head across a clean base update (its carried_from field), goes to
      bin/fm-pr-merge.sh <task> <url> with no other argument, never an override, waiver or captain word,
      and a captain-word basis is left to Main. Otherwise `fm-review-record.py plan` names the author
      families still uncovered and one read is requested for them. While the PR sits in a merge

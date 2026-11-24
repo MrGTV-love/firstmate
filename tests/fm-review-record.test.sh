@@ -856,8 +856,30 @@ test_carry_over_accepts_a_same_tree_rewrite() {
   pass "a rewrite that keeps the reviewed tree, such as an amended message, carries the PASS"
 }
 
+test_carry_over_refuses_after_a_later_head_was_read() {
+  local case_dir r2 live out rc=0
+  case_dir=$(make_carry_case carry-later-fail)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+  r2=$(merge_trunk_into_pr "$case_dir")
+  record_review "$case_dir" "$r2" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at R2"
+  # A late PASS of R is appended after the FAIL, so R is again the newest review.
+  record_review "$case_dir" "$REVIEWED" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record late PASS at R"
+  cgit "$case_dir" checkout -q trunk
+  printf 'more\n' > "$case_dir/wt/more.txt"
+  cgit "$case_dir" add more.txt
+  cgit "$case_dir" commit -qm 'base moves again'
+  TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a FAIL at a later head must not be skipped by a late PASS of an earlier head: $out"
+  expect_not_qualified "$out" "head mismatch" "later head read"
+  pass "a read of any later head turns carry-over off, so row order cannot skip a FAIL"
+}
+
 fm_test_run_cases \
   test_carry_over_refuses_a_branch_that_is_not_on_the_base \
+  test_carry_over_refuses_after_a_later_head_was_read \
   test_carry_over_accepts_a_same_tree_rewrite \
   test_carry_over_accepts_a_clean_merge_of_the_base \
   test_carry_over_accepts_a_clean_rebase \

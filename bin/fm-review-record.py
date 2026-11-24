@@ -101,7 +101,9 @@ narrow, but do not eliminate, that risk. See docs/configuration.md's
 Exact-head binding, report validation, captain-word/away rules and every live
 forge/hold check remain mandatory.
 Review carry-over: when the newest review names an earlier head R, no review
-row names the live head H, and no captain-word at H applies, verify asks whether
+row names the live head H or any head other than R after R's first review row
+(so row order can never skip a FAIL at a later head), and no captain-word at H
+applies, verify asks whether
 H adds anything no read covered. It takes P, the merge base of the live --base
 and H (base-branch content H already contains), merges R into P with
 git merge-tree --write-tree, and requires that tree to equal H's tree exactly.
@@ -541,7 +543,11 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
             raise VerificationError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
         if review["head"] != read_head:
             mismatch = f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge"
-            if reviewed or any(row["kind"] == "review" and row["head"] == head for row in rows):
+            first = min(i for i, row in enumerate(rows) if row["kind"] == "review" and row["head"] == review["head"])
+            # Any read of the live head, or of another head after R was first read, means some
+            # head after R had its own reads (possibly a FAIL), so R no longer speaks for H.
+            if reviewed or any(row["kind"] == "review" and (row["head"] == head or (i > first and row["head"] != review["head"]))
+                               for i, row in enumerate(rows)):
                 raise VerificationError(mismatch)
             refusal = carry_over_refusal(home, task, head, review["head"], base)
             if refusal:
