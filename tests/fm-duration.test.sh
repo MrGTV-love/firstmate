@@ -317,6 +317,31 @@ assert bursted.returncode == 124 and 'no_progress' in bursted.stderr and 'absolu
 assert bursted_elapsed < 40, f'a past CPU burst held off the no-progress stop: {bursted_elapsed:.1f}s'
 assert float(burst_cpu.read_text()) >= 3, burst_cpu.read_text()
 
+# The floor's value is decided at its edge: under the same 10x clock a silent
+# child at about 5% of a core (about 0.3 s per 6 real second window) is idle,
+# while one at about 20% (about 1.2 s per window) is working and finishes.
+duty = """import pathlib, sys, time
+share, seconds, done = float(sys.argv[1]), float(sys.argv[2]), pathlib.Path(sys.argv[3])
+end = time.monotonic() + seconds
+while time.monotonic() < end:
+    mark = time.process_time()
+    while time.process_time() - mark < share * 0.1:
+        pass
+    time.sleep(0.1 * (1 - share))
+done.touch()
+"""
+for share, key, trips in (('0.05', 'duty.below-floor', True), ('0.2', 'duty.above-floor', False)):
+    done = tmp / f'{key}.done'
+    begun = time.monotonic()
+    duty_run = subprocess.run([sys.executable, str(tenfold_clock), str(helper), 'run', key, '--', sys.executable, '-c', duty, share, '15', str(done)],
+                              env=dict(env, FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='600'), cwd=workrepo, capture_output=True, text=True)
+    duty_elapsed = time.monotonic() - begun
+    if trips:
+        assert duty_run.returncode == 124 and 'no_progress' in duty_run.stderr and not done.exists(), (key, duty_run.returncode, duty_run.stderr)
+        assert duty_elapsed < 14, f'{key}: a child below the floor was not stopped: {duty_elapsed:.1f}s'
+    else:
+        assert duty_run.returncode == 0 and 'no_progress' not in duty_run.stderr and done.exists(), (key, duty_run.returncode, duty_run.stderr)
+
 
 def wait_for(path):
     deadline = time.monotonic() + 60
