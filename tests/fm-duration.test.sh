@@ -388,6 +388,14 @@ for share, key, trips in (('0.05', 'duty.below-floor', True), ('0.2', 'duty.abov
     else:
         assert duty_run.returncode == 0 and 'no_progress' not in duty_run.stderr and done.exists(), (key, duty_run.returncode, duty_run.stderr)
 
+# A blind stretch from the start is not idle time: blinded for 12 real
+# seconds (120 scaled, twice the bound) and then sighted, a silent 40% child
+# is not stopped and finishes.
+start_done = tmp / 'blind-start.done'
+from_start, _ = sampler_run('creep.blind-start', duty, ['0.4', '18', start_done], FM_TEST_CLOCK='10', FM_TEST_BLIND='0:12',
+                            FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert from_start.returncode == 0 and 'no_progress' not in from_start.stderr and start_done.exists(), (from_start.returncode, from_start.stderr)
+
 # CPU spent while telemetry is blind counts. A silent child at about 40% of a
 # core is blinded from 2 to 12 real seconds under a 10x clock, a gap of 100
 # scaled seconds, longer than the 60 s window and the 60 s bound; when samples
@@ -398,14 +406,6 @@ gap, gap_elapsed = sampler_run('creep.blind-gap', gap_child, ['0.4', '18', blind
                                FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
 assert gap.returncode == 0 and 'no_progress' not in gap.stderr and blind_done.exists(), (gap.returncode, gap.stderr)
 assert 'cpu_telemetry_unavailable' in gap.stderr and float(blind_cpu.read_text()) >= 3, (gap.stderr, blind_cpu.read_text() if blind_cpu.exists() else None)
-
-# A blind stretch from the start is not idle time: blinded for 12 real
-# seconds (120 scaled, twice the bound) and then sighted, a silent 40% child
-# is not stopped and finishes.
-start_done = tmp / 'blind-start.done'
-from_start, _ = sampler_run('creep.blind-start', duty, ['0.4', '18', start_done], FM_TEST_CLOCK='10', FM_TEST_BLIND='0:12',
-                            FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
-assert from_start.returncode == 0 and 'no_progress' not in from_start.stderr and start_done.exists(), (from_start.returncode, from_start.stderr)
 
 # Nor is a gap progress: a silent 7% child (about 0.42 s per 6 real second
 # window, under the floor) is blinded for the first 12 s of every 15, so each
