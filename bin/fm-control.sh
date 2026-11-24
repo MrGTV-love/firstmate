@@ -2946,6 +2946,7 @@ do_relaunch() {
   RELAUNCH_ACTIVE=0
   # The task's own successful relaunch ends its earlier session-end refusal episode, so a later death is a new cause
   # (D6(d)); only this task's memory file is named, in a subshell so the library's shell options stay out of this script.
+  # shellcheck source=bin/fm-session-end-relaunch-lib.sh
   ( . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh" && fm_session_end_refusal_clear "$STATE" "$ID" ) >/dev/null 2>&1 || true
   if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
     fm_status_append_line "$STATE/$ID.status" "$(printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}")" \
