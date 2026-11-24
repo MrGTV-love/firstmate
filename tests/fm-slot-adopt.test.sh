@@ -471,9 +471,25 @@ test_firstmate_written_wiring_is_not_reported_as_drift() {
   pass "drift: wiring recorded in state/<id>.wiring-sha is not listed; the task's own change still is"
 }
 
+# B1 (exact-head read of 6acb4545): a governed task's own valid manifest is adopted. The record check must not overwrite
+# the manifest verdict, so the repository root the adoption judged is the manifest's own repo root, not the word ok.
+test_a_governed_tasks_own_manifest_is_adopted_with_the_manifest_repo_root() {
+  local out rc want
+  make_world adopt-own
+  want=$(python3 -c 'import json,os,sys; print(os.path.realpath(json.load(open(sys.argv[1]))["repo_root"]))' "$W_MANIFEST")
+  FM_SLOT_ADOPT_ROOT=
+  fm_slot_adopt_check "$W_PROJ" "$W_SLOT" t fm/t "$W_META" "$W_STATE" >"$W_DIR/adopt.out" 2>&1; rc=$?
+  out=$(cat "$W_DIR/adopt.out")
+  [ "$rc" -eq 0 ] || fail "a governed task's own valid manifest was refused: $out"
+  [ "${FM_SLOT_ADOPTED:-0}" = 1 ] || fail 'the own manifest was not marked adopted'
+  [ "$FM_SLOT_ADOPT_ROOT" = "$want" ] || fail "the judged repository root is '$FM_SLOT_ADOPT_ROOT', not the manifest's '$want'"
+  pass "adoption: a governed task's own valid manifest is adopted and the judged root is the manifest's repo root"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
+test_a_governed_tasks_own_manifest_is_adopted_with_the_manifest_repo_root
 test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name
 test_a_hidden_symlink_retarget_is_task_drift
 test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not

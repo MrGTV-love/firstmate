@@ -590,6 +590,7 @@ EOF
 # relaunch by name unless that task's record places its copy inside the slot, and no other peer claim is checked; the
 # drift report only makes the out-of-scope paths visible.
 FM_SLOT_ADOPTED=0
+FM_SLOT_ADOPT_ROOT=
 
 # 0 when <meta>'s task is relaunched into its own recorded slot: a recorded manifest, no
 # relocation to a replacement copy, and not the recovery of a first provisioning that never finished.
@@ -753,7 +754,7 @@ fm_slot_custody_check() { # <project> <copy> <task-id> <meta> <state-dir>
 # otherwise prints the refusal by name and returns 1.
 fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
   local project=$1 copy=$2 id=$3 branch=$4 meta=$5 state=$6
-  local manifest base ref common slot_common real_copy root verdict line git_head head_name marker records
+  local manifest base ref common slot_common real_copy root verdict records_verdict line git_head head_name marker records
   local -a scope=()
   FM_SLOT_ADOPTED=0
   manifest=$(fm_meta_get "$meta" slot_manifest)
@@ -776,17 +777,19 @@ fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
     fm_slot_adopt_refuse "${verdict%%$'\t'*}" "${verdict#*$'\t'}"
     return 1
   fi
+  # The repository root is the manifest verdict's; the record check below has its own verdict variable so it can never
+  # overwrite it.
+  root=${verdict#*$'\t'}
   # The pointer must name the authoritative record and agree with the other one the provisioner keeps for this copy.
   records=$(fm_slot_record_paths "$project" "$real_copy") || { fm_slot_adopt_refuse repository_unreadable "$project"; return 1; }
-  verdict=$(fm_slot_adopt_records "$manifest" "${records%%$'\n'*}" "${records#*$'\n'}") ||
+  records_verdict=$(fm_slot_adopt_records "$manifest" "${records%%$'\n'*}" "${records#*$'\n'}") ||
     { fm_slot_adopt_refuse manifest_unreadable "$manifest"; return 1; }
-  if [ "${verdict%%$'\t'*}" != ok ]; then
-    fm_slot_adopt_refuse "${verdict%%$'\t'*}" "${verdict#*$'\t'}"
+  if [ "${records_verdict%%$'\t'*}" != ok ]; then
+    fm_slot_adopt_refuse "${records_verdict%%$'\t'*}" "${records_verdict#*$'\t'}"
     return 1
   fi
   # The repository is judged by identity: the recorded root is the canonical root the provisioner records (the
   # parent of the common directory, which need not be a checkout) or a checkout of the same repository.
-  root=${verdict#*$'\t'}
   if ! { [ "$(dirname "$common")" -ef "$root" ] ||
     [ "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$common" ]; }; then
     fm_slot_adopt_refuse repository_mismatch "the manifest's repository root $root belongs to another repository"
@@ -809,6 +812,7 @@ fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
   FM_SLOT_MANIFEST=$manifest
   FM_SLOT_BASE_SHA=$base
   FM_SLOT_BASE_REF=$ref
+  FM_SLOT_ADOPT_ROOT=$root
   FM_SLOT_PROVISIONED=1
   FM_SLOT_ADOPTED=1
 }
