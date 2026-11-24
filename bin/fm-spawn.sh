@@ -7036,20 +7036,38 @@ SPAWN_KEPT_SETTINGS=
 # Firstmate's own previous entries (busy and guard hooks of this task) are dropped from the kept side so they do not
 # pile up; no other key of the worker's file is carried into the active file, so an override such as disableAllHooks
 # or an env entry is never applied, and the mode is restored. The kept copy itself stays byte for byte at its kept path.
-# A kept file that does not parse stays byte for byte at its kept path, the fresh wiring is written without it, and the
-# report says so.
+# A kept file that does not parse stays byte for byte at its kept path and the report says so; the base for the merge is then
+# the most recent parseable version the launch can establish: the version staged in the index, else the committed one, so a
+# protection of a tracked file stays effective beside the fresh wiring (D1); an ignored file has no such version, so the fresh
+# wiring is written without it and the protections that exist only in the unparseable bytes are not effective.
 spawn_merge_kept_settings() { # <kept-path> <active-path>
-  python3 - "$1" "$2" "$ID" <<'PY' || return 1
-import json, os, stat, sys
-kept, active, task = sys.argv[1:4]
+  python3 - "$1" "$2" "$ID" "$WT" <<'PY' || return 1
+import json, os, stat, subprocess, sys
+kept, active, task, worktree = sys.argv[1:5]
 try:
     with open(kept, encoding="utf-8") as handle:
         old = json.load(handle)
     if not isinstance(old, dict):
         raise ValueError("not a JSON object")
 except (OSError, ValueError) as exc:
-    print("the kept settings %s do not parse (%s): they stay byte for byte at that path, the fresh wiring is written without them, and protections that exist only in those bytes are NOT effective" % (kept, exc), file=sys.stderr)
-    sys.exit(0)
+    old = None
+    source = ""
+    rel = os.path.relpath(active, worktree)
+    for ref in (":" + rel, "HEAD:" + rel):
+        shown = subprocess.run(["git", "-C", worktree, "show", ref], capture_output=True, stdin=subprocess.DEVNULL)
+        if shown.returncode != 0:
+            continue
+        try:
+            candidate = json.loads(shown.stdout.decode("utf-8"))
+        except ValueError:
+            continue
+        if isinstance(candidate, dict):
+            old, source = candidate, ("the version staged in the index" if ref.startswith(":") else "the committed version")
+            break
+    if old is None:
+        print("the kept settings %s do not parse (%s): they stay byte for byte at that path, the fresh wiring is written without them, and protections that exist only in those bytes are NOT effective" % (kept, exc), file=sys.stderr)
+        sys.exit(0)
+    print("the kept settings %s do not parse (%s): they stay byte for byte at that path; the hook and permission entries of %s stay effective beside the fresh wiring, and protections that exist only in the unparseable bytes are NOT effective" % (kept, exc, source), file=sys.stderr)
 with open(active, encoding="utf-8") as handle:
     fresh = json.load(handle)
 ours = ("fm-busy-event.sh", "fm-jev-guard-hook.sh")

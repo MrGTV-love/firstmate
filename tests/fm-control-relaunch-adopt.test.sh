@@ -341,6 +341,38 @@ PY
   pass "fm-control relaunch: the worker's allow, deny and ask rule lists reach the active file; a mode and other permission keys do not"
 }
 
+# D1: a TRACKED settings file cut off mid-write keeps the protections of its staged version (and the committed one beside
+# it) effective beside the fresh wiring, and the cut-off bytes stay recoverable.
+test_adopt_keeps_the_staged_and_committed_protections_of_a_cut_off_tracked_settings_file() {
+  local id=adopttracked out rc settings kept
+  make_adopt_case adopt-tracked "$id" src
+  settings="$ADOPT_DIR/wt/.claude/settings.local.json"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "the first relaunch must be admitted"$'\n'"$out"
+  # the committed version carries hook A; the index holds a parseable version that adds hook B
+  printf '{"hooks":{"PreToolUse":[{"matcher":"Task","hooks":[{"type":"command","command":"deny-committed"}]}]}}\n' > "$settings"
+  git -C "$ADOPT_DIR/wt" add -f .claude/settings.local.json
+  git -C "$ADOPT_DIR/wt" -c user.name=T -c user.email=t@example.invalid commit -qm 'track the settings with hook A'
+  printf '{"hooks":{"PreToolUse":[{"matcher":"Task","hooks":[{"type":"command","command":"deny-committed"}]},{"matcher":"Bash","hooks":[{"type":"command","command":"deny-staged"}]}]}}\n' > "$settings"
+  git -C "$ADOPT_DIR/wt" add -f .claude/settings.local.json
+  # then the working file is cut off mid-write by the reboot
+  printf '{"hooks":{"PreToolUse":[{"matcher":"Task",' > "$settings"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch over a cut-off tracked settings file must be admitted"$'\n'"$out"
+  assert_contains "$out" 'staged in the index' 'the report did not say which version stays effective'
+  kept=$(kept_files "$ADOPT_DIR/wt/.claude" | head -n 1)
+  [ -n "$kept" ] || fail 'the cut-off bytes were not kept'
+  [ "$(cat "$kept")" = '{"hooks":{"PreToolUse":[{"matcher":"Task",' ] || fail 'the kept copy is not byte-identical to the cut-off bytes'
+  python3 - "$settings" <<'PY' || fail 'the staged and committed protections are not effective beside the fresh wiring'
+import json, sys
+pre = json.load(open(sys.argv[1]))["hooks"]["PreToolUse"]
+assert any(e.get("matcher") == "Task" and any(h.get("command") == "deny-committed" for h in e["hooks"]) for e in pre), pre
+assert any(e.get("matcher") == "Bash" and any(h.get("command") == "deny-staged" for h in e["hooks"]) for e in pre), pre
+assert any(any("fm-jev-guard-hook" in h.get("command", "") for h in e["hooks"]) for e in pre), pre
+PY
+  pass "fm-control relaunch: a cut-off tracked settings file keeps its staged and committed protections effective and its bytes recoverable"
+}
+
 control_relaunch_test_cases=(
 test_manifest_inventory_oracle_rejects_both_mutants
 test_adopt_relaunch_keeps_the_manifest_and_survives_a_second_relaunch
@@ -352,6 +384,7 @@ test_adopt_route_is_only_for_the_own_slot
 test_adopt_keeps_a_worker_edited_launch_artifact
 test_adopt_keeps_worker_override_keys_out_of_the_active_file
 test_adopt_carries_only_the_worker_rule_lists_into_the_active_file
+test_adopt_keeps_the_staged_and_committed_protections_of_a_cut_off_tracked_settings_file
 )
 
 control_relaunch_run "$@"
