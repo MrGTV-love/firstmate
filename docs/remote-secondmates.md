@@ -42,9 +42,10 @@ Every path that provisions or launches one refuses a host that is not ready for 
 `fm-on.sh` adds its own protections:
 
 - On every call, it also disables agent forwarding, forwarding setup, and configured `SendEnv` patterns.
+- It bounds SSH connection setup, so a host that cannot be reached fails within a bounded window instead of hanging before the connection opens.
 - It arms bounded SSH dead-peer detection, so a vanished host (a reboot, a dropped link) fails within a bounded window instead of hanging indefinitely.
 
-Its [script header](../bin/fm-on.sh) owns the keepalive defaults and environment overrides.
+Its [script header](../bin/fm-on.sh) owns the connect-timeout and keepalive defaults and environment overrides.
 
 ### Remote clone and entrypoint
 
@@ -480,6 +481,7 @@ FM_HOME=<primary-home> bin/fm-send.sh fm-<id> '<request>'
 ```
 
 The [`fm-send.sh` header](../bin/fm-send.sh) owns the exact delivery-status contract.
+A routed request to a secondmate with open keyed decisions must also pass `--resolve-key <key>` or `--answers-none` (rule: the same header).
 Routed requests use the [steering-inbox contract](../bin/fm-task-inbox-lib.sh) in the remote home.
 The payload is never delivered by typing it into the pane.
 Exit 0 means the record durably exists.

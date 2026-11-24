@@ -801,10 +801,10 @@ test_partition_checks_judge_loss_and_duplication() {
   pass "the partition checks catch an unregistered, ghost, duplicated, or unlisted case and accept an added test"
 }
 
-# The three teardown groups partition one former suite: every case a group file
+# The teardown groups partition one suite: every case a group file
 # defines is registered by that file, and no case is registered by two groups.
 test_teardown_groups_register_each_case_once() {
-  assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup
+  assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse
   pass "the teardown groups are a duplicate-free cover, each case registered by the file that defines it"
 }
 
@@ -813,7 +813,7 @@ test_teardown_groups_register_each_case_once() {
 # landing and cleanup paths the former single file carried.
 test_teardown_groups_share_helper_and_stay_selectable() {
   local tmp repo listed listed_alone family script group helper lock_helper
-  local -a groups=(fm-teardown fm-teardown-pool fm-teardown-cleanup)
+  local -a groups=(fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse)
   helper=fm-teardown-helpers
   helper=$helper.sh
   lock_helper=git-lock-helpers
@@ -2446,12 +2446,15 @@ test_portable_serial_packing_budget_boundary() {
   # Three shards: the 1500000 ms script fills one alone, two of the three
   # 700000 ms scripts must share another, and that 1400000 ms shard is packing.
   # The lane's larger single script elsewhere must not license it.
-  shard_fixture_init "$repo" 1500000
+  # Keep all other fixture members weightless in this case so inventory growth
+  # cannot shift the exact total. Earlier cases exercise nonzero filler weight.
+  shard_fixture_init "$repo" 1500000 0
   sed -i.bak \
     -e 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=3/' \
-    -e 's/^tests\/fm-teardown\.test\.sh 1$/tests\/fm-teardown.test.sh 700000/' \
-    -e 's/^tests\/fm-watch-triage-waits\.test\.sh 1$/tests\/fm-watch-triage-waits.test.sh 700000/' \
-    -e 's/^tests\/fm-watcher-lock\.test\.sh 1$/tests\/fm-watcher-lock.test.sh 700000/' \
+    -e 's/^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=.*/PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=0/' \
+    -e 's/^tests\/fm-teardown\.test\.sh 0$/tests\/fm-teardown.test.sh 700000/' \
+    -e 's/^tests\/fm-watch-triage-waits\.test\.sh 0$/tests\/fm-watch-triage-waits.test.sh 700000/' \
+    -e 's/^tests\/fm-watcher-lock\.test\.sh 0$/tests\/fm-watcher-lock.test.sh 700000/' \
     "$repo/bin/fm-test-run.sh"
   out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
   expect_code 1 "$rc" "a multi-script shard above the target must be refused beside a larger lone script"
@@ -2474,12 +2477,11 @@ test_portable_serial_packing_budget_boundary() {
 # harness adds are enough to hide it, and a regression test that cannot fail on
 # the old code proves nothing.
 shard_fixture_init() {
-  local dir=$1 name weight=${2:-1}
+  local dir=$1 name weight=${2:-1} filler_weight=${3:-1}
   mkdir -p "$dir/bin" "$dir/tests"
   cp "$RUNNER" "$dir/bin/fm-test-run.sh"
-  # Keep coverage fixtures independent of production duration growth. The
-  # optional boundary weight changes only the script tested at that boundary.
-  python3 - "$dir/bin/fm-test-run.sh" "$weight" <<'PY' \
+  # Keep coverage fixtures independent of production duration growth.
+  python3 - "$dir/bin/fm-test-run.sh" "$weight" "$filler_weight" <<'PY' \
     || fail "could not seed the fixture's measured timing input"
 from pathlib import Path
 import re, sys
@@ -2489,7 +2491,7 @@ start = text.index("portable_serial_weight_hints() {")
 end = text.index("\nEOF", start)
 text = text[:start] + re.sub(
     r"(?m)^(tests/[^ ]+\.test\.sh) [0-9]+$",
-    lambda match: f"{match[1]} {sys.argv[2] if match[1] == 'tests/fm-watch-triage.test.sh' else 1}",
+    lambda match: f"{match[1]} {sys.argv[2] if match[1] == 'tests/fm-watch-triage.test.sh' else sys.argv[3]}",
     text[start:end],
 ) + text[end:]
 runner.write_text(text)

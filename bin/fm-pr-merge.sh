@@ -38,6 +38,9 @@
 # hold immediately before its merge command. bin/fm-review-record.py's header owns
 # the review/captain-word rule and recording CLI; neither --attended-override nor
 # away authority substitutes for this evidence, and captain words waive no guard.
+# An accepted verify's 'pipeline author family not recorded' fact is written into
+# the existing merge-authority record; bin/fm-merge-authority-lib.sh owns its
+# backward-compatible optional-line format, reader and short record lifetime.
 #
 # Merge method on GitHub defaults to --squash when the caller passes none of
 # --squash, --merge, --rebase, or --method after the optional -- separator.
@@ -238,9 +241,10 @@
 # A landed merge whose outcome cannot be written is reported loudly rather than
 # misreported as a failed merge.
 # Once the outcome is recorded, bin/fm-pr-close-items.sh closes every backlog item the
-# merged pull request names with a `Closes: <item-id>` line, and the items of a merge
-# train's members; an item it cannot close is reported by id with its reason and never
-# changes this script's exit status.
+# merged pull request names with a `Closes-backlog-item: <item-id>` line in its closes block, and
+# the items of each pull request a merge train lists there with a `Train-member: <url>` line
+# (bin/fm-pr-closes-lib.sh owns the block); an item it cannot close is
+# reported by id with its reason and never changes this script's exit status.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -679,10 +683,22 @@ if [ "$PROVIDER" = gitlab ] || [ "$PROVIDER" = forgejo ]; then
   RECORDED_HEAD=$(grep '^pr_head=' "$META" | tail -1 | cut -d= -f2- || true)
 fi
 
+FM_PR_REVIEW_FACT=
 require_recorded_review() {
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  local verification line status=0
+  FM_PR_REVIEW_FACT=
+  verification=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     python3 "$SCRIPT_DIR/fm-review-record.py" verify --pr "$URL" --head "$FM_PR_MERGE_HEAD" \
-      --task "$ID" --base "$FM_PR_MERGE_BASE" >&2
+      --task "$ID" --base "$FM_PR_MERGE_BASE") || status=$?
+  printf '%s\n' "$verification" >&2
+  [ "$status" -eq 0 ] || return "$status"
+  while IFS= read -r line; do
+    case "$line" in
+      'review: pipeline author family not recorded') FM_PR_REVIEW_FACT='pipeline author family not recorded' ;;
+    esac
+  done <<VERIFICATION
+$verification
+VERIFICATION
 }
 
 # Pre-merge conditions for a GitLab merge request, read from one live view of
@@ -1874,7 +1890,7 @@ persist_accepted_merge_authority() {
   MERGE_META_LOCK=$(fm_meta_lock_path "$META") || return 1
   fm_lock_acquire_wait "$MERGE_META_LOCK" || return 1
   fm_merge_authority_persist "$STATE" "$ID" "$META" \
-    "$PROVIDER" "$PR_HOST" "$PR_PATH" "$PR_NUMBER" "$FM_PR_MERGE_AUTHORITY" \
+    "$PROVIDER" "$PR_HOST" "$PR_PATH" "$PR_NUMBER" "$FM_PR_MERGE_AUTHORITY" "$FM_PR_REVIEW_FACT" \
     || status=1
   fm_lock_release "$MERGE_META_LOCK" || status=1
   MERGE_META_LOCK=
@@ -2427,17 +2443,25 @@ case "$outcome_rc" in
     ;;
 esac
 
-# The merge is verified: close the backlog items its body names with
-# `Closes: <item-id>` lines, and a merge train's members' items too, but only when its
+# The merge is verified: close the backlog items its body's closes block names with
+# `Closes-backlog-item: <item-id>` lines, and a merge train's members' items too, but only when its
 # outcome was recorded above. A merge that could not be recorded runs no close and lists
 # the items it names as not closed. A failure here never changes the merge result: the
-# close step reports each item it left open and its exit status is ignored
+# close step reports each item it left open, and its exit status is checked only to report a
+# failure (Main 1851 F2): 0 is all closed, 3 is items left open and already reported, and any
+# other status gets one actionable line with the retry command
 # (bin/fm-pr-close-items.sh header owns the contract). The explicit home and state keep
 # it on this merge's own backlog.
 close_mode=()
 [ "$outcome_rc" -eq 0 ] || close_mode=(--not-recorded)
-FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-  "$SCRIPT_DIR/fm-pr-close-items.sh" ${close_mode[@]+"${close_mode[@]}"} "$ID" "$URL" </dev/null || true
+close_call=("$SCRIPT_DIR/fm-pr-close-items.sh" ${close_mode[@]+"${close_mode[@]}"} "$ID" "$URL")
+close_rc=0
+FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "${close_call[@]}" </dev/null || close_rc=$?
+case "$close_rc" in
+  0|3) ;;
+  *) printf 'actionable: the merge of %s stands, but its close step failed with status %s, so the backlog items it names may be left open; retry: %s\n' \
+       "$URL" "$close_rc" "${close_call[*]}" >&2 ;;
+esac
 
 # The merge is verified and its outcome recorded: arm the prune of the task's
 # pool copy and start one detached attempt. Teardown stays the authority and the

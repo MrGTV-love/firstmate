@@ -39,6 +39,7 @@ tmux select-window -t <session-name>:fm-<id>
 
 Typing into an attached task window is authoritative direct intervention.
 Routine supervision does not require attachment: `bin/fm-peek.sh <id>` captures a bounded tail and `FM_HOME=<home> bin/fm-send.sh <id> '<text>'` steers the recorded endpoint.
+A text steer to a task that has open keyed decisions must also pass `--resolve-key <key>` or `--answers-none` (rule: `bin/fm-send.sh` header).
 
 Verify setup by spawning a small task and confirming its `fm-<id>` window appears in the selected session.
 
@@ -71,7 +72,7 @@ Direct executable identities `pi`, `pi-signed`, and `Pi` remain accepted exactly
 Muse is likewise anchored to the exact `muse` launcher identity or the installed `muse-bin-<version>` prefix, so unrelated names such as `musescore` and `amuse` remain ambiguous.
 omp is anchored to the exact `omp` identity for the same reason, so `ompd` and `comp` remain ambiguous.
 AGY and Devin are anchored to the exact `agy` and `devin` identities for the same reason, so unrelated names containing either fragment remain ambiguous.
-dsh is anchored to the exact `dsh` and `dsh-tui` identities, and a bare `node` counts only when its argv names the `dsh-tui` launcher or a script inside a `@deepseek-harness-tui/dsh-tui` package directory, so an unrelated `node` or a name containing the fragment remains ambiguous.
+dsh is anchored to the exact `dsh` and `dsh-tui` identities, and a bare `node` counts only when its argv names a recognized DSH launcher script, whose identity the [dsh adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md) owns, so an unrelated `node` or a name containing the fragment remains ambiguous.
 Cursor is identified from its exact `cursor-agent` identity or versioned install tree in the foreground process path or structured argv[0]; a bare `node` or unrelated `agent` remains ambiguous.
 
 The CI-enforced portable regression and opt-in real-harness drift guard follow the split owned by `.agents/skills/firstmate-coding-guidelines/SKILL.md`.

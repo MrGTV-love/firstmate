@@ -588,6 +588,9 @@ function makeHost(session) {
     // Pi reads its session through runtimeHost, which a session replacement swaps.
     runtimeHost: { session },
     compactionQueuedMessages: [],
+    // A class field of InteractiveMode, so a real instance always has it; Pi 1.5.1
+    // reads it in updatePendingMessagesDisplay.
+    pendingBashComponents: [],
     statuses: [],
     warnings: [],
     editorText: "",
@@ -649,6 +652,19 @@ visibility.setCalmPresentation(true);
   }
   check(JSON.stringify(host.statuses) === JSON.stringify([layout.CALM_SUPERVISION_CONTINUES_NOTICE]), `continuation notice: ${JSON.stringify(host.statuses)}`);
   assertNoOperationalText(host.statuses.join("\n"), "continuation notice");
+}
+
+// 1b. A pending bash component in the same listing changes nothing about queued rows.
+//     Whether its own line shows depends on the Pi version, so that is not asserted.
+{
+  const session = makeSession();
+  const host = makeHost(session);
+  host.pendingBashComponents.push({ render: () => ["PENDING_BASH_STUB_LINE"] });
+  session.followUp.push(watcherOne, captainText);
+  host.updatePendingMessagesDisplay();
+  const rows = host.rows();
+  assertNoOperationalText(rows, "queued listing under Calm beside a pending bash component");
+  check(rows.includes(`Follow-up: ${captainText}`), `captain's queued row disappeared beside a pending bash component: ${rows}`);
 }
 
 // 2. The dequeue key restores captain text while the run keeps going: nothing restarts.
@@ -1329,6 +1345,19 @@ const stockOperationalComponent = new UserMessageComponent(watcherMessage, undef
 const expectedCalmOffOperationalRows = ["", ...stockOperationalComponent.render(100)];
 if (JSON.stringify(operationalComponent.render(100)) !== JSON.stringify(expectedCalmOffOperationalRows)) {
   throw new Error("Calm-off operational user rendering changed from Pi stock rows");
+}
+const firstRowChat = {
+  children: [],
+  addChild(component) {
+    this.children.push(component);
+  },
+};
+InteractiveMode.prototype.addMessageToChat.call(
+  { ...operationalMode, chatContainer: firstRowChat },
+  { role: "user", content: [{ type: "text", text: watcherMessage }] },
+);
+if (JSON.stringify(firstRowChat.children[0].render(100)) !== JSON.stringify(stockOperationalComponent.render(100))) {
+  throw new Error("Calm-off first operational user row gained a leading spacer or lost a stock row");
 }
 if (operationalHistory.length !== 1 || operationalHistory[0] !== watcherMessage) {
   throw new Error("operational user presentation changed Pi input history behavior");

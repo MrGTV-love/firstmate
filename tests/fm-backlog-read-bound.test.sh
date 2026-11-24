@@ -281,6 +281,7 @@ PATH="$CAPTAIN_FAKEBIN:$BASE_PATH" FM_HOME="$CAPTAIN" \
   FM_CONFIG_OVERRIDE="$CAPTAIN/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
   FM_TEST_TASKS_AXI_ADD_LOG="$ADD_LOG" \
   "$ROOT/bin/fm-captain-hold.sh" hold wedged-hold --title 'Wedged hold' --reason 'backend wedged' \
+  --boundary owner-rule-change --if-no 'Keep the existing owner rule' \
   > "$HOLD_STDOUT" 2> "$HOLD_OUT" || HOLD_STATUS=$?
 
 [ "$HOLD_STATUS" -ne 0 ] \

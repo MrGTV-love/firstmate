@@ -23,6 +23,7 @@ Once ownership is settled, validate exactly once against that final head so no o
 
 An ask-user finding returns as `needs-decision`; firstmate loads `ask-user-authority` and either decides or escalates per that skill.
 Send the same worker one exact decision naming the decision key, step, action, affected finding IDs, instructions where needed, and exact response command, passing `--resolve-key` so the worker's open decision record closes at answer time.
+A send to that worker that answers none of its open keyed decisions passes `--answers-none` instead (rule: the `bin/fm-send.sh` header, "Decision closure").
 Require the matching `resolved` event, forbid `--yes`, and require the worker to process every synchronous return until completion or a genuinely new escalation.
 Resume fleet supervision immediately after the decision lands.
 

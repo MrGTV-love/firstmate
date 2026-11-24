@@ -109,6 +109,13 @@
 #                          The queued payload names what to check. These three
 #                          kinds are joined with `;` when more than one surfaces
 #                          in a cycle
+#   check: github-accounting owner failed to start: exit=<n>; ...
+#                          a primary home's start of the standing GitHub accounting
+#                          owner exited nonzero other than 75 (github_accounting_tick);
+#                          reported once per failure episode and retried on a long
+#                          cadence.
+#                          docs/configuration.md "Standing GitHub caller accounting"
+#                          owns the contract
 #   check: rejected unauthenticated state checks: <paths>
 #                          unsafe state checks were refused without execution
 #   check: rejected unauthenticated PR poll retirement receipts: <paths>
@@ -458,6 +465,11 @@ case "$LAVISH_AUTO_RETIRE_INTERVAL" in
 esac
 LAVISH_AUTO_RETIRE_BIN=${FM_LAVISH_AUTO_RETIRE_BIN:-$SCRIPT_DIR/fm-procevent-lavish.sh}
 LAVISH_AUTO_RETIRE_NEXT=
+GITHUB_ACCOUNTING_BIN=${FM_GITHUB_ACCOUNTING_BIN:-$SCRIPT_DIR/fm-github-accounting.py}
+# Pace of silent retries after a failed start; it stops no running work.
+GITHUB_ACCOUNTING_RETRY_FALLBACK=3600
+GITHUB_ACCOUNTING_RETRY_SECS=$(python3 "$SCRIPT_DIR/fm-duration.py" limit github-accounting.start-retry \
+  --fallback "$GITHUB_ACCOUNTING_RETRY_FALLBACK" 2>/dev/null) || GITHUB_ACCOUNTING_RETRY_SECS=$GITHUB_ACCOUNTING_RETRY_FALLBACK
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake
@@ -3493,6 +3505,40 @@ lavish_auto_retire_tick() {
   LAVISH_AUTO_RETIRE_PID=$!
 }
 
+# The standing GitHub accounting owner is host-wide evidence, so only a primary
+# home keeps it running, never a secondmate or a disposable lab. Each cycle asks
+# the owner's own idempotent start, detached and single-flight, so a reboot or a
+# crash recovers at the next cycle and a running owner is left alone. A busy start
+# (exit 75, a held lock) changes nothing and the next cycle asks again. A failed
+# start wakes once; the marker holds later attempts to one per retry interval and
+# keeps them silent, across watcher restarts, until a start succeeds.
+GITHUB_ACCOUNTING_PID=
+github_accounting_tick() {
+  local status=0 failed="$STATE/.github-accounting-start-failed" reason
+  [ "${FM_GITHUB_ACCOUNTING:-1}" != 0 ] || return 0
+  [ ! -e "$FM_HOME/.fm-secondmate-home" ] && [ ! -e "$FM_HOME/.fm-lab-home" ] || return 0
+  if [ -n "$GITHUB_ACCOUNTING_PID" ]; then
+    kill -0 "$GITHUB_ACCOUNTING_PID" 2>/dev/null && return 0
+    wait "$GITHUB_ACCOUNTING_PID" 2>/dev/null || status=$?
+    GITHUB_ACCOUNTING_PID=
+    if [ "$status" -eq 0 ]; then
+      rm -f -- "$failed"
+    elif [ "$status" -eq 75 ]; then
+      :
+    elif [ -e "$failed" ]; then
+      touch -- "$failed"
+    else
+      reason="check: github-accounting owner failed to start: exit=$status; owner stderr: $STATE/github-accounting/owner.log; retries every ${GITHUB_ACCOUNTING_RETRY_SECS}s without another wake"
+      fm_wake_append check github-accounting-start-failed "$reason" || exit 1
+      : > "$failed"
+      wake "$reason"
+    fi
+  fi
+  [ "$(age_of "$failed")" -ge "$GITHUB_ACCOUNTING_RETRY_SECS" ] || return 0
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$GITHUB_ACCOUNTING_BIN" start </dev/null >/dev/null 2>&1 &
+  GITHUB_ACCOUNTING_PID=$!
+}
+
 # Surface the ledger so overdue work cannot be dropped silently. A new or changed
 # overdue row wakes firstmate at once as open-loop-ledger; the periodic waiting list
 # is its own open-loop-ledger-resurface wake every OPEN_LOOPS_RESURFACE seconds,
@@ -3519,6 +3565,8 @@ open_loops_surface() {
       || open_loops_stale_wake "$ledger"
     return 0
   fi
+  # Keep the legacy display-field identity and append the producer's opaque
+  # current-row token; never infer an opening from mutable source or handling history.
   ids=$(jq -rs '
     if length == 1 then .[0] else error("expected one open-loop ledger") end
     | if type == "object" and .schema == "fm-open-loops.v1"
@@ -3526,8 +3574,11 @@ open_loops_surface() {
         and (.home | type) == "string" and (.home | length) > 0
         and (.complete | type) == "boolean" and (.rows | type) == "array"
         and all(.rows[]; type == "object" and (.id | type) == "string"
-          and (.id | length) > 0 and (.overdue | type) == "boolean")
-      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]]
+          and (.id | length) > 0 and (.overdue | type) == "boolean"
+          and (if has("current_identity") then
+            (.current_identity | type == "string" and test("^[0-9a-f]{24}$")) else true end))
+      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]
+        + (if has("current_identity") then [.current_identity] else [] end)]
         | sort | .[] | @json
       else error("invalid open-loop ledger") end
   ' "$ledger" 2>/dev/null) || return 0
@@ -3851,6 +3902,7 @@ prelude_phase() {
   memory_health_tick
   memory_health_surface
   lavish_auto_retire_tick
+  github_accounting_tick
 
   # Bearings publishes reconcile asks as local one-shot request files and
   # returns before any mate delivery. Supervision owns their later delivery;
@@ -3954,6 +4006,7 @@ prelude_phase() {
       [ -e "$c" ] || continue
       watcher_beat
       is_pr_poll=0
+      check_events=0
       if [ "$(basename "$c")" = x-watch.check.sh ]; then
         if fmx_poll_shim_valid "$c" "$FM_HOME" "$FM_ROOT" \
           && [ -f "$FM_ROOT/bin/fm-x-poll.sh" ] && [ ! -L "$FM_ROOT/bin/fm-x-poll.sh" ]; then
@@ -3986,7 +4039,8 @@ prelude_phase() {
           out=$FM_CHECK_RESULT
         elif fm_custom_check_snapshot_prepare "$STATE" "$id"; then
           custom_snapshot=$FM_CUSTOM_CHECK_SNAPSHOT
-          run_check_capture "$id" "$custom_snapshot" || exit 1
+          [ "$id" = contributions ] || check_events=1
+          FM_CHECK_EVENT_OUTPUT=$check_events run_check_capture "$id" "$custom_snapshot" || exit 1
           out=$FM_CHECK_RESULT
           fm_custom_check_snapshot_cleanup
         else
@@ -3995,7 +4049,7 @@ prelude_phase() {
           continue
         fi
       fi
-      [ -z "$FM_CHECK_STOP_NOTICE" ] || out=$FM_CHECK_STOP_NOTICE
+      [ -z "$FM_CHECK_STOP_NOTICE" ] || { out=$FM_CHECK_STOP_NOTICE; check_events=0; }
       if [ -n "$out" ]; then
         if [ "$(basename "$c")" = contributions.check.sh ]; then
           contribution_check_output=
@@ -4062,8 +4116,13 @@ EOF
           continue
         fi
         pr_poll_control_release || exit 1
-        fm_wake_append check "$c" "$reason" || exit 1
-        [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+        if [ "$check_events" -eq 1 ]; then
+          fm_check_queue_output "$c" "$out" || exit 1
+          [ -n "$check_wake_reason" ] || check_wake_reason=$FM_CHECK_WAKE_REASON
+        else
+          fm_wake_append check "$c" "$reason" || exit 1
+          [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+        fi
       fi
       pr_poll_control_release || exit 1
     done
