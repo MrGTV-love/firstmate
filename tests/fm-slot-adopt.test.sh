@@ -289,6 +289,50 @@ test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner()
   pass "provision: a refused-first-provisioning recovery refuses the missing copy-local provisioner; an ordinary relaunch takes the primary one"
 }
 
+# D8: a pinned provisioner without the read-only manifest check still has its collision named before the stop, from the
+# two record paths its own writer uses; a provisioner with a same-owner arm is not foreseen, and a clean copy is admitted.
+test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named() {
+  local out rc digest
+  make_primary pinned-preflight
+  git clone --quiet --bare "$P_PROJ" "$P_DIR/origin.git"
+  git -C "$P_PROJ" remote add origin "file://$P_DIR/origin.git"
+  printf 'x\n' >"$P_PROJ/README.md"
+  git -C "$P_PROJ" add README.md
+  git -C "$P_PROJ" "${GITID[@]}" commit -qm readme
+  # the pinned provisioner: create-only, no read-only check, no same-owner arm
+  printf 'import sys\nprint("create-only")\n' >"$P_PROJ/scripts/git-stability/provision_existing_slot.py"
+  git -C "$P_PROJ" "${GITID[@]}" commit -qam 'pinned create-only provisioner'
+  git -C "$P_PROJ" push -q origin main
+  git -C "$P_PROJ" fetch -q origin
+  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" origin/main
+  git -C "$P_DIR/copy" rm -rq scripts
+  git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
+  git -C "$P_DIR/copy" update-ref refs/remotes/origin/main "$(git -C "$P_DIR/copy" rev-parse HEAD)"
+  printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy" "$P_PROJ" >"$P_DIR/t.meta"
+  mkdir -p "$P_DIR/durable" "$P_DIR/hookstate/worktree-lifecycle"
+  digest=$(python3 -c 'import hashlib,os,sys; print(hashlib.sha256(os.path.realpath(sys.argv[1]).encode()).hexdigest()[:16])' "$P_DIR/copy")
+  export WORKTREE_LIFECYCLE_STORE_DIR="$P_DIR/durable" CODEX_HOOK_STATE_DIR="$P_DIR/hookstate"
+  out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
+  [ "$rc" -eq 0 ] || fail "a clean old copy with no record was refused: $out"
+  printf '{}' >"$P_DIR/durable/$digest.json"
+  out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "a durable collision passed the preflight of a provisioner without the check option: $out"
+  assert_contains "$out" manifest_exists 'the durable collision was not named'
+  assert_contains "$out" "\"manifest_path\": \"$P_DIR/durable/$digest.json\"" 'the collision file was not named in the provisioner form'
+  rm -f "$P_DIR/durable/$digest.json"
+  printf '{}' >"$P_DIR/hookstate/worktree-lifecycle/$digest.json"
+  out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "a legacy collision passed the preflight of a provisioner without the check option: $out"
+  assert_contains "$out" manifest_exists 'the legacy collision was not named'
+  # a provisioner with a same-owner arm may admit an identical declaration: not foreseen, the existing rollback stays
+  printf 'import sys\ndef _same_owner_outcome():\n    pass\n' >"$P_PROJ/scripts/git-stability/provision_existing_slot.py"
+  git -C "$P_PROJ" "${GITID[@]}" commit -qam 'provisioner with a same-owner arm'
+  out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
+  unset WORKTREE_LIFECYCLE_STORE_DIR CODEX_HOOK_STATE_DIR
+  [ "$rc" -eq 0 ] || fail "a provisioner with a same-owner arm was refused by guesswork: $out"
+  pass "preflight: a pinned provisioner without the check option has a durable or legacy collision named before the stop; a same-owner provisioner is not guessed"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
@@ -299,6 +343,7 @@ test_old_copy_preflight_asks_the_provisioner_that_would_really_run
 test_a_second_adoption_refusal_says_the_wiring_and_record_were_written
 test_a_refused_provision_leaves_no_export_directory
 test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner
+test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

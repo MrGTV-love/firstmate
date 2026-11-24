@@ -457,7 +457,17 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
     script=$FM_SLOT_PROVISIONER
   fi
   if ! grep -q -e '--check-manifest-only' "$script" 2>/dev/null; then
+    # A pinned provisioner without the read-only check and without a same-owner arm refuses every existing manifest at
+    # its create-only path (D8), so the same two record paths its own writer uses are read here, and a manifest found
+    # there is named before the stop. A provisioner with a same-owner arm may admit an identical declaration, so its
+    # outcome cannot be foreseen here and the existing rollback stays.
+    mpath=
+    grep -q -e '_same_owner_outcome' "$script" 2>/dev/null || mpath=$(fm_slot_record_collision "$project" "$copy") || mpath=
     fm_slot_export_drop
+    [ -z "$mpath" ] || {
+      echo "error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it; \"manifest_path\": \"$mpath\"" >&2
+      return 1
+    }
     return 0
   fi
   for path in "$@"; do args+=(--owned-path "$path"); done
@@ -485,6 +495,37 @@ except Exception:
       echo "error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it${mpath:+; \"manifest_path\": \"$mpath\"}" >&2
       return 1 ;;
   esac
+}
+
+# The lifecycle record already at the path a create-only provisioner would write for <copy>, read-only: the durable
+# store, else the legacy store, named by the same digest of the copy's resolved path that bin/fm-slot-manifest-retire.py
+# uses for the same two stores. Prints the first existing path and returns 0, or prints nothing and returns 1.
+fm_slot_record_collision() { # <project> <copy>
+  python3 -I - "$1" "$2" <<'PY'
+import hashlib
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+project, copy = sys.argv[1:3]
+common = subprocess.run(["git", "-C", project, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                        capture_output=True, text=True)
+if common.returncode:
+    sys.exit(1)
+common = Path(common.stdout.strip()).resolve()
+default = Path("/tmp/vernant-codex-hooks-%d" % os.getuid())
+state = Path(os.environ.get("CODEX_HOOK_STATE_DIR") or default)
+durable = Path(os.environ.get("WORKTREE_LIFECYCLE_STORE_DIR") or common / "vernant-worktree-lifecycle")
+if "WORKTREE_LIFECYCLE_STORE_DIR" not in os.environ and state.resolve() != default.resolve():
+    durable = state / "worktree-lifecycle"
+name = hashlib.sha256(str(Path(copy).resolve()).encode()).hexdigest()[:16] + ".json"
+for path in (durable / name, state / "worktree-lifecycle" / name):
+    if os.path.lexists(path):
+        print(path)
+        sys.exit(0)
+sys.exit(1)
+PY
 }
 
 # Where a copy is, read-only: its branch, "detached" (git says so: exit 1), or "unknown" (any other failure), and its commit.
