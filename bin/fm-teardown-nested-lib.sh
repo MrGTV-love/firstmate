@@ -70,8 +70,9 @@
 # the work is landed or held by a recorded bundle, and no tracked change,
 # because the clean proof refuses one.
 # Any other ignored entry is copied to the task's data directory before removal.
-# The clean proof skips
-# untracked files under .claude only; the ignored-file proof skips ignored files
+# The clean proof counts every untracked file except those
+# fm_task_copy_dirty_status leaves out (bin/fm-teardown.sh's header owns that
+# rule); the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
 # the final project-lock wait, so the driver never runs while the lock is held;
