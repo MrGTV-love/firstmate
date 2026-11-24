@@ -486,10 +486,31 @@ test_a_governed_tasks_own_manifest_is_adopted_with_the_manifest_repo_root() {
   pass "adoption: a governed task's own valid manifest is adopted and the judged root is the manifest's repo root"
 }
 
+# B2 (exact-head read of 6acb4545): the record check fails closed. A pointer whose record store is not one of the stores this
+# relaunch computes cannot be checked against the other record, so it is refused by name; the same pointer under the
+# matching store configuration is adopted.
+test_a_pointer_in_an_unknown_record_store_is_refused_and_a_known_one_adopted() {
+  local out rc digest
+  make_world store-unknown
+  mkdir -p "$W_DIR/hookA/worktree-lifecycle" "$W_DIR/durableA" "$W_DIR/hookB" "$W_DIR/durableB"
+  digest=$(python3 -c 'import hashlib,os,sys; print(hashlib.sha256(os.path.realpath(sys.argv[1]).encode()).hexdigest()[:16])' "$W_SLOT")
+  cp "$W_MANIFEST" "$W_DIR/hookA/worktree-lifecycle/$digest.json"
+  sed -i.bak "s|^slot_manifest=.*|slot_manifest=$W_DIR/hookA/worktree-lifecycle/$digest.json|" "$W_META" && rm -f "$W_META.bak"
+  # the relaunch runs under another store configuration than the one the legacy pointer was written under
+  out=$(WORKTREE_LIFECYCLE_STORE_DIR="$W_DIR/durableB" CODEX_HOOK_STATE_DIR="$W_DIR/hookB" adopt); rc=$?
+  [ "$rc" -ne 0 ] || fail "a pointer in a record store this relaunch does not compute was adopted: $out"
+  assert_contains "$out" manifest_store_unknown 'the unknown record store was not refused by name'
+  # the same pointer under the matching configuration is adopted
+  out=$(WORKTREE_LIFECYCLE_STORE_DIR="$W_DIR/durableA" CODEX_HOOK_STATE_DIR="$W_DIR/hookA" adopt); rc=$?
+  [ "$rc" -eq 0 ] || fail "the same pointer under the matching store configuration was refused: $out"
+  pass "adoption: a pointer in a record store the relaunch does not compute is refused by name; the same pointer under the matching stores is adopted"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
 test_a_governed_tasks_own_manifest_is_adopted_with_the_manifest_repo_root
+test_a_pointer_in_an_unknown_record_store_is_refused_and_a_known_one_adopted
 test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name
 test_a_hidden_symlink_retarget_is_task_drift
 test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not

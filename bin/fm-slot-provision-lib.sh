@@ -671,11 +671,19 @@ fm_slot_adopt_records() { # <manifest> <durable> <legacy>
   python3 -I - "$@" <<'PY'
 import json
 import os
+import re
 import sys
 
 pointer, durable, legacy = sys.argv[1:4]
 real = os.path.realpath
 existing = [path for path in (durable, legacy) if os.path.lexists(path)]
+# A provisioner record is named by a 16-hex digest. One whose directory is not among the two stores computed here was
+# written under another store configuration, so the other record cannot be read and the pointer cannot be judged: it is
+# refused by name rather than adopted unchecked (fail closed).
+if re.fullmatch(r"[0-9a-f]{16}\.json", os.path.basename(pointer)) and \
+        real(os.path.dirname(pointer)) not in (real(os.path.dirname(durable)), real(os.path.dirname(legacy))):
+    print("manifest_store_unknown\tthe recorded pointer %s is in a record store that is not one of this relaunch's (%s, %s); relaunch with the CODEX_HOOK_STATE_DIR and WORKTREE_LIFECYCLE_STORE_DIR the task was provisioned with" % (pointer, os.path.dirname(durable), os.path.dirname(legacy)))
+    sys.exit(0)
 if os.path.lexists(durable) and real(pointer) != real(durable):
     print("manifest_shadowed\tthe recorded pointer %s is not the durable record %s, which is the authoritative one" % (pointer, durable))
     sys.exit(0)
