@@ -9187,14 +9187,20 @@ BODY
 # retained population (the .claude and .opencode trees whole) before it unlocks,
 # for a foreign copy and for an own nested copy whose #380 preserve already holds
 # its selected file; the real final proof then checks that preserve, and the
-# unlock and remove run. Logs and evidence are archived, never deleted.
+# unlock and remove run. Logs and evidence are archived, never deleted. R7-1: a
+# .claude file that appears in an own nested copy after that preserve, just
+# before the unlock, refuses at the final proof: the lock goes back on and the
+# copy is not removed.
 test_pr400_direct_release_preserves_claude_and_opencode() {
   local body=$TMP_ROOT/pr400-body-direct-retained.sh
   cat > "$body" <<'BODY'
 teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:4194305 launcher=4194305'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s; return 0; }
 teardown_launcher_gone() { return 0; }
 teardown_launcher_live_since() { return 1; }
-teardown_lock_is_first_seen() { return 0; }
+teardown_lock_is_first_seen() {
+  [ "$shape" != own-late ] || printf 'late\n' > "$copy/.claude/channel-outbox/c.jsonl"
+  return 0
+}
 teardown_landed() { teardown_admit "$1" landed "$(git -C "$1" rev-parse HEAD)" "refs/heads/main $(git -C "$1" rev-parse main)"; return 0; }
 teardown_copy_git_protects() { return 1; }
 teardown_admitted_bundles_current() { return 0; }
@@ -9202,8 +9208,9 @@ teardown_foreign_copy_unowned() { return 0; }
 teardown_copy_holder_free() { return 0; }
 fm_lock_path_mtime() { printf '1\n'; }
 TEARDOWN_CLOSEOUT_PROOF=fixture META="$R5_BASE/task.meta"
-for kind in foreign 'own nested'; do
-  shape=${kind// /-}
+for shape in foreign own-nested own-late; do
+  kind='own nested'
+  [ "$shape" != foreign ] || kind=foreign
   r5_repo "$shape"
   printf '/.claude/\n/.opencode/\n/notes/\n' > "$repo/.gitignore"
   git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
@@ -9228,13 +9235,18 @@ for kind in foreign 'own nested'; do
       kept+=" $f"
     fi
   done
-  echo "$shape release=$rc why=${TEARDOWN_RELEASE_WHY:-none} kept=${kept# } git=$(cat "$R5_BASE/$shape-git")"
+  why=${TEARDOWN_RELEASE_WHY:-none}
+  case "$why" in *'does not hold its ignored files, the .claude and .opencode trees whole included,'*'; its lock was restored') why=late-refused-restored ;; esac
+  late=gone
+  [ ! -f "$copy/.claude/channel-outbox/c.jsonl" ] || late=in-copy
+  echo "$shape release=$rc why=$why kept=${kept# } git=$(cat "$R5_BASE/$shape-git") late=$late"
 done
 BODY
   r5_harness direct-retained "$body"
-  r5_expect 'foreign release=0 why=none kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove ' 'pr400-direct-retained: a foreign copy was not released and removed with its .claude and .opencode files preserved'
-  r5_expect 'own-nested release=0 why=none kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove ' 'pr400-direct-retained: an own nested copy was not released and removed with its .claude and .opencode files preserved'
-  pass 'the direct release of a dead launcher'"'"'s lock preserves the .claude and .opencode trees whole, byte for byte with their SHA256SUMS lines, for a foreign and an own nested copy, before it unlocks and removes'
+  r5_expect 'foreign release=0 why=none kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone' 'pr400-direct-retained: a foreign copy was not released and removed with its .claude and .opencode files preserved'
+  r5_expect 'own-nested release=0 why=none kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone' 'pr400-direct-retained: an own nested copy was not released and removed with its .claude and .opencode files preserved'
+  r5_expect 'own-late release=1 why=late-refused-restored kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock  late=in-copy' 'pr400-direct-retained: a .claude file that appeared after the own preserve was removed unpreserved, or the lock was not put back'
+  pass 'the direct release of a dead launcher'"'"'s lock preserves the .claude and .opencode trees whole, byte for byte with their SHA256SUMS lines, for a foreign and an own nested copy, before it unlocks and removes; a .claude file that appears in an own copy after its preserve refuses and the lock goes back on'
 }
 
 # Main 1839 item 5: a lock proved earlier that now reads absent or unreadable
@@ -9512,7 +9524,8 @@ BODY
 # R5-1: a launcher's start time is read and converted in UTC, so the hour that
 # repeats when clocks go back cannot move it. Two launchers start at 01:30 EDT
 # and at 01:30 EST on 2026-11-01 in America/New_York; ps prints the same local
-# time for both, so only a UTC reading tells them apart.
+# time for both, so only a UTC reading tells them apart. R6-2: a lock time that
+# cannot be read counts as live, not as an unreadable process table.
 test_pr400_launcher_start_epoch_is_exact_in_the_repeated_hour() {
   local body=$TMP_ROOT/pr400-body-start-epoch.sh
   cat > "$body" <<'BODY'
@@ -9530,11 +9543,19 @@ export TZ=America/New_York
 for pid in 101 102; do
   echo "pid $pid start=$(teardown_pid_start_epoch "$pid" || echo failed)"
 done
+fm_task_copy_launcher_state() { return 0; }
+for mtime in '' 1793511060 1793510000; do
+  rc=0; teardown_launcher_live_since 101 "$mtime" || rc=$?
+  echo "live mtime=${mtime:-unread} rc=$rc"
+done
 BODY
   r5_harness start-epoch "$body"
   r5_expect 'pid 101 start=1793511000' 'pr400-start-epoch: the launcher started at 01:30 EDT got the wrong epoch'
   r5_expect 'pid 102 start=1793514600' 'pr400-start-epoch: the launcher started at 01:30 EST got the wrong epoch'
-  pass 'a launcher start time in the hour repeated when clocks go back converts to its exact epoch'
+  r5_expect 'live mtime=unread rc=0' 'pr400-start-epoch: an unreadable lock time did not count as live'
+  r5_expect 'live mtime=1793511060 rc=0' 'pr400-start-epoch: a launcher that started before its lock was written did not count as live'
+  r5_expect 'live mtime=1793510000 rc=1' 'pr400-start-epoch: a launcher that started after its lock was written was not taken for a recycled pid'
+  pass 'a launcher start time in the hour repeated when clocks go back converts to its exact epoch, and an unreadable lock time counts as live'
 }
 
 # Main 1843 (c): an Orca-backed task keeps base behaviour: the direct release, the
