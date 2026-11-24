@@ -101,7 +101,9 @@ fm_dsh_args_are_dsh() {  # <flattened-argv> [script-predicate]
 # launcher (fm_dsh_args_are_dsh) whose argv carries this launch's own
 # `--patch <launch-patch>`. Each launch's patch path is unique to its task and
 # generation, so a frame left on screen by a launch that exited, or one parked
-# with job control, does not count as this launch's live composer.
+# with job control, does not count as this launch's live composer. The patch
+# sits inside the pattern's double quotes, so glob characters in it match only
+# themselves.
 fm_dsh_launch_alive() {  # <launch-patch>
   local patch=$1 line stat args
   [ -n "$patch" ] || return 1

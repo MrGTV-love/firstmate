@@ -424,6 +424,17 @@ def first_turn(path, since):
         return (False, "", "", accepted) if started else None
 
 
+def printable(text):
+    # Provider text reaches stderr and the status file, so terminal escape
+    # sequences and every other control or format character are removed and
+    # whitespace runs fold to one space.
+    import re
+    import unicodedata
+    text = re.sub(r"\x1b(\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(\x07|\x1b\\)?|[@-Z\\-_])", "", str(text))
+    text = "".join(" " if c.isspace() else c for c in text if c.isspace() or unicodedata.category(c) not in ("Cc", "Cf"))
+    return " ".join(text.split())
+
+
 def start_state(state, task, since=None):
     # The launch's start proof, judged on the first turn beyond the launch
     # position, never a later one:
@@ -439,7 +450,7 @@ def start_state(state, task, since=None):
         raise ValueError("no turn started beyond the launch position")
     ended, kind, text, accepted = turn
     if ended and kind == "error":
-        text = " ".join(text.split())
+        text = printable(text)
         return f"failed: {text}" if text else "failed"
     if ended:
         return "idle" if accepted else f"ended-unaccepted: {kind}"

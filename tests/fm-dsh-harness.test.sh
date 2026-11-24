@@ -500,8 +500,23 @@ dsh_start_expect 'a later accepted turn after an unaccepted first turn' 'ended-u
 dsh_start_expect 'a resumed launch past an earlier failed turn' unaccepted busy "$TMP/start-resumed.jsonl" '["@LOG@", 18]'
 dsh_offset=$(($(wc -c < "$dsh_turn_error") + $(printf '%s\n' '{"type": "session", "version": 4, "id": "8578f75e-697c-461f-b778-227432316ca2", "cwd": "/w", "delegationDepth": 0}' | wc -c)))
 dsh_start_expect 'a resumed launch read from its byte offset' unaccepted busy "$TMP/start-resumed.jsonl" "[\"@LOG@\", 18, $dsh_offset]"
+{ head -n 2 "$dsh_turn_error"
+  printf '%s\n' '{"type": "turn/end", "seq": 18, "data": {"turn": 1, "reason": {"kind": "error", "error": {"message": "bad \u001b[31mmodel\u001b[0m\u0007 name\r\nhere \u001b]0;title\u0007end​"}}}}'; } > "$TMP/start-escapes.jsonl"
+dsh_start_expect 'provider text with terminal escapes and control bytes' 'failed: bad model name here end' idle "$TMP/start-escapes.jsonl"
 dsh_start_expect 'no turn yet beyond the launch position' 'unknown: no turn started beyond the launch position' \
   idle "$dsh_turn_error" '["@LOG@", 18]'
+# fm_dsh_launch_alive takes the patch path literally: glob characters in it
+# match only themselves, so such a launch is found and a pattern-looking path
+# does not match another launch.
+mkdir -p "$TMP/fake-dsh"
+ln -s "$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))')" "$TMP/fake-dsh/node"
+printf 'import sys, time\ntime.sleep(float(sys.argv[-1]))\n' > "$TMP/fake-dsh/dsh-tui"
+"$TMP/fake-dsh/node" "$TMP/fake-dsh/dsh-tui" --patch "$TMP/st[a]te*?/launch.yml" 30 >/dev/null 2>&1 &
+dsh_glob_pid=$!; disown "$dsh_glob_pid"
+for _ in $(seq 1 50); do fm_dsh_launch_alive "$TMP/st[a]te*?/launch.yml" && break; sleep 0.1; done
+fm_dsh_launch_alive "$TMP/st[a]te*?/launch.yml" || { kill "$dsh_glob_pid"; echo 'a patch path with glob characters must find its own launch' >&2; exit 1; }
+if fm_dsh_launch_alive "$TMP/st*/launch.yml"; then kill "$dsh_glob_pid"; echo 'a pattern-looking patch path must not match another launch' >&2; exit 1; fi
+kill "$dsh_glob_pid"
 # fm-spawn reads the launch identity from the binding prepare recorded.
 mkdir -p "$TMP/identity"
 printf '{"root": "/r", "cwd": "/w/fm/plaindir", "generation": "g1", "model": "deepseek-v4.1-flash-1017", "effort": "xhigh"}' > "$TMP/identity/t.dsh-session"
@@ -597,8 +612,9 @@ if fm_composer_dsh_screen_check "$dsh_generic" "$dsh_id_plain" 2>/dev/null; then
   echo 'an empty composer without the dsh frame must fail the dsh launch check' >&2; exit 1
 fi
 # A dsh box is held to its whole screen: past its furniture, any text further
-# down, even after blank rows, is a lower live surface. This holds with no
-# launch identity (the shared classifier every consumer reads) and with one.
+# down, even after blank rows, is a lower live surface. These run through the
+# shared classifier with no launch identity, the verdict every steering
+# consumer reads.
 for tail in 'esc to interrupt' '6.5k/1.0M 0.7%' "$dsh_status"; do
   got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" "   $tail" '' 'user@host work % echo hello')")
   [ "$got" = unknown ] || { echo "a shell row after a blank below dsh furniture '$tail' must not be a composer, got $got" >&2; exit 1; }
@@ -607,6 +623,34 @@ got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" '' '' 'user@host work % echo
 [ "$got" = unknown ] || { echo "a shell row after blank rows below a dsh box must not be a composer, got $got" >&2; exit 1; }
 got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" '   esc to interrupt' '' '')")
 [ "$got" = empty ] || { echo "dsh furniture followed only by blank rows must stay empty, got $got" >&2; exit 1; }
+# The busy hint is furniture only as dsh's whole row: a shell prompt typed
+# after a stale hint is a lower live surface, alone or under the meter and ctx
+# rows, with or without a launch identity, and a rendered-busy override that
+# matches the prompt does not make it furniture.
+dsh_hinted='   esc to interrupt user@host work % echo hello'
+for above in none meter meter-ctx; do
+  case "$above" in
+    none) screen=$(printf '%s\n' "$dsh_stale_box" "$dsh_hinted") ;;
+    meter) screen=$(printf '%s\n' "$dsh_stale_box" "$dsh_meter" "$dsh_hinted") ;;
+    meter-ctx) screen=$(printf '%s\n' "$dsh_stale_box" "$dsh_meter" "$dsh_status" "$dsh_hinted") ;;
+  esac
+  got=$(dsh_verdict "$screen")
+  [ "$got" = unknown ] || { echo "a shell prompt after a stale busy hint ($above) must not be a composer, got $got" >&2; exit 1; }
+  got=$(FM_BUSY_REGEX='user@host' dsh_verdict "$screen")
+  [ "$got" = unknown ] || { echo "a busy-regex override must not make the hinted prompt ($above) furniture, got $got" >&2; exit 1; }
+  dsh_refuse "a shell prompt after a stale busy hint ($above) with a launch identity" "$dsh_id_plain" "$screen"
+done
+# Below a dsh box only blank rows count, so a row that merely looks like an
+# edge (a shell trace line) is a lower live surface too; other boxes keep the
+# shared first-row edge rule.
+for edge in '+ rm -rf x' '| tee out' 'x |' '─ done'; do
+  got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" "$edge")")
+  [ "$got" = unknown ] || { echo "an edge-looking row '$edge' flush under a dsh box must not be a composer, got $got" >&2; exit 1; }
+  got=$(dsh_verdict "$(printf '%s\n' "$dsh_stale_box" '   esc to interrupt' '' "$edge")")
+  [ "$got" = unknown ] || { echo "an edge-looking row '$edge' below dsh furniture must not be a composer, got $got" >&2; exit 1; }
+done
+got=$(dsh_verdict "$(printf '%s\n' "  ╭$(printf '─%.0s' $(seq 1 40))╮" "  │ ❯$(printf ' %.0s' $(seq 1 38))│" "  ╰$(printf '─%.0s' $(seq 1 40))╯" '+ rm -rf x')")
+[ "$got" = empty ] || { echo "a generic box keeps the shared edge rule for the row below it, got $got" >&2; exit 1; }
 # The cwd cell is the bound basename taken literally, as dsh-tui renders it,
 # whole or cut by its `…`; another directory still refuses.
 dsh_id_spaced=$(printf 'deepseek-flash\thigh\tmy project')

@@ -2411,7 +2411,7 @@ _fm_composer_claude_slash_choice() {  # <plain> <bare-row>
 }
 
 _fm_composer_select_cursorless() {
-  local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0
+  local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0 dsh_whole=0
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
   FM_COMPOSER_SELECTED_LAST=-1
@@ -2567,8 +2567,8 @@ _fm_composer_select_cursorless() {
     # furniture, not the lower live shape that would make this box stale.
     # The pre-usage status row is accepted only flush under the border and
     # only as the screen's last furniture, which consumes the rest of it. Once
-    # that row is present its rule alone decides, so the override-widenable
-    # furniture loop below never reconsiders the rows it refused.
+    # that row is present its rule alone decides, so the furniture loop below
+    # never reconsiders the rows it refused. Neither reads FM_BUSY_REGEX.
     if [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_DSH" = 1 ]; then
       if [ "$next" = $((boundary + 1)) ]; then
         raw=$(_fm_composer_screen_row "$next" "$plain")
@@ -2588,9 +2588,10 @@ _fm_composer_select_cursorless() {
         trimmed=$raw
         fm_composer_normalize_trim_var trimmed
         [ -n "$trimmed" ] || break
+        # The busy hint is furniture only as dsh's whole row, never a row that
+        # merely contains it (a shell prompt typed after a stale hint).
         if _fm_composer_row_is_dsh_status "$trimmed" \
-           || { [ "$(type -t fm_busy_lines_match)" = function ] \
-                && printf '%s\n' "$trimmed" | fm_busy_lines_match dsh; }; then
+           || fm_composer_idle_matches "$trimmed" "^($FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT)\$" sensitive; then
           next=$((next + 1))
           continue
         fi
@@ -2598,20 +2599,23 @@ _fm_composer_select_cursorless() {
       done
     fi
     # The first row past the envelope's furniture must be blank or an edge.
-    # A dsh box is held to its whole screen: every real dsh-tui capture leaves
-    # only blank rows below its furniture, so any other text further down,
-    # even after blank rows, is a lower live surface (a shell under a stale
-    # frame). Other harnesses keep the first-row rule, because some draw a
-    # legitimate footer after a blank row (Grok's `Shift+Tab:mode` hints).
+    # A dsh box is held to its whole screen, and only blank rows count: every
+    # real dsh-tui capture leaves nothing else below its furniture, so any
+    # other row further down, even after blank rows and even one that only
+    # looks like an edge (`+ rm -rf x`), is a lower live surface (a shell under
+    # a stale frame). Other harnesses keep the first-row edge rule, because
+    # some draw a legitimate footer after a blank row (Grok's `Shift+Tab:mode`).
     _fm_composer_rows_load "$plain"
+    dsh_whole=0
+    [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_DSH" = 1 ] && dsh_whole=1
     while [ "$next" -lt "${#_FM_COMPOSER_ROWS[@]}" ]; do
       trimmed=${_FM_COMPOSER_ROWS[$next]}
       fm_composer_normalize_trim_var trimmed
-      if [ -n "$trimmed" ] && ! fm_composer_row_has_edge "$trimmed"; then
+      if [ -n "$trimmed" ] && { [ "$dsh_whole" = 1 ] || ! fm_composer_row_has_edge "$trimmed"; }; then
         FM_COMPOSER_SELECTED_KIND=
         return 1
       fi
-      [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_DSH" = 1 ] || break
+      [ "$dsh_whole" = 1 ] || break
       next=$((next + 1))
     done
   fi
