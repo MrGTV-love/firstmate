@@ -4664,8 +4664,10 @@ unc_pool_case() {
   UNC_PROVIDER=$bin
   UNC_STATE=$pool/treehouse-state.json
   # The wrapper records every argv. A one-shot $case/inject file makes the next
-  # `return` fail before it runs, fail after the provider's return succeeded, or
-  # change the entry's holder or lease id first (a successor taking the slot);
+  # `return` fail before it runs, fail after the provider's return succeeded,
+  # change the entry's holder or lease id first (a successor taking the slot), or
+  # let the provider's return succeed and then lease the freed slot to a successor
+  # (successor-takes, so the readback that follows fails);
   # $case/capability-fail makes `capabilities` fail, $case/capability-old answers
   # it as an older treehouse that has no such command, $case/capability-no-holder
   # answers it as a schema 1 build that publishes no protected holder, and
@@ -4692,6 +4694,7 @@ if [ "\${1:-}" = return ] && [ -s "$case_dir/inject" ]; then
     fail-before) echo "injected failure before return" >&2; exit 1 ;;
     fail-after) "$bin" "\$@"; echo "injected failure after return" >&2; exit 1 ;;
     successor-holder|successor-lease-id) "$case_dir/successor" "\$mode" "\$2" ;;
+    successor-takes) rc=0; "$bin" "\$@" || rc=\$?; "$case_dir/successor" "\$mode" "\$2"; exit "\$rc" ;;
   esac
 fi
 exec "$bin" "\$@"
@@ -4700,6 +4703,7 @@ SH
 #!/usr/bin/env bash
 case "\$1" in
   successor-holder) filter='.lease_holder = "successor" | .lease_id = "$UNC_SUCCESSOR_ID"' ;;
+  successor-takes) filter='.leased = true | .lease_holder = "successor" | .lease_id = "$UNC_SUCCESSOR_ID"' ;;
   *) filter='.lease_id = "$UNC_SUCCESSOR_ID"' ;;
 esac
 jq --arg p "\$2" "(.worktrees[] | select(.path == \\\$p)) |= (\$filter)" "$UNC_STATE" > "$UNC_STATE.tmp"
@@ -4964,6 +4968,68 @@ test_unclaimed_release_interruptions_converge_and_never_clear_a_successor() {
     done
   done
   pass 'R4: a failure before or after the exact return converges on retry without a second reset, and a successor lease or changed lease id, before or after the verify, is never cleared'
+}
+
+# F2(d): a failure after a successful return converges on retry also when another task
+# takes the freed slot first. The provider's return succeeds, a successor leases slot A
+# and puts its own work in A's root, and the readback then fails: the retry retires the
+# record and marker from the marker's record of that return, sends the provider no
+# second return, and leaves the successor's slot byte-for-byte unchanged. A refusal for
+# a successor that took the slot before the return (nothing recorded as returned) names
+# its remedy, and following it (the slot is another task's ordinary lease: remove the
+# marker, run again) completes without returning or resetting that slot.
+test_unclaimed_release_retry_after_return_leaves_a_successor_alone() {
+  local provider history mode case_dir out rc marker
+  unc_providers "F2(d) real-provider retry after a return a successor followed"
+  for provider in "${UNC_PROVIDERS[@]}"; do
+    for history in prior-slot none; do
+      for mode in successor-takes successor-holder; do
+        UNC_HISTORY=$history unc_pool_case "unclaimed-after-return-$mode-$history" ordinary "$provider" \
+          || fail "$provider $history $mode: cannot build the pool"
+        case_dir=$UNC_CASE
+        marker=$case_dir/state/task-x1.teardown-return-pending
+        unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.before"
+        jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" > "$case_dir/b-entry.before"
+        printf '%s\n' "$mode" > "$case_dir/inject"
+        rc=0
+        out=$(unc_run_teardown "$case_dir") || rc=$?
+        [ "$rc" -ne 0 ] || fail "$provider $history $mode: teardown reported success with a successor on the slot"$'\n'"$out"
+        assert_present "$case_dir/state/task-x1.meta" "$provider $history $mode: the record was retired before the readback held"
+        assert_present "$marker" "$provider $history $mode: the return-pending marker was dropped"
+        [ ! -e "$UNC_NESTED" ] || fail "$provider $history $mode: the task's own nested copy survived its cleanup"
+        jq -e '.[1] == true and .[2] == "successor"' <<<"$(unc_a_entry)" >/dev/null \
+          || fail "$provider $history $mode: the successor's lease is not on slot A: $(unc_a_entry)"
+        printf 'successor work\n' > "$UNC_A/successor-work.txt"
+        unc_copy_snapshot "$UNC_A" "$case_dir/a-root.before"
+        unc_a_entry > "$case_dir/a-entry.before"
+        rc=0
+        out=$(unc_run_teardown "$case_dir") || rc=$?
+        if [ "$mode" = successor-holder ]; then
+          [ "$rc" -ne 0 ] || fail "$provider $history $mode: a slot taken before the return was retired as returned"$'\n'"$out"
+          assert_contains "$out" "remove $marker and run this teardown again" "$provider $history $mode: the refusal does not name its remedy"
+          assert_present "$case_dir/state/task-x1.meta" "$provider $history $mode: the refusal retired the record"
+          rm -f "$marker"
+          rc=0
+          out=$(unc_run_teardown "$case_dir") || rc=$?
+        fi
+        expect_code 0 "$rc" "$provider $history $mode: the retry did not converge"$'\n'"$out"
+        assert_absent "$case_dir/state/task-x1.meta" "$provider $history $mode: the retry left the record"
+        assert_absent "$marker" "$provider $history $mode: the retry left the return-pending marker"
+        unc_a_entry | cmp -s - "$case_dir/a-entry.before" \
+          || fail "$provider $history $mode: the successor's lease entry changed: $(unc_a_entry)"
+        unc_copy_snapshot "$UNC_A" "$case_dir/a-root.after"
+        cmp -s "$case_dir/a-root.before" "$case_dir/a-root.after" || fail "$provider $history $mode: the successor's slot root changed"
+        assert_equals 1 "$(unc_return_count "$case_dir")" "$provider $history $mode: the provider was sent a return other than once: $(cat "$case_dir/treehouse.argv")"
+        unc_assert_only_route_commands "$case_dir" "$provider $history $mode"
+        unc_assert_no_forced_git "$case_dir" "$provider $history $mode"
+        unc_copy_snapshot "$UNC_B_COPY" "$case_dir/b-copy.after"
+        cmp -s "$case_dir/b-copy.before" "$case_dir/b-copy.after" || fail "$provider $history $mode: sibling B's nested copy changed"
+        jq -c --arg p "$UNC_B" '.worktrees[] | select(.path == $p)' "$UNC_STATE" | cmp -s - "$case_dir/b-entry.before" \
+          || fail "$provider $history $mode: sibling B's lease entry changed"
+      done
+    done
+  done
+  pass 'F2(d): a retry after a successful return retires the record without touching a slot a successor took since, and the refusal for a successor that took it before the return names a remedy that completes the same way'
 }
 
 # The two early refusals of a live task (an unreadable slot claim, an unavailable
@@ -6881,6 +6947,7 @@ test_a_user_config_base_branch_is_ignored_when_the_repo_has_a_treehouse_toml() {
 teardown_test_cases=(
 test_unclaimed_enclosing_slot_is_released_by_exact_conditional_return
 test_unclaimed_release_interruptions_converge_and_never_clear_a_successor
+test_unclaimed_release_retry_after_return_leaves_a_successor_alone
 test_unclaimed_release_refuses_each_custody_condition
 test_unclaimed_slot_on_unproven_provider_stays_inert
 test_unclaimed_return_refuses_to_overwrite_an_ignored_root_file

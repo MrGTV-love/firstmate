@@ -1334,17 +1334,18 @@ teardown_hex_decode() {  # <hex>; fails on anything but whole hex bytes
 }
 
 # The lease this task's earlier attempt proved for <slot> (state|holder|lease id|name),
-# as the current return-pending marker recorded it; empty when the marker is not current,
+# as the current return-pending marker recorded it (<key> lease), or the lease that
+# attempt then returned (<key> returned); empty when the marker is not current,
 # names another slot, or carries none (the other routes write none). Fails when a
 # recorded value cannot be decoded, which a caller must treat as a refusal, never as none.
-teardown_marker_lease() {  # <slot>
-  local marker="$STATE/$ID.teardown-return-pending" slot_real marked hex
+teardown_marker_lease() {  # <slot> [lease|returned]
+  local marker="$STATE/$ID.teardown-return-pending" key=${2:-lease} slot_real marked hex
   fm_teardown_return_pending "$STATE" "$ID" || return 0
   marked=$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)
   [ -n "$marked" ] || return 0
   slot_real=$(fm_task_copy_canonical_dir "$marked" 2>/dev/null) || slot_real=$marked
   [ "$marked" = "$1" ] || [ "$slot_real" = "$1" ] || return 0
-  hex=$(sed -n 's/^lease=//p' "$marker" 2>/dev/null | tail -1)
+  hex=$(sed -n "s/^$key=//p" "$marker" 2>/dev/null | tail -1)
   [ -n "$hex" ] || return 0
   teardown_hex_decode "$hex"
 }
@@ -1357,9 +1358,11 @@ teardown_marker_lease() {  # <slot>
 # records the lease its gate proved (lease=, hex of state|holder|lease id|name), so a
 # retry compares the slot against that identity and never re-records another lease it
 # then finds (only exactly the adoption of a recorded old-holder entry); every other
-# write of the same slot's marker carries the recorded lease along.
+# write of the same slot's marker carries the recorded lease along. Once the route's
+# conditional return succeeded it also records that return (returned=, hex of the lease
+# returned), carried along the same way, so a retry knows the slot is no longer this task's.
 teardown_mark_return_pending() {  # <slot> [child-id]
-  local marker="$STATE/$ID.teardown-return-pending" tmp gen lease=
+  local marker="$STATE/$ID.teardown-return-pending" tmp gen lease= returned=
   tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
   if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ] && [ "$1" = "$TEARDOWN_UNCLAIMED_SLOT" ] \
       && [ -n "$TEARDOWN_UNCLAIMED_EARLY" ]; then
@@ -1371,15 +1374,17 @@ teardown_mark_return_pending() {  # <slot> [child-id]
       ordinary\|*|recovered\|*) lease=$(teardown_hex_encode "$TEARDOWN_UNCLAIMED_EARLY") ;;
     esac
   fi
-  if [ -z "$lease" ]; then
-    lease=$(sed -n 's/^lease=//p' "$marker" 2>/dev/null | tail -1)
-    [ "$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)" = "$1" ] || lease=
+  if [ "$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)" = "$1" ]; then
+    [ -n "$lease" ] || lease=$(sed -n 's/^lease=//p' "$marker" 2>/dev/null | tail -1)
+    returned=$(sed -n 's/^returned=//p' "$marker" 2>/dev/null | tail -1)
   fi
+  [ "$1" != "$TEARDOWN_UNCLAIMED_SLOT" ] || [ -z "$TEARDOWN_UNCLAIMED_RETURNED" ] || returned=$TEARDOWN_UNCLAIMED_RETURNED
   [ -z "$TEARDOWN_RUN_DIR" ] || tmp="$TEARDOWN_RUN_DIR/teardown-return-pending"
   if teardown_return_pending_target_ok && gen=$(fm_teardown_return_pending_gen "$META") \
       && { printf 'spawn_gen=%s\n' "$gen" && printf 'slot=%s\n' "$1" \
            && { [ -z "${2:-}" ] || printf 'child=%s\n' "$2"; } \
-           && { [ -z "$lease" ] || printf 'lease=%s\n' "$lease"; }; } > "$tmp" \
+           && { [ -z "$lease" ] || printf 'lease=%s\n' "$lease"; } \
+           && { [ -z "$returned" ] || printf 'returned=%s\n' "$returned"; }; } > "$tmp" \
       && mv -f "$tmp" "$marker" && [ -f "$marker" ] && [ ! -L "$marker" ]; then
     return 0
   fi
@@ -5217,9 +5222,14 @@ teardown_release_enclosing_slot() {
 # (fm_task_copy_treehouse_persists_recovered_leases) is used, because only then
 # does a failed or stale return leave every sibling untouched. A slot already
 # unleased by an earlier interrupted attempt converges after the same checks
-# without a second reset. Nothing here searches for leases by task name.
+# without a second reset. Right after the provider accepts the return, and before the
+# readback, the return-pending marker records it (returned=), so a retry after a later
+# failure retires the record without touching the slot even when another task has
+# taken it since (teardown_unclaimed_returned). Nothing here searches for leases by task name.
 TEARDOWN_UNCLAIMED_SLOT=
 TEARDOWN_UNCLAIMED_KIND=
+# The hex of the lease this run's conditional return released, once the provider accepted it.
+TEARDOWN_UNCLAIMED_RETURNED=
 TEARDOWN_UNCLAIMED_NAME=
 TEARDOWN_UNCLAIMED_HOLDER=
 TEARDOWN_UNCLAIMED_LEASE_ID=
@@ -5673,6 +5683,22 @@ teardown_unclaimed_prove_custody() {
   return 0
 }
 
+# Whether an interrupted attempt of this task already returned <slot>: its current
+# return-pending marker records the return (returned=) of exactly the lease it proved
+# (lease=, or that lease's adoption), and no own copy of this task (the recorded
+# worktree, a prior copy inside the slot) remains. The slot is then no longer this
+# task's, whoever holds it now, so the route is not planned again and nothing in the
+# slot is read for a release or touched; the record retires.
+teardown_unclaimed_returned() {  # <slot>
+  local proved returned slot_real
+  proved=$(teardown_marker_lease "$1") && [ -n "$proved" ] || return 1
+  returned=$(teardown_marker_lease "$1" returned) && [ -n "$returned" ] || return 1
+  teardown_unclaimed_lease_matches "$proved" "$returned" || return 1
+  [ ! -e "$WT" ] && [ ! -L "$WT" ] || return 1
+  slot_real=$(fm_task_copy_canonical_dir "$1" 2>/dev/null) || slot_real=$1
+  [ -z "$(fm_task_copy_priors_inside "$META" "$slot_real")" ]
+}
+
 # Whether this teardown plans the release of <slot>, the record's enclosing slot
 # with no slot claim (read-only, no custody needed). Without force, for a ship or
 # scout. An unproven treehouse or a failed capability probe stays inert: the copy
@@ -5684,7 +5710,8 @@ teardown_unclaimed_prove_custody() {
 # task's own lease, with or without a lease id, any legacy lease, whatever holder
 # it names or none, because with no lease id its owner cannot be told, a recovered
 # quarantine, a conflicting or unreadable entry, an interrupted release) is planned,
-# so any refusal there keeps the record and the retry obligation. It records what it
+# so any refusal there keeps the record and the retry obligation. A slot an interrupted
+# attempt already returned (teardown_unclaimed_returned) is not planned. It records what it
 # saw in TEARDOWN_UNCLAIMED_SEEN for teardown_unclaimed_retire_gate.
 teardown_unclaimed_candidate() {  # <slot>
   local slot=$1 marked
@@ -5692,6 +5719,7 @@ teardown_unclaimed_candidate() {  # <slot>
   case "$KIND" in ship|scout) ;; *) return 1 ;; esac
   [ -n "$slot" ] || return 1
   fm_task_copy_treehouse_persists_recovered_leases || return 1
+  ! teardown_unclaimed_returned "$slot" || return 1
   fm_task_copy_pool_slot_lease "$slot" || true
   case "$FM_TASK_COPY_LEASE_STATE" in
     ordinary) [ "$FM_TASK_COPY_LEASE_HOLDER" = "$ID" ] || return 1 ;;
@@ -5743,25 +5771,28 @@ teardown_unclaimed_early_proof() {
 # the interrupted attempt proved) nor exactly its adoption under the protected holder
 # (teardown_unclaimed_lease_matches), in every other shape, whether or not the route
 # is planned again: a successor, another holder, a new lease id for the same holder,
-# an entry that cannot be read. An unleased slot (the interrupted attempt returned it) converges. A
-# marker with no recorded lease (another route's, or an older one) leaves nothing to
-# compare. Runs before any retirement helper.
+# an entry that cannot be read. An unleased slot (the interrupted attempt returned it) converges,
+# and so does a slot the marker records as returned by that attempt with no own copy left
+# (teardown_unclaimed_returned), whoever took it since. A marker with no recorded lease
+# (another route's, or an older one) leaves nothing to compare. Runs before any
+# retirement helper.
 teardown_unclaimed_marker_refusal() {
   local marker="$STATE/$ID.teardown-return-pending" slot proved now
   [ "$KIND" != secondmate ] || return 0
   fm_teardown_return_pending "$STATE" "$ID" || return 0
   slot=$(sed -n 's/^slot=//p' "$marker" 2>/dev/null | head -1)
   [ -n "$slot" ] || return 0
-  if ! proved=$(teardown_marker_lease "$slot"); then
-    echo "REFUSED: the lease recorded in task $ID's return-pending marker for pool slot $slot cannot be decoded, so the slot cannot be compared with what the interrupted attempt proved; nothing was removed, returned, retired or signalled, and the record and marker are kept." >&2
+  if ! proved=$(teardown_marker_lease "$slot") || ! teardown_marker_lease "$slot" returned >/dev/null; then
+    echo "REFUSED: the lease recorded in task $ID's return-pending marker for pool slot $slot, or the return it records, cannot be decoded, so the slot cannot be compared with what the interrupted attempt proved; nothing was removed, returned, retired or signalled, and the record and marker are kept." >&2
     return 1
   fi
   [ -n "$proved" ] || return 0
+  ! teardown_unclaimed_returned "$slot" || return 0
   fm_task_copy_pool_slot_lease "$(fm_task_copy_canonical_dir "$slot" 2>/dev/null || printf '%s' "$slot")" || true
   [ "$FM_TASK_COPY_LEASE_STATE" != unleased ] || return 0
   now="$FM_TASK_COPY_LEASE_STATE|$FM_TASK_COPY_LEASE_HOLDER|$FM_TASK_COPY_LEASE_ID|$FM_TASK_COPY_LEASE_NAME"
   ! teardown_unclaimed_lease_matches "$proved" "$now" || return 0
-  echo "REFUSED: pool slot $slot is not in the state task $ID's interrupted teardown proved: its lease was '$proved' and is now '$now' (an unreadable entry reads 'unreadable'), so a successor may hold it; nothing was removed, returned, retired or signalled, and the record and marker are kept for the captain's decision." >&2
+  echo "REFUSED: pool slot $slot is not in the state task $ID's interrupted teardown proved: its lease was '$proved' and is now '$now' (an unreadable entry reads 'unreadable'), and the marker records no return of it by that attempt, so a successor may hold it; nothing was removed, returned, retired or signalled, and the record and marker are kept. Retry once the entry reads as the recorded lease or as free; if the captain confirms that the slot is now another task's ordinary lease, remove $marker and run this teardown again, which then leaves that slot alone, neither returned nor reset." >&2
   return 1
 }
 
@@ -5791,6 +5822,7 @@ teardown_unproven_recovered_refusal() {
   fm_treehouse_slot_owner_state "$slot" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] || return 0
   ! fm_task_copy_treehouse_persists_recovered_leases || return 0
+  ! teardown_unclaimed_returned "$slot" || return 0
   fm_task_copy_pool_slot_lease "$slot" || true
   case "$FM_TASK_COPY_LEASE_STATE" in
     recovered|conflicting|unreadable) ;;
@@ -5882,6 +5914,8 @@ teardown_unclaimed_slot_release() {
       teardown_unclaimed_note "treehouse refused the exact conditional return (exit $rc): $out"
       return 1
     fi
+    TEARDOWN_UNCLAIMED_RETURNED=$(teardown_hex_encode "$TEARDOWN_UNCLAIMED_KIND|$TEARDOWN_UNCLAIMED_HOLDER|$TEARDOWN_UNCLAIMED_LEASE_ID|$TEARDOWN_UNCLAIMED_NAME")
+    teardown_mark_return_pending "$slot" || true
   fi
   if [ -z "$held" ]; then
     fm_task_copy_pool_slot_lease "$slot" || true
