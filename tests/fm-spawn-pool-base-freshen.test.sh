@@ -1988,6 +1988,9 @@ test_successor_of_checks_are_load_bearing() {
     rm -rf "$mut"
     mkdir -p "$mut"
     cp -R "$ROOT/bin" "$ROOT/docs" "$ROOT/.agents" "$mut/"
+    # The mutant is not a git tree, so the suite's stubbed spawn tree cannot be cloned from it; it carries its own stub instead.
+    printf '#!/bin/sh\nexit 0\n' > "$mut/bin/fm-home-summary-refresh.sh"
+    chmod +x "$mut/bin/fm-home-summary-refresh.sh"
     case "$row" in
       branch)
         # shellcheck disable=SC2016 # sed text, not shell expansion
@@ -2004,7 +2007,7 @@ test_successor_of_checks_are_load_bearing() {
     esac
     # Control: the unmutated copy refuses the row.
     successor_mutation_case "$row"
-    out=$(ROOT="$mut" run_successor_spawn --successor-of moved) || true
+    out=$(ROOT="$mut" FM_TEST_STUB_SUMMARY_REFRESH=0 run_successor_spawn --successor-of moved) || true
     assert_contains "$out" "$expect" "the $row control did not refuse"
     sed -i.bak "$pattern" "$mut/bin/fm-slot-provision-lib.sh"
     if [ "$row" = advertise ]; then
@@ -2022,7 +2025,7 @@ test_successor_of_checks_are_load_bearing() {
     # A fresh case of the same shape, now on the mutant.
     successor_mutation_case "$row"
     rc=0
-    out=$(ROOT="$mut" run_successor_spawn --successor-of moved) || rc=$?
+    out=$(ROOT="$mut" FM_TEST_STUB_SUMMARY_REFRESH=0 run_successor_spawn --successor-of moved) || rc=$?
     ! printf '%s' "$out" | grep -q "$expect" || fail "the $row check is not what refuses: $out"
     [ "$(successor_calls)" -ge 1 ] || fail "the mutated $row check never reached the provisioner, so the row does not discriminate: $out"
   done
