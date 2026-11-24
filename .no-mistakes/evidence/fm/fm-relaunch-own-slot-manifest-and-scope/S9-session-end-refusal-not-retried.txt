@@ -1,0 +1,41 @@
+== scan 1: watcher session-end tick on a dead governed worker whose own committed out-of-scope work refuses (scope_mismatch)
+scan rc=0
+WAKE: check: se1 auto-relaunch failed after session-end (the complete drift report is in /Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/se1.relaunch-drift): fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.uGPUlu [refused: scope_mismatch: error: slot provisioning refused: scope_mismatch: out1.txt changed outside the recorded scope; not retried by the scan until its cause changes; bin/fm-control.sh se1 relaunch tries again]; drift report: 1 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits): proven out1.txt
+[exit 0]
+-- refusal memory:
+g1795537410.21410.6803	2	scope_mismatch	ff2146f74093f65da890339c6c55226dc0319c1ec84854761f1bb4e182816a9f	
+-- attempt ledger rows: 2
+-- wake-queue rows naming se1: 1
+-- control-relaunch journal: 0
+-- worker: dead
+
+== scan 2: same cause unchanged; the 30-minute attempt ledger is removed first so only the refusal memory can stop a retry
+scan rc=0
+WAKE: <none>
+[exit 0]
+-- refusal memory:
+g1795537410.21410.6803	2	scope_mismatch	ff2146f74093f65da890339c6c55226dc0319c1ec84854761f1bb4e182816a9f	
+show: no such file or directory: /Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/.session-end-relaunch-se1
+-- attempt ledger rows: 
+-- wake-queue rows naming se1: 1
+-- control-relaunch journal: 0
+-- worker: dead
+
+== scan 3: the cause changes (the task's out-of-scope commit is undone); ledger removed again
+scan rc=0
+WAKE: check: se1 auto-relaunched after session-end
+[exit 0]
+-- refusal memory:
+<absent>
+-- attempt ledger rows: 2
+-- wake-queue rows naming se1: 2
+-- control-relaunch journal: 4
+-- worker: alive
+provisioner runs: 1
+== state/se1.relaunch-drift (durable drift file written by the scan-1 refusal)
+relaunch drift report for se1: 1 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: proven out1.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+== wake queue rows
+1795537434	1	check	session-end-relaunch-failed-se1-g1795537410.21410.6803-2	check: se1 auto-relaunch failed after session-end (the complete drift report is in /Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/se1.relaunch-drift): fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.uGPUlu [refused: scope_mismatch: error: slot provisioning refused: scope_mismatch: out1.txt changed outside the recorded scope; not retried by the scan until its cause changes; bin/fm-control.sh se1 relaunch tries again]; drift report: 1 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits): proven out1.txt
+1795537462	2	check	session-end-relaunch-se1-g1795537410.21410.6803-2	check: se1 auto-relaunched after session-end

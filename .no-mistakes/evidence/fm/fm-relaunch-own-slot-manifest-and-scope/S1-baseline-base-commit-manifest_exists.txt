@@ -1,0 +1,16 @@
+== BASELINE: base commit 032c4871b (git clone at that commit), own-manifest relaunch of a dead governed worker with an own out-of-scope commit
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adoptbase2/manifests/adoptbase2.json ino=2187608277 size=331 sha=4e57ed439cbde0ab mtime=1795537124220455394 ctime=1795537124220455394
+worker: dead
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/tmp/fm-lab.uGPUlu/data/adoptbase2/launch-brief.md records no ship branch; defaulting to legacy branch fm/adoptbase2
+warning: /Users/charlesabrooker/tmp/fm-lab.uGPUlu/data/adoptbase2/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+{"state": "BLOCKED", "reason": "manifest_exists", "blocked_reasons": ["manifest_exists"], "manifest_path": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adoptbase2/manifests/adoptbase2.json"}
+error: slot provisioner refused task adoptbase2 (exit 2); no agent or ship transition admitted; the copy is left exactly where it is (refs/heads/fm/adoptbase2 at 53b6ef2e3eb8004c5a76b6c709c46f9bbd34c1f5); report: /Users/charlesabrooker/tmp/fm-lab.uGPUlu/data/adoptbase2/slot-provision-spawn.13621.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adoptbase2/copy and endpoint fmses:fm-adoptbase2 retained; no worker admitted
+error: the replacement agent for adoptbase2 could not be launched on codex
+error: adoptbase2's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adoptbase2/copy
+[exit 1]
+== after
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adoptbase2/manifests/adoptbase2.json ino=2187608277 size=331 sha=4e57ed439cbde0ab mtime=1795537124220455394 ctime=1795537124220455394
+provisioner runs:        1
+worker: dead

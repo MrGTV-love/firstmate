@@ -1,0 +1,29 @@
+== HEAD: clean dead worker, record has scope src but no manifest (provisioning route)
+slot_owned_path=src
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/manifests/chain1.json absent
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/manifests/chain1.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/copy", "owner_id": "chain1", "branch": "fm/chain1", "base_sha": "a9df60bdb2a577c22369284c38cf09b6784f965f", "owned_paths": ["src"], "lifecycle_state": "worktree_active", "repo_root": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/proj"}
+relaunched chain1 harness=codex from=codex model=default effort=default backend=tmux endpoint=fmses:fm-chain1 worktree=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/copy
+[exit 0]
+-- after relaunch 1
+slot_manifest=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/manifests/chain1.json
+slot_base_sha=a9df60bdb2a577c22369284c38cf09b6784f965f
+slot_owned_path=src
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/manifests/chain1.json ino=2187699300 size=315 sha=ffca0e43f7842a55 mtime=1795537334621047804 ctime=1795537334621047804
+provisioner runs: 1
+{"base_sha": "a9df60bdb2a577c22369284c38cf09b6784f965f", "branch": "fm/chain1", "lifecycle_state": "worktree_active", "owned_paths": ["src"], "owner_id": "chain1", "repo_root": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/proj", "worktree_path": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/copy"}
+worker: alive
+
+== HEAD: the same task's worker died again; relaunch 2 (now its record names its own manifest)
+relaunch drift report for chain1: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+relaunch drift report for chain1: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+relaunched chain1 harness=codex from=codex model=default effort=default backend=tmux endpoint=fmses:fm-chain1 worktree=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/copy
+[exit 0]
+-- after relaunch 2
+slot_manifest=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/manifests/chain1.json
+slot_base_sha=a9df60bdb2a577c22369284c38cf09b6784f965f
+slot_owned_path=src
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/chain1/manifests/chain1.json ino=2187699300 size=315 sha=ffca0e43f7842a55 mtime=1795537334621047804 ctime=1795537334621047804
+provisioner runs: 1
+worker: alive

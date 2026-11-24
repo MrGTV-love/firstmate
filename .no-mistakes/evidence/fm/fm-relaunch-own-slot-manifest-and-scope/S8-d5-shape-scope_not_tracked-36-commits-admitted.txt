@@ -1,0 +1,32 @@
+== HEAD: d5-shape dead worker: own manifest, recorded scope newpkg absent at the base (scope_not_tracked shape), 36 unlanded own commits (6 outside the scope)
+slot_manifest=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/untracked1/manifests/untracked1.json
+slot_base_sha=93c2881ea4e3a1d18bb6d43a4b1f254c41d796ac
+slot_owned_path=newpkg
+base has newpkg? 0
+unlanded commits: 36
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/untracked1/manifests/untracked1.json ino=2187704975 size=334 sha=b7bf4ff3764f132e mtime=1795537362848004976 ctime=1795537362848004976
+relaunch drift report for untracked1: 6 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: proven side-12.txt
+  drift: proven side-18.txt
+  drift: proven side-24.txt
+  drift: proven side-30.txt
+  drift: proven side-36.txt
+  drift: proven side-6.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+relaunch drift report for untracked1: 6 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: proven side-12.txt
+  drift: proven side-18.txt
+  drift: proven side-24.txt
+  drift: proven side-30.txt
+  drift: proven side-36.txt
+  drift: proven side-6.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+relaunched untracked1 harness=codex from=codex model=default effort=default backend=tmux endpoint=fmses:fm-untracked1 worktree=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/untracked1/copy
+[exit 0]
+-- after
+slot_manifest=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/untracked1/manifests/untracked1.json
+slot_base_sha=93c2881ea4e3a1d18bb6d43a4b1f254c41d796ac
+slot_owned_path=newpkg
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/untracked1/manifests/untracked1.json ino=2187704975 size=334 sha=b7bf4ff3764f132e mtime=1795537362848004976 ctime=1795537362848004976
+provisioner runs: 0
+worker: alive

@@ -1,0 +1,7 @@
+ok - fm-control relaunch: an old copy is provisioned by the primary clone's provisioner once, then adopted
+ok - fm-control relaunch: a primary provisioner that differs from the default tip is refused by name
+ok - fm-control relaunch: foreseeable provisioning refusals are named before the agent is stopped
+ok - fm-control relaunch: a committed own out-of-scope change is refused before the stop with every path and the drift report
+ok - fm-control relaunch: the manifest_exists refusal names the collision file and a cleared collision changes the refusal memory
+ok - fm-control relaunch: a copy another task records is refused before the stop on the provisioning route; the own copy is provisioned
+rc=0

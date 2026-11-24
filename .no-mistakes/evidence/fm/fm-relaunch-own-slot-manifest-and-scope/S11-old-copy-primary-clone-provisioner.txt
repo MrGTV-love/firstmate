@@ -1,0 +1,25 @@
+head: illegal line count -- 0
+== HEAD: no-manifest dead worker whose copy predates the provisioner (no script in the copy); the project's main has it
+ls: /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old1/copy/scripts: No such file or directory
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old1/manifests/old1.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old1/copy", "owner_id": "old1", "branch": "fm/old1", "base_sha": "19ee712bd585c091e169456d32199021d4038eec", "owned_paths": ["src"], "lifecycle_state": "worktree_active", "repo_root": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old1/proj"}
+relaunched old1 harness=codex from=codex model=default effort=default backend=tmux endpoint=fmses:fm-old1 worktree=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old1/copy
+[exit 0]
+-- after
+slot_manifest=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old1/manifests/old1.json
+slot_base_sha=19ee712bd585c091e169456d32199021d4038eec
+slot_owned_path=src
+provisioner runs: 1
+["--repo-root", "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old1/proj", "--worktree-path", "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old1/copy", "--owner-id", "old1", "--branch", "fm/old1", "--base-sha", "19ee712bd585c091e169456d32199021d4038eec", "--owned-path", "src"]
+
+worker: alive
+
+head: illegal line count -- 0
+== HEAD: same shape, but the primary clone's provisioner has an uncommitted local edit (not the default-branch tip)
+error: slot provisioner source is not the primary clone's current main: scripts/git-stability/provision_existing_slot.py differs from main's tip in /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old2/proj
+error: refused relaunch of governed task old2: its assigned copy /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old2/copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+[exit 1]
+-- after
+slot_owned_path=src
+provisioner runs: 0
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/old2/manifests/old2.json absent
+worker: dead

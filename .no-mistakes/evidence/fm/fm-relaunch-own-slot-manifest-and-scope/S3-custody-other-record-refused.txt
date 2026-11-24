@@ -1,0 +1,19 @@
+== HEAD: own-manifest relaunch while another task's record (stranger) names the same copy; worker is a live codex process
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/cust1/manifests/cust1.json ino=2187653216 size=311 sha=5a6015a4a0774958 mtime=1795537229452761019 ctime=1795537229452761019
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/cust1.meta ino=2187653169 size=455 sha=f402e78b0fc7ff1f mtime=1795537229457434043 ctime=1795537229457434043
+worker: alive pane_pid=86339 fg=
+error: slot adoption refused: custody_other_record: task stranger's record names this copy as its worktree; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task cust1: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/cust1/copy; preserve and reconcile it first; the running agent was not stopped
+[exit 1]
+== after
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/cust1/manifests/cust1.json ino=2187653216 size=311 sha=5a6015a4a0774958 mtime=1795537229452761019 ctime=1795537229452761019
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/cust1.meta ino=2187653169 size=455 sha=f402e78b0fc7ff1f mtime=1795537229457434043 ctime=1795537229457434043
+worker: alive pane_pid=86339
+provisioner runs:        0
+cust1.meta
+
+== control: the stranger record removed, same relaunch
+skill selection for cust1: unavailable - no TypeSafe or OpenRouter key
+relaunched cust1 harness=codex from=codex model=default effort=default backend=tmux endpoint=fmses:fm-cust1 worktree=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/cust1/copy
+[exit 0]
+provisioner runs:        0

@@ -1,0 +1,16 @@
+== before
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/foreign1/manifests/foreign1.json ino=2187586323 size=320 sha=9aab03cdd5b63ff8 mtime=1795537079856670581 ctime=1795537079856670581
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/foreign1.meta ino=2187585798 size=479 sha=2dac3af7cd963151 mtime=1795537073020599379 ctime=1795537073020599379
+worker: dead
+== bin/fm-control.sh foreign1 relaunch --note ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.uGPUlu
+error: slot adoption refused: branch_mismatch: manifest branch is 'fm/other', the task branch is 'fm/foreign1'; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task foreign1: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/foreign1/copy; preserve and reconcile it first; the running agent was not stopped
+[exit 1]
+== after
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/foreign1/manifests/foreign1.json ino=2187586323 size=320 sha=9aab03cdd5b63ff8 mtime=1795537079856670581 ctime=1795537079856670581
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/foreign1.meta ino=2187585798 size=479 sha=2dac3af7cd963151 mtime=1795537073020599379 ctime=1795537073020599379
+worker: dead
+provisioner runs:        0
+foreign1.meta
+guard-events.jsonl

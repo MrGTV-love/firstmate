@@ -1,0 +1,18 @@
+== HEAD: claude-harness governed task, own manifest; relaunch 1 (records the launch wiring); CLAUDE_CONFIG_DIR is a throwaway dir so no user Claude config is written
+relaunch drift report for kept1: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+relaunch drift report for kept1: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched kept1 harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-kept1 worktree=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/kept1/copy
+[exit 0]
+-- state/kept1.wiring-sha:
+69fa3db1fcb71414a45fd3d662d1355207ba622fea97f56bff165ff99a98cdee:100000:644 .claude/settings.local.json
+-- copy files:
+./.claude/settings.local.json
+./docs.txt
+./scripts/git-stability/provision_existing_slot.py
+./src/owned.txt
+worker: alive

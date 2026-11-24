@@ -1,0 +1,25 @@
+== HEAD: second relaunch of the same task after its worker died again; manifest file and its directory made read-only
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adopt1/manifests/adopt1.json ino=2187611230 size=315 sha=1438469002c7935d mtime=1795537141512166509 ctime=1795537188334176705
+worker: dead
+relaunch drift report for adopt1: 3 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: proven docs-moved.txt
+  drift: proven docs.txt
+  drift: proven notes.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+warning: /Users/charlesabrooker/tmp/fm-lab.uGPUlu/data/adopt1/launch-brief.md records no ship branch; defaulting to legacy branch fm/adopt1
+warning: /Users/charlesabrooker/tmp/fm-lab.uGPUlu/data/adopt1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunch drift report for adopt1: 3 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: proven docs-moved.txt
+  drift: proven docs.txt
+  drift: proven notes.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for adopt1: unavailable - no TypeSafe or OpenRouter key
+relaunched adopt1 harness=codex from=codex model=default effort=default backend=tmux endpoint=fmses:fm-adopt1 worktree=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adopt1/copy
+[exit 0]
+== after
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adopt1/manifests/adopt1.json ino=2187611230 size=315 sha=1438469002c7935d mtime=1795537141512166509 ctime=1795537188334176705
+provisioner runs:        0
+slot_manifest=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/adopt1/manifests/adopt1.json
+slot_base_sha=342d030d3dfe2baf33a60e63609fb1a7ed2faba5
+slot_owned_path=src
+worker: alive

@@ -1,0 +1,67 @@
+== HEAD: no-manifest relaunch (provisioning route), copy has an uncommitted out-of-scope file and an uncommitted in-scope edit; live codex worker
+-- before
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/pdirty.meta ino=2187686183 size=319 sha=8324bf44409b7922 mtime=1795537275649611924 ctime=1795537275649611924
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pdirty/manifests/pdirty.json absent
+worker: alive pane_pid=74145
+ M src/owned.txt
+?? "notes outside.txt"
+error: slot provisioning refused: dirty_worktree; preserve and reconcile the scratch state before retrying
+relaunch drift report for pdirty: 1 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: proven notes outside.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+error: refused relaunch of governed task pdirty: its assigned copy /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pdirty/copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+[exit 1]
+-- after
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/pdirty.meta ino=2187686183 size=319 sha=8324bf44409b7922 mtime=1795537275649611924 ctime=1795537275649611924
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pdirty/manifests/pdirty.json absent
+worker: alive pane_pid=74145
+provisioner runs: 0
+ M src/owned.txt
+?? "notes outside.txt"
+
+== HEAD: no-manifest relaunch, two committed out-of-scope files (out1.txt, out2.txt); live codex worker
+-- before
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/pscope.meta ino=2187688382 size=319 sha=7d8ccd666e918876 mtime=1795537285963760536 ctime=1795537285963760536
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pscope/manifests/pscope.json absent
+worker: alive pane_pid=90404
+error: slot provisioning refused: scope_mismatch: out1.txt, out2.txt changed outside the recorded scope
+relaunch drift report for pscope: 2 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: proven out1.txt
+  drift: proven out2.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+error: refused relaunch of governed task pscope: its assigned copy /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pscope/copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+[exit 1]
+-- after
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/pscope.meta ino=2187688382 size=319 sha=7d8ccd666e918876 mtime=1795537285963760536 ctime=1795537285963760536
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pscope/manifests/pscope.json absent
+worker: alive pane_pid=90404
+provisioner runs: 0
+
+== HEAD: no-manifest relaunch whose recorded scope path missing/dir is not tracked at the base; live codex worker
+-- before
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/ptrack.meta ino=2187692419 size=327 sha=bd47873234e4691e mtime=1795537296034464456 ctime=1795537296034464456
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/ptrack/manifests/ptrack.json absent
+worker: alive pane_pid=9157
+error: slot provisioning refused: scope_not_tracked: missing/dir is not tracked at the base 02fadfff6ca126cbb8b0479fa3d391e5ad3ed1f4
+error: refused relaunch of governed task ptrack: its assigned copy /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/ptrack/copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+[exit 1]
+-- after
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/ptrack.meta ino=2187692419 size=327 sha=bd47873234e4691e mtime=1795537296034464456 ctime=1795537296034464456
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/ptrack/manifests/ptrack.json absent
+worker: alive pane_pid=9157
+provisioner runs: 0
+
+== HEAD: no-manifest relaunch while a manifest already exists at the provisioner's record path (collision); live codex worker
+-- before
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/pexist.meta ino=2187695253 size=319 sha=53c69ca8fa022001 mtime=1795537307139755612 ctime=1795537307139755612
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pexist/manifests/pexist.json ino=2187695254 size=2 sha=44136fa355b3678a mtime=1795537307161172928 ctime=1795537307161172928
+worker: alive pane_pid=28146
+error: slot provisioning refused: manifest_exists: a lifecycle manifest is already at the path the provisioner would write, and the task record does not adopt it; "manifest_path": "/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pexist/manifests/pexist.json"
+error: refused relaunch of governed task pexist: its assigned copy /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pexist/copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped
+[exit 1]
+-- after
+/Users/charlesabrooker/tmp/fm-lab.uGPUlu/state/pexist.meta ino=2187695253 size=319 sha=53c69ca8fa022001 mtime=1795537307139755612 ctime=1795537307139755612
+/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/pexist/manifests/pexist.json ino=2187695254 size=2 sha=44136fa355b3678a mtime=1795537307161172928 ctime=1795537307161172928
+worker: alive pane_pid=28146
+provisioner runs: 0
+

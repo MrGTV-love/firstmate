@@ -1,0 +1,10 @@
+== PRE-FIX PARENT 4fae394b5 (clone at that commit): the same task, same copy with its kept copy; worker dies; relaunch 4
+relaunch drift report for kept1: 1 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored .claude/settings.local.json.fm-kept.1795537561.0
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+relaunch drift report for kept1: 1 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored .claude/settings.local.json.fm-kept.1795537561.0
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+merged the worker's kept hook and permission entries into the fresh wiring at /Users/charlesabrooker/tmp/fm-live-scr.hUKYan/kept1/copy/.claude/settings.local.json; its other keys are not carried over
+relaunched kept1 harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-kept1 worktree=/Users/charlesabrooker/tmp/fm-live-scr.hUKYan/kept1/copy
+[exit 0]
