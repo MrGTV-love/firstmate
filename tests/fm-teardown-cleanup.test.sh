@@ -5053,12 +5053,12 @@ test_linux_removability_refuses_an_entry_it_cannot_open() {
   pass "the Linux removability check refuses an entry it cannot open and passes readable files, links and absent paths"
 }
 
-# An earlier archive of a copy's ignored files is never lost: a failed copy
-# keeps it in place, one the new archive holds whole goes once the new one
-# verifies, a different one is kept beside the new archive, and a preserve
-# parent that cannot be written refuses at entry with nothing changed.
+# The archive of a copy's ignored files is never removed or overwritten: a
+# failed copy keeps the earlier one, an identical one is kept as is, a
+# different one is kept beside a new archive, and a preserve parent that cannot
+# be written refuses at entry with nothing changed.
 test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
-  local shape rc exclude hash dest real_cp root label earlier
+  local shape rc exclude hash dest real_cp root label new
   real_cp=$(command -v cp)
   for shape in failed-copy kept-beside same-content read-only-parent; do
     label="own-backup-$shape"
@@ -5107,18 +5107,18 @@ SH
         ;;
       kept-beside)
         expect_code 0 "$rc" "$label: a verified preserve must release the copy: $(cat "$FOREIGN_CASE/stderr")"
-        assert_equals "only here" "$(cat "$dest/files/unique.dat")" "$label: the new preserve does not hold the copy's bytes"
-        assert_grep "$(shasum -a 256 "$dest/files/unique.dat" | awk '{print $1}')  unique.dat" "$dest/meta/SHA256SUMS" \
+        assert_equals "earlier backup" "$(cat "$dest/files/unique.dat")" "$label: the earlier preserved copy was replaced"
+        assert_equals "earlier manifest" "$(cat "$dest/meta/SHA256SUMS")" "$label: the earlier manifest was replaced"
+        new=$(find "$root" -mindepth 1 -maxdepth 1 -name "$hash.*" -type d)
+        [ "$(printf '%s\n' "$new" | grep -c .)" = 1 ] || fail "$label: no single new preserve was kept beside the earlier one: $new"
+        assert_equals "only here" "$(cat "$new/files/unique.dat")" "$label: the new preserve does not hold the copy's bytes"
+        assert_grep "$(shasum -a 256 "$new/files/unique.dat" | awk '{print $1}')  unique.dat" "$new/meta/SHA256SUMS" \
           "$label: the new manifest does not describe the preserved bytes"
-        earlier=$(find "$root" -mindepth 1 -maxdepth 1 -name ".aside-$hash*" -type d)
-        [ "$(printf '%s\n' "$earlier" | grep -c .)" = 1 ] || fail "$label: no single earlier preserve was kept beside the new one: $earlier"
-        assert_equals "earlier backup" "$(cat "$earlier/files/unique.dat")" "$label: the earlier preserved copy was lost"
-        assert_equals "earlier manifest" "$(cat "$earlier/meta/SHA256SUMS")" "$label: the earlier manifest was lost"
         ;;
       same-content)
         expect_code 0 "$rc" "$label: an identical earlier preserve must let the copy go: $(cat "$FOREIGN_CASE/stderr")"
         assert_equals "only here" "$(cat "$dest/files/unique.dat")" "$label: the identical preserve changed"
-        [ -z "$(find "$root" -mindepth 1 -maxdepth 1 -name ".aside-$hash*")" ] || fail "$label: a duplicate preserve was kept beside an identical one"
+        [ -z "$(find "$root" -mindepth 1 -maxdepth 1 -name "$hash.*")" ] || fail "$label: a duplicate preserve was written beside an identical one"
         assert_absent "$FOREIGN_COPY" "$label: the copy survived"
         ;;
       read-only-parent)
@@ -5133,7 +5133,7 @@ SH
         ;;
     esac
   done
-  pass "an earlier preserve of a locked own copy is never lost: a failed copy and an unwritable parent keep it in place, a different one is kept beside the new one, and only an identical one goes"
+  pass "an earlier preserve of a locked own copy is never removed: a failed copy, an identical one, a different one and an unwritable parent all keep it"
 }
 
 # The preserve parent must be a real directory whose physical location is
