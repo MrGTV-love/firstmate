@@ -331,18 +331,6 @@ while time.monotonic() < end:
     time.sleep(0.1 * (1 - share))
 done.touch()
 """
-for share, key, trips in (('0.05', 'duty.below-floor', True), ('0.2', 'duty.above-floor', False)):
-    done = tmp / f'{key}.done'
-    begun = time.monotonic()
-    duty_run = subprocess.run([sys.executable, str(tenfold_clock), str(helper), 'run', key, '--', sys.executable, '-c', duty, share, '15', str(done)],
-                              env=dict(env, FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='600'), cwd=workrepo, capture_output=True, text=True)
-    duty_elapsed = time.monotonic() - begun
-    if trips:
-        assert duty_run.returncode == 124 and 'no_progress' in duty_run.stderr and not done.exists(), (key, duty_run.returncode, duty_run.stderr)
-        assert duty_elapsed < 14, f'{key}: a child below the floor was not stopped: {duty_elapsed:.1f}s'
-    else:
-        assert duty_run.returncode == 0 and 'no_progress' not in duty_run.stderr and done.exists(), (key, duty_run.returncode, duty_run.stderr)
-
 # A sampler wrapper for the telemetry cases: FM_TEST_CLOCK scales the clock,
 # FM_TEST_BLIND=FROM:TO blinds tree_cpu between those real seconds after
 # start, and FM_TEST_NOT_RUNNABLE hides runnable state so CPU alone decides.
@@ -376,6 +364,24 @@ def sampler_run(key, program, args, **extra):
     return result, time.monotonic() - begun
 
 
+# CPU alone keeps a bursty silent child alive: runnable state is hidden at
+# every sample, and a 40% duty cycle stays well above the floor.
+bursty_done = tmp / 'bursty.done'
+bursty, _ = sampler_run('busy.bursty', duty, ['0.4', '12', bursty_done], FM_DURATION_NO_PROGRESS_SECS='4', FM_DURATION_ABSOLUTE_SECS='60')
+assert bursty.returncode == 0 and 'no_progress' not in bursty.stderr and bursty_done.exists(), (bursty.returncode, bursty.stderr)
+
+for share, key, trips in (('0.05', 'duty.below-floor', True), ('0.2', 'duty.above-floor', False)):
+    done = tmp / f'{key}.done'
+    begun = time.monotonic()
+    duty_run = subprocess.run([sys.executable, str(tenfold_clock), str(helper), 'run', key, '--', sys.executable, '-c', duty, share, '15', str(done)],
+                              env=dict(env, FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='600'), cwd=workrepo, capture_output=True, text=True)
+    duty_elapsed = time.monotonic() - begun
+    if trips:
+        assert duty_run.returncode == 124 and 'no_progress' in duty_run.stderr and not done.exists(), (key, duty_run.returncode, duty_run.stderr)
+        assert duty_elapsed < 14, f'{key}: a child below the floor was not stopped: {duty_elapsed:.1f}s'
+    else:
+        assert duty_run.returncode == 0 and 'no_progress' not in duty_run.stderr and done.exists(), (key, duty_run.returncode, duty_run.stderr)
+
 # CPU spent while telemetry is blind counts. A silent child at about 40% of a
 # core is blinded from 2 to 12 real seconds under a 10x clock, a gap of 100
 # scaled seconds, longer than the 60 s window and the 60 s bound; when samples
@@ -386,12 +392,6 @@ gap, gap_elapsed = sampler_run('creep.blind-gap', gap_child, ['0.4', '18', blind
                                FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
 assert gap.returncode == 0 and 'no_progress' not in gap.stderr and blind_done.exists(), (gap.returncode, gap.stderr)
 assert 'cpu_telemetry_unavailable' in gap.stderr and float(blind_cpu.read_text()) >= 3, (gap.stderr, blind_cpu.read_text() if blind_cpu.exists() else None)
-
-# CPU alone keeps a bursty silent child alive: runnable state is hidden at
-# every sample, and a 40% duty cycle stays well above the floor.
-bursty_done = tmp / 'bursty.done'
-bursty, _ = sampler_run('busy.bursty', duty, ['0.4', '12', bursty_done], FM_DURATION_NO_PROGRESS_SECS='4', FM_DURATION_ABSOLUTE_SECS='60')
-assert bursty.returncode == 0 and 'no_progress' not in bursty.stderr and bursty_done.exists(), (bursty.returncode, bursty.stderr)
 
 # The snapshot's process table survives a ps that rejects ucomm (busybox), keeps
 # at most 200 rows, keeps the newest 100 snapshots, and goes to stderr when
