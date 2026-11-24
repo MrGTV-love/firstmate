@@ -1,0 +1,207 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+herdr session: fm-lab-e1claude-83478-11418
+head: 3b236b0e1c057f353a8249dac3ccecdf8bbc67c0
+base tree: /Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp/base (032c4871b)
+
+=================== PRECONDITIONS (live state per pane) ===================
+e1-unpinned: state=alive verdict=unmanaged pid=298 cmd=claude env=readable-no-pin
+e1-pinned: state=alive verdict=managed pid=505 cmd=claude env=pin=gen-e1-pinned
+e1-legacy: state=alive verdict=unknown pid=2101 cmd=claude env=readable-no-pin
+e1-unread: state=unreadable verdict=unknown pid=none cmd= env=-
+e1-shell: state=dead verdict=unknown pid=none cmd= env=-
+e1-mate: state=alive verdict=unmanaged pid=4296 cmd=node /Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp/standin/bin/teamclaude run -- env=readable-no-pin
+e1-mate stand-in launcher child: pid=4557 cmd=claude pgid= 4296 cwd=/Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp/wt-e1-mate
+GUARD: e1-unread is unreadable/unknown, not alive/unknown; its consumers are skipped
+
+=================== base: reboot sweep + control verbs on refused panes ===================
+--- [base] $ bin/fm-reboot-recover.sh recover (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-mate: live launch settings are unreadable; no lifecycle action taken
+    REBOOT_RECOVERY: e1-unpinned: live launch settings are unreadable; no lifecycle action taken
+    REBOOT_RECOVERY: e1-unread: agent state is unreadable; no lifecycle action taken
+--- [base repeat, unbounded] $ bin/fm-reboot-recover.sh recover (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-mate: live launch settings are unreadable; no lifecycle action taken
+    REBOOT_RECOVERY: e1-unpinned: live launch settings are unreadable; no lifecycle action taken
+    REBOOT_RECOVERY: e1-unread: agent state is unreadable; no lifecycle action taken
+--- [base] $ bin/fm-control.sh e1-unpinned interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-unpinned cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+--- [base] $ bin/fm-control.sh e1-unpinned exit (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-unpinned cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+--- [base] $ bin/fm-control.sh e1-mate interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-mate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+--- [base] $ bin/fm-control.sh e1-mate exit (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-mate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+[base] lab home + mate home file changes:
+    20a21
+    > 3472255582 1978 /Users/charlesabrooker/tmp/fm-lab.ftdnpa/state/guard-events.jsonl
+[base] refused panes (screen text + attributed pid): unchanged
+
+=================== head: reboot sweep + control verbs on refused panes ===================
+--- [head] $ bin/fm-reboot-recover.sh recover (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-mate: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-mate relaunch", or decide the lane by hand
+    REBOOT_RECOVERY: e1-unpinned: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-unpinned relaunch", or decide the lane by hand
+    REBOOT_RECOVERY: e1-unread: agent state is unreadable; no lifecycle action taken
+--- [head repeat, unbounded] $ bin/fm-reboot-recover.sh recover (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-mate: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-mate relaunch", or decide the lane by hand
+    REBOOT_RECOVERY: e1-unpinned: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-unpinned relaunch", or decide the lane by hand
+    REBOOT_RECOVERY: e1-unread: agent state is unreadable; no lifecycle action taken
+--- [head] $ bin/fm-control.sh e1-unpinned interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-unpinned cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-unpinned relaunch", or decide the lane by hand
+--- [head] $ bin/fm-control.sh e1-unpinned exit (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-unpinned cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-unpinned relaunch", or decide the lane by hand
+--- [head] $ bin/fm-control.sh e1-mate interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-mate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-mate relaunch", or decide the lane by hand
+--- [head] $ bin/fm-control.sh e1-mate exit (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-mate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-mate relaunch", or decide the lane by hand
+--- [head] $ bin/fm-control.sh e1-unpinned relaunch --note must not reach (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-unpinned cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-unpinned relaunch", or decide the lane by hand
+--- [head] $ bin/fm-control.sh e1-unpinned relaunch --recover-launch (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: launch recovery for e1-unpinned found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-unpinned relaunch", or decide the lane by hand
+--- [head] $ bin/fm-control.sh e1-mate relaunch --note must not reach (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-mate cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-mate relaunch", or decide the lane by hand
+--- [head] $ bin/fm-control.sh e1-mate relaunch --recover-launch (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: launch recovery for e1-mate found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-mate relaunch", or decide the lane by hand
+--- [head] $ bin/fm-control.sh e1-unpinned adopt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh e1-unpinned relaunch"; nothing was changed
+--- [head] $ bin/fm-control.sh e1-mate adopt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh e1-mate relaunch"; nothing was changed
+
+=================== head: secondmate restart on an unpinned wrapper-launched mate ===================
+--- [head] $ bin/fm-secondmate-restart.sh e1-mate (exit 3)
+    unreached: e1-mate: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-mate relaunch", or decide the lane by hand
+    summary: 0 of 1 restarted, 0 nudged, 1 unreached
+mate operational inbox: 0 file(s)
+pending-reply records in lab state: 0
+[head] lab home + mate home file changes:
+    21c21
+    < 3472255582 1978 /Users/charlesabrooker/tmp/fm-lab.ftdnpa/state/guard-events.jsonl
+    ---
+    > 1066964878 5816 /Users/charlesabrooker/tmp/fm-lab.ftdnpa/state/guard-events.jsonl
+[head] refused panes (screen text + attributed pid): unchanged
+
+=================== head: --one bounded sweep cursor + notice suppression ===================
+--- [head --one #1] $ bin/fm-reboot-recover.sh recover --one (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    cursor=e1-legacy
+--- [head --one #2] $ bin/fm-reboot-recover.sh recover --one (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-mate: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-mate relaunch", or decide the lane by hand
+    cursor=e1-mate
+--- [head --one #3] $ bin/fm-reboot-recover.sh recover --one (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    cursor=e1-pinned
+--- [head --one #4] $ bin/fm-reboot-recover.sh recover --one (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    cursor=e1-shell
+--- [head --one #5] $ bin/fm-reboot-recover.sh recover --one (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-unpinned: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh e1-unpinned relaunch", or decide the lane by hand
+    cursor=e1-unpinned
+--- [head --one #6] $ bin/fm-reboot-recover.sh recover --one (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-unread: agent state is unreadable; no lifecycle action taken
+    cursor=e1-unread
+--- [head --one #7] $ bin/fm-reboot-recover.sh recover --one (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    cursor=e1-legacy
+notices: e1-mate.reboot-notice e1-unpinned.reboot-notice e1-unread.reboot-notice 
+  e1-mate.reboot-notice: unmanaged fm-lab-e1claude-83478-11418:w6:p1 4296 Tue Nov 24 12:36:40 2026 
+  e1-unpinned.reboot-notice: unmanaged fm-lab-e1claude-83478-11418:w1:p1 298 Tue Nov 24 12:36:38 2026 
+  e1-unread.reboot-notice: state-unreadable fm-lab-e1claude-83478-11418:w4:p1 
+
+=================== base: --one bounded sweep for comparison ===================
+--- [base --one #1] $ bin/fm-reboot-recover.sh recover --one (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    cursor=e1-legacy
+--- [base --one #2] $ bin/fm-reboot-recover.sh recover --one (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-mate: live launch settings are unreadable; no lifecycle action taken
+    cursor=e1-mate
+--- [base --one #3] $ bin/fm-reboot-recover.sh recover --one (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    cursor=e1-pinned
+--- [base --one #4] $ bin/fm-reboot-recover.sh recover --one (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    cursor=e1-shell
+--- [base --one #5] $ bin/fm-reboot-recover.sh recover --one (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-unpinned: live launch settings are unreadable; no lifecycle action taken
+    cursor=e1-unpinned
+--- [base --one #6] $ bin/fm-reboot-recover.sh recover --one (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    REBOOT_RECOVERY: e1-unread: agent state is unreadable; no lifecycle action taken
+    cursor=e1-unread
+--- [base --one #7] $ bin/fm-reboot-recover.sh recover --one (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    cursor=e1-legacy
+  e1-mate.reboot-notice: launch-unreadable fm-lab-e1claude-83478-11418:w6:p1 4296 Tue Nov 24 12:36:40 2026 
+  e1-unpinned.reboot-notice: launch-unreadable fm-lab-e1claude-83478-11418:w1:p1 298 Tue Nov 24 12:36:38 2026 
+  e1-unread.reboot-notice: state-unreadable fm-lab-e1claude-83478-11418:w4:p1 
+
+=================== stopped control: shell-only pane, exit (base then head) ===================
+--- [base] $ bin/fm-control.sh e1-shell exit (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    already-stopped e1-shell harness=claude backend=herdr endpoint=fm-lab-e1claude-83478-11418:w5:p1 worktree=/Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp/wt-e1-shell
+--- [head] $ bin/fm-control.sh e1-shell exit (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    already-stopped e1-shell harness=claude backend=herdr endpoint=fm-lab-e1claude-83478-11418:w5:p1 worktree=/Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp/wt-e1-shell
+
+=================== positive control (k): pinned claude; adversarial: peer record names same worktree ===================
+verdict with peer record (base lib): managed
+--- [base with peer] $ bin/fm-control.sh e1-pinned interrupt (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    interrupt-delivered e1-pinned harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+verdict without peer (base lib): unknown
+--- [base] $ bin/fm-control.sh e1-pinned interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: no agent is running at task e1-pinned's recorded endpoint (state: dead); there is nothing to interrupt
+verdict with peer record (head lib): unknown
+--- [head with peer] $ bin/fm-control.sh e1-pinned interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: no agent is running at task e1-pinned's recorded endpoint (state: dead); there is nothing to interrupt
+verdict without peer (head lib): unknown
+--- [head] $ bin/fm-control.sh e1-pinned interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: no agent is running at task e1-pinned's recorded endpoint (state: dead); there is nothing to interrupt
+
+=================== legacy control (j): legacy record, exit on base, relaunch bare claude, exit on head ===================
+--- [base] $ bin/fm-control.sh e1-legacy exit (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    error: task e1-legacy's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+e1-legacy state after base exit: alive
+e1-legacy state after second bare claude: dead pid=
+--- [head] $ bin/fm-control.sh e1-legacy exit (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    already-stopped e1-legacy harness=claude backend=herdr endpoint=fm-lab-e1claude-83478-11418:w3:p1 worktree=/Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp/wt-e1-legacy
+e1-legacy state after head exit: dead
+--- [head] $ bin/fm-control.sh e1-pinned exit (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+    already-stopped e1-pinned harness=claude backend=herdr endpoint=fm-lab-e1claude-83478-11418:w2:p1 worktree=/Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp/wt-e1-pinned
+e1-pinned state after head exit: dead
+DONE
+
+=================== TEARDOWN ===================
+pid 298 gone
+pid 505 gone
+pid 2101 gone
+pid 4296 gone
+pid 4557 gone
+lab home removed: /Users/charlesabrooker/tmp/fm-lab.ftdnpa
+aux tree removed: /Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp

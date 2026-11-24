@@ -1,0 +1,23 @@
+charlesabrooker@Mac-Studio wt-e1-pinned % env -u FM_HOME FM_SPAWN_GEN=gen-e1-pinned claude
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /Users/charlesabrooker/tmp/fm-e1-aux.ie7rTp/wt-e1-pinned
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
+
+Claude Code didn't start because this folder isn't trusted.
+Run claude again and choose Yes, or run it in another folder.
+charlesabrooker@Mac-Studio wt-e1-pinned %

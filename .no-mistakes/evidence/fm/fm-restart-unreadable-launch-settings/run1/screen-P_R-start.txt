@@ -1,0 +1,3 @@
+/usr/bin/su nobody
+charlesabrooker@Mac-Studio wt-e1-unread % /usr/bin/su nobody
+Password:

@@ -1,0 +1,45 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.UybdMB
+herdr session: fm-lab-e1ctl-54856-21954
+head: 3b236b0e1c057f353a8249dac3ccecdf8bbc67c0
+base tree: /Users/charlesabrooker/tmp/fm-e1-aux.kVoj9t/base (032c4871b)
+pinned claude started by hand in its pane: state=dead verdict=unknown pid=
+
+=================== positive control (k) + adversarial (peer record names same worktree) via interrupt ===================
+Note: claude shows its folder-trust screen; Escape (the interrupt key) ends claude there, so a delivered interrupt shows as the pinned agent stopping.
+verdict with peer (head lib): contested
+--- [head with peer] $ bin/fm-control.sh e1-pinned interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UybdMB
+    error: task e1-pinned cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: another task record (e1-peer.meta) claims this pane, this home or worktree, or a worktree around the agent's working directory; something other than this task's own agent tree, directory or record shares its pane; Main inspects the pane and decides the lane by hand
+after head with-peer interrupt: state=alive pid=5754 (was 5754); screen unchanged
+--- [head with peer] $ bin/fm-control.sh e1-pinned exit (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UybdMB
+    error: task e1-pinned cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: another task record (e1-peer.meta) claims this pane, this home or worktree, or a worktree around the agent's working directory; something other than this task's own agent tree, directory or record shares its pane; Main inspects the pane and decides the lane by hand
+after head with-peer exit: state=alive pid=5754
+verdict without peer (head lib): managed
+--- [base no peer] $ bin/fm-control.sh e1-pinned interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UybdMB
+    error: task e1-pinned's agent is 'dead' after its interrupt key; an interrupt must leave the agent running
+after base interrupt: state=dead
+pinned claude started by hand in its pane: state=alive verdict=managed pid=58286
+--- [head no peer] $ bin/fm-control.sh e1-pinned interrupt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UybdMB
+    error: task e1-pinned's agent is 'dead' after its interrupt key; an interrupt must leave the agent running
+after head interrupt: state=dead
+
+=================== legacy control (j): record with no launch_proof line, live unpinned claude, exit on base and head ===================
+legacy verdict: unknown state=alive
+--- [base] $ bin/fm-control.sh e1-legacy exit (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UybdMB
+    error: task e1-legacy's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+legacy state after base exit: alive
+--- [head] $ bin/fm-control.sh e1-legacy exit (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UybdMB
+    error: task e1-legacy's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+legacy state after head exit: alive
+DONE
+
+=================== TEARDOWN ===================
+pid 6654 gone
+pid 58286 gone
+lab home removed: /Users/charlesabrooker/tmp/fm-lab.UybdMB
+aux tree removed: /Users/charlesabrooker/tmp/fm-e1-aux.kVoj9t
