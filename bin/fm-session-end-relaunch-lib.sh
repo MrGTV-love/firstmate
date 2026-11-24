@@ -259,7 +259,7 @@ fm_session_end_cause_fingerprint() {  # <state-dir> <id> <reason> [<obstruction-
 
 # The first drift report inside a control output: from its header to its closing line, before any later report.
 fm_session_end_first_drift_report() {  # <control-output>
-  printf '%s\n' "$1" | awk '/^relaunch drift report for /{ if (seen) exit; seen = 1 } seen { print } seen && /^  a relaunch is not a new scope declaration/ { exit }'
+  printf '%s\n' "$1" | awk '/^relaunch drift report for /{ if (seen) exit; seen = 1 } seen { print } seen && /^  a relaunch is not a new scope declaration|^relaunch drift report for .*could not be produced/ { exit }'
 }
 
 # Write the complete drift report from a control output to its stable durable path and print that path.
