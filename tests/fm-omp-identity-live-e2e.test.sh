@@ -23,7 +23,7 @@
 # Refresh docs/verification/runtime-backends.md "omp identity" with this command:
 #   bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh
 # The identity rule compares the live process with the one trusted installed identity
-# held in bin/fm-omp-identity.py (installed_identity(), FM_OMP_INSTALLED_ROOT for tests)
+# held in bin/fm-omp-identity.py (installed_identity(); no environment variable moves it)
 # and needs no launcher, but this guard must start a real Bun-shaped omp. It starts the
 # first omp on PATH; when that is a native binary it starts the file named by
 # FM_OMP_IDENTITY_LIVE_LAUNCHER, which only chooses what to start and never decides
@@ -31,11 +31,10 @@
 # not first. With no text launcher it FAILS, naming FM_OMP_IDENTITY_LIVE_LAUNCHER (and
 # FM_OMP_IDENTITY_LIVE=0 for an explicit opt-out, which is reported as an opt-out and
 # never as a pass), because a guard that could pass having checked nothing proves nothing.
-# It also fails when FM_OMP_INSTALLED_ROOT is set, because an override makes it compare a
-# stand-in with itself and it could never see drift in the real install, and no ambient
-# variable lifts that refusal: tests/fm-omp-identity.test.sh exercises this script's logic
-# on a stand-in tree only through a scratch COPY from which the marked refusal block is
-# cut. It fails when the installed CLI's dispatch tables cannot be read next to the entry
+# No environment variable can make it compare a stand-in with itself, because production
+# reads none: tests/fm-omp-identity.test.sh exercises this script's logic on a stand-in
+# tree only through a scratch COPY run beside the test-only root shim of tests/lib.sh.
+# It fails when the installed CLI's dispatch tables cannot be read next to the entry
 # script, because the role port is then not verified. An absent omp is reported explicitly
 # (fm_live_gate), and a run that checked nothing fails.
 set -u
@@ -66,11 +65,6 @@ if [ "$(uname -s)" != Darwin ]; then
   fail "the omp identity rule reads libproc facts and runs on macOS; this host is $(uname -s), so nothing was checked"
 fi
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
-# BEGIN override-refusal
-if [ -n "${FM_OMP_INSTALLED_ROOT:-}" ]; then
-  fail "FM_OMP_INSTALLED_ROOT is set; this guard checks the real installed identity and cannot detect drift against an override. Unset it"
-fi
-# END override-refusal
 OMP=$(command -v omp)
 is_text_launcher() { [ -f "$1" ] && [ "$(head -c 2 "$1" 2>/dev/null)" = '#!' ]; }
 START=

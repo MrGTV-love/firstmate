@@ -11,6 +11,12 @@
 # shellcheck source=tests/fm-control-relaunch-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-control-relaunch-helpers.sh"
 
+# The omp identity rule holds one fixed installed root and no environment variable moves it, so the Bun-runtime
+# cases below reach their scratch installed tree through the test-only python3 of tests/lib.sh (FM_TEST_OMP_ROOT).
+fm_test_omp_root_shim "$TMP_ROOT/omp-root-shim" || fail "could not build the test-only omp root shim"
+# shellcheck disable=SC2031 # PATH is set at file scope here; later subshell edits are theirs.
+PATH="$TMP_ROOT/omp-root-shim:$PATH"; export PATH
+
 test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter() {
   local dir home out rc
   dir=$(new_case sm sm1)
@@ -1993,8 +1999,9 @@ BUN_PIDS=()
 bun_tree() { # one scratch installation per run
   [ -z "$BUN_TREE" ] || return 0
   BUN_TREE="$(cd "$TMP_ROOT" && pwd -P)/bun-tree" # canonical: the rule compares raw argument bytes with a canonical path
-  # The one trusted installed identity (bin/fm-omp-identity.py installed_identity) is this scratch tree.
-  export FM_OMP_INSTALLED_ROOT="$BUN_TREE"
+  # The one trusted installed identity (bin/fm-omp-identity.py installed_identity) is this scratch tree,
+  # reached only through the test-only root shim above.
+  export FM_TEST_OMP_ROOT="$BUN_TREE"
   local bin="$BUN_TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin"
   mkdir -p "$bin" "$BUN_TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src"
   printf '#include <unistd.h>\nint main(void){alarm(900);for(;;)pause();}\n' > "$BUN_TREE/stub.c"

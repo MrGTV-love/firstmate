@@ -3,8 +3,9 @@
 # installed omp can run as its Bun runtime on an entry script, so its process is
 # named bun and only its executable path, script and role identify it.
 # The one trusted installed identity is held in bin/fm-omp-identity.py
-# (installed_identity(); FM_OMP_INSTALLED_ROOT is the test override), and this suite
-# points it at the scratch tree $TREE.
+# (installed_identity()) and no environment variable moves it; this suite points the rule
+# at the scratch tree $TREE through the test-only runner of tests/lib.sh fm_test_omp_root_shim
+# (FM_TEST_OMP_ROOT, read only by that runner).
 # Real processes only: a compiled stand-in "bun" under a scratch runtime root, a
 # launcher that execs it as the host's does, and pseudo-terminal or pipe standard
 # input. No harness runs and no model is called. macOS only (libproc facts).
@@ -71,7 +72,10 @@ EOF
   chmod +x "$root/omp"
 }
 TREE="$TMP/tree"; build_tree "$TREE"
-export FM_OMP_INSTALLED_ROOT="$TREE"
+ORIG_PATH=$PATH # without the root shim: what production sees
+fm_test_omp_root_shim "$TMP/root-shim" || fail "could not build the test-only root shim"
+PATH="$TMP/root-shim:$PATH"; export PATH
+export FM_TEST_OMP_ROOT="$TREE"
 BUN="$TREE/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun"
 SCRIPT="$TREE/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts"
 REAL_BUN=$(python3 -I -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$BUN")
@@ -266,7 +270,7 @@ test_identity_comes_from_the_process_tree() {
   tree_launch "$t/good" --no-title
   assert_tree 1 0 "$SPAWNED" "a complete omp-shaped tree at another path is refused as the interactive agent but may still own a record"
   # the same foreign tree is recognized when it is the installed identity: the identity is the only difference
-  FM_OMP_INSTALLED_ROOT="$t/good" assert_tree 0 0 "$SPAWNED" "the same tree is the interactive agent once it is the installed identity"
+  FM_TEST_OMP_ROOT="$t/good" assert_tree 0 0 "$SPAWNED" "the same tree is the interactive agent once it is the installed identity"
   # a Bun on another script of the installed tree, and on another script of a foreign tree
   spawn tty "$BUN" "$BUN" "$TREE/$script_pkg/src/main.ts" --no-title
   assert_tree 1 1 "$SPAWNED" "a bun on src/main.ts of the installed tree is another program"
@@ -274,19 +278,19 @@ test_identity_comes_from_the_process_tree() {
   assert_tree 1 1 "$SPAWNED" "a bun on src/main.ts of a complete foreign tree is another program"
   # the installed identity cannot be derived: nothing is admitted and a live process may still own a record
   tree_launch "$TREE" --no-title
-  FM_OMP_INSTALLED_ROOT="$t/no-such-root" assert_tree 2 0 "$SPAWNED" "no installed tree: unresolved, never interactive"
-  FM_OMP_INSTALLED_ROOT=relative/root assert_tree 2 0 "$SPAWNED" "a relative installed root is no identity"
+  FM_TEST_OMP_ROOT="$t/no-such-root" assert_tree 2 0 "$SPAWNED" "no installed tree: unresolved, never interactive"
+  FM_TEST_OMP_ROOT=relative/root assert_tree 2 0 "$SPAWNED" "a relative installed root is no identity"
   # a trusted root that is itself a link must not re-anchor the identity on whatever it points at
   build_tree "$t/real-root"
   ln -s "$t/real-root" "$t/root-link"
   tree_launch "$t/real-root" --no-title
-  FM_OMP_INSTALLED_ROOT="$t/root-link" assert_tree 2 0 "$SPAWNED" "a redirected installed root is no identity, whatever complete tree it points at"
-  FM_OMP_INSTALLED_ROOT="$t/real-root" assert_tree 0 0 "$SPAWNED" "the same tree named directly is the installed identity (the legitimate pair)"
+  FM_TEST_OMP_ROOT="$t/root-link" assert_tree 2 0 "$SPAWNED" "a redirected installed root is no identity, whatever complete tree it points at"
+  FM_TEST_OMP_ROOT="$t/real-root" assert_tree 0 0 "$SPAWNED" "the same tree named directly is the installed identity (the legitimate pair)"
   build_tree "$t/linked"; build_tree "$t/away"
   rm "$t/linked/$script_pkg/src/cli.ts"
   ln -s "$t/away/$script_pkg/src/cli.ts" "$t/linked/$script_pkg/src/cli.ts"
   tree_launch "$t/linked" --no-title
-  FM_OMP_INSTALLED_ROOT="$t/linked" assert_tree 2 0 "$SPAWNED" "an installed script that links out of its root is no identity"
+  FM_TEST_OMP_ROOT="$t/linked" assert_tree 2 0 "$SPAWNED" "an installed script that links out of its root is no identity"
 
   # What the files around a process say NOW refuses adoption but is never proof the process is not an omp
   # session writer: a running Bun keeps what it loaded after those files change.
@@ -315,7 +319,7 @@ test_identity_comes_from_the_process_tree() {
   # D1: a live writer from a previously complete tree, whose files change only after it started
   build_tree "$t/old"
   tree_launch "$t/old" --no-title; old_pid=$SPAWNED
-  FM_OMP_INSTALLED_ROOT="$t/old" assert_tree 0 0 "$old_pid" "the control: the old tree's process, while its tree is complete, is the installed agent"
+  FM_TEST_OMP_ROOT="$t/old" assert_tree 0 0 "$old_pid" "the control: the old tree's process, while its tree is complete, is the installed agent"
   assert_tree 1 0 "$old_pid" "the control: the old tree's process is not the installed identity, and may own a record"
   rm "$t/old/$script_pkg/src/cli-commands.ts"
   assert_tree 1 0 "$old_pid" "a live writer whose tree lost cli-commands.ts after it started may still own a record"
@@ -357,7 +361,7 @@ test_captured_facts_replay_without_the_tree() {
   local t="$TMP/replay" rc
   mkdir -p "$t"
   build_tree "$t/tree"
-  export FM_OMP_INSTALLED_ROOT="$t/tree"
+  export FM_TEST_OMP_ROOT="$t/tree"
   tree_launch "$t/tree" --no-title
   python3 -I "$IDENT" facts "$SPAWNED" > "$t/good.json" || fail "facts must be capturable"
   tree_launch "$t/tree" __omp_worker_daemon_broker
@@ -371,7 +375,7 @@ test_captured_facts_replay_without_the_tree() {
   python3 -I -c 'import json,sys;f=json.load(open(sys.argv[1]));f.pop("exe");json.dump(f,open(sys.argv[2],"w"))' "$t/good.json" "$t/no-exe.json"
   python3 -I -c 'import json,sys;f=json.load(open(sys.argv[1]));f.pop("evidence");json.dump(f,open(sys.argv[2],"w"))' "$t/good.json" "$t/no-evidence.json"
   rm -rf "$t/tree"
-  export FM_OMP_INSTALLED_ROOT="$TREE"
+  export FM_TEST_OMP_ROOT="$TREE"
   replay() { # <file> <interactive-exit> <writer-exit> <message>
     rc=0; python3 -I "$IDENT" interactive --facts "$t/$1" >/dev/null 2>&1 || rc=$?
     [ "$rc" -eq "$2" ] || fail "replay: $4: expected interactive exit $2, got $rc"
@@ -487,7 +491,7 @@ test_fail_closed_runs_recover_when_the_evidence_returns() {
   local t="$TMP/fail" pid helper foreign rc=0 script_pkg=src/node_modules/@oh-my-pi/pi-coding-agent
   mkdir -p "$t"
   build_tree "$t/tree"
-  export FM_OMP_INSTALLED_ROOT="$t/tree"
+  export FM_TEST_OMP_ROOT="$t/tree"
   spawn tty /bin/sh /bin/sh "$t/tree/omp" --no-title; pid=$SPAWNED
   spawn tty /bin/sh /bin/sh "$t/tree/omp" __omp_worker_daemon_broker; helper=$SPAWNED
   cp "$BUN" "$t/foreign-runtime"
@@ -508,7 +512,7 @@ test_fail_closed_runs_recover_when_the_evidence_returns() {
   assert_verdict 0 "$SPAWNED" "a fresh launch from the restored tree is admitted"
   assert_verdict 1 "$helper" "a helper stays refused once the evidence returns"
   assert_verdict 1 "$foreign" "a foreign process stays refused once the evidence returns"
-  export FM_OMP_INSTALLED_ROOT="$TREE"
+  export FM_TEST_OMP_ROOT="$TREE"
   pass "fail closed: unreadable evidence admits nothing; a process that started before the tree changed stays unresolved, and a fresh launch is admitted once the evidence returns"
 }
 
@@ -586,6 +590,8 @@ test_a_helper_failure_is_never_proof_of_no_writer() {
 import importlib.util, os, sys
 spec = importlib.util.spec_from_file_location("oi", sys.argv[1])
 oi = importlib.util.module_from_spec(spec); spec.loader.exec_module(oi)
+_installed = oi.installed_identity
+oi.installed_identity = lambda: _installed(os.environ["FM_TEST_OMP_ROOT"])  # the test-only root seam
 kind, args = sys.argv[2], sys.argv[3:]
 def boom(*_args, **_kwargs):
     raise RuntimeError("simulated crash")
@@ -681,39 +687,52 @@ valueless = "".join('\t"%s",\n' % n for n in sorted(oi.VALUELESS_FLAGS))
 open(src + "/cli/flag-tables.ts", "w").write("export const STRING_SETTERS = {\n" + strings + "};\nexport const OPTIONAL_FLAGS = new Set([]);\nexport const VALUELESS_FLAGS = new Set([\n" + valueless + "]);\n")
 PY
 }
-make_guard_copy() { # <dest>: the live guard with its override refusal block cut, beside the real helpers
+make_guard_copy() { # <dest>: a scratch copy of the live guard beside the real helpers, so its logic runs on a stand-in tree
   mkdir -p "$1/tests"
   cp -R "$ROOT/bin" "$1/bin"
   cp "$ROOT/tests/lib.sh" "$1/tests/"
-  sed '/^# BEGIN override-refusal$/,/^# END override-refusal$/d' "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" > "$1/tests/fm-omp-identity-live-e2e.test.sh"
-  grep -q 'Unset it' "$1/tests/fm-omp-identity-live-e2e.test.sh" && fail "the scratch guard copy must have its override refusal cut"
+  cp "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" "$1/tests/fm-omp-identity-live-e2e.test.sh"
   return 0
 }
+test_production_ignores_fm_omp_installed_root() {
+  # An environment variable that moves the trusted root would let any caller point the
+  # identity at another tree. Production reads none: the stand-in tree is the installed
+  # identity only through the test-only root shim (the control), never through the old variable.
+  local out rc facts_root
+  tree_launch "$TREE" --no-title
+  FM_TEST_OMP_ROOT="$TREE" assert_tree 0 0 "$SPAWNED" "control: through the test-only root shim the stand-in tree is the installed identity"
+  out=$(env -u FM_TEST_OMP_ROOT FM_OMP_INSTALLED_ROOT="$TREE" PATH="$ORIG_PATH" python3 -I "$IDENT" interactive "$SPAWNED" 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "FM_OMP_INSTALLED_ROOT in the environment must not make a stand-in tree the installed identity: $out"
+  facts_root=$(env -u FM_TEST_OMP_ROOT FM_OMP_INSTALLED_ROOT="$TREE" PATH="$ORIG_PATH" python3 -I "$IDENT" facts "$SPAWNED" \
+    | python3 -I -c 'import json,sys;i=json.load(sys.stdin).get("installed");print(i["root"] if i else "none")') || fail "facts must still be readable"
+  [ "$facts_root" != "$TREE" ] || fail "the installed root in the facts must not follow FM_OMP_INSTALLED_ROOT"
+  pass "production ignores FM_OMP_INSTALLED_ROOT: the variable neither admits a stand-in nor moves the reported installed root"
+}
 test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable() {
-  local base out mutant copy notables
+  local base realbase out mutant copy notables
   base=$(fm_test_base_path_sans "$PATH" omp)
+  realbase=$(fm_test_base_path_sans "$ORIG_PATH" omp) # no root shim: what an operator's guard run sees
   write_dispatch_tables "$TREE"
-  # The real guard: no ambient variable lets it certify a stand-in.
+  # The real guard, with no root shim and the old override variable set: production ignores
+  # it, so a stand-in launcher is compared with the real installed identity and never certified.
   guard() { # <PATH> <env assignments...>
     local path=$1
     shift
-    env -u FM_LIVE FM_OMP_IDENTITY_LIVE=1 "$@" PATH="$path" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
+    env -u FM_LIVE -u FM_TEST_OMP_ROOT FM_OMP_IDENTITY_LIVE=1 FM_OMP_INSTALLED_ROOT="$TREE" "$@" PATH="$path" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1
   }
-  if out=$(guard "$TREE:$NATIVE_BIN:$base"); then
-    fail "the live guard must refuse to run under an installed-root override: $out"
+  if out=$(guard "$TREE:$NATIVE_BIN:$realbase"); then
+    fail "the real live guard must not certify a stand-in whatever FM_OMP_INSTALLED_ROOT says: $out"
   fi
-  assert_contains "$out" "FM_OMP_INSTALLED_ROOT" "the refusal names the override"
-  assert_not_contains "$out" "checked " "a refused run claims no check"
-  if out=$(guard "$TREE:$NATIVE_BIN:$base" FM_OMP_IDENTITY_LIVE_STANDIN=1); then
-    fail "an ambient stand-in marker must not lift the live guard's override refusal: $out"
+  assert_not_contains "$out" "checked " "a run that certified nothing claims no check"
+  if out=$(guard "$TREE:$NATIVE_BIN:$realbase" FM_OMP_IDENTITY_LIVE_STANDIN=1); then
+    fail "an ambient stand-in marker must not make the live guard certify a stand-in: $out"
   fi
-  assert_contains "$out" "FM_OMP_INSTALLED_ROOT" "the refusal still names the override with a stand-in marker set"
   assert_not_contains "$out" "checked " "a run under a stand-in marker claims no check"
   out=$(env -u FM_LIVE FM_OMP_IDENTITY_LIVE=0 PATH="$TREE:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1) || fail "an explicit opt-out must end cleanly: $out"
   assert_contains "$out" "skip: live: disabled by FM_OMP_IDENTITY_LIVE=0" "an opt-out is reported as an opt-out"
   assert_not_contains "$out" "checked " "an opt-out claims no check"
   assert_not_contains "$out" "ok - " "an opt-out is never a pass"
-  if out=$(env -u FM_LIVE -u FM_OMP_INSTALLED_ROOT FM_OMP_IDENTITY_LIVE=1 PATH="$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+  if out=$(env -u FM_LIVE -u FM_TEST_OMP_ROOT FM_OMP_IDENTITY_LIVE=1 PATH="$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
     fail "a native omp alone cannot exercise the Bun rule and must fail, never skip or pass: $out"
   fi
   assert_contains "$out" "FM_OMP_IDENTITY_LIVE_LAUNCHER" "the failure names the variable that supplies the Bun launcher"
@@ -735,14 +754,14 @@ test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable() {
   out=$(copy_guard "$NATIVE_BIN:$base" FM_OMP_IDENTITY_LIVE_LAUNCHER="$TREE/omp") || fail "the named launcher must run the live guard to its end: $out"
   assert_contains "$out" "checked " "the guard exercised the Bun rule on the named launcher"
   # The stand-in on a different installed identity must not be recognized, or the binding is vacuous.
-  if out=$(copy_guard "$TREE:$NATIVE_BIN:$base" FM_OMP_INSTALLED_ROOT="$TMP/no-such-install"); then
+  if out=$(copy_guard "$TREE:$NATIVE_BIN:$base" FM_TEST_OMP_ROOT="$TMP/no-such-install"); then
     fail "a stand-in that is not the installed identity must fail the live guard: $out"
   fi
   assert_contains "$out" "OMP IDENTITY DRIFT" "the guard reports the unrecognized process by name"
   # Dispatch tables that cannot be read leave the role port unchecked: that fails, it does not pass with fewer checks.
   notables="$TMP/no-tables-tree"
   build_tree "$notables"
-  if out=$(copy_guard "$notables:$NATIVE_BIN:$base" FM_OMP_INSTALLED_ROOT="$notables"); then
+  if out=$(copy_guard "$notables:$NATIVE_BIN:$base" FM_TEST_OMP_ROOT="$notables"); then
     fail "a missing dispatch source must fail the live guard, not pass with fewer checks: $out"
   fi
   assert_contains "$out" "dispatch tables cannot be read" "the failure names the missing dispatch evidence"
@@ -791,11 +810,11 @@ test_a_writer_whose_script_link_is_retargeted_after_launch_stays_a_writer() {
   ps() { case "$*" in '-p '*' -o comm=') python3 -I "$PROCINFO" comm "$2" ;; '-p '*' -o args=') python3 -I "$PROCINFO" args "$2" ;; *) return 1 ;; esac; }
   build_tree "$t/a"
   tree_launch "$t/a" --no-title; a=$SPAWNED
-  FM_OMP_INSTALLED_ROOT="$t/a" assert_tree 0 0 "$a" "control: before the retarget the process is the installed agent"
+  FM_TEST_OMP_ROOT="$t/a" assert_tree 0 0 "$a" "control: before the retarget the process is the installed agent"
   mv "$t/a/$n1_script_pkg/src/cli.ts" "$t/a/$n1_script_pkg/src/cli.ts.orig"
   ln -s main.ts "$t/a/$n1_script_pkg/src/cli.ts"
   assert_tree 1 0 "$a" "a script link retargeted after launch is never proof the process is another program"
-  FM_OMP_INSTALLED_ROOT="$t/a" assert_tree 1 0 "$a" "a script link retargeted after launch is not admitted even where its tree is the installed one"
+  FM_TEST_OMP_ROOT="$t/a" assert_tree 1 0 "$a" "a script link retargeted after launch is not admitted even where its tree is the installed one"
   fm_launch_proof_pid_may_own_record "$a" || fail "a live writer whose script link was retargeted after launch may still own its record"
   # the genuinely unrelated control: the raw arguments name no omp entry at all
   mkdir -p "$t/other/bin"; cp "$BUN" "$t/other/bin/bun"
@@ -827,7 +846,7 @@ test_a_directory_swapped_into_the_installed_path_after_launch_is_not_admitted() 
   tree_launch "$t/c" --no-title; c=$SPAWNED
   rm "$t/c/$n1_script_pkg/src"
   mv "$t/c/real-src" "$t/c/$n1_script_pkg/src"
-  FM_OMP_INSTALLED_ROOT="$t/c" assert_tree 2 0 "$c" "a directory swapped into the installed path after launch leaves the process unresolved, never admitted"
+  FM_TEST_OMP_ROOT="$t/c" assert_tree 2 0 "$c" "a directory swapped into the installed path after launch leaves the process unresolved, never admitted"
   pass "N1 C: a directory swapped into the installed path after launch is not admitted"
 }
 test_a_write_into_the_installed_path_after_launch_fails_closed() {
@@ -835,9 +854,9 @@ test_a_write_into_the_installed_path_after_launch_fails_closed() {
   mkdir -p "$t"
   build_tree "$t/d"
   tree_launch "$t/d" --no-title; d=$SPAWNED
-  FM_OMP_INSTALLED_ROOT="$t/d" assert_tree 0 0 "$d" "control: an untouched installed tree admits"
+  FM_TEST_OMP_ROOT="$t/d" assert_tree 0 0 "$d" "control: an untouched installed tree admits"
   : > "$t/d/$n1_script_pkg/src/extra.txt"
-  FM_OMP_INSTALLED_ROOT="$t/d" assert_tree 2 0 "$d" "a write into a directory of the installed path after launch fails closed (named policy)"
+  FM_TEST_OMP_ROOT="$t/d" assert_tree 2 0 "$d" "a write into a directory of the installed path after launch fails closed (named policy)"
   pass "N1 D: an unrelated write into a directory of the installed path after launch fails closed (named policy)"
 }
 
@@ -899,6 +918,7 @@ test_record_writer_check_fails_open_and_adoption_target_fails_closed
 test_verdict_does_not_depend_on_the_omp_on_path
 test_a_helper_failure_is_never_proof_of_no_writer
 test_descendant_walk_never_reports_a_live_bun_agent_as_agent_free
+test_production_ignores_fm_omp_installed_root
 test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable
 test_a_writer_whose_script_link_is_retargeted_after_launch_stays_a_writer
 test_a_foreign_process_whose_link_is_retargeted_to_the_installed_entry_stays_refused

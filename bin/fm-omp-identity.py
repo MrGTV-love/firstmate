@@ -32,8 +32,10 @@ either way, and the installed launcher always passes the canonical entry path.
 Admission (`interactive`) needs every filesystem input tied to launch time, and
 otherwise fails closed. One trusted installed identity is held in one place
 (INSTALLED_RUNTIME and INSTALLED_SCRIPT below, resolved by installed_identity(); the
-test override is the single variable FM_OMP_INSTALLED_ROOT, which names a replacement
-root with the same layout). It is its own canonical path: the root must be a real
+root is always the fixed one under the account's home, and no environment variable or
+argument can move it). The tests reach a replacement root only through the `root`
+parameter of installed_identity(), which tests/lib.sh fm_test_omp_root_shim passes from
+its own runner; nothing in bin/ passes it. It is its own canonical path: the root must be a real
 directory (a link there redefines nothing) and neither the runtime nor the script may
 be reached through a link. It never consults a launcher or PATH, so an `omp update`
 that replaces a launcher cannot change the verdict on a process that is already
@@ -110,7 +112,6 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROC_INFO = os.path.join(HERE, "fm-proc-info.py")
 
-INSTALLED_ROOT_VARIABLE = "FM_OMP_INSTALLED_ROOT"
 INSTALLED_ROOT = os.path.join(".local", "share", "omp-promax-fix")  # relative to the user's home
 INSTALLED_RUNTIME = os.path.join("runtime", "node_modules", "@oven", "bun-darwin-aarch64", "bin", "bun")
 INSTALLED_SCRIPT = os.path.join("src", "node_modules", "@oh-my-pi", "pi-coding-agent", "src", "cli.ts")
@@ -439,20 +440,20 @@ def _package_name(directory):
     return name if isinstance(name, str) else ""
 
 
-def installed_identity():
+def installed_identity(root=None):
     """The one trusted installed identity, or None.
 
     {"root", "runtime", "script"}, each a canonical path: the identity is its own
     canonical form, so no link inside it can be retargeted after a process starts and
-    change which file the identity names. The root is the override FM_OMP_INSTALLED_ROOT
-    when set, else the installed omp's root under the account's home directory (the passwd
-    entry, never $HOME, so the environment holds no second override). The root is anchored
+    change which file the identity names. The root is the installed omp's root under the
+    account's home directory (the passwd entry, never $HOME, and no environment variable,
+    so the environment holds no override). The `root` parameter is the test-only seam: no
+    code under bin/ passes it, and production reads it from nowhere. The root is anchored
     by resolving its PARENT and keeping its own final name; a root that is itself a link is
     not the trusted root. None when it cannot be derived: no home, a missing or linked
     root, a missing runtime or script, or a runtime or script reached through any link.
     """
-    root = os.environ.get(INSTALLED_ROOT_VARIABLE)
-    if not root:
+    if root is None:
         try:
             home = pwd.getpwuid(os.getuid()).pw_dir
         except (KeyError, OSError):

@@ -1188,7 +1188,7 @@ The guard submits no prompt and spends no tokens, so it runs by default wherever
 ## omp identity as its Bun runtime
 
 The installed omp can be a text launcher that execs the Bun runtime on an entry script, so the live process is named `bun` and only its executable path, script and role identify it.
-[`bin/fm-omp-identity.py`](../../bin/fm-omp-identity.py) owns that identity rule for [`bin/fm-launch-proof-lib.sh`](../../bin/fm-launch-proof-lib.sh) and the Herdr descendant walk, and it compares the live process with one installed identity held in one place (`installed_identity()`; `FM_OMP_INSTALLED_ROOT` overrides the root for tests), never reading a launcher or `PATH`.
+[`bin/fm-omp-identity.py`](../../bin/fm-omp-identity.py) owns that identity rule for [`bin/fm-launch-proof-lib.sh`](../../bin/fm-launch-proof-lib.sh) and the Herdr descendant walk, and it compares the live process with one installed identity held in one place (`installed_identity()`; no environment variable moves the root, and tests reach a scratch root only through `tests/lib.sh` `fm_test_omp_root_shim`), never reading a launcher or `PATH`.
 Verified 2026-11-04 on macOS arm64 (Darwin 27.2.0), read-only, against the omp 18.15.0 tree at `~/.local/share/omp-promax-fix`:
 - The runtime package is `@oven/bun-darwin-aarch64` with `bin/bun`, and the script package is `@oh-my-pi/pi-coding-agent` with `src/cli.ts`, `src/cli-commands.ts` and `src/main.ts`.
 - The installed CLI's subcommand names, string-valued flags and value-less flags in `cli-commands.ts` and `cli/flag-tables.ts` equal the copy the role rule ports (compared by the same extraction `tests/fm-omp-identity-live-e2e.test.sh` runs: all three sets equal).
@@ -1197,7 +1197,7 @@ Verified 2026-11-04 on macOS arm64 (Darwin 27.2.0), read-only, against the omp 1
 
 When the first `omp` is native, the guard starts a text launcher from later on `PATH` or the file named by `FM_OMP_IDENTITY_LIVE_LAUNCHER`, which only chooses what to start and never decides identity; it names that launcher in its output.
 With no text launcher it fails, naming `FM_OMP_IDENTITY_LIVE_LAUNCHER`, because a guard that checked nothing proves nothing; `FM_OMP_IDENTITY_LIVE=0` opts out explicitly.
-It also fails when `FM_OMP_INSTALLED_ROOT` is set, because an override would compare a stand-in with itself and hide drift in the real install.
+No environment variable can make it compare a stand-in with itself, because production reads none.
 
 The live result against the installed omp is not recorded here yet.
 The guard starts the installed omp bare on a pseudo-terminal under `env -i` with a scratch `HOME`, submits no prompt, and runs the identity rule and the descendant walk on it.
