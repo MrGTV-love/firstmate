@@ -331,7 +331,8 @@ def sampling_valid(case, seen, label):
     case.measure(**{'sampler_gap_p99_max_ms[%s]' % label: '%d/%d' % (seen['gap_p99_ms'], seen['gap_max_ms'])})
     case.check(seen['peak_total'] > 0, '%s: the sampler never saw a worker, so a cap that held proves nothing' % label)
     # The contract (H3) asks for a sample at least every 50 ms, so a sampler that ever skipped longer is declared invalid: it is reported
-    # as invalid sampling, not as a product failure. Every run so far measured a maximum gap of 30 to 31 ms on a loaded host.
+    # as invalid sampling, not as a product failure. A healthy sampler has crossed this limit on a loaded host, so H3abc and the
+    # soak judge the harm instead (sampler_saw_every_worker).
     case.check(seen['gap_p99_ms'] <= 50 and seen['gap_max_ms'] <= 50,
                '%s: the sampler skipped too long (p99 gap %d ms, max gap %d ms): it may have missed a short-lived worker' % (label, seen['gap_p99_ms'], seen['gap_max_ms']))
 
