@@ -543,8 +543,8 @@
 #   fm_slot_apply_move), which git itself refuses unless the copy's HEAD is an ancestor of
 #   the tip, so no commit is dropped and no tracked or untracked change is overwritten.
 #   A home whose treehouse base_branch is fm-pool-base also has that branch moved to the fetched origin default,
-#   under the project lock and before any copy is acquired; a case that cannot fast-forward refuses with no copy
-#   taken (bin/fm-pool-base-lib.sh).
+#   under the project lock and before any copy is acquired, after the capacity and memory deferrals (exit 75) so a
+#   deferred spawn moves no ref; a case that cannot fast-forward refuses with no copy taken (bin/fm-pool-base-lib.sh).
 #   It is preceded by a read-only proof (fm_slot_prove_idle) that writes nothing to the
 #   copy, no ref and no file: one snapshot must show the tree clean, no process with its
 #   working directory in the copy (no age exemption; only the spawn's own pane or `treehouse`
@@ -4659,12 +4659,6 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
     exit 1
   fi
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
-  # A home whose treehouse base_branch is fm-pool-base has that branch moved to the origin default, under this lock
-  # and before any copy is acquired, so the pool cuts the copy at the origin default whatever starting branch the task
-  # names; a refusal leaves every ref unchanged and acquires no copy (bin/fm-pool-base-lib.sh).
-  if [ "$BACKEND" != orca ]; then
-    fm_pool_base_advance "$PROJ_ABS" "$SPAWN_POOL_DEFAULT_SHA" "$SPAWN_POOL_DEFAULT_ERROR" || exit 1
-  fi
   spawn_validate_local_base || exit 1
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
@@ -4693,6 +4687,13 @@ if [ "$RELAUNCH" -eq 0 ] && { [ "$KIND" != secondmate ] || [ ! -e "$STATE/$ID.me
     echo "deferred: host memory admission refused new task $ID (exit $memory_rc); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl" >&2
     exit 75
   fi
+fi
+# A home whose treehouse base_branch is fm-pool-base has that branch moved to the origin default, under the project
+# lock and before any copy is acquired, so the pool cuts the copy at the origin default whatever starting branch the
+# task names. It runs after the capacity and memory deferrals above, so a retryable exit 75 stays first and a deferred
+# spawn changes no ref; a refusal leaves every ref unchanged and acquires no copy (bin/fm-pool-base-lib.sh).
+if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+  fm_pool_base_advance "$PROJ_ABS" "$SPAWN_POOL_DEFAULT_SHA" "$SPAWN_POOL_DEFAULT_ERROR" || exit 1
 fi
 if [ "$RELAUNCH_RELOCATING" = 1 ]; then
   SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {

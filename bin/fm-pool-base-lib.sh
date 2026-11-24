@@ -15,12 +15,12 @@
 # The treehouse config decides whether the step applies (fm_pool_base_config_names): treehouse.toml in the main
 # checkout, else the user config, read as bin/fm-teardown.sh teardown_return_base_branch reads it. A config that does not
 # name fm-pool-base, or no config file at all, makes the step do nothing and print nothing. Where it applies:
-#   - an absent fm-pool-base is created at the origin default;
 #   - an fm-pool-base that is an ancestor of the origin default is moved to it, by `git update-ref` with the old value
 #     as the compare-and-set check;
 #   - an fm-pool-base already at the origin default is left alone.
 # Every other case is refused, names its reason, the fm-pool-base commit (or absent) and the origin default commit (or
 # unavailable), returns 1 and leaves every ref unchanged:
+#   absent             fm-pool-base does not exist; the repository's owner creates it, this library never does;
 #   config_unreadable  the treehouse config cannot be read or parsed, so it is unknown whether the pool uses fm-pool-base;
 #   origin_missing     <repo> has no origin remote;
 #   origin_unreadable  the origin default could not be fetched or is not a commit;
@@ -76,7 +76,7 @@ fm_pool_base_refuse() { # <reason> <detail>
 }
 
 fm_pool_base_advance() { # <repo> <origin-default-sha-or-empty> [<why-the-sha-is-empty>]
-  local repo=$1 tip=${2:-} why=${3:-} ref=refs/heads/fm-pool-base old zero resolved rc holders holder bad
+  local repo=$1 tip=${2:-} why=${3:-} ref=refs/heads/fm-pool-base old resolved rc holders holder bad
   FM_POOL_BASE_REPO=$repo
   FM_POOL_BASE_TIP=
   rc=0
@@ -102,13 +102,8 @@ fm_pool_base_advance() { # <repo> <origin-default-sha-or-empty> [<why-the-sha-is
   tip=$resolved
   FM_POOL_BASE_TIP=$tip
   if ! git -C "$repo" show-ref --verify --quiet "$ref"; then
-    zero=$(printf '%*s' "${#tip}" '' | tr ' ' 0)
-    if ! git -C "$repo" update-ref --no-deref -m "fm-pool-base: created at the origin default" "$ref" "$tip" "$zero" 2>/dev/null; then
-      fm_pool_base_refuse changed "fm-pool-base appeared while it was being created at origin default $tip"
-      return
-    fi
-    echo "fm-pool-base: created at origin default $tip" >&2
-    return 0
+    fm_pool_base_refuse absent "the treehouse config of $repo names fm-pool-base as the pool base, but the branch does not exist; the repository's owner creates it at the origin default $tip"
+    return
   fi
   if ! old=$(git -C "$repo" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null); then
     fm_pool_base_refuse ref_unreadable "fm-pool-base exists but does not name a commit"
