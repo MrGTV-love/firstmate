@@ -153,6 +153,7 @@ The [verification record](verification/runtime-backends.md#claude-background-tas
    A pool slot that another task claims refuses the relaunch by name (`custody_slot_claim`), unless that task's own record places its copy strictly inside the slot; a relaunch checks no other peer claims beyond that.
    The residual: Vernant's push-time `owned_paths` gate stays the control for what the task may push.
    An adopted relaunch keeps a launch artifact the worker edited since its last launch (its settings or plugin) byte for byte beside the fresh wiring instead of deleting it.
+   Only the settings file is merged, so the edits of any other kept launch artifact (the OpenCode plugin) are kept aside and recoverable, not effective, and the relaunch prints one `WARNING` line naming the set-aside path.
    Of the kept settings, only the worker's hook entries (not this task's own Firstmate hooks) and its allow, deny and ask lists reach the active settings file; no other key does, and the kept copy stays byte for byte at its kept path.
    When the kept settings do not parse, a tracked file's staged version, else its committed version, is the base for that merge; an ignored file has no such version, so protections that exist only in its unparseable bytes are not effective.
    A relaunch with no recorded manifest, a relocation to a replacement copy, and the recovery of a first provisioning that was refused keep the provisioning route, where `fm_slot_foresee_refusals` names a foreseeable refusal before the stop.

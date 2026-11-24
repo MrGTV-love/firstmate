@@ -373,6 +373,30 @@ PY
   pass "fm-control relaunch: a cut-off tracked settings file keeps its staged and committed protections effective and its bytes recoverable"
 }
 
+# D1 (amended, Main 3659): an edited launch artifact other than the settings file is kept aside and recoverable but not
+# effective, and the relaunch says so once, loudly, naming the set-aside file; an unchanged artifact draws no such line.
+test_adopt_says_loudly_that_an_edited_plugin_is_set_aside_and_not_active() {
+  local id=adoptplugin out rc plugin kept
+  make_adopt_case adopt-plugin "$id" src
+  sed -i.bak 's/^harness=.*/harness=opencode/' "$ADOPT_META" && rm -f "$ADOPT_META.bak"
+  plugin="$ADOPT_DIR/wt/.opencode/plugins/fm-busy-state.js"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "the first opencode relaunch must be admitted"$'\n'"$out"
+  [ -f "$plugin" ] || fail 'the launch wrote no plugin to edit'
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch over an unchanged plugin must be admitted"$'\n'"$out"
+  assert_not_contains "$out" 'no longer active' 'an unchanged plugin drew the set-aside warning'
+  printf '// worker edit\n' >> "$plugin"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch over an edited plugin must be admitted"$'\n'"$out"
+  kept=$(for f in "$ADOPT_DIR/wt/.opencode/plugins"/fm-busy-state.js.fm-kept.*; do [ -e "$f" ] && printf '%s\n' "$f"; done | head -n 1)
+  [ -n "$kept" ] || fail 'the edited plugin was not kept aside'
+  grep -qF '// worker edit' "$kept" || fail 'the kept plugin lost the worker edit'
+  assert_contains "$out" "WARNING: the worker's edits to .opencode/plugins/fm-busy-state.js are set aside at $kept and are no longer active" 'the relaunch did not say loudly that the edits are no longer active'
+  [ "$(printf '%s\n' "$out" | grep -c 'no longer active')" = 1 ] || fail 'the warning was not printed exactly once'
+  pass "fm-control relaunch: an edited plugin is set aside with one loud line naming its path; an unchanged one draws none"
+}
+
 control_relaunch_test_cases=(
 test_manifest_inventory_oracle_rejects_both_mutants
 test_adopt_relaunch_keeps_the_manifest_and_survives_a_second_relaunch
@@ -385,6 +409,7 @@ test_adopt_keeps_a_worker_edited_launch_artifact
 test_adopt_keeps_worker_override_keys_out_of_the_active_file
 test_adopt_carries_only_the_worker_rule_lists_into_the_active_file
 test_adopt_keeps_the_staged_and_committed_protections_of_a_cut_off_tracked_settings_file
+test_adopt_says_loudly_that_an_edited_plugin_is_set_aside_and_not_active
 )
 
 control_relaunch_run "$@"

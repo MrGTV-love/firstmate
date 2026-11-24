@@ -7123,6 +7123,10 @@ spawn_keep_edited_wiring() { # <prior-harness>
     [ "$rel" != .claude/settings.local.json ] || SPAWN_KEPT_SETTINGS=$kept
     exclude_path "${kept#"$WT"/}"
     echo "kept the worker's edited launch artifact $rel byte for byte at ${kept#"$WT"/}; the fresh wiring is written beside it" >&2
+    # Only the settings file is merged, so the edits of any other launch artifact are set aside and recoverable but not
+    # effective; say so once, loudly, so no edited protection is lost silently (Main 3659).
+    [ "$rel" = .claude/settings.local.json ] ||
+      echo "WARNING: the worker's edits to $rel are set aside at $kept and are no longer active; the regenerated $rel replaced them" >&2
   done <<EOF
 $(fm_control_harness_wiring_paths "$harness" "$WT" "$STATE_REAL" "$ID" "$KIND")
 EOF
