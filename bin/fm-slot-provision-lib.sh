@@ -876,6 +876,32 @@ def escape(path):
 limits = []
 proven = {}
 status = {}
+# The launch artifacts Firstmate itself wrote, from the task's wiring record (state/<id>.wiring-sha: "<sha> <rel> [merged]"):
+# an ignored path or generated directory made only of those is not the task's drift.
+recorded = set()
+record_file = os.environ.get("FM_SLOT_DRIFT_WIRING", "")
+if record_file and os.path.isfile(record_file):
+    with open(record_file, "rb") as handle:
+        for row in handle.read().splitlines():
+            parts = row.split(None, 2)
+            if len(parts) >= 2:
+                recorded.add(parts[1])
+
+
+def wiring_only(path):
+    if path in recorded:
+        return True
+    full = os.path.join(os.fsencode(copy), path)
+    if not os.path.isdir(full) or os.path.islink(full):
+        return False
+    found = False
+    for base_dir, _dirs, files in os.walk(full):
+        for name in files:
+            found = True
+            rel = os.path.relpath(os.path.join(base_dir, name), os.fsencode(copy))
+            if rel not in recorded:
+                return False
+    return found
 
 
 def add(path, *labels):
@@ -914,12 +940,20 @@ for tip_head in heads:
         fork = base
         limits.append("the default branch tip or the fork point is unavailable; the recorded base %s is the reference, so inherited upstream paths may be listed as uncertain" % base[:12])
     net = set(names(git("diff", "--no-renames", "-z", "--name-only", "--ignore-submodules=none", fork, tip_head).stdout))
+    own = set()
+    if known:
+        # The task's own line: the commits on the first-parent chain, a merge counting only for the paths it authored
+        # itself (the combined diff). A path that reaches HEAD only through a merged side branch, such as another task's
+        # branch, is not established as this task's work, so it is listed uncertain, never proven (D3 R3).
+        own |= set(names(git("log", "--first-parent", "--no-merges", "--no-renames", "--name-only", "-z", "--format=", tip_head, "--not", tip).stdout))
+        for merge in git("rev-list", "--first-parent", "--merges", tip_head, "--not", tip).stdout.decode().split():
+            own |= set(names(git("show", "--cc", "--name-only", "-z", "--format=", merge, ok=(0, 128)).stdout))
     for path in net:
-        (add if known else uncertain)(path)
+        (add if known and path in own else uncertain)(path)
     if known:
         exclusive = set(names(git("log", "--cc", "--name-only", "-z", "--format=", tip_head, "--not", tip).stdout))
         for path in exclusive - net:
-            add(path, "reverted-to-base")
+            (add if path in own else uncertain)(path, "reverted-to-base")
 # What the branch's own reflog records the task committing counts as the task's work even when the default branch later
 # absorbed and reverted it (the merge base then moves past it and no net diff remains). Pulls, merges, fast-forwards
 # and rebase picks are not "commit" entries, so work that only came in from the default branch is not attributed here.
@@ -960,6 +994,8 @@ while i < len(raw):
         i += 1
         continue
     if code == b"!!":
+        if wiring_only(path.rstrip(b"/")):
+            continue
         if path.endswith(b"/"):
             uncertain(path.rstrip(b"/"), "ignored", "generated")
         else:
@@ -1005,7 +1041,8 @@ FMDRIFTPY
 fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   local copy=$1 id=$2 branch=$3 base=$4 out count line
   shift 4
-  out=$(python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || {
+  # state/<id>.wiring-sha names the launch artifacts Firstmate wrote, so they are not reported as the task's drift.
+  out=$(FM_SLOT_DRIFT_WIRING="${FM_SLOT_DRIFT_STATE:-${STATE:-}}/$id.wiring-sha" python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || {
     echo "relaunch drift report for $id: could not be produced ($(printf '%s' "$out" | tail -n 1)); this is a limitation of the report, not a statement that the task stayed in scope" >&2
     return 0
   }

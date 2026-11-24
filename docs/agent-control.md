@@ -150,6 +150,7 @@ The [verification record](verification/runtime-backends.md#claude-background-tas
    `bin/fm-spawn.sh` checks the adoption again after the stop, the wiring rewrite and the record publish, just before it delivers the launch.
    If that second check refuses, the wiring and the task record were already written by the relaunch, and the recorded manifest and scope are still unchanged.
    The task's own out-of-scope commits and uncommitted edits never block it, never change the recorded scope, and are printed as a labelled drift report by both `fm-control relaunch` and `fm-spawn --relaunch`.
+   A path that reaches `HEAD` only through a merged side branch is labelled `uncertain`, never `proven`, and the launch artifacts Firstmate wrote (named by `state/<id>.wiring-sha`) are not listed.
    A pool slot that another task claims refuses the relaunch by name (`custody_slot_claim`), unless that task's own record places its copy strictly inside the slot; a relaunch checks no other peer claims beyond that.
    The residual: Vernant's push-time `owned_paths` gate stays the control for what the task may push.
    An adopted relaunch keeps a launch artifact the worker edited since its last launch (its settings or plugin) byte for byte beside the fresh wiring instead of deleting it.

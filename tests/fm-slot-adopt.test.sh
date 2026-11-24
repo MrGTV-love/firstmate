@@ -430,12 +430,55 @@ test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not() {
   pass "drift: a deleted assume-unchanged tracked path is listed; an absent skip-worktree path is not"
 }
 
+# D3 R3 (Main 3659): a path that reaches HEAD only through a merged side branch, such as another task's branch, is listed
+# uncertain, never proven; the task's own commit stays proven.
+test_a_path_that_arrives_only_through_a_merged_peer_branch_is_uncertain_not_proven() {
+  local out
+  make_world drift-peer
+  git -C "$W_SLOT" checkout -q -b peer "$W_BASE"
+  printf 'peer\n' >"$W_SLOT/docs/peer.txt"
+  git -C "$W_SLOT" add docs/peer.txt
+  git -C "$W_SLOT" "${GITID[@]}" commit -qm 'peer task work'
+  git -C "$W_SLOT" checkout -q fm/t
+  printf 'own\n' >"$W_SLOT/docs/own.txt"
+  git -C "$W_SLOT" add docs/own.txt
+  git -C "$W_SLOT" "${GITID[@]}" commit -qm 'own out-of-scope work'
+  git -C "$W_SLOT" "${GITID[@]}" merge -q --no-ff -m 'merge the peer branch' peer
+  out=$(drift)
+  assert_contains "$out" 'drift: proven docs/own.txt' "the task's own commit lost its proven label"
+  assert_contains "$out" 'drift: uncertain docs/peer.txt' 'the merged peer path was not listed uncertain'
+  case "$out" in *'proven docs/peer.txt'*) fail "a merged peer branch's path was labelled proven as the task's own: $out" ;; esac
+  pass "drift: a path that arrives only through a merged peer branch is uncertain; the task's own commit stays proven"
+}
+
+# D3 (Main 3659): the launch artifacts Firstmate itself wrote, named by state/<id>.wiring-sha, are not the task's drift; a
+# path the task really changed still is.
+test_firstmate_written_wiring_is_not_reported_as_drift() {
+  local out exclude
+  make_world drift-wiring
+  mkdir -p "$W_SLOT/.claude"
+  printf '{}\n' >"$W_SLOT/.claude/settings.local.json"
+  exclude=$(git -C "$W_SLOT" rev-parse --path-format=absolute --git-path info/exclude)
+  mkdir -p "$(dirname "$exclude")"
+  printf '.claude/\n' >>"$exclude"
+  printf 'real\n' >"$W_SLOT/docs/real.txt"
+  out=$(drift)
+  assert_contains "$out" '.claude' 'the fixture is vacuous: the ignored wiring is not reported without its record'
+  printf 'abc:100000:600 .claude/settings.local.json merged\n' >"$W_STATE/t.wiring-sha"
+  out=$(STATE=$W_STATE drift)
+  case "$out" in *.claude*) fail "recorded Firstmate wiring was reported as the task's drift: $out" ;; esac
+  assert_contains "$out" 'drift: proven docs/real.txt' "the task's real untracked change disappeared from the report"
+  pass "drift: wiring recorded in state/<id>.wiring-sha is not listed; the task's own change still is"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
 test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name
 test_a_hidden_symlink_retarget_is_task_drift
 test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not
+test_a_path_that_arrives_only_through_a_merged_peer_branch_is_uncertain_not_proven
+test_firstmate_written_wiring_is_not_reported_as_drift
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run
