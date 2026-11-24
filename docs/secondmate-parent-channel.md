@@ -25,7 +25,7 @@ Every captain-facing outcome that leaves durable evidence in the mate home is pu
 | Ship child PR ready | the child's `done:` PR ready line, whose accepted spellings the publisher below owns; `pr=` in the child's record once registered | `bin/fm-inactive-reconcile.sh` on the next poll with the child's line; `bin/fm-pr-check.sh` at registration with the canonical URL |
 | Scout child findings | the child's `done:` line plus `data/<child>/report.md` | `bin/fm-inactive-reconcile.sh` on the next poll, with the report pointer |
 | Child failed | the child's `failed:` line | `bin/fm-inactive-reconcile.sh` on the next poll |
-| Child decision escalated to the captain | the task held for the captain in the mate backlog, with `Decision owner: captain` | `bin/fm-captain-hold.sh hold --owner captain`, and its answer by `answer` |
+| Child decision escalated to the captain | the task held for the captain in the mate backlog, with `Decision owner: captain` | `bin/fm-captain-hold.sh hold` with the required filing fields from its `--help` and `--owner captain`, and its answer by `answer` |
 | Child decision the main firstmate makes itself | never held: a keyed `needs-decision` line for the main firstmate, and the work continues on its answer | the mate's own appended line |
 | PR merged | the merge poll or the mate's own merge | `bin/fm-merge-outcome-lib.sh` |
 | Child leaving the home | its final ledger line | `bin/fm-teardown.sh`, which does not remove the child while that line is undelivered |
@@ -60,6 +60,8 @@ A missed-reply escalation includes the complete first sighting path and line num
 `tests/fm-teardown-cleanup.test.sh` covers teardown delivering a child's final line and refusing when the channel cannot be written.
 `tests/fm-brief.test.sh` pins the charter's channel rule.
 `tests/fm-pending-reply.test.sh` covers helper-selected local routing, remote-channel classification, same-basename restatement before false escalation, readable wrong-home diagnostics, and the rule that arbitrary mate-home sightings never acknowledge a reply.
+It also exercises exactly-once recovery and relayed-request repost delivery when macOS cannot execute `ps`, using the native process reader while refusing recovery if the sender's identity remains unreadable.
+The stock macOS Bash CI job runs that native-reader recovery case explicitly; the portable serial lane runs the full suite.
 `tests/fm-parent-channel-scan-exclusion.test.sh` covers the home-shape-aware scan exclusion against real remote, main-home, and local-mate fixtures: the watcher signal scan, both heartbeat backstops, the fleet-wide folds, and the real `fm-wake-drain.sh` end to end.
 
 ## Live verification

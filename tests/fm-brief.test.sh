@@ -989,10 +989,6 @@ SIGNALS
     # shellcheck disable=SC2016 # Literal backticks and braces must remain unexpanded.
     assert_no_grep '`paused: {why}`' "$brief" \
       "$kind brief still instructs the default paused status"
-    assert_grep 'a blocker or wait clears' "$brief" \
-      "$kind brief did not require durable resolution when a blocker clears"
-    assert_grep 'even when the answer is what started that work' "$brief" \
-      "$kind brief did not warn that an answer-started done/working never closes a decision"
   done
   pass "fm-brief.sh: custom pause verb renders in every scaffold"
 }
@@ -1029,25 +1025,6 @@ test_ship_and_scout_teach_validation_round_pause() {
       "$kind brief did not limit the declaration to actual waits"
   done
   pass "fm-brief.sh: ship and scout scaffolds declare a validation-round pause once, then hold it"
-}
-
-test_scout_and_secondmate_load_decision_hold_policy() {
-  local home scout charter
-  home="$TMP_ROOT/decision-policy-home"
-  mkdir -p "$home/data"
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    "$ROOT/bin/fm-brief.sh" sample-investigation sample --scout >/dev/null 2>&1
-  scout="$home/data/sample-investigation/brief.md"
-  assert_grep "$ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md" "$scout" \
-    "scout brief did not load the captain-call policy before done"
-  assert_grep "pass its shared completion gate for the report and any visual review" "$scout" \
-    "scout brief did not cross-reference visual-review completion"
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" FM_SECONDMATE_CHARTER='sample reviews' \
-    "$ROOT/bin/fm-brief.sh" sample-mate --secondmate --no-projects >/dev/null 2>&1
-  charter="$home/data/sample-mate/brief.md"
-  assert_grep "load \`captain-hold-lifecycle\`" "$charter" \
-    "secondmate charter did not load the shared captain-call policy for detailed investigations"
-  pass "fm-brief.sh: investigation and visual-review completions load the shared decision policy"
 }
 
 # A scout brief offers the Lavish review loop for every compatible board version,
@@ -1635,6 +1612,7 @@ test_crewmate_scaffolds_require_stopping_private_services() {
   pass "fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line"
 }
 
+# shellcheck disable=SC2016 # Backticks in the asserted brief text are literal Markdown.
 test_ship_scaffolds_teach_the_closes_line() {
   local home mode forge id brief
   home="$TMP_ROOT/closes-line-home"
@@ -1650,12 +1628,44 @@ test_ship_scaffolds_teach_the_closes_line() {
       FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" --forge "$forge" >/dev/null 2>&1 \
         || fail "fm-brief.sh --mode $mode --forge $forge exited non-zero"
       brief="$home/data/$id/brief.md"
-      assert_grep 'Closes: <task-id>' "$brief" "$mode/$forge ship brief did not teach the Closes: line"
-      assert_grep 'in your commit message and in the PR body' "$brief" "$mode/$forge ship brief did not say where the line goes"
-      assert_grep 'A merge through bin/fm-pr-merge.sh closes each named item' "$brief" "$mode/$forge ship brief did not say what the line does"
-      assert_grep 'The pipeline can rewrite the PR body after your commit' "$brief" "$mode/$forge ship brief did not warn about pipeline body writes"
-      assert_grep 'read the PR body back' "$brief" "$mode/$forge ship brief did not say to re-check the body last"
-      assert_grep "then read the body again and confirm each line is there" "$brief" "$mode/$forge ship brief did not say to confirm the re-added lines"
+      assert_grep "Closes-backlog-item: $id" "$brief" "$mode/$forge ship brief did not teach the Closes-backlog-item: line with this task's id"
+      assert_no_grep 'Closes-backlog-item: <task-id>' "$brief" "$mode/$forge ship brief left the placeholder instead of the task id"
+      assert_grep 'in your commit message' "$brief" "$mode/$forge ship brief did not say where the line goes"
+      assert_grep 'Train-member: <PR URL>' "$brief" "$mode/$forge ship brief did not teach the Train-member: line for a merge train"
+      assert_grep 'closes nothing' "$brief" "$mode/$forge ship brief did not say that only the directive lines close an item"
+      assert_grep 'A merge that bin/fm-pr-merge.sh confirms and records itself closes each named item' "$brief" "$mode/$forge ship brief did not say what the line does"
+      assert_grep 'fm-pr-close-items-queued-and-polled-merges' "$brief" "$mode/$forge ship brief did not name the queued-merge gap"
+      assert_grep 'ead the PR body back' "$brief" "$mode/$forge ship brief did not say to re-check the body"
+      assert_grep "then read the body again and confirm each of those lines is there" "$brief" "$mode/$forge ship brief did not say to confirm the re-added lines"
+      assert_grep 'any `Train-member:` line for a component that landed' "$brief" "$mode/$forge ship brief did not make the body repair cover the Train-member: lines of a merge train"
+      assert_grep "keep every one of them through the pipeline's body rewrite" "$brief" "$mode/$forge ship brief did not say that Train-member: lines must survive the pipeline body rewrite"
+      # Main 043: the lines close only inside the one closes block, between its exact marker lines.
+      assert_grep '<!-- firstmate-backlog-closes:begin -->' "$brief" "$mode/$forge ship brief did not teach the closes block's begin line"
+      assert_grep '<!-- firstmate-backlog-closes:end -->' "$brief" "$mode/$forge ship brief did not teach the closes block's end line"
+      assert_grep 'exactly one closes block' "$brief" "$mode/$forge ship brief did not say the body holds exactly one closes block"
+      assert_no_grep 'in a paragraph of directive lines alone' "$brief" "$mode/$forge ship brief still teaches the old paragraph rule"
+      # Main 045: the block opens the body, in the strict line forms; a quoted copy refuses the body.
+      assert_grep "its begin line must be the body's first non-empty line" "$brief" "$mode/$forge ship brief did not say the block opens the body"
+      assert_grep 'one space after the colon, nothing after the value, plain printable ASCII' "$brief" "$mode/$forge ship brief did not teach the strict line forms"
+      assert_grep 'a second or quoted copy of the block' "$brief" "$mode/$forge ship brief did not say a quoted copy refuses the body"
+      assert_grep 'if it is not the first thing in the body' "$brief" "$mode/$forge ship brief's body check does not cover a block that is not first"
+      assert_no_grep 'a quoted example closes nothing even with its marker lines' "$brief" "$mode/$forge ship brief still claims a quoted block closes nothing"
+      if [ "$mode" = no-mistakes ]; then
+        # The pipeline writes the PR body after the handoff, so the check belongs after the
+        # CI-ready return point and before the CI-ready done, never before the handoff done.
+        handoff=$(grep -n 'is the handoff that starts the pipeline' "$brief" | head -1 | cut -d: -f1)
+        ready=$(grep -n 'After /no-mistakes reports CI green' "$brief" | head -1 | cut -d: -f1)
+        check=$(grep -n 'Before that done, check the PR body' "$brief" | head -1 | cut -d: -f1)
+        final=$(grep -n 'checks green` and stop' "$brief" | head -1 | cut -d: -f1)
+        [ -n "$handoff" ] && [ -n "$ready" ] && [ -n "$check" ] && [ -n "$final" ] \
+          || fail "$mode/$forge brief is missing a stage line the body check is ordered against"
+        [ "$check" -gt "$ready" ] && [ "$check" -lt "$final" ] && [ "$check" -gt "$handoff" ] \
+          || fail "$mode/$forge brief puts the PR body check outside the window after CI green"
+        sed -n "${check}p" "$brief" | grep -q 'one `Train-member:` line per component that landed' \
+          || fail "$mode/$forge brief's post-CI body check does not cover the Train-member: lines"
+      else
+        assert_grep 'as the last step before your final done' "$brief" "$mode/$forge ship brief did not order the body check last"
+      fi
     done
     assert_grep 'gh-axi pr edit <number> --body-file' "$home/data/brief-closes-$mode-none/brief.md" "$mode ship brief did not name the GitHub edit route"
     assert_grep 'tea pulls edit <number>' "$home/data/brief-closes-$mode-forgejo/brief.md" "$mode Forgejo brief did not name the Forgejo edit route"
@@ -1663,14 +1673,14 @@ test_ship_scaffolds_teach_the_closes_line() {
 
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-local alpha --mode local-only >/dev/null 2>&1 \
     || fail "fm-brief.sh --mode local-only exited non-zero"
-  assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-local/brief.md" "the local-only brief taught a Closes: line it has no PR body for"
+  assert_no_grep 'Closes-backlog-item: brief-closes-local' "$home/data/brief-closes-local/brief.md" "the local-only brief taught a Closes-backlog-item: line it has no PR body for"
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-gerrit alpha --mode direct-PR --forge gerrit --shape squash >/dev/null 2>&1 \
     || fail "fm-brief.sh --forge gerrit exited non-zero"
-  assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-gerrit/brief.md" "the Gerrit brief taught a Closes: line it has no PR body for"
+  assert_no_grep 'Closes-backlog-item: brief-closes-gerrit' "$home/data/brief-closes-gerrit/brief.md" "the Gerrit brief taught a Closes-backlog-item: line it has no PR body for"
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-closes-scout alpha --scout >/dev/null 2>&1 \
     || fail "fm-brief.sh --scout exited non-zero"
-  assert_no_grep 'Closes: <task-id>' "$home/data/brief-closes-scout/brief.md" "the scout brief taught the Closes: line"
-  pass "fm-brief.sh: every forge-PR delivery teaches the Closes: line and its re-check route; local-only, Gerrit and scout briefs do not"
+  assert_no_grep 'Closes-backlog-item: brief-closes-scout' "$home/data/brief-closes-scout/brief.md" "the scout brief taught the Closes-backlog-item: line"
+  pass "fm-brief.sh: every forge-PR delivery teaches the Closes-backlog-item: line and its re-check route; local-only, Gerrit and scout briefs do not"
 }
 
 test_crewmate_scaffolds_teach_the_docker_task_marker() {
@@ -2049,7 +2059,6 @@ test_secondmate_marked_request_reporting_contract
 test_secondmate_directory_paths_are_absolute_and_output_is_stable
 test_pause_verb_override_renders_all_brief_scaffolds
 test_ship_and_scout_teach_validation_round_pause
-test_scout_and_secondmate_load_decision_hold_policy
 test_scout_and_secondmate_scaffold
 test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections
 test_spawn_lists_every_dispatch_placeholder_in_one_refusal

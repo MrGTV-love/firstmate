@@ -18,7 +18,7 @@ cleanup() {
     # Stop the detached Linux supervisor's whole process group and wait for its
     # cleanup before removing the fixture tree.
     # shellcheck source=bin/fm-remote-job-lib.sh
-    . "$ROOT/bin/fm-remote-job-lib.sh"
+    . "$TMP_ROOT/remote-root/bin/fm-remote-job-lib.sh"
     FM_REMOTE_JOB_STATE="$TMP_ROOT/remote-jobs"
     fm_remote_job_stop_worker_tree "$pid" 2>/dev/null || true
   fi
@@ -34,8 +34,68 @@ SSH_LOG="$TMP_ROOT/ssh.log"
 SSH_COUNT="$TMP_ROOT/ssh.count"
 mkdir -p "$LOCAL_HOME/data" "$REMOTE_ROOT/bin" "$REMOTE_HOME"
 printf 'fixture\n' > "$REMOTE_ROOT/AGENTS.md"
+
+# A failed stock-Bash PID probe must refuse before attempting ownership reads.
+mkdir "$TMP_ROOT/pid-probe-bin"
+printf '#!/bin/sh\nexit 1\n' > "$TMP_ROOT/pid-probe-bin/sh"
+chmod +x "$TMP_ROOT/pid-probe-bin/sh"
+pid_probe_result=$(
+  # shellcheck source=bin/fm-remote-job-lib.sh
+  . "$ROOT/bin/fm-remote-job-lib.sh"
+  unset BASHPID
+  PATH="$TMP_ROOT/pid-probe-bin:$PATH"
+  fm_remote_job_ps_bin() {
+    printf 'consulted\n' > "$TMP_ROOT/pid-probe-bin/ps-consulted"
+    return 1
+  }
+  if fm_remote_job_require_process_inspection; then
+    printf 'unexpected success\n'
+  else
+    printf '%s:%s\n' "$?" "$FM_REMOTE_JOB_ERROR"
+  fi
+)
+[ "$pid_probe_result" = '69:cannot inspect process ownership: cannot determine owner pid' ] &&
+  [ ! -e "$TMP_ROOT/pid-probe-bin/ps-consulted" ] \
+  || fail "failed ownership PID probe did not refuse with its named status: $pid_probe_result"
+pass "failed ownership PID probe reports unavailable without continuing to ps"
+
 cp "$ROOT/bin/fm-remote-entrypoint.sh" "$ROOT/bin/fm-remote-job-lib.sh" \
   "$ROOT/bin/fm-remote-job-worker.sh" "$REMOTE_ROOT/bin/"
+
+# Injection exists only in this disposable library copy, never as a production
+# environment override. CI uses real ps; confined Darwin uses real kernel facts
+# through the existing reader, not invented ownership identities.
+PS_NATIVE=1
+/bin/ps -p $$ -o lstart= > "$TMP_ROOT/ps-native.stdout" 2> "$TMP_ROOT/ps-native.stderr" || {
+  ps_rc=$?
+  [ "$ps_rc" -eq 126 ] && [ "$(uname -s)" = Darwin ] \
+    || fail "native ps probe failed unexpectedly (exit $ps_rc)"
+  PS_NATIVE=0
+}
+printf 'process identity fixture: native_ps=%s\n' "$PS_NATIVE"
+cat > "$TMP_ROOT/test-ps" <<SH
+#!/usr/bin/env bash
+if [ -f '$TMP_ROOT/ps-refused' ]; then
+  printf '%s\\n' "\$0" >> '$TMP_ROOT/ps-refused.calls'
+  printf 'fixture ps: Operation not permitted\n' >&2
+  exit 126
+fi
+if [ '$PS_NATIVE' -eq 1 ]; then exec /bin/ps "\$@"; fi
+[ "\$#" -eq 4 ] && [ "\$1" = -p ] && [ "\$3" = -o ] || exit 2
+case "\$4" in
+  lstart=) field=lstart ;;
+  command=) field=args ;;
+  pgid=) field=pgid ;;
+  state=)
+    exec python3 -c 'import runpy,sys; m=runpy.run_path(sys.argv[1]); print(m["state"](m["kinfo"](int(sys.argv[2]))))' \
+      '$ROOT/bin/fm-proc-info.py' "\$2" ;;
+  *) exit 2 ;;
+esac
+exec python3 '$ROOT/bin/fm-proc-info.py' "\$field" "\$2"
+SH
+chmod +x "$TMP_ROOT/test-ps"
+printf '\nfm_remote_job_ps_bin() { printf "%%s\\n" "%s"; }\n' \
+  "$TMP_ROOT/test-ps" >> "$REMOTE_ROOT/bin/fm-remote-job-lib.sh"
 
 cat > "$REMOTE_ROOT/bin/fm-probe-one.sh" <<'SH'
 #!/usr/bin/env bash
@@ -131,6 +191,29 @@ fm_on() {
   "$ROOT/bin/fm-on.sh" "$@"
 }
 
+# A dependency refusal must be diagnosed before starting a worker or staging a
+# command, and must not masquerade as protocol-usage exit 64.
+: > "$TMP_ROOT/ps-refused"
+set +e
+fm_on ios fm-mutate.sh "$REMOTE_HOME/refused-mutations" \
+  > "$TMP_ROOT/refused.stdout" 2> "$TMP_ROOT/refused.stderr"
+refused_rc=$?
+set -e
+[ "$refused_rc" -eq 69 ] \
+  || fail "ps refusal was not reported as unavailable (got $refused_rc): $(cat "$TMP_ROOT/refused.stderr")"
+assert_grep 'cannot inspect process ownership' "$TMP_ROOT/refused.stderr" "ps refusal lost its ownership context"
+assert_grep 'exit 126' "$TMP_ROOT/refused.stderr" "ps refusal lost its original exit status"
+assert_grep 'fixture ps: Operation not permitted' "$TMP_ROOT/refused.stderr" "ps refusal lost exact dependency stderr"
+printf '%s\n' "$TMP_ROOT/test-ps" > "$TMP_ROOT/ps-refused.expected"
+cmp -s "$TMP_ROOT/ps-refused.expected" "$TMP_ROOT/ps-refused.calls" \
+  || fail "refused ps was retried, including through a copied binary"
+[ ! -s "$TMP_ROOT/refused.stdout" ] || fail "ps refusal polluted stdout"
+assert_absent "$REMOTE_HOME/refused-mutations" "ps refusal executed the remote command"
+assert_absent "$TMP_ROOT/remote-jobs/worker.pid" "ps refusal started a worker"
+assert_absent "$TMP_ROOT/remote-jobs/jobs" "ps refusal staged a job"
+rm "$TMP_ROOT/ps-refused"
+pass "ownership inspection refusal reports exit 69 and the original ps diagnostic before execution"
+
 # The pre-feature user path had no executable transport at all. The regression
 # exercises the adopted public surface end to end through a deterministic SSH
 # process boundary rather than checking script source. A payload caller passes
@@ -169,6 +252,39 @@ if grep -q 'stdin:' "$TMP_ROOT/stdout-default"; then
   fail "caller stdin crossed the transport without --stdin: $(cat "$TMP_ROOT/stdout-default")"
 fi
 pass "fm-on defaults the remote command's stdin to /dev/null"
+
+# Exercise the default independently of ambient overrides, and inspect argv
+# boundaries rather than a substring that could accept ConnectTimeout=150.
+cat > "$FAKEBIN/record-ssh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$FM_CONNECT_ARGV"
+printf 'called\n' >> "$FM_CONNECT_CALLS"
+SH
+chmod +x "$FAKEBIN/record-ssh"
+connect_probe() {
+  FM_HOME="$LOCAL_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
+    FM_SSH_BIN="$FAKEBIN/record-ssh" FM_CONNECT_ARGV="$TMP_ROOT/connect.argv" \
+    FM_CONNECT_CALLS="$TMP_ROOT/connect.calls" \
+    "$ROOT/bin/fm-on.sh" "$@"
+}
+(unset FM_SSH_CONNECT_TIMEOUT; connect_probe ios fm-probe-two.sh)
+grep -Fx -- 'ConnectTimeout=15' "$TMP_ROOT/connect.argv" >/dev/null \
+  || fail "default SSH connect timeout was not 15 seconds"
+FM_SSH_CONNECT_TIMEOUT=7 connect_probe --stdin ios fm-probe-two.sh < /dev/null
+grep -Fx -- 'ConnectTimeout=7' "$TMP_ROOT/connect.argv" >/dev/null \
+  || fail "explicit SSH connect timeout was not honored"
+CONNECT_CALLS_BEFORE=$(wc -l < "$TMP_ROOT/connect.calls" | tr -d ' ')
+for invalid_timeout in 0 '' not-a-number; do
+  set +e
+  invalid_out=$(FM_SSH_CONNECT_TIMEOUT="$invalid_timeout" connect_probe ios fm-probe-two.sh 2>&1)
+  invalid_rc=$?
+  set -e
+  [ "$invalid_rc" -eq 1 ] || fail "invalid connect timeout '$invalid_timeout' was accepted (rc $invalid_rc)"
+  assert_contains "$invalid_out" 'FM_SSH_CONNECT_TIMEOUT must be a positive integer' "invalid connect timeout did not explain its constraint"
+  [ "$(wc -l < "$TMP_ROOT/connect.calls" | tr -d ' ')" -eq "$CONNECT_CALLS_BEFORE" ] \
+    || fail "invalid connect timeout launched SSH"
+done
+pass "fm-on passes default and explicit connect timeouts and rejects invalid values before SSH"
 
 # A vanished remote peer must become a bounded ssh failure instead of an
 # indefinite hang on a half-open TCP connection, so the existing no-result ->

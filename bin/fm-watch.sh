@@ -3565,6 +3565,8 @@ open_loops_surface() {
       || open_loops_stale_wake "$ledger"
     return 0
   fi
+  # Keep the legacy display-field identity and append the producer's opaque
+  # current-row token; never infer an opening from mutable source or handling history.
   ids=$(jq -rs '
     if length == 1 then .[0] else error("expected one open-loop ledger") end
     | if type == "object" and .schema == "fm-open-loops.v1"
@@ -3572,8 +3574,11 @@ open_loops_surface() {
         and (.home | type) == "string" and (.home | length) > 0
         and (.complete | type) == "boolean" and (.rows | type) == "array"
         and all(.rows[]; type == "object" and (.id | type) == "string"
-          and (.id | length) > 0 and (.overdue | type) == "boolean")
-      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]]
+          and (.id | length) > 0 and (.overdue | type) == "boolean"
+          and (if has("current_identity") then
+            (.current_identity | type == "string" and test("^[0-9a-f]{24}$")) else true end))
+      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]
+        + (if has("current_identity") then [.current_identity] else [] end)]
         | sort | .[] | @json
       else error("invalid open-loop ledger") end
   ' "$ledger" 2>/dev/null) || return 0
@@ -4001,6 +4006,7 @@ prelude_phase() {
       [ -e "$c" ] || continue
       watcher_beat
       is_pr_poll=0
+      check_events=0
       if [ "$(basename "$c")" = x-watch.check.sh ]; then
         if fmx_poll_shim_valid "$c" "$FM_HOME" "$FM_ROOT" \
           && [ -f "$FM_ROOT/bin/fm-x-poll.sh" ] && [ ! -L "$FM_ROOT/bin/fm-x-poll.sh" ]; then
@@ -4033,7 +4039,8 @@ prelude_phase() {
           out=$FM_CHECK_RESULT
         elif fm_custom_check_snapshot_prepare "$STATE" "$id"; then
           custom_snapshot=$FM_CUSTOM_CHECK_SNAPSHOT
-          run_check_capture "$id" "$custom_snapshot" || exit 1
+          [ "$id" = contributions ] || check_events=1
+          FM_CHECK_EVENT_OUTPUT=$check_events run_check_capture "$id" "$custom_snapshot" || exit 1
           out=$FM_CHECK_RESULT
           fm_custom_check_snapshot_cleanup
         else
@@ -4042,7 +4049,7 @@ prelude_phase() {
           continue
         fi
       fi
-      [ -z "$FM_CHECK_STOP_NOTICE" ] || out=$FM_CHECK_STOP_NOTICE
+      [ -z "$FM_CHECK_STOP_NOTICE" ] || { out=$FM_CHECK_STOP_NOTICE; check_events=0; }
       if [ -n "$out" ]; then
         if [ "$(basename "$c")" = contributions.check.sh ]; then
           contribution_check_output=
@@ -4109,8 +4116,13 @@ EOF
           continue
         fi
         pr_poll_control_release || exit 1
-        fm_wake_append check "$c" "$reason" || exit 1
-        [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+        if [ "$check_events" -eq 1 ]; then
+          fm_check_queue_output "$c" "$out" || exit 1
+          [ -n "$check_wake_reason" ] || check_wake_reason=$FM_CHECK_WAKE_REASON
+        else
+          fm_wake_append check "$c" "$reason" || exit 1
+          [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+        fi
       fi
       pr_poll_control_release || exit 1
     done

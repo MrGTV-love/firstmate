@@ -176,6 +176,7 @@ assert_grep 'mode=no-mistakes' "$home/data/cwd-promote/ship-instructions.md" \
   "promotion did not publish home ship instructions"
 
 run_home fm-captain-hold.sh hold cwd-call --title 'Choose a home-owned option' \
+  --boundary owner-rule-change --if-no 'Keep the existing home-owned rule' \
   --reason 'home write proof' > "$TMP_ROOT/hold.out" 2>&1 \
   || fail "foreign-directory hold failed: $(cat "$TMP_ROOT/hold.out")"
 printf 'Use the investigated option.\n' > "$TMP_ROOT/answer.txt"

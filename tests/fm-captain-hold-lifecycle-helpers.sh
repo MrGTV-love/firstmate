@@ -99,8 +99,14 @@ tasks_in() {  # <home> <tasks-axi args...>
 # suites exercise the captain-owned lifecycle, so a `hold` run inside a mate home
 # declares that owner here unless the caller passes one itself.
 run_captain() {  # <home> <command args...>
-  local home=$1 arg owner_given=0
+  local home=$1 arg owner_given=0 boundary_given=0
   shift
+  # These lifecycle fixtures already posit an owner-rule decision; boundary
+  # refusal tests bypass this convenience wrapper and exercise raw CLI inputs.
+  if [ "${1-}" = hold ]; then
+    for arg in "$@"; do [ "$arg" != --boundary ] || boundary_given=1; done
+    [ "$boundary_given" = 1 ] || set -- "$@" --boundary owner-rule-change --if-no 'Keep the existing owner rule'
+  fi
   if [ "${1-}" = hold ] && [ -e "$home/.fm-secondmate-home" ]; then
     for arg in "$@"; do [ "$arg" != --owner ] || owner_given=1; done
     [ "$owner_given" = 1 ] || set -- "$@" --owner captain
@@ -276,6 +282,9 @@ SH
 run_shim() {  # <home> <command args...>
   local home=$1
   shift
+  if [ "${1:-}" = hold ]; then
+    set -- "$@" --boundary owner-rule-change --if-no 'Keep the existing owner rule'
+  fi
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-decision-hold.sh" "$@"

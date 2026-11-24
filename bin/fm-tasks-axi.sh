@@ -1228,29 +1228,73 @@ if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then
   fi
   exit "$task_status"
 fi
-case "${ARGS[0]:-}:${ARGS[1]:-}" in
-  public-followup:record-delivery|public-followup:waive)
-    # These typed completions can move a row to Done, and a done_keep of 0 archives it at
-    # once. Run them without exec so a row they finished stops blocking its dependents,
-    # exactly like done/close.
-    pf_id=${ARGS[2]:-}
-    tasks-axi "${ARGS[@]}"
-    pf_status=$?
-    pf_help=0
-    for pf_arg in "${ARGS[@]}"; do
-      case "$pf_arg" in -h|--help) pf_help=1 ;; esac
-    done
-    if [ "$pf_status" -eq 0 ] && [ "$pf_help" = 0 ] && [[ "$pf_id" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*$ ]]; then
-      if fm_backlog_row_probe "$DATA" "$pf_id"; then
-        [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] || fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
-      elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+# Typed public-followup completions, in every form tasks-axi accepts (an optional `task` noun,
+# flags before or after the id): fm_typed_completion_resolve (bin/fm-tasks-axi-lib.sh) reads
+# them with tasks-axi's own grammar. These completions can move a row to Done, and a done_keep of
+# 0 archives it at once, so they run without exec and a finished row stops blocking its
+# dependents in the same run, exactly like done/close.
+pf_form=0
+fm_typed_completion_resolve ${ARGS[@]+"${ARGS[@]}"} || pf_form=$?
+if [ "$pf_form" != 1 ]; then
+  pf_id=$FM_TYPED_COMPLETION_ID
+  pf_name=$FM_TYPED_COMPLETION
+  # Main 1785 F5: the capture file exists before the completion runs. When it cannot be made,
+  # the completion does not run, so nothing changes, and the caller is told to retry.
+  if ! pf_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-pf.XXXXXX" 2>/dev/null); then
+    printf 'actionable: the %s of %s did not run, so nothing changed: the wrapper could not make the file that keeps its output, which it needs to clear the items %s blocks; retry when %s is writable\n' \
+      "$pf_name" "${pf_id:-its item}" "${pf_id:-it}" "${TMPDIR:-/tmp}" >&2
+    exit 1
+  fi
+  tasks-axi ${ARGS[@]+"${ARGS[@]}"} > "$pf_out"
+  pf_status=$?
+  # Main 1875 F8: the replay of the kept output is checked. When it fails, the caller may hold
+  # cut output (a JSON caller, invalid JSON), so the wrapper says the completion's own status
+  # and exits 1, and the item's edges are handled below from the kept result as usual.
+  pf_replay=0
+  cat -- "$pf_out" || pf_replay=$?
+  if [ "$pf_replay" -ne 0 ]; then
+    printf 'actionable: tasks-axi finished the %s of %s with status %s, but the wrapper could not show its output (status %s), so what was printed may be cut; read the item with tasks-axi show %s before acting on it\n' \
+      "$pf_name" "${pf_id:-its item}" "$pf_status" "$pf_replay" "${pf_id:-<id>}" >&2
+  fi
+  if [ "$pf_status" -eq 0 ] && [ "$pf_form" = 2 ]; then
+    printf 'actionable: tasks-axi accepted the %s, but the wrapper could not resolve which item it completed from these arguments, so no blocked-by edge was cleared; clear the items it blocked with tasks-axi unblock <item> --by <id>\n' \
+      "$pf_name" >&2
+  elif [ "$pf_status" -eq 0 ] && [ "$pf_form" = 0 ]; then
+    # Main 2086: the completion's own result decides the clear, with no other read. tasks-axi
+    # exits 0 from `public-followup waive` and `record-delivery` only when the row it completed is
+    # Done, refuses to move a public-followup row through any generic transition, and prints that
+    # row's state in its result, plain and --json (fm_typed_completion_result_state reads it).
+    # When the printed result names the row done, or there is no readable result at all and the
+    # exit 0 alone is the proof (Main 1795), its dependents are cleared through tasks-axi's own
+    # unblock, exactly as after done and close (fm_backlog_unblock_dependents). When a readable
+    # result names another state or another row, every edge and hold is kept and the item is
+    # reported. No tasks-axi module is loaded and no tasks-axi version is checked. tasks-axi has no
+    # command that clears an id's dependents only while that id is done, in one locked write
+    # (docs/configuration.md names the window this leaves).
+    pf_result=0
+    fm_typed_completion_result_state "$pf_out" "$pf_id" || pf_result=$?
+    pf_state=$FM_TYPED_COMPLETION_RESULT_STATE
+    case "$pf_result:$pf_state" in
+      0:done)
         fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
-      else
-        printf 'actionable: tasks-axi accepted the %s of %s, but its state could not be read (%s); if it is done, clear the items it blocked with tasks-axi unblock <item> --by %s\n' \
-          "${ARGS[1]}" "$pf_id" "${FM_BACKLOG_ROW_ERROR:-unknown error}" "$pf_id" >&2
-      fi
-    fi
-    exit "$pf_status"
-    ;;
-esac
+        ;;
+      0:*)
+        printf 'actionable: tasks-axi accepted the %s of %s, but its own result shows %s as %s, not done, so every blocked-by edge and hold on it is kept\n' \
+          "$pf_name" "$pf_id" "$pf_id" "$pf_state" >&2
+        ;;
+      2:*)
+        printf 'actionable: tasks-axi accepted the %s of %s, but its own result names the row %s, not %s, so every blocked-by edge and hold on %s is kept; once %s reads done, clear its dependents with tasks-axi unblock <item> --by %s\n' \
+          "$pf_name" "$pf_id" "$FM_TYPED_COMPLETION_RESULT_ROW" "$pf_id" "$pf_id" "$pf_id" "$pf_id" >&2
+        ;;
+      *)
+        printf '%s: tasks-axi printed no result the wrapper can read for its %s, so the clear rests on its exit 0, which tasks-axi gives only when the row is done\n' \
+          "$pf_id" "$pf_name" >&2
+        fm_backlog_unblock_dependents "$DATA" "$pf_id" >&2
+        ;;
+    esac
+  fi
+  rm -f -- "$pf_out"
+  [ "$pf_replay" -eq 0 ] || exit 1
+  exit "$pf_status"
+fi
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

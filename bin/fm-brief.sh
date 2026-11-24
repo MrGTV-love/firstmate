@@ -571,7 +571,8 @@ That file is your parent channel, and in this home it IS the captain: every sent
 Your own machinery publishes the durable facts about your crew's work for you (\`bin/fm-parent-channel-lib.sh\`): a child's terminal done or failed line with its note and PR on every supervision poll, a PR-ready line when you register a PR, a task you hold for the captain and its answer, a merge, and a child's final line at cleanup all reach the parent channel from the scripts that record them, whether or not you append anything.
 What only you can append is judgement: the answer to a marked request below, a recommendation or caveat on a delivered outcome, a blocker or failure of your own, and anything else you would otherwise say to the captain.
 A call the main firstmate owns is never held: append it as a \`needs-decision\` line for the main firstmate and keep working where you can, and the work continues on its answer.
-\`bin/fm-captain-hold.sh hold\` is only for a call that needs the captain's own words, and here it must say so with \`--owner captain\`; only the captain's words release it.
+\`bin/fm-captain-hold.sh hold\` is only for a real boundary that needs the captain's own words; use its \`--help\` for the required boundary and if-no fields, and here also say \`--owner captain\`; only the captain's words release it.
+When the card carries a \`Recommendation:\`, also pass \`--recommendation <exact-answer-text>\`: the exact answer value that choosing that option sends (typed words, or for a keyed or Slack answer the option's answer value, never its number and never its display label: \`1. Approve the charge (approve)\` gives \`approve\`); an answer equal to it after trimming surrounding whitespace records the wait as a delay mistake.
 
 # Requests from the main firstmate
 You are a firstmate in your own home, so an incoming message reaches you in your own chat.
@@ -800,8 +801,8 @@ $CREWMATE_PAUSE_INSTRUCTIONS
    Timeout and elapsed-read events follow the measured-command instructions above, not this stop rule.
 6. If a decision belongs to a human (product choices, destructive actions),
    append \`needs-decision [at=<epoch>]: {summary of options}\` and stop. Firstmate will reply with the decision.
-   A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
-   Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
+   Report readiness while any choice or blocker key remains open through its keyed \`needs-decision\` or \`blocked\` line, including the report path and inventory. Never follow it with \`done:\` or \`failed:\`: terminal scout status retires open keys in the existing fold.
+   Firstmate owns the durable hold/transfer or exact-key resolution. Its reply normally records that action; when an operational blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
 $PRIVATE_SERVICE_RULE
 $SHARED_PROC_BUDGET_RULE
@@ -813,8 +814,10 @@ $WAIT_BLOCK$INBOX_SECTION
 Write your findings to \`$DATA/$ID/report.md\`.
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
 $LAVISH_LINE
-Before reporting done, read and follow \`$FM_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and pass its shared completion gate for the report and any visual review.
-When the report is complete, append \`done [at=<epoch>]: {one-line conclusion}\` to the status file and stop.
+Before reporting the findings ready, read \`$FM_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and inventory the whole report and any visual review for genuine unresolved captain choices. Include each choice and its options in the report, or explicitly state that none remain; route any unresolved choice or operational blocker through the existing keyed status protocol.
+Do not invoke the captain-hold mutation commands or write protected task metadata from this worker. Send the report path and complete semantic inventory to the supervising firstmate through the status protocol.
+When the report and inventory are ready and no choice or blocker keys remain open, append \`done [at=<epoch>]: report ready at $DATA/$ID/report.md; {one-line conclusion and inventory}\` to the status file and stop. This is a report-ready signal for owner review, not self-certified task completion. Otherwise send the report path and inventory in the still-open keyed status and stop without a terminal status.
+The supervising firstmate must review the complete report and visual surface, register any genuine captain calls through the existing hold path, and reconcile operational keys through their existing owner before attesting. The firstmate, in the authoritative \`FM_HOME\`, must run \`bin/fm-captain-hold.sh complete $ID <captain-held-task-id>...\`, or \`bin/fm-captain-hold.sh complete $ID --none\` only when its reviewed inventory is empty. This normal completion gate remains mandatory before treating the investigation as complete or tearing it down.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.
 
 $DOD_TASK
@@ -890,8 +893,8 @@ $CREWMATE_PAUSE_INSTRUCTIONS
 6. If a decision belongs above the implementation worker (product choices, destructive actions),
    append \`needs-decision [at=<epoch>]: {summary of options}\` and stop. Firstmate will reply with the decision.
 $ASK_USER_BLOCK
-   A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
-   Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
+   Keep each unresolved choice or blocker on its keyed \`needs-decision\` or \`blocked\` status, including any ready-work pointer. Never follow it with \`done:\` or \`failed:\`: terminal ship status retires open keys in the existing fold.
+   Firstmate owns the durable hold/transfer or exact-key resolution. Its reply normally records that action; when an operational blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume. Report terminal completion only after the pending keys and the selected delivery gates are settled.
 $SHARED_INFRA_RULE
 $PRIVATE_SERVICE_RULE
 $SHARED_PROC_BUDGET_RULE

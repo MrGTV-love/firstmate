@@ -240,6 +240,72 @@ assert bad.returncode == 1 and 'unknown open-loop age category' in bad.stdout, b
 (home / 'config/open-loops.json').unlink()
 print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 
+# A terminal declaration hands report/candidate ownership back even when there
+# is no PR. A failed scout does not become resolved merely by writing a report.
+completion_tasks = [task('finished-review', world / 'no-review-copy', state='done', kind='scout'),
+                    task('failed-review', world / 'no-review-copy', state='failed', kind='scout'),
+                    task('candidate-ready', fresh, state='done'),
+                    task('dropped-review', world / 'no-review-copy', state='done', kind='scout'),
+                    task('dropped-candidate', fresh, state='done'),
+                    # The durable `done` line owns the handoff when the pane closed or cannot be read.
+                    task('closed-review', world / 'no-review-copy', state='unknown', exists=False, alive='dead',
+                         kind='scout'),
+                    task('unread-review', world / 'no-review-copy', state='unknown', kind='scout'),
+                    task('paused-review', world / 'no-review-copy', state='unknown', kind='scout')]
+declared = dict.fromkeys(('closed-review', 'unread-review'), 'done')
+declared['paused-review'] = 'paused'
+completion_backlog = backlog + [dict(id=name, structured=True, state='done', captain_drop=True)
+                                for name in ('dropped-review', 'dropped-candidate')]
+for item in completion_tasks:
+    name = item['id']
+    (home / f'state/{name}.status').write_text(f"{declared.get(name, item['current_state']['state'])} [at={hours(1)}]: ready for owner\n")
+    (home / f'state/{name}.meta').write_text(f"kind={item['kind']}\nspawn_gen=fixture-{name}\n")
+    if item['kind'] == 'scout':
+        report_dir = home / 'data' / name
+        report_dir.mkdir()
+        (report_dir / 'report.md').write_text('fixture review result\n')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks + completion_tasks,
+                                                    backlog=dict(present=True, records=completion_backlog))))
+for _ in range(2):  # a fresh collector process must recover the same unfinished handoff
+    completion_report = ledger()
+    completed = rows(completion_report, 'completed_task')
+    assert set(completed) == {'finished-review', 'candidate-ready', 'closed-review', 'unread-review'}, completed
+    assert all(r['owner'] == 'firstmate' and r['overdue'] for r in completed.values()), completed
+    assert 'failed-review' in rows(completion_report, 'failed_task'), completion_report
+    # The reviewed-inventory attestation alone is not owner acceptance: the row stays until teardown or a drop.
+    with (home / 'state/finished-review.meta').open('a') as meta:
+        meta.write('decisions_reviewed=1\ndecision_keys=\n')
+# A completed task whose status log cannot be folded degrades coverage for that
+# one read; it keeps its own row and never hides a later task's obligations.
+blind = task('blind-review', world / 'no-review-copy', state='done', alive='dead', kind='scout')
+# The same unreadable log behind a closed pane still keeps its row: the declaration read does not fold.
+blind_closed = task('blind-closed', world / 'no-review-copy', state='unknown', exists=False, alive='dead', kind='scout')
+after_blind = task('after-blind', lost, state='failed', exists=False, alive='dead')
+(home / 'state/blind-review.status').write_text(f'working [at={hours(2)}]: {"x" * 80}\n' * 40
+                                                + f'done [at={hours(1)}]: ready for owner\n')
+shutil.copy(home / 'state/blind-review.status', home / 'state/blind-closed.status')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[blind, blind_closed, after_blind],
+                                                    backlog=dict(present=True, records=backlog))))
+blind_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'],
+                              env=dict(env, FM_STATUS_CAP_BYTES='2048', FM_STATUS_CAP_RESERVE_BYTES='1')))
+assert not blind_report['complete'], blind_report
+assert 'completion status blind-review' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
+for name in ('blind-review', 'blind-closed'):
+    assert f'completion status {name}' in rows(blind_report, 'coverage')['ledger degraded']['evidence'], blind_report
+    assert rows(blind_report, 'completed_task')[name]['overdue'], blind_report
+for category in ('failed_task', 'missing_worker', 'unlanded_commit'):
+    assert 'after-blind' in rows(blind_report, category), (category, blind_report)
+(home / 'state/blind-review.status').unlink()
+(home / 'state/blind-closed.status').unlink()
+# Retirement is owned elsewhere; collection never launches or accepts the work.
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
+                                                    backlog=dict(present=True, records=backlog))))
+assert not rows(ledger(), 'completed_task')
+for item in completion_tasks:
+    for suffix in ('status', 'meta'):
+        (home / f"state/{item['id']}.{suffix}").unlink()
+print('PASS: completed reviews and committed candidates retain their owner action; failed reports do not imply acceptance', flush=True)
+
 # Independent review is only the record owner's verified exact-head evidence.
 # review_lanes is a discovery hint, not authority: the ledger asks
 # bin/fm-review-record.py once for the live head and consumes one atomic
@@ -620,9 +686,37 @@ domain = teardown_rows['closed-domain']
 assert not domain['overdue'] and 'child child-1' in domain['next_action'], domain
 pending[0].unlink()
 assert 'closed-pool' not in rows(ledger(), 'interrupted_teardown'), 'a completed teardown is no longer open work'
+linked_target = home / 'linked-pool.target'
+linked_target.write_text('spawn_gen=g0\nslot=/pool/linked-pool/project\n')
+(home / 'state' / 'linked-pool.meta').write_text('kind=ship\nspawn_gen=g5\n')
+linked_marker = home / 'state' / 'linked-pool.teardown-return-pending'
+linked_marker.symlink_to(linked_target)
+linked_rows = rows(ledger(), 'interrupted_teardown')
+assert 'linked-pool' in linked_rows, linked_rows
+assert 'fm-teardown.sh linked-pool' in linked_rows['linked-pool']['next_action'], linked_rows
+assert linked_rows['linked-pool']['evidence'] == '/pool/linked-pool/project', linked_rows
+linked_marker.unlink()
+linked_fifo = home / 'linked-pool.fifo'
+os.mkfifo(linked_fifo)
+linked_marker.symlink_to(linked_fifo)
+linked_rows = rows(ledger(), 'interrupted_teardown')
+assert linked_rows['linked-pool']['evidence'] == '', 'a link to a FIFO is pending with no evidence, never a blocked read'
+linked_marker.unlink()
+(home / 'state' / 'other-pool.meta').write_text('kind=ship\nspawn_gen=g1\n')
+other_record = home / 'state' / 'other-pool.teardown-return-pending'
+other_record.write_text('spawn_gen=g0\nslot=/pool/other-pool/project\nchild=other-child\n')
+linked_marker.symlink_to(other_record)
+linked_rows = rows(ledger(), 'interrupted_teardown')
+assert linked_rows['linked-pool']['evidence'] == '', 'a link to another task\'s record never borrows its slot'
+assert 'other-child' not in linked_rows['linked-pool']['next_action'], linked_rows
+linked_marker.unlink()
+other_record.unlink()
+(home / 'state' / 'other-pool.meta').unlink()
+linked_fifo.unlink()
+linked_target.unlink()
 for marker in pending[1:]:
     marker.unlink(missing_ok=True)
-for task_id in ('closed-pool', 'closed-domain', 'respawned-pool'):
+for task_id in ('closed-pool', 'closed-domain', 'respawned-pool', 'linked-pool'):
     (home / 'state' / (task_id + '.meta')).unlink()
 print('PASS: interrupted teardown records bound to the current task record', flush=True)
 
@@ -785,9 +879,13 @@ assert git(local, 'rev-parse', 'refs/heads/main') == local_head
 for pushed in (False, True):
     if pushed:
         git(local_worker, 'push', '-q', 'origin', 'HEAD:refs/heads/fm/local-delivery')
-    fixture([local_task])
-    delivered = ledger()
-    assert not rows(delivered, 'failed_task') and not rows(delivered, 'unlanded_commit'), delivered
+    for state in ('failed', 'done'):
+        local_task['current_state']['state'] = state
+        fixture([local_task])
+        delivered = ledger()
+        assert not rows(delivered, 'failed_task') and not rows(delivered, 'unlanded_commit'), delivered
+        assert not rows(delivered, 'completed_task'), delivered
+local_task['current_state']['state'] = 'failed'
 local_task['mode'] = 'no-mistakes'
 fixture([local_task])
 assert 'local-delivery' in rows(ledger(), 'failed_task')
@@ -795,6 +893,12 @@ local_task['mode'] = 'local-only'
 git(local, 'update-ref', 'refs/heads/main', local_base)
 fixture([local_task])
 assert 'local-delivery' in rows(ledger(), 'unlanded_commit')
+local_task['current_state']['state'] = 'done'
+fixture([local_task])
+pending_local = ledger()
+assert 'local-delivery' in rows(pending_local, 'completed_task'), pending_local
+assert 'local-delivery' in rows(pending_local, 'unlanded_commit'), 'the commits stay a separate obligation'
+local_task['current_state']['state'] = 'failed'
 git(local, 'update-ref', 'refs/heads/trunk', local_head)
 git(local, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk')
 git(local, 'update-ref', 'refs/remotes/origin/trunk', local_base)
@@ -813,13 +917,16 @@ for exists, alive in ((False, 'dead'), (True, 'dead'), (True, 'missing'), (True,
         task('axis-missing-pr', world / 'missing-pr-copy', state='failed', exists=exists, alive=alive,
              pr=PR_URL + '5'),
         task('axis-drop', lost, state='failed', exists=exists, alive=alive),
-        task('axis-report', lost, state='failed', exists=exists, alive=alive, kind='scout')]
-    (home / 'data/axis-report').mkdir(exist_ok=True)
-    (home / 'data/axis-report/report.md').write_text('Delivered findings\n')
-    fixture(failed_axes, [dict(id='axis-drop', structured=True, state='done', captain_drop=True)])
+        task('axis-report', lost, state='failed', exists=exists, alive=alive, kind='scout'),
+        task('axis-dropped-report', lost, state='failed', exists=exists, alive=alive, kind='scout')]
+    for name in ('axis-report', 'axis-dropped-report'):
+        (home / 'data' / name).mkdir(exist_ok=True)
+        (home / 'data' / name / 'report.md').write_text('Delivered findings\n')
+    fixture(failed_axes, [dict(id=name, structured=True, state='done', captain_drop=True)
+                         for name in ('axis-drop', 'axis-dropped-report')])
     (home / 'config/open-loops.json').write_text(json.dumps(dict(age_limits_seconds=dict(failed_task=123))))
     axes = ledger()
-    assert set(rows(axes, 'failed_task')) == {'axis-pending'}, axes
+    assert set(rows(axes, 'failed_task')) == {'axis-pending', 'axis-report'}, axes
     assert rows(axes, 'failed_task')['axis-pending']['limit_seconds'] == 123
     if not exists or alive in ('dead', 'missing'):
         assert set(rows(axes, 'missing_worker')) == {t['id'] for t in failed_axes}, axes
@@ -1523,7 +1630,7 @@ for overrides, expected_home in address_cases:
     assert set(rows(addressed, 'ready_not_started')) == {'address-ready'}, addressed
     assert rows(addressed, 'ready_not_started')['address-ready']['limit_seconds'] == 77, addressed
     assert set(rows(addressed, 'unanswered_question')) == {'address:home'}, addressed
-    assert not rows(addressed, 'failed_task'), addressed
+    assert set(rows(addressed, 'failed_task')) == {'address-report'}, addressed
     assert set(rows(addressed, 'open_pr')) == {address_url}, addressed
     assert (expected_home / 'state/.open-loops.lock').is_file(), overrides
     assert json.loads((expected_home / 'state/open-loops.json').read_text()) == addressed
@@ -1934,6 +2041,17 @@ assert rows()['scout']['overdue']
 refused = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--check-in', 'worker'],
                          env=dict(env, FM_HOME=''), text=True, capture_output=True, timeout=120)
 assert refused.returncode == 1 and 'FM_HOME is required' in refused.stdout
+# A reserved key a supervisor raised (a pending-reply expectation) is not the report's own wait, so the silent
+# report stays eligible and its check-in reaches a task that fm-send sees as holding an open keyed decision.
+# The check-in answers none of them and states --answers-none (fm-send header, "Decision closure"), so fm-send
+# delivers it and the key stays open.
+status('scout', f'blocked [at={now - 901}] [key=pending-reply-abcdef0123456789]: pending-reply-missed: task=scout pending-reply-id=abcdef0123456789 request=ship it\n', now - 901)
+assert rows()['scout']['overdue']
+scout_status_before = (home / 'state/scout.status').read_text()
+call('--check-in', 'scout')
+scout_messages = list((home / 'state/scout.inbox').glob('*.msg')); assert len(scout_messages) == 1, scout_messages
+assert 'report progress' in scout_messages[0].read_text()
+assert (home / 'state/scout.status').read_text() == scout_status_before
 print('PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run', flush=True)
 PY
 
@@ -2260,14 +2378,15 @@ assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a
 clock['now'] = now
 # A steer delivered in an earlier overdue episode cannot answer a row whose age clock restarted with unchanged text:
 # the episode follows the row's obligation clock as well as its digest.
-home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker')
+home, ledger, row, call, ok, drain, ack = case('clock-restart-steer', owner='worker:worker', age_seconds=3660)
 _, boundary = drain()
 inbox(home, '001.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
 assert ack(boundary).returncode == 0
-clock['now'] = now + 8000
+clock['now'] = now + 120
+ok(code / 'bin/fm-open-loops.sh', '--check-actions')  # the delivery is still within its row limit
 record = json.loads(ledger.read_text())
-record['generated_epoch'] = now + 8000
+record['generated_epoch'] = now + 120
 ledger.write_text(json.dumps(record))
 restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
 assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a restarted clock is changed work', restarted)
@@ -2506,7 +2625,8 @@ assert reused.returncode == 0, ('the same unchanged row needs no newer message',
 assert ack(boundary).returncode == 0
 # A steer on a reviewed green PR answers its presentation for four hours from its delivery, not from the action.
 home, ledger, row, call, ok, drain, ack = case('steer-remaining', category='review_pass_not_merged', subject=PR,
-                                               owner='firstmate', source=dict(task='worker'), limit_seconds=600)
+                                               owner='firstmate', source=dict(task='worker'),
+                                               age_seconds=93600, limit_seconds=86400)
 _, boundary = drain()
 inbox(home, '005.msg', offset=-600)
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
@@ -2533,7 +2653,7 @@ for handled in (False, True):
     inbox(home, '002.msg', handled=handled, offset=-3700)
     refused = call(*args, '002.msg')
     assert refused.returncode == 1 and 'new delivery' in refused.stdout, refused
-    inbox(home, '003.msg', handled=handled, offset=1)
+    inbox(home, '003.msg', handled=handled)
     ok(*args, '003.msg')
     action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
     assert action['kind'] == 'steered' and action['evidence'] == '003.msg', action
@@ -2546,7 +2666,7 @@ print('PASS: PR provenance steers use own inbox or handled records, reject forei
 for index, damaged in enumerate(('a string', None, ['worker'], 7)):
     home, ledger, row, call, ok, drain, ack = case('damaged-source-' + str(index), source=damaged)
     _, boundary = drain()
-    inbox(home, '001.msg', offset=1)
+    inbox(home, '001.msg', offset=0)
     ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
     action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
     assert action['kind'] == 'steered' and action['evidence'] == '001.msg', (damaged, action)
@@ -3717,7 +3837,7 @@ import tempfile
 import time
 
 root = Path(sys.argv[1]).resolve()
-world = Path(tempfile.mkdtemp(prefix='ledger-receipts-'))
+world = Path(tempfile.mkdtemp(prefix='ledger-receipts-')).resolve()
 code = world / 'code'
 shutil.copytree(root / 'bin', code / 'bin')
 # Count the actual local snapshot reader, not a fabricated snapshot.
@@ -3781,8 +3901,10 @@ try:
                    + [dict(row_id='absent', kind='escalated', evidence='not a row'),
                       dict(row_id='row-0', kind='unknown', evidence='invalid kind')])
     assert result.returncode == 1, result
+    assert runs.is_file(), (result.stdout, result.stderr)
     assert len(runs.read_text().splitlines()) == 1, 'a 50-row batch must read one snapshot'
     assert len(stored()['handling']['actions']) == 50, result
+    assert not any(action.get('unverified') for action in stored()['handling']['actions'].values()), result
     assert 'absent' in result.stdout and 'unknown' in result.stdout, result
     assert len(result.stdout.splitlines()) == 53, result.stdout
     call(loops, '--check-actions')
@@ -3836,7 +3958,7 @@ try:
         assert ack(boundary, good=False).returncode == 1, field
     print('PASS: every obligation identity change requires new evidence', flush=True)
 
-    # Firstmate escalations and steers cover unchanged work across turns with no time bound; a change gates again.
+    # Escalations retain their unchanged-work behavior; steers require result follow-up after their row limit.
     for kind in ('escalated', 'steered'):
         publish([rows[0]])
         _, boundary = drain()
@@ -3849,7 +3971,11 @@ try:
         receipt_time = clock
         for clock in (receipt_time + 14399, receipt_time + 14400, receipt_time + 3 * 14400):
             result = call(drain_cli)
-            assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, (kind, result)
+            if kind == 'steered':
+                assert 'row-0' in result.stdout and 'WAKE_ACK_REQUIRED' in result.stderr, (kind, result)
+                assert call(loops, '--check-actions', good=False).returncode == 1
+            else:
+                assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, (kind, result)
         record = stored()
         record['rows'][0]['evidence'] += '-changed'
         ledger.write_text(json.dumps(record))
@@ -3857,7 +3983,7 @@ try:
         assert ack(boundary, good=False).returncode == 1, kind
         act('row-0')
         ack(boundary)
-    print('PASS: firstmate escalations and steers need no new action on unchanged work, only on changed work', flush=True)
+    print('PASS: unchanged escalations retain their behavior while delivered steers require bounded result follow-up', flush=True)
 
     # Free-text escalation is not proof it reached the captain, even after its turn closes.
     # Exercise the exact receipt text the away daemon used to emit through the real CLI.
@@ -3912,7 +4038,7 @@ try:
             heartbeat(4800, wait='lint failed: 3 errors')
             result, boundary = drain()
             assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1
-    print('PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do', flush=True)
+    print('PASS: display counters do not change an obligation; current bounded steers, deferrals and escalations remain valid', flush=True)
 
     # A timer the worker's own pane paints, in any unit and shape, is elapsed time too.
     def retime(timer, work='Running lint…'):
@@ -4138,7 +4264,7 @@ def case(name, actor='main', **fields):
 # 1. A delivery sent after the row's overdue episode began keeps counting when the unchanged row is presented again.
 home, ledger, row, call, ok, wake, drain, ack, act, stored = case('represent')
 _, boundary = drain()
-inbox(home, '001.msg', offset=1)
+inbox(home, '001.msg', offset=0)
 assert act('steered', '001.msg').returncode == 0
 assert ack(boundary).returncode == 0
 clock['now'] = now + 120
@@ -4152,7 +4278,7 @@ home, ledger, row, call, ok, wake, drain, ack, act, stored = case(
     'represent-reviewed', category='review_pass_not_merged', subject=PR, owner='firstmate',
     source=dict(task='worker'), limit_seconds=600)
 _, boundary = drain()
-inbox(home, '001.msg', offset=1)
+inbox(home, '001.msg', offset=0)
 assert act('steered', '001.msg').returncode == 0
 assert ack(boundary).returncode == 0
 clock['now'] = now + 120
@@ -4175,7 +4301,7 @@ print('PASS: a steer delivered after the overdue episode began counts on every r
 # A delivery older than the receipt window, and one sent before the episode, never counts.
 home, ledger, row, call, ok, wake, drain, ack, act, stored = case('old-steer', age_seconds=100000)
 _, boundary = drain()
-inbox(home, '001.msg', offset=1)
+inbox(home, '001.msg', offset=0)
 inbox(home, '002.msg', offset=-96500)
 before = act('steered', '002.msg')
 assert before.returncode == 1 and 'new delivery' in before.stdout, before
@@ -4186,7 +4312,7 @@ clock['now'] = now
 # Materially changed evidence opens a new episode: the earlier delivery no longer answers it.
 home, ledger, row, call, ok, wake, drain, ack, act, stored = case('changed-evidence')
 _, boundary = drain()
-inbox(home, '001.msg', offset=1)
+inbox(home, '001.msg', offset=0)
 assert act('steered', '001.msg').returncode == 0 and ack(boundary).returncode == 0
 record = stored()
 record['rows'][0]['evidence'] = 'waiting for lint.full.whole and a new failing step; declaration age 7200s'
@@ -4196,7 +4322,7 @@ wake('changed')
 _, boundary = drain()
 stale = act('steered', '001.msg')
 assert stale.returncode == 1 and 'new delivery' in stale.stdout, stale
-inbox(home, '002.msg', offset=1)
+inbox(home, '002.msg', offset=0)
 assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
 clock['now'] = now
 print('PASS: a steer older than four hours, one sent before the episode, or one predating changed evidence is refused', flush=True)
@@ -4219,7 +4345,7 @@ _, boundary = drain()
 assert stored()['handling']['episodes'][row['id']]['start'] == now, stored()['handling']['episodes']
 early = act('steered', '001.msg')
 assert early.returncode == 1 and 'became overdue' in early.stdout, early
-inbox(home, '002.msg', offset=1)
+inbox(home, '002.msg', offset=0)
 assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
 print('PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say',
       flush=True)
@@ -4237,13 +4363,17 @@ _, boundary = drain()
 reply_record(home, '0123456789abcdef', delivered='')
 undelivered = act('steered', '0123456789abcdef')
 assert undelivered.returncode == 1 and 'task inbox' in undelivered.stdout, undelivered
-reply_record(home, 'fedcba9876543210', task='other', delivered=str(now + 5))
+reply_record(home, 'fedcba9876543210', task='other', delivered=str(now))
 foreign = act('steered', 'fedcba9876543210')
-assert foreign.returncode == 1, foreign
+assert foreign.returncode == 1 and 'task inbox' in foreign.stdout, foreign
 reply_record(home, '0011223344556677', delivered=str(now - 3700))
 early = act('steered', '0011223344556677')
 assert early.returncode == 1 and 'new delivery' in early.stdout, early
-reply_record(home, 'aabbccddeeff0011', delivered=str(now + 5))
+reply_record(home, '0123012301230123', delivered=str(now + 5))
+future = act('steered', '0123012301230123')
+assert future.returncode == 1 and 'result follow-up' in future.stdout, future
+assert ack(boundary).returncode == 1, 'an unconfirmed or future delivery must leave the row actionable'
+reply_record(home, 'aabbccddeeff0011', delivered=str(now))
 accepted = act('steered', 'aabbccddeeff0011')
 assert accepted.returncode == 0, ('a delivered pending-reply id is a remote secondmate delivery record', accepted.stdout)
 assert stored()['handling']['actions'][row['id']]['evidence'] == 'aabbccddeeff0011'
@@ -4254,11 +4384,11 @@ home2, ledger2, row2, call2, ok2, wake2, drain2, ack2, act2, stored2 = case(
     'remote-link', category='silent_report', subject='mini', owner='firstmate',
     next_action='check in: progress, blockers, cross-workstream dependencies', evidence='last heard')
 _, boundary2 = drain2()
-reply_record(home2, 'aabbccddeeff0011', delivered=str(now + 5))
+reply_record(home2, 'aabbccddeeff0011', delivered=str(now))
 (home2 / 'state/pending-replies/2211221122112211').symlink_to(home2 / 'state/pending-replies/aabbccddeeff0011')
 linked = act2('steered', '2211221122112211')
-assert linked.returncode == 1, linked
-print('PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused', flush=True)
+assert linked.returncode == 1 and 'task inbox' in linked.stdout, linked
+print('PASS: a confirmed remote delivery is accepted; undelivered, foreign, early, future and linked records are refused', flush=True)
 
 # 3. One owner decides captain visibility: the printed row and the deferral check agree.
 def printed_visibility(result, ident):

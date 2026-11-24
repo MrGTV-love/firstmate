@@ -294,7 +294,8 @@ make_retry_boundary() {
 #!/usr/bin/env bash
 set -eu
 [ "$1" = fm-sm ]
-case "$2" in 'CONFIG_REREAD: '*) instruction=${2#'CONFIG_REREAD: '} ;; *) exit 2 ;; esac
+[ "$2" = --answers-none ]
+case "$3" in 'CONFIG_REREAD: '*) instruction=${3#'CONFIG_REREAD: '} ;; *) exit 2 ;; esac
 [ -f "$instruction" ] && [ ! -L "$instruction" ]
 count=0
 if [ -f "$FM_DELIVERY_DIR/count" ]; then read -r count < "$FM_DELIVERY_DIR/count"; fi

@@ -117,6 +117,41 @@ drain_out() {  # <home>
   FM_STATE_OVERRIDE="$1/state" "$DRAIN" 2>/dev/null
 }
 
+# A key that starts with - is a valid key of the fold; it is answered with the = form,
+# and with the split form as on base. A message word that looks like a choice flag is
+# message text, as on base.
+test_dash_key_is_answered_with_the_equals_form() {
+  local dir fb log home rc
+  dir="$TMP_ROOT/dash-key"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_home dash-key)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'blocked [key=-urgent]: choose\n' > "$home/state/t1.status"
+  run_send "$fb" "$home" "$log" t1 --resolve-key=-urgent "go with the fix"; rc=$?
+  expect_code 0 "$rc" "--resolve-key=-urgent answers the open -urgent key"
+  grep -qF "go with the fix" "$home/state/t1.inbox/001.msg" || fail "the answer did not reach the inbox record"
+  fm_test_fold "$home/state/t1.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "the -urgent key is still open after its = form answer: $FM_TEST_FOLD"
+
+  home=$(setup_home dash-key-split)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'blocked [key=-urgent]: choose\n' > "$home/state/t1.status"
+  run_send "$fb" "$home" "$log" t1 --resolve-key -urgent "go with the fix"; rc=$?
+  expect_code 0 "$rc" "--resolve-key -urgent answers the open -urgent key, as on base"
+  grep -qF "go with the fix" "$home/state/t1.inbox/001.msg" || fail "the split-form answer did not reach the inbox record"
+  fm_test_fold "$home/state/t1.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "the -urgent key is still open after its split-form answer: $FM_TEST_FOLD"
+
+  home=$(setup_home dash-key-word)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'working: busy\n' > "$home/state/t1.status"
+  run_send "$fb" "$home" "$log" t1 please run --resolve-key k1 later; rc=$?
+  expect_code 0 "$rc" "a message word that looks like a flag is text on a task with no open decision, as on base"
+  assert_equals "please run --resolve-key k1 later" "$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")" \
+    "the flag-like message word is delivered as text"
+  pass "fm-send --resolve-key: a key that starts with - is answered and closed with the = and split forms; a flag-like message word is text"
+}
+
 test_answer_send_closes_open_decision() {
   local dir fb log home rc out
   dir="$TMP_ROOT/closes"; mkdir -p "$dir"
@@ -145,9 +180,9 @@ test_answer_send_closes_open_decision() {
     fail "the answerer's close hid a worker line the drain never listed"
   fi
 
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the answered decision still lists as open: $out"
+  fm_test_fold "$home/state/t1.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the answered decision still lists as open: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: the answer send itself closes the open decision"
 }
@@ -266,9 +301,9 @@ test_colon_first_key_position_is_answerable() {
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/t8.status" | grep -qF 'resolved [key=seam-max-bound]: answered: cap it at 4' \
     || fail "the closing resolved line is missing:"$'\n'"$(cat "$home/state/t8.status")"
 
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the answered colon-first decision still lists as open: $out"
+  fm_test_fold "$home/state/t8.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the answered colon-first decision still lists as open: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: a colon-first stated key is open under that key and answerable"
 }
@@ -289,9 +324,9 @@ test_answer_starts_work_never_orphans() {
   printf 'working [key=phased-impl]: building region gates\n' >> "$home/state/t2.status"
   printf 'done [key=phased-impl]: PR up\n' >> "$home/state/t2.status"
 
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the answered decision orphaned after the answer started work: $out"
+  fm_test_fold "$home/state/t2.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the answered decision orphaned after the answer started work: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: an answer that starts a workstream leaves no orphaned decision"
 }
@@ -304,7 +339,7 @@ test_routine_steer_never_closes() {
   fm_write_meta "$home/state/t3.meta" "window=sess:fm-t3" "kind=ship"
   printf 'needs-decision [key=schema]: split or embed\n' > "$home/state/t3.status"
 
-  run_send "$fb" "$home" "$log" t3 "unrelated nudge, keep going"; rc=$?
+  run_send "$fb" "$home" "$log" t3 --answers-none "unrelated nudge, keep going"; rc=$?
   expect_code 0 "$rc" "a routine steer should still succeed"
   printf 'working: resumed\n' >> "$home/state/t3.status"
 
@@ -391,10 +426,8 @@ test_failed_ring_still_closes_at_enqueue() {
     || fail "the answer must be durably recorded despite the failed ring"
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/t5.status" | grep -qF 'resolved [key=creds]: answered: token is in the vault now' \
     || fail "the enqueued answer must close the decision at answer time: $(cat "$home/state/t5.status")"
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F '[key=creds]' >/dev/null; then
-    fail "the answered blocker still lists as open after an enqueue-time close: $out"
-  fi
+  fm_test_fold "$home/state/t5.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "the answered blocker still lists as open after an enqueue-time close: $FM_TEST_FOLD"
   pass "fm-send --resolve-key: the close happens at enqueue, surviving a failed doorbell"
 }
 
@@ -439,12 +472,9 @@ test_multiple_keys_close_together() {
   run_send "$fb" "$home" "$log" t6 --resolve-key k1 --resolve-key k2 \
     "one answer covering both"; rc=$?
   expect_code 0 "$rc" "an answer resolving two keys should succeed"
-  out=$(drain_out "$home")
-  printf '%s' "$out" | grep -F '[key=k3]' >/dev/null \
-    || fail "the unanswered third decision must stay open: $out"
-  if printf '%s' "$out" | grep -E '\[key=k1\]|\[key=k2\]' >/dev/null; then
-    fail "an answered key is still open after a multi-key answer: $out"
-  fi
+  fm_test_fold "$home/state/t6.status"
+  [ "$FM_TEST_FOLD" = "k3"$'\t'"needs-decision"$'\t'"third, unanswered" ] \
+    || fail "a multi-key answer must close k1 and k2 and leave only the unanswered k3 open, unchanged: $FM_TEST_FOLD"
   pass "fm-send --resolve-key: one answer closes each named key and only those"
 }
 
@@ -472,9 +502,9 @@ test_multiple_keys_close_after_fold_is_self_announced() {
     . "$1"; fm_wake_signal_seen_current "$2" "$3"
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state" "$home/state/t7.status" \
     || fail "one answer's two closes after an OPEN DECISIONS drain were left to re-wake this home"
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "an answered folded key is still open: $out"
+  fm_test_fold "$home/state/t7.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "an answered folded key is still open: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: one answer's closes after a drain fold never wake this home"
 }
@@ -504,9 +534,9 @@ test_local_secondmate_answer_marked_and_closed() {
     *"$FM_FROMFIRST_SEPARATOR"*) fail "the closing line leaked marker bytes" ;;
   esac
   assert_contains "$closing" "shard by team" "the closing line should carry the plain answer"
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the answered secondmate decision still lists as open: $out"
+  fm_test_fold "$home/state/domain.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the answered secondmate decision still lists as open: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: a marked local-secondmate answer closes with the plain answer text"
 }
@@ -553,9 +583,9 @@ test_remote_secondmate_answer_closes_locally() {
     "the answer message should cross the remote transport"
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/rsm.status" | grep -qF 'resolved [key=upgrade-window]: answered: the weekend, freeze Friday' \
     || fail "the remote answer did not close the local ledger: $(cat "$home/state/rsm.status")"
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the answered remote-secondmate decision still lists as open: $out"
+  fm_test_fold "$home/state/rsm.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the answered remote-secondmate decision still lists as open: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: a remote-secondmate answer closes the same local ledger, transport-only difference"
 }
@@ -589,9 +619,9 @@ test_remote_reply_corr_tag_does_not_block_resolve_key() {
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/rsm.status" | grep -qF 'resolved [key=loan-installment-cadence-amount]: answered: monthly' \
     || fail "the closing resolved line is missing:"$'\n'"$(cat "$home/state/rsm.status")"
 
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the answered corr-tagged remote decision still lists as open: $out"
+  fm_test_fold "$home/state/rsm.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the answered corr-tagged remote decision still lists as open: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: a remote reply's leading [corr=...] tag no longer blocks closing its stated key"
 }
@@ -691,9 +721,9 @@ test_reserved_pending_reply_key_closes_through_resolve_key() {
     fail "the operator close still wrote a bare answered: note that the fold ignores:"$'\n'"$(cat "$home/state/mate.status")"
   fi
 
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the reserved pending-reply decision still lists as open after --resolve-key: $out"
+  fm_test_fold "$home/state/mate.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the reserved pending-reply decision still lists as open after --resolve-key: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: a reserved pending-reply key actually closes through the operator path"
 }
@@ -714,18 +744,17 @@ test_unrelated_writer_cannot_close_or_hijack_reserved_key() {
     printf 'resolved [key=%s]: all good now\n' "$key"
   } > "$home/state/mate.status"
 
-  out=$(drain_out "$home")
-  printf '%s' "$out" | grep -F "pending-reply-id=$corr" >/dev/null \
-    || fail "an unrelated answered: resolution cleared a reserved decision: $out"
-  if printf '%s' "$out" | grep -F 'shipping is blocked on infra' >/dev/null; then
-    fail "an unrelated writer took over a reserved decision key: $out"
-  fi
+  fm_test_fold "$home/state/mate.status"
+  # The whole row: still open, still blocked, and still the library's own note (an
+  # unrelated writer neither closed it nor replaced its note).
+  [ "$FM_TEST_FOLD" = "$key"$'\t'"blocked"$'\t'"pending-reply-missed: task=mate pending-reply-id=$corr request=ship it" ] \
+    || fail "an unrelated writer closed or took over a reserved decision: $FM_TEST_FOLD"
 
   run_send "$fb" "$home" "$log" mate --resolve-key "$key" "dismiss the missed-reply hold"; rc=$?
   expect_code 0 "$rc" "the operator close should still succeed after foreign no-op lines"
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the reserved key stayed open after the operator close: $out"
+  fm_test_fold "$home/state/mate.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the reserved key stayed open after the operator close: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: an unrelated writer cannot close or hijack a reserved key, and the operator close still can"
 }
@@ -834,9 +863,9 @@ test_failed_close_recovery_command_is_shell_safe() {
   manual=${manual% - do not resend the answer.}
   bash -c "$manual" || fail "the generated manual close command should execute successfully"
   [ ! -e "$marker" ] || fail "the generated manual close command executed answer text as shell code"
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the generated manual close command did not close the decision: $out"
+  fm_test_fold "$home/state/t1.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the generated manual close command did not close the decision: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: failed-close recovery commands safely quote operator text and paths"
 }
@@ -860,9 +889,9 @@ test_remote_reserved_pending_reply_key_closes_locally() {
   grep -F "pending-reply-resolved: task=rsm pending-reply-id=$corr via=operator-resolve-key" \
     "$home/state/rsm.status" >/dev/null \
     || fail "the remote operator close did not write the owning library's close note: $(cat "$home/state/rsm.status")"
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the remote reserved pending-reply decision still lists as open: $out"
+  fm_test_fold "$home/state/rsm.status"
+  if [ -n "$FM_TEST_FOLD" ]; then
+    fail "the remote reserved pending-reply decision still lists as open: $FM_TEST_FOLD"
   fi
   pass "fm-send --resolve-key: a remote secondmate reserved-key close is the same local ledger append"
 }
@@ -914,10 +943,8 @@ test_decision_answer_partition_relocates_under_the_record() {
     || fail "the relocated answer did not close the decision:"$'\n'"$(cat "$home/state/t1.status")"
   grep -qF "go with REST" "$home/state/t1.inbox/002.msg" \
     || fail "the relocated answer did not reach the worker's inbox"
-  out=$(drain_out "$home")
-  if printf '%s' "$out" | grep -F '[key=api-shape]' >/dev/null; then
-    fail "the relocated answer left the decision open: $out"
-  fi
+  fm_test_fold "$home/state/t1.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "the relocated answer left the decision open: $FM_TEST_FOLD"
 
   # Main never meets the partition, attended or not.
   FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
@@ -1005,7 +1032,616 @@ test_unwritable_ledger_leaves_the_send_alone() {
   pass "fm-send --resolve-key: an unwritable ledger costs one stderr line and changes neither the close nor the output"
 }
 
+
+# --- The send must state its choice when the target has open keyed decisions ---
+# (bin/fm-send.sh header, "Decision closure"). A send that states neither
+# --resolve-key nor --answers-none is delivered yet leaves its decision open, so
+# the drain keeps listing answered work as waiting; it now refuses before
+# anything durable happens.
+
+# tree_state <home>: every file under the home with its checksum, so a refusal can
+# be shown to have changed nothing durable (inbox, expectation, ledger, status).
+# The supervision-warning banner marker (fm-guard.sh runs before any argument is
+# read, so every send writes it, refused or not) is not send state.
+tree_state() {
+  (cd "$1" && find . -type f ! -name '.guard-*' -exec cksum {} + 2>/dev/null | sort)
+}
+
+# setup_two_key_home <name> -> a home whose task t1 holds an open needs-decision
+# k1 and an open blocked k2.
+setup_two_key_home() {
+  local home
+  home=$(setup_home "$1")
+  mkdir -p "$home/config"
+  : > "$home/config/fleet-ledger"
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'needs-decision [key=k1]: pick REST or RPC\n' > "$home/state/t1.status"
+  printf 'blocked [key=k2]: need the staging token\n' >> "$home/state/t1.status"
+  printf '%s\n' "$home"
+}
+
+# send_capture <fakebin> <home> <log> <err-file> <args...>: run_send that keeps stderr.
+send_capture() {
+  local fb=$1 home=$2 log=$3 err=$4; shift 4
+  : > "$log"
+  env PATH="$fb:$PATH" \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" "$@" 2>"$err"
+}
+
+test_bare_send_with_open_keys_refuses() {
+  local dir fb log home err rc before after
+  dir="$TMP_ROOT/choice-bare"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home choice-bare)
+  before=$(tree_state "$home")
+
+  send_capture "$fb" "$home" "$log" "$err" t1 "go with REST"; rc=$?
+  expect_code 1 "$rc" "a send that states no choice must refuse with the same status as the --resolve-key refusals"
+  after=$(tree_state "$home")
+  assert_equals "$before" "$after" "a refused send must change nothing durable (inbox, expectation, ledger, status)"
+  [ ! -e "$home/state/t1.inbox" ] || fail "a refused send wrote a steering record"
+  [ ! -s "$log" ] || fail "a refused send rang a doorbell or typed text: $(cat "$log")"
+  assert_contains "$(cat "$err")" "[key=k1] needs-decision" "the refusal must list k1 with its verb"
+  assert_contains "$(cat "$err")" "[key=k2] blocked" "the refusal must list k2 with its verb"
+  assert_contains "$(cat "$err")" "--resolve-key <key>" "the refusal must name the --resolve-key way to proceed"
+  assert_contains "$(cat "$err")" "--answers-none" "the refusal must name the --answers-none way to proceed"
+  assert_contains "$(cat "$err")" "nothing was sent" "the refusal must say nothing was sent"
+
+  # The listing is the fold's open set: a key that closes leaves the listing.
+  send_capture "$fb" "$home" "$log" "$err.close" t1 --resolve-key k1 "REST" >/dev/null; rc=$?
+  expect_code 0 "$rc" "the keyed resend must deliver"
+  send_capture "$fb" "$home" "$log" "$err" t1 "next"; rc=$?
+  expect_code 1 "$rc" "one key still open: a bare send still refuses"
+  assert_contains "$(cat "$err")" "[key=k2] blocked" "the remaining open key is listed"
+  case "$(cat "$err")" in
+    *"[key=k1]"*) fail "a closed key is still listed: $(cat "$err")" ;;
+  esac
+  pass "fm-send: a send that states no choice refuses before anything durable and lists every open key"
+}
+
+# full_state <home>: every file and directory under the home, dot files and
+# guard markers included, with content checksums, so a refusal that appends
+# telemetry, creates the watcher-banner marker, or removes a stale lease shows.
+full_state() {
+  (cd "$1" && find . -print | LC_ALL=C sort | while IFS= read -r p; do
+    if [ -f "$p" ]; then printf 'f %s %s\n' "$p" "$(cksum < "$p")"; else printf 'd %s\n' "$p"; fi
+  done)
+}
+
+# refusal_env_send <fakebin> <home> <log> <err> <args...>: the real fm-send
+# through REAL gate-agent containment (not the tests/lib.sh bypass; run from the
+# fixture home, which is not a git checkout, with NO_MISTAKES_GATE unset), the
+# default home guard-event log (FM_GUARD_EVENT_LOG unset) and the supervision
+# guard live, so every pre-refusal write lands in the home.
+refusal_env_send() {
+  local fb=$1 home=$2 log=$3 err=$4; shift 4
+  : > "$log"
+  (cd "$home" && env -u FM_GUARD_EVENT_LOG -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" "$@" 2>"$err")
+}
+
+# A held lease answers 6 for any --resolve-key, valid or malformed: on base the lease
+# guard ran before option parsing (base bin/fm-send.sh: fm_lease_guard, then the
+# --resolve-key loop), so a malformed key under the other actor's live lease exited 6
+# there, and it must here too. With no live lease the malformed key is refused with 1.
+test_held_lease_answers_6_before_an_option_error() {
+  local dir fb log home err rc
+  dir="$TMP_ROOT/lease-first"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home lease-first)
+  printf '%s\n' "$$" > "$home/state/.lock"
+  printf 'branch\t%s\t1\n' "$$" > "$home/state/.lease-t1"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key=bad@ "answer"; rc=$?
+  expect_code 6 "$rc" "a malformed key under the other actor's live lease exits 6, as on base: $(cat "$err")"
+  assert_contains "$(cat "$err")" "leased to the branch" "the lease refusal is the one reported"
+  assert_not_contains "$(cat "$err")" "not a valid decision key" "the option error is not reported while the lease refuses"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key k1 --resolve-key k1 "answer"; rc=$?
+  expect_code 6 "$rc" "a duplicate key under the live lease exits 6: $(cat "$err")"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key -x "answer"; rc=$?
+  expect_code 6 "$rc" "a split-form key that starts with - is a key, as on base, so the live lease answers 6: $(cat "$err")"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "answer"; rc=$?
+  expect_code 6 "$rc" "a valid key under the live lease exits 6 (control): $(cat "$err")"
+  [ ! -e "$home/state/t1.inbox" ] || fail "a lease-refused send was delivered"
+
+  home=$(setup_two_key_home lease-first-free)
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key=bad@ "answer"; rc=$?
+  expect_code 1 "$rc" "with no live lease a malformed key is refused with 1 (control)"
+  assert_contains "$(cat "$err")" "not a valid decision key" "the option error names the bad key"
+  [ ! -e "$home/state/t1.inbox" ] || fail "a malformed-key send was delivered"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --resolve-key -x "answer"; rc=$?
+  expect_code 1 "$rc" "with no live lease a split-form dash key that is not open is refused with 1, as on base"
+  assert_contains "$(cat "$err")" "--resolve-key '-x': no open decision or blocker with that key" "the not-open refusal names the -x key, as on base"
+  [ ! -e "$home/state/t1.inbox" ] || fail "a split-form dash-key send was delivered"
+  pass "fm-send: a held lease answers 6 before an option error, as on base; with no lease the option error answers 1"
+}
+
+# assert_only_gate_event <before-state> <home> <expected-gate-line-jq> <label>:
+# the home changed in exactly one way - state/guard-events.jsonl now exists and
+# holds exactly one gate-agent-containment event matching the jq filter - and
+# nothing else was recorded, created or removed (Main 2026-11-14 D1 ruling).
+assert_only_gate_event() {
+  local before=$1 home=$2 filter=$3 label=$4 after
+  [ -f "$home/state/guard-events.jsonl" ] || fail "$label: real containment wrote no guard event"
+  assert_equals 1 "$(grep -c . "$home/state/guard-events.jsonl")" \
+    "$label: exactly one guard event before the refusal: $(cat "$home/state/guard-events.jsonl")"
+  jq -e "$filter" "$home/state/guard-events.jsonl" >/dev/null \
+    || fail "$label: the one event is not the expected gate-agent-containment event: $(cat "$home/state/guard-events.jsonl")"
+  after=$(full_state "$home" | grep -v ' \./state/guard-events\.jsonl ')
+  assert_equals "$before" "$after" "$label: nothing but the gate event was recorded, created or removed"
+  rm -f "$home/state/guard-events.jsonl"
+}
+
+# The no-choice refusal (and the contradictory-pair and unknown-open-set
+# refusals beside it) comes right after gate-agent containment, which stays
+# first as a security guard and may write its one guard event; before guard
+# telemetry, the watcher-banner marker and the supervision lease guard. So a
+# refused send records, creates and removes nothing else, and takes no lease
+# lock (header: "Decision closure"; Main 2026-11-14 ruling on D1).
+test_no_choice_refusal_precedes_telemetry_banner_and_lease() {
+  local dir fb log home err rc before lease_before lab
+  dir="$TMP_ROOT/choice-first"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home choice-first)
+  # A stale lease: well formed, but its pid is not alive and holds no session lock.
+  printf 'branch\t999999\t1\n' > "$home/state/.lease-t1"
+  lease_before=$(cksum < "$home/state/.lease-t1")
+  before=$(full_state "$home")
+
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 "go with REST"; rc=$?
+  expect_code 1 "$rc" "a bare send to a task with open keys refuses: $(cat "$err")"
+  assert_contains "$(cat "$err")" "[key=k1] needs-decision" "the refusal lists k1"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment" and .decision == "allow"' "bare refusal"
+  [ -e "$home/state/.lease-t1" ] || fail "a no-choice refusal removed the stale lease"
+  assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the refusal"
+
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 "go"; rc=$?
+  expect_code 1 "$rc" "the contradictory pair refuses"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "contradictory-pair refusal"
+  # The pair wins over an option error: with --answers-none and any --resolve-key form
+  # both standing as options (one grammar, fm_send_tokenize), nothing but the gate event
+  # is recorded, no supervision warning is printed and the stale lease is untouched. Each
+  # case is the whole argument list after the target, so the last one really leaves
+  # --resolve-key without a value. The split form takes the next word as its value, so
+  # after --resolve-key -x or --resolve-key -- the none flag is still seen; a value that
+  # is exactly --answers-none counts as that flag (--resolve-key --answers-none).
+  for pair in "--answers-none --resolve-key k1 --resolve-key k1 go" "--answers-none --resolve-key=bad@ go" \
+    "--resolve-key=bad@ --answers-none go" "--resolve-key --answers-none answer" "--answers-none --resolve-key" \
+    "--resolve-key -x --answers-none answer" "--resolve-key -- --answers-none go"; do
+    # shellcheck disable=SC2086 # Word-split on purpose: each case is an argument list.
+    refusal_env_send "$fb" "$home" "$log" "$err" t1 $pair; rc=$?
+    expect_code 1 "$rc" "the pair with an option error ($pair) refuses with exit 1: $(cat "$err")"
+    assert_contains "$(cat "$err")" "contradict each other" "the pair refusal is the one reported ($pair)"
+    assert_not_contains "$(cat "$err")" "WARNING" "no supervision warning ran before the pair refusal ($pair)"
+    assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "pair with an option error ($pair)"
+    assert_equals "$lease_before" "$(cksum < "$home/state/.lease-t1")" "the stale lease is byte-identical after the pair refusal ($pair)"
+  done
+
+  { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t1.status"
+  before=$(full_state "$home")
+  : > "$log"
+  (cd "$home" && env -u FM_GUARD_EVENT_LOG -u FM_GATE_REFUSE_BYPASS -u NO_MISTAKES_GATE PATH="$fb:$PATH" \
+    FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t1 "a bare steer" >/dev/null 2>"$err"); rc=$?
+  expect_code 1 "$rc" "a bare send whose open set cannot be read refuses"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "unknown-open-set refusal"
+
+  # A live lease held by the other supervision actor: the choice refusal comes
+  # first, so the sender learns the choice rule and no lease lock is taken.
+  home=$(setup_two_key_home choice-first-live)
+  printf '%s\n' "$$" > "$home/state/.lock"
+  printf 'branch\t%s\t1\n' "$$" > "$home/state/.lease-t1"
+  before=$(full_state "$home")
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 "go with REST"; rc=$?
+  expect_code 1 "$rc" "under another actor's live lease the no-choice refusal still comes first (exit 1, not the lease refusal)"
+  assert_contains "$(cat "$err")" "[key=k2] blocked" "the choice refusal lists the open keys"
+  assert_not_contains "$(cat "$err")" "leased to the branch" "the lease guard did not run before the choice refusal"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "refusal under a live lease"
+  refusal_env_send "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 --resolve-key k1 "go"; rc=$?
+  expect_code 1 "$rc" "under the live lease the pair with a duplicate key still refuses as the pair (exit 1, not 6): $(cat "$err")"
+  assert_contains "$(cat "$err")" "contradict each other" "the pair refusal comes before the lease guard"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment"' "pair under a live lease"
+
+  # A gate agent admitted in a marked disposable lab home: containment admits it
+  # first and writes its one allow event; the choice refusal then changes nothing else.
+  lab="$TMP_ROOT/choice-first-lab"; mkdir -p "$lab"; lab=$(cd "$lab" && pwd -P)
+  # The marker bin/fm-lab-home.sh writes (token owned by bin/fm-gate-refuse-lib.sh).
+  printf 'fm-lab-home v1\n' > "$lab/.fm-lab-home"
+  mkdir -p "$lab/state" "$lab/config" "$lab/data" "$lab/projects"
+  fm_write_meta "$lab/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'needs-decision [key=k1]: pick REST or RPC\nblocked [key=k2]: need the staging token\n' > "$lab/state/t1.status"
+  before=$(full_state "$lab")
+  : > "$log"
+  (cd "$lab" && env -u FM_GUARD_EVENT_LOG -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE \
+    NO_MISTAKES_GATE=1 PATH="$fb:$PATH" FM_HOME="$lab" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t1 "go with REST" >/dev/null 2>"$err"); rc=$?
+  expect_code 1 "$rc" "an admitted lab gate agent's no-choice send gets the choice refusal: $(cat "$err")"
+  assert_contains "$(cat "$err")" "[key=k1] needs-decision" "the lab refusal lists k1"
+  assert_only_gate_event "$before" "$lab" '.guard == "gate-agent-containment" and .decision == "allow" and .actor == "gate"' "admitted lab gate agent"
+
+  # Control: a gate agent outside a lab home is still refused by containment first.
+  home=$(setup_two_key_home choice-first-gate)
+  before=$(full_state "$home")
+  : > "$log"
+  (cd "$home" && env -u FM_GUARD_EVENT_LOG -u FM_GATE_REFUSE_BYPASS NO_MISTAKES_GATE=1 PATH="$fb:$PATH" \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t1 "go with REST" >/dev/null 2>"$err"); rc=$?
+  expect_code 3 "$rc" "a gate agent outside a lab home is refused by containment first"
+  assert_contains "$(cat "$err")" "gate agent must not drive the fleet" "the containment refusal is the one shown"
+  assert_only_gate_event "$before" "$home" '.guard == "gate-agent-containment" and .decision == "deny"' "denied gate agent"
+  pass "fm-send: through real containment, only its one gate event precedes the no-choice, contradictory (also beside an option error) and unknown-open-set refusals; telemetry, banner and lease come after"
+}
+
+# -- ends the options, so a literal body that starts with -- can be sent, and
+# --key after it is text, not the key path. The contradictory pair before --
+# still refuses.
+test_double_dash_ends_options() {
+  local dir fb log home err rc body
+  dir="$TMP_ROOT/choice-dashdash"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_home choice-dashdash)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'working: busy\n' > "$home/state/t1.status"
+  send_capture "$fb" "$home" "$log" "$err" t1 -- --answers-none deploy; rc=$?
+  expect_code 0 "$rc" "a literal body after -- is delivered"
+  body=$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")
+  assert_equals "--answers-none deploy" "$body" "the literal body after -- is delivered unchanged"
+  send_capture "$fb" "$home" "$log" "$err" t1 -- --key Enter; rc=$?
+  expect_code 0 "$rc" "--key after -- is text"
+  body=$(sed '1,/^--$/d' "$home/state/t1.inbox/002.msg")
+  assert_equals "--key Enter" "$body" "--key after -- is delivered as a text record, not sent as a key"
+
+  home=$(setup_two_key_home choice-dashdash-open)
+  send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 -- --answers-none; rc=$?
+  expect_code 0 "$rc" "a keyed answer whose literal body is --answers-none is delivered"
+  body=$(sed '1,/^--$/d' "$home/state/t1.inbox/001.msg")
+  assert_equals "--answers-none" "$body" "the literal keyed answer is delivered unchanged"
+  fm_test_fold "$home/state/t1.status"
+  [ "$FM_TEST_FOLD" = "k2"$'\t'"blocked"$'\t'"need the staging token" ] \
+    || fail "the keyed answer closes k1 and leaves only k2 open, unchanged: $FM_TEST_FOLD"
+  assert_contains "$(drain_out "$home")" "[key=k2]" "k2 stays open"
+  send_capture "$fb" "$home" "$log" "$err" t1 -- "plain words"; rc=$?
+  expect_code 1 "$rc" "-- states no choice: a bare body after -- still refuses while k2 is open"
+  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k2 -- go; rc=$?
+  expect_code 1 "$rc" "the genuinely contradictory pair still refuses"
+  assert_contains "$(cat "$err")" "contradict each other" "the contradictory refusal names both flags"
+  pass "fm-send: -- ends the options, so a literal body starting with -- is sent and the contradictory pair still refuses"
+}
+
+test_bare_send_refuses_before_marking_a_secondmate() {
+  local dir fb log home err rc before after
+  dir="$TMP_ROOT/choice-sm"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_home choice-sm)
+  fm_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:fm-domain"
+  printf 'needs-decision [key=fleet-split]: shard by team or by repo\n' > "$home/state/domain.status"
+  before=$(tree_state "$home")
+  send_capture "$fb" "$home" "$log" "$err" fm-domain "carry on"; rc=$?
+  expect_code 1 "$rc" "a bare send to a secondmate with an open key must refuse"
+  assert_equals "$before" "$(tree_state "$home")" "a refusal must leave no inbox record, no pending-reply expectation, no marker"
+  [ ! -d "$home/state/pending-replies" ] || fail "a refused send created a reply expectation"
+  assert_contains "$(cat "$err")" "[key=fleet-split] needs-decision" "the secondmate refusal lists the key"
+  pass "fm-send: the refusal happens before a secondmate target is marked or its reply expectation is created"
+}
+
+test_bare_send_unchanged_without_open_decisions() {
+  local dir fb log home rc rec_bare rec_none
+  dir="$TMP_ROOT/choice-none-open"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_home choice-none-open)
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'needs-decision [key=old]: choose\nresolved [key=old]: answered: done\nworking: busy\n' > "$home/state/t1.status"
+  run_send "$fb" "$home" "$log" t1 "plain steer"; rc=$?
+  expect_code 0 "$rc" "a bare send to a task with no open decision is delivered as before"
+  rec_bare=$(sed '/^at=/d' "$home/state/t1.inbox/001.msg")
+  rm -rf "$home/state/t1.inbox"
+  run_send "$fb" "$home" "$log" t1 --answers-none "plain steer"; rc=$?
+  expect_code 0 "$rc" "--answers-none on a task with no open decision is accepted (a caller may pass it unconditionally)"
+  rec_none=$(sed '/^at=/d' "$home/state/t1.inbox/001.msg")
+  assert_equals "$rec_bare" "$rec_none" "the record is identical with and without the flag (timestamp line aside)"
+  assert_contains "$rec_bare" "plain steer" "the steer text reached the record"
+
+  # A reply expectation that opened no status entry is outside the rule.
+  home=$(setup_home choice-pending-only)
+  fm_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:fm-domain"
+  run_send "$fb" "$home" "$log" fm-domain "first request"; rc=$?
+  expect_code 0 "$rc" "first request creates a reply expectation"
+  [ -d "$home/state/pending-replies" ] || fail "precondition: the first request should leave a pending-reply expectation"
+  run_send "$fb" "$home" "$log" fm-domain "second request"; rc=$?
+  expect_code 0 "$rc" "an expectation with no status entry is not an open keyed decision: the send is delivered"
+  pass "fm-send: sends to tasks with no open keyed decision are delivered exactly as before"
+}
+
+test_answers_none_delivers_a_routine_steer() {
+  local dir fb log home err rc before drain
+  dir="$TMP_ROOT/choice-none"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home choice-none)
+  before=$(cat "$home/state/t1.status")
+
+  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none "unrelated nudge"; rc=$?
+  expect_code 0 "$rc" "--answers-none delivers the steer"
+  grep -qF "unrelated nudge" "$home/state/t1.inbox/001.msg" || fail "the steer did not reach the record"
+  assert_contains "$(cat "$log")" "Firstmate instruction waiting" "the doorbell is rung for a none-send"
+  assert_equals "$before" "$(cat "$home/state/t1.status")" "a none-send appends no status line"
+  drain=$(drain_out "$home")
+  assert_contains "$drain" "[key=k1]" "k1 stays open after a none-send"
+  assert_contains "$drain" "[key=k2]" "k2 stays open after a none-send"
+  [ ! -e "$home/state/fleet-ledger.jsonl" ] || fail "a none-send recorded an answer in the ledger"
+
+  # --resolve-key for one of two keys is a stated choice and leaves the other open.
+  send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "REST"; rc=$?
+  expect_code 0 "$rc" "--resolve-key for one of two open keys needs no further flag"
+  fm_test_fold "$home/state/t1.status"
+  [ "$FM_TEST_FOLD" = "k2"$'\t'"blocked"$'\t'"need the staging token" ] \
+    || fail "answering k1 closes k1 and leaves only k2 open, unchanged: $FM_TEST_FOLD"
+  pass "fm-send --answers-none: delivers a routine steer, appends nothing, and leaves every key open"
+}
+
+test_answers_none_with_resolve_key_is_contradictory() {
+  local dir fb log home err rc before after
+  dir="$TMP_ROOT/choice-contradict"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home choice-contradict)
+  before=$(tree_state "$home")
+  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 "both"; rc=$?
+  expect_code 1 "$rc" "the flag pair is refused"
+  assert_contains "$(cat "$err")" "--answers-none" "the refusal names --answers-none"
+  assert_contains "$(cat "$err")" "--resolve-key" "the refusal names --resolve-key"
+  assert_equals "$before" "$(tree_state "$home")" "a contradictory pair changes nothing durable"
+  send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 --answers-none "both"; rc=$?
+  expect_code 1 "$rc" "the flag pair is refused in the other order too"
+  assert_equals "$before" "$(tree_state "$home")" "refusals change nothing durable"
+  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none --answers-none "twice"; rc=$?
+  expect_code 0 "$rc" "a repeated --answers-none states one choice and is delivered"
+  grep -qF "twice" "$home/state/t1.inbox/001.msg" || fail "the repeated-flag send did not reach the record"
+  assert_contains "$(drain_out "$home")" "[key=k1]" "a repeated --answers-none leaves k1 open"
+  pass "fm-send: --answers-none together with --resolve-key is refused as contradictory; a repeated --answers-none is one choice"
+}
+
+test_mistyped_or_closed_key_is_not_turned_into_a_none_send() {
+  local dir fb log home err rc before
+  dir="$TMP_ROOT/choice-mistyped"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home choice-mistyped)
+  before=$(tree_state "$home")
+  send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key nope "answer"; rc=$?
+  expect_code 1 "$rc" "a mistyped key is refused"
+  assert_contains "$(cat "$err")" "no open decision or blocker with that key" "the existing refusal text is unchanged"
+  assert_equals "$before" "$(tree_state "$home")" "a mistyped key changes nothing durable"
+  send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "REST" >/dev/null; rc=$?
+  expect_code 0 "$rc" "precondition: k1 closes"
+  before=$(tree_state "$home")
+  send_capture "$fb" "$home" "$log" "$err" t1 --resolve-key k1 "REST again"; rc=$?
+  expect_code 1 "$rc" "a closed key is refused as on base"
+  assert_contains "$(cat "$err")" "already closed or mistyped" "the existing closed-key refusal text is unchanged"
+  assert_equals "$before" "$(tree_state "$home")" "a closed key changes nothing durable"
+  pass "fm-send --resolve-key: a mistyped or closed key still refuses with the existing text and is never turned into a none-send"
+}
+
+test_reserved_key_counts_as_an_open_decision() {
+  local dir fb log home err rc key corr out
+  dir="$TMP_ROOT/choice-reserved"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  corr=abcdef0123456789
+  key="pending-reply-$corr"
+  home=$(setup_home choice-reserved)
+  fm_write_meta "$home/state/mate.meta" "window=sess:fm-mate" "kind=ship"
+  printf 'blocked [key=%s]: pending-reply-missed: task=mate pending-reply-id=%s request=ship it\n' \
+    "$key" "$corr" > "$home/state/mate.status"
+
+  send_capture "$fb" "$home" "$log" "$err" mate "carry on"; rc=$?
+  expect_code 1 "$rc" "a bare send to a task whose only open entry is a reserved key refuses"
+  assert_contains "$(cat "$err")" "[key=$key] blocked" "the reserved key is listed"
+  [ ! -e "$home/state/mate.inbox" ] || fail "the refused send wrote a record"
+
+  send_capture "$fb" "$home" "$log" "$err" mate --answers-none "carry on"; rc=$?
+  expect_code 0 "$rc" "the none-send is delivered"
+  assert_contains "$(drain_out "$home")" "[key=$key]" "the none-send leaves the reserved key open"
+
+  send_capture "$fb" "$home" "$log" "$err" mate --resolve-key "$key" "ack, false escalation"; rc=$?
+  expect_code 0 "$rc" "the keyed answer is delivered"
+  grep -F "pending-reply-resolved: task=mate pending-reply-id=$corr via=operator-resolve-key" \
+    "$home/state/mate.status" >/dev/null \
+    || fail "the keyed answer did not close with the owning library's vocabulary:"$'\n'"$(cat "$home/state/mate.status")"
+  fm_test_fold "$home/state/mate.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "the reserved key still lists as open: $FM_TEST_FOLD"
+  pass "fm-send: an open reserved pending-reply key refuses a bare send; the keyed answer closes it; the none-send leaves it open"
+}
+
+test_sends_that_cannot_answer_are_not_subject() {
+  local dir fb log home err rc
+  dir="$TMP_ROOT/choice-exempt"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_two_key_home choice-exempt)
+  send_capture "$fb" "$home" "$log" "$err" t1 --key Enter; rc=$?
+  expect_code 0 "$rc" "a --key send to a task with open keys is not subject to the rule"
+  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none --key Enter; rc=$?
+  expect_code 0 "$rc" "--answers-none is a harmless no-op beside --key"
+  send_capture "$fb" "$home" "$log" "$err" sess:elsewhere "typed text"; rc=$?
+  expect_code 0 "$rc" "a send to an explicit backend target has no task ledger and is not subject"
+  assert_contains "$(cat "$log")" "typed text" "the explicit-target text was typed"
+  assert_equals "$(printf 'needs-decision [key=k1]: pick REST or RPC\nblocked [key=k2]: need the staging token')" \
+    "$(cat "$home/state/t1.status")" "none of these sends touched the status log"
+  send_capture "$fb" "$home" "$log" "$err" t1 --answers-none --resolve-key k1 --key Enter; rc=$?
+  [ "$rc" -ne 0 ] || fail "--resolve-key beside --key still refuses"
+  pass "fm-send: --key sends and explicit backend targets are not subject to the choice rule"
+}
+
+test_log_past_the_read_limits_refuses_a_bare_send() {
+  local dir fb log home err rc
+  dir="$TMP_ROOT/choice-limits"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_home choice-limits)
+  fm_write_meta "$home/state/t5.meta" "window=sess:fm-t5" "kind=ship"
+  { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t5.status"
+
+  : > "$log"
+  env PATH="$fb:$PATH" FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t5 "a bare steer" >/dev/null 2>"$err"; rc=$?
+  expect_code 1 "$rc" "a bare send whose decision ledger cannot be read must refuse, not guess"
+  assert_contains "$(cat "$err")" "cannot tell whether t5 has open decisions" "the refusal says the open set is unknown"
+  assert_contains "$(cat "$err")" "nothing was sent" "the refusal states nothing was sent"
+  [ ! -d "$home/state/t5.inbox" ] || fail "a refused bare send still enqueued a record"
+  : > "$log"
+  env PATH="$fb:$PATH" FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t5 --answers-none "a none steer" >/dev/null 2>"$err"; rc=$?
+  expect_code 0 "$rc" "--answers-none does not depend on reading the log and is delivered"
+  pass "fm-send: an unreadable (past-the-limits) status log refuses a bare send rather than guessing"
+}
+
+# The CONFIG_REREAD pointer send (bin/fm-config-inherit-lib.sh) answers no
+# decision, so it states --answers-none and still lands when the mate has an open
+# keyed decision.
+test_config_reread_pointer_is_delivered_to_a_mate_with_an_open_keyed_decision() {
+  local dir fb log home instr out rc before
+  dir="$TMP_ROOT/reread-open-key"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_home reread-open-key)
+  fm_write_secondmate_meta "$home/state/sm.meta" "$home" "sess:fm-sm"
+  printf 'needs-decision [key=shard-plan]: shard by team or by repo\n' > "$home/state/sm.status"
+  before=$(cat "$home/state/sm.status")
+  instr="$home/state/.fm-inherited-config-reread.fixture"
+  printf 'These inherited config files changed. Re-read them.\n' > "$instr"
+  printf '%s' "$instr" > "$instr.pending"
+  : > "$log"
+  # The single-quoted script is deliberate: its $1 and $2 are bash -c positional parameters.
+  # shellcheck disable=SC2016
+  out=$(env PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    bash -c '. "$1"; fm_config_reread_send_pointer sm "$2"' _ "$ROOT/bin/fm-config-inherit-lib.sh" "$instr" 2>&1); rc=$?
+  expect_code 0 "$rc" "the CONFIG_REREAD send was refused by the open keyed decision: $out"
+  assert_contains "$out" "config-reread: sent" "the CONFIG_REREAD send did not report delivery: $out"
+  grep -qF "CONFIG_REREAD: $instr" "$home/state/sm.inbox/001.msg" \
+    || fail "the CONFIG_REREAD pointer did not reach the mate's record"
+  assert_equals "$before" "$(cat "$home/state/sm.status")" "the CONFIG_REREAD send closed or appended something in the mate's status log"
+  assert_contains "$(drain_out "$home")" "[key=shard-plan]" "the open decision no longer lists as open after the CONFIG_REREAD send"
+  pass "fm-send callers: the CONFIG_REREAD pointer reaches a mate that has an open keyed decision and leaves it open"
+}
+
+# The three cases of 2026-11-03 that led to the choice rule (fm-send header, "Decision
+# closure"). Each status log below holds the recorded verb, key, corr and at stamps of the
+# lines in the home's state/ at the moment the answer was sent; the summary text is cut after
+# its first clause (the full recorded lines are in the task's evidence). The answer texts are
+# stand-ins: the message bodies of Main 2874, Main 3000 and the Main 2868 follow-up are not in
+# any status log. On the old behavior each answer was delivered and the key stayed open (the
+# lane's own working:/done: lines cannot close it); now the bare send refuses.
+recorded_case_check() {  # <case-name> <task> <key> <status-log-file> <lane-lines-file> <drain-marker>
+  local name=$1 task=$2 key=$3 statusfile=$4 lanefile=$5 marker=$6 dir fb log home err rc out
+  local before after new_records rec none_rec status_lines resolved n rline resolve_re keyed_text="stand-in keyed answer to $key"
+  dir="$TMP_ROOT/recorded-$name"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_home "recorded-$name")
+  # All three recorded lanes are secondmates: a secondmate's own done: line does not clear its open set.
+  fm_write_secondmate_meta "$home/state/$task.meta" "$home" "sess:fm-$task"
+  cp "$statusfile" "$home/state/$task.status"
+  assert_contains "$(drain_out "$home")" "$marker" "precondition: the recorded decision lists as open"
+
+  send_capture "$fb" "$home" "$log" "$err" "$task" "stand-in answer text"; rc=$?
+  expect_code 1 "$rc" "$name: the bare answer must refuse"
+  assert_contains "$(cat "$err")" "[key=$key]" "$name: the refusal must list the recorded key"
+  [ ! -e "$home/state/$task.inbox" ] || fail "$name: the refused answer was delivered"
+
+  # What the old behavior led to: a none-send is the explicit way to deliver without closing, and
+  # the lane's own later lines never close the key.
+  send_capture "$fb" "$home" "$log" "$err" "$task" --answers-none "stand-in answer text"; rc=$?
+  expect_code 0 "$rc" "$name: the none-send is delivered"
+  # The none-send's own record: exactly one numeric NNN.msg record (the inbox's record names,
+  # bin/fm-task-inbox-lib.sh "Layout"), with its answer in its body.
+  none_rec=$(fm_test_inbox_records "$home/state/$task.inbox")
+  [ "$(printf '%s\n' "$none_rec" | grep -c .)" = 1 ] || fail "$name: the none-send did not land exactly one inbox record: $none_rec"
+  case "$(sed '1,/^--$/d' "$home/state/$task.inbox/$none_rec")" in
+    *"stand-in answer text"*) ;;
+    *) fail "$name: the none-send's record does not carry its answer in its body" ;;
+  esac
+  cat "$lanefile" >> "$home/state/$task.status"
+  assert_contains "$(drain_out "$home")" "$marker" "$name: the lane's working:/done: lines closed the key"
+
+  # The keyed answer must land its OWN new inbox record: one numeric record that did not exist
+  # before this send, whose body (after the record's -- line) carries this send's answer, which
+  # names the key; the none-send's record must still be there, unchanged in name and still
+  # carrying its own answer, so the inbox holds exactly those two records. The send must also
+  # append its own resolution: a status line that is exactly "resolved [key=<key>]: answered:
+  # <this answer>", with an optional [at=<digits>] stamp only before the colon.
+  before=$(fm_test_inbox_records "$home/state/$task.inbox")
+  status_lines=$(wc -l < "$home/state/$task.status" | tr -d ' ')
+  send_capture "$fb" "$home" "$log" "$err" "$task" --resolve-key "$key" "$keyed_text"; rc=$?
+  expect_code 0 "$rc" "$name: the keyed answer is delivered"
+  after=$(fm_test_inbox_records "$home/state/$task.inbox")
+  new_records=$(comm -13 <(printf '%s\n' "$before" | sort) <(printf '%s\n' "$after" | sort) | grep -c .)
+  [ "$new_records" = 1 ] || fail "$name: the keyed answer must add exactly one new inbox record (added $new_records)"
+  [ "$(printf '%s\n' "$after" | grep -c .)" = 2 ] || fail "$name: the inbox must hold the none-send's record and the keyed answer's (has: $after)"
+  rec=$(comm -13 <(printf '%s\n' "$before" | sort) <(printf '%s\n' "$after" | sort) | grep .)
+  case "$(sed '1,/^--$/d' "$home/state/$task.inbox/$rec")" in
+    *"$keyed_text"*) ;;
+    *) fail "$name: the keyed answer's own record $rec does not carry the answer and its key in its body: $(cat "$home/state/$task.inbox/$rec")" ;;
+  esac
+  [ "$rec" != "$none_rec" ] || fail "$name: the keyed answer reused the none-send's record name $none_rec"
+  case "$(sed '1,/^--$/d' "$home/state/$task.inbox/$none_rec" 2>/dev/null)" in
+    *"stand-in answer text"*) ;;
+    *) fail "$name: after the keyed answer the none-send's record $none_rec no longer carries its answer" ;;
+  esac
+  # One bash match over each appended line, no external command: the optional [at=<digits>]
+  # stamp only before the colon; the key and the whole answer compared with =; an empty answer
+  # fails.
+  resolved=0 n=0
+  resolve_re='^resolved \[key=([^]]+)\]( \[at=[0-9]+\])?: answered: (.*)$'
+  while IFS= read -r rline || [ -n "$rline" ]; do
+    n=$((n + 1))
+    [ "$n" -gt "$status_lines" ] || continue
+    if [[ $rline =~ $resolve_re ]] && [ "${BASH_REMATCH[1]}" = "$key" ] \
+      && [ -n "${BASH_REMATCH[3]}" ] && [ "${BASH_REMATCH[3]}" = "$keyed_text" ]; then
+      resolved=1
+    fi
+  done < "$home/state/$task.status"
+  [ "$resolved" = 1 ] \
+    || fail "$name: the keyed answer did not append its own resolved [key=$key] line: $(cat "$home/state/$task.status")"
+  fm_test_fold "$home/state/$task.status"
+  [ -z "$FM_TEST_FOLD" ] || fail "$name: the key is still open after the keyed answer: $FM_TEST_FOLD"
+}
+
+test_recorded_cases_of_2026_11_03() {
+  local dir="$TMP_ROOT/recorded-lines"
+  mkdir -p "$dir"
+  # Case 1 - d3 b6-slice2-seam-and-admit, Main 2874 sent with a correlation only.
+  cat > "$dir/case1.status" <<'EOF'
+needs-decision [key=b6-slice2-seam-and-admit] [at=1793687475]: B6 slice 2 customer screens (worker alive, clean at ad8e09ee9, 1 unlanded commit) has waited about 8 h for two Main items: (1) the after-confirm seam answer, (2) the admit for its one run.
+EOF
+  cat > "$dir/case1.lane" <<'EOF'
+working [key=b6-slice2-seam-and-admit] [corr=770ac0ee07611c04] [at=1793687979]: Main 2874 relayed to the B6 worker (seam = option A); keep holding ad8e09ee9 for the admit.
+done [key=b6-slice2-seam-and-admit] [corr=770ac0ee07611c04] [at=1793688539]: B6 M6 Verify addition PASSED clean contract review.
+EOF
+  recorded_case_check d3-b6-slice2 b6mate b6-slice2-seam-and-admit "$dir/case1.status" "$dir/case1.lane" "[key=b6-slice2-seam-and-admit]"
+
+  # Case 2 - vernant-mini-build train-records-close-route: the lane reopened the key after
+  # Main 2999 closed it, and Main 3000 went without the key.
+  cat > "$dir/case2.status" <<'EOF'
+needs-decision [key=train-records-close-route] [at=1793711904]: train H5 landed (PR 3607, commit 06a18553). Three old ledger rows block my wake acks and cannot be deferred twice.
+resolved [key=train-records-close-route] [at=1793712032]: answered: Main 2999 [key=train-records-close-route] Ledger rows (record each with this message's text as evidence)
+needs-decision [key=train-records-close-route] [corr=6abd3f41d39e730f] [at=1793712159]: (a) three ledger rows recorded escalated with Main 2999 text (steered refused as before). (b) h5 closed already by the merge script's own prune.
+EOF
+  cat > "$dir/case2.lane" <<'EOF'
+done [key=train-records-close-route] [corr=5aa6551388deaf07] [at=1793712531]: received Main 3000. h3 record held untouched until Main relays the captain's drop words verbatim.
+EOF
+  recorded_case_check vernant-mini-build minimate train-records-close-route "$dir/case2.status" "$dir/case2.lane" "[key=train-records-close-route]"
+
+  # Case 3 - d3, the Main 2868 blocker: an unkeyed blocked: line with a correlation folds under the
+  # key "default"; it stayed open until Main 3124.
+  cat > "$dir/case3.status" <<'EOF'
+blocked [corr=5187ee73da3d3afd] [at=1793687534]: Main 2868 not done. Drop words written verbatim to the two captain-drop-words files. The teardown command did NOT run: this session's harness permission check refused it before execution.
+EOF
+  cat > "$dir/case3.lane" <<'EOF'
+working [at=1793687900]: retrying the two drop items after Main 2868.
+EOF
+  recorded_case_check d3-main2868 d3mate default "$dir/case3.status" "$dir/case3.lane" "d3mate blocked:"
+  pass "fm-send: the three recorded cases of 2026-11-03 refuse a bare answer; the keyed answer leaves the drain's open set without the key"
+}
+
 test_answer_send_closes_open_decision
+test_dash_key_is_answered_with_the_equals_form
 test_answer_close_is_self_announced
 test_separate_resolve_key_answers_do_not_rewake
 test_colon_first_key_position_is_answerable
@@ -1032,3 +1668,17 @@ test_remote_reserved_pending_reply_key_closes_locally
 test_decision_answer_partition_relocates_under_the_record
 test_resolve_key_records_task_answered
 test_unwritable_ledger_leaves_the_send_alone
+test_bare_send_with_open_keys_refuses
+test_bare_send_refuses_before_marking_a_secondmate
+test_no_choice_refusal_precedes_telemetry_banner_and_lease
+test_held_lease_answers_6_before_an_option_error
+test_double_dash_ends_options
+test_bare_send_unchanged_without_open_decisions
+test_answers_none_delivers_a_routine_steer
+test_answers_none_with_resolve_key_is_contradictory
+test_mistyped_or_closed_key_is_not_turned_into_a_none_send
+test_reserved_key_counts_as_an_open_decision
+test_sends_that_cannot_answer_are_not_subject
+test_log_past_the_read_limits_refuses_a_bare_send
+test_config_reread_pointer_is_delivered_to_a_mate_with_an_open_keyed_decision
+test_recorded_cases_of_2026_11_03

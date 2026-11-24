@@ -650,7 +650,7 @@ mirror_spawn() {  # <dsh-home> <id> -> spawn output
   python3 "$TMP_ROOT/dsh-session-writer.py" "$HOME_DIR/state" "$2" "$LAUNCH_LOG" &
   writer=$!
   # shellcheck disable=SC2016 # the body expands inside the dsh-named shell
-  out=$(export -f fm_test_run_spawn; ROOT="$ROOT" FM_DSH_HARNESS=dsh DSH_HOME="$1" FM_DSH_SOURCE_HOME="$HOME_DIR/user-home/.dsh" \
+  out=$(export -f fm_test_run_spawn fm_test_spawn_script; ROOT="$ROOT" FM_DSH_HARNESS=dsh DSH_HOME="$1" FM_DSH_SOURCE_HOME="$HOME_DIR/user-home/.dsh" \
     FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
     "$CASE_DIR/ancestor/dsh" -c 'fm_test_run_spawn "$@"; exit "$?"' _ "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$2" "$PROJ_DIR" --scout)
   status=$?

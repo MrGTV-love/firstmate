@@ -21,8 +21,8 @@
 #
 # Usage:
 #   fm-captain-hold.sh hold <task-id> --reason <reason> \
-#     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD] \
-#     [--owner captain]
+#     --boundary <name> --if-no <action> [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD] \
+#     [--owner captain] [--recommendation <exact-answer-text>]
 #   fm-captain-hold.sh withdraw <task-id> --evidence-file <path> --ruling <ruling-task-id>
 #   fm-captain-hold.sh freeze <task-id> --project <project>
 #   fm-captain-hold.sh frozen <task-id>
@@ -63,6 +63,27 @@
 # `complete` and `verify` check. The reason may hold parentheses and line breaks:
 # tasks-axi refuses them, so `hold` escapes them where it writes the reason and
 # readers decode them (bin/fm-hold-reason-lib.sh owns the encoding).
+# New holds require --boundary to be exactly credential, spend, destructive,
+# irreversible, tool-denial, or owner-rule-change, and --if-no must contain a
+# non-whitespace action the fleet would take if the answer were no. Otherwise
+# Main decides: the call is not the captain's to hold. The header stores
+# `Captain hold boundary:` and `Captain hold if-no:` (a JSON string preserving
+# the action verbatim); tasks-axi show <id> --full reads them back. The name is
+# the filing agent's assertion, not proof that the boundary applies.
+# An unresolved captain hold, including a legacy hold without these fields,
+# may be re-held or deferred without supplying them and retains its fields.
+# A released/resolved task starts a new hold and must supply the new fields.
+# Optional --recommendation records the exact answer value as a JSON string on
+# a `Captain hold recommendation:` header line, never inferred from card prose.
+# Re-holds keep it; a released task's new hold does not inherit it. An answer
+# whose payload equals that value after trimming surrounding whitespace records
+# one delay mistake in the owning home's data/error-log.jsonl. Each JSON line
+# has exactly kind="delay", hold_id, hours_open (answer time minus hold-set time
+# in hours, rounded to two decimals), answer (verbatim first 200 characters),
+# and at (UTC ISO answer time). Keyed answers use the answer value, not its
+# display label or provenance wrapper. No recorded recommendation means no log.
+# The resolution retains its planned delay record so an exact answer retry can
+# finish an interrupted append without duplicating it; it is not a new answer.
 # `--until` records the captain's own deferral date through `tasks-axi hold
 # --until`, so a "revisit later" answer is stored as a date instead of a live
 # card.
@@ -133,8 +154,8 @@
 # writes a resolution block while preserving the leading hold-set stamp until
 # the close succeeds (the previous body is preserved and archived through
 # tasks-axi --archive-body). It closes a question with `tasks-axi done` (and then clears
-# the finished id from every other item's blocked-by list, as `answer` and `withdraw`
-# both do) - or,
+# the finished id from every other item's blocked-by list, as `withdraw` and
+# `reconcile close` do too) - or,
 # with `--release`, lifts the hold with `tasks-axi unhold` so a captain-gated
 # WORK item resumes without closing - and restores resolution-first body
 # ordering. For direct callers, an exact retry also completes unfinished ordering
@@ -243,7 +264,18 @@
 # (a process-event source id, for example). The binding is a private record
 # under `state/decision-bindings/`; a source with no binding feeds nothing, so
 # this whole path is opt-in per source and an unbound source behaves as if it
-# did not exist. `bind` deliberately does not require the source to exist yet,
+# did not exist. The Slack request path and the mirror's card posts check the binding
+# and then deliver (the acknowledgement post, the selection of a request wake line for printing, a card post)
+# while they hold `state/decision-bindings/` shared, and `unbind` takes it exclusive
+# to remove the record: no such delivery already past its binding check is completed
+# once `unbind` has returned. The write of a selected line to standard output is not
+# held, so that a reader that does not read can never make an unbind wait. Other channels (the Slack answer path, process-event
+# feeds) check the binding as before and are not held. `unbind` waits for a delivery
+# already under way and has no time limit (no override either); after 60 seconds of
+# waiting it prints one line saying so on stderr and keeps waiting. When the binding
+# folder exists but cannot be examined or opened, it refuses (exit 1) and the binding
+# stays as it was, so a successful `unbind` always means the record is gone.
+# `bind` deliberately does not require the source to exist yet,
 # so a channel can be bound BEFORE it is armed. The optional second argument
 # exists only for legacy pre-collapse records and callers: a concrete origin is
 # stored verbatim and used as the composition fallback above, and
@@ -415,9 +447,13 @@ publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
 
 CAPTAIN_META_LOCK=
 CAPTAIN_META_LOCK_HELD=0
+CAPTAIN_META_TMP=
 CAPTAIN_CONTROL_LOCK=
 CAPTAIN_CONTROL_LOCK_HELD=0
 captain_hold_cleanup() {
+  if [ -n "$CAPTAIN_META_TMP" ]; then
+    rm -f -- "$CAPTAIN_META_TMP" || true
+  fi
   if [ "$CAPTAIN_META_LOCK_HELD" = 1 ]; then
     fm_lock_release "$CAPTAIN_META_LOCK" || true
     CAPTAIN_META_LOCK_HELD=0
@@ -492,8 +528,9 @@ BINDING_ANY='(any)'
 
 DECISION_TEXT=''
 DECISION_DIGEST=''
+DECISION_FILE=''
 
-load_decision() {  # <path>; sets DECISION_TEXT and DECISION_DIGEST
+load_decision() {  # <path>; sets DECISION_TEXT, DECISION_DIGEST and DECISION_FILE
   local path=$1 decision
   [ -n "$path" ] || fail "--decision-file is required"
   [ -f "$path" ] || fail "decision file does not exist: $path"
@@ -502,6 +539,7 @@ load_decision() {  # <path>; sets DECISION_TEXT and DECISION_DIGEST
   [ "$(printf '%s' "$decision" | LC_ALL=C wc -c | tr -d ' ')" -le 8192 ] \
     || fail "decision file exceeds 8192 bytes"
   DECISION_TEXT=$decision
+  DECISION_FILE=$path
   DECISION_DIGEST=$(sha256_text "$decision")
 }
 
@@ -806,6 +844,7 @@ resolution_block() {
       ;;
     *) printf 'Answered by: %s\n' "$(fm_answered_by "$FM_HOME" "$STATE" hold "$(decision_source)")" ;;
   esac
+  [ -z "${3:-}" ] || printf 'Captain hold delay: %s\n' "$3"
   printf '\n%s\n%s\n' "$label" "$DECISION_TEXT"
 }
 
@@ -1497,7 +1536,7 @@ task_identity() {
 }
 
 write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
-  local id=$1 body=$2 origin=$3 stamp owner freeze rest new_body tmp
+  local id=$1 body=$2 origin=$3 stamp owner freeze filing rest new_body tmp
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   stamp=$(printf '%s\n' "$body" | sed -n 1p)
@@ -1505,12 +1544,18 @@ write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
     || fail "task $id lost its hold-set stamp before its origin was recorded"
   owner=$(body_decision_owner "$body")
   freeze=$(body_hold_freeze_project "$body")
+  filing=$(printf '%s\n' "$body" | awk '
+    NR == 1 { next }
+    NF == 0 { exit }
+    /^Captain hold (boundary|if-no|recommendation): / { print }
+  ')
   rest=$(printf '%s\n' "$body" | sed 1d | awk '
       BEGIN { header = 1 }
       header && NF == 0 { header = 0 }
       /^Captain hold origin: / { next }
       header && /^Captain hold freezes project: / { next }
       header && /^Decision owner: / { next }
+      header && /^Captain hold (boundary|if-no|recommendation): / { next }
       { print }
     ' | awk 'NF || started { started = 1; print }')
   new_body=$stamp
@@ -1522,6 +1567,9 @@ write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
   fi
   if [ -n "$freeze" ]; then
     new_body=$(printf '%s\nCaptain hold freezes project: %s' "$new_body" "$freeze")
+  fi
+  if [ -n "$filing" ]; then
+    new_body=$(printf '%s\n%s' "$new_body" "$filing")
   fi
   if [ -n "$rest" ]; then
     new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
@@ -1651,10 +1699,53 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
   printf '%s %s %s\n' "$id" "$how" "$origin_state"
 }
 
+validate_hold_boundary() {  # <boundary> <if-no>
+  case "$1" in
+    credential|spend|destructive|irreversible|tool-denial|owner-rule-change) : ;;
+    *) fail "Main decides: a new captain hold requires --boundary credential, spend, destructive, irreversible, tool-denial, or owner-rule-change" ;;
+  esac
+  printf '%s' "$2" | perl -MEncode=decode -e '
+    local $/;
+    my $value = decode("UTF-8", <STDIN> // "");
+    exit($value =~ /\S/ ? 0 : 1);
+  ' || fail "Main decides: a captain hold requires a nonempty --if-no action"
+}
+
+write_hold_filing_fields() {  # <id> <shown-body> <boundary-or-empty> <if-no> <recommendation-given> <recommendation>
+  local id=$1 body tmp
+  body=$(decode_shown_value "$2") || fail "could not decode the existing body for $id"
+  tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-fields.XXXXXX") \
+    || fail "cannot stage the hold filing fields"
+  if ! printf '%s' "$body" | perl -MJSON::PP -MEncode=decode -0777 -e '
+    binmode STDIN, ":encoding(UTF-8)";
+    binmode STDOUT, ":encoding(UTF-8)";
+    my ($boundary, $if_no, $recommendation_given, $recommendation) = map { decode("UTF-8", $_) } @ARGV;
+    my $json = JSON::PP->new->allow_nonref->ascii;
+    my ($header, $rest) = split /\n\n/, <STDIN>, 2;
+    $header =~ /^Captain hold set: / or die "missing hold-set stamp\n";
+    $header = join "\n", grep {
+      !(length($boundary) && /^Captain hold (?:boundary|if-no): /)
+        && !($recommendation_given && /^Captain hold recommendation: /)
+    } split /\n/, $header;
+    print "$header\n";
+    print "Captain hold boundary: $boundary\nCaptain hold if-no: ", $json->encode($if_no), "\n" if length($boundary);
+    print "Captain hold recommendation: ", $json->encode($recommendation), "\n" if $recommendation_given;
+    print "\n$rest\n" if defined($rest) && length($rest);
+  ' "$3" "$4" "$5" "$6" > "$tmp"; then
+    rm -f -- "$tmp"
+    fail "cannot stage the hold filing fields for $id"
+  fi
+  if ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
+    rm -f -- "$tmp"
+    fail "could not record the hold filing fields on $id"
+  fi
+  rm -f -- "$tmp"
+}
+
 command_hold() {
   local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
   local existing_hold_kind='' existing_held='' preserve_hold_set=0 existing_freeze='' stored_reason previous_origin='' hold_status=0 resolved_hold_set
-  local owner='' scope
+  local owner='' scope boundary='' if_no='' boundary_given=0 if_no_given=0 recommendation='' recommendation_given=0
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -1665,6 +1756,18 @@ command_hold() {
       --origin) shift; origin=${1:-} ;;
       --until) shift; until=${1:-} ;;
       --owner) shift; owner=${1:-} ;;
+      --boundary)
+        [ "$#" -ge 2 ] || fail "Main decides: --boundary requires a named authority boundary"
+        shift; boundary=$1; boundary_given=1
+        ;;
+      --if-no)
+        [ "$#" -ge 2 ] || fail "Main decides: --if-no requires the action a no answer would cause"
+        shift; if_no=$1; if_no_given=1
+        ;;
+      --recommendation)
+        [ "$#" -ge 2 ] || fail "--recommendation requires an exact answer value"
+        shift; recommendation=$1; recommendation_given=1
+        ;;
       *) usage >&2; exit 2 ;;
     esac
     shift
@@ -1681,6 +1784,9 @@ command_hold() {
       ;;
   esac
   [ -n "$reason" ] || fail "reason must not be empty"
+  if [ "$boundary_given" = 1 ] || [ "$if_no_given" = 1 ]; then
+    validate_hold_boundary "$boundary" "$if_no"
+  fi
   # bin/fm-hold-reason-lib.sh owns the storage constraint and reversible encoding.
   stored_reason=$(fm_hold_reason_encode "$reason") || fail "could not encode the hold reason"
   if [ -n "$origin" ]; then
@@ -1709,13 +1815,27 @@ command_hold() {
     if [ "$existing_hold_kind" = captain ] && [ "$existing_held" = yes ]; then
       preserve_hold_set=1
     elif [ "$existing_hold_kind" = captain ]; then
-      existing_freeze=$(body_hold_freeze_project "$(show_field_value "$show" body)")
+      # Date-gated holds retain captain provenance after tasks-axi reports them
+      # unheld. They are still the same unresolved call, not new authority.
+      body=$(show_field_value "$show" body)
+      resolved_hold_set=$(recorded_resolved_hold_set "$(show_field "$show" body)")
+      if { [ -n "$(body_hold_set_timestamp "$body")" ] \
+          && [ "$(body_hold_set_timestamp "$body")" != "$resolved_hold_set" ]; } \
+        || ! body_has_resolution_record "$(show_field "$show" body)"; then
+        preserve_hold_set=1
+      else
+        existing_freeze=$(body_hold_freeze_project "$body")
+      fi
+    fi
+    if [ "$preserve_hold_set" = 0 ] && [ "$boundary_given" = 0 ]; then
+      validate_hold_boundary "$boundary" "$if_no"
     fi
     if [ -n "$title" ]; then
       existing_title=$(show_field_value "$show" title)
       [ "$existing_title" = "$title" ] || fail "existing task $id has a different title"
     fi
   else
+    [ "$boundary_given" = 1 ] || validate_hold_boundary "$boundary" "$if_no"
     [ -n "$title" ] || fail "--title is required to create task $id"
     validate_one_line title "$title"
     if [ -z "$repo" ] && [ -n "$origin" ] && [ -f "$STATE/$origin.meta" ]; then
@@ -1771,6 +1891,10 @@ command_hold() {
     previous_origin=$(body_hold_origin "$(show_field_value "$show" body)")
     write_hold_origin "$id" "$(show_field "$show" body)" "$origin" || exit $?
   fi
+  if [ "$boundary_given" = 1 ] || [ "$recommendation_given" = 1 ]; then
+    task_show_or_fail "$id" "task $id disappeared before recording its filing fields"
+    write_hold_filing_fields "$id" "$(show_field "$show" body)" "$boundary" "$if_no" "$recommendation_given" "$recommendation"
+  fi
   if [ -n "$until" ]; then
     tasks_axi hold "$id" --reason "$stored_reason" --kind captain --until "$until" >/dev/null \
       || hold_status=$?
@@ -1797,15 +1921,99 @@ command_hold() {
   printf '%s\n' "$id"
 }
 
+# Prepare accounting from the active hold header only, never from recommendation
+# prose or historical headers. The raw file preserves direct answers byte-for-
+# character after UTF-8 decoding; keyed files contribute only their Answer value.
+build_delay_record() {  # <id> <mode> <decoded-body>
+  case "$2" in answered|released|repaired) : ;; *) return 0 ;; esac
+  case "$3" in *"Captain hold recommendation: "*) : ;; *) return 0 ;; esac
+  printf '%s' "$3" | perl -MJSON::PP -MTime::HiRes=time -MTime::Local=timegm -MPOSIX=strftime -e '
+    use strict;
+    use warnings;
+    binmode STDIN, ":encoding(UTF-8)";
+    binmode STDOUT, ":encoding(UTF-8)";
+    local $/;
+    my $body = <STDIN>;
+    my ($header) = split /\n\n/, $body, 2;
+    exit 0 unless $header =~ /^Captain hold set: (\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})Z)?\n/;
+    my $opened = timegm($6 // 0, $5 // 0, $4 // 0, $3, $2 - 1, $1);
+    exit 0 unless $header =~ /^Captain hold recommendation: (.+)$/m;
+    my $json = JSON::PP->new->allow_nonref->ascii->canonical;
+    my $recommendation = $json->decode($1);
+    die "recommendation is not a string\n" if ref($recommendation) || !defined($recommendation);
+    open my $answer_file, "<:encoding(UTF-8)", $ARGV[1] or die "answer input: $!\n";
+    my $answer = <$answer_file>;
+    close $answer_file or die "answer input: $!\n";
+    if ($answer =~ /\ACaptain answered this call through [^\n]*\nTask: [^\n]+\nAnswer: ([^\n]*)\n/) {
+      $answer = $1;
+    }
+    my $trimmed = $answer;
+    $trimmed =~ s/^\s+|\s+$//g;
+    $recommendation =~ s/^\s+|\s+$//g;
+    exit 0 unless $trimmed eq $recommendation;
+    my $now = time;
+    my $seconds = int($now);
+    my $at = strftime("%Y-%m-%dT%H:%M:%S", gmtime($seconds)) . sprintf(".%06dZ", int(($now - $seconds) * 1000000));
+    print $json->encode({kind => "delay", hold_id => $ARGV[0],
+      hours_open => 0 + sprintf("%.2f", ($now - $opened) / 3600),
+      answer => substr($answer, 0, 200), at => $at});
+  ' "$1" "$DECISION_FILE" || fail "could not prepare delay accounting for $1"
+}
+
+# The planned line lives in the newest resolution header, so the existing exact
+# answer retry can finish an append interrupted after the answer became durable.
+# The native microsecond event time identifies that immutable line; the log lock
+# serializes different tasks in the same home without a second state store.
+append_recorded_delay() {  # <id> <shown-body>
+  local id=$1 body record
+  case "$2" in *"Captain hold delay: "*) : ;; *) return 0 ;; esac
+  body=$(decode_shown_value "$2") || fail "could not read delay accounting for $id"
+  record=$(printf '%s\n' "$body" | awk '
+    NR == 1 && /^Captain hold set: / { next }
+    !started && NF == 0 { next }
+    !started && /^Resolution recorded by fm-captain-hold\.$/ { started = 1; next }
+    !started || NF == 0 { exit }
+    /^Captain hold delay: / { sub(/^Captain hold delay: /, ""); print; exit }
+  ')
+  [ -n "$record" ] || return 0
+  mkdir -p "$FM_HOME/data" || fail "could not create the delay log directory for $id"
+  printf '%s' "$record" | perl -MJSON::PP -MFcntl=:DEFAULT,:flock -e '
+    use strict;
+    use warnings;
+    my $json = JSON::PP->new->utf8->canonical;
+    local $/;
+    my $record = $json->decode(<STDIN>);
+    die "delay record belongs to another task\n" unless $record->{hold_id} eq $ARGV[1] && $record->{kind} eq "delay";
+    my $line = $json->encode($record);
+    sysopen(my $log, $ARGV[0], O_RDWR | O_CREAT | O_APPEND, 0600) or die "delay log: $!\n";
+    flock($log, LOCK_EX) or die "delay log lock: $!\n";
+    seek($log, 0, 0) or die "delay log seek: $!\n";
+    local $/ = "\n";
+    my $separator = "";
+    while (my $existing = <$log>) {
+      $separator = $existing =~ /\n\z/ ? "" : "\n";
+      my $row = eval { $json->decode($existing) };
+      next unless ref($row) eq "HASH";
+      next unless ($row->{kind} // "") eq "delay" && ($row->{hold_id} // "") eq $record->{hold_id} && ($row->{at} // "") eq $record->{at};
+      die "conflicting delay event\n" unless $json->encode($row) eq $line;
+      close $log or die "delay log close: $!\n";
+      exit 0;
+    }
+    print {$log} "$separator$line\n" or die "delay log append: $!\n";
+    close $log or die "delay log close: $!\n";
+  ' "$FM_HOME/data/error-log.jsonl" "$id" || fail "could not append delay accounting for $id"
+}
+
 # Record a resolution block beneath any leading active hold-set stamp,
 # preserving the previous body below it and archiving the pristine original.
 # Successful closure removes the stamp to restore resolution-first ordering.
 write_resolution_record() {  # <task-id> <mode> <shown-body>
-  local id=$1 mode=$2 body=$3 new_body tmp hold_set
+  local id=$1 mode=$2 body=$3 new_body tmp hold_set delay_record
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   hold_set=$(body_hold_set_timestamp "$body")
-  new_body=$(resolution_block "$mode" "$hold_set")
+  delay_record=$(build_delay_record "$id" "$mode" "$body")
+  new_body=$(resolution_block "$mode" "$hold_set" "$delay_record")
   if [ -n "$hold_set" ]; then
     body=${body#"Captain hold set: $hold_set"}
     case "$body" in
@@ -1949,7 +2157,8 @@ command_answer() {
 
   if [ "$state" = "done" ]; then
     if body_has_resolution_record "$body"; then
-      # An exact compatible retry is an idempotent no-op; drift is rejected.
+      # An exact compatible retry finishes pending accounting idempotently;
+      # drift is rejected.
       [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] \
         || fail "captain-held task $id records a different captain decision"
       recorded_mode=$(recorded_resolution_mode "$body" || true)
@@ -1959,6 +2168,7 @@ command_answer() {
       [ "$release" = 0 ] \
         || fail "task $id records this answer with mode ${recorded_mode:-unknown}; --release cannot reopen a closed task"
       remove_interrupted_answer_stamp "$id"
+      append_recorded_delay "$id" "$body"
       case "$recorded_mode" in
         repaired) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "answered (repaired)" ;;
         released) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released ;;
@@ -1982,6 +2192,7 @@ command_answer() {
     [ "$(show_field "$show" state)" = "done" ] || fail "recording the answer reopened closed task $id"
     body_has_resolution_record "$(show_field "$show" body)" \
       || fail "captain-held task $id did not retain its durable resolution record"
+    append_recorded_delay "$id" "$(show_field "$show" body)"
     publish_parent_resolution_then_retire "$id" "$occurrence" "answered (repaired)"
     printf 'repaired: %s\n' "$id"
     return 0
@@ -2011,6 +2222,7 @@ command_answer() {
         fail "could not close answered captain-held task $id"
       fi
       remove_interrupted_answer_stamp "$id"
+      append_recorded_delay "$id" "$body"
       case "$recorded_mode" in
         released) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released ;;
         *) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "$outcome" ;;
@@ -2027,6 +2239,7 @@ command_answer() {
     show=$TASK_SHOW_OUTPUT
     body_has_resolution_record "$(show_field "$show" body)" \
       || fail "captain-held task $id did not retain its durable resolution record"
+    append_recorded_delay "$id" "$(show_field "$show" body)"
     publish_parent_resolution_then_retire "$id" "$occurrence" "$outcome"
     printf '%s: %s\n' "$outcome" "$id"
     return 0
@@ -2040,6 +2253,7 @@ command_answer() {
     [ "$recorded_mode" = released ] && [ "$release" = 1 ] \
       || fail "task $id records this answer with mode ${recorded_mode:-unknown}; replay requires matching --release"
     remove_interrupted_answer_stamp "$id"
+    append_recorded_delay "$id" "$body"
     publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released
     printf 'released: %s\n' "$id"
     return 0
@@ -2280,10 +2494,37 @@ command_bind() {
 }
 
 command_unbind() {
-  local source=${1:-}
+  local source=${1:-} dest
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
   validate_source_id "$source"
-  rm -f -- "$(binding_path "$source")"
+  dest=$(binding_path "$source")
+  # The Slack delivery paths hold BINDING_DIR shared across their binding check and the post or the selection of a line
+  # to print that it allows (never across the write to standard output), so the removal waits for such a delivery to
+  # end: none completes after this returns. Other channels are not held.
+  # The wait has no time limit and no override: it ends when the delivery ends, which the operating system also
+  # settles if that process dies. A slow wait is an alarm, never a cut-off: one line after 60 seconds, then it keeps
+  # waiting. Nothing the delivery waits for is held by an unbind (it takes only this folder), so the wait cannot
+  # become a cycle. A folder that was never made holds no binding; one that cannot be examined or opened is a refusal.
+  perl -e '
+    use strict; use warnings; use Fcntl qw(:flock);
+    my ($dir, $path) = @ARGV;
+    # A request acknowledgement under the shared hold makes at most three Slack calls, each bound by the 10 s timeout of bin/fm_slack.py, so 30 s at worst.
+    # A mirror card post holds it longer: the probe child, owner_channel (it can call conversations.open), the lookup in post, chat.postMessage, and one
+    # reactions.add call per option, each Slack call bound by the same 10 s timeout, so a slow Slack can pass 60 s. The alarm is only a message: the wait never ends because of it.
+    my $alarm_after = 60;
+    if (!stat($dir)) {
+      exit 0 if $!{ENOENT};
+      die "fm-captain-hold: cannot examine the decision binding folder: $dir: $!\n";
+    }
+    open(my $held, "<", $dir) or die "fm-captain-hold: cannot open the decision binding folder: $dir: $!\n";
+    my $tries = 0;
+    until (flock($held, LOCK_EX | LOCK_NB)) {
+      $tries++;
+      print STDERR "fm-captain-hold: unbind is slow: a delivery that began earlier is still running and holds the binding after ${alarm_after}s; it keeps waiting, and the binding is unchanged until that delivery ends\n" if $tries == $alarm_after * 10;
+      select(undef, undef, undef, 0.1);
+    }
+    unlink($path) or $!{ENOENT} or die "fm-captain-hold: cannot remove the decision binding: $path: $!\n";
+  ' "$BINDING_DIR" "$dest" || fail "cannot unbind $source"
   printf 'unbound: %s\n' "$source"
 }
 
@@ -2444,6 +2685,7 @@ command_answers() {
           continue
         fi
         occurrence=$(resolution_record_count "$body")
+        append_recorded_delay "$id" "$body"
         case "$recorded_mode" in
           repaired) publish_parent_resolution_then_retire "$id" "$occurrence" "answered (repaired)" ;;
           released) publish_parent_resolution_then_retire "$id" "$occurrence" released ;;
@@ -2944,7 +3186,7 @@ reconcile_note() {
 }
 
 command_complete() {
-  local origin=${1:-} meta previous='' supplied='' keys='' entry key status_file open has_meta=0 transfer_rc transfers=() resolved
+  local origin=${1:-} meta previous='' supplied='' keys='' entry key line status_file open has_meta=0 transfer_rc transfers=() resolved
   local resolved_how attested_by_prefix='' attested_by_archive='' attested_by_archive_resolved='' origin_state unrecorded_origin=''
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   validate_slug origin-id "$origin"
@@ -3007,7 +3249,29 @@ EOF
 
   if [ "$has_meta" = 1 ]; then
     if [ "$(meta_value "$meta" decisions_reviewed)" != 1 ] || [ "$previous" != "$keys" ]; then
-      printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" >> "$meta"
+      CAPTAIN_META_TMP=$(umask 077; mktemp "$STATE/.fm-captain-meta.XXXXXX") \
+        || fail "cannot stage the reviewed inventory"
+      # Use the existing metadata publication pattern: refreshed fields first,
+      # remaining fields in their original order, then a rename under the same
+      # metadata lock as PR registration. In particular, never append inventory
+      # fields after the PR identity footer or move an unknown trailing field
+      # ahead of it: the managed poll must keep enforcing that boundary.
+      printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" > "$CAPTAIN_META_TMP" \
+        || fail "cannot stage the reviewed inventory"
+      while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+          decisions_reviewed=*|decision_keys=*) ;;
+          *) printf '%s\n' "$line" >> "$CAPTAIN_META_TMP" \
+            || fail "cannot preserve task metadata while recording the reviewed inventory" ;;
+        esac
+      done < "$meta" || fail "cannot read task metadata while recording the reviewed inventory"
+      if ! chmod 0600 "$CAPTAIN_META_TMP"; then
+        fail "cannot publish the reviewed inventory"
+      fi
+      if ! mv -f -- "$CAPTAIN_META_TMP" "$meta"; then
+        fail "cannot publish the reviewed inventory"
+      fi
+      CAPTAIN_META_TMP=
     fi
     fm_lock_release "$CAPTAIN_META_LOCK"
     CAPTAIN_META_LOCK_HELD=0
