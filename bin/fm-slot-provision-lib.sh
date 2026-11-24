@@ -690,7 +690,8 @@ if os.path.lexists(durable) and real(pointer) != real(durable):
 if existing and real(pointer) not in [real(path) for path in existing]:
     print("manifest_shadowed\tthe recorded pointer %s is not the provisioner's record %s" % (pointer, existing[0]))
     sys.exit(0)
-identity = ("repo_root", "worktree_path", "branch", "base_ref", "base_sha", "owner_id", "owned_paths", "created_at_iso")
+# A timestamp is not identity and its formatting can differ between the two records, so it is not compared.
+identity = ("repo_root", "worktree_path", "branch", "base_ref", "base_sha", "owner_id", "owned_paths")
 try:
     with open(pointer, encoding="utf-8") as handle:
         want = json.load(handle)

@@ -370,7 +370,13 @@ test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name() {
   out=$(adopt); rc=$?
   [ "$rc" -ne 0 ] || fail "a durable pointer whose legacy record disagrees was adopted: $out"
   assert_contains "$out" manifest_records_disagree 'the disagreeing legacy record was not refused by name'
+  # F5: two records that differ only in a creation timestamp (its formatting) are the same admission, not a disagreement
+  python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); m["created_at_iso"]="2026-11-01T10:00:00Z"; json.dump(m, open(sys.argv[2],"w"))' "$W_MANIFEST" "$durable"
+  python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); m["created_at_iso"]="2026-11-01T10:00:00.000000+00:00"; json.dump(m, open(sys.argv[2],"w"))' "$W_MANIFEST" "$legacy"
+  out=$(adopt); rc=$?
+  [ "$rc" -eq 0 ] || fail "records that differ only in a timestamp's formatting were refused: $out"
   # controls: the durable pointer with an identical legacy record, and the durable pointer alone, are admitted
+  cp "$W_MANIFEST" "$durable"
   cp "$W_MANIFEST" "$legacy"
   out=$(adopt); rc=$?
   [ "$rc" -eq 0 ] || fail "a durable pointer with an agreeing legacy record was refused: $out"
