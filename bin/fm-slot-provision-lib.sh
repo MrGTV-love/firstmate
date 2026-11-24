@@ -1054,8 +1054,9 @@ FMDRIFTPY
 fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   local copy=$1 id=$2 branch=$3 base=$4 out count line
   shift 4
-  # state/<id>.wiring-sha names the launch artifacts Firstmate wrote, so they are not reported as the task's drift.
-  out=$(FM_SLOT_DRIFT_WIRING="${FM_SLOT_DRIFT_STATE:-${STATE:-}}/$id.wiring-sha" python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || {
+  # state/<id>.wiring-sha names the launch artifacts Firstmate wrote, so they are not reported as the task's drift. Callers
+  # (fm-control.sh and fm-spawn.sh) set STATE; with no STATE no record is read and nothing is filtered.
+  out=$(FM_SLOT_DRIFT_WIRING="${STATE:-}/$id.wiring-sha" python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || {
     echo "relaunch drift report for $id: could not be produced ($(printf '%s' "$out" | tail -n 1)); this is a limitation of the report, not a statement that the task stayed in scope" >&2
     return 0
   }
