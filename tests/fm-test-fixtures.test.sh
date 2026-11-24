@@ -166,6 +166,25 @@ fm_git_init_commit "$2"
 SH
   unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
 
+  # The config carrier injects the same hooks as GIT_CONFIG_PARAMETERS rows and
+  # records them in FM_GIT_HOOK_ROWS; the helper removes exactly those rows and
+  # keeps every other parameter.
+  rows="'hook.fm-fixture.event'='pre-commit' 'hook.fm-fixture.command'='$dir/failing-hooks/pre-commit'"
+  export FM_GIT_HOOK_ROWS="$rows" GIT_CONFIG_PARAMETERS="'fixture.input'='preserved' $rows" FM_GIT_HOOK_MODE=config
+  git init -q "$dir/rows-armed"
+  if git -C "$dir/rows-armed" -c user.name=test -c user.email=test@example.invalid \
+    commit -q --allow-empty -m armed > "$dir/rows-armed.log" 2>&1; then
+    fail "the injected hook rows did not run, so the case proves nothing"
+  fi
+  bash -eus -- "$ROOT/tests/lib.sh" "$dir/rows-env" <<'SH' || exit 1
+. "$1"
+fm_git_init_commit "$2"
+[ "$(git -C "$2" log -1 --format=%s)" = initial ] || fail "injected hook rows blocked a fixture commit"
+[ "$(git -C "$2" config --get fixture.input)" = preserved ] || fail "the launcher's other parameter was dropped"
+[ -z "${FM_GIT_HOOK_ROWS+x}" ] || fail "the helper left FM_GIT_HOOK_ROWS for a nested launch to trust"
+SH
+  unset FM_GIT_HOOK_ROWS GIT_CONFIG_PARAMETERS FM_GIT_HOOK_MODE
+
   # The system layer is the shared helper's other half: one entry point settles
   # it, and the caller still signing proves the layer was genuinely armed.
   arm_host_signing system
