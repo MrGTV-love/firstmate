@@ -202,7 +202,10 @@ if [ "${1:-}" = release ]; then
     exit 1
   fi
   # Only this canonical writer removes the verified pair, under its claim lock.
-  rm -f "$LOCK" "$LOCK_SESSION" || exit 1
+  # Line 1 goes first: a lock it cannot remove must keep its sidecar, or the
+  # same session could no longer prove that it owns the lock.
+  rm -f "$LOCK" || exit 1
+  rm -f "$LOCK_SESSION" || exit 1
   release_claim_lock
   echo 'lock released: exact native Web owner'
   exit 0
