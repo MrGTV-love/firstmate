@@ -5567,14 +5567,14 @@
       ],
       "invariant": "a governed assigned copy never admits a worker or ship transition without a matching PASS attestation from the project provisioner",
       "layer": "runtime-block",
-      "source": "the report and manifest of the copy's scripts/git-stability/provision_existing_slot.py, plus the copy's git status, operation markers, common dir and task branch",
-      "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme",
+      "source": "on the provisioning route, the report and manifest of the copy's scripts/git-stability/provision_existing_slot.py, plus the copy's git status, operation markers, common dir and task branch; on the adoption route of a same-task relaunch, the slot manifest the task record names, the copy's repository, branch and base, the copy-custody owners, and the copy's own out-of-scope commits and edits for the drift report",
+      "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme; or, on the adoption route, the recorded manifest is missing, unreadable, not this task's own, or disagrees with the copy, owner, branch, base or scope, the copy is not isolated or belongs to another repository, or a copy-custody owner refuses (fm_slot_adopt_check refuses with `error: slot adoption refused: <reason>`)",
       "remedy": "preserve and reconcile the assigned copy's scratch state, then bin/fm-control.sh <task> relaunch --note <reason>, or bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off> --owned-path <tracked-path>",
       "budget": 1,
-      "test": "tests/fm-spawn-dispatch-profile.test.sh",
+      "test": "tests/fm-slot-adopt.test.sh",
       "tier": "C",
       "harm": "irreversible",
-      "layer_note": "deny without a guard event: bin/fm-spawn.sh and bin/fm-promote.sh stop before admission and print the refusal and the provisioner report on stderr, and bin/fm-control.sh refuses an unattestable governed relaunch before stopping the running agent; a refused spawn keeps the copy and records recovery=slot-provision-refused"
+      "layer_note": "deny without a guard event: bin/fm-spawn.sh and bin/fm-promote.sh stop before admission and print the refusal and the provisioner report on stderr, and bin/fm-control.sh refuses an unattestable governed relaunch before stopping the running agent; a refused spawn keeps the copy and records recovery=slot-provision-refused; on the adoption route bin/fm-control.sh runs fm_slot_adopt_check before the stop, and bin/fm-spawn.sh runs it again at launch and a last time after the stop, the wiring rewrite and the record publish, just before delivery, so a last-check refusal leaves the wiring and task record already written while the recorded manifest and scope stay unchanged; a relaunch never runs the provisioner on this route and prints own out-of-scope paths as a drift report instead of refusing; the provisioning route is also covered by tests/fm-spawn-dispatch-profile.test.sh and the adoption route by tests/fm-control-relaunch-adopt.test.sh"
     },
     {
       "decision": "deny",
