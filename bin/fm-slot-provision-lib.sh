@@ -976,6 +976,10 @@ for flagged in names(git("ls-files", "-v", "-z").stdout):
         continue
     full = os.path.join(os.fsencode(copy), path)
     if not os.path.lexists(full):
+        # An assume-unchanged path that is gone was deleted by the task, which status cannot show; a skip-worktree path
+        # that is absent is what sparse checkout leaves unmaterialized on purpose, so it is not a difference.
+        if tag.islower() and tag != b"s":
+            add(path)
         continue
     entry = git("ls-files", "-s", "-z", "--", os.fsdecode(path)).stdout.split(b"\0")[0].split()
     if len(entry) < 2:

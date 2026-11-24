@@ -415,11 +415,33 @@ test_the_no_manifest_route_consults_copy_custody() {
   pass "no-manifest route: a clean copy another task's record names is refused by name before provisioning; the own copy is admitted"
 }
 
+# D3: a tracked out-of-scope file marked assume-unchanged and then deleted is the task's own drift that status cannot show;
+# a skip-worktree path that is absent (sparse checkout) is not a difference.
+test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not() {
+  local out
+  make_world drift-hidden-delete
+  git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
+  git -C "$W_SLOT" update-index --assume-unchanged docs/y.txt
+  rm "$W_SLOT/docs/y.txt"
+  [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail 'the fixture is not hidden from status'
+  out=$(drift)
+  assert_contains "$out" 'drift: proven docs/y.txt' 'the hidden deletion was omitted from the drift report'
+  # control: the same absence under skip-worktree is what a sparse checkout leaves on purpose
+  make_world drift-sparse-absent
+  git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
+  git -C "$W_SLOT" update-index --skip-worktree docs/y.txt
+  rm "$W_SLOT/docs/y.txt"
+  out=$(drift)
+  case "$out" in *docs/y.txt*) fail "a sparse-checkout absence was listed as the task's drift: $out" ;; esac
+  pass "drift: a deleted assume-unchanged tracked path is listed; an absent skip-worktree path is not"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
 test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name
 test_a_hidden_symlink_retarget_is_task_drift
+test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run
