@@ -509,7 +509,8 @@ def carry_over_refusal(home, task, head, reviewed, base, others):
     """
     _, meta = task_metadata(home, task)
     worktree = Path(nonempty(meta.get("worktree"), "task worktree"))
-    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
+    # Replace refs and grafts can both rewrite ancestry, so the proof reads neither.
+    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull}
 
     def run(*args, extra=None):
         return subprocess.run(["git", "-C", str(worktree), *args], capture_output=True, text=True,
@@ -517,7 +518,8 @@ def carry_over_refusal(home, task, head, reviewed, base, others):
 
     for ref in (head, reviewed, base):
         if run("cat-file", "-e", f"{ref}^{{commit}}").returncode:
-            return f"commit {ref} is not available in the task worktree"
+            fetch = shlex.join(["git", "-C", str(worktree), "fetch", "origin", base, head, reviewed])
+            return f"commit {ref} is not available in the task worktree; fetch it with: {fetch}, then retry"
     for other in sorted(others):
         if run("cat-file", "-e", f"{other}^{{commit}}").returncode:
             return f"a review row names head {other}, which is not available to prove the reviewed head builds on it"

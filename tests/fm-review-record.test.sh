@@ -930,32 +930,90 @@ test_carry_over_allows_reads_of_heads_r_was_built_on() {
 }
 
 test_carry_over_writes_nothing_to_the_task_object_store() {
-  # GLM-5.4 review finding 4: the proof's merged trees must not land in the task's store.
-  local case_dir live before after out rc=0
+  # GLM-5.4 finding 4 and DeepSeek finding 1: a refusing proof builds a tree the
+  # store lacks (a conflict tree here), so the scratch store is what keeps the
+  # task's object store unchanged. A disposable copy without the override must
+  # change the store, so this case can see the behavior it names.
+  local case_dir live base before after out rc copy
   case_dir=$(make_carry_case carry-readonly)
   carry_refs "$case_dir"
   record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
-  live=$(merge_trunk_into_pr "$case_dir")
-  # A different update than the one committed, so the proof must build a tree the store lacks.
   cgit "$case_dir" checkout -q trunk
-  printf 'later\n' > "$case_dir/wt/later.txt"
-  cgit "$case_dir" add later.txt
-  cgit "$case_dir" commit -qm 'base moves again'
+  printf 'base version\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm 'base edits the same file'
+  base=$(cgit "$case_dir" rev-parse HEAD)
   cgit "$case_dir" checkout -q pr
-  cgit "$case_dir" merge -q --no-edit trunk
+  cgit "$case_dir" merge -q --no-edit trunk >/dev/null 2>&1 || true
+  printf 'one\ntwo\nthree\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm "Merge branch 'trunk' into pr"
   live=$(cgit "$case_dir" rev-parse HEAD)
-  cgit "$case_dir" checkout -q --detach "$REVIEWED"
   before=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
-  out=$(verify_on "$case_dir" "$live" "$(cgit "$case_dir" rev-parse trunk)") || rc=$?
+  rc=0
+  out=$(verify_on "$case_dir" "$live" "$base" --json) || rc=$?
   after=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
-  expect_code 0 "$rc" "the clean update must carry: $out"
-  assert_equals "$before" "$after" "verify must not add objects to the task worktree's store"
-  pass "the carry-over proof writes its merged trees to scratch, never the task's object store"
+  expect_code 1 "$rc" "the conflicted update must refuse: $out"
+  expect_not_qualified "$out" "does not merge cleanly" "conflicted update"
+  assert_equals "$before" "$after" "a refusing proof must not add objects to the task worktree's store"
+  copy="$TMP_ROOT/no-scratch-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY2' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = 'extra={"GIT_OBJECT_DIRECTORY": scratch, "GIT_ALTERNATE_OBJECT_DIRECTORIES": objects.stdout.strip()}'
+assert text.count(needle) == 1, "scratch override not found exactly once"
+open(path, "w").write(text.replace(needle, "extra=None"))
+PY2
+  NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
+    --head "$live" --task task-x1 --base "$base" >/dev/null 2>&1 || true
+  after=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
+  [ "$before" != "$after" ] || fail "control: without the scratch store the refusing proof must write to the task store, or this case observes nothing"
+  pass "the carry-over proof writes its merged trees to scratch, and removing that override makes the store change"
+}
+
+test_carry_over_ignores_grafts() {
+  # DeepSeek finding 2: a graft can make a FAILed later head look like an ancestor of R.
+  local case_dir h1 live out rc=0
+  case_dir=$(make_carry_case carry-graft)
+  carry_refs "$case_dir"
+  h1=$(merge_trunk_into_pr "$case_dir")
+  record_review "$case_dir" "$h1" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at H1"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+  mkdir -p "$case_dir/wt/.git/info"
+  printf '%s %s %s\n' "$REVIEWED" "$BASE" "$h1" > "$case_dir/wt/.git/info/grafts"
+  cgit "$case_dir" checkout -q trunk
+  printf 'more\n' > "$case_dir/wt/more.txt"
+  cgit "$case_dir" add more.txt
+  cgit "$case_dir" commit -qm 'base moves again'
+  TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a graft must not make the FAILed head an ancestor of R: $out"
+  expect_not_qualified "$out" "does not build on" "graft"
+  pass "grafts are ignored by the carry-over proof, so they cannot fake ancestry"
+}
+
+test_carry_over_refuses_a_base_older_than_the_update() {
+  # DeepSeek note: a --base older than the base content the live head merged
+  # makes the trees differ, so it refuses rather than carries.
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-old-base)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$BASE" --json) || rc=$?
+  expect_code 1 "$rc" "a base older than the merged base content must refuse: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "old base"
+  pass "a base older than the base content the live head merged refuses"
 }
 
 fm_test_run_cases \
   test_carry_over_refuses_a_branch_that_is_not_on_the_base \
+  test_carry_over_refuses_a_base_older_than_the_update \
   test_carry_over_writes_nothing_to_the_task_object_store \
+  test_carry_over_ignores_grafts \
   test_carry_over_refuses_after_a_fail_recorded_before_the_pass \
   test_carry_over_allows_reads_of_heads_r_was_built_on \
   test_carry_over_refuses_after_a_later_head_was_read \
