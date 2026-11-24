@@ -2393,7 +2393,7 @@ owner_call_cases() {  # <case-dir> <proof-label> <done-args-suffix...>
   shift 2
   # held through bin/fm-captain-hold.sh
   wrapper_from_code "$dir" add "hold-a-$label" "$(ftitle "hold-a-$label")" --objective O7 --kind ship >/dev/null
-  (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" hold "hold-a-$label" --reason "which name?" >/dev/null 2>&1) \
+  (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" hold "hold-a-$label" --reason "which name?" --boundary owner-rule-change --if-no "Keep the existing owner rule" >/dev/null 2>&1) \
     || fail "fm-captain-hold.sh could not hold hold-a-$label"
   out=$(refusal_of "$dir" "held through fm-captain-hold" "done" "hold-a-$label" "$@")
   assert_contains "$out" "open owner call" "a task held through fm-captain-hold.sh closed"
