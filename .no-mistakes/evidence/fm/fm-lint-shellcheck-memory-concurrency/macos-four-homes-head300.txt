@@ -1,0 +1,17 @@
+== head: 4 runs x 3 roots, stand-in 300 MiB each, hold 3s
+run 1 exit=0
+run 2 exit=0
+run 3 exit=0
+run 4 exit=0
+wall_s=35
+samples=74 peak_concurrent_standins=3 peak_aggregate_rss_kib=1830256 (1787 MiB)
+budget stated by head: 3670016 KiB (3584 MiB)
+-- concurrency over time (sampled count -> number of samples)
+  0 at once: 16 samples
+  1 at once: 41 samples
+  2 at once: 16 samples
+  3 at once: 1 samples
+-- run 1 stderr
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint: watch run rss_longest_reply_ms=139 root=/Users/charlesabrooker/tmp/fourhomes.K6OMPn/c.sh rss_longest_tick_ms=210 root=/Users/charlesabrooker/tmp/fourhomes.K6OMPn/c.sh

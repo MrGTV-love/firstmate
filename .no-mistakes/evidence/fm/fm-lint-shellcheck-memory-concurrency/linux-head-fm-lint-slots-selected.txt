@@ -1,0 +1,13 @@
+ok - the slot pool cannot be disabled, rejects bad settings, and refuses an unusable directory instead of running unbounded
+ok - slot open, counter and non-contention coordinator/scan lock failures refuse naming the path and never run the analysis
+ok - two concurrent runs against an unusable slot file both refuse naming it and start nothing; with it usable both analyze their root and leave no ticket
+ok - a host-wide budget directory that is a plain file or a symbolic link is refused with its path named, before any root starts
+ok - a root admitted in one pool is charged in every pool: two pools never run roots whose charges exceed the budget together (peak 210228 KiB, 1 at once; no budget: 319604 KiB, 2 at once)
+ok - a queue head waiting on a full budget read the process table 10 times in 4 s (at most 0.5 s apart) and ran once the budget was free
+ok - four runs with four HOME values keep to the fixed memory budget with and without records, run two recorded roots at once, and finish all 12 roots (small charges: 8 12; no records: 1 12; records: 2 12)
+ok - a root larger than the budget runs alone, and a killed run frees its charge and leaves no ticket
+ok - a watched running root whose record is absent, empty, invalidated or names an old sample keeps every new root out; once it names a fresh sample the root is admitted; beside a fresh sample it is admitted at once
+
+real	2m2.338s
+user	0m36.891s
+sys	0m8.773s

@@ -1,0 +1,5 @@
+Both trees: git archive of the commit into a fresh git repo; GITHUB_ACTIONS and CI empty.
+bin/fm-lint.sh --list-files : head_lines=706 base_lines=706 differing_lines=0 head_sha=04cd93db7a84 base_sha=04cd93db7a84
+bin/fm-lint.sh --list-files --partition 1of3: head_lines=235 base_lines=235 differing_lines=0 head_sha=368ae456e4d3 base_sha=368ae456e4d3
+bin/fm-lint.sh --list-files --partition 2of3: head_lines=236 base_lines=236 differing_lines=0 head_sha=8446b56b473e base_sha=8446b56b473e
+bin/fm-lint.sh --list-files --partition 3of3: head_lines=235 base_lines=235 differing_lines=0 head_sha=c9e2b1b6e962 base_sha=c9e2b1b6e962

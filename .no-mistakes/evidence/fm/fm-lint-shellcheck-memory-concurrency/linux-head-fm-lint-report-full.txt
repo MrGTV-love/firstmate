@@ -1,0 +1,19 @@
+ok - a memory fallback runs only within the time left in its root's original deadline
+ok - explicit memory evidence outranks findings and signal reasons (modes: 0 1)
+ok - OOM words in a source excerpt or a root path never classify a root as memory
+ok - FM_LINT_REQUIRE_BOUNDS refuses missing enforcement and proceeds when enforceable
+ok - the pinned ShellCheck both respects and survives under the memory envelope
+ok - the roots sidecar and telemetry record the run's final exit status
+ok - the retained sidecar records each root's lifecycle with a mode, reason, and duration
+ok - jointly sourced dispatcher, adapter, production-owner, and test-local diagnostics preserve parity
+ok - CI=true checks the complete inventory even with an empty diff
+ok - fm-lint.sh forces a full lint when HEAD is on main
+ok - fm-lint.sh explicit paths bypass changed-file mode selection
+ok - an explicit leading-dash root retains real ShellCheck findings
+not ok - zero changed lint targets must exit 0, got 1
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: WARNING: on Linux without FM_LINT_REQUIRE_BOUNDS=1 the per-root resident cap and the 64 MiB version-probe lane are not enforced; the host-wide admission still counts every root, by its charge only, because no resident watch measures roots here.
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: no changed lint targets
+fm-lint-workflows.sh: actionlint not found; install actionlint 1.7.12 with bin/fm-install-actionlint.sh <destination-directory> and put that directory on PATH.
+suite_rc=1

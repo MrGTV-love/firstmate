@@ -1,0 +1,33 @@
+### A. probe under 8 MiB limit, real shellcheck (no stand-in)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: WARNING: on Linux no memory cap is enforced: the per-root resident cap and the 64 MiB version-probe lane do not apply, and the 8192 KiB per-process address-space limit is not a resident-memory cap; the host-wide admission still counts every root, by its charge only, because no resident watch measures roots here.
+assertion failed [!mmap_result.is_error && mmap_result.value == kSlabAllocatorBase]: Could not mmap data for the VMTracker slab allocator: 12
+(VMAllocationTracker.cpp:313 init)
+ fm-lint.sh: the ShellCheck version probe exited with status 133 under the 8192 KiB address-space limit; no root was started.
+ledger: "/tmp/head/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=2
+
+### B. root under default limit via probe stand-in
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: WARNING: on Linux no memory cap is enforced: the per-root resident cap and the 64 MiB version-probe lane do not apply, and the 12582912 KiB per-process address-space limit is not a resident-memory cap; the host-wide admission still counts every root, by its charge only, because no resident watch measures roots here.
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+calibration: "0 of 5 samples for lint-root.full./tmp/tmp.qJwF8ZRHRE/small.sh on 34a7d05522e0"
+fallback: "1200s existing caller limit"
+ledger: "/tmp/head/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0
+end row: root=/tmp/tmp.qJwF8ZRHRE/small.sh status=ok
+
+### C. root under 8 MiB limit via probe stand-in
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: WARNING: on Linux no memory cap is enforced: the per-root resident cap and the 64 MiB version-probe lane do not apply, and the 8192 KiB per-process address-space limit is not a resident-memory cap; the host-wide admission still counts every root, by its charge only, because no resident watch measures roots here.
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+calibration: "1 of 5 samples for lint-root.full./tmp/tmp.qJwF8ZRHRE/small.sh on 34a7d05522e0"
+fallback: "1200s existing caller limit"
+fm-lint: end /tmp/tmp.qJwF8ZRHRE/small.sh reason=signal:5 rc=133 duration_ms=217 rss_kib=unavailable
+assertion failed [!mmap_result.is_error && mmap_result.value == kSlabAllocatorBase]: Could not mmap data for the VMTracker slab allocator: 12
+(VMAllocationTracker.cpp:313 init)
+ ledger: "/tmp/head/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=133
+real shellcheck argv log:
+--norc --external-sources -- /tmp/tmp.qJwF8ZRHRE/small.sh
+end row: root=/tmp/tmp.qJwF8ZRHRE/small.sh status=signal:5

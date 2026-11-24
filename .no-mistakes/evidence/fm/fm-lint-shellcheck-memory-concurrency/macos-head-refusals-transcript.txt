@@ -1,0 +1,43 @@
+### control: valid private slot dir
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint: watch run rss_longest_reply_ms=0 root=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.ptD2OaIunq/refusals/a.sh rss_longest_tick_ms=0 root=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.ptD2OaIunq/refusals/a.sh
+exit=0
+analyses_started=1
+
+### FM_LINT_HOST_SLOTS=abc (invalid)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got abc.
+exit=2
+analyses_started=0
+
+### FM_LINT_HOST_SLOTS=0 (invalid)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got 0.
+exit=2
+analyses_started=0
+
+### FM_LINT_ROOT_RSS_KIB=12x (invalid)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got 12x.
+exit=2
+analyses_started=0
+
+### FM_LINT_SLOT_DIR=off (pool cannot be disabled)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_SLOT_DIR=off is not supported: no setting turns the host-wide ShellCheck memory bound off. Unset FM_LINT_SLOT_DIR to use the host pool /var/tmp/firstmate-lint-501/lint-slots.
+exit=2
+analyses_started=0
+
+### FM_LINT_SLOT_DIR is a plain file (unusable)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: host slot pool unusable (FM_LINT_SLOT_DIR: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.ptD2OaIunq/refusals/plainfile is not a writable directory); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.
+exit=2
+analyses_started=0
+
+### FM_LINT_SLOT_DIR inside a read-only dir (unusable)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: host slot pool unusable (FM_LINT_SLOT_DIR: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.ptD2OaIunq/refusals/ro/slots is not a writable directory); the host-wide ShellCheck memory bound cannot be enforced, so no root was started. Make that path writable or remove it if it is damaged.
+exit=2
+analyses_started=0
+

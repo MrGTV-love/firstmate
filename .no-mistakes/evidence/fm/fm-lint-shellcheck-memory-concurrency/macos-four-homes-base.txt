@@ -1,0 +1,15 @@
+== base: 4 runs x 3 roots, stand-in 300 MiB each, hold 3s
+run 1 exit=0
+run 2 exit=0
+run 3 exit=0
+run 4 exit=0
+wall_s=16
+samples=25 peak_concurrent_standins=8 peak_aggregate_rss_kib=4946832 (4831 MiB)
+budget stated by head: 3670016 KiB (3584 MiB)
+-- concurrency over time (sampled count -> number of samples)
+  0 at once: 13 samples
+  4 at once: 6 samples
+  8 at once: 6 samples
+-- run 1 stderr
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled

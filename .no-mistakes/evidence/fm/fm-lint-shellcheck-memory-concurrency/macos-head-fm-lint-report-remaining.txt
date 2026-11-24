@@ -1,0 +1,4 @@
+ok - SKIP (host cannot enforce the bounded envelope): pinned memory-envelope check
+ok - fm-lint.sh exits 0 with a note when the local branch has no changed lint targets
+ok - fm-lint.sh CI keeps source following without the local exclusion list
+ok - fm-lint.sh on main keeps source following without the local exclusion list

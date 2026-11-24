@@ -1,0 +1,6 @@
+ok - fm-lint.sh exits 0 with a note when the local branch has no changed lint targets
+ok - fm-lint.sh CI keeps source following without the local exclusion list
+ok - fm-lint.sh on main keeps source following without the local exclusion list
+ok - fm-lint.sh without a merge-base keeps source following without the local exclusion list
+ok - fm-lint.sh explicit paths keep source following
+suite_rc=0

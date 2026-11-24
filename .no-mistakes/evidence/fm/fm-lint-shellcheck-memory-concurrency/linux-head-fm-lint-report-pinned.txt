@@ -1,0 +1,7 @@
+ok - FM_LINT_REQUIRE_BOUNDS refuses missing enforcement and proceeds when enforceable
+ok - the pinned ShellCheck both respects and survives under the memory envelope
+ok - the retained sidecar records each root's lifecycle with a mode, reason, and duration
+
+real	0m23.766s
+user	0m11.251s
+sys	0m2.034s

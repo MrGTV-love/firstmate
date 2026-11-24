@@ -1,0 +1,27 @@
+base: roots=40 stand-in=1MiB hold=0s exit=0 wall_s=12.47 completed_roots=40 peak_overlap=1
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+head: roots=40 stand-in=1MiB hold=0s exit=0 wall_s=35.97 completed_roots=40 peak_overlap=1
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+head-second-run: roots=40 stand-in=1MiB hold=0s exit=0 wall_s=16.95 completed_roots=40 peak_overlap=1
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+base: roots=10 stand-in=50MiB hold=2s exit=0 wall_s=14.66 completed_roots=10 peak_overlap=2
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+head: roots=10 stand-in=50MiB hold=2s exit=0 wall_s=45.37 completed_roots=10 peak_overlap=1
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint: watch miss /Users/charlesabrooker/tmp/lone.C1eVkw/r3.sh rss_miss=unbound,wait_ms=13,interrupted=0
+fm-lint: watch miss /Users/charlesabrooker/tmp/lone.C1eVkw/r4.sh rss_miss=unbound,wait_ms=31,interrupted=0
+fm-lint: watch miss /Users/charlesabrooker/tmp/lone.C1eVkw/r5.sh rss_miss=unbound,wait_ms=568,interrupted=0
+head-samepaths-run1: roots=10 stand-in=50MiB hold=2s exit=0 wall_s=38.27 completed_roots=10 peak_overlap=1
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+head-samepaths-run2: roots=10 stand-in=50MiB hold=2s exit=0 wall_s=21.20 completed_roots=10 peak_overlap=2
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+base-samepaths: roots=10 stand-in=50MiB hold=2s exit=0 wall_s=24.93 completed_roots=10 peak_overlap=2
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
