@@ -333,9 +333,47 @@ test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named
   pass "preflight: a pinned provisioner without the check option has a durable or legacy collision named before the stop; a same-owner provisioner is not guessed"
 }
 
+# D2: when a durable lifecycle record exists for the copy it is the authoritative one, the recorded pointer must name it,
+# and an existing legacy record must agree with it on the identity fields; a differing shadowed record is refused by name.
+test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name() {
+  local out rc digest durable legacy
+  make_world shadowed
+  mkdir -p "$W_DIR/durable" "$W_DIR/hookstate/worktree-lifecycle"
+  digest=$(python3 -c 'import hashlib,os,sys; print(hashlib.sha256(os.path.realpath(sys.argv[1]).encode()).hexdigest()[:16])' "$W_SLOT")
+  durable="$W_DIR/durable/$digest.json"
+  legacy="$W_DIR/hookstate/worktree-lifecycle/$digest.json"
+  export WORKTREE_LIFECYCLE_STORE_DIR="$W_DIR/durable" CODEX_HOOK_STATE_DIR="$W_DIR/hookstate"
+  point_at() { sed -i.bak "s|^slot_manifest=.*|slot_manifest=$1|" "$W_META" && rm -f "$W_META.bak"; }
+  differing() { python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); m["owner_id"]="another-task"; m["branch"]="fm/another"; json.dump(m, open(sys.argv[2],"w"))' "$1" "$2"; }
+  # a legacy pointer whose durable record names another owner and branch is the shadowed case
+  cp "$W_MANIFEST" "$legacy"
+  differing "$W_MANIFEST" "$durable"
+  point_at "$legacy"
+  out=$(adopt); rc=$?
+  [ "$rc" -ne 0 ] || fail "a legacy pointer shadowed by a differing durable record was adopted: $out"
+  assert_contains "$out" manifest_shadowed 'the shadowed pointer was not refused by name'
+  # a durable pointer whose legacy record names another owner and branch is the disagreeing case
+  cp "$W_MANIFEST" "$durable"
+  differing "$W_MANIFEST" "$legacy"
+  point_at "$durable"
+  out=$(adopt); rc=$?
+  [ "$rc" -ne 0 ] || fail "a durable pointer whose legacy record disagrees was adopted: $out"
+  assert_contains "$out" manifest_records_disagree 'the disagreeing legacy record was not refused by name'
+  # controls: the durable pointer with an identical legacy record, and the durable pointer alone, are admitted
+  cp "$W_MANIFEST" "$legacy"
+  out=$(adopt); rc=$?
+  [ "$rc" -eq 0 ] || fail "a durable pointer with an agreeing legacy record was refused: $out"
+  rm -f "$legacy"
+  out=$(adopt); rc=$?
+  unset WORKTREE_LIFECYCLE_STORE_DIR CODEX_HOOK_STATE_DIR
+  [ "$rc" -eq 0 ] || fail "a durable pointer alone was refused: $out"
+  pass "adoption: a shadowed legacy pointer and a disagreeing legacy record are refused by name; the durable pointer, alone or with an agreeing legacy record, is admitted"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
+test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name
 test_a_hidden_symlink_retarget_is_task_drift
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected

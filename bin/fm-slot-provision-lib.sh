@@ -497,10 +497,10 @@ except Exception:
   esac
 }
 
-# The lifecycle record already at the path a create-only provisioner would write for <copy>, read-only: the durable
-# store, else the legacy store, named by the same digest of the copy's resolved path that bin/fm-slot-manifest-retire.py
-# uses for the same two stores. Prints the first existing path and returns 0, or prints nothing and returns 1.
-fm_slot_record_collision() { # <project> <copy>
+# The two lifecycle record paths a provisioner keeps for <copy>, durable then legacy, one per line, whether or not either
+# exists: the same two stores and the same digest of the copy's resolved path that bin/fm-slot-manifest-retire.py uses.
+# Returns 1 when the project's repository cannot be read.
+fm_slot_record_paths() { # <project> <copy>
   python3 -I - "$1" "$2" <<'PY'
 import hashlib
 import os
@@ -520,12 +520,21 @@ durable = Path(os.environ.get("WORKTREE_LIFECYCLE_STORE_DIR") or common / "verna
 if "WORKTREE_LIFECYCLE_STORE_DIR" not in os.environ and state.resolve() != default.resolve():
     durable = state / "worktree-lifecycle"
 name = hashlib.sha256(str(Path(copy).resolve()).encode()).hexdigest()[:16] + ".json"
-for path in (durable / name, state / "worktree-lifecycle" / name):
-    if os.path.lexists(path):
-        print(path)
-        sys.exit(0)
-sys.exit(1)
+print(durable / name)
+print(state / "worktree-lifecycle" / name)
 PY
+}
+
+# The lifecycle record already at the path a create-only provisioner would write for <copy>, read-only: the first of the
+# two record paths that exists is printed (return 0); nothing is printed and 1 is returned when neither exists.
+fm_slot_record_collision() { # <project> <copy>
+  local paths path
+  paths=$(fm_slot_record_paths "$1" "$2") || return 1
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if [ -e "$path" ] || [ -L "$path" ]; then printf '%s\n' "$path"; return 0; fi
+  done <<<"$paths"
+  return 1
 }
 
 # Where a copy is, read-only: its branch, "detached" (git says so: exit 1), or "unknown" (any other failure), and its commit.
@@ -623,12 +632,56 @@ else:
 PY
 }
 
+# The recorded pointer against the lifecycle records the provisioner keeps for the copy (D2): when a durable record exists
+# it is the authoritative one and the pointer must name it, and every existing record must agree with the pointed one on
+# the identity fields a provisioner compares (a legacy record omits newer fields, so a field is compared only when both
+# records carry it). Prints "ok" or "<reason><TAB><detail>"; reads only.
+fm_slot_adopt_records() { # <manifest> <durable> <legacy>
+  python3 -I - "$@" <<'PY'
+import json
+import os
+import sys
+
+pointer, durable, legacy = sys.argv[1:4]
+real = os.path.realpath
+existing = [path for path in (durable, legacy) if os.path.lexists(path)]
+if os.path.lexists(durable) and real(pointer) != real(durable):
+    print("manifest_shadowed\tthe recorded pointer %s is not the durable record %s, which is the authoritative one" % (pointer, durable))
+    sys.exit(0)
+if existing and real(pointer) not in [real(path) for path in existing]:
+    print("manifest_shadowed\tthe recorded pointer %s is not the provisioner's record %s" % (pointer, existing[0]))
+    sys.exit(0)
+identity = ("repo_root", "worktree_path", "branch", "base_ref", "base_sha", "owner_id", "owned_paths", "created_at_iso")
+try:
+    with open(pointer, encoding="utf-8") as handle:
+        want = json.load(handle)
+    for path in existing:
+        if real(path) == real(pointer):
+            continue
+        with open(path, encoding="utf-8") as handle:
+            other = json.load(handle)
+        for key in identity:
+            if key not in want or key not in other:
+                continue
+            a, b = want[key], other[key]
+            if key == "owned_paths" and isinstance(a, list) and isinstance(b, list):
+                a, b = sorted(a), sorted(b)
+            if a != b:
+                print("manifest_records_disagree\tthe recorded pointer and %s differ in %s" % (path, key))
+                sys.exit(0)
+except (OSError, ValueError, TypeError):
+    print("manifest_unreadable\ta lifecycle record of the copy cannot be read")
+    sys.exit(0)
+print("ok")
+PY
+}
+
 # Judge the recorded manifest against the task's own record, copy and branch. Returns 0 and sets
 # FM_SLOT_MANIFEST, FM_SLOT_BASE_SHA, FM_SLOT_BASE_REF and FM_SLOT_ADOPTED=1 only when every check holds;
 # otherwise prints the refusal by name and returns 1.
 fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
   local project=$1 copy=$2 id=$3 branch=$4 meta=$5 state=$6
-  local manifest base ref common slot_common real_copy root verdict line git_head head_name marker slot rc
+  local manifest base ref common slot_common real_copy root verdict line git_head head_name marker slot rc records
   local -a scope=()
   FM_SLOT_ADOPTED=0
   manifest=$(fm_meta_get "$meta" slot_manifest)
@@ -647,6 +700,14 @@ fm_slot_adopt_check() { # <project> <copy> <task-id> <branch> <meta> <state-dir>
   [ -f "$manifest" ] && [ ! -L "$manifest" ] || { fm_slot_adopt_refuse manifest_missing "$manifest"; return 1; }
   verdict=$(fm_slot_adopt_verdict "$manifest" "$real_copy" "$branch" "$base" "${scope[@]}"
   ) || { fm_slot_adopt_refuse manifest_unreadable "$manifest"; return 1; }
+  if [ "${verdict%%$'\t'*}" != ok ]; then
+    fm_slot_adopt_refuse "${verdict%%$'\t'*}" "${verdict#*$'\t'}"
+    return 1
+  fi
+  # The pointer must name the authoritative record and agree with the other one the provisioner keeps for this copy.
+  records=$(fm_slot_record_paths "$project" "$real_copy") || { fm_slot_adopt_refuse repository_unreadable "$project"; return 1; }
+  verdict=$(fm_slot_adopt_records "$manifest" "${records%%$'\n'*}" "${records#*$'\n'}") ||
+    { fm_slot_adopt_refuse manifest_unreadable "$manifest"; return 1; }
   if [ "${verdict%%$'\t'*}" != ok ]; then
     fm_slot_adopt_refuse "${verdict%%$'\t'*}" "${verdict#*$'\t'}"
     return 1
