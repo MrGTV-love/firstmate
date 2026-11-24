@@ -709,7 +709,7 @@ test_production_ignores_fm_omp_installed_root() {
   pass "production ignores FM_OMP_INSTALLED_ROOT: the variable neither admits a stand-in nor moves the reported installed root"
 }
 test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable() {
-  local base realbase out mutant copy notables
+  local base realbase out mutant copy notables native_mutant
   base=$(fm_test_base_path_sans "$PATH" omp)
   realbase=$(fm_test_base_path_sans "$ORIG_PATH" omp) # no root shim: what an operator's guard run sees
   write_dispatch_tables "$TREE"
@@ -736,7 +736,28 @@ test_live_guard_starts_a_bun_omp_or_fails_naming_the_launcher_variable() {
     fail "a native omp alone cannot exercise the Bun rule and must fail, never skip or pass: $out"
   fi
   assert_contains "$out" "FM_OMP_IDENTITY_LIVE_LAUNCHER" "the failure names the variable that supplies the Bun launcher"
-  assert_not_contains "$out" "checked " "a native omp alone checks nothing and claims nothing"
+  assert_not_contains "$out" "checked " "a requested run with a native omp alone checks nothing and claims nothing"
+  if out=$(env -u FM_OMP_IDENTITY_LIVE FM_LIVE=1 PATH="$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+    fail "FM_LIVE=1 is a request: a native omp alone must fail it, never skip or pass: $out"
+  fi
+  assert_contains "$out" "FM_OMP_IDENTITY_LIVE_LAUNCHER" "a FM_LIVE=1 failure names the variable that supplies the Bun launcher"
+  # An unrequested default run on a host with only a native omp checks the native omp for real and says once what it did not check.
+  out=$(env -u FM_LIVE -u FM_OMP_IDENTITY_LIVE PATH="$NATIVE_BIN:$base" bash "$ROOT/tests/fm-omp-identity-live-e2e.test.sh" 2>&1) \
+    || fail "a default run with only a native omp must check the native omp and end cleanly: $out"
+  assert_contains "$out" "the native omp is classified as an agent by name" "a default native-only run checks the native omp for real"
+  assert_contains "$out" "checked 1 invariants" "a default native-only run reports the one check it ran"
+  assert_contains "$out" "the Bun-runtime identity rule was not exercised" "a default native-only run names what it did not check"
+  assert_contains "$out" "FM_OMP_IDENTITY_LIVE_LAUNCHER" "the named line says which variable enables the Bun rule"
+  [ "$(printf '%s\n' "$out" | grep -c 'was not exercised')" = 1 ] || fail "the not-exercised line must be printed once: $out"
+  assert_not_contains "$out" "skip:" "a default native-only run is not a skip"
+  # The native check must be able to fail: a classifier that no longer reads the native omp as an agent fails the guard.
+  native_mutant="$TMP/native-mutant"
+  make_guard_copy "$native_mutant"
+  printf '\nfm_agent_process_classify() { printf other; }\n' >> "$native_mutant/bin/fm-agent-process-lib.sh"
+  if out=$(env -u FM_LIVE -u FM_OMP_IDENTITY_LIVE PATH="$NATIVE_BIN:$base" bash "$native_mutant/tests/fm-omp-identity-live-e2e.test.sh" 2>&1); then
+    fail "a classifier that rejects the native omp must fail the default native-only run: $out"
+  fi
+  assert_contains "$out" "OMP IDENTITY DRIFT" "the native check reports the drift by name"
 
   # The guard's own logic, on a stand-in tree, through a scratch copy that cannot be mistaken for the real guard.
   copy="$TMP/guard-copy"

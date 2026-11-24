@@ -21,16 +21,19 @@
 # It uses no Herdr server: the pane is a pseudo-terminal and Herdr's process-info
 # view is the same JSON shape the adapter parses (docs/herdr-backend.md).
 # Refresh docs/verification/runtime-backends.md "omp identity" with this command:
-#   bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh
+#   FM_OMP_IDENTITY_LIVE_LAUNCHER=~/.local/share/omp-promax-fix/omp-promax bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh
 # The identity rule compares the live process with the one trusted installed identity
 # held in bin/fm-omp-identity.py (installed_identity(); no environment variable moves it)
 # and needs no launcher, but this guard must start a real Bun-shaped omp. It starts the
 # first omp on PATH; when that is a native binary it starts the file named by
 # FM_OMP_IDENTITY_LIVE_LAUNCHER, which only chooses what to start and never decides
 # identity, or a text launcher from later on PATH, and it names any Bun launcher that is
-# not first. With no text launcher it FAILS, naming FM_OMP_IDENTITY_LIVE_LAUNCHER (and
-# FM_OMP_IDENTITY_LIVE=0 for an explicit opt-out, which is reported as an opt-out and
-# never as a pass), because a guard that could pass having checked nothing proves nothing.
+# not first. With no text launcher a REQUESTED run (FM_OMP_IDENTITY_LIVE=1 or FM_LIVE=1)
+# FAILS, naming FM_OMP_IDENTITY_LIVE_LAUNCHER; a default run starts the native omp and
+# checks for real that it classifies as an agent, then prints one line saying the Bun rule
+# was not exercised and which variable enables it (FM_OMP_IDENTITY_LIVE=0 is an explicit
+# opt-out, reported as an opt-out and never as a pass). Neither ends a run having checked
+# nothing.
 # No environment variable can make it compare a stand-in with itself, because production
 # reads none: tests/fm-omp-identity.test.sh exercises this script's logic on a stand-in
 # tree only through a scratch COPY run beside the test-only root shim of tests/lib.sh.
@@ -78,8 +81,15 @@ while IFS= read -r CANDIDATE; do
     note "the Bun launcher $CANDIDATE is not first on PATH and is not started by this run"
   fi
 done < <(printf '%s\n' "$OMP" "${FM_OMP_IDENTITY_LIVE_LAUNCHER:-}"; type -ap omp)
+NATIVE=0
 if [ -z "$START" ]; then
-  fail "no Bun launcher to start: the first omp on PATH is native and no text launcher was found, so the Bun identity rule was not exercised. Name the installed launcher with FM_OMP_IDENTITY_LIVE_LAUNCHER=<path>, or set FM_OMP_IDENTITY_LIVE=0 to opt out of this guard"
+  # Only a native omp is installed. A requested run (FM_OMP_IDENTITY_LIVE=1 or FM_LIVE=1) must exercise the Bun rule and
+  # fails without a launcher. A default run exercises the native omp for real and says, once, what it did not check.
+  if [ "${FM_OMP_IDENTITY_LIVE:-${FM_LIVE:-}}" = 1 ]; then
+    fail "no Bun launcher to start: the first omp on PATH is native and no text launcher was found, so the Bun identity rule was not exercised. Name the installed launcher with FM_OMP_IDENTITY_LIVE_LAUNCHER=<path>, or set FM_OMP_IDENTITY_LIVE=0 to opt out of this guard"
+  fi
+  START=$OMP
+  NATIVE=1
 fi
 [ "$START" -ef "$OMP" ] || note "the Bun launcher $START is not first on PATH ($OMP is); this run starts $START"
 # Even `--version` runs under the scratch environment, so no operator agent directory or .env is read.
@@ -114,6 +124,22 @@ AGENT_PID=$(cat "$SCRATCH/pid")
 # Let the launcher exec and the interface come up; the process must still be alive.
 sleep 3
 kill -0 "$AGENT_PID" 2>/dev/null || drift "the installed omp exited before it could be inspected (it ran bare, with no prompt)"
+
+if [ "$NATIVE" = 1 ]; then
+  # The native omp is a named process, so the name rule identifies it: classify the live process as the Herdr walk and the
+  # launch proof do, from the kernel's executable path and argument words (no ps), never from this script's own say-so.
+  # shellcheck source=bin/fm-agent-process-lib.sh
+  . "$ROOT/bin/fm-agent-process-lib.sh"
+  EXE=$(python3 -I "$PROCINFO" exe "$AGENT_PID") || drift "the process executable path is unreadable"
+  ARGS=$(python3 -I "$PROCINFO" args "$AGENT_PID") || drift "the process arguments are unreadable"
+  CLASS=$(fm_agent_process_classify "$EXE" "${ARGS%% *}" "$ARGS" "$AGENT_PID")
+  [ "$CLASS" = agent ] || drift "the installed native omp classified as '$CLASS', not as an agent (executable $EXE)"
+  CHECKED=$((CHECKED + 1))
+  pass "the native omp is classified as an agent by name ($EXE)"
+  note "the Bun-runtime identity rule was not exercised: only a native omp is installed here; set FM_OMP_IDENTITY_LIVE_LAUNCHER=<path to the omp-promax launcher> to exercise it"
+  note "checked $CHECKED invariants against $LABEL"
+  exit 0
+fi
 
 EXE=$(python3 -I "$PROCINFO" exe "$AGENT_PID") || drift "the process executable path is unreadable"
 RESULT=$(python3 -I "$IDENT" interactive "$AGENT_PID" 2>&1); rc=$?

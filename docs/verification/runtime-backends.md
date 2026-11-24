@@ -1196,7 +1196,9 @@ Verified 2026-11-04 on macOS arm64 (Darwin 27.2.0), read-only, against the omp 1
 - `fm-proc-info.py` reads the kernel facts the rule compares: `exe` (libproc `proc_pidpath`), `argv` (the raw argument array with boundaries), `startid` (kernel start time with microseconds) and `stdin` (file descriptor 0 as `tty`, `pipe`, `none` or `other`); `tests/fm-omp-identity.test.sh` exercises each on real processes, including two processes started inside one whole second.
 
 When the first `omp` is native, the guard starts a text launcher from later on `PATH` or the file named by `FM_OMP_IDENTITY_LIVE_LAUNCHER`, which only chooses what to start and never decides identity; it names that launcher in its output.
-With no text launcher it fails, naming `FM_OMP_IDENTITY_LIVE_LAUNCHER`, because a guard that checked nothing proves nothing; `FM_OMP_IDENTITY_LIVE=0` opts out explicitly.
+With no text launcher, a requested run (`FM_OMP_IDENTITY_LIVE=1` or `FM_LIVE=1`) fails, naming `FM_OMP_IDENTITY_LIVE_LAUNCHER`.
+A default run on a host with only a native omp starts that omp on the same pseudo-terminal, checks that the live process classifies as an agent by name, and prints one line saying the Bun-runtime identity rule was not exercised and which variable enables it; it is never a skip and never a pass that checked nothing.
+`FM_OMP_IDENTITY_LIVE=0` opts out explicitly.
 No environment variable can make it compare a stand-in with itself, because production reads none.
 
 The live result against the installed omp is not recorded here yet.
