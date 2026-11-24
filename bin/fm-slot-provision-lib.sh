@@ -362,15 +362,20 @@ fm_slot_primary_provisioner() { # <project>
   FM_SLOT_EXPORT_SUMS=$FM_SLOT_EXPORT.sums
   : >"$FM_SLOT_EXPORT_SUMS" || { fm_slot_export_drop; return 1; }
   while IFS=$'\t' read -r kind rel; do
-    if mkdir -p "$FM_SLOT_EXPORT/$(dirname "$rel")" && git -C "$primary" show "$tip:$rel" >"$FM_SLOT_EXPORT/$rel"; then
-      printf '%s %s\n' "$(shasum -a 256 <"$FM_SLOT_EXPORT/$rel" | awk '{print $1}')" "$rel" >>"$FM_SLOT_EXPORT_SUMS"
-    else
+    if ! { mkdir -p "$FM_SLOT_EXPORT/$(dirname "$rel")" && git -C "$primary" show "$tip:$rel" >"$FM_SLOT_EXPORT/$rel"; }; then
       echo "error: slot provisioner source is not the primary clone's current main: $rel could not be exported from $default's tip" >&2
       fm_slot_export_drop
       return 1
     fi
   done <<<"$closure"
   chmod -R a-w "$FM_SLOT_EXPORT" 2>/dev/null || true
+  # The record is taken after the files are made read-only: bytes, inode and change time in nanoseconds of every file, so a
+  # substitution that is restored before the run ends still changes an inode or a change time (D7 (a)).
+  fm_slot_export_fingerprint "$FM_SLOT_EXPORT" >"$FM_SLOT_EXPORT_SUMS" || {
+    echo "error: slot provisioner source is not the primary clone's current main: the export could not be recorded" >&2
+    fm_slot_export_drop
+    return 1
+  }
   FM_SLOT_PROVISIONER=$FM_SLOT_EXPORT/scripts/git-stability/provision_existing_slot.py
   FM_SLOT_PYARGS=(-X "pycache_prefix=$FM_SLOT_PYCACHE")
 }
@@ -379,22 +384,39 @@ FM_SLOT_EXPORT=
 FM_SLOT_EXPORT_SUMS=
 FM_SLOT_PYCACHE=
 FM_SLOT_PYARGS=()
-# Refuse by name when any exported file changed or appeared since the export (a substitution after the check).
+# One line per exported file: sha256, inode, change time in nanoseconds, relative path; sorted by path.
+fm_slot_export_fingerprint() { # <export-dir>
+  python3 -I - "$1" <<'PY'
+import hashlib
+import os
+import sys
+
+root = sys.argv[1]
+rows = []
+for base, _dirs, files in os.walk(root):
+    for name in files:
+        path = os.path.join(base, name)
+        info = os.lstat(path)
+        with open(path, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        rows.append((os.path.relpath(path, root), "%s %d %d %s" % (digest, info.st_ino, info.st_ctime_ns, os.path.relpath(path, root))))
+for _rel, row in sorted(rows):
+    print(row)
+PY
+}
+# Refuse by name when any exported file changed, was replaced (inode) or touched (change time) since the export, or when a
+# file appeared: a substitution after the check is detected even when its bytes and mode are restored before the run ends.
 fm_slot_export_verify() {
-  local want got rel count
+  local now
   [ -n "$FM_SLOT_EXPORT" ] || return 0
-  while read -r want rel; do
-    got=$(shasum -a 256 <"$FM_SLOT_EXPORT/$rel" 2>/dev/null | awk '{print $1}')
-    [ "$got" = "$want" ] || {
-      echo "error: slot provisioner source changed after it was verified: $rel; the run is refused" >&2
-      return 1
-    }
-  done <"$FM_SLOT_EXPORT_SUMS"
-  count=$(find "$FM_SLOT_EXPORT" -type f | wc -l | tr -d ' ')
-  [ "$count" = "$(wc -l <"$FM_SLOT_EXPORT_SUMS" | tr -d ' ')" ] || {
-    echo "error: slot provisioner source gained files after it was verified; the run is refused" >&2
-    return 1
-  }
+  now=$(fm_slot_export_fingerprint "$FM_SLOT_EXPORT" 2>/dev/null) || now=
+  [ "$now" = "$(cat "$FM_SLOT_EXPORT_SUMS" 2>/dev/null)" ] && return 0
+  if [ "$(printf '%s\n' "$now" | wc -l | tr -d ' ')" != "$(wc -l <"$FM_SLOT_EXPORT_SUMS" | tr -d ' ')" ]; then
+    echo "error: slot provisioner source gained files after it was verified (or lost one); the run is refused" >&2
+  else
+    echo "error: slot provisioner source changed after it was verified (bytes, inode or change time); the run is refused" >&2
+  fi
+  return 1
 }
 fm_slot_export_drop() {
   [ -z "$FM_SLOT_EXPORT" ] || { chmod -R u+w "$FM_SLOT_EXPORT" 2>/dev/null; rm -rf -- "$FM_SLOT_EXPORT" "$FM_SLOT_EXPORT_SUMS"; }

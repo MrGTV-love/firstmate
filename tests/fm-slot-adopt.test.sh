@@ -195,6 +195,17 @@ test_a_forged_cached_module_never_runs_and_a_substitution_is_detected() {
   printf '# substituted\n' >>"$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py"
   if fm_slot_export_verify 2>/dev/null; then fail 'a substitution after the check was not detected'; fi
   fm_slot_export_drop
+  # a substitution that is RESTORED (same bytes, same mode) before the run ends still changes the change time
+  fm_slot_primary_provisioner "$P_PROJ" || fail 'the clean primary provisioner was refused on the second export'
+  fm_slot_export_verify || fail 'an untouched second export failed its own verification'
+  cp -p "$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py" "$P_DIR/helper_mod.saved"
+  chmod u+w "$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py"
+  printf '# substituted for the load\n' >>"$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py"
+  cat "$P_DIR/helper_mod.saved" >"$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py"
+  chmod a-w "$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py"
+  cmp -s "$P_DIR/helper_mod.saved" "$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py" || fail 'the fixture did not restore the bytes'
+  if fm_slot_export_verify 2>/dev/null; then fail 'a substitution restored to the same bytes and mode before the run ended was not detected'; fi
+  fm_slot_export_drop
   # a locally changed imported module is refused before anything runs
   printf '# local edit\n' >>"$P_PROJ/scripts/git-stability/helper_mod.py"
   if fm_slot_primary_provisioner "$P_PROJ" 2>/dev/null; then fail 'a primary clone whose imported module differs from the tip was accepted'; fi
