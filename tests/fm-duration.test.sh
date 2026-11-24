@@ -396,10 +396,12 @@ from_start, _ = sampler_run('creep.blind-start', duty, ['0.4', '18', start_done]
                             FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
 assert from_start.returncode == 0 and 'no_progress' not in from_start.stderr and start_done.exists(), (from_start.returncode, from_start.stderr)
 
-# CPU spent while telemetry is blind counts. A silent child at about 40% of a
-# core is blinded from 2 to 12 real seconds under a 10x clock, a gap of 100
-# scaled seconds, longer than the 60 s window and the 60 s bound; when samples
-# return it must not be stopped, and it finishes at 18 real seconds.
+# A blind gap after a valid sample is not idle time either. A silent child at
+# about 40% of a core is blinded from 2 to 12 real seconds under a 10x clock, a
+# gap of 100 scaled seconds, longer than the 60 s window and the 60 s bound.
+# The gap pauses the clock and its CPU is not credited; once samples return the
+# child is sighted above the floor, so it is not stopped and finishes at 18
+# real seconds.
 blind_done, blind_cpu = tmp / 'blind-gap.done', tmp / 'blind-gap.cpu'
 gap_child = duty.replace('done.touch()', 'done.touch()\npathlib.Path(sys.argv[4]).write_text(repr(time.process_time()))')
 gap, gap_elapsed = sampler_run('creep.blind-gap', gap_child, ['0.4', '18', blind_done, blind_cpu], FM_TEST_CLOCK='10', FM_TEST_BLIND='2:12',
