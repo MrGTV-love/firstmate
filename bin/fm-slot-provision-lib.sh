@@ -131,11 +131,11 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   fm_slot_check_copy "$project" "$copy" || return 1
   local provisioner_path=scripts/git-stability/provision_existing_slot.py default_branch
   [ -f "$project/$provisioner_path" ] || {
-    echo "error: slot provisioner is missing from project clone $project: $project/$provisioner_path; run fleet sync" >&2
+    echo "error: slot provisioner is missing from project clone $project: $project/$provisioner_path; provisioning refused; run fleet sync" >&2
     return 1
   }
   default_branch=$(fm_task_copy_default_branch "$project") || {
-    echo "error: cannot read fetched origin default branch for $project/$provisioner_path; run fleet sync" >&2
+    echo "error: cannot read fetched origin default branch for $project/$provisioner_path; provisioning refused; run fleet sync" >&2
     return 1
   }
   # Read only the fetched remote-tracking ref; provisioning never fetches or
@@ -152,7 +152,7 @@ try:
         content = source.read()
         mode = '100755' if os.fstat(source.fileno()).st_mode & 0o100 else '100644'
 except OSError as exc:
-    print(f'error: cannot read project clone provisioner {path}: {exc}; run fleet sync', file=sys.stderr)
+    print(f'error: cannot read project clone provisioner {path}: {exc}; provisioning refused; run fleet sync', file=sys.stderr)
     sys.exit(1)
 try:
     entry = subprocess.check_output(['git', '-C', project, 'ls-tree', ref, '--', relative], stderr=subprocess.PIPE)
@@ -161,13 +161,13 @@ try:
         raise ValueError('origin path is not a regular provisioner file')
     origin_content = subprocess.check_output(['git', '-C', project, 'cat-file', 'blob', blob.decode('ascii')], stderr=subprocess.PIPE)
 except (OSError, subprocess.CalledProcessError, ValueError) as exc:
-    print(f'error: cannot read fetched origin version {ref}:{relative} for {path}: {exc}; run fleet sync', file=sys.stderr)
+    print(f'error: cannot read fetched origin version {ref}:{relative} for {path}: {exc}; provisioning refused; run fleet sync', file=sys.stderr)
     sys.exit(1)
 if content != origin_content:
-    print(f'error: slot provisioner {path} differs from fetched origin version {ref}:{relative}; run fleet sync', file=sys.stderr)
+    print(f'error: slot provisioner {path} differs from fetched origin version {ref}:{relative}; provisioning refused; run fleet sync', file=sys.stderr)
     sys.exit(1)
 if mode.encode() != origin_mode:
-    print(f'error: slot provisioner {path} mode differs from fetched origin version {ref}:{relative}; run fleet sync', file=sys.stderr)
+    print(f'error: slot provisioner {path} mode differs from fetched origin version {ref}:{relative}; provisioning refused; run fleet sync', file=sys.stderr)
     sys.exit(1)
 PY
   git check-ref-format --branch "$branch" >/dev/null || return 1
