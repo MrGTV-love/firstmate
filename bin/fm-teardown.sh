@@ -334,7 +334,10 @@
 # or a pid that started after the lock was written), teardown makes its own
 # proofs again, then scans for processes in the copy, reads its HEAD and, when a
 # bundle proved it, the record and stored bundle again, reads the lock and the
-# process table once more immediately before the unlock, and then releases the
+# process table once more immediately before the unlock, preserves the copy's
+# ignored files with the .claude and .opencode trees whole (#380's retained
+# population; logs and evidence are archived, never deleted) in
+# data/<task>/nested-copy-preserved, and then releases the
 # lock itself with a non-forced git worktree unlock followed by a non-forced git
 # worktree remove; a removal that fails puts the lock back and says it is back
 # only when it reads back, and otherwise that the copy is now unlocked. The
@@ -348,7 +351,8 @@
 # plain non-forced git worktree remove. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
-# ignored under its .claude and .opencode trees); any other ignored entry is
+# ignored under its .claude and .opencode trees, except on the direct release of
+# a dead launcher's lock above, which preserves those trees first); any other ignored entry is
 # preserved first in data/<task>/nested-copy-preserved with its SHA-256. It loses
 # no commit, because the work is landed or held by a recorded bundle, and no
 # tracked change, because the clean proof refuses one. The clean proof counts

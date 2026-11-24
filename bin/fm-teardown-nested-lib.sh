@@ -66,7 +66,8 @@
 # copy still registered afterwards refuses. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
-# ignored under its .claude and .opencode trees); it loses no commit, because
+# ignored under its .claude and .opencode trees, except on
+# teardown_dead_launcher_release, which preserves those trees first); it loses no commit, because
 # the work is landed or held by a recorded bundle, and no tracked change,
 # because the clean proof refuses one.
 # Any other ignored entry is copied to the task's data directory before removal.
@@ -1051,7 +1052,7 @@ teardown_removal_dirty_status() {  # <porcelain-status> <copy> [<nested-copy>...
 # is a real directory outside every removal root and each payload file's real
 # directory lies inside it. Every listing and scan is checked, so one that fails
 # refuses. Reads the preserved payload itself, never only the manifest.
-teardown_ignored_preserved_current() {  # <copy> [all|releasable]
+teardown_ignored_preserved_current() {  # <copy> [all|releasable|retained]
   local copy=$1 mode=${2:-} list files rc=0
   list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
   files=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { rm -f "$list"; TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
@@ -1123,11 +1124,14 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 #   - the bundle that admitted the whole cleanup, when one did, is unchanged;
 #   - ignored files: none outside the preserve allow-list (refuse), or all of
 #     them preserved again outside every removal root and the preserved payload
-#     matched by SHA-256 to the manifest and to the copy (preserve), or, for an
+#     matched by SHA-256 to the manifest and to the copy (preserve; retained
+#     does the same for #380's retained population, the .claude and .opencode
+#     trees whole, on a foreign copy's direct release), or, for an
 #     own nested copy Vernant's lock holds (before its driver call and on its
 #     direct release), the preserve #380's teardown_own_preserve chose
 #     (TEARDOWN_PRESERVE_DIR) lies outside every removal root and still holds
-#     the copy's selected ignored files byte for byte, and is left as it is,
+#     the copy's selected ignored files, and every file it already holds that
+#     the copy still has, byte for byte, and is left as it is,
 #     never rebuilt, moved or replaced (own; Main 3529 Ruling 2, Main 3556 F1);
 #   - locked: the launcher <pid> is gone by pid and start time against the lock
 #     time read before the unlock; an empty or non-numeric pid or time refuses.
@@ -1140,7 +1144,7 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 # re-run cannot help; empty when a re-run for a fresh proof can).
 TEARDOWN_FINAL_WHY=
 TEARDOWN_FINAL_STABLE=
-teardown_removal_final_proof() {  # <copy> <preserve|refuse|own> <locked|unlocked> [<launcher-pid> <lock-mtime> [forced]]
+teardown_removal_final_proof() {  # <copy> <preserve|retained|refuse|own> <locked|unlocked> [<launcher-pid> <lock-mtime> [forced]]
   local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} forced=${6:-} head status unique canonical i latest found=0 rc=0 snap ref now work
   TEARDOWN_FINAL_WHY=
   TEARDOWN_FINAL_STABLE=
@@ -1226,8 +1230,8 @@ teardown_removal_final_proof() {  # <copy> <preserve|refuse|own> <locked|unlocke
       fi
       rm -f "$unique"
       ;;
-    preserve)
-      if ! teardown_preserve_ignored "$copy" || ! teardown_ignored_preserved_current "$copy"; then
+    preserve|retained)
+      if ! teardown_preserve_ignored "$copy" "${ignored#preserve}" || ! teardown_ignored_preserved_current "$copy" "${ignored#preserve}"; then
         TEARDOWN_FINAL_WHY="its ignored files could not be preserved and verified outside every removal root (${TEARDOWN_PRESERVE_WHY:-preservation failed})"
         return 1
       fi
@@ -1433,7 +1437,7 @@ teardown_preserve_plan() {
 # cannot be listed, copied, hashed, published or verified, and the caller then
 # refuses the copy rather than removing unpreserved content.
 TEARDOWN_PRESERVE_WHY=
-teardown_preserve_ignored() {  # <copy> [all|releasable]
+teardown_preserve_ignored() {  # <copy> [all|releasable|retained]
   local copy=$1 mode=${2:-} root dest stage aside='' failed list hash why
   TEARDOWN_PRESERVE_WHY=
   list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || { TEARDOWN_PRESERVE_WHY='a scratch file cannot be made'; return 1; }
@@ -2459,7 +2463,7 @@ teardown_launcher_gone() {  # <pid> <lock-file>
 # Returns 1 with TEARDOWN_RELEASE_WHY naming the fact that kept the copy.
 TEARDOWN_RELEASE_WHY=
 teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
-  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap final_mode=preserve
+  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap final_mode=retained
   TEARDOWN_RELEASE_WHY=
   # Main 1843: an Orca-backed task keeps base behaviour, which has no direct release.
   if [ "${BACKEND:-}" = orca ] || [ "${TEARDOWN_CLEANUP_RECOVERY:-}" = orca ]; then
@@ -2530,6 +2534,15 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     TEARDOWN_RELEASE_WHY="its recorded bundle no longer holds it ($TEARDOWN_BUNDLE_REASON)"
     return 1
   fi
+  if [ "$kind" = 'own nested' ]; then
+    if ! teardown_own_preserve_widen "$copy"; then
+      TEARDOWN_RELEASE_WHY="its ignored files, the .claude and .opencode trees whole included, could not be preserved in ${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved} outside every removal root"
+      return 1
+    fi
+  elif ! teardown_preserve_ignored "$copy" retained; then
+    TEARDOWN_RELEASE_WHY="its ignored files, the .claude and .opencode trees whole included, could not be preserved in $DATA/$ID/nested-copy-preserved outside every removal root (${TEARDOWN_PRESERVE_WHY:-preservation failed})"
+    return 1
+  fi
   # The lock and the launcher are read once more, immediately before the unlock;
   # the lock must be the one first proved for this copy.
   if ! teardown_copy_lock_file "$copy" || [ "$TEARDOWN_FOREIGN_LOCK" != "$lock" ] || ! teardown_lock_is_first_seen "$copy" "$lock"; then
@@ -2542,11 +2555,14 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   mtime=$(fm_lock_path_mtime "$TEARDOWN_FOREIGN_LOCK_FILE") || mtime=
   git -C "$slot" worktree unlock "$copy" >/dev/null 2>&1 || { TEARDOWN_RELEASE_WHY='git worktree unlock failed'; return 1; }
   # The final proof runs after the last unlock and the remove is the very next
-  # action; a failed proof puts the lock back and refuses. An own nested copy's
-  # ignored files are in the preserve #380's dispose chose before the driver: the
+  # action; a failed proof puts the lock back and refuses. Logs and evidence are
+  # archived, never deleted (Main 3851): the retained population (#380's retained
+  # mode, the .claude and .opencode trees whole) is preserved before the release.
+  # An own nested copy's is copied into the preserve #380's dispose chose before
+  # the driver (teardown_own_preserve_widen, never over a byte it holds), and the
   # proof checks that preserve and leaves it in place (own), never rebuilding,
   # moving or replacing it (Main 3529 Ruling 2, Main 3556 F1); a foreign copy's
-  # are preserved again here.
+  # is preserved again here (retained).
   [ "$kind" != 'own nested' ] || final_mode=own
   if ! teardown_removal_final_proof "$copy" "$final_mode" locked "$pid" "$mtime"; then
     git -C "$slot" worktree lock --reason "$lock" "$copy" >/dev/null 2>&1 || true

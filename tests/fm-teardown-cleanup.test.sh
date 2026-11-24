@@ -9183,6 +9183,60 @@ BODY
   pass 'the last holder check before the unlock refuses any cwd holder, an indexer name included; an open-file-only indexer not recorded as own is exempt; with none the release proceeds'
 }
 
+# Main 3851 (R6-1): the direct release of a dead launcher's lock preserves the
+# retained population (the .claude and .opencode trees whole) before it unlocks,
+# for a foreign copy and for an own nested copy whose #380 preserve already holds
+# its selected file; the real final proof then checks that preserve, and the
+# unlock and remove run. Logs and evidence are archived, never deleted.
+test_pr400_direct_release_preserves_claude_and_opencode() {
+  local body=$TMP_ROOT/pr400-body-direct-retained.sh
+  cat > "$body" <<'BODY'
+teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:4194305 launcher=4194305'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s; return 0; }
+teardown_launcher_gone() { return 0; }
+teardown_launcher_live_since() { return 1; }
+teardown_lock_is_first_seen() { return 0; }
+teardown_landed() { teardown_admit "$1" landed "$(git -C "$1" rev-parse HEAD)" "refs/heads/main $(git -C "$1" rev-parse main)"; return 0; }
+teardown_copy_git_protects() { return 1; }
+teardown_admitted_bundles_current() { return 0; }
+teardown_foreign_copy_unowned() { return 0; }
+teardown_copy_holder_free() { return 0; }
+fm_lock_path_mtime() { printf '1\n'; }
+TEARDOWN_CLOSEOUT_PROOF=fixture META="$R5_BASE/task.meta"
+for kind in foreign 'own nested'; do
+  shape=${kind// /-}
+  r5_repo "$shape"
+  printf '/.claude/\n/.opencode/\n/notes/\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  mkdir -p "$copy/.claude/channel-outbox" "$copy/.opencode/state" "$copy/notes"
+  printf 'one\n' > "$copy/.claude/channel-outbox/a.jsonl"
+  printf 'evidence\n' > "$copy/.opencode/state/log.json"
+  printf 'only here\n' > "$copy/notes/unique.dat"
+  r5_reset "$copy"
+  TEARDOWN_PRESERVE_DIR=
+  [ "$kind" != 'own nested' ] || teardown_own_preserve "$copy" 2>/dev/null || echo "$shape own-preserve=failed"
+  head=$(git -C "$copy" rev-parse HEAD)
+  : > "$R5_BASE/$shape-git"
+  git() { case " $* " in *' worktree unlock '*|*' worktree remove '*) printf '%s ' "$4" >> "$R5_BASE/$shape-git"; return 0 ;; esac; command git "$@"; }
+  rc=0; teardown_dead_launcher_release "$repo" "$copy" "$head" "$kind" 2>/dev/null || rc=$?
+  unset -f git
+  dest=${TEARDOWN_PRESERVE_DIR:-$(r5_dest "$copy")}
+  kept=
+  for f in .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat; do
+    sum=$(teardown_ignored_sha256 "$copy/$f")
+    if [ "$(teardown_ignored_sha256 "$dest/files/$f" 2>/dev/null)" = "$sum" ] && grep -qxF "$sum  $f" "$dest/meta/SHA256SUMS"; then
+      kept+=" $f"
+    fi
+  done
+  echo "$shape release=$rc why=${TEARDOWN_RELEASE_WHY:-none} kept=${kept# } git=$(cat "$R5_BASE/$shape-git")"
+done
+BODY
+  r5_harness direct-retained "$body"
+  r5_expect 'foreign release=0 why=none kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove ' 'pr400-direct-retained: a foreign copy was not released and removed with its .claude and .opencode files preserved'
+  r5_expect 'own-nested release=0 why=none kept=.claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove ' 'pr400-direct-retained: an own nested copy was not released and removed with its .claude and .opencode files preserved'
+  pass 'the direct release of a dead launcher'"'"'s lock preserves the .claude and .opencode trees whole, byte for byte with their SHA256SUMS lines, for a foreign and an own nested copy, before it unlocks and removes'
+}
+
 # Main 1839 item 5: a lock proved earlier that now reads absent or unreadable
 # refuses on the foreign, own-release and own-removal routes; never the unlocked
 # route.
@@ -10834,10 +10888,11 @@ test_the_preserve_and_the_archives_survive_the_close_and_every_later_run() {
 # FM_TEARDOWN_VERNANT_PYTHON truly unset, and set to an empty string) and the explicit
 # override give the same close; with a missing interpreter the driver never runs, so
 # the copy, whose launcher is gone, takes the direct release of a dead launcher's lock:
-# its unique ignored file is preserved, the copy is removed and no retained record is
-# written.
+# its unique ignored file and its .claude/channel-outbox files are preserved (Main
+# 3851: logs and evidence are archived, never deleted), the copy is removed and no
+# retained record is written.
 test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
-  local rc mode preserved
+  local rc mode preserved f
   for mode in default default-empty override missing missing-empty override-missing; do
     make_retained_case "retained-config-$mode" enclosing
     case "$mode" in
@@ -10874,13 +10929,20 @@ test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
       preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -path '*/notes/unique.dat' -type f 2>/dev/null | head -n 1)
       [ -n "$preserved" ] || fail "retained-config-$mode: the unique ignored file was not preserved"
       assert_equals "only here" "$(cat "$preserved")" "retained-config-$mode: the preserved file changed"
+      for f in a:one b:two; do
+        preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -path "*/files/.claude/channel-outbox/${f%%:*}.jsonl" -type f 2>/dev/null | head -n 1)
+        [ -n "$preserved" ] || fail "retained-config-$mode: .claude/channel-outbox/${f%%:*}.jsonl was not preserved"
+        assert_equals "${f#*:}" "$(cat "$preserved")" "retained-config-$mode: the preserved .claude/channel-outbox/${f%%:*}.jsonl changed"
+        assert_grep "$(printf '%s\n' "${f#*:}" | shasum -a 256 | awk '{print $1}')  .claude/channel-outbox/${f%%:*}.jsonl" "${preserved%/files/*}/meta/SHA256SUMS" \
+          "retained-config-$mode: SHA256SUMS does not record .claude/channel-outbox/${f%%:*}.jsonl"
+      done
     else
       expect_code 0 "$rc" "retained-config-$mode: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
       assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver was not asked exactly once"
       retained_assert_closed "retained-config-$mode"
     fi
   done
-  pass "the default interpreter and the explicit override close the kept-copy task the same way, and with a missing interpreter a dead launcher's lock is released directly with the unique ignored file preserved"
+  pass "the default interpreter and the explicit override close the kept-copy task the same way, and with a missing interpreter a dead launcher's lock is released directly with the unique ignored file and the .claude/channel-outbox files preserved"
 }
 
 # C2 (legacy): a copy that already holds driver tars and saved outputs, with no
@@ -11515,6 +11577,7 @@ test_pr400_root_claude_untracked_file_is_the_copys_work
 test_pr400_preserve_replacement_keeps_an_earlier_only_payload
 test_pr400_landing_admission_carries_the_proofs_commit
 test_pr400_last_holder_check_sees_cwd_and_own_indexer
+test_pr400_direct_release_preserves_claude_and_opencode
 test_pr400_vanished_lock_never_takes_the_unlocked_route
 test_pr400_nested_repository_under_a_newline_path_is_found
 test_pr400_newline_copy_path_reaches_disposal_whole
