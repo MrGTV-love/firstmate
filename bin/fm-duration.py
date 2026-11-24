@@ -129,9 +129,13 @@ command's process group only. Resources a command owns outside that group,
 such as Docker containers, networks and volumes that the Docker daemon holds,
 survive the stop, so such a command must stop and remove its own resources in
 its TERM handling or its owner's cleanup; run neither finds nor removes them.
-CPU spent while telemetry is blind is credited when samples return: the first
-complete sample after a gap is compared with the last one before it, so a gap
-never reads as idle time. The floor's owner is fm-repair, then Main once the
+For run, a blind stretch is neither idle time nor progress, from the start of
+the run onward: each sample that cannot read complete tree CPU pauses the
+no-progress clock for the interval it ends, and the CPU window restarts once
+samples return, so CPU gained across the gap is not credited as progress. A
+no-progress stop therefore needs the bound in sighted time; a run that stays
+blind is bounded only by the absolute stop. keep-going keeps its base rule:
+it stops nothing while its latest sample is blind. The floor's owner is fm-repair, then Main once the
 repair session hands back: reassess it from the trip snapshots after the first
 5 real run trips, or at once after any reported false trip.
 Claim and tier: run's stops are containment of the command's own process group
@@ -904,7 +908,7 @@ def write_trip_snapshot(key, rule, pid, facts):
             lines.append(f'truncated: {len(rows) - SNAPSHOT_ROWS} more rows')
     text = '\n'.join(lines) + '\n'
     table = ledger_path()
-    reason = 'recording is off' if table is None else ''
+    reason = ('recording refused' if REFUSED else 'recording is off') if table is None else ''
     if table is not None:
         directory = table.parent / 'command-duration-trips'
         name = re.sub(r'[^A-Za-z0-9._-]', '_', key)[:80] + '.' + time.strftime('%Y%m%dT%H%M%S') + f'.{pid}.txt'
@@ -1841,9 +1845,10 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
     observed_cpu = {}
     cpu_window = collections.deque()  # (time, tree CPU) samples inside the idle-floor window
     window_gain = 0.0
-    # The last complete sample before a blind stretch: CPU spent while telemetry was missing is
-    # credited against it, so a gap never reads as idle once samples return.
-    gap_base = None
+    # A blind sample is neither idle time nor progress (run only): the interval it ends does not
+    # advance the no-progress clock, and the CPU window restarts after the gap, so CPU gained
+    # across the gap is never read as progress either.
+    last_sampled = started
     occurrence_id = str(uuid.uuid4())
     expired = False
     last_progress = started
@@ -1870,17 +1875,16 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
                 if blind and not warned_blind:
                     warned_blind = True
                     warn_blind_telemetry()
-                if blind and gap_base is None and cpu_window:
-                    gap_base = cpu_window[-1][1]
+                sampled_at = time.monotonic()
+                if blind and inactivity is None:
+                    last_progress = min(sampled_at, last_progress + (sampled_at - last_sampled))  # pause the clock
+                    cpu_window.clear()
+                last_sampled = sampled_at
                 if sample is not None:
-                    sampled_at = time.monotonic()
                     cpu_window.append((sampled_at, sample))
                     while cpu_window[0][0] < sampled_at - IDLE_CPU_WINDOW_SECS:
                         cpu_window.popleft()
                     window_gain = sample - cpu_window[0][1]
-                    if gap_base is not None:
-                        window_gain = max(window_gain, sample - gap_base)  # high-water gain across the gap
-                        gap_base = None
                     # keep-going keeps any growth as progress; run requires CPU above the idle floor.
                     cpu_progress = sample > previous_cpu if inactivity is not None else window_gain > IDLE_CPU_FLOOR_SECS
                 next_cpu_sample = time.monotonic() + cadence  # Observation, not a deadline.

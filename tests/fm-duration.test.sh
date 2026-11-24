@@ -333,7 +333,9 @@ done.touch()
 """
 # A sampler wrapper for the telemetry cases: FM_TEST_CLOCK scales the clock,
 # FM_TEST_BLIND=FROM:TO blinds tree_cpu between those real seconds after
-# start, and FM_TEST_NOT_RUNNABLE hides runnable state so CPU alone decides.
+# start, FM_TEST_BLIND_PERIOD=P:B blinds the first B real seconds of every P,
+# FM_TEST_NOT_RUNNABLE hides runnable state so CPU alone decides, and
+# FM_TEST_PLATFORM stands in for sys.platform after the module has loaded.
 sampler = tmp / 'sampler-run.py'
 sampler.write_text("""import importlib.util, os, sys, time
 real = time.monotonic
@@ -345,10 +347,14 @@ module = importlib.util.module_from_spec(spec)
 sys.modules['fm_duration'] = module
 spec.loader.exec_module(module)
 blind_from, blind_to = map(float, os.environ.get('FM_TEST_BLIND', '-1:-1').split(':'))
+period, blind_part = map(float, os.environ.get('FM_TEST_BLIND_PERIOD', '0:0').split(':'))
+if os.environ.get('FM_TEST_PLATFORM'):
+    sys.platform = os.environ['FM_TEST_PLATFORM']
 sampled = module.tree_cpu
 def tree_cpu(pid, observed):
     cpu, runnable = sampled(pid, observed)
-    if blind_from <= real() - start < blind_to:
+    at = real() - start
+    if blind_from <= at < blind_to or (period and at % period < blind_part):
         return None, False
     return cpu, runnable and not os.environ.get('FM_TEST_NOT_RUNNABLE')
 module.tree_cpu = tree_cpu
@@ -393,6 +399,75 @@ gap, gap_elapsed = sampler_run('creep.blind-gap', gap_child, ['0.4', '18', blind
 assert gap.returncode == 0 and 'no_progress' not in gap.stderr and blind_done.exists(), (gap.returncode, gap.stderr)
 assert 'cpu_telemetry_unavailable' in gap.stderr and float(blind_cpu.read_text()) >= 3, (gap.stderr, blind_cpu.read_text() if blind_cpu.exists() else None)
 
+# A blind stretch from the start is not idle time: blinded for 12 real
+# seconds (120 scaled, twice the bound) and then sighted, a silent 40% child
+# is not stopped and finishes.
+start_done = tmp / 'blind-start.done'
+from_start, _ = sampler_run('creep.blind-start', duty, ['0.4', '18', start_done], FM_TEST_CLOCK='10', FM_TEST_BLIND='0:12',
+                            FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert from_start.returncode == 0 and 'no_progress' not in from_start.stderr and start_done.exists(), (from_start.returncode, from_start.stderr)
+
+# Nor is a gap progress: a silent 7% child (about 0.42 s per 6 real second
+# window, under the floor) is blinded for the first 12 s of every 15, so each
+# gap gains about 0.84 s. Counted over sighted time only, the 6 real second
+# bound is reached during the second sighted stretch; crediting the gaps would
+# hold it to the absolute limit.
+gaps_done = tmp / 'blind-gaps.done'
+gapped, gapped_elapsed = sampler_run('creep.blind-gaps', duty, ['0.07', '80', gaps_done], FM_TEST_CLOCK='10', FM_TEST_BLIND_PERIOD='15:12',
+                                     FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert gapped.returncode == 124 and 'no_progress' in gapped.stderr and 'absolute_limit' not in gapped.stderr, (gapped.returncode, gapped.stderr)
+assert 20 <= gapped_elapsed < 50 and not gaps_done.exists(), f'a gapped sub-floor tree was not stopped on sighted time: {gapped_elapsed:.1f}s'
+
+# A TERM cleanup is judged by the same floor: one that creeps below it is
+# killed after the no-progress interval, one that works above it finishes.
+cleanup = """import pathlib, signal, sys, time
+ready, done, share, seconds = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4])
+def work(signum, frame):
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        mark = time.process_time()
+        while time.process_time() - mark < share * 0.1:
+            pass
+        time.sleep(0.1 * (1 - share))
+    done.touch()
+    sys.exit(0)
+signal.signal(signal.SIGTERM, work)
+ready.touch()
+while True:
+    print('working', flush=True)
+    time.sleep(0.2)
+"""
+for share, seconds, key, killed in (('0.05', '3600', 'cleanup.creep-below', True), ('0.4', '8', 'cleanup.work-above', False)):
+    ready, done = tmp / f'{key}.ready', tmp / f'{key}.done'
+    job = subprocess.Popen([sys.executable, str(sampler), str(helper), 'run', key, '--', sys.executable, '-c', cleanup, str(ready), str(done), share, seconds],
+                           env=dict(env, FM_TEST_CLOCK='10', FM_TEST_NOT_RUNNABLE='1', FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='6000'),
+                           cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    ready_by = time.monotonic() + 60
+    while not ready.exists():
+        assert time.monotonic() < ready_by, f'{key}: the child never became ready'
+        time.sleep(0.05)
+    job.terminate()
+    signalled = time.monotonic()
+    try:
+        job.communicate(timeout=25)
+    except subprocess.TimeoutExpired:
+        os.killpg(job.pid, signal.SIGKILL)
+        job.communicate()
+        raise AssertionError(f'{key}: the TERM cleanup was neither killed nor finished within 25 s')
+    waited = time.monotonic() - signalled
+    assert job.returncode == 143, (key, job.returncode)
+    if killed:
+        assert 2.5 <= waited < 20 and not done.exists(), f'{key}: a cleanup creeping below the floor was not killed after the bound: {waited:.1f}s'
+    else:
+        assert done.exists() and waited >= 8, f'{key}: a cleanup working above the floor did not finish: {waited:.1f}s'
+
+# A refused table location is named as refused, not as recording turned off.
+refused_repo = make_repo('refused-table')
+refused = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.refused', '--', 'sleep', '30'],
+                         env=dict(env, FM_DURATION_FILE=str(refused_repo / 'durations.jsonl'), FM_DURATION_ABSOLUTE_SECS='2'),
+                         cwd=workrepo, capture_output=True, text=True)
+assert 'snapshot=unavailable (recording refused; rows on stderr)' in refused.stderr, refused.stderr
+
 # The snapshot's process table survives a ps that rejects ucomm (busybox), keeps
 # at most 200 rows, keeps the newest 100 snapshots, and goes to stderr when
 # recording is off.
@@ -408,6 +483,16 @@ fallback = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.no-ucom
 fallback_snapshot = trip_snapshot(fallback.stderr, 'absolute_limit')
 assert 'process table unavailable' not in fallback_snapshot, fallback_snapshot
 assert any(line.split()[0] == fallback_pid.read_text() for line in fallback_snapshot.splitlines() if line[:1].isdigit()), fallback_snapshot
+
+# Off Darwin the fallback is comm, the kernel name there: with sys.platform
+# standing in as linux and ucomm rejected, the row still carries a name.
+linux_pid = tmp / 'linux-comm.pid'
+linux = subprocess.run([sys.executable, str(sampler), str(helper), 'run', 'snapshot.linux-comm', '--', sys.executable, '-c', sleeper, str(linux_pid)],
+                       env=dict(env, PATH=f'{no_ucomm}:{env["PATH"]}', FM_TEST_PLATFORM='linux', FM_DURATION_ABSOLUTE_SECS='3'),
+                       cwd=workrepo, capture_output=True, text=True)
+linux_snapshot = trip_snapshot(linux.stderr, 'absolute_limit')
+linux_row = next(line.split() for line in linux_snapshot.splitlines() if line[:1].isdigit() and line.split()[0] == linux_pid.read_text())
+assert len(linux_row) >= 6 and linux_row[5] != '-', (linux_row, linux_snapshot)
 
 many = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.rows', '--', 'bash', '-c', 'for i in $(seq 1 210); do sleep 60 & done; wait'],
                       env=dict(env, FM_DURATION_ABSOLUTE_SECS='6'), cwd=workrepo, capture_output=True, text=True)
