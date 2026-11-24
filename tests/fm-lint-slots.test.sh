@@ -4258,6 +4258,26 @@ test_a_live_ledger_entry_that_cannot_be_opened_refuses_the_admission() {
   pass "a live ledger entry the gate cannot open refuses the admission and names the entry; readable, its charge holds the budget and the root starts once it ends"
 }
 
+# A changed-mode run with no lint target leaves no run entry in the host ledger.
+# The control: the run reached the ledger, so its entry was created and then removed.
+test_a_run_with_no_changed_target_leaves_no_run_entry() {
+  local tmp repo diff_file rc=0 entries
+  tmp=$(fm_test_tmproot fm-lint-no-target-entry)
+  repo=$(fm_lint_isolated_copy "$tmp" notarget)
+  fm_lint_write_logging_shellcheck "$tmp/fake" "$tmp/starts.log"
+  fm_lint_stub_git "$tmp/fake"
+  diff_file="$tmp/diff.nul"
+  : > "$diff_file"
+  ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_BRANCH=feature \
+      FM_TEST_GIT_DIFF_FILE="$diff_file" bash bin/fm-lint.sh > "$tmp/run.out" 2>&1 ) || rc=$?
+  [ "$rc" -eq 0 ] || fm_lint_fail_settled "a run with no changed target exited $rc: $(cat "$tmp/run.out")"
+  grep -q 'no changed lint targets' "$tmp/run.out" || fm_lint_fail_settled "the run did not take the no-target path: $(cat "$tmp/run.out")"
+  [ -d "$tmp/notarget/host/admission.lock.ledger" ] || fm_lint_fail_settled "the run did not reach the host ledger"
+  entries=$(find "$tmp/notarget/host/admission.lock.ledger" -name 'run.*' -print)
+  [ -z "$entries" ] || fm_lint_fail_settled "the no-target run left its run entry in the ledger: $entries"
+  pass "a run with no changed lint target removes its run entry from the host ledger"
+}
+
 # fm_lint_write_owner_stand_in <dir> <repo> <stub python>: a script named
 # fm-lint.sh (so it is recognised as a lint owner) that writes a run entry into the
 # copy's host ledger the way bin/fm-lint.sh does, holds its flock on descriptor 9,
@@ -5138,15 +5158,19 @@ test_strict_mode_refuses_where_the_caps_are_not_enforced() {
   if ! { [ "$rc" -eq 1 ] && grep -q 'ShellCheck 0.11.0 required for CI parity, found 0.10.0' "$tmp/inherited.out"; }; then
     fm_lint_fail_settled "an inherited FM_LINT_STRICT_VERSION=1 did not refuse a mismatched version ($rc): $(cat "$tmp/inherited.out")"
   fi
-  # Whatever the bound mechanism: the refusal, taken from this script and run with the
-  # enforced envelope's mechanism on a host that reports Linux, refuses a strict run.
-  local branch
-  branch=$(perl -0ne 'print $1 if /\n(if \[ "\$STRICT_VERSION" -eq 1 \] \|\| \[ "\$\{GITHUB_ACTIONS:-\}" = true \].*?\n)# The version probe is a ShellCheck start/s' "$repo/bin/fm-lint.sh")
-  [ -n "$branch" ] || fm_lint_fail_settled "the strict-mode block was not found in the script"
-  rc=0
-  env PATH="$tmp/fake:$PATH" GITHUB_ACTIONS='' CI='' bash -c 'STRICT_VERSION=1 BOUND_MECH=perl ROOT_MEMORY_KIB=12582912; '"$branch"'; printf reached_probe' > "$tmp/envelope.out" 2>&1 || rc=$?
-  if ! { [ "$rc" -eq 2 ] && grep -q 'strict mode refuses on Linux' "$tmp/envelope.out"; }; then
-    fm_lint_fail_settled "a strict run under the enforced envelope on Linux was not refused ($rc): $(cat "$tmp/envelope.out")"
+  # Under the enforced envelope, on a host that can apply it, a strict run is refused
+  # by the real CLI before any ShellCheck starts.
+  if fm_lint_bounds_supported; then
+    : > "$tmp/starts.log"
+    rc=0
+    ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_REQUIRE_BOUNDS=1 \
+        bash bin/fm-lint.sh --strict-version bin/consumer.sh > "$tmp/envelope.out" 2>&1 ) || rc=$?
+    if ! { [ "$rc" -eq 2 ] && grep -q 'strict mode refuses on Linux' "$tmp/envelope.out"; }; then
+      fm_lint_fail_settled "a strict run under the enforced envelope on Linux was not refused ($rc): $(cat "$tmp/envelope.out")"
+    fi
+    [ ! -s "$tmp/starts.log" ] || fm_lint_fail_settled "the refused strict run under the enforced envelope started ShellCheck: $(cat "$tmp/starts.log")"
+  else
+    printf '# SKIP (host cannot enforce the bounded envelope): the strict refusal under FM_LINT_REQUIRE_BOUNDS=1\n'
   fi
   pass "where the resident cap and the probe lane are not enforced a strict run refuses before any ShellCheck starts and names why, also under the enforced envelope; a non-strict run warns and goes on; an inherited FM_LINT_STRICT_VERSION=1 refuses a mismatched version but not on memory caps"
 }
@@ -6085,6 +6109,7 @@ test_the_stated_bound_holds_under_trusted_records_and_growth_beyond_the_charge
 test_two_pools_charge_one_host_wide_ledger_so_the_budget_holds_across_them
 test_a_gate_reads_the_ledger_under_the_host_lock_so_a_root_admitted_meanwhile_counts
 test_a_live_ledger_entry_that_cannot_be_opened_refuses_the_admission
+test_a_run_with_no_changed_target_leaves_no_run_entry
 test_the_private_modes_start_a_command_only_inside_an_admitted_root
 test_a_worker_started_directly_takes_nothing_from_the_callers_environment
 test_the_roots_log_keeps_the_time_reading_and_the_watch_peak_in_separate_columns

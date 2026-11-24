@@ -2585,10 +2585,6 @@ if [ "$probe_rc" -ne 0 ] && [ "$probe_rc" -ne 127 ]; then
   printf 'fm-lint.sh: the ShellCheck version probe exited with status %s%s; no root was started.\n' "$probe_rc" "$probe_limit" >&2
   exit 2
 fi
-printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$$" "$PERL_BIN" "$WATCH_PYTHON" "$BOUND_MECH" "$ROOT_MEMORY_KIB" "$ROOT_RSS_KIB" > "$RUN_ENTRY" || {
-  printf 'fm-lint.sh: host ledger unusable (%s cannot be written); no root was started.\n' "$RUN_ENTRY" >&2
-  exit 2
-}
 # The probe's wait for its lane, in milliseconds, for the roots log.
 probe_wait_ms=$(tr -d '[:space:]' < "$TMP_ROOT/probe.wait" 2>/dev/null) || probe_wait_ms=
 case "$probe_wait_ms" in ''|*[!0-9]*) probe_wait_ms=unavailable ;; esac
@@ -2608,6 +2604,7 @@ fi
 if [ "$CHANGED_MODE" -eq 1 ] && [ "$ROOT_COUNT" -eq 0 ]; then
   trap - EXIT
   rm -rf "$TMP_ROOT"
+  rm -f "$RUN_ENTRY"
   printf 'fm-lint.sh: no changed lint targets\n'
   overall_rc=0
   fm_lint_run_backend_purity || overall_rc=$?
