@@ -170,8 +170,7 @@ if [ -n "${FM_GIT_HOOK_ROWS-}" ]; then
   GIT_CONFIG_PARAMETERS=$missing git commit -q -m missing-script 2>/dev/null
   emit missing_script "$(landed missing-script)"; undo missing-script
   printf 'y\n' > y; git add y
-  # /bin holds sh and bash but no python3.
-  /usr/bin/env PATH=/bin "$(command -v git)" commit -q -m no-python 2>/dev/null
+  /usr/bin/env PATH="$(cat "$dir/no-python-path")" "$(command -v git)" commit -q -m no-python 2>/dev/null
   emit missing_python "$(landed no-python)"; undo no-python
   printf 'y\n' > y; git add y
   nocmd=$(printf '%s' "$GIT_CONFIG_PARAMETERS" | sed "s#'hook.fm-scan-commit.command'=#'fixture.inert'=#")
@@ -252,6 +251,7 @@ make_case() {
   printf '%s' "$proj.origin.git" > "$dir/origin-path"
   printf '%s' "$home/state/$id.git-hooks" > "$dir/hooks-path"
   printf 'full' > "$dir/plan"
+  fm_test_base_path_sans "$PATH" python3 > "$dir/no-python-path" || fail "cannot build a python3-free PATH"
   printf '%s' "$fakebin" > "$dir/fakebin"
   printf '%s' "$id" > "$dir/id"
   : > "$dir/launch.log"
@@ -520,6 +520,94 @@ test_keep_ai_trailers_keeps_the_scan() {
   pass "keep-ai-trailers keeps the trailer and still refuses a credential on the config carrier"
 }
 
+# A real endpoint: the spawn itself must fail, publish no task record, and type
+# nothing further, when the pane's git honours neither carrier. The harness
+# stand-in records whether it ever started.
+test_spawn_fails_when_the_pane_refuses() {
+  command -v tmux >/dev/null 2>&1 || { printf 'skip: tmux absent; real-endpoint refusal not exercised\n'; return; }
+  real_endpoint_spawn refuse 100
+  [ "$REAL_STATUS" -ne 0 ] || fail "spawn reported success although the pane refused the launch: $REAL_OUT"
+  assert_contains "$REAL_OUT" "honours neither task Git hook carrier" "spawn did not name the refusal"
+  assert_absent "$REAL_HOME/state/$REAL_ID.meta" "a refused launch published a task record"
+  assert_absent "$REAL_DIR/harness-started" "the harness started although the launch was refused"
+  assert_contains "$(cat "$REAL_HOME/state/$REAL_ID.status" 2>/dev/null)" "refused to start a worker without the task Git hooks" \
+    "the refusal was not recorded in the task status"
+  # The nearest legitimate launch: the same endpoint with an ordinary git.
+  real_endpoint_spawn admit 100
+  expect_code 0 "$REAL_STATUS" "spawn failed on a pane whose git honours the carrier: $REAL_OUT"
+  assert_present "$REAL_DIR/harness-started" "the harness did not start on a healthy pane"
+  # Control: without the wait the same refusal is reported as a spawned worker.
+  real_endpoint_spawn ctl 0
+  expect_code 0 "$REAL_STATUS" "control: spawn without the verdict wait did not report success: $REAL_OUT"
+  assert_absent "$REAL_DIR/harness-started" "control: the harness started although the launch was refused"
+  pass "a real endpoint whose git honours neither carrier fails the spawn, names the reason and starts no harness; without the verdict wait it is falsely reported spawned"
+}
+
+# real_endpoint_spawn <refuse|admit|ctl> <verdict-polls>: one spawn into a
+# private tmux server whose pane git honours neither carrier (refuse, ctl) or
+# is the real git (admit). Sets REAL_DIR REAL_HOME REAL_ID REAL_OUT REAL_STATUS.
+real_endpoint_spawn() {
+  local mode=$1 polls=$2 real_tmux dir home proj wt fakebin socket id
+  real_tmux=$(command -v tmux)
+  dir="$TMP_ROOT/real-$mode"
+  mkdir -p "$dir/gitbin"
+  dir=$(cd "$dir" && pwd -P)
+  home="$dir/home"
+  proj="$dir/project"
+  wt="$dir/wt"
+  socket="$dir/tmux.sock"
+  id="carrier-real$mode-$$"
+  fakebin=$(fm_test_make_spawn_fakebin "$dir/fake")
+  fm_test_spawn_home "$home" omp
+  fm_test_spawn_brief "$home" "$id"
+  fm_git_worktree "$proj" "$wt" "fixture-$mode"
+  cat > "$fakebin/tmux" <<SH
+#!/bin/sh
+exec '$real_tmux' -S '$socket' "\$@"
+SH
+  cat > "$fakebin/omp" <<SH
+#!/bin/sh
+if [ "\${1:-}" = --version ]; then printf 'omp/18.1.20\n'; exit 0; fi
+: > '$dir/harness-started'
+SH
+  # The pane's git ignores both carriers: it drops every environment
+  # configuration channel before running the real git.
+  if [ "$mode" = admit ]; then
+    ln -s "$REAL_GIT" "$dir/gitbin/git"
+  else
+    printf '#!/bin/sh\nunset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\nexec %s "$@"\n' "$REAL_GIT" > "$dir/gitbin/git"
+  fi
+  chmod +x "$fakebin/tmux" "$fakebin/omp" "$dir/gitbin/git" 2>/dev/null || chmod +x "$fakebin/tmux" "$fakebin/omp"
+  cat > "$dir/rc" <<SH
+export PATH='$dir/gitbin:$fakebin:$PATH'
+PS1='fixture> '
+SH
+  mkdir -p "$dir/launcher"
+  cp /bin/bash "$dir/launcher/treehouse" || fail "cannot copy bash for the treehouse launcher"
+  [ "$(uname)" != Darwin ] || codesign -f -s - "$dir/launcher/treehouse" >/dev/null 2>&1 || true
+  # shellcheck disable=SC2016 # $? and $status expand in the launcher, not here.
+  printf 'cd %q || exit 1\n%s\nstatus=$?\nexit "$status"\n' "$wt" "/bin/bash --noprofile --rcfile '$dir/rc' -i" > "$dir/launcher/get.sh"
+  cat > "$fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" = get ] || exit 0
+exec -a treehouse '$dir/launcher/treehouse' '$dir/launcher/get.sh'
+SH
+  chmod +x "$fakebin/treehouse"
+  env -i HOME="$home/user-home" PATH="$fakebin:$PATH" TERM=xterm \
+    GIT_CONFIG_GLOBAL="$GIT_CONFIG_GLOBAL" GIT_CONFIG_NOSYSTEM=1 \
+    "$real_tmux" -S "$socket" -f /dev/null new-session -d -s firstmate -c "$proj" \
+    "/bin/bash --noprofile --rcfile '$dir/rc' -i" || fail "cannot start owned tmux fixture"
+  "$real_tmux" -S "$socket" set-option -g default-command "/bin/bash --noprofile --rcfile '$dir/rc' -i"
+  REAL_OUT=$(TMUX='' FM_GIT_HOOKS_VERDICT_POLLS=$polls fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" \
+    --mode no-mistakes --yolo off --harness omp --backend tmux)
+  REAL_STATUS=$?
+  # Let a launch that is still running reach the harness before observing it.
+  sleep 2
+  "$real_tmux" -S "$socket" kill-server 2>/dev/null || :
+  rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
+  REAL_DIR=$dir REAL_HOME=$home REAL_ID=$id
+}
+
 tests=(
   test_listed_harness_runs_the_config_carrier
   test_git_without_config_hooks_falls_back_to_legacy
@@ -529,6 +617,7 @@ tests=(
   test_relaunch_keeps_exactly_one_carrier
   test_allowlisted_parameters_keep_one_row_set
   test_keep_ai_trailers_keeps_the_scan
+  test_spawn_fails_when_the_pane_refuses
 )
 fm_test_run_cases "${tests[@]}" -- "$@"
 

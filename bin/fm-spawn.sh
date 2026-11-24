@@ -8290,7 +8290,7 @@ IFS= read -r -d '' GIT_HOOKS_LAUNCH_FUNCTION <<'SH' || true
 fm_launch_git_hooks() {
   fm_hooks=$1 fm_rows=$2 fm_carrier=$3
   if ! command -v git >/dev/null 2>&1; then
-    echo "fm-spawn: git does not resolve on this pane's PATH; refusing to launch a worker without the task Git hooks" >&2
+    fm_reason="fm-spawn: git does not resolve on this pane's PATH; refusing to launch a worker without the task Git hooks"
     return 1
   fi
   fm_gcp=${GIT_CONFIG_PARAMETERS-}
@@ -8314,7 +8314,7 @@ fm_launch_git_hooks() {
   case "$fm_count" in
     '') fm_count=0 ;;
     *[!0-9]*)
-      echo "fm-spawn: this pane's GIT_CONFIG_COUNT is not a number; refusing to launch a worker without the task Git hooks" >&2
+      fm_reason="fm-spawn: this pane's GIT_CONFIG_COUNT is not a number; refusing to launch a worker without the task Git hooks"
       return 1
       ;;
   esac
@@ -8336,7 +8336,7 @@ fm_launch_git_hooks() {
   done
   if [ "$fm_out" -gt 0 ]; then export GIT_CONFIG_COUNT=$fm_out; else unset GIT_CONFIG_COUNT; fi
   if [ -n "$fm_gcp" ] && ! GIT_CONFIG_PARAMETERS=$fm_gcp git config --list >/dev/null 2>&1; then
-    echo "fm-spawn: this pane's GIT_CONFIG_PARAMETERS is malformed; refusing to launch a worker without the task Git hooks" >&2
+    fm_reason="fm-spawn: this pane's GIT_CONFIG_PARAMETERS is malformed; refusing to launch a worker without the task Git hooks"
     return 1
   fi
   if [ "$fm_carrier" = config ]; then
@@ -8359,7 +8359,7 @@ fm_launch_git_hooks() {
   export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
   export GIT_CONFIG_COUNT=$((fm_out + 1))
   if [ "$(git config --get core.hooksPath 2>/dev/null)" != "$fm_hooks" ]; then
-    echo "fm-spawn: this pane's git honours neither task Git hook carrier; refusing to launch a worker without the task Git hooks" >&2
+    fm_reason="fm-spawn: this pane's git honours neither task Git hook carrier; refusing to launch a worker without the task Git hooks"
     return 1
   fi
   export FM_GIT_HOOK_MODE=legacy
@@ -8374,13 +8374,44 @@ GIT_HOOKS_CARRIER=legacy
 case " $GIT_HOOKS_CONFIG_HARNESSES " in
   *" $HARNESS "*) GIT_HOOKS_CARRIER=config ;;
 esac
-# git_hooks_guard <launch text>: the launch text run only after the selector
-# chose a carrier; on refusal the selector's reason is printed and nothing runs.
+# git_hooks_guard <inner|outer> <launch text>: the launch text, run only after
+# the selector chose a carrier. On refusal the selector's reason is printed,
+# nothing runs, and the refusal is recorded for spawn_git_hooks_verdict below;
+# the inner (last) selector also records that it admitted the worker.
+GIT_HOOKS_VERDICT_REFUSED="$TASK_TMP/git-hooks-refused.$SPAWN_GEN"
+GIT_HOOKS_VERDICT_ADMITTED="$TASK_TMP/git-hooks-admitted.$SPAWN_GEN"
 git_hooks_guard() {
-  local unset_vars='unset fm_hooks fm_rows fm_carrier fm_gcp fm_old fm_count fm_i fm_out fm_key fm_value fm_new fm_cm fm_pp fm_ok; unset -f fm_launch_git_hooks'
-  printf '%s\nif fm_launch_git_hooks %s %s %s; then\n%s\n%s\nelse\n%s\nfalse\nfi\n' \
+  local unset_vars='unset fm_hooks fm_rows fm_carrier fm_gcp fm_old fm_count fm_i fm_out fm_key fm_value fm_new fm_cm fm_pp fm_ok fm_reason; unset -f fm_launch_git_hooks'
+  local admitted=:
+  # shellcheck disable=SC2016 # The destination shell expands these references.
+  [ "$1" != inner ] || admitted='{ printf "%s\n" "$FM_GIT_HOOK_MODE" > '"$(shell_quote "$GIT_HOOKS_VERDICT_ADMITTED")"'; } 2>/dev/null || :'
+  # shellcheck disable=SC2016 # The destination shell expands these references.
+  printf '%s\nfm_reason=\nif fm_launch_git_hooks %s %s %s; then\n%s\n%s\n%s\nelse\nprintf "%%s\\n" "$fm_reason" >&2\n{ printf "%%s\\n" "$fm_reason" > %s; } 2>/dev/null || :\n%s\nfalse\nfi\n' \
     "$GIT_HOOKS_LAUNCH_FUNCTION" "$(shell_quote "$GIT_HOOKS_DIR")" "$(shell_quote "$GIT_HOOKS_ROWS")" \
-    "$GIT_HOOKS_CARRIER" "$unset_vars" "$1" "$unset_vars"
+    "$GIT_HOOKS_CARRIER" "$unset_vars" "$admitted" "$2" \
+    "$(shell_quote "$GIT_HOOKS_VERDICT_REFUSED")" "$unset_vars"
+}
+# A launch the selector refused leaves a bare shell in the endpoint. Wait,
+# bounded, for the launch's own verdict and fail the spawn on a refusal, before
+# any brief text is typed into that shell. A launch that records neither within
+# the bound (an endpoint that has not run it yet) proceeds as before.
+spawn_git_hooks_verdict() {
+  local i=0 max=${FM_GIT_HOOKS_VERDICT_POLLS:-100} reason
+  while :; do
+    if [ -s "$GIT_HOOKS_VERDICT_REFUSED" ]; then
+      reason=$(head -n 1 "$GIT_HOOKS_VERDICT_REFUSED")
+      SPAWN_BRIEF_FAILURE_REASON="the launch refused to start a worker without the task Git hooks: $reason"
+      spawn_status_append "$(status_stamp_line "failed: $SPAWN_BRIEF_FAILURE_REASON")"
+      echo "error: $SPAWN_BRIEF_FAILURE_REASON; nothing was launched in window $T" >&2
+      return 1
+    fi
+    [ ! -e "$GIT_HOOKS_VERDICT_ADMITTED" ] || break
+    [ "$i" -lt "$max" ] || break
+    i=$((i + 1))
+    sleep 0.1
+  done
+  rm -f "$GIT_HOOKS_VERDICT_ADMITTED" "$GIT_HOOKS_VERDICT_REFUSED" 2>/dev/null || true
+  return 0
 }
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
@@ -8541,7 +8572,7 @@ LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_S
 # shellcheck disable=SC2016 # The destination pane expands this selector.
 LAUNCH_SHELL_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$(git_hooks_guard "$LAUNCH")")"
+  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$(git_hooks_guard inner "$LAUNCH")")"
 else
   # Numbered entries are destination-owned, so collect their values only there.
   IFS= read -r -d '' LAUNCH_GIT_CONFIG_ARGS <<'SH' || true
@@ -8558,7 +8589,7 @@ SH
   # Select the pane's absolute shell before clearing the environment. zsh -f
   # avoids reloading its .zshenv; noninteractive Bash/sh do not load startup
   # files when BASH_ENV/ENV are absent from the explicit keep set.
-  LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$(git_hooks_guard "$LAUNCH")") )"
+  LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$(git_hooks_guard inner "$LAUNCH")") )"
 fi
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # Set all temp selectors inside the final environment boundary, not in the
@@ -8573,7 +8604,7 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   LAUNCH="( $LAUNCH_SHELL_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
 fi
 # The persistent pane shell, not only the confined child, keeps the task hooks.
-LAUNCH=$(git_hooks_guard "$LAUNCH")
+LAUNCH=$(git_hooks_guard outer "$LAUNCH")
 # Implement the launch-delivery contract in this script's header. The full
 # home-identity hash isolates equal task ids across homes, and the spawn token in
 # the final filename keeps a buffered source line bound to this incarnation.
@@ -8629,6 +8660,7 @@ if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
 fi
 spawn_send_or_abort "launch Enter" spawn_send_key "$T" Enter
 SPAWN_LAUNCH_SENT=1
+spawn_git_hooks_verdict || exit 1
 if [ "$HARNESS" = kimi ]; then
   if ! kimi_wait_for_ready; then
     kimi_spawn_fail "$KIMI_READY_FAILURE_DETAIL"

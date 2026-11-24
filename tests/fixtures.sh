@@ -361,7 +361,9 @@ make_spawn_fakebin() {
 
 # fm_test_run_spawn <home> <pane-path> <fakebin> [fm-spawn args...]
 # Common spawn env. Extra variables in the caller (GROK_HOME, FM_FAKE_LAUNCH_LOG,
-# CLAUDE_CONFIG_DIR, ...) are inherited. Does not add --mode/--yolo; ship tests
+# CLAUDE_CONFIG_DIR, ...) are inherited. A fake endpoint never runs the launch,
+# so the wait for its Git hook verdict defaults to none; a real-endpoint case
+# sets FM_GIT_HOOKS_VERDICT_POLLS itself. Does not add --mode/--yolo; ship tests
 # that need a delivery contract pass those flags themselves.
 # fm_test_spawn_script: the fm-spawn.sh a test runs. With FM_TEST_STUB_SUMMARY_REFRESH=1 it is the same code in a
 # private copy of this checkout whose detached home-summary refresh does nothing: the real refresh reaches
@@ -434,6 +436,7 @@ fm_test_run_spawn() {
     FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$pane" TMUX="${TMUX:-fake,1,0}" \
     FM_CLAUDE_START_POLL_INTERVAL="${FM_CLAUDE_START_POLL_INTERVAL:-0.02}" \
+    FM_GIT_HOOKS_VERDICT_POLLS="${FM_GIT_HOOKS_VERDICT_POLLS:-0}" \
     PATH="$fakebin:$PATH" \
     "$spawn_script" "$@" 2>&1
 }
