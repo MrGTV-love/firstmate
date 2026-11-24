@@ -394,6 +394,12 @@ test_adopt_says_loudly_that_an_edited_plugin_is_set_aside_and_not_active() {
   grep -qF '// worker edit' "$kept" || fail 'the kept plugin lost the worker edit'
   assert_contains "$out" "WARNING: the worker's edits to .opencode/plugins/fm-busy-state.js are set aside at $kept and are no longer active" 'the relaunch did not say loudly that the edits are no longer active'
   [ "$(printf '%s\n' "$out" | grep -c 'no longer active')" = 1 ] || fail 'the warning was not printed exactly once'
+  # F3: with no prior launch record there is nothing to compare, so no worker edit is claimed
+  rm -f "$ADOPT_DIR/home/state/$id.wiring-sha"
+  out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
+  expect_code 0 "$rc" "a relaunch with no prior launch record must be admitted"$'\n'"$out"
+  assert_contains "$out" 'kept aside; no prior launch record to compare' 'a pre-record task was not told that nothing could be compared'
+  assert_not_contains "$out" 'no longer active' 'a task with no launch record was told its worker edits are no longer active'
   pass "fm-control relaunch: an edited plugin is set aside with one loud line naming its path; an unchanged one draws none"
 }
 
