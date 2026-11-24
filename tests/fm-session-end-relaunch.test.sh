@@ -524,6 +524,28 @@ test_drift_report_reaches_the_observer() {
   pass "the complete drift report reaches the observer on a relaunch and on a dirty refusal"
 }
 
+# The control print and the spawn print both reach the captured output: the wake and the durable file hold the first report once.
+test_two_printed_reports_are_listed_once() {
+  local dir report out file n
+  report=$(printf '%s\n' 'relaunch drift report for lane: 2 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged' \
+    '  drift: proven docs/b.txt' '  drift: uncertain,ignored cache dir' '  limitation: shallow history' '  a relaunch is not a new scope declaration')
+  out=$(printf '%s\n' "$report" 'spawn: launching the agent' "$report" 'spawn: the agent started')
+  dir=$(make_lane drift-twice)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$out" scan_lane_fresh "$dir" || fail "the scan failed"
+  case "$FM_SESSION_END_WAKE" in *'drift report: 2 out-of-scope path(s)'*) ;; *) fail "the wake has no count of 2: $FM_SESSION_END_WAKE" ;; esac
+  for n in 'docs/b.txt' 'uncertain,ignored cache dir' 'shallow history'; do
+    [ "$(printf '%s' "$FM_SESSION_END_WAKE" | grep -o -F "$n" | wc -l | tr -d ' ')" = 1 ] || fail "the wake does not list $n once: $FM_SESSION_END_WAKE"
+  done
+  file="$dir/state/lane.relaunch-drift"
+  [ "$(grep -c '^relaunch drift report for ' "$file")" = 1 ] || fail "the durable file holds more than one report: $(cat "$file")"
+  [ "$(grep -c '^  drift: ' "$file")" = 2 ] || fail "the durable file does not list the 2 counted paths: $(cat "$file")"
+  for n in '  drift: proven docs/b.txt' '  drift: uncertain,ignored cache dir' '  limitation: shallow history'; do
+    [ "$(grep -c -x -F "$n" "$file")" = 1 ] || fail "the durable file does not list '$n' once: $(cat "$file")"
+  done
+  ! grep -F 'spawn:' "$file" >/dev/null || fail "the durable file holds unrelated spawn output: $(cat "$file")"
+  pass "two printed reports are listed once, with a count that matches the paths, in the wake and in the durable file"
+}
+
 # A fresh session-end generation for the lane, as a later worker death produces.
 new_generation() {  # <dir>
   local dir=$1 gen
@@ -601,6 +623,7 @@ test_unchanged_refusal_survives_a_new_generation_and_an_unrelated_commit
 test_long_drift_report_keeps_its_durable_reference_at_the_fallback
 test_a_non_refusal_failure_keeps_its_retry
 test_drift_report_reaches_the_observer
+test_two_printed_reports_are_listed_once
 test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched
 test_relaunch_bound_stays_inside_the_watcher_grace

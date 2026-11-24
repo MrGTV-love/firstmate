@@ -257,18 +257,24 @@ fm_session_end_cause_fingerprint() {  # <state-dir> <id> <reason> [<obstruction-
   } | shasum -a 256 | awk '{print $1}'
 }
 
+# The first drift report inside a control output: from its header to its closing line, before any later report.
+fm_session_end_first_drift_report() {  # <control-output>
+  printf '%s\n' "$1" | awk '/^relaunch drift report for /{ if (seen) exit; seen = 1 } seen { print } seen && /^  a relaunch is not a new scope declaration/ { exit }'
+}
+
 # Write the complete drift report from a control output to its stable durable path and print that path.
 fm_session_end_write_drift() {  # <state-dir> <id> <control-output>
   local file="$1/$2.relaunch-drift"
-  printf '%s\n' "$3" | sed -n -e '/^relaunch drift report for /,$p' > "$file" 2>/dev/null || true
+  fm_session_end_first_drift_report "$3" > "$file" 2>/dev/null || true
   printf '%s' "$file"
 }
 
 # The complete drift report inside a control output, on one line: "header | entry | entry ...". Empty when the
 # output carries no report or the report found nothing out of scope.
 fm_session_end_drift_summary() {  # <control-output>
-  local text=$1 header entries limits
-  header=$(printf '%s\n' "$text" | sed -n 's/^relaunch drift report for \(.*\)$/\1/p' | head -n 1)
+  local text header entries limits
+  text=$(fm_session_end_first_drift_report "$1")
+  header=$(printf '%s\n' "$text" | sed -n 's/^relaunch drift report for \(.*\)$/\1/p')
   case "$header" in ''|*'no out-of-scope path'*|*'could not be produced'*) ;; *)
     entries=$(printf '%s\n' "$text" | sed -n 's/^  drift: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
     limits=$(printf '%s\n' "$text" | sed -n 's/^  limitation: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
