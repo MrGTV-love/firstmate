@@ -166,28 +166,32 @@ The relaunch suite emitted two non-fatal BSD `sed` diagnostics in its Pi-session
 ## Task Git hook carrier in the worker tool shell
 
 A harness joins `GIT_HOOKS_CONFIG_HARNESSES` in [`bin/fm-spawn.sh`](../../bin/fm-spawn.sh), and so runs the config carrier, only after `tests/fm-git-hook-carrier-live-e2e.test.sh` passes for it on that carrier.
-The guard replays the launch text `fm-spawn.sh` stages in a private tmux pane with the installed harness first on PATH; a private scripted provider on loopback (Anthropic Messages for Claude, OpenAI Responses for omp) makes the harness run one shell tool call that commits and pushes in the task worktree.
+The guard replays the launch text `fm-spawn.sh` stages in a private tmux pane with the installed harness first on PATH; a private scripted provider on loopback (Anthropic Messages for Claude, OpenAI Responses for omp and codex) makes the harness run one shell tool call that commits and pushes in the task worktree.
 It checks each installed harness it can drive on the carrier `fm-spawn.sh` selects for it, and reads HEAD, the bare remote's refs, the commit body and git's `GIT_TRACE`, never the hooks' own status.
 Its control launches the same text through a fixture wrapper that removes the carrier's variables at the harness boundary, and must see the credential commit and the AI trailer land.
 No model tokens are spent and the harness stores are scratch directories with throwaway keys.
 
-Verified 2026-11-24 on Darwin arm64, Apple Git 2.54.0 and tmux, under `seatbelt-v1` write confinement:
+Verified 2026-11-24 on Darwin arm64, Apple Git 2.54.0 and tmux; claude and omp ran under `seatbelt-v1` write confinement, codex unconfined as the fleet launches it:
 
 ```sh
 FM_GIT_HOOK_CARRIER_LIVE=1 bash tests/fm-git-hook-carrier-live-e2e.test.sh
 ```
 
 ```text
-# live claude 2.1.331 (Claude Code)
-ok - claude 2.1.331 (Claude Code): the config carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
-ok - control claude 2.1.331 (Claude Code): with the carrier removed at the harness boundary the credential commit and AI trailer land
+# live claude 2.1.332 (Claude Code)
+ok - claude 2.1.332 (Claude Code): the config carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control claude 2.1.332 (Claude Code): with the carrier removed at the harness boundary the credential commit and AI trailer land
 # live omp omp/19.1.1
 ok - omp omp/19.1.1: the legacy carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
 ok - control omp omp/19.1.1: with the carrier removed at the harness boundary the credential commit and AI trailer land
+# live codex codex-cli 0.171.0
+ok - codex codex-cli 0.171.0: the legacy carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control codex codex-cli 0.171.0: with the carrier removed at the harness boundary the credential commit and AI trailer land
 # all fm-git-hook-carrier-live tests passed
 ```
 
-Only `claude` is listed; omp is proven on the legacy carrier only, and every other harness is unverified in its tool shell on either carrier.
+The same claude result was also observed on Claude Code 2.1.331 the same day.
+Only `claude` is listed; omp and codex are proven on the legacy carrier only, and every other harness is unverified in its tool shell on either carrier.
 Inside `seatbelt-v1` confinement a process cannot execute the setuid `/bin/ps`, so a repository hook that identifies its calling git through `ps`, such as a `reference-transaction` guard, sees no caller there; `tests/fm-spawn-git-hook-carrier.test.sh` records that observation.
 
 ## Fleet model-index catalog discovery
