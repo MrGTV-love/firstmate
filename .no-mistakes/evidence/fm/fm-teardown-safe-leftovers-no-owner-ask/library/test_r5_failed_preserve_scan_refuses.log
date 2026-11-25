@@ -1,0 +1,2 @@
+ok - a failed scan of the staged preserve or of the copy refuses, alone or hiding a changed payload; working scans pass an intact preserve
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.DctGe2

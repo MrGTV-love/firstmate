@@ -1,0 +1,14 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 57s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project at 6761661e260d is already in remotes/origin/main (6761661e260d164f20ac0477ffe46ed929945f29)
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one at 6761661e260d is already in remotes/origin/main (6761661e260d164f20ac0477ffe46ed929945f29)
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/data/task-x1/nested-copy-preserved/d264d222b869f31215d2024429a6b4977d85804e4bb91609082995dce31b23bf
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one (exit 127): full output: /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/data/task-x1/vernant-closeout.gk6MtT
+  Vernant's closeout driver /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/scripts/git-stability/closeout_pr.py or its interpreter /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/vernant-python is not available
+  The copy was not released directly: its preserve /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/data/task-x1/nested-copy-preserved/d264d222b869f31215d2024429a6b4977d85804e4bb91609082995dce31b23bf does not hold its ignored files, the .claude and .opencode trees whole included, as the copy holds them now, outside every removal root; its lock was restored.

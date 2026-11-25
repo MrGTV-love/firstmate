@@ -1,0 +1,10 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 52s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/pool/1/project at a1b93e771a5d is already in remotes/origin/main (a1b93e771a5d9a6d511c9b62f03c0edd434de663)
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-open-file-owner missing=own nested copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/pool/1/project: process 19692 holds /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/pool/1/project/.claude/worktrees/fc-one/.git open.
+human-only-exit: Which task or person owns process 19692, which holds a file in /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/pool/1/project/.claude/worktrees/fc-one open? Stop it or tell me it is yours.

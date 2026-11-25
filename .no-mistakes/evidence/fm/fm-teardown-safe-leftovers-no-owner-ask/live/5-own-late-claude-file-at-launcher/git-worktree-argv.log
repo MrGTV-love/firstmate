@@ -1,0 +1,15 @@
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project worktree unlock /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project worktree lock --reason vernant-session-active owner=launcher:48239 launcher=48239 /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project/.claude/worktrees/fc-one

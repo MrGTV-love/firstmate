@@ -1,0 +1,7 @@
+0	fm-teardown-cleanup.test.sh	test_dead_launcher_lock_is_released_when_the_driver_is_unavailable	261s
+0	fm-teardown.test.sh	test_squash_landed_content_counts_in_every_shape_and_prints_its_base	562s
+0	fm-teardown.test.sh	test_squash_landed_content_refuses_whatever_differs	522s
+0	fm-teardown-cleanup.test.sh	test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable	1488s
+0	fm-teardown-cleanup.test.sh	test_missing_closeout_driver_or_interpreter_releases_a_dead_launchers_lock	483s
+0	fm-teardown.test.sh	test_bundle_route_needs_no_captains_call	1147s
+0	fm-teardown-cleanup.test.sh	test_own_locked_copy_with_no_closeout_interpreter_releases_a_dead_launchers_lock	409s

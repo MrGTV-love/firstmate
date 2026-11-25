@@ -1,0 +1,14 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/pool/1/project at 3066218388ca is already in remotes/origin/main (3066218388cab525e11d747171175bd34d7be5bb)
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/pool/1/project/.claude/worktrees/fc-one at 3066218388ca is already in remotes/origin/main (3066218388cab525e11d747171175bd34d7be5bb)
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/data/task-x1/nested-copy-preserved/f520aa171baf1d898563a59830ea3fd150d802ca49ebbc982f5059829cdea106
+teardown: closeout credit for /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/pool/1/project/.claude/worktrees/fc-one (exit 127): full output: /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/data/task-x1/vernant-closeout.51rOg9
+  Vernant's closeout driver /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/pool/1/project/scripts/git-stability/closeout_pr.py or its interpreter /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/vernant-python is not available
+  The copy was not released directly: its preserve /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.qJYzFQ/own-late/data/task-x1/nested-copy-preserved/f520aa171baf1d898563a59830ea3fd150d802ca49ebbc982f5059829cdea106 does not hold its ignored files, the .claude and .opencode trees whole included, as the copy holds them now, outside every removal root; its lock was restored.

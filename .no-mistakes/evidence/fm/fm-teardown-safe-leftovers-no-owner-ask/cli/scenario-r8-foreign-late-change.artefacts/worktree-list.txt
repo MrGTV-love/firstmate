@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.TuX9ND/foreign-late/project
+HEAD d8d449b46b8b4dea2301c6ef1b163a0c2a2d5d89
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.TuX9ND/foreign-late/pool/1/project
+HEAD d8d449b46b8b4dea2301c6ef1b163a0c2a2d5d89
+detached
+

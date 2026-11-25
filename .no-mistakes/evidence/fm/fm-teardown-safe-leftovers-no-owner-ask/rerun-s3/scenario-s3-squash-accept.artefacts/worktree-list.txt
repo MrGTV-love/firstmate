@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.HUEWU2/content-shape-main-moved-on/project
+HEAD e45f6c2631a4d6c9126edd1c6b80de958be787c0
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.HUEWU2/content-shape-main-moved-on/wt
+HEAD 55d714f63eaeac17dccb529f92d6bcbecbd8bf92
+detached
+

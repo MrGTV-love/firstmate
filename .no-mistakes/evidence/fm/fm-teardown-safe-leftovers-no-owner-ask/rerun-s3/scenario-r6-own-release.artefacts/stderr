@@ -1,0 +1,13 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project at 3531125303dd is already in remotes/origin/main (3531125303dd7ce7d04f0bdbf727ae5ac9ce1afb)
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one at 3531125303dd is already in remotes/origin/main (3531125303dd7ce7d04f0bdbf727ae5ac9ce1afb)
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/data/task-x1/nested-copy-preserved/4bb09e58b3338e2d902867801fecfe03984a10c66512587e935ce5ba4e0d6749
+teardown: closeout credit for /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: released creation lock 'vernant-session-active owner=launcher:40537 launcher=40537' on own nested copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one (launcher 40537 is gone; proof: the landed-work rule) and removed it without force
+teardown: removed landed own nested copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project

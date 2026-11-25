@@ -1,0 +1,14 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 22s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project/.claude/worktrees/fc-one at 6a4d9f0dffe7 is already in remotes/origin/main (6a4d9f0dffe76cf0fe47d99c2fc1c184e48f9e17)
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project at 6a4d9f0dffe7 is already in remotes/origin/main (6a4d9f0dffe76cf0fe47d99c2fc1c184e48f9e17)
+teardown: closeout credit for /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/data/task-x1/nested-copy-preserved/d7911933d7b9d9429576bb8af2b1e63b3fd89cd07eda43b92029243663079c7e
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/data/task-x1/nested-copy-preserved/d7911933d7b9d9429576bb8af2b1e63b3fd89cd07eda43b92029243663079c7e
+teardown: released creation lock 'vernant-session-active owner=launcher:11385 launcher=11385' on foreign copy /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project/.claude/worktrees/fc-one (launcher 11385 is gone; proof: the landed-work rule) and removed it without force
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project

@@ -1,0 +1,12 @@
+earlier-preserve rc=0
+earlier .cache=run
+release=0 why=none git=unlock remove 
+current .cache/run.bin bytes=run-v2 preserved-and-summed=yes
+current .claude/channel-outbox/a.jsonl bytes=two preserved-and-summed=yes
+current notes/unique.dat bytes=only here preserved-and-summed=yes
+aside .aside-e5a486fe61f9c6b58af8eec70b78e076a58d6e880a0a2cf9b658530c51390fe5.1795564962.88549 .cache=run a.jsonl=one
+<nested-copy-preserved>
+<nested-copy-preserved>/e5a486fe61f9c6b58af8eec70b78e076a58d6e880a0a2cf9b658530c51390fe5
+<nested-copy-preserved>/.aside-e5a486fe61f9c6b58af8eec70b78e076a58d6e880a0a2cf9b658530c51390fe5.1795564962.88549
+--- stderr tail
+ok - R8-1: a foreign copy whose .cache and .claude files change before the unlock has the new bytes preserved again and the earlier preserve kept aside

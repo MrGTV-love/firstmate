@@ -1,0 +1,2 @@
+ok - a successful preserve replacement keeps an earlier preserve with a file the new one lacks, and drops one the new preserve fully covers
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.eQ34K9

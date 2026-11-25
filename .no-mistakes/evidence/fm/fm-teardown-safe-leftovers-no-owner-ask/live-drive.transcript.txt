@@ -1,0 +1,85 @@
+== 1-foreign-dead-launcher-driver-missing
+exit=0
+copy=present
+worktree-list: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-foreign/pool/1/project/.claude/worktrees/fc-one
+worktree-list: HEAD 3edb87bf8f40d7c467c4fa0e2a2e6297f4da4e0d
+worktree-list: branch refs/heads/fm/task-x1-v2
+worktree-list: locked vernant-session-active owner=launcher:60080 launcher=60080
+task-meta=gone
+NOT-preserved .claude/channel-outbox/a.jsonl
+NOT-preserved .opencode/state/log.json
+NOT-preserved .cache/run.bin
+NOT-preserved notes/unique.dat
+== 2-own-dead-launcher-driver-missing
+exit=0
+copy=gone
+task-meta=gone
+preserved .claude/channel-outbox/a.jsonl bytes=one sha256-line=1
+preserved .opencode/state/log.json bytes=evidence sha256-line=1
+preserved .cache/run.bin bytes=run sha256-line=1
+preserved notes/unique.dat bytes=only\ here sha256-line=1
+preserve-tree: <case>/data/task-x1/nested-copy-preserved
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/meta
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/meta/copy-path
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/meta/SHA256SUMS
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.opencode
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.opencode/state
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.opencode/state/log.json
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.claude
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.claude/channel-outbox
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.claude/channel-outbox/a.jsonl
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/notes
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/notes/unique.dat
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.cache
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.cache/run.bin
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: released creation lock 'vernant-session-active owner=launcher:44594 launcher=44594' on own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one (launcher 44594 is gone; proof: the landed-work rule) and removed it without force
+== 3-own-dead-launcher-driver-uncovered
+exit=0
+copy=gone
+task-meta=gone
+preserved .claude/channel-outbox/a.jsonl bytes=one sha256-line=1
+preserved .opencode/state/log.json bytes=evidence sha256-line=1
+preserved .cache/run.bin bytes=run sha256-line=1
+preserved notes/unique.dat bytes=only\ here sha256-line=1
+preserve-tree: <case>/data/task-x1/nested-copy-preserved
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/meta
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/meta/copy-path
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/meta/SHA256SUMS
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/.opencode
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/.opencode/state
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/.opencode/state/log.json
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/.claude
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/.claude/channel-outbox
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/.claude/channel-outbox/a.jsonl
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/notes
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/notes/unique.dat
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/.cache
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec/files/.cache/run.bin
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: released creation lock 'vernant-session-active owner=launcher:34229 launcher=34229' on own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one (launcher 34229 is gone; proof: the landed-work rule) and removed it without force
+== 4-own-live-launcher-driver-missing
+exit=1
+copy=present
+worktree-list: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-launcher/pool/1/project/.claude/worktrees/fc-one
+worktree-list: HEAD b5fd47b52f4d952a6fb0386bec9256192c0e9e15
+worktree-list: branch refs/heads/fm/task-x1-v2
+worktree-list: locked vernant-session-active owner=launcher:29141 launcher=29141
+task-meta=present
+NOT-preserved .claude/channel-outbox/a.jsonl
+NOT-preserved .opencode/state/log.json
+NOT-preserved .cache/run.bin
+NOT-preserved notes/unique.dat
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-launcher/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-launcher/pool/1/project at b5fd47b52f4d is already in remotes/origin/main (b5fd47b52f4d952a6fb0386bec9256192c0e9e15)
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-launcher/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-launcher/pool/1/project: its creation-lock launcher process 29141 may still be running.
+human-only-exit: Is launcher 29141, named in the creation lock on /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-launcher/pool/1/project/.claude/worktrees/fc-one, still running, and who owns it?
+live launcher 29141 still running (not signalled)
+drive done

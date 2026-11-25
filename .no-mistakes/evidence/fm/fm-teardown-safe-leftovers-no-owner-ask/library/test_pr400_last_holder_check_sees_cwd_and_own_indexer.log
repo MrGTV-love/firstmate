@@ -1,0 +1,2 @@
+ok - the last holder check before the unlock refuses any cwd holder, an indexer name included; an open-file-only indexer not recorded as own is exempt; with none the release proceeds
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.T6Moa1

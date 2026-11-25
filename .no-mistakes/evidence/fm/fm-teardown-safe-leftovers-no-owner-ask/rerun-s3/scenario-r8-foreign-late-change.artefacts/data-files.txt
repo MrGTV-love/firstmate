@@ -1,0 +1,9 @@
+data/task-x1/nested-copy-preserved/.aside-3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e.1795570639.85267/files/.claude/channel-outbox/a.jsonl
+data/task-x1/nested-copy-preserved/.aside-3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e.1795570639.85267/files/.opencode/state/log.json
+data/task-x1/nested-copy-preserved/.aside-3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e.1795570639.85267/meta/SHA256SUMS
+data/task-x1/nested-copy-preserved/.aside-3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e.1795570639.85267/meta/copy-path
+data/task-x1/nested-copy-preserved/3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e/files/.cache/run.bin
+data/task-x1/nested-copy-preserved/3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e/files/.claude/channel-outbox/a.jsonl
+data/task-x1/nested-copy-preserved/3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e/files/.opencode/state/log.json
+data/task-x1/nested-copy-preserved/3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e/meta/SHA256SUMS
+data/task-x1/nested-copy-preserved/3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e/meta/copy-path

@@ -1,0 +1,3 @@
+$ TMPDIR=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-teardown-cleanup.test.sh test_the_default_driver_interpreter_and_the_override_close_the_same_way   (head 762cd358f)
+ok - the default interpreter and the explicit override close the kept-copy task the same way, and with a missing interpreter a dead launcher's lock is released directly with the unique ignored file and the .claude/channel-outbox files preserved
+rc=0 elapsed=978s

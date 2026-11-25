@@ -1,0 +1,87 @@
+=================== shape=foreign
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+teardown: preserved ignored files from /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-copy in /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-data/data/fixture/nested-copy-preserved/6d3947371cd13f327c6a8c8f0dc5db79eae3d582b687700325b1acc8c47280dc
+teardown: released creation lock 'vernant-session-active owner=launcher:4194305 launcher=4194305' on foreign copy /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-copy (launcher 4194305 is gone; proof: fixture) and removed it without force
+release rc=0
+why=none
+copy: removed
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-project
+  HEAD 39053210dda685dfb6767bd2156f8a1263205a9c
+  branch refs/heads/main
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-data/data/fixture/nested-copy-preserved/6d3947371cd13f327c6a8c8f0dc5db79eae3d582b687700325b1acc8c47280dc/meta/SHA256SUMS
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+  ./6d3947371cd13f327c6a8c8f0dc5db79eae3d582b687700325b1acc8c47280dc/files/.cache/run.bin = run
+  ./6d3947371cd13f327c6a8c8f0dc5db79eae3d582b687700325b1acc8c47280dc/files/notes/unique.dat = only here
+=================== shape=own-nested
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+teardown: released creation lock 'vernant-session-active owner=launcher:4194305 launcher=4194305' on own nested copy /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/own-nested-copy (launcher 4194305 is gone; proof: fixture) and removed it without force
+release rc=0
+why=none
+copy: removed
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/own-nested-project
+  HEAD 26b2eeff8c16e6ec262a1f06c92fe964f22fd2bf
+  branch refs/heads/main
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/own-nested-data/data/fixture/nested-copy-preserved/881d3beacf554cca8a8b2e38e1ebb2b7d4c50303010cb769123ed2780179362b/meta/SHA256SUMS
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+  ./881d3beacf554cca8a8b2e38e1ebb2b7d4c50303010cb769123ed2780179362b/files/.cache/run.bin = run
+  ./881d3beacf554cca8a8b2e38e1ebb2b7d4c50303010cb769123ed2780179362b/files/notes/unique.dat = only here
+=================== shape=own-late
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+teardown: released creation lock 'vernant-session-active owner=launcher:4194305 launcher=4194305' on own nested copy /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/own-late-copy (launcher 4194305 is gone; proof: fixture) and removed it without force
+release rc=0
+why=none
+copy: removed
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/own-late-project
+  HEAD 484293ef4e9c6aae605a60570e090963e3535b42
+  branch refs/heads/main
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/own-late-data/data/fixture/nested-copy-preserved/b2e8037c629f483daca8f81cbc391d81bf72f6749937205727b25456eb9f0e38/meta/SHA256SUMS
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+  ./b2e8037c629f483daca8f81cbc391d81bf72f6749937205727b25456eb9f0e38/files/.cache/run.bin = run
+  ./b2e8037c629f483daca8f81cbc391d81bf72f6749937205727b25456eb9f0e38/files/notes/unique.dat = only here
+=================== shape=foreign-late
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+teardown: preserved ignored files from /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-late-copy in /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-late-data/data/fixture/nested-copy-preserved/863287af44f087ab756c87c59aec9e518d4fda8f070ffb95a8b74ba5be9500c5
+teardown: released creation lock 'vernant-session-active owner=launcher:4194305 launcher=4194305' on foreign copy /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-late-copy (launcher 4194305 is gone; proof: fixture) and removed it without force
+release rc=0
+why=none
+copy: removed
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-late-project
+  HEAD b16dc4adb47e58bb05eadbbc95487fb2afbe4a82
+  branch refs/heads/main
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/foreign-late-data/data/fixture/nested-copy-preserved/863287af44f087ab756c87c59aec9e518d4fda8f070ffb95a8b74ba5be9500c5/meta/SHA256SUMS
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+  ./863287af44f087ab756c87c59aec9e518d4fda8f070ffb95a8b74ba5be9500c5/files/.cache/run.bin = run
+  ./863287af44f087ab756c87c59aec9e518d4fda8f070ffb95a8b74ba5be9500c5/files/notes/unique.dat = only here
+=================== shape=live-launcher
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+release rc=1
+why=its creation-lock launcher process 4194305 may still be running
+copy: STILL PRESENT
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/live-launcher-project
+  HEAD e012644b7e3a47ddcc38249ca9515d5fbd07dfa5
+  branch refs/heads/main
+  
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8/live-launcher-copy
+  HEAD e012644b7e3a47ddcc38249ca9515d5fbd07dfa5
+  branch refs/heads/f-live-launcher
+  locked vernant-session-active owner=launcher:4194305 launcher=4194305
+  
+preserved files (path  sha256 via SHA256SUMS):
+base=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.1Hfio8

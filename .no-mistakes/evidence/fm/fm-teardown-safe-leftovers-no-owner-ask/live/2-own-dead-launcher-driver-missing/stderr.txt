@@ -1,0 +1,13 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 37s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project at 89d12f9ef176 is already in remotes/origin/main (89d12f9ef1765116a715e26251b2117587d7e73b)
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one at 89d12f9ef176 is already in remotes/origin/main (89d12f9ef1765116a715e26251b2117587d7e73b)
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: released creation lock 'vernant-session-active owner=launcher:44594 launcher=44594' on own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one (launcher 44594 is gone; proof: the landed-work rule) and removed it without force
+teardown: removed landed own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project

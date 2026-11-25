@@ -1,0 +1,12 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 73s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.hR2dQi/pr-credit/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: closeout credit for /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.hR2dQi/pr-credit/pool/1/project/.claude/worktrees/fc-one: --pr 7 (the merged pull request holds HEAD eaeb4617a46c)
+teardown: closeout credit for /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.hR2dQi/pr-credit/pool/1/project/.claude/worktrees/fc-one: --pr 7 (the merged pull request holds HEAD eaeb4617a46c)
+teardown: closeout credit for /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.hR2dQi/pr-credit/pool/1/project/.claude/worktrees/fc-one: --pr 7 (the merged pull request holds HEAD eaeb4617a46c)
+teardown: closeout credit for /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.hR2dQi/pr-credit/pool/1/project/.claude/worktrees/fc-one: --pr 7 (the merged pull request holds HEAD eaeb4617a46c)
+teardown: removed landed own nested copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.hR2dQi/pr-credit/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.hR2dQi/pr-credit/pool/1/project

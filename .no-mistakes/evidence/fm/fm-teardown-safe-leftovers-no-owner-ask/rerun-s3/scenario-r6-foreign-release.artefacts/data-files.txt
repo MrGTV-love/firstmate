@@ -1,0 +1,4 @@
+data/task-x1/nested-copy-preserved/5d4cbf5d5414ba115d30a1107bd2860110fb2a9da2301f95baa32157441cbdd6/files/.claude/channel-outbox/a.jsonl
+data/task-x1/nested-copy-preserved/5d4cbf5d5414ba115d30a1107bd2860110fb2a9da2301f95baa32157441cbdd6/files/.opencode/state/log.json
+data/task-x1/nested-copy-preserved/5d4cbf5d5414ba115d30a1107bd2860110fb2a9da2301f95baa32157441cbdd6/meta/SHA256SUMS
+data/task-x1/nested-copy-preserved/5d4cbf5d5414ba115d30a1107bd2860110fb2a9da2301f95baa32157441cbdd6/meta/copy-path

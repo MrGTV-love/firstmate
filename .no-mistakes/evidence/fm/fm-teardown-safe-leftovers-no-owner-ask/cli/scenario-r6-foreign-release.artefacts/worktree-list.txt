@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/project
+HEAD 6a4d9f0dffe76cf0fe47d99c2fc1c184e48f9e17
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.y3RPGt/foreign-release/pool/1/project
+HEAD 6a4d9f0dffe76cf0fe47d99c2fc1c184e48f9e17
+detached
+

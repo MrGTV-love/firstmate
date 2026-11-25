@@ -1,0 +1,16 @@
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree unlock /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree remove /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/project worktree list --porcelain

@@ -1,0 +1,2 @@
+ok - the final proof refuses what a plain git worktree remove refuses: an untracked managed hook file or turn-end marker keeps the copy, an excluded one is removed
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.dQygYl

@@ -1,0 +1,21 @@
+live-launcher: SCENARIO live-launcher: PASS rc=0 elapsed=63s
+r6-foreign-release: SCENARIO r6-foreign-release: PASS rc=0 elapsed=70s
+r8-foreign-held: SCENARIO r8-foreign-held: PASS rc=0 elapsed=110s
+r6-own-release: SCENARIO r6-own-release: PASS rc=0 elapsed=131s
+r8-foreign-cache-tabpath: SCENARIO r8-foreign-cache-tabpath: FAIL rc=1 elapsed=113s
+stream done: r8-foreign-cache-tabpath
+r8-foreign-late-change:  rc=2 elapsed=254s
+r7-own-late-claude:  rc=2 elapsed=270s
+s3-squash-refuse: SCENARIO s3-squash-refuse: PASS rc=0 elapsed=125s
+s2-open-file-holder: SCENARIO s2-open-file-holder: PASS rc=0 elapsed=190s
+s3-squash-accept: SCENARIO s3-squash-accept: PASS rc=0 elapsed=230s
+s4-bundle-unattended: SCENARIO s4-bundle-unattended: PASS rc=0 elapsed=330s
+s5-pr-credit: SCENARIO s5-pr-credit: PASS rc=0 elapsed=411s
+r7-own-late-claude: SCENARIO r7-own-late-claude: PASS rc=0 elapsed=269s
+s4-bundle-attended: SCENARIO s4-bundle-attended: PASS rc=0 elapsed=483s
+r8-foreign-late-change: SCENARIO r8-foreign-late-change: PASS rc=0 elapsed=207s
+stream done: r7-own-late-claude r8-foreign-late-change
+s6-late-record-at-unlock: SCENARIO s6-late-record-at-unlock: PASS rc=0 elapsed=271s
+stream done: r6-foreign-release r8-foreign-held r8-foreign-late-change s3-squash-refuse s4-bundle-unattended s5-pr-credit s6-late-record-at-unlock
+s5-bundle-credit: SCENARIO s5-bundle-credit: PASS rc=0 elapsed=250s
+stream done: live-launcher r6-own-release r7-own-late-claude s2-open-file-holder s3-squash-accept s4-bundle-attended s5-bundle-credit

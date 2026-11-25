@@ -1,0 +1,14 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D r8-foreign-late-change   (head 762cd358f)
+$ env FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/code-root FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/state FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/data FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/config NM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/nm PATH=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/fakebin:$PATH /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late
+teardown rc=0
+FACT ok  - the change was written at the unlock
+teardown: released creation lock 'vernant-session-active owner=launcher:42364 launcher=42364' on foreign copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/pool/1/project/.claude/worktrees/fc-one (launcher 42364 is gone; proof: the landed-work rule) and removed it without force
+preserves of .cache/run.bin: late|sums=yes
+preserves of .claude/channel-outbox/a.jsonl: one|sums=yes;one-rerun|sums=yes
+outcome: copy removed
+FACT ok  - copy removed: the new .cache/run.bin bytes are preserved with their SHA256SUMS line
+FACT ok  - copy removed: the new .claude bytes are preserved with their SHA256SUMS line
+FACT ok  - the earlier preserve holding the old .claude bytes is kept aside
+FACT ok  - no forced removal
+SCENARIO r8-foreign-late-change: PASS
+rc=0 elapsed=207s

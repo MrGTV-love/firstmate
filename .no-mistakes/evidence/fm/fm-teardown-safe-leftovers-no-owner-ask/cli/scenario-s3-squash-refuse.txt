@@ -1,0 +1,8 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/cli/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D s3-squash-refuse   (head 762cd358f)
+$ (scratch home /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-c/fm-teardown-tests.MiAPV4/content-differs-unique) /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1
+teardown rc=1
+FACT ok  - teardown refuses
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+FACT ok  - the task record and the unique file stay
+SCENARIO s3-squash-refuse: PASS
+rc=0 elapsed=16s

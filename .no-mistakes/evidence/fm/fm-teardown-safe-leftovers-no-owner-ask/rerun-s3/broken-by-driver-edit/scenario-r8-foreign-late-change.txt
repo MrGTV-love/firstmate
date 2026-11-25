@@ -1,0 +1,28 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D r8-foreign-late-change   (head 762cd358f)
+$ env FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late/code-root FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late/state FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late/data FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late/config NM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late/nm PATH=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late/fakebin:$PATH /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late
+teardown rc=0
+FACT ok  - the change was written at the unlock
+teardown: released creation lock 'vernant-session-active owner=launcher:3366 launcher=3366' on foreign copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-late/pool/1/project/.claude/worktrees/fc-one (launcher 3366 is gone; proof: the landed-work rule) and removed it without force
+preserves of .cache/run.bin: late|sums=yes
+preserves of .claude/channel-outbox/a.jsonl: one|sums=yes;one-rerun|sums=yes
+outcome: copy removed
+FACT ok  - copy removed: the new .cache/run.bin bytes are preserved with their SHA256SUMS line
+FACT ok  - copy removed: the new .claude bytes are preserved with their SHA256SUMS line
+FACT ok  - the earlier preserve holding the old .claude bytes is kept aside
+FACT ok  - no forced removal
+/Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh: line 378: eachable: command not found
+FACT ok  - the fixture copy moved to a tab path and relocked with 'vernant-session-active owner=launcher:70072 launcher=70072'
+$ env FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab/code-root FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab/state FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab/data FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab/config NM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab/nm PATH=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab/fakebin:$PATH /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab
+teardown rc=1
+FACT BAD - the .cache change was written at the unlock
+REFUSED: worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.CVvRxu/foreign-cache-tab/pool/1/project has uncommitted changes.
+preserves of .cache/run.bin: 
+preserves of notes/unique.dat: 
+preserves of .claude/channel-outbox/a.jsonl: 
+preserves of .opencode/state/log.json: 
+outcome: copy kept
+FACT BAD - copy kept: the new .cache bytes are still in the copy
+FACT ok  - copy kept: no worktree remove ran
+/Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh: line 416: syntax error near unexpected token `;;'
+/Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh: line 416: `    ;;'
+rc=2 elapsed=254s

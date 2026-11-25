@@ -1,0 +1,7 @@
+== data/task-x1/nested-copy-preserved/.aside-3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e.1795570639.85267/meta/SHA256SUMS
+bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+== data/task-x1/nested-copy-preserved/3f87e757127f762f1a6d9ffc9f599b3837a894d5b5a4a37b2f1383592a68881e/meta/SHA256SUMS
+bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+922ee9a672a8e10af8e08a79e058b9d5229d590e571d5f3b609b72ac54ace38e  .claude/channel-outbox/a.jsonl
+f152945b358aa26a9e72e25381deff94e254c547089bd690dccd218e9414d148  .cache/run.bin

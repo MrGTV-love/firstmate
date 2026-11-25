@@ -1,0 +1,9 @@
+data/task-x1/nested-copy-preserved/.aside-8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0.1795562934.16469/files/.claude/channel-outbox/a.jsonl
+data/task-x1/nested-copy-preserved/.aside-8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0.1795562934.16469/files/.opencode/state/log.json
+data/task-x1/nested-copy-preserved/.aside-8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0.1795562934.16469/meta/SHA256SUMS
+data/task-x1/nested-copy-preserved/.aside-8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0.1795562934.16469/meta/copy-path
+data/task-x1/nested-copy-preserved/8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0/files/.cache/run.bin
+data/task-x1/nested-copy-preserved/8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0/files/.claude/channel-outbox/a.jsonl
+data/task-x1/nested-copy-preserved/8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0/files/.opencode/state/log.json
+data/task-x1/nested-copy-preserved/8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0/meta/SHA256SUMS
+data/task-x1/nested-copy-preserved/8c2545ec86cbac167e1261fc49c80374e84519ccffeb0d178b5f202f9ac708a0/meta/copy-path

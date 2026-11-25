@@ -1,0 +1,166 @@
+=================== shape=foreign
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+teardown: preserved ignored files from /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-copy in /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-data/data/fixture/nested-copy-preserved/c34d0d25c5a4b839a2260d51de5db574b793ddd39788daf6f5e83af2081a4c9e
+teardown: preserved ignored files from /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-copy in /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-data/data/fixture/nested-copy-preserved/c34d0d25c5a4b839a2260d51de5db574b793ddd39788daf6f5e83af2081a4c9e
+teardown: released creation lock 'vernant-session-active owner=launcher:4194305 launcher=4194305' on foreign copy /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-copy (launcher 4194305 is gone; proof: fixture) and removed it without force
+release rc=0
+why=none
+copy: removed
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-project
+  HEAD eca38b5aea25bb1e16ab03d65298ab029f8b2062
+  branch refs/heads/main
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-data/data/fixture/nested-copy-preserved/c34d0d25c5a4b839a2260d51de5db574b793ddd39788daf6f5e83af2081a4c9e/meta/SHA256SUMS
+    bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+    aa301fa33765f678226a0378cef28649c9b588c68d566bd19fa195cc9959f684  .claude/bug-evidence/r.json
+    2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+  ./c34d0d25c5a4b839a2260d51de5db574b793ddd39788daf6f5e83af2081a4c9e/files/.cache/run.bin = run
+  ./c34d0d25c5a4b839a2260d51de5db574b793ddd39788daf6f5e83af2081a4c9e/files/.claude/bug-evidence/r.json = closeout record
+  ./c34d0d25c5a4b839a2260d51de5db574b793ddd39788daf6f5e83af2081a4c9e/files/.claude/channel-outbox/a.jsonl = one
+  ./c34d0d25c5a4b839a2260d51de5db574b793ddd39788daf6f5e83af2081a4c9e/files/.opencode/state/log.json = evidence
+  ./c34d0d25c5a4b839a2260d51de5db574b793ddd39788daf6f5e83af2081a4c9e/files/notes/unique.dat = only here
+=================== shape=own-nested
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+teardown: released creation lock 'vernant-session-active owner=launcher:4194305 launcher=4194305' on own nested copy /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/own-nested-copy (launcher 4194305 is gone; proof: fixture) and removed it without force
+release rc=0
+why=none
+copy: removed
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/own-nested-project
+  HEAD 8d023e8d7b59e0f3e195d9187a0d67b018e29948
+  branch refs/heads/main
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/own-nested-data/data/fixture/nested-copy-preserved/f440f27f098d3c65de3365270ee785a23613de664a559ff30da1631a83615377/meta/SHA256SUMS
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+    aa301fa33765f678226a0378cef28649c9b588c68d566bd19fa195cc9959f684  .claude/bug-evidence/r.json
+    2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+    bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+  ./f440f27f098d3c65de3365270ee785a23613de664a559ff30da1631a83615377/files/.cache/run.bin = run
+  ./f440f27f098d3c65de3365270ee785a23613de664a559ff30da1631a83615377/files/.claude/bug-evidence/r.json = closeout record
+  ./f440f27f098d3c65de3365270ee785a23613de664a559ff30da1631a83615377/files/.claude/channel-outbox/a.jsonl = one
+  ./f440f27f098d3c65de3365270ee785a23613de664a559ff30da1631a83615377/files/.opencode/state/log.json = evidence
+  ./f440f27f098d3c65de3365270ee785a23613de664a559ff30da1631a83615377/files/notes/unique.dat = only here
+=================== shape=own-late
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+release rc=1
+why=its preserve /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/own-late-data/data/fixture/nested-copy-preserved/0823cf2f5277d4c747b5b35ff87d547f7166cd5d905da5197e4ebaa3f4711e2a does not hold its ignored files, the .claude and .opencode trees whole included, as the copy holds them now, outside every removal root; its lock was restored
+copy: STILL PRESENT
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/own-late-project
+  HEAD 2fa4234558287226afa17dc3c5ffea5f305d1909
+  branch refs/heads/main
+  
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/own-late-copy
+  HEAD 2fa4234558287226afa17dc3c5ffea5f305d1909
+  branch refs/heads/f-own-late
+  locked vernant-session-active owner=launcher:4194305 launcher=4194305
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/own-late-data/data/fixture/nested-copy-preserved/0823cf2f5277d4c747b5b35ff87d547f7166cd5d905da5197e4ebaa3f4711e2a/meta/SHA256SUMS
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+    aa301fa33765f678226a0378cef28649c9b588c68d566bd19fa195cc9959f684  .claude/bug-evidence/r.json
+    2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+    bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+  ./0823cf2f5277d4c747b5b35ff87d547f7166cd5d905da5197e4ebaa3f4711e2a/files/.cache/run.bin = run
+  ./0823cf2f5277d4c747b5b35ff87d547f7166cd5d905da5197e4ebaa3f4711e2a/files/.claude/bug-evidence/r.json = closeout record
+  ./0823cf2f5277d4c747b5b35ff87d547f7166cd5d905da5197e4ebaa3f4711e2a/files/.claude/channel-outbox/a.jsonl = one
+  ./0823cf2f5277d4c747b5b35ff87d547f7166cd5d905da5197e4ebaa3f4711e2a/files/.opencode/state/log.json = evidence
+  ./0823cf2f5277d4c747b5b35ff87d547f7166cd5d905da5197e4ebaa3f4711e2a/files/notes/unique.dat = only here
+=================== shape=foreign-late
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+teardown: preserved ignored files from /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-copy in /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-data/data/fixture/nested-copy-preserved/a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918
+teardown: kept earlier preserve /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-data/data/fixture/nested-copy-preserved/.aside-a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918.1795557053.19669: it holds a file the new preserve /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-data/data/fixture/nested-copy-preserved/a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918 does not hold with the same bytes
+teardown: preserved ignored files from /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-copy in /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-data/data/fixture/nested-copy-preserved/a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918
+teardown: released creation lock 'vernant-session-active owner=launcher:4194305 launcher=4194305' on foreign copy /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-copy (launcher 4194305 is gone; proof: fixture) and removed it without force
+release rc=0
+why=none
+copy: removed
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-project
+  HEAD 33d2c8b8829817aedb42c797ddac0597b484bd38
+  branch refs/heads/main
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-data/data/fixture/nested-copy-preserved/.aside-a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918.1795557053.19669/meta/SHA256SUMS
+    bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+    aa301fa33765f678226a0378cef28649c9b588c68d566bd19fa195cc9959f684  .claude/bug-evidence/r.json
+    2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-data/data/fixture/nested-copy-preserved/a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918/meta/SHA256SUMS
+    bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+    aa301fa33765f678226a0378cef28649c9b588c68d566bd19fa195cc9959f684  .claude/bug-evidence/r.json
+    7f8b1dfc466b6249f06cbe55c9174df2578e7754da793fded244ef5cba2a38f1  .claude/channel-outbox/a.jsonl
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+  ./.aside-a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918.1795557053.19669/files/.cache/run.bin = run
+  ./.aside-a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918.1795557053.19669/files/.claude/bug-evidence/r.json = closeout record
+  ./.aside-a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918.1795557053.19669/files/.claude/channel-outbox/a.jsonl = one
+  ./.aside-a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918.1795557053.19669/files/.opencode/state/log.json = evidence
+  ./.aside-a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918.1795557053.19669/files/notes/unique.dat = only here
+  ./a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918/files/.cache/run.bin = run
+  ./a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918/files/.claude/bug-evidence/r.json = closeout record
+  ./a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918/files/.claude/channel-outbox/a.jsonl = changed
+  ./a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918/files/.opencode/state/log.json = evidence
+  ./a1d440ecb2c4f571595c6d398fe448c5ca25266d86cb3b7e4d83d5fb28930918/files/notes/unique.dat = only here
+=================== shape=foreign-late-cache
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+teardown: preserved ignored files from /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-copy in /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-data/data/fixture/nested-copy-preserved/77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d
+teardown: kept earlier preserve /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-data/data/fixture/nested-copy-preserved/.aside-77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d.1795557146.19669: it holds a file the new preserve /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-data/data/fixture/nested-copy-preserved/77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d does not hold with the same bytes
+teardown: preserved ignored files from /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-copy in /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-data/data/fixture/nested-copy-preserved/77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d
+teardown: released creation lock 'vernant-session-active owner=launcher:4194305 launcher=4194305' on foreign copy /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-copy (launcher 4194305 is gone; proof: fixture) and removed it without force
+release rc=0
+why=none
+copy: removed
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-project
+  HEAD a0541ced8cd7830b059fb4fa11f995b5d5724983
+  branch refs/heads/main
+  
+preserved files (path  sha256 via SHA256SUMS):
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-data/data/fixture/nested-copy-preserved/77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d/meta/SHA256SUMS
+    bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+    aa301fa33765f678226a0378cef28649c9b588c68d566bd19fa195cc9959f684  .claude/bug-evidence/r.json
+    2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    78fd9ec9bd4fafa0fdfc75f16cd93c757c8d04b83fb225e5de57ab9b45646e57  .cache/run.bin
+  manifest /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/foreign-late-cache-data/data/fixture/nested-copy-preserved/.aside-77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d.1795557146.19669/meta/SHA256SUMS
+    bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+    aa301fa33765f678226a0378cef28649c9b588c68d566bd19fa195cc9959f684  .claude/bug-evidence/r.json
+    2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+    06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+    b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+  ./.aside-77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d.1795557146.19669/files/.cache/run.bin = run
+  ./.aside-77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d.1795557146.19669/files/.claude/bug-evidence/r.json = closeout record
+  ./.aside-77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d.1795557146.19669/files/.claude/channel-outbox/a.jsonl = one
+  ./.aside-77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d.1795557146.19669/files/.opencode/state/log.json = evidence
+  ./.aside-77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d.1795557146.19669/files/notes/unique.dat = only here
+  ./77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d/files/.cache/run.bin = rerun
+  ./77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d/files/.claude/bug-evidence/r.json = closeout record
+  ./77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d/files/.claude/channel-outbox/a.jsonl = one
+  ./77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d/files/.opencode/state/log.json = evidence
+  ./77cd4cecac01e89c53e4b7b7ac5f283b673b9740d32bb2ba114c14a0e8881a1d/files/notes/unique.dat = only here
+=================== shape=live-launcher
+before: locked vernant-session-active owner=launcher:4194305 launcher=4194305
+release rc=1
+why=its creation-lock launcher process 4194305 may still be running
+copy: STILL PRESENT
+worktree list after:
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/live-launcher-project
+  HEAD 8516f622c704299ba7c22484ab129c18f6739d4e
+  branch refs/heads/main
+  
+  worktree /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K/live-launcher-copy
+  HEAD 8516f622c704299ba7c22484ab129c18f6739d4e
+  branch refs/heads/f-live-launcher
+  locked vernant-session-active owner=launcher:4194305 launcher=4194305
+  
+preserved files (path  sha256 via SHA256SUMS):
+base=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/drr.ODpV5K

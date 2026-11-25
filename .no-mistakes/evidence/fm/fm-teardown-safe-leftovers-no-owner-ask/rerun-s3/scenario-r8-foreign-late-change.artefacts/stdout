@@ -1,0 +1,3 @@
+/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/pool/1/project)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/data/backlog.md). Update /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.5FGaOC/foreign-late/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.

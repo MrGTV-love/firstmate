@@ -1,0 +1,7 @@
+data/task-x1/nested-copy-preserved/f520aa171baf1d898563a59830ea3fd150d802ca49ebbc982f5059829cdea106/files/.cache/run.bin
+data/task-x1/nested-copy-preserved/f520aa171baf1d898563a59830ea3fd150d802ca49ebbc982f5059829cdea106/files/.claude/channel-outbox/a.jsonl
+data/task-x1/nested-copy-preserved/f520aa171baf1d898563a59830ea3fd150d802ca49ebbc982f5059829cdea106/files/.opencode/state/log.json
+data/task-x1/nested-copy-preserved/f520aa171baf1d898563a59830ea3fd150d802ca49ebbc982f5059829cdea106/files/notes/unique.dat
+data/task-x1/nested-copy-preserved/f520aa171baf1d898563a59830ea3fd150d802ca49ebbc982f5059829cdea106/meta/SHA256SUMS
+data/task-x1/nested-copy-preserved/f520aa171baf1d898563a59830ea3fd150d802ca49ebbc982f5059829cdea106/meta/copy-path
+data/task-x1/vernant-closeout.51rOg9

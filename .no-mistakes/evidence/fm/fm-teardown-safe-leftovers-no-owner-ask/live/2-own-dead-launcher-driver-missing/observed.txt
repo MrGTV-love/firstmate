@@ -1,0 +1,23 @@
+exit=0
+copy=gone
+task-meta=gone
+preserved .claude/channel-outbox/a.jsonl bytes=one sha256-line=1
+preserved .opencode/state/log.json bytes=evidence sha256-line=1
+preserved .cache/run.bin bytes=run sha256-line=1
+preserved notes/unique.dat bytes=only\ here sha256-line=1
+preserve-tree: <case>/data/task-x1/nested-copy-preserved
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/meta
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/meta/copy-path
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/meta/SHA256SUMS
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.opencode
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.opencode/state
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.opencode/state/log.json
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.claude
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.claude/channel-outbox
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.claude/channel-outbox/a.jsonl
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/notes
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/notes/unique.dat
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.cache
+preserve-tree: <case>/data/task-x1/nested-copy-preserved/882bdf1d92dd5cdacf1405625f4a1e6876dcf812598d6c372bd807c317e194f6/files/.cache/run.bin

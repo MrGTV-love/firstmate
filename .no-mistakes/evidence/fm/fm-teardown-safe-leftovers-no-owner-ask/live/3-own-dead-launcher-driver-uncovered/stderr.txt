@@ -1,0 +1,17 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 43s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project at d0c8e0402eb1 is already in remotes/origin/main (d0c8e0402eb17a13ab3ce2a448f049aa546a1c41)
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one at d0c8e0402eb1 is already in remotes/origin/main (d0c8e0402eb17a13ab3ce2a448f049aa546a1c41)
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/data/task-x1/nested-copy-preserved/0148be630c8d050eb635d7fc2fc68f2f03370327ae4285e046d344da819f8eec
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: released creation lock 'vernant-session-active owner=launcher:34229 launcher=34229' on own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one (launcher 34229 is gone; proof: the landed-work rule) and removed it without force
+teardown: removed landed own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own-uncovered/pool/1/project
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-home-summary-refresh.sh: child setpgid (770 to 770): Operation not permitted

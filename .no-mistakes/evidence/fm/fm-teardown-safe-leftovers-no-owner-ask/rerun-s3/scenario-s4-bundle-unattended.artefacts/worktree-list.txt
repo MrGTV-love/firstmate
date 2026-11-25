@@ -1,0 +1,12 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.FYYdGw/bundle-unattended-branch/project
+HEAD 4a85b432210bb3694626a4018c22df555f7bc7e8
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.FYYdGw/bundle-unattended-branch/pool/1/project
+HEAD 4a85b432210bb3694626a4018c22df555f7bc7e8
+branch refs/heads/fm/task-x1
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.FYYdGw/bundle-unattended-branch/pool/1/project/.claude/worktrees/bundled
+HEAD 145525c8f99d5764698d40bebcf7d538d84a7726
+branch refs/heads/fm/task-x1-v2
+

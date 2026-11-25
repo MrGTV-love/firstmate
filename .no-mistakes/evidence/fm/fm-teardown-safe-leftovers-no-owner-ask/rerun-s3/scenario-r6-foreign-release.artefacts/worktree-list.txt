@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/project
+HEAD b90486bb4995660010baf77382504de00d2e49b4
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project
+HEAD b90486bb4995660010baf77382504de00d2e49b4
+detached
+

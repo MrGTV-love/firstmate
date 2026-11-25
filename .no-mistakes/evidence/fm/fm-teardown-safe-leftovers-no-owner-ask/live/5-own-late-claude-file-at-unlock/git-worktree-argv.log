@@ -1,0 +1,15 @@
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project worktree unlock /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project worktree lock --reason vernant-session-active owner=launcher:74579 launcher=74579 /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one

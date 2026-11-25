@@ -1,0 +1,15 @@
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project worktree unlock /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project worktree lock --reason vernant-session-active owner=launcher:39565 launcher=39565 /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/pool/1/project/.claude/worktrees/fc-one

@@ -1,0 +1,3 @@
+data/task-x1/preservation-bundles.tsv
+data/task-x1/preserved-bundles/7c96bfa04c1357c72117ed07e477f4116a02f66607d70dbb5dc0d3f4b1c12a59.bundle
+data/task-x1/vernant-closeout.8cs80A

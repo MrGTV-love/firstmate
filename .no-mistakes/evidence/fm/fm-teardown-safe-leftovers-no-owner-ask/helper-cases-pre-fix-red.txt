@@ -1,0 +1,6 @@
+== test_pr400_direct_release_preserves_claude_and_opencode (bin at 6e85b4253, tests at HEAD)
+not ok - pr400-direct-retained: a foreign copy was not released and removed with its .claude and .opencode files preserved (want 'foreign release=0 why=none kept=.cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone'; output: foreign release=0 why=none kept=.cache/run.bin notes/unique.dat git=unlock remove  late=gone|own-nested release=0 why=none kept=.cache/run.bin notes/unique.dat git=unlock remove  late=gone|own-late release=0 why=none kept=.cache/run.bin notes/unique.dat git=unlock remove  late=in-copy; stderr: )
+--- out
+== test_pr400_launcher_start_epoch_is_exact_in_the_repeated_hour (bin at 6e85b4253, tests at HEAD)
+not ok - pr400-start-epoch: an unreadable lock time did not count as live (want 'live mtime=unread rc=0'; output: pid 101 start=1793511000|pid 102 start=1793514600|live mtime=unread rc=2|live mtime=1793511060 rc=0|live mtime=1793510000 rc=1; stderr: /private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/base6e8.fOyLi7/bin/fm-teardown-nested-lib.sh: line 317: [: : integer expression expected)
+--- out

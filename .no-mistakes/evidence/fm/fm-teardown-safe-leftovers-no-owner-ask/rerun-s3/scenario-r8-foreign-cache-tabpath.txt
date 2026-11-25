@@ -1,0 +1,15 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D r8-foreign-cache-tabpath   (head 762cd358f)
+FACT ok  - the fixture copy moved to a tab path and relocked with 'vernant-session-active owner=launcher:51553 launcher=51553'
+$ env FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/code-root FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/state FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/data FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/config NM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/nm PATH=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/fakebin:$PATH /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab
+teardown rc=1
+FACT BAD - the .cache change was written at the unlock
+REFUSED: worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/pool/1/project has uncommitted changes.
+preserves of .cache/run.bin: 
+preserves of notes/unique.dat: 
+preserves of .claude/channel-outbox/a.jsonl: 
+preserves of .opencode/state/log.json: 
+outcome: copy kept
+FACT BAD - copy kept: the new .cache bytes are still in the copy
+FACT ok  - copy kept: no worktree remove ran
+SCENARIO r8-foreign-cache-tabpath: FAIL
+rc=1 elapsed=113s

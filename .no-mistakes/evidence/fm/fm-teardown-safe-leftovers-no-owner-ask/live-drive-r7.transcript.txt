@@ -1,0 +1,35 @@
+== 1b
+exit=0
+copy=gone
+preserved .claude/channel-outbox/a.jsonl bytes=one sha256-lines=1
+preserved .opencode/state/log.json bytes=evidence sha256-lines=1
+argv: -C <case>/pool/1/project worktree unlock <case>/pool/1/project/.claude/worktrees/fc-one
+argv: -C <case>/pool/1/project worktree remove <case>/pool/1/project/.claude/worktrees/fc-one
+teardown: released creation lock 'vernant-session-active owner=launcher:46359 launcher=46359' on foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one (launcher 46359 is gone; proof: the landed-work rule) and removed it without force
+== point=launcher
+exit=1
+mutation=ran
+copy=present
+worktree-list: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project/.claude/worktrees/fc-one
+worktree-list: HEAD 67556460f0e3d53e8758b54a3dbf05980958446e
+worktree-list: branch refs/heads/fm/task-x1-v2
+worktree-list: locked vernant-session-active owner=launcher:48239 launcher=48239
+worktree-list: 
+late-file=in-copy
+task-meta=present
+REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project/.claude/worktrees/fc-one (exit 127): full output: /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/data/task-x1/vernant-closeout.L7w8Cy
+  The copy was not released directly: its preserve /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/data/task-x1/nested-copy-preserved/dc96f2041d005c6b5bd07da6de891f9133f5f31610c7f30a1e70827d9c8d445c does not hold its ignored files, the .claude and .opencode trees whole included, as the copy holds them now, outside every removal root; its lock was restored.
+== point=unlock
+exit=1
+mutation=ran
+copy=present
+worktree-list: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one
+worktree-list: HEAD 6761661e260d164f20ac0477ffe46ed929945f29
+worktree-list: branch refs/heads/fm/task-x1-v2
+worktree-list: locked vernant-session-active owner=launcher:74579 launcher=74579
+worktree-list: 
+late-file=in-copy
+task-meta=present
+REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/pool/1/project/.claude/worktrees/fc-one (exit 127): full output: /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/data/task-x1/vernant-closeout.gk6MtT
+  The copy was not released directly: its preserve /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-unlock/data/task-x1/nested-copy-preserved/d264d222b869f31215d2024429a6b4977d85804e4bb91609082995dce31b23bf does not hold its ignored files, the .claude and .opencode trees whole included, as the copy holds them now, outside every removal root; its lock was restored.
+drive done

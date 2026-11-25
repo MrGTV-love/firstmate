@@ -1,0 +1,11 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/cli/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D s4-bundle-attended   (head 762cd358f)
+$ (scratch home /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-c/fm-teardown-tests.2Vt3uV/bundle-call-unheld) FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-c/fm-teardown-tests.2Vt3uV/bundle-call-unheld/home /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1
+teardown rc=0
+FACT ok  - teardown exits 0
+FACT ok  - the copy is gone
+FACT ok  - no hold command printed
+FACT ok  - the row closes with the bundle note
+FACT ok  - no captain hold exists
+FACT ok  - the stored bundle restores the work after the copy is gone
+SCENARIO s4-bundle-attended: PASS
+rc=0 elapsed=275s

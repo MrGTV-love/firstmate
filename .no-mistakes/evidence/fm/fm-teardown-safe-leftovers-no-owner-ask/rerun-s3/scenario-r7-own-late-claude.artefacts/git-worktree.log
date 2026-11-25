@@ -1,0 +1,15 @@
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project worktree unlock /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project worktree lock --reason vernant-session-active owner=launcher:62060 launcher=62060 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/pool/1/project/.claude/worktrees/fc-one

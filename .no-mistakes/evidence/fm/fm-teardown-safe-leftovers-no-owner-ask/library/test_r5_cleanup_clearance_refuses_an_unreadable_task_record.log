@@ -1,0 +1,2 @@
+ok - teardown's cleanup-target custody scan refuses when another task's record cannot be read; readable and elsewhere, or absent, it clears
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.sb1Nli

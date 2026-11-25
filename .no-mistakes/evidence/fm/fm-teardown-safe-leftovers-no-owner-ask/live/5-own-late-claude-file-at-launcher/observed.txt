@@ -1,0 +1,10 @@
+exit=1
+mutation=ran
+copy=present
+worktree-list: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-r7-launcher/pool/1/project/.claude/worktrees/fc-one
+worktree-list: HEAD 67556460f0e3d53e8758b54a3dbf05980958446e
+worktree-list: branch refs/heads/fm/task-x1-v2
+worktree-list: locked vernant-session-active owner=launcher:48239 launcher=48239
+worktree-list: 
+late-file=in-copy
+task-meta=present

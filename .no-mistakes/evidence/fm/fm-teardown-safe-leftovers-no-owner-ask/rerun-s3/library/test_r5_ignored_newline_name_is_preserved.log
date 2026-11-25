@@ -1,0 +1,2 @@
+ok - an ignored file whose name holds a newline is preserved byte for byte, a changed payload of it refuses, and the one-per-line list refuses that name
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.f3MmGj

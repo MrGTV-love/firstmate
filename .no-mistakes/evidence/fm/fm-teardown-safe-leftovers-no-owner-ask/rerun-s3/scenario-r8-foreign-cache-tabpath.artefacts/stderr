@@ -1,0 +1,13 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 15s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/pool/1/project/.claude/worktrees/fc	tab at f1e8249034af is already in remotes/origin/main (f1e8249034afc81e26ccf98850ff822ca0b9441c)
+REFUSED: worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/pool/1/project has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  ".claude/worktrees/fc\ttab/"
+Commit them (or get the captain's explicit OK to discard, then --force).

@@ -1,0 +1,1 @@
+printf %s\\n $'/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/bundles/work.bundle\t7c96bfa04c1357c72117ed07e477f4116a02f66607d70dbb5dc0d3f4b1c12a59\t4d86021b2e36a0031eae21280b038969d66ec4ac' > /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-b/fm-teardown-tests.CUvjYa/late-record-unlock/data/task-x1/preservation-bundles.tsv

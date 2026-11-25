@@ -1,0 +1,13 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.1p3s80/holder/project
+HEAD df132da43464bfbdce49bd9b3d0729c57c2045c0
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.1p3s80/holder/pool/1/project
+HEAD df132da43464bfbdce49bd9b3d0729c57c2045c0
+branch refs/heads/fm/task-x1
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.1p3s80/holder/pool/1/project/.claude/worktrees/fc-one
+HEAD df132da43464bfbdce49bd9b3d0729c57c2045c0
+branch refs/heads/fm/task-x1-v2
+locked vernant-session-active owner=launcher:89798 launcher=89798
+

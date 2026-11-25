@@ -1,0 +1,13 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D s2-open-file-holder   (head 762cd358f)
+$ env FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/code-root FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/state FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/data FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/config NM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/nm PATH=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder/fakebin:$PATH /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.u8HwvC/holder
+teardown rc=1
+FACT ok  - teardown exits 1
+FACT ok  - the refusal names holder pid 19692 and the held file
+FACT ok  - the holder was not signalled
+FACT ok  - no unlock ran
+FACT ok  - the copy is still there
+FACT ok  - the copy is still locked
+FACT ok  - the task record is still there
+FACT ok  - no release was printed
+SCENARIO s2-open-file-holder: PASS
+rc=0 elapsed=190s

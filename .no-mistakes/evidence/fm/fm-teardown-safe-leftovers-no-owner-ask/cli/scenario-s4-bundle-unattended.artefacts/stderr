@@ -1,0 +1,7 @@
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-c/fm-teardown-tests.P8qt4b/bundle-unattended-branch/pool/1/project at 9d2dd145c04b is already in remotes/origin/main (9d2dd145c04bea41505d052b16a2310b46524b2e)
+teardown: bundle preservation unavailable: recorded bundles require attended teardown; unattended cleanup still requires landing.
+Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+0cae87e unpublished work
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.

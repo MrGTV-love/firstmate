@@ -1,0 +1,14 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D r7-own-late-claude   (head 762cd358f)
+$ env FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/code-root FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/state FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/data FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/config NM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/nm PATH=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late/fakebin:$PATH /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.ZbDQDj/own-late
+teardown rc=1
+FACT ok  - the late file was written at the unlock
+FACT ok  - teardown exits 1
+FACT ok  - the refusal names the unpreserved .claude/.opencode file and says the lock was restored
+FACT ok  - the late file is still in the copy
+FACT ok  - no worktree remove ran
+FACT ok  - the copy is still there
+FACT ok  - the copy is still locked
+FACT ok  - the task record is still there
+FACT ok  - no release was printed
+SCENARIO r7-own-late-claude: PASS
+rc=0 elapsed=269s

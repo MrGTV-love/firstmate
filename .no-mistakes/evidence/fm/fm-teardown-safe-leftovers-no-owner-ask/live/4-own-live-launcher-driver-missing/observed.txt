@@ -1,0 +1,12 @@
+exit=1
+copy=present
+worktree-list: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-launcher/pool/1/project/.claude/worktrees/fc-one
+worktree-list: HEAD b5fd47b52f4d952a6fb0386bec9256192c0e9e15
+worktree-list: branch refs/heads/fm/task-x1-v2
+worktree-list: locked vernant-session-active owner=launcher:29141 launcher=29141
+task-meta=present
+NOT-preserved .claude/channel-outbox/a.jsonl
+NOT-preserved .opencode/state/log.json
+NOT-preserved .cache/run.bin
+NOT-preserved notes/unique.dat
+live launcher 29141 still running (not signalled)

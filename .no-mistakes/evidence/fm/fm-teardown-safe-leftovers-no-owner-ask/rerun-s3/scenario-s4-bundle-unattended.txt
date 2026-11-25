@@ -1,0 +1,8 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D s4-bundle-unattended   (head 762cd358f)
+$ (scratch home /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.FYYdGw/bundle-unattended-branch) FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.FYYdGw/bundle-unattended-branch/home FM_SUPERVISION_ACTOR=branch /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1
+teardown rc=1
+FACT ok  - teardown exits 1
+FACT ok  - the refusal names the attended-only rule
+FACT ok  - the copy and the task record stay
+SCENARIO s4-bundle-unattended: PASS
+rc=0 elapsed=330s

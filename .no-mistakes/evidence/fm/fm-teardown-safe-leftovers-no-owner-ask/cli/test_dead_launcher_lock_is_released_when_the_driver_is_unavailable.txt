@@ -1,0 +1,3 @@
+$ TMPDIR=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-teardown-cleanup.test.sh test_dead_launcher_lock_is_released_when_the_driver_is_unavailable   (head 762cd358f)
+ok - a landed copy under a dead launcher's lock is released by the script when the closeout driver cannot run
+rc=0 elapsed=461s

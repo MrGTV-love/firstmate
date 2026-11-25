@@ -1,0 +1,13 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/project
+HEAD f1e8249034afc81e26ccf98850ff822ca0b9441c
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/pool/1/project
+HEAD f1e8249034afc81e26ccf98850ff822ca0b9441c
+branch refs/heads/fm/task-x1
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-c/fm-teardown-tests.hscTfh/foreign-cache-tab/pool/1/project/.claude/worktrees/fc	tab
+HEAD f1e8249034afc81e26ccf98850ff822ca0b9441c
+branch refs/heads/fm/task-x1-v2
+locked vernant-session-active owner=launcher:51553 launcher=51553
+

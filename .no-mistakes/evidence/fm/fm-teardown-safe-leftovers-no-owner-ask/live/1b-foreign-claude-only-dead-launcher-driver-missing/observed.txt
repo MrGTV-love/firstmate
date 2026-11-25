@@ -1,0 +1,6 @@
+exit=0
+copy=gone
+preserved .claude/channel-outbox/a.jsonl bytes=one sha256-lines=1
+preserved .opencode/state/log.json bytes=evidence sha256-lines=1
+argv: -C <case>/pool/1/project worktree unlock <case>/pool/1/project/.claude/worktrees/fc-one
+argv: -C <case>/pool/1/project worktree remove <case>/pool/1/project/.claude/worktrees/fc-one

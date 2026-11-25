@@ -1,0 +1,14 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 4s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project/.claude/worktrees/fc-one at b90486bb4995 is already in remotes/origin/main (b90486bb4995660010baf77382504de00d2e49b4)
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project at b90486bb4995 is already in remotes/origin/main (b90486bb4995660010baf77382504de00d2e49b4)
+teardown: closeout credit for /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/data/task-x1/nested-copy-preserved/5d4cbf5d5414ba115d30a1107bd2860110fb2a9da2301f95baa32157441cbdd6
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/data/task-x1/nested-copy-preserved/5d4cbf5d5414ba115d30a1107bd2860110fb2a9da2301f95baa32157441cbdd6
+teardown: released creation lock 'vernant-session-active owner=launcher:40598 launcher=40598' on foreign copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project/.claude/worktrees/fc-one (launcher 40598 is gone; proof: the landed-work rule) and removed it without force
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.qI9eIV/foreign-release/pool/1/project

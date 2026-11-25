@@ -1,0 +1,14 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 17s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one at 3323a2b09fd4 is already in remotes/origin/main (3323a2b09fd4b61d137e463a829dc4ea46db00a6)
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project at 3323a2b09fd4 is already in remotes/origin/main (3323a2b09fd4b61d137e463a829dc4ea46db00a6)
+teardown: closeout credit for /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one: none (no preservation record)
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/data/task-x1/nested-copy-preserved/edac22bbce06907b6d70b902a2ce914d254c4b2f5220f7805269b6d811d13f13
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/data/task-x1/nested-copy-preserved/edac22bbce06907b6d70b902a2ce914d254c4b2f5220f7805269b6d811d13f13
+teardown: released creation lock 'vernant-session-active owner=launcher:46359 launcher=46359' on foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one (launcher 46359 is gone; proof: the landed-work rule) and removed it without force
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.YiCr4r/live-foreign-claude/pool/1/project

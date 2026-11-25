@@ -1,0 +1,2 @@
+ok - a launcher start time in the hour repeated when clocks go back converts to its exact epoch, and an unreadable lock time counts as live
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.OSfDTB

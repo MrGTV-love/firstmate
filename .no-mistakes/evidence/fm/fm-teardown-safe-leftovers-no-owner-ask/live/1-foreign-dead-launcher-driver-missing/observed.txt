@@ -1,0 +1,11 @@
+exit=0
+copy=present
+worktree-list: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-foreign/pool/1/project/.claude/worktrees/fc-one
+worktree-list: HEAD 3edb87bf8f40d7c467c4fa0e2a2e6297f4da4e0d
+worktree-list: branch refs/heads/fm/task-x1-v2
+worktree-list: locked vernant-session-active owner=launcher:60080 launcher=60080
+task-meta=gone
+NOT-preserved .claude/channel-outbox/a.jsonl
+NOT-preserved .opencode/state/log.json
+NOT-preserved .cache/run.bin
+NOT-preserved notes/unique.dat

@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.3JdkyC/bundle-call-unheld/project
+HEAD 23c901503c33d53ff4f3aae382e3a4bfd5c475c2
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.3JdkyC/bundle-call-unheld/pool/1/project
+HEAD 23c901503c33d53ff4f3aae382e3a4bfd5c475c2
+detached
+

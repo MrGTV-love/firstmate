@@ -1,0 +1,20 @@
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree unlock /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree remove /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.Vm995e/live-own/project worktree list --porcelain

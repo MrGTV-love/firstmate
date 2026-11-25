@@ -1,0 +1,11 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/rerun-s3/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D r8-foreign-held   (head 762cd358f)
+$ env FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/code-root FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/state FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/data FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/config NM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/nm PATH=/Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/fakebin:$PATH /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held
+teardown rc=0
+notice: held foreign copy /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.gSx39e/foreign-held/pool/1/project: it holds ignored files that exist nowhere else: .cache notes.
+FACT ok  - the copy is held and the notice names .cache and notes
+FACT ok  - the copy is still there
+FACT ok  - the copy is still locked with its Vernant lock
+FACT ok  - every file of the copy is byte for byte unchanged
+FACT ok  - no worktree unlock or remove ran
+SCENARIO r8-foreign-held: PASS
+rc=0 elapsed=110s

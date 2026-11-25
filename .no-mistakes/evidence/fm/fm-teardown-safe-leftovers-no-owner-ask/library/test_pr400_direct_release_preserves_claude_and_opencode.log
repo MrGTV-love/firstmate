@@ -1,0 +1,2 @@
+ok - the direct release of a dead launcher's lock preserves the .claude and .opencode trees whole, byte for byte with their SHA256SUMS lines, for a foreign and an own nested copy, before it unlocks and removes; a .claude file that appears in an own copy after its preserve refuses and the lock goes back on
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.CpCmjV

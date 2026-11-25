@@ -1,0 +1,3 @@
+== data/task-x1/nested-copy-preserved/d7911933d7b9d9429576bb8af2b1e63b3fd89cd07eda43b92029243663079c7e/meta/SHA256SUMS
+bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl

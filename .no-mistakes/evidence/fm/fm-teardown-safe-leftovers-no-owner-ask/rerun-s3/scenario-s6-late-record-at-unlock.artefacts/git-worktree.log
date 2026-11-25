@@ -1,0 +1,15 @@
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project worktree unlock /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project worktree lock --reason vernant-session-active owner=launcher:12228 launcher=12228 /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-b/fm-teardown-tests.18R8s1/late-record-unlock/pool/1/project/.claude/worktrees/fc-one

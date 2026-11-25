@@ -1,0 +1,5 @@
+== data/task-x1/nested-copy-preserved/e376d0c34751e69bec1e9f4b3155b7d8209f744a4614550aea854fcf7d00f355/meta/SHA256SUMS
+06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+b5004f26a852b0d60ec1237432c1a33c2307ff2458c374d9d99749d045c7feb9  .cache/run.bin
+2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json

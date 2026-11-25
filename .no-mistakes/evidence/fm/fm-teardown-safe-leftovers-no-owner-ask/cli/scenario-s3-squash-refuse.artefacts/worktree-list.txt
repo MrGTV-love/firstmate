@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-c/fm-teardown-tests.MiAPV4/content-differs-unique/project
+HEAD 4d3dc95d1de9cf9a31aba74d1362e510ba3271e8
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-c/fm-teardown-tests.MiAPV4/content-differs-unique/wt
+HEAD 56f895983110db59493e123daf407097b26196db
+branch refs/heads/fm/task-x1
+

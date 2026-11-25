@@ -1,0 +1,10 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: landed by content: every change of /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/pool/1/project at 7b29f1926d26 is already in remotes/origin/main (7b29f1926d261af0c34e92e3ec2a71386e166ba0)
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=own nested copy /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/pool/1/project: its creation-lock launcher process 19832 may still be running.
+human-only-exit: Is launcher 19832, named in the creation lock on /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/pool/1/project/.claude/worktrees/fc-one, still running, and who owns it?

@@ -1,0 +1,24 @@
+== test_pr400_direct_release_preserves_claude_and_opencode
+ok - the direct release of a dead launcher's lock preserves the .claude and .opencode trees whole, byte for byte with their SHA256SUMS lines, for a foreign and an own nested copy, before it unlocks and removes; a .claude file that appears in an own copy after its preserve refuses and the lock goes back on
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.jvLxWw
+== test_pr400_launcher_start_epoch_is_exact_in_the_repeated_hour
+ok - a launcher start time in the hour repeated when clocks go back converts to its exact epoch, and an unreadable lock time counts as live
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.ovsoRh
+== test_pr400_last_holder_check_sees_cwd_and_own_indexer
+ok - the last holder check before the unlock refuses any cwd holder, an indexer name included; an open-file-only indexer not recorded as own is exempt; with none the release proceeds
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.B4lMcY
+== test_pr400_vanished_lock_never_takes_the_unlocked_route
+ok - a lock proved earlier that now reads absent or unreadable refuses on the foreign, own-release and own-removal routes; never-locked and still-locked controls take their routes
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.EKyapS
+== test_r5_ignored_newline_name_is_preserved
+ok - an ignored file whose name holds a newline is preserved byte for byte, a changed payload of it refuses, and the one-per-line list refuses that name
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.7G6bc1
+== test_pr400_orca_keeps_base_behaviour
+ok - an Orca-backed task, an Orca cleanup-recovery record included, keeps base behaviour: the no-hold bundle route, the history landing and the direct release refuse it with a named reason; another backend keeps them
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.yGGaKs
+== test_pr400_forgejo_only_landing_is_held
+ok - a copy that only a merged Forgejo pull request admits is held with a named reason unless the content proof holds it; GitHub, content, bundle-held and Forgejo-plus-content controls are released
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.eIFjae
+== test_pr400_root_claude_untracked_file_is_the_copys_work
+ok - an untracked file under .claude is the copy's own work on the root check and the anchor proof; only Firstmate's managed files are exempt
+tmp=/private/tmp/fm-fm-teardown-safe-leftovers-no-owner-ask/case.MjnHJm

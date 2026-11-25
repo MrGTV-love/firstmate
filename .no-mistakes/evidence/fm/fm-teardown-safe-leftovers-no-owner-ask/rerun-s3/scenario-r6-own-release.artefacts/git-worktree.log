@@ -1,0 +1,20 @@
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree unlock /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree remove /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/pool/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/nm-01M87E3D-rerun-a/fm-teardown-tests.tdkE2V/own-release/project worktree list --porcelain

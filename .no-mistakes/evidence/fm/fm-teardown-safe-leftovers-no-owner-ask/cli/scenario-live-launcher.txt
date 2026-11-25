@@ -1,0 +1,16 @@
+$ bin/fm-proc-budget.sh --own-procs 128 -- bash /Users/charlesabrooker/.no-mistakes/evidence/01M87E3DXKY8YXG964RQ01FZ3D/cli/cli-scenario.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D live-launcher   (head 762cd358f)
+$ env FM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/home FM_ROOT_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/code-root FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/state FM_DATA_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/data FM_CONFIG_OVERRIDE=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/config NM_HOME=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/nm PATH=/Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/fakebin:$PATH /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M87E3DXKY8YXG964RQ01FZ3D/bin/fm-teardown.sh task-x1 /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher
+teardown rc=1
+FACT ok  - teardown exits 1
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=own nested copy /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/pool/1/project: its creation-lock launcher process 19832 may still be running.
+human-only-exit: Is launcher 19832, named in the creation lock on /Users/charlesabrooker/tmp/nm-01M87E3D-test-cli-a/fm-teardown-tests.fe6pTs/live-launcher/pool/1/project/.claude/worktrees/fc-one, still running, and who owns it?
+FACT ok  - the refusal names the live launcher pid
+FACT ok  - no unlock ran
+FACT ok  - no wide (.claude) preserve was made
+FACT ok  - the live launcher was not signalled
+FACT ok  - the copy is still there
+FACT ok  - the copy is still locked
+FACT ok  - the task record is still there
+FACT ok  - no release was printed
+SCENARIO live-launcher: PASS
+rc=0 elapsed=30s
