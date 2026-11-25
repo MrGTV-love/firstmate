@@ -1,0 +1,17 @@
+# slow healthy child prints one line per second for 10 s, no-progress bound 3 s
+$ env FM_DURATION_FILE=/tmp/g1lab.8TOm/home/data/command-durations.jsonl FM_DURATION_NO_PROGRESS_SECS=3 FM_DURATION_ABSOLUTE_SECS=60 python3 /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89QNM0M9MQBVDQDJZMXPT0D/bin/fm-duration.py run lab.talker -- python3 /tmp/g1lab.8TOm/talker.py 10
+calibration: "0 of 5 samples for lab.talker on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+working step 0
+progress: "lab.talker elapsed=0.0s output_bytes=15 tree_cpu=0.01s"
+working step 1
+working step 2
+working step 3
+working step 4
+working step 5
+working step 6
+working step 7
+working step 8
+working step 9
+exit=0
+wall=10.9s

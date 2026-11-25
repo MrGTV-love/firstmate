@@ -1,0 +1,8 @@
+# silent leader ignores the stop signal; no-progress trip at 4 s, then forced stop about one bound later
+$ env FM_DURATION_FILE=/tmp/g1lab.8TOm/home/data/command-durations.jsonl FM_DURATION_NO_PROGRESS_SECS=4 FM_DURATION_ABSOLUTE_SECS=60 python3 /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89QNM0M9MQBVDQDJZMXPT0D/bin/fm-duration.py run lab.termignore -- python3 /tmp/g1lab.8TOm/ignore_term.py /tmp/g1lab.8TOm/term-mark.txt
+[t=   0.1s] calibration: "0 of 5 samples for lab.termignore on Mac-Studio.local"
+[t=   0.1s] fallback: "no destructive deadline; collect samples"
+[t=   1.1s] progress: "lab.termignore elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+[t=   5.2s] no_progress: "lab.termignore made no output and no CPU progress above the idle floor (0.5s per 60s) for 4s; stopping; snapshot=/private/tmp/g1lab.8TOm/home/data/command-duration-trips/lab.termignore.20261125T101954.29344.txt"
+exit=124
+wall=9.4s

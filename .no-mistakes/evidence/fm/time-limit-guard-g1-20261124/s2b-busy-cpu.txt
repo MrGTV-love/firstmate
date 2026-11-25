@@ -1,0 +1,7 @@
+# silent child at ~30% CPU duty for 10 s, no-progress bound 3 s
+$ env FM_DURATION_FILE=/tmp/g1lab.8TOm/home/data/command-durations.jsonl FM_DURATION_NO_PROGRESS_SECS=3 FM_DURATION_ABSOLUTE_SECS=60 python3 /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89QNM0M9MQBVDQDJZMXPT0D/bin/fm-duration.py run lab.busy -- python3 /tmp/g1lab.8TOm/busy.py 10
+calibration: "0 of 5 samples for lab.busy on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "lab.busy elapsed=0.8s output_bytes=0 tree_cpu=0.31s"
+exit=0
+wall=10.9s

@@ -1,0 +1,12 @@
+key: lab.creep
+rule: no_progress
+elapsed_secs: 5.2
+idle_secs: 4.1
+output_bytes: 0
+tree_cpu_secs: 0.04
+cpu_gain_in_window_secs: 0.03
+idle_cpu_floor: 0.5s per 60s
+telemetry: sampled
+leader_pid: 32800
+columns: pid ppid stat cpu elapsed comm
+32800 32689 SNs 0:00.04 00:05 python3.13      

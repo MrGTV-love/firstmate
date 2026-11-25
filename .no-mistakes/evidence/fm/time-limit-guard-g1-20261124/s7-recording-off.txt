@@ -1,0 +1,20 @@
+# recording off; silent creep child trips
+$ env FM_DURATION_FILE=off FM_DURATION_NO_PROGRESS_SECS=3 FM_DURATION_ABSOLUTE_SECS=30 python3 /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89QNM0M9MQBVDQDJZMXPT0D/bin/fm-duration.py run lab.off -- python3 /tmp/g1lab.8TOm/creep.py 30
+calibration: "0 of 5 samples for lab.off on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "lab.off elapsed=0.8s output_bytes=0 tree_cpu=0.01s"
+key: lab.off
+rule: no_progress
+elapsed_secs: 3.9
+idle_secs: 3.1
+output_bytes: 0
+tree_cpu_secs: 0.02
+cpu_gain_in_window_secs: 0.01
+idle_cpu_floor: 0.5s per 60s
+telemetry: sampled
+leader_pid: 75765
+columns: pid ppid stat cpu elapsed comm
+75765 75560 SNs 0:00.03 00:04 python3.13      
+no_progress: "lab.off made no output and no CPU progress above the idle floor (0.5s per 60s) for 3s; stopping; snapshot=unavailable (recording is off; rows on stderr)"
+exit=124
+wall=4.2s

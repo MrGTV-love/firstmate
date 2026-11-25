@@ -1,0 +1,14 @@
+key: lab.tree
+rule: absolute_limit
+elapsed_secs: 6.2
+idle_secs: 0.0
+output_bytes: 0
+tree_cpu_secs: 1.75
+cpu_gain_in_window_secs: 1.43
+idle_cpu_floor: 0.5s per 60s
+telemetry: sampled
+leader_pid: 75780
+columns: pid ppid stat cpu elapsed comm
+75780 75555 SNs 0:00.00 00:06 bash            
+75785 75780 SN 0:00.04 00:06 python3.13      
+75784 75780 SN 0:01.72 00:06 python3.13      

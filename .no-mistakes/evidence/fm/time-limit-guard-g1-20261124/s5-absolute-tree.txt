@@ -1,0 +1,8 @@
+# busy tree (bash -> two python children) hits 6 s absolute stop
+$ env FM_DURATION_FILE=/tmp/g1lab.8TOm/home/data/command-durations.jsonl FM_DURATION_NO_PROGRESS_SECS=60 FM_DURATION_ABSOLUTE_SECS=6 python3 /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89QNM0M9MQBVDQDJZMXPT0D/bin/fm-duration.py run lab.tree -- bash -c python3 /tmp/g1lab.8TOm/busy.py 30 & python3 /tmp/g1lab.8TOm/creep.py 30 & wait
+calibration: "0 of 5 samples for lab.tree on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "lab.tree elapsed=1.0s output_bytes=0 tree_cpu=0.32s"
+absolute_limit: "lab.tree reached the 6s absolute limit; stopping; snapshot=/private/tmp/g1lab.8TOm/home/data/command-duration-trips/lab.tree.20261125T101856.75780.txt"
+exit=124
+wall=6.5s

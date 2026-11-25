@@ -1,0 +1,9 @@
+# ps fails on PATH (blind telemetry); silent creep child; bound 4 s, absolute 15 s
+$ env FM_DURATION_FILE=/tmp/g1lab.8TOm/home/data/command-durations.jsonl PATH=/tmp/g1lab.8TOm/failps:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources FM_DURATION_NO_PROGRESS_SECS=4 FM_DURATION_ABSOLUTE_SECS=15 python3 /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89QNM0M9MQBVDQDJZMXPT0D/bin/fm-duration.py run lab.blind -- python3 /tmp/g1lab.8TOm/creep.py 40
+calibration: "0 of 5 samples for lab.blind on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+progress: "lab.blind elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+absolute_limit: "lab.blind reached the 15s absolute limit; stopping; snapshot=/private/tmp/g1lab.8TOm/home/data/command-duration-trips/lab.blind.20261125T101905.75781.txt"
+exit=124
+wall=15.5s

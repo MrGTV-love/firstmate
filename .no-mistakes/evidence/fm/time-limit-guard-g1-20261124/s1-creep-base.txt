@@ -1,0 +1,7 @@
+$ FM_DURATION_NO_PROGRESS_SECS=4 FM_DURATION_ABSOLUTE_SECS=30 /tmp/g1lab.8TOm/base-fm-duration.py run lab.creep -- python3 creep.py 40 --token=ARGVSECRET
+calibration: "0 of 5 samples for lab.creep on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "lab.creep elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+absolute_limit: "lab.creep reached the 30s absolute limit; stopping"
+exit=124
+wall=30.2s

@@ -1,0 +1,12 @@
+key: lab.blind
+rule: absolute_limit
+elapsed_secs: 15.2
+idle_secs: 0.0
+output_bytes: 0
+tree_cpu_secs: 0.00
+cpu_gain_in_window_secs: 0.00
+idle_cpu_floor: 0.5s per 60s
+telemetry: blind
+leader_pid: 75781
+columns: pid ppid stat cpu elapsed comm
+process table unavailable
