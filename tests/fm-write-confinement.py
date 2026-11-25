@@ -249,6 +249,27 @@ def folder_link_replace_refused(link, opened):
     return False
 
 
+def move_edit_back_refused(protected, anchor, moved):
+    """True only when moving the folder ANCHOR to MOVED, to edit PROTECTED below it there and move it back, was refused.
+
+    The verdict is the first move: once it lands, the program file has left
+    its name. The edit and the move back then show what a worker gains.
+    """
+    protected, anchor, moved = Path(protected), Path(anchor), Path(moved)
+    before = protected.read_bytes()
+    try:
+        anchor.rename(moved)
+    except PermissionError:
+        return anchor.is_dir() and protected.read_bytes() == before
+    try:
+        with (moved / protected.relative_to(anchor)).open("a") as stream:
+            stream.write("\n# fixture write\n")
+        moved.rename(anchor)
+    except OSError:
+        pass  # the caller puts the folder back
+    return False
+
+
 def tracking_checkout_clean(worktree):
     """True only when starting the task's branch from a remote-tracking ref exits 0, records no upstream and tries no config write."""
     tip = git("-C", worktree, "rev-parse", "HEAD").stdout.strip()
@@ -261,7 +282,7 @@ def tracking_checkout_clean(worktree):
 
 CASES = {"program": program_refused, "tracking-checkout": tracking_checkout_clean, "create": program_create_refused, "rename-over": rename_over_refused,
          "link-create": link_create_refused, "rename-into-place": rename_into_place_refused, "link-replace": link_replace_refused,
-         "folder-link-replace": folder_link_replace_refused}
+         "folder-link-replace": folder_link_replace_refused, "move-edit-back": move_edit_back_refused}
 
 
 def writable(path):
@@ -725,8 +746,8 @@ console.log(JSON.stringify({ foreignDenied, filesystemOwner }));
     # profile runs, one case per deny: a write by its name, by another
     # spelling the volume folds into it, through a symbolic link to its real
     # path, a new file in its folder, a rename over it, a new hard link to it,
-    # a prepared folder moved into place where none exists, and a symbolic
-    # link replaced by a file of the worker's own.
+    # a prepared folder moved into place where none exists, a symbolic link
+    # replaced by a file of the worker's own, and a folder above one moved away.
     for case in manifest["git_cases"]:
         results["refused-" + case["name"]] = CASES[case["kind"]](*case["args"])
         for alias in case["cleanup"]:
@@ -1048,6 +1069,33 @@ def git_program_fixture(common, worktree, user_home, base):
         ("git-branches-rename-into-place", "rename-into-place", [common / "branches", worktree / "prepared-branches"],
          subpath, common / "branches", [common / "branches", worktree / "prepared-branches"]),
     ]
+    # Every folder the profile anchors above a program path planted here,
+    # strictly below the user's home or the shared Git directory, whose own
+    # denies are older and cover other entries too: moving the folder to a
+    # writable place, to edit the program file there and move it back, must be
+    # refused. A folder a subpath deny also covers is refused by that deny as
+    # well, so mutants pairs the two rules for it ("pair"); the system file's
+    # folder link has its own block there.
+    planted = [common / "config.worktree", gitdir / "config.worktree", included, conditional_real, user_config, user_xdg_config,
+               system_real, hook_script, module_hook_script, object_link_target]
+    covered = {common / "hooks": common / "hooks/post-checkout", common / "modules": common / "modules/sub/config",
+               common / "remotes": common / "remotes/probe", hooks_path: hooks_path / "post-checkout",
+               common / "worktrees": gitdir / "config.worktree"}
+    moves = base / "anchor-moves"
+    moves.mkdir()
+    anchors = {}
+    for folder in list(covered) + [parent for path in planted + [system_config] for parent in path.parents]:
+        if (folder in anchors or folder in (user_home, common) or folder.is_symlink()
+                or not (user_home in folder.parents or common in folder.parents)):
+            continue
+        anchors[folder] = covered.get(folder) or next(path for path in planted if folder in path.parents)
+    pairs = set()
+    for folder, protected in anchors.items():
+        root, prefix = (common, "git") if common in folder.parents else (user_home, "home")
+        slug = prefix + "-" + str(folder.relative_to(root)).replace("/", "-")
+        cases.append((f"git-anchor-{slug}", "move-edit-back", [protected, folder, moves / slug], literal, folder, []))
+        if folder in covered:
+            pairs.add(f"git-anchor-{slug}")
     if folds:
         # This volume folds case, so Git reads these spellings as the real names.
         cases += [("git-config-other-spelling", "program", [common / "CONFIG"], literal, common / "config", []),
@@ -1055,7 +1103,8 @@ def git_program_fixture(common, worktree, user_home, base):
                    [common / "BRANCHES"])]
     return [{"name": name, "kind": kind, "args": [str(arg) for arg in args], "rule": rule, "path": str(path),
              "cleanup": [str(entry) for entry in cleanup],
-             "relink": [str(conditional), str(conditional_real)] if kind == "link-replace" else None}
+             "relink": [str(conditional), str(conditional_real)] if kind == "link-replace" else None,
+             "pair": str(path) if name in pairs else None}
             for name, kind, args, rule, path, cleanup in cases]
 
 
@@ -1406,25 +1455,25 @@ def mutants(repo, manifest, base, harness, env, launch_env):
     The case must turn red: the write it tries now lands. Returns every
     mutant whose case stayed refused, for the run to fail on after all of them
     have printed; a mutant that finds no rule to remove fails at once. So
-    every deny is shown to be the one rule that stops its case.
+    every deny is shown to be the one rule that stops its case, or, where a
+    second rule also stops it, to stop it alone.
     """
     profile = base / f"mutant-head-{harness}.sb"
     build_profile(repo, manifest, harness, profile, env)
     lines = profile.read_text().splitlines()
     survived = []
-    for case in manifest["git_cases"]:
-        rule = f"(deny file-write* ({case['rule']} {json.dumps(case['path'], ensure_ascii=False)}))"
-        kept = [line for line in lines if line != rule]
-        assert len(lines) - len(kept) == 1, (case["name"], rule, len(lines) - len(kept))
-        mutant = base / f"mutant-{case['name']}-{harness}.sb"
-        mutant.write_text("\n".join(kept) + "\n")
+
+    def run_without(case, removed, label):
+        """Run CASE under the profile less the REMOVED rules, then put the fixture back outside any profile."""
+        for rule in removed:
+            assert lines.count(rule) == 1, (case["name"], rule, lines.count(rule))
+        mutant = base / f"mutant-{case['name']}{label}-{harness}.sb"
+        mutant.write_text("\n".join(line for line in lines if line not in removed) + "\n")
         before = {path: Path(path).read_bytes() for path in case["args"][:1] if Path(path).is_file()}
         run = subprocess.run(["/usr/bin/sandbox-exec", "-f", str(mutant), sys.executable, __file__, "--case", json.dumps(case)],
                              capture_output=True, text=True, env=launch_env)
-        landed = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": False})
-        if not landed:
-            survived.append((case["name"], run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
-        # Put the fixture back for the next mutant, outside any profile.
+        if case["kind"] == "move-edit-back" and os.path.lexists(case["args"][2]) and not os.path.lexists(case["args"][1]):
+            os.rename(case["args"][2], case["args"][1])
         for path, data in before.items():
             Path(path).write_bytes(data)
         for path in case["cleanup"]:
@@ -1435,7 +1484,30 @@ def mutants(repo, manifest, base, harness, env, launch_env):
         if case["relink"]:
             os.unlink(case["relink"][0])
             os.symlink(case["relink"][1], case["relink"][0])
+        return run
+
+    for case in manifest["git_cases"]:
+        if case["pair"]:
+            continue
+        rule = f"(deny file-write* ({case['rule']} {json.dumps(case['path'], ensure_ascii=False)}))"
+        run = run_without(case, (rule,), "")
+        landed = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": False})
+        if not landed:
+            survived.append((case["name"], run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
         print(f"{harness} mutant {case['name']}: removed {rule}; " + ("the case's write landed" if landed else "SURVIVED: the case stayed refused"))
+    # A folder a subpath deny also covers: moving it away is refused by its own
+    # deny and by that subpath deny, each alone, and lands with both removed.
+    for case in (case for case in manifest["git_cases"] if case["pair"]):
+        own = f"(deny file-write* (literal {json.dumps(case['path'], ensure_ascii=False)}))"
+        subpath = f"(deny file-write* (subpath {json.dumps(case['pair'], ensure_ascii=False)}))"
+        for label, removed, expected in (("its own deny removed", (own,), True), ("the subpath deny removed", (subpath,), True),
+                                         ("both removed", (own, subpath), False)):
+            run = run_without(case, removed, "-" + label.replace(" ", "-"))
+            held = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": expected})
+            if not held:
+                survived.append((case["name"] + " " + label, run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
+            print(f"{harness} pair {case['name']}, {label}: " + ("refused" if expected else "landed")
+                  + (" as expected" if held else f" NOT as expected ({run.stdout.strip()})"))
     # The system file's opened name, as /etc/gitconfig, sits under a folder
     # link, as /etc -> private/etc, so the kernel judges a write by that name
     # only once a folder of the worker's own replaces the link. The literal
