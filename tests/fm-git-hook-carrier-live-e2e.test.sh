@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Live guard for the task Git hook carrier inside a real harness's tool shell
-# (live-harness-optin family; the in-pane case H1 of the carrier design).
+# (live-harness-optin family).
 #
 # bin/fm-spawn.sh selects the config carrier (GIT_CONFIG_PARAMETERS hook rows)
 # only for harnesses listed in GIT_HOOKS_CONFIG_HARNESSES, because a selector in
