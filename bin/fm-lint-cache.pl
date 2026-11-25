@@ -1283,7 +1283,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     # ended the command's group (it notices the lost parent within a tick).
     POSIX::setpgid(0, 0);
     my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
-    my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down, $reader_answered);
+    my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down);
     my ($reader_failures, $libproc_samples) = (0, 0);
     # Measurement only: this tick's miss branch, reply wait (s) and interrupted
     # waits; the misses' records; ticks, longest tick (s), longest reply latency (s).
@@ -1318,7 +1318,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         my $first = !defined $reader_fresh;
         $reader_pid = -r $helper
             ? eval { IPC::Open2::open2($from_reader, $to_reader, $python, $helper, 'rss-tree', $root_pid) } : undef;
-        ($reader_fresh, $reader_answered) = ($first && $reader_pid ? 1 : 0, 0);
+        $reader_fresh = $first && $reader_pid ? 1 : 0;
         return if $reader_pid;
         $reader_down = $first ? 'exited-at-start' : ++$reader_failures > 3 ? 'restarts-failed' : undef;
     };
@@ -1327,9 +1327,12 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     # (a miss) when the reader cannot give a bound reply. Each request names those
     # identities ("bind <pid>:<sec>:<usec> ..."), and the reader binds its reply in
     # the same process (fm-proc-info.py bind_members), so a tick starts no process.
-    # A late or unconfirmed reply is read once more in the same tick (the retry),
-    # which waits at most 1 s: a late reply gets 1 s more, an unconfirmed one a new
-    # request with 1 s; a retry that also misses is the tick's miss.
+    # Every reply, a new reader's first and each later one, has 6 s; a late or
+    # unconfirmed reply is read once more in the same tick (the retry), which waits
+    # at most 1 s: a late reply gets 1 s more, an unconfirmed one a new request with
+    # 1 s; a retry that also misses is the tick's miss. So a reply is late (an
+    # rss_miss=late record, wait_ms about 7000) only after 7 s (Main 3923: about
+    # twice the worst late reply measured on a loaded host, 3347 ms).
     my $tree_rss;
     $tree_rss = sub {
         my ($root_pid, $retry) = @_;
@@ -1341,7 +1344,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         vec($ready, fileno($from_reader), 1) = 1;
         my $gone = !syswrite($to_reader, join(' ', 'bind', map { "$_:$known{$_}[0]:$known{$_}[1]" } sort { $a <=> $b } keys %known) . "\n");
         my $asked = Time::HiRes::time();
-        my $wait = $retry ? 1 : $reader_answered ? 0.5 : 2;
+        my $wait = $retry ? 1 : 6;
         while (1) {
             # Each wait has a deadline: a signal that interrupts it (EINTR) waits
             # again for the time left and does not spend the retry.
@@ -1365,7 +1368,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         }
         if ($answer =~ /\A\{"rss_kib":([0-9]+),[^\n]*\}\n\z/) {
             my $kib = $1 + 0;
-            ($reader_failures, $reader_fresh, $reader_answered) = (0, 0, 1);
+            ($reader_failures, $reader_fresh) = (0, 0);
             my $named = eval { require JSON::PP; JSON::PP::decode_json($answer)->{members} };
             my %reply;
             %reply = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) } @$named

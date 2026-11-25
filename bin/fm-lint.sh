@@ -308,9 +308,10 @@
 # it is ended and takes the memory retry described below, and the roots log's
 # last end-record column counts the libproc reader's samples and names any
 # attempt that gave up its reader, with the reason; the reader is the only source
-# of a sample, and a tick it cannot answer is a miss. A late or unconfirmed reply
-# is read once more in the same tick (at most 1 s more) before it is a miss; no
-# other source and no older sample is used. As measurement only, each missed tick's
+# of a sample, and a tick it cannot answer is a miss. Each reply has 6 s; a late or
+# unconfirmed reply is read once more in the same tick (at most 1 s more) before it
+# is a miss, so a reply is late only after 7 s; no other source and no older sample
+# is used. As measurement only, each missed tick's
 # rss_miss=<branch>,wait_ms=<n>,interrupted=<n> record is printed on stderr with its
 # root's path, and at exit one stderr line names the largest rss_longest_reply_ms
 # and rss_longest_tick_ms of the run's roots, with the root of each (none when no

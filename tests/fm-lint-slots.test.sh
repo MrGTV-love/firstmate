@@ -3333,8 +3333,8 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 # naming the root by its real identity (read once when the reader starts) and
 # marked bound, instead of reading memory; with FM_TEST_PY_PLAN=<file> too,
 # the Nth rss-tree reader started follows line N of <file>: stall answers its
-# first line 4 s late, slow answers its first line 1 s late, slow-later answers
-# its second line 2 s late, exit exits before any reply, and anything else (or
+# first line 8 s late, slow answers its first line 1 s late, slow-later answers
+# its second line 8 s late (8 s is past a reply's 6 s and its 1 s retry), exit exits before any reply, and anything else (or
 # no such line) answers at once. The python3 shim names itself as the
 # interpreter lint resolves for the watch's readers.
 fm_lint_write_rss_shims() {  # <dir>
@@ -3380,11 +3380,11 @@ print("%d,%d" % tuple(fp.process_identity(fp.kinfo(int(sys.argv[2])))))' "$1" "$
   while read -r _; do
     line=$((line + 1))
     case "$plan:$line" in
-      stall:1) sleep 4 ;;
+      stall:1) sleep 8 ;;
       slow:1) sleep 1 ;;
-      slow-later:2) sleep 2 ;;
+      slow-later:2) sleep 8 ;;
     esac
-    printf '{"rss_kib":%s,"members":[[%s,%s]],"uncounted":[],"bound":true}\n'"$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')" "$3" "$ident"
+    printf '{"rss_kib":%s,"members":[[%s,%s]],"uncounted":[],"bound":true}\n' "$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')" "$3" "$ident"
   done
   exit 0
 fi
@@ -3576,7 +3576,7 @@ test_resident_watch_replaces_a_stalled_reader() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-stall)
   printf 'stall\n' > "$tmp/plan"
-  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=8; then
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=22; then
     pass "SKIP (the resident-memory watch runs only on macOS): stalled reader check"
     return
   fi
@@ -3592,7 +3592,7 @@ test_resident_watch_replaces_a_stalled_reader() {
   pass "a reader that misses one deadline is replaced, and the missed tick followed by a later one fails the root unmeasured with no narrower retry"
 }
 
-# A reader's first reply has its own longer deadline, so a reader that starts
+# A reader's first reply has the same 6 s as every reply, so a reader that starts
 # slowly on a busy host still has its footprint used, with no miss.
 test_resident_watch_waits_for_a_slow_first_reply() {
   local tmp out samples
@@ -3614,14 +3614,14 @@ test_resident_watch_waits_for_a_slow_first_reply() {
   pass "a reader whose first reply is 1 s late keeps footprint in use"
 }
 
-# A later reply keeps the short deadline and its one retry: one 2 s late is a miss
+# A later reply has the same 6 s and its one 1 s retry: one 8 s late is a miss
 # for that tick, a new reader answers every tick after it, and the miss followed by later ticks
 # fails the root unmeasured (96).
 test_resident_watch_fails_a_root_whose_later_reply_was_late() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-slow-later)
   printf 'slow-later\n' > "$tmp/plan"
-  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_PY_MEMORY="1024 2048" FM_TEST_GROW_HOLD=7; then
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_PY_MEMORY="1024 2048" FM_TEST_GROW_HOLD=22; then
     pass "SKIP (the resident-memory watch runs only on macOS): slow later reply check"
     return
   fi
@@ -3637,7 +3637,7 @@ test_resident_watch_fails_a_root_whose_later_reply_was_late() {
   esac
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 2 ] \
     || fail "the reader with a slow later reply was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
-  pass "a later reply 2 s late (past its retry) is a miss, and with later ticks it fails the root unmeasured"
+  pass "a later reply 8 s late (past its 6 s and its 1 s retry) is a miss, and with later ticks it fails the root unmeasured"
 }
 
 # A replacement reader that exits before its first reply is one failed restart,
@@ -3647,7 +3647,7 @@ test_resident_watch_retries_a_replacement_that_exits() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-replacement-exit)
   printf 'stall\nexit\n' > "$tmp/plan"
-  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=10; then
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=24; then
     pass "SKIP (the resident-memory watch runs only on macOS): failed replacement check"
     return
   fi
@@ -3669,7 +3669,7 @@ test_resident_watch_gives_up_after_three_failed_restarts() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-restarts-failed)
   printf 'stall\nexit\nexit\nexit\n' > "$tmp/plan"
-  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=11; then
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=22; then
     pass "SKIP (the resident-memory watch runs only on macOS): restarts-failed check"
     return
   fi
@@ -4465,7 +4465,8 @@ test_a_worker_started_directly_takes_nothing_from_the_callers_environment() {
 # by the reader's own check (fm-proc-info.py bind_members) on the real process
 # table; FM_TEST_READER=late:<n>:<secs> makes the first reader (marked by
 # $FM_TEST_READER_MARK) answer its <n>th request <secs> late and the others at once,
-# and later readers run normally; FM_TEST_READER=phantom:<ended|unreadable> makes
+# and later readers run normally; FM_TEST_READER=slow:<secs> makes every reader
+# answer each request <secs> late; FM_TEST_READER=phantom:<ended|unreadable> makes
 # every reader the real one, with one extra child of the root (a free pid) in each
 # census: "ended" is in neither the kernel's table nor libproc when read (it ended
 # after the census), "unreadable" is read by libproc but its identity read fails.
@@ -4485,10 +4486,6 @@ if args[:2] == ["-c", "import sys; print(sys.executable)"]:
 if "-c" in args:
     i = args.index("-c")
     program = args[i + 1]
-    if os.environ.get("FM_TEST_CHECK_DELAY"):
-        # A loaded host: every one-shot check starts this many seconds late.
-        import time
-        time.sleep(float(os.environ["FM_TEST_CHECK_DELAY"]))
     if os.environ.get("FM_TEST_IDENTITY") == "fail" and args[i + 3:i + 4] == ["identity"]:
         print("unknown")
         sys.exit(0)
@@ -4579,6 +4576,23 @@ if len(args) >= 3 and args[1] == "rss-tree":
                     answer = "-"
                 print(answer, flush=True)
             sys.exit(0)
+    if mode.startswith("slow:"):
+        import importlib.util, time
+        spec = importlib.util.spec_from_file_location("fp", args[0])
+        fp = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fp)
+        root, known = int(args[2]), {}
+        for request in iter(sys.stdin.readline, ""):
+            time.sleep(float(mode.split(":")[1]))
+            try:
+                answer = fp.rss_tree(root, known, request)
+            except Exception:
+                answer = "-"
+            try:
+                print(answer, flush=True)
+            except BrokenPipeError:
+                os._exit(0)
+        sys.exit(0)
     if mode.startswith("interrupt:"):
         # On the Nth request, signal the watch (SIGUSR1) twice while it waits,
         # 0.1 s apart, then answer 0.3 s after the request.
@@ -5710,42 +5724,55 @@ SH
   pass "a root unmeasured for an interval, long or short, and later over the bound exits 96 (unmeasured), not 98; measured throughout, the same growth exits 98"
 }
 
-# (Main 2421 RV-2) A late reply is read once more in the same tick before it is a
-# miss. The reader answers its third request 0.8 s late (after the 0.5 s read, inside
-# the 1 s retry): the root runs to its own result (0), measured throughout. Answered
-# 2.5 s late, the read and its retry both miss, and the root still exits 96
-# (unmeasured).
+# (Main 2421 RV-2, Main 3923) Every reply has 6 s, and a late reply is read once
+# more in the same tick (1 s) before it is a miss, so a reply is late only after 7 s.
+# The first reader answers one request late: its first at 3.4 s or its third at
+# 3.4 s (inside the 6 s), or its third at 6.5 s (after the 6 s read, inside the 1 s
+# retry); in each the root runs to its own result (0), measured throughout, with
+# that reply used. Answered 7.5 s late, the read and its retry both miss
+# (rss_miss=late, about 7000 ms waited), and the root exits 96 (unmeasured).
 test_a_late_reply_is_retried_once_in_the_same_tick() {
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the resident watch runs on native macOS only): late reply retried once"
     return
   fi
-  local tmp real_python rc label delay
+  local tmp real_python rc label request delay hold latency waited
   tmp=$(fm_test_tmproot fm-lint-late-retry)
   real_python=$(command -v python3) || fail "python3 is not on PATH"
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
-  for label in retried missed; do
+  for label in first later retried missed; do
     rc=0
-    case "$label" in retried) delay=0.8 ;; missed) delay=2.5 ;; esac
-    FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER="late:3:$delay" \
+    case "$label" in
+      first) request=1 delay=3.4 hold=8 ;;
+      later) request=3 delay=3.4 hold=10 ;;
+      retried) request=3 delay=6.5 hold=13 ;;
+      missed) request=3 delay=7.5 hold=18 ;;
+    esac
+    FM_TEST_SIGNAL_LOG="$tmp/signals.$label" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER="late:$request:$delay" \
       FM_TEST_READER_MARK="$tmp/mark.$label" \
-      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$label" -- sleep 7 > "$tmp/err.$label" 2>&1 || rc=$?
+      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$label" -- sleep "$hold" > "$tmp/err.$label" 2>&1 || rc=$?
     [ -e "$tmp/mark.$label" ] || fail "the late reader never ran ($label): $(cat "$tmp/err.$label")"
-    if [ "$label" = retried ]; then
-      [ "$rc" -eq 0 ] || fail "a root whose reply was late once and good on the retry exited $rc, expected 0: $(cat "$tmp/err.$label") $(cat "$tmp/rss.$label" 2>/dev/null)"
-      ! grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" 2>/dev/null || fail "a reply good on the retry was recorded as unmeasured: $(cat "$tmp/rss.$label")"
+    if [ "$label" != missed ]; then
+      [ "$rc" -eq 0 ] || fail "a root whose reply was $delay s late ($label) exited $rc, expected 0: $(cat "$tmp/err.$label") $(cat "$tmp/rss.$label" 2>/dev/null)"
+      ! grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" 2>/dev/null || fail "a reply $delay s late ($label) was recorded as unmeasured: $(cat "$tmp/rss.$label")"
+      ! grep -q '^rss_miss=late,' "$tmp/rss.$label" || fail "a reply $delay s late ($label) was recorded as a late miss: $(cat "$tmp/rss.$label")"
+      latency=$(sed -n 's/^rss_longest_reply_ms=//p' "$tmp/rss.$label")
+      [ "${latency:-0}" -ge "${delay%.*}000" ] || fail "the $delay s reply ($label) was not the one used: longest reply ${latency:-none} ms"
     else
+      waited=$(sed -n 's/^rss_miss=late,wait_ms=\([0-9]*\),.*/\1/p' "$tmp/rss.$label" | head -n 1)
+      [ "${waited:-0}" -ge 6900 ] || fail "the 7.5 s reply was not a late miss after about 7 s: $(cat "$tmp/rss.$label" 2>/dev/null)"
+
       [ "$rc" -eq 96 ] || fail "a root whose read and retry both missed exited $rc, expected 96: $(cat "$tmp/err.$label") $(cat "$tmp/rss.$label" 2>/dev/null)"
       grep -q '^rss_unmeasured=1$' "$tmp/rss.$label" || fail "the missed tick was not recorded as unmeasured: $(cat "$tmp/rss.$label")"
     fi
   done
-  pass "a reply late on its first read and good on the same-tick retry keeps the root to its own result (0); a tick whose read and retry both miss still ends the root with 96 (unmeasured)"
+  pass "a first or later reply 3.4 s late is a sample, one 6.5 s late is good on the same-tick retry, each keeping the root to its own result (0); a reply 7.5 s late is a late miss after about 7 s and ends the root with 96 (unmeasured)"
 }
 
 # (Main 3511) A signal that interrupts a reply wait (EINTR) waits again for the time
 # left and does not spend the retry. The watch runs with a USR1 handler that logs
 # each signal; the reader signals it twice while it waits for its second reply,
-# then answers 0.3 s after the request, inside the 0.5 s wait. No tick is a miss
+# then answers 0.3 s after the request, inside the 6 s wait. No tick is a miss
 # and the root runs to its own result (0). Without the deadline, the first
 # interrupt spent the retry and the second made the tick a miss (96).
 test_an_interrupted_reply_wait_with_a_reply_in_time_is_no_miss() {
@@ -5835,12 +5862,13 @@ test_a_live_member_that_cannot_be_read_is_still_a_miss() {
   pass "a live member whose identity cannot be read is a miss on every tick, and the root exits 96 (unmeasured)"
 }
 
-# (Main 2981, Main 2988) On a loaded host each one-shot check starts late, so a tick
-# that meets the root's own exit (a zombie, refused by the reply check and retried)
-# outlasts the 1 s timer and the next tick ran before the watch could reap the root:
-# a clean root ended 96. Each tick now reaps an exited root first. The root is
-# shaped as bin/fm-lint.sh runs it (/usr/bin/time around the analysis), every check
-# is 0.5 s late, and the root keeps its own exit status, 0 or 3.
+# (Main 2981, Main 2988, Main 3923) On a loaded host each reader reply comes late, so
+# a tick that meets the root's own exit (a zombie, refused by the reply check and
+# retried) outlasts the 1 s timer and the next tick ran before the watch could reap
+# the root: a clean root ended 96. Each tick now reaps an exited root first. The
+# root is shaped as bin/fm-lint.sh runs it (/usr/bin/time around the analysis),
+# every reader reply is 1.5 s late (FM_TEST_READER=slow:1.5, so ticks run back to
+# back), and the root keeps its own exit status, 0 or 3.
 test_a_root_exit_under_slow_checks_keeps_its_own_status() {
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the resident watch runs on native macOS only): root exit under slow checks"
@@ -5852,14 +5880,14 @@ test_a_root_exit_under_slow_checks_keeps_its_own_status() {
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
   for want in 0 3; do
     rc=0
-    FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_CHECK_DELAY=0.5 \
+    FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=slow:1.5 \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$want" -- \
-      /usr/bin/time -lp -o "$tmp/rss.$want" perl -e 'sleep 3; exit $ARGV[0]' "$want" > "$tmp/err.$want" 2>&1 || rc=$?
-    [ "$rc" -eq "$want" ] || fail "a root that exited $want under 0.5 s slow checks ended $rc: $(cat "$tmp/err.$want") $(cat "$tmp/rss.$want" 2>/dev/null)"
-    ! grep -q '^rss_unmeasured=1$' "$tmp/rss.$want" || fail "a root's own exit under slow checks was recorded as unmeasured: $(cat "$tmp/rss.$want")"
+      /usr/bin/time -lp -o "$tmp/rss.$want" perl -e 'sleep 8; exit $ARGV[0]' "$want" > "$tmp/err.$want" 2>&1 || rc=$?
+    [ "$rc" -eq "$want" ] || fail "a root that exited $want under 1.5 s slow replies ended $rc: $(cat "$tmp/err.$want") $(cat "$tmp/rss.$want" 2>/dev/null)"
+    ! grep -q '^rss_unmeasured=1$' "$tmp/rss.$want" || fail "a root's own exit under slow replies was recorded as unmeasured: $(cat "$tmp/rss.$want")"
     grep -Eq '^rss_samples=libproc:[1-9]' "$tmp/rss.$want" || fail "the watch took no sample of the root: $(cat "$tmp/rss.$want")"
   done
-  pass "under 0.5 s slow checks a root's own exit is reaped, not sampled as misses: it ends with its own status (0, and 3), measured and not unmeasured"
+  pass "under 1.5 s slow reader replies a root's own exit is reaped, not sampled as misses: it ends with its own status (0, and 3), measured and not unmeasured"
 }
 
 # (Main 1806 item 5, Main 1862) A compiled launcher that runs delegate A or B (one
