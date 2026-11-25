@@ -558,9 +558,16 @@
 #   A copy the pool hands out that already carries another holder's lease (an ordinary lease of another holder or
 #   Treehouse's recovered lease), shown by one consistent row of Treehouse's pool state read before anything is written, is
 #   passed over before any claim, lease command or idle proof: nothing is written to it, the claim marker beside it is
-#   never created, replaced or removed, and this home takes no lease (the pool state already holds it; Treehouse leaves a
-#   stands inside it, so the pane is not closed for the rest of the spawn). It is recorded in skipped-copies.tsv with the holder the pool
-#   names, which bin/fm-teardown.sh never returns, and listed as passed over. A recovered lease is freed by Treehouse itself
+#   never created, replaced or removed, and this home takes no lease (the pool state already holds it). It is recorded in
+#   skipped-copies.tsv with the holder the pool names and the acquisition endpoint, which bin/fm-teardown.sh never returns,
+#   and listed as passed over. From the first pass-over to the end of the spawn, even after a clean copy is reached, the
+#   acquisition pane is never closed: the get that entered the passed-over copy opened a subshell inside it and every
+#   later get runs beneath that subshell, so the pane's process tree holds a shell inside the passed-over copy, and
+#   closing the pane ends that shell, which can let Treehouse release or reset a copy another holder may lease. An abort
+#   after a pass-over, before launch, instead interrupts any `treehouse get` in the pane's foreground and proves from the
+#   process table that those processes are gone and that the pane rests in a copy this spawn recorded; anything else
+#   (a get still alive, a pane resting in an unrecorded copy, a foreground the backend cannot read) is an error. Either
+#   way the pane is recorded, read back, in $DATA/<task>/acquisition-pane.tsv. A recovered lease is freed by Treehouse itself
 #   once the copy is idle, clean and landed. Each passed-over copy is a distinct copy the acquisition never accepts again,
 #   so the loop ends by the one absolute bound below or by the copies the pool has, with the refusal naming each copy.
 #   A pool state that cannot be read as exactly one consistent row for the copy (unreadable, a duplicate row by name or by
@@ -1992,6 +1999,8 @@ SPAWN_BRIEF_DELIVERED=0
 SPAWN_BRIEF_FAILURE_REASON=
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_TREEHOUSE_ABORT_TARGET=
+# The acquisition endpoint once a copy was passed over: never closed again; an abort settles it instead (spawn_settle_passed_over_pane).
+SPAWN_PASSED_OVER_PANE=
 SPAWN_ROUTING_PAIR=
 
 spawn_fresh_commit_rollback() {
@@ -2097,6 +2106,11 @@ spawn_abort_cleanup() {
         status=1
       fi
     fi
+  fi
+  # After a pass-over the pane is never closed (it holds a shell inside the passed-over copy), so closing it cannot cancel a
+  # get still running there: the get is interrupted in place and proved gone instead. This never ends the cleanup early.
+  if [ -n "$SPAWN_PASSED_OVER_PANE" ] && [ "$KIND" != secondmate ] && [ "$SPAWN_LAUNCH_SENT" = 0 ]; then
+    spawn_settle_passed_over_pane || status=1
   fi
   if [ "$ORCA_ABORT_CLEANUP" = 1 ]; then
     ORCA_ABORT_CLEANUP=0
@@ -6245,6 +6259,97 @@ spawn_pane_pid() {
   [ "$pid" -gt 1 ] || return 0
   printf '%s' "$pid"
 }
+# The pids of <target>'s foreground process group, one per line, from the process table: on tmux the processes of the
+# pane's tty in the tty's foreground group, on herdr `pane process-info`. Nothing when the backend cannot say.
+spawn_foreground_pids() { # <target>
+  local out
+  case "$BACKEND" in
+    tmux) fm_backend_tmux_foreground_pids "$1" 2>/dev/null || true ;;
+    herdr)
+      # shellcheck disable=SC2016 # The single-quoted bash -c program expands its own positional arguments.
+      out=$(bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
+        _ "$SCRIPT_DIR" "${1%%:*}" "${1#*:}" 2>/dev/null </dev/null) || out=
+      printf '%s' "$out" | jq -r --arg pane "${1#*:}" '
+        select(.result.type == "pane_process_info" and .result.process_info.pane_id == $pane)
+        | .result.process_info.foreground_processes[]? | .pid | select(type == "number") | floor' 2>/dev/null || true
+      ;;
+  esac
+}
+# Whether <pid> is a live process the kernel names `treehouse`: the launcher rule of bin/fm-slot-provision-lib.sh.
+spawn_pid_is_treehouse() { # <pid>
+  local comm
+  comm=$(LC_ALL=C ps -p "$1" -o comm= 2>/dev/null) || return 1
+  comm=${comm%"${comm##*[![:space:]]}"}
+  [ "${comm##*/}" = treehouse ]
+}
+# Settle the acquisition pane on an abort after a pass-over, without closing it (the header owns why). A `treehouse get`
+# in the pane's foreground is interrupted through the backend and must then be gone from the process table, and the pane
+# must rest in a copy this spawn recorded; a get still alive, a pane resting anywhere else, or a foreground or path the
+# backend cannot read is an error. The outcome is recorded and read back in $DATA/<task>/acquisition-pane.tsv
+# (endpoint, outcome, detail, epoch). Returns 1 unless the pane was proved settled and recorded. Never exits.
+spawn_settle_passed_over_pane() {
+  local target=$SPAWN_PASSED_OVER_PANE fg pid gets='' alive='' path='' outcome='' detail row i=0
+  fg=$(spawn_foreground_pids "$target")
+  for pid in $fg; do
+    ! spawn_pid_is_treehouse "$pid" || gets="${gets:+$gets }$pid"
+  done
+  if [ -n "$gets" ]; then
+    spawn_send_key "$target" C-c >/dev/null 2>&1 || true
+    while :; do
+      alive=''
+      for pid in $gets; do
+        ! spawn_pid_is_treehouse "$pid" || alive="${alive:+$alive }$pid"
+      done
+      [ -n "$alive" ] && [ "$i" -lt 100 ] || break
+      i=$((i + 1))
+      sleep 0.1
+    done
+  fi
+  if [ -z "$fg" ]; then
+    outcome=unobservable
+    detail="the $BACKEND backend did not report the pane's foreground processes, so no treehouse get in it is proved cancelled"
+  elif [ -n "$alive" ]; then
+    outcome=get-not-cancelled
+    detail="treehouse get process(es) $alive in its foreground were interrupted but are still running and can still take a copy no record names"
+  else
+    # Read again after the interrupt: the foreground must hold no get, and the pane must rest in a recorded copy.
+    fg=$(spawn_foreground_pids "$target")
+    alive=''
+    for pid in $fg; do
+      ! spawn_pid_is_treehouse "$pid" || alive="${alive:+$alive }$pid"
+    done
+    path=$(spawn_current_path "$target" 2>/dev/null) || path=
+    if [ -z "$fg" ] || [ -z "$path" ]; then
+      outcome=unobservable
+      detail="the pane's foreground or current path could not be read after the interrupt, so it is not proved to rest in a copy this spawn recorded"
+    elif [ -n "$alive" ]; then
+      outcome=get-not-cancelled
+      detail="treehouse process(es) $alive are in its foreground after the interrupt and can still take a copy no record names"
+    elif ! spawn_slot_skipped "$path"; then
+      outcome=unrecorded-copy
+      detail="it rests in $path, which no record of this spawn names, so a shell there holds that copy"
+    elif [ -n "$gets" ]; then
+      outcome=get-cancelled
+      detail="the treehouse get running in it (pid(s) $gets) was interrupted and is gone, and it rests in $path, a copy this spawn recorded"
+    else
+      outcome=no-get
+      detail="no treehouse get was running in it, and it rests in $path, a copy this spawn recorded"
+    fi
+  fi
+  row=$(printf '%s\t%s\t%s\t%s' "$target" "$outcome" "$(printf '%s' "$detail" | tr '\t\r\n' '   ')" "$(date +%s)")
+  if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/acquisition-pane.tsv" && grep -Fxq -- "$row" "$DATA/$ID/acquisition-pane.tsv"; } 2>/dev/null; then
+    echo "error: acquisition pane $target ($T) is left open after a pass-over and its record could not be written and read back in $DATA/$ID/acquisition-pane.tsv; $detail" >&2
+    return 1
+  fi
+  case "$outcome" in
+    get-cancelled | no-get)
+      echo "notice: acquisition pane $target ($T) is left open because its process tree holds a shell inside a copy this spawn passed over; $detail (record: $DATA/$ID/acquisition-pane.tsv)" >&2
+      return 0
+      ;;
+  esac
+  echo "error: acquisition pane $target ($T) is left open after a pass-over and is not settled: $detail; this abort is not clean: inspect the pane and the copies it stands in (treehouse status) before closing it (record: $DATA/$ID/acquisition-pane.tsv)" >&2
+  return 1
+}
 # What this spawn left leased: each copy it skipped is leased in place to this home (holder
 # firstmate-skipped:<task>) and recorded in $DATA/<task>/skipped-copies.tsv. Nothing here releases a lease.
 spawn_report_leased_copies() {
@@ -6533,14 +6638,15 @@ spawn_classify_copy() { # <path>
 }
 # A copy the pool handed this spawn that already carries another holder's lease is passed over before anything is written to
 # it: no claim (the claim marker beside the copy is never created, replaced or removed), no lease command, no idle proof.
-# The pool state already holds the copy's lease, so this home adds no lease of its own; the pane is not closed for the rest of
-# this spawn, since its shell stands inside the copy. It is recorded in $DATA/<task>/skipped-copies.tsv with the
-# lease holder the pool state names in the holder column, never a holder this home could own, so bin/fm-teardown.sh never
-# returns it. The record is read back; a record that cannot be written and read back refuses the whole spawn.
+# The pool state already holds the copy's lease, so this home adds no lease of its own. The pane is not closed for the rest
+# of this spawn, and an abort settles it instead (the header owns why). It is recorded in $DATA/<task>/skipped-copies.tsv
+# with the lease holder the pool state names in the holder column, never a holder this home could own, so
+# bin/fm-teardown.sh never returns it, and with the acquisition endpoint in the fifth column. The record is read back; a
+# record that cannot be written and read back refuses the whole spawn.
 spawn_pass_over_copy() {
   local passed=$WT real row reason
-  # The pane's shell stands inside this passed-over copy. Closing the pane would let Treehouse reset a copy another holder
-  # may lease, so the pane stays open for the rest of this spawn.
+  # From here the pane's process tree holds a shell inside this copy: never close the pane; settle it on abort instead.
+  SPAWN_PASSED_OVER_PANE=$WT_TARGET
   SPAWN_TREEHOUSE_ABORT_TARGET=
   HERDR_PROJECTION_ABORT_CLEANUP=0
   real=$(CDPATH='' cd -- "$passed" 2>/dev/null && pwd -P) && [ -n "$real" ] || {
@@ -6548,7 +6654,7 @@ spawn_pass_over_copy() {
     exit 1
   }
   reason=$(printf 'already carries another holder'"'"'s lease in the pool state (holder: %s); this spawn wrote nothing to it' "$SPAWN_OTHER_LEASE_HOLDER" | tr '\t\r\n' '   ')
-  row=$(printf '%s\t%s\t%s\t%s' "$real" "$reason" "$(printf '%s' "$SPAWN_OTHER_LEASE_HOLDER" | tr '\t\r\n' '   ')" "$(date +%s)")
+  row=$(printf '%s\t%s\t%s\t%s\t%s' "$real" "$reason" "$(printf '%s' "$SPAWN_OTHER_LEASE_HOLDER" | tr '\t\r\n' '   ')" "$(date +%s)" "$WT_TARGET")
   if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/skipped-copies.tsv" && grep -Fxq -- "$row" "$DATA/$ID/skipped-copies.tsv"; } 2>/dev/null; then
     echo "error: could not write and read back the record of passed-over copy $real in $DATA/$ID/skipped-copies.tsv; nothing was written to the copy and the spawn is refused (no worker admitted)" >&2
     exit 1
@@ -6589,7 +6695,7 @@ spawn_skip_copy() {
     echo "error: skipped copy '$skipped' cannot be resolved to a real path, so its record cannot be trusted; it stays leased as firstmate-skipped:$ID, its endpoint $T stays open, and the spawn is refused (no worker admitted)" >&2
     exit 1
   fi
-  row=$(printf '%s\t%s\tfirstmate-skipped:%s\t%s' "$real" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)")
+  row=$(printf '%s\t%s\tfirstmate-skipped:%s\t%s\t%s' "$real" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)" "$WT_TARGET")
   if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/skipped-copies.tsv" && grep -Fxq -- "$row" "$DATA/$ID/skipped-copies.tsv"; } 2>/dev/null; then
     echo "error: could not write and read back the record of skipped copy $real in $DATA/$ID/skipped-copies.tsv; the copy stays leased as firstmate-skipped:$ID, its endpoint $T stays open, and the spawn is refused (no worker admitted)" >&2
     exit 1

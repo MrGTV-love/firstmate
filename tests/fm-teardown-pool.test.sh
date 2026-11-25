@@ -4566,7 +4566,12 @@ test_skipped_copies_are_released_only_when_clean_and_landed() {
       [ "$dir" != "$busy" ] || procs='[{"pid": 1}]'
       printf '%s{"path": "%s", "lease_holder": "%s", "processes": %s}' "$sep" "$canon" "$holder" "$procs"
       sep=,
-      printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\n' "$dir" >> "$rec"
+      # The busy copy's row names the acquisition pane the spawn left open on it (the fifth column).
+      if [ "$dir" = "$busy" ]; then
+        printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\t@41\n' "$dir" >> "$rec"
+      else
+        printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\n' "$dir" >> "$rec"
+      fi
     done
     printf ']\n'
   } > "$case_dir/pool.json"
@@ -4579,6 +4584,12 @@ SH
   chmod +x "$case_dir/fakebin/treehouse"
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "skipped-copies: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fq "process(es) are running inside it (acquisition pane @41 of the spawn may still stand in it)" "$case_dir/stderr" \
+    || fail "skipped-copies: the refusal for the busy copy did not name its acquisition pane"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fxq "$busy"$'\t'"dirty_tree"$'\t'"firstmate-skipped:task-x1"$'\t'"1"$'\t'"@41" "$rec" \
+    || fail "skipped-copies: the busy copy's row lost its acquisition pane"$'\n'"$(cat "$rec")"
+  grep -Fxq "$unlanded"$'\t'"dirty_tree"$'\t'"firstmate-skipped:task-x1"$'\t'"1" "$rec" \
+    || fail "skipped-copies: a four-column row was not kept as it was"$'\n'"$(cat "$rec")"
   canon=$(cd "$landed" && pwd -P)
   grep -Fq "return $canon --if-lease-holder firstmate-skipped:task-x1" "$log" || fail "skipped-copies: the clean, landed copy was not released"$'\n'"$(cat "$log")"
   for dir in "$unlanded" "$other" "$busy"; do

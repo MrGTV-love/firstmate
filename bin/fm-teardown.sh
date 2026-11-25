@@ -3426,8 +3426,10 @@ teardown_return_collisions() { # <copy> <branch>
 }
 
 # Copies this task's spawn skipped and left leased in place (bin/fm-spawn.sh spawn_skip_copy writes one
-# $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch; a copy passed over
-# because another holder's lease was already there has that holder instead and is never returned here).
+# $DATA/<id>/skipped-copies.tsv row per copy: path, reason, lease holder firstmate-skipped:<id>, epoch and, on rows written
+# since it was added, the spawn's acquisition endpoint; a copy passed over because another holder's lease was already there
+# has that holder instead and is never returned here). A copy kept because a process runs in it names that endpoint, which
+# the spawn may have left open on it.
 # This home owns each lease. It is released here and nowhere else, never automatically at spawn or by any
 # sweep, and only when that copy passes the same landed-work test as any other copy: a clean worktree
 # root whose HEAD is landed (teardown_landed, with no recorded bundle accepting it; an anchor alone never releases), with no process running in it, no ignored file where the
@@ -3435,8 +3437,12 @@ teardown_return_collisions() { # <copy> <branch>
 # lease still held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
 # Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
 # whose copy is gone is dropped; a row naming another holder is kept untouched. This never changes the exit status.
+# One skipped-copies.tsv row as read: four columns, or five when the row named the spawn's acquisition endpoint.
+teardown_skipped_row() { # <copy> <reason> <holder> <epoch> <endpoint>
+  if [ -n "$5" ]; then printf '%s\t%s\t%s\t%s\t%s\n' "$@"; else printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4"; fi
+}
 teardown_skipped_copies() {
-  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when canonical row lease_holder procs dirt ignored_files hidden_work ok reset_branch
+  local record="$DATA/$ID/skipped-copies.tsv" copy reason holder when pane canonical row lease_holder procs dirt ignored_files hidden_work ok reset_branch
   local keep="$record.keep.${BASHPID:-$$}" changed=0
   [ -f "$record" ] && [ ! -L "$record" ] || return 0
   : > "$keep" || return 0
@@ -3452,20 +3458,20 @@ teardown_skipped_copies() {
     rm -f "$keep"
     return 0
   fi
-  while IFS=$'\t' read -r copy reason holder when || [ -n "$copy" ]; do
+  while IFS=$'\t' read -r copy reason holder when pane || [ -n "$copy" ]; do
     [ -n "$copy" ] || continue
     if [ "$holder" != "firstmate-skipped:$ID" ]; then
       # Only the exact holder this task's spawn leased under is this task's to return. A row naming anyone else (a copy the
       # spawn passed over because another holder's lease was already there) is never returned, whatever the pool says.
       echo "notice: the record row for $copy names holder '$holder', not this task's firstmate-skipped:$ID; that lease is not this task's, so nothing is returned and the row is left as it is" >&2
-      printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+      teardown_skipped_row "$copy" "$reason" "$holder" "$when" "$pane" >> "$keep"
       continue
     fi
     canonical=$(fm_task_copy_canonical_dir "$copy") || canonical=
     if [ -z "$canonical" ]; then
       # A path that cannot be resolved proves nothing about the lease. The copy stays leased and its record stays (rule Q).
       echo "warning: leaving $copy leased to $holder: its recorded path cannot be resolved, so nothing proves it is released (skipped for: $reason)" >&2
-      printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+      teardown_skipped_row "$copy" "$reason" "$holder" "$when" "$pane" >> "$keep"
       continue
     fi
     row=$(jq -r --arg p "$canonical" '[.[] | select(.path == $p)] as $m
@@ -3485,7 +3491,7 @@ teardown_skipped_copies() {
     procs=${procs%%$'\t'*}
     if [ "$holder_known" != 1 ]; then
       echo "warning: leaving $copy leased to $holder: its pool row does not say who holds the lease, or the pool lists it more than once (skipped for: $reason)" >&2
-      printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+      teardown_skipped_row "$copy" "$reason" "$holder" "$when" "$pane" >> "$keep"
       continue
     fi
     if [ "$lease_holder" != "$holder" ]; then
@@ -3497,7 +3503,7 @@ teardown_skipped_copies() {
     if [ "$procs" = '?' ]; then
       echo "warning: leaving $copy leased to $holder: its pool row has no list of the processes running in it, so nobody is not proved (skipped for: $reason)" >&2
     elif [ "${procs:-1}" != 0 ]; then
-      echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it (skipped for: $reason)" >&2
+      echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it${pane:+ (acquisition pane $pane of the spawn may still stand in it)} (skipped for: $reason)" >&2
     elif ! dirt=$(git -C "$canonical" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) || [ -n "$dirt" ]; then
       echo "warning: leaving $copy leased to $holder: it is not clean, or its status cannot be read (skipped for: $reason)" >&2
     elif ! hidden_work=$(fm_slot_hidden_work "$canonical") || [ -n "$hidden_work" ]; then
@@ -3530,7 +3536,7 @@ teardown_skipped_copies() {
     fi
     [ "$ok" = 0 ] || echo "warning: could not release the lease on skipped copy $canonical" >&2
     echo "  release it by hand once it is landed or unwanted: (cd '$PROJ' && treehouse return '$canonical' --if-lease-holder '$holder' </dev/null)" >&2
-    printf '%s\t%s\t%s\t%s\n' "$copy" "$reason" "$holder" "$when" >> "$keep"
+    teardown_skipped_row "$copy" "$reason" "$holder" "$when" "$pane" >> "$keep"
   done < "$record"
   if [ "$changed" = 1 ]; then
     if [ -s "$keep" ]; then mv -f "$keep" "$record" 2>/dev/null || rm -f "$keep"; else rm -f "$keep" "$record"; fi

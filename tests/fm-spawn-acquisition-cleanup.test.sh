@@ -4,6 +4,7 @@
 # FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
 # The late, laterexit, earlyexit, clock and gone cases read the pane's foreground process and run on tmux only.
 # FM_TEST_ACQUISITION_CASES=cleanup-writer leaves a detached child writing during this script's own cleanup.
+# FM_TEST_ACQUISITION_CASES=passover runs only the pass-over in-flight get case and its control (tmux, real treehouse).
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -109,6 +110,14 @@ cat > "$FAKEBIN/treehouse" <<SH
 [ "\${1:-}" != pool-dir ] || { printf '%s\n' '$TMP_ROOT/treehouse-pool'; exit 0; }
 [ "\${1:-}" = get ] || exit 0
 . '$TMP_ROOT/get-config'
+if [ "\$MODE" = passover ] && [ ! -e "\$FIRSTPID" ]; then
+  # The first get of a pass-over case enters copy A and opens its subshell there, staying its parent, as the real get does.
+  printf '%s\n' "\$\$" > "\$FIRSTPID"
+  cd "\$PASSED" || exit 1
+  HISTFILE='$TMP_ROOT/get-history' /bin/bash --noprofile --norc -c 'printf "%s\n" "\$\$" > "\$1"; exec /bin/bash --noprofile --norc -i' _ "\$ASHELL"
+  exit 0
+fi
+[ "\$MODE" != passover ] || MODE=slow
 trap 'rm -f "\$LEASE"; exit 0' HUP INT TERM
 trap 'rm -f "\$LEASE"' EXIT
 printf '%s\n' "\$\$" > "\$PIDFILE"
@@ -283,6 +292,7 @@ sleep() {
 SH
 for MODE in success slow spawning foreign dirty late laterexit earlyexit clock gone; do
   [ "${FM_TEST_ACQUISITION_CASES:-all}" != contention ] || [ "$MODE" = success ] || continue
+  [ "${FM_TEST_ACQUISITION_CASES:-all}" != passover ] || continue
   case "$MODE" in late|laterexit|earlyexit|clock|gone) [ "$BACKEND" = tmux ] || continue ;; esac
   ID="get-cleanup-$MODE-$$"
   CASE="$TMP_ROOT/case-$MODE"
@@ -378,6 +388,100 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   fi
   pass "$BACKEND $MODE refusal returns its slot and ends its get subshell"
 done
+
+# A get still running when the spawn gives up after a pass-over. The first get enters copy A, a real pool slot whose state
+# shows another holder's lease, so the spawn passes it over and keeps the pane open; the second get, for copy B, makes no
+# progress and the no-progress limit ends the spawn. That get must be interrupted and gone from the process table, B never
+# entered, A byte-identical with its lease, and the pane still open with A's shell and the get that opened it alive.
+# run_passover_inflight_case <label> <bash-env>: the spawn runs with <bash-env> as BASH_ENV, so the control can inject a fault.
+passover_copy_digest() { # <copy> <state-file>
+  (
+    set -o pipefail
+    git -C "$1" rev-parse HEAD || exit 1
+    git -C "$1" status --porcelain=v1 --untracked-files=all --ignored || exit 1
+    find "$1" -path "$1/.git" -prune -o -type f -print | LC_ALL=C sort | while IFS= read -r f; do shasum -a 256 "$f"; done || exit 1
+    shasum -a 256 "$2" || exit 1
+  )
+}
+run_passover_inflight_case() {
+  local label=$1 bash_env=$2 id case th_root a_copy b_copy state before after wid rc get2 row
+  id="get-cleanup-$label-$$"
+  case="$TMP_ROOT/case-$label"
+  th_root="$case/th-root"
+  b_copy="$TMP_ROOT/$label-copy-b"
+  mkdir -p "$case"
+  fm_git_init_commit "$b_copy"
+  a_copy=$(cd "$PROJECT" && TREEHOUSE_ROOT="$th_root" "$REAL_TREEHOUSE" get --lease --lease-holder other-holder 2>/dev/null </dev/null | tail -n 1) \
+    || fail "$label: the real treehouse made no pool slot"
+  a_copy=$(CDPATH='' cd -- "$a_copy" && pwd -P) || fail "$label: the pool slot cannot be resolved"
+  state="$(dirname "$(dirname "$a_copy")")/treehouse-state.json"
+  [ "$(jq -r --arg p "$a_copy" '[.worktrees[] | select(.path == $p) | .lease_holder] | join(",")' "$state")" = other-holder ] \
+    || fail "$label: copy A does not carry the other holder's lease in the pool state"
+  before=$(passover_copy_digest "$a_copy" "$state") || fail "$label: copy A could not be read before the spawn"
+  : > "$case/ticks"
+  printf 'MODE=passover\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\nPASSED=%q\nFIRSTPID=%q\nASHELL=%q\n' \
+    "$case/lease" "$case/pid" "$case/allow" "$case/arrived" "$b_copy" "$case/ticks" "$a_copy" "$case/first-pid" "$case/a-shell" \
+    > "$TMP_ROOT/get-config"
+  fm_test_spawn_brief "$FM_HOME" "$id" 'A get in flight after a pass-over must not outlive the refused spawn.'
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$case/claude" PATH="$FAKEBIN:$PATH" \
+    FM_TEST_TICK_FILE="$case/ticks" FM_TEST_TICK_SECONDS=60 FM_TEST_TICK_GATE="$case/pid" FM_TEST_REAL_CLEANUP_SLEEP=1 \
+    BASH_ENV="$bash_env" \
+    bash "$ROOT/bin/fm-spawn.sh" "$id" "$PROJECT" --backend tmux --harness codex --allow-api-key --mode no-mistakes --yolo off 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail "$label: the spawn launched although its only clean copy never arrived: $out"
+  assert_contains "$out" "skipped: copy $a_copy already carries another holder's lease" "$label: copy A was not passed over"
+  assert_contains "$out" 'no path or output progress for 600s' "$label: the second get was not ended by the no-progress limit"
+  [ -s "$case/pid" ] || fail "$label: the second get never started: $out"
+  get2=$(cat "$case/pid")
+  # The process table, not the spawn's exit status, says whether the second get survived the refusal.
+  ! kill -0 "$get2" 2>/dev/null || fail "$label: the spawn left the second treehouse get (pid $get2) running after it refused: $out"
+  touch "$case/allow"
+  for _ in $(seq 1 100); do /bin/sleep 0.02; done
+  [ ! -e "$case/lease" ] || fail "$label: the second get still holds its process lease after the refusal"
+  [ ! -e "$case/arrived" ] || fail "$label: the second get entered copy B after the spawn refused"
+  [ ! -f "$FM_HOME/state/$id.meta" ] || fail "$label: a refused spawn published task metadata"
+  after=$(passover_copy_digest "$a_copy" "$state") || fail "$label: copy A could not be read after the spawn"
+  [ "$after" = "$before" ] || fail "$label: copy A or its pool state changed"$'\n'"$(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") | head -20)"
+  wid=$("$REAL_TMUX" list-windows -a -F '#{window_id} #{window_name}' | awk -v n="fm-$id" '$2 == n { print $1 }')
+  [ -n "$wid" ] || fail "$label: the spawn closed the acquisition pane while it still held copy A"
+  kill -0 "$(cat "$case/first-pid")" 2>/dev/null || fail "$label: the get that opened copy A's subshell is gone"
+  kill -0 "$(cat "$case/a-shell")" 2>/dev/null || fail "$label: copy A's subshell is gone"
+  [ "$(CDPATH='' cd -- "$("$REAL_TMUX" display-message -p -t "$wid" '#{pane_current_path}')" && pwd -P)" = "$a_copy" ] \
+    || fail "$label: the pane does not rest in copy A after the interrupt"
+  row=$(grep -F "$a_copy"$'\t' "$FM_HOME/data/$id/skipped-copies.tsv") || fail "$label: copy A was not recorded"
+  [ "${row##*$'\t'}" = "$wid" ] || fail "$label: the record of copy A does not name the acquisition pane $wid: $row"
+  grep -q "^$wid"$'\t'"get-cancelled"$'\t' "$FM_HOME/data/$id/acquisition-pane.tsv" \
+    || fail "$label: the acquisition pane was not recorded as settled: $(cat "$FM_HOME/data/$id/acquisition-pane.tsv" 2>&1)"
+  assert_not_contains "$out" 'is not settled' "$label: a settled pane was reported as not settled"
+}
+if [ "$BACKEND" = tmux ] && { [ "${FM_TEST_ACQUISITION_CASES:-all}" = all ] || [ "${FM_TEST_ACQUISITION_CASES:-all}" = passover ]; }; then
+  REAL_TREEHOUSE=$(command -v treehouse 2>/dev/null || true)
+  if [ -z "$REAL_TREEHOUSE" ] || ! "$REAL_TREEHOUSE" get --help 2>&1 | grep -q -- '--lease' || ! command -v jq >/dev/null 2>&1; then
+    echo "skip - no treehouse with get --lease (or no jq) is installed"
+  else
+    run_passover_inflight_case passover "$TMP_ROOT/clock.sh"
+    pass 'tmux an abort after a pass-over interrupts the in-flight get, keeps the pane in the passed-over copy and leaves that copy untouched'
+    # The control restores the earlier abort for this case only: at the start of the abort cleanup it forgets the pane
+    # (no close and no interrupt), so the case must fail on the surviving get.
+    cat > "$TMP_ROOT/passover-mutant.sh" <<SH
+. '$TMP_ROOT/clock.sh'
+set -T
+__fm_passover_mutant() {
+  case "\$BASH_COMMAND" in
+    'local status=\$? skill_meta_tmp') SPAWN_PASSED_OVER_PANE= ;;
+  esac
+  return 0
+}
+trap '__fm_passover_mutant' DEBUG
+SH
+    rc=0
+    out=$( (run_passover_inflight_case passover-control "$TMP_ROOT/passover-mutant.sh") 2>&1 ) || rc=$?
+    [ "$rc" -ne 0 ] || fail 'the pass-over in-flight case passed with a spawn that leaves the second get running'
+    assert_contains "$out" 'the spawn left the second treehouse get' 'the control failed for another reason than the surviving get'
+    pass 'tmux the pass-over in-flight case rejects an abort that leaves the second get running'
+  fi
+fi
+[ "${FM_TEST_ACQUISITION_CASES:-all}" != passover ] || exit 0
 
 if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   load_acquisition_herdr "$@"
