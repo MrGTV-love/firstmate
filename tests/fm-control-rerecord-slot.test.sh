@@ -1271,7 +1271,22 @@ rr_expect_signal_rollback() { # <id> <SIG> <rc>
 }
 test_R9a_term_in_published_rolls_back() { rr_expect_signal_rollback R9a TERM 143; }
 test_R9b_hup_in_published_rolls_back() { rr_expect_signal_rollback R9b HUP 129; }
-test_R9c_int_in_published_rolls_back() { rr_expect_signal_rollback R9c INT 130; }
+# A shell started with SIGINT ignored (a non-interactive parent's background job, as some runners start suites) cannot
+# trap or be stopped by SIGINT, so the verb then finishes its write; R9c branches on that, as N6 asks for TERM.
+rr_sigint_ignored() { bash -c 'kill -INT $$; exit 0' >/dev/null 2>&1; }
+test_R9c_int_in_published_rolls_back() {
+  local out rc
+  if rr_sigint_ignored; then
+    rr_make_f R9c
+    rr_signal_in_postcheck INT
+    out=$(rr_write); rc=$?
+    expect_code 0 "$rc" "R9c with SIGINT ignored at entry"$'\n'"$out"
+    [ "$(rr_results)" = published ] && rr_agrees "$(rr_audits)" || fail "R9c: the uninterrupted write did not commit"
+    rr_ok R9c "SIGINT is ignored in this test environment (inherited), so the verb is not interrupted: the write commits and audit_agrees (the interrupted branch exits 130 and rolls back when SIGINT is deliverable)"
+    return 0
+  fi
+  rr_expect_signal_rollback R9c INT 130
+}
 
 # rr_signal_run [match-line]: TERM sent by the mv stub to the verb while its publish mv (or, with a match line, the mv
 # whose source holds that line) is still to land; the stub waits for the verb to exit before its mv lands.
