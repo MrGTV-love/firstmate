@@ -1,0 +1,12 @@
+# case bun-run-dev: recorded pid 66885 is a REAL bun process: bun run dev
+#   record before: {"version":1,"spawn_gen":"old","pid":66885,"task_session_file":"/Users/charlesabrooker/tmp/fm-control-relaunch.S4XRsC/adoption-bun-live-bun-run-dev-6233/wt/recorded-session.jsonl","current_session_file":""}
+#   adopt exit=0
+#   | adopted: rcv-46273-S4XRsC-adoption-bun-live-bun-run-dev
+#   record after:  {"version":1,"spawn_gen":"old","pid":60279,"task_session_file":"/Users/charlesabrooker/tmp/fm-control-relaunch.S4XRsC/adoption-bun-live-bun-run-dev-6233/wt/recorded-session.jsonl","current_session_file":"/Users/charlesabrooker/tmp/fm-control-relaunch.S4XRsC/adoption-bun-live-bun-run-dev-6233/wt/recorded-session.jsonl","start":"1795544910.824137"}
+# case relative-src-cli: recorded pid 84786 is a REAL bun process: bun src/cli.ts
+#   record before: {"version":1,"spawn_gen":"old","pid":84786,"task_session_file":"/Users/charlesabrooker/tmp/fm-control-relaunch.S4XRsC/adoption-bun-live-relative-src-cli-4445/wt/recorded-session.jsonl","current_session_file":""}
+#   adopt exit=1
+#   | adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; 84786 is a live omp process, so the omp extension owns this record and it was not changed
+#   | adopt note: a live Bun process counts as a possible omp writer unless its raw arguments prove another program: argv[0] not a bun, no script argument, a script argument whose name is not cli.ts (bun run dev, bun test, bun dev or bun x), or an absolute cli.ts outside a src directory; a relative cli.ts or src/cli.ts script argument is unresolved, so it keeps this record
+#   record after:  {"version":1,"spawn_gen":"old","pid":84786,"task_session_file":"/Users/charlesabrooker/tmp/fm-control-relaunch.S4XRsC/adoption-bun-live-relative-src-cli-4445/wt/recorded-session.jsonl","current_session_file":""}
+ok - live real bun: a recorded bun run dev pid lets adopt repair the record; a recorded relative src/cli.ts pid keeps it, with the note

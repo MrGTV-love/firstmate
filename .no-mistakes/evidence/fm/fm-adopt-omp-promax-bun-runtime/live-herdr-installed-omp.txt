@@ -1,0 +1,11 @@
+# herdr herdr 0.9.5; lab fm-lab-instomp-85580-12154; pane w1:p1; repo 865358aa0; 2026-11-24T18:33:26Z
+case: empty shell: walk=shell
+case: installed omp-promax (bare, no prompt) in the pane foreground
+  typed: env -i PATH="$PATH" HOME=/private/tmp/fm-instomp.6BVP3U/home TERM=xterm-256color OMP_SKIP_SETUP=1 /Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax --no-session --no-extensions --no-skills --no-rules --no-title
+  herdr process-info foreground: [{"pid":28118,"name":"bun","argv":["/Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun","/Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts","--no-session","--no-extensions","--no-skills","--no-rules","--no-title"]}]
+  kernel exe: /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun
+  identity writer exit=0 : may own: the installed omp interactive agent
+  identity interactive exit=0 : {"verdict": "interactive", "start": "1795545218.491829", "pid": 28118}
+  walk (fm_backend_herdr_pane_process_state_sample): other
+# teardown ok: fm-lab-instomp-85580-12154
+# omp 28118 gone after teardown

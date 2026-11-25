@@ -17,3 +17,11 @@ ok - omp adoption: unreadable pin proof refuses before staging and preserves the
 ok - omp bun adoption: the installed runtime adopts, binds its incarnation, is attributed afterwards, and a repeat adopt keeps its refusal
 ok - omp bun adoption: endpoint, foreground, pin, registration, generation, role, input and script proofs each still refuse with their own message
 ok - omp bun adoption: a live Bun writer of any role, unreadable identity, edited old tree or unreadable table entry keeps its record; a dead or unrelated pid does not
+ok - omp adoption: with a native omp first on PATH a live Bun writer keeps its record, a dead writer does not, and a proven Bun target adopts
+ok - omp bun adoption: a record published after the last comparison is never overwritten
+ok - omp bun adoption: a record published between the claim and the install is never overwritten
+ok - omp bun adoption: a failed install restores the old record, and a failed restoration keeps and names the last copy instead of deleting it
+ok - omp bun adoption: a same-second replacement process with the adopted PID is not the adopted agent; the adopted incarnation still is
+ok - omp bun adoption: a registration is not proof of the live session; the process must hold the task session open, at adoption and at the recheck
+ok - omp bun adoption: a process holding the task session and another session is refused, because which one is current cannot be proved
+ok - omp bun adoption: the supported relaunch refuses an unadopted Bun worker and, once adopted, stops the proven agent and launches its replacement

@@ -1,0 +1,21 @@
+# herdr herdr 0.9.5; lab session fm-lab-relbun-64552-5488; pane w1:p1; repo 865358aa0; 2026-11-24T18:22:20Z
+case: empty shell
+  walk verdict: shell
+case: background bun run dev (relative 'run')
+  typed in pane: bun run dev >/dev/null 2>&1 &
+  pane process-info foreground: [["-zsh"]]
+  live children of pane shell 67774: 80291 79952 sleep 40;79952 67774 bun run dev;
+  walk verdict (fm_backend_herdr_pane_process_state_sample): shell
+case: background bun test (relative 'test')
+  typed in pane: bun test ./wait.test.ts >/dev/null 2>&1 & 
+  pane process-info foreground: [["-zsh"]]
+  live children of pane shell 67774:  8768 67774 bun test ./wait.test.ts;
+  walk verdict (fm_backend_herdr_pane_process_state_sample): shell
+case: background bun src/cli.ts (relative src/cli.ts)
+  typed in pane: bun src/cli.ts >/dev/null 2>&1 &
+  pane process-info foreground: [["-zsh"]]
+  live children of pane shell 67774: 43911 67774 bun src/cli.ts;
+  walk verdict (fm_backend_herdr_pane_process_state_sample): other
+case: empty shell again
+  walk verdict: shell
+# teardown ok: fm-lab-relbun-64552-5488

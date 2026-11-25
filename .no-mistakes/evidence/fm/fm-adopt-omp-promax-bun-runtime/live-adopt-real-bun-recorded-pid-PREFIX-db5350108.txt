@@ -1,0 +1,10 @@
+# EXPECTED CONTROLLED FAULT: this is the same real-bun adopt drive run on db5350108, the commit BEFORE 865358aa0.
+# The 'not ok' line below is the reproduced old behaviour (a real 'bun run dev' recorded PID wrongly blocked adopt). It is not a failure of the change.
+# case bun-run-dev: recorded pid 35394 is a REAL bun process: bun run dev
+#   record before: {"version":1,"spawn_gen":"old","pid":35394,"task_session_file":"/Users/charlesabrooker/tmp/fm-control-relaunch.v5qEaZ/adoption-bun-live-bun-run-dev-8284/wt/recorded-session.jsonl","current_session_file":""}
+#   adopt exit=1
+#   | adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; 35394 is a live omp process, so the omp extension owns this record and it was not changed
+#   record after:  {"version":1,"spawn_gen":"old","pid":35394,"task_session_file":"/Users/charlesabrooker/tmp/fm-control-relaunch.v5qEaZ/adoption-bun-live-bun-run-dev-8284/wt/recorded-session.jsonl","current_session_file":""}
+not ok - a real bun run dev recorded pid must not block adoption: adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; 35394 is a live omp process, so the omp extension owns this record and it was not changed
+/tmp/fm-nm-livetest/prefix/tests/lib.sh: line 574:  4822 Killed: 9               python3 -I "$BUN_TREE/spawn.py" "$kind" "$file" "$exe" "$@"
+/tmp/fm-nm-livetest/prefix/tests/lib.sh: line 526: 35394 Killed: 9               ( cd "$scratch" && exec bun run dev < /dev/null > /dev/null 2>&1 )

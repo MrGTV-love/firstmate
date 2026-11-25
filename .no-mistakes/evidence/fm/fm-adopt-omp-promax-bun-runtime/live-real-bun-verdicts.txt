@@ -1,0 +1,30 @@
+# live: real Bun (/Users/charlesabrooker/.bun/bin/bun, 1.3.14) processes; verdicts from bin/fm-omp-identity.py at 865358aa0, 2026-11-24T18:18:52Z
+# writer exit: 1 = positively another program (unrelated), 0 = may own; interactive exit: 0 admitted, 1 refused, 2 unresolved
+case: bun run dev (relative argv[1] 'run')
+  pid=7156  ps args: bun run dev
+  writer exit=1 : unrelated: the script argument is not a cli.ts
+  interactive exit=1 : refused: the script argument is not a cli.ts
+case: bun dev (relative argv[1] 'dev')
+  pid=28854  ps args: bun dev
+  writer exit=1 : unrelated: the script argument is not a cli.ts
+  interactive exit=1 : refused: the script argument is not a cli.ts
+case: bun test (relative argv[1] 'test')
+  pid=38997  ps args: bun test ./wait.test.ts
+  writer exit=1 : unrelated: the script argument is not a cli.ts
+  interactive exit=1 : refused: the script argument is not a cli.ts
+case: bun src/cli.ts (relative src/cli.ts)
+  pid=51401  ps args: bun src/cli.ts --no-title
+  writer exit=0 : may own: the script argument is a relative cli.ts, which the raw arguments cannot place
+  interactive exit=2 : unresolved: the script argument is a relative cli.ts, which the raw arguments cannot place
+case: bun cli.ts (relative cli.ts)
+  pid=64313  ps args: bun cli.ts --no-title
+  writer exit=0 : may own: the script argument is a relative cli.ts, which the raw arguments cannot place
+  interactive exit=2 : unresolved: the script argument is a relative cli.ts, which the raw arguments cannot place
+case: bun <abs>/cli.ts outside a src dir
+  pid=69073  ps args: bun /private/tmp/fm-relbun.f31hVi/cli.ts
+  writer exit=1 : unrelated: the script argument is not a cli.ts in a src directory
+  interactive exit=1 : refused: the script argument is not a cli.ts in a src directory
+case: bun <abs>/src/cli.ts (not the installed tree)
+  pid=72583  ps args: bun /private/tmp/fm-relbun.f31hVi/src/cli.ts
+  writer exit=0 : may own: the executable is not in a Bun runtime package now
+  interactive exit=1 : refused: the executable is not in a Bun runtime package now

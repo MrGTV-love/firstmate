@@ -1,0 +1,15 @@
+# 2026-11-24T18:23:46Z head 865358aa0
+$ FM_OMP_IDENTITY_LIVE_LAUNCHER=~/.local/share/omp-promax-fix/omp-promax bash bin/fm-test-run.sh tests/fm-omp-identity-live-e2e.test.sh
+FM_TEST_BEGIN 2026-11-24T18:24:33Z tests/fm-omp-identity-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+# the Bun launcher /Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax is not first on PATH (/Users/charlesabrooker/.bun/bin/omp is); this run starts /Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax
+ok - the installed omp's Bun runtime is recognized as the interactive agent ({"verdict": "interactive", "start": "1795544706.121806", "pid": 30422})
+ok - the installed CLI's subcommand and flag tables match the role rule's copy
+ok - the Herdr descendant walk keeps a pane holding the installed omp occupied
+# checked 6 invariants against omp omp/18.15.0 at /Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax
+FM_TEST_END 2026-11-24T18:25:58Z tests/fm-omp-identity-live-e2e.test.sh exit=0 duration_ms=80294 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8789Q3MCNWKTC4XJ4TXQP5D/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=135234
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=80294 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-omp-identity-live-e2e.test.sh duration_ms=80294
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8789Q3MCNWKTC4XJ4TXQP5D/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+rc=0
