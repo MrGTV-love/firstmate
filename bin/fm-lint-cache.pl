@@ -399,7 +399,8 @@ if (defined $mode && $mode eq 'check') {
     $cache = $root;
     $root = shift @args;
 }
-die "fm-lint-cache: invalid private invocation\n" unless defined $root && ($mode eq 'select' || $mode eq 'check');
+die "fm-lint-cache: invalid private invocation\n"
+    unless defined $root && ($mode eq 'select' || $mode eq 'select-changed' || $mode eq 'check');
 chdir $root or die "fm-lint-cache: chdir $root: $!\n";
 my @inventory = sort map { glob $_ } qw(bin/*.sh bin/backends/*.sh tests/*.sh);
 my @source_candidates = @inventory;
@@ -697,6 +698,18 @@ sub closure {
     my ($path, $seen) = @_;
     return if $seen->{$path}++;
     closure($_, $seen) for dependencies($path);
+}
+if ($mode eq 'select-changed') {
+    # Changed canonical roots only: a root that merely sources a changed library
+    # is not selected. fm-lint.sh --changed-roots owns when to ask for this.
+    # A change to the selection policy itself still selects every root, so a
+    # policy edit is never linted against a partial set.
+    local $/ = "\0";
+    my %changed;
+    while (<STDIN>) { chomp; s{^\./}{}; $changed{$_} = 1; }
+    my $policy_changed = grep { $changed{$_} } qw(bin/fm-lint.sh bin/fm-lint-cache.pl);
+    print "$_\0" for $policy_changed ? @inventory : grep { $changed{$_} } @inventory;
+    exit 0;
 }
 if ($mode eq 'select') {
     local $/ = "\0";

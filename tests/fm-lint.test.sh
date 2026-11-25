@@ -813,6 +813,34 @@ test_selection_adds_no_unchanged_imported_roots() {
   pass "selection analyzes unchanged imports only through changed or explicit callers"
 }
 
+test_changed_roots_mode_keeps_caller_expansion_off_the_pipeline() {
+  local tmp repo fakebin diff_file listed
+  tmp=$(fm_test_tmproot fm-lint-changed-roots)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_git "$fakebin"
+  fm_lint_stub_shellcheck "$fakebin" "$tmp/checks"
+  diff_file="$tmp/diff.nul"
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files) || fail "library selection failed"
+  assert_contains "$listed" bin/consumer.sh "default selection dropped a caller of the changed library"
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files --changed-roots) || fail "changed-roots selection failed"
+  assert_contains "$listed" bin/library.sh "changed-roots dropped the changed root"
+  assert_not_contains "$listed" bin/consumer.sh "changed-roots kept a caller of the changed library"
+  fm_lint_write_diff_file "$diff_file" bin/fm-lint-cache.pl
+  listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+    "$repo/bin/fm-lint.sh" --list-files --changed-roots) || fail "changed-roots policy selection failed"
+  assert_contains "$listed" bin/consumer.sh "changed-roots dropped canonical coverage for a policy change"
+  if PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' "$repo/bin/fm-lint.sh" \
+    --changed-roots bin/consumer.sh >/dev/null 2>&1; then
+    fail "changed-roots accepted explicit paths, which already bypass selection"
+  fi
+  pass "changed-roots lints changed roots only and keeps full coverage for a policy change"
+}
+
 test_runtime_backend_changes_select_every_dispatcher_consumer() {
   local tmp diff_file selection caller backend listed
   tmp=$(fm_test_tmproot fm-lint-runtime-selection)
@@ -1076,6 +1104,7 @@ test_declaration_source_words_do_not_disable_cache
 test_fast_cache_cannot_hide_full_analysis_findings
 test_changed_dependencies_and_deleted_sources_retain_findings
 test_selection_adds_no_unchanged_imported_roots
+test_changed_roots_mode_keeps_caller_expansion_off_the_pipeline
 test_runtime_backend_changes_select_every_dispatcher_consumer
 test_runtime_backend_inputs_invalidate_dispatcher_cache
 test_shared_cache_reuses_only_identical_successful_inputs

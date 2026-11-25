@@ -39,9 +39,20 @@ document:
 # `tests/fm-lint-report.test.sh` exercises finding parity;
 # `tests/fm-lint-workflows.test.sh` exercises malformed workflow rejection.
 #
+# --changed-roots keeps the pipeline gate on the roots the change touches and
+# leaves transitive caller roots to CI, which lints the full canonical set on the
+# same head before any merge. Caller expansion is why one-line edits to a widely
+# sourced library cost hours here: changing bin/fm-duration-lib.sh alone selects
+# 200 of 683 roots, and the recorded lint step's median is 752 s at host load
+# under 18 (13,963 s at load 100 and over) against a 1.7 s median per root. The
+# pipeline is therefore paying twice for coverage CI already owns. Revert to
+# `bin/fm-lint.sh` if a caller break ever reaches CI that this gate would have
+# caught first; the tradeoff is an early local catch for duplicated analysis, not
+# a weaker merge gate.
+#
 # Keep commands.test absent; the firstmate-coding-guidelines skill owns this policy.
 commands:
-  lint: 'bin/fm-lint.sh'
+  lint: 'bin/fm-lint.sh --changed-roots'
 
 # Publish each run's test evidence to the orphan no-mistakes/evidence branch linked from the PR.
 # The evidence is not committed to the feature or default branch.

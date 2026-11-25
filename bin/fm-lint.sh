@@ -45,6 +45,15 @@
 #     set skips ShellCheck but still checks backend purity and workflows. A
 #     changed widely sourced library still costs a cold source-aware analysis
 #     of every caller; the cache only reuses identical inputs.
+# --changed-roots selects only the changed canonical roots, without expanding to
+# transitive caller roots. Caller expansion is what makes a one-line edit to a
+# widely sourced library expensive: changing bin/fm-duration-lib.sh alone selects
+# 200 of the 683 canonical roots, and the recorded pipeline lint step has a
+# 752 s median at host load under 18 against a 1.7 s median per root. The mode
+# exists for the no-mistakes pipeline, where CI lints the full canonical set on
+# the same head before any merge, so caller coverage is not lost, only moved off
+# the critical path. It never applies implicitly: without the flag the default
+# selection is unchanged, and a policy change still selects every root.
 # Explicit paths bypass changed-file selection and are linted as given, without
 # the workflow YAML check.
 # Explicit core bin/ and bin/backends/ scripts still receive the
@@ -188,6 +197,8 @@
 #   fm-lint.sh --check-version         report whether the ShellCheck/actionlint pins are current
 #   fm-lint.sh --strict-version        refuse a local ShellCheck that differs from the pin
 #   fm-lint.sh --list-files            print the file set that would be linted
+#   fm-lint.sh --changed-roots         select changed canonical roots only, without
+#                                      transitive caller expansion (see below)
 #   fm-lint.sh --help                  print this usage
 set -u
 
@@ -949,6 +960,7 @@ STRICT_VERSION=0
 PARTITION=
 PARTITION_REQUESTED=0
 LIST_FILES=0
+CHANGED_ROOTS=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --jobs)
@@ -991,6 +1003,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --list-files)
       LIST_FILES=1
+      shift
+      ;;
+    --changed-roots)
+      CHANGED_ROOTS=1
       shift
       ;;
     --help|-h)
@@ -1052,6 +1068,17 @@ if [ "$FAST" -eq 1 ] && { [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true
   exit 2
 fi
 
+if [ "$CHANGED_ROOTS" -eq 1 ]; then
+  if [ -n "$PARTITION" ]; then
+    printf 'fm-lint.sh: --changed-roots selects changed files; omit --partition, which lints a canonical slice.\n' >&2
+    exit 2
+  fi
+  if [ "$#" -gt 0 ]; then
+    printf 'fm-lint.sh: --changed-roots takes no explicit paths; they already bypass selection.\n' >&2
+    exit 2
+  fi
+fi
+
 # fm_lint_changed_base_ref prints the ref to diff the working branch against:
 # the local origin/main tracking ref when present, else local main. Returns
 # nonzero when neither is resolvable, which the caller treats as "no
@@ -1105,14 +1132,19 @@ else
   fi
 
   if [ "$full_lint" -eq 1 ]; then
+    if [ "$CHANGED_ROOTS" -eq 1 ]; then
+      printf 'fm-lint.sh: --changed-roots cannot select a changed set here (CI environment, main branch, or no merge-base); linting the full canonical set.\n' >&2
+    fi
     ROOTS=(bin/*.sh bin/backends/*.sh tests/*.sh)
   else
     CHANGED_MODE=1
     ROOTS=()
+    selection_mode=select
+    [ "$CHANGED_ROOTS" -eq 1 ] && selection_mode=select-changed
     changed_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-changes.XXXXXX") || exit 1
     selected_list=$(mktemp "${TMPDIR:-/tmp}/fm-lint-selection.XXXXXX") || { rm -f "$changed_list"; exit 1; }
     # The dependency scan is one CPU-bound process (measured 8.9 CPU seconds for one path), so it takes a pass too.
-    select_command=(perl "$SELF_DIR/fm-lint-cache.pl" select "$ROOT")
+    select_command=(perl "$SELF_DIR/fm-lint-cache.pl" "$selection_mode" "$ROOT")
     if [ -x "$SELF_DIR/fm-cpu-pass.sh" ] && [ -r "$SELF_DIR/fm-cpu-pass.py" ]; then
       select_command=("$SELF_DIR/fm-cpu-pass.sh" run --label "fm-lint select" --log-fd 8 -- "${select_command[@]}")
     fi
