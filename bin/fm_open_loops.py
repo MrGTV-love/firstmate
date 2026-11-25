@@ -884,7 +884,8 @@ class Collector:
         review_lanes is only a discovery hint: a repository absent from it is
         not checked for review readiness, and the lane ids themselves supply no
         verdict or model metadata. bin/fm-review-record.py is the sole
-        authority, asked once for the exact live head and consumed as one
+        authority, asked once for the live head (it may accept a PASS carried
+        across a clean base update) and consumed as one
         atomic fm-review-verification.v1 object. A typed not-qualified answer is
         ordinary absence of qualifying review; unreadable or corrupt history and
         invalid input degrade coverage instead of reading as unreviewed. The

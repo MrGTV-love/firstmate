@@ -1346,6 +1346,19 @@ const expectedCalmOffOperationalRows = ["", ...stockOperationalComponent.render(
 if (JSON.stringify(operationalComponent.render(100)) !== JSON.stringify(expectedCalmOffOperationalRows)) {
   throw new Error("Calm-off operational user rendering changed from Pi stock rows");
 }
+const firstRowChat = {
+  children: [],
+  addChild(component) {
+    this.children.push(component);
+  },
+};
+InteractiveMode.prototype.addMessageToChat.call(
+  { ...operationalMode, chatContainer: firstRowChat },
+  { role: "user", content: [{ type: "text", text: watcherMessage }] },
+);
+if (JSON.stringify(firstRowChat.children[0].render(100)) !== JSON.stringify(stockOperationalComponent.render(100))) {
+  throw new Error("Calm-off first operational user row gained a leading spacer or lost a stock row");
+}
 if (operationalHistory.length !== 1 || operationalHistory[0] !== watcherMessage) {
   throw new Error("operational user presentation changed Pi input history behavior");
 }
