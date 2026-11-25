@@ -8421,8 +8421,15 @@ spawn_git_hooks_verdict() {
     if [ -s "$GIT_HOOKS_VERDICT_REFUSED" ]; then
       reason=$(head -n 1 "$GIT_HOOKS_VERDICT_REFUSED")
       SPAWN_BRIEF_FAILURE_REASON="the launch refused to start a worker without the task Git hooks: $reason"
-      spawn_status_append "$(status_stamp_line "failed: $SPAWN_BRIEF_FAILURE_REASON")"
       echo "error: $SPAWN_BRIEF_FAILURE_REASON; nothing was launched in window $T" >&2
+      if [ "$RELAUNCH" -eq 0 ]; then
+        # A fresh attempt leaves nothing behind: its endpoint holds only the
+        # refusing shell, so close it, which lets the abort cleanup remove the
+        # hooks dir, and write no status line for a task the abort unpublishes.
+        rovo_endpoint_cleanup
+      else
+        spawn_status_append "$(status_stamp_line "failed: $SPAWN_BRIEF_FAILURE_REASON")"
+      fi
       return 1
     fi
     [ ! -e "$GIT_HOOKS_VERDICT_ADMITTED" ] || break

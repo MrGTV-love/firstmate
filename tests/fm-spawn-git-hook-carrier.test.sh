@@ -541,18 +541,28 @@ test_spawn_fails_when_the_pane_refuses() {
   assert_contains "$REAL_OUT" "honours neither task Git hook carrier" "spawn did not name the refusal"
   assert_absent "$REAL_HOME/state/$REAL_ID.meta" "a refused launch published a task record"
   assert_absent "$REAL_DIR/harness-started" "the harness started although the launch was refused"
-  assert_contains "$(cat "$REAL_HOME/state/$REAL_ID.status" 2>/dev/null)" "refused to start a worker without the task Git hooks" \
-    "the refusal was not recorded in the task status"
+  # A refused fresh spawn leaves nothing behind: no endpoint, no hooks dir and
+  # no status line for the unpublished task.
+  case " $REAL_WINDOWS " in
+    *" fm-$REAL_ID "*) fail "a refused fresh spawn left its endpoint open (windows: $REAL_WINDOWS)" ;;
+  esac
+  assert_absent "$REAL_HOME/state/$REAL_ID.git-hooks" "a refused fresh spawn left its hooks dir"
+  assert_absent "$REAL_HOME/state/$REAL_ID.status" "a refused fresh spawn left a status line for an unpublished task"
   # The nearest legitimate launch: the same endpoint with an ordinary git.
   real_endpoint_spawn admit 100
   expect_code 0 "$REAL_STATUS" "spawn failed on a pane whose git honours the carrier: $REAL_OUT"
   assert_present "$REAL_DIR/harness-started" "the harness did not start on a healthy pane"
+  case " $REAL_WINDOWS " in
+    *" fm-$REAL_ID "*) ;;
+    *) fail "the healthy spawn's endpoint was closed (windows: $REAL_WINDOWS), so the refusal checks above prove nothing" ;;
+  esac
+  assert_present "$REAL_HOME/state/$REAL_ID.git-hooks" "the healthy spawn lost its hooks dir"
   assert_not_contains "$REAL_OUT" "recorded no Git hook carrier verdict" "the healthy launch never recorded its verdict, so spawn waited out the bound"
   # Control: without the wait the same refusal is reported as a spawned worker.
   real_endpoint_spawn ctl 0
   expect_code 0 "$REAL_STATUS" "control: spawn without the verdict wait did not report success: $REAL_OUT"
   assert_absent "$REAL_DIR/harness-started" "control: the harness started although the launch was refused"
-  pass "a real endpoint whose git honours neither carrier fails the spawn, names the reason and starts no harness; without the verdict wait it is falsely reported spawned"
+  pass "a real endpoint whose git honours neither carrier fails the spawn, names the reason, starts no harness and leaves no endpoint, hooks dir or status line; without the verdict wait it is falsely reported spawned"
 }
 
 # real_endpoint_await <command...>: poll for a launch outcome, up to five
@@ -637,6 +647,8 @@ SH
   REAL_OUT=$(TMUX='' FM_GIT_HOOKS_VERDICT_POLLS=$polls fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" \
     --mode no-mistakes --yolo off --harness omp --backend tmux)
   REAL_STATUS=$?
+  # The endpoints still open on the private server, recorded before teardown.
+  REAL_WINDOWS=$("$real_tmux" -S "$socket" list-windows -a -F '#{window_name}' 2>/dev/null | tr '\n' ' ')
   # Observe only once the launch itself has finished: the harness started
   # (admit), or the pane recorded its refusal (ctl). A refused spawn has
   # already read that refusal and removed the task temp root holding it.

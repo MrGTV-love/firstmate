@@ -303,7 +303,7 @@
       "invariant": "no worker starts in a pane whose git honours neither task Git hook carrier, or whose GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS is malformed",
       "source": "the launch's own carrier selector (fm_launch_git_hooks in the staged launch text) run in the pane shell and again after env -i, which records a refusal reason in the task temp root",
       "trigger": "git does not resolve on the pane PATH, GIT_CONFIG_COUNT is not a number, GIT_CONFIG_PARAMETERS is malformed, or the pane's git honours neither the config rows nor the numbered core.hooksPath",
-      "remedy": "fix the named pane condition (put git on the pane PATH, or unset the malformed GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS), then spawn or relaunch again",
+      "remedy": "fix the named pane condition (put git on the pane PATH, unset the malformed GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS, or use a git that honours the config rows or a numbered core.hooksPath), then spawn or relaunch again",
       "test": "tests/fm-spawn-git-hook-carrier.test.sh",
       "sites": [
         {
@@ -325,7 +325,7 @@
       "budget": 1,
       "tier": "C",
       "harm": "reversible",
-      "layer_note": "The refusal happens in the pane before the harness starts; fm-spawn reports it by failing the spawn with the recorded reason and a failed: status line. Uninstrumented: no guard event is appended."
+      "layer_note": "The refusal happens in the pane before the harness starts; fm-spawn reports it by failing the spawn with the recorded reason. A fresh spawn then closes its endpoint and the abort cleanup removes the hooks dir and unpublishes the task, leaving no status line; a relaunch keeps its pane and records a failed: status line. Uninstrumented: no guard event is appended."
     },
     {
       "id": "secondmate-sync",
