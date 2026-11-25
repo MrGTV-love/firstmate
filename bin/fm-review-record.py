@@ -115,13 +115,16 @@ carries. An accepted carry-over prints the fact 'review carried from R: ...'
 and --json adds carried_from; its at is R's verdict time. Callers that
 consume verify: bin/fm-pr-merge.sh, bin/fm-pr-auto-review.py and
 bin/fm_open_loops.py. plan still answers for the exact head only; the
-auto-review lane asks verify first, so plan runs only when carry-over refused. A merge or rebase of the base into a reviewed PR
-therefore needs no new read, and neither does any rewrite that keeps the
-reviewed tree (an amended message, a squash, an empty commit); a merge of a
-branch that is not on the base is unread content and refuses. The proof trusts
+auto-review lane asks verify first, so plan runs only when carry-over refused.
+A merge or rebase of the base into a reviewed PR therefore needs no new read,
+and neither does a rewrite that keeps the reviewed tree (an amended message,
+a squash, an empty commit) unless a review row names the head it replaced,
+which is then not an ancestor of R and refuses; a merge of a branch that is
+not on the base is unread content and refuses. The proof trusts
 --base to be a commit on the PR's base branch (every caller passes the live
 forge's base SHA; GitLab's is its stored merge base) and trusts the task
-worktree's object store and git config; see docs/configuration.md 'Review carry-over across a
+worktree's object store and git config;
+see docs/configuration.md 'Review carry-over across a
 base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
