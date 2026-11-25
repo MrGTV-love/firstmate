@@ -948,7 +948,6 @@ tests/fm-control-reassociate.test.sh 395783
 tests/fm-control-relaunch-backends.test.sh 681931
 tests/fm-control-relaunch-recovery.test.sh 550782
 tests/fm-control-relaunch.test.sh 340032
-tests/fm-control-rerecord-slot.test.sh 1800000
 tests/fm-control.test.sh 186185
 tests/fm-copy-sweep.test.sh 438967
 tests/fm-cpu-pass.test.sh 26583
