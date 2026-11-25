@@ -113,6 +113,7 @@ new_case() {  # <name> <id>
   local dir="$TMP_ROOT/$1" id=$2
   mkdir -p "$dir/home/state" "$dir/home/data/$id" "$dir/fake"
   make_fakebin "$dir"
+  successor_ps_fallback "$dir"
   printf '%s\n' "$$" > "$dir/fake/primary-pid"
   printf '%s\n' "$$" > "$dir/home/state/.lock"
   : > "$dir/fake/endpoint-calls"
