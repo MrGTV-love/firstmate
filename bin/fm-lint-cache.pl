@@ -1213,13 +1213,15 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # fail; a good reply resets that count. The reason is appended to <rss-file> once
 # as rss_reader_unavailable=<reason>.
 # Binding a reply: the reader lists the tree in one census and then reads each
-# member's memory by pid, so after each reply every member it names is read again
-# through libproc. A member whose identity differs from the reply's, cannot be read
-# or has ended, a reply without a whole member list, one that measured memory but
-# names no process, and one whose root is a zombie or exiting (its memory is no
-# longer read) are misses. A member the watch already knew by its exact identity
-# that the reply does not name (one that left the tree) is read again by that
-# identity, with its descendants, and counted, or the tick is a miss.
+# member's memory by pid, so right after those reads, in the same process (no tick
+# starts a process), it reads every member again by pid and marks the reply bound
+# or not. A member whose pid is in neither the kernel's process table nor libproc
+# has ended and is dropped (it holds no memory). A member whose identity differs
+# from the census's or that cannot be read, a reply that is not bound or names no
+# root, and one whose root is a zombie or exiting (its memory is no longer read)
+# are misses. Each request names every member the watch knows by exact identity;
+# the reader keeps each one that still runs, with its descendants, and counts it,
+# and one whose pid the census lists with another identity is a miss.
 # Crossing the limit ends the root's group with KILL, records the peak sampled as
 # max_rss_kib=<KiB> in <rss-file>, names the bound on stderr, and exits 98, which
 # fm-lint.sh reports as a memory failure so the root takes its narrower retry.
@@ -1320,137 +1322,13 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         return if $reader_pid;
         $reader_down = $first ? 'exited-at-start' : ++$reader_failures > 3 ? 'restarts-failed' : undef;
     };
-    # The reply check: the root must be neither a zombie nor exiting, and every
-    # member the reply names must still have exactly the identity the reply gave
-    # (read in the census before its memory read; an equal read after it proves the
-    # same process lived through the read, since a pid is not reused while its
-    # process lives, zombies included). Anything else, or any failed read, is
-    # "unknown".
-    my $verify_members_py = <<'PYTHON';
-import importlib.util, struct, sys
-spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
-fp = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fp)
-try:
-    root = fp.kinfo(int(sys.argv[2]))
-    if root[fp.P_STAT] == fp.SZOMB or struct.unpack_from("i", root, fp.P_FLAG)[0] & fp.P_WEXIT:
-        print("unknown")
-        sys.exit(0)
-    for item in sys.argv[3:]:
-        pid, sec, usec = (int(part) for part in item.split(":"))
-        if tuple(fp.process_identity(fp.kinfo(pid))) != (sec, usec):
-            print("unknown")
-            sys.exit(0)
-except Exception:
-    print("unknown")
-    sys.exit(0)
-print("same")
-PYTHON
-    my $verify_members = sub {
-        my ($root_pid, %members) = @_;
-        return 0 unless $members{$root_pid} && -r $helper;
-        no warnings 'exec';
-        open(my $py, '-|', $python, '-I', '-c', $verify_members_py, $helper, $root_pid,
-            map { "$_:$members{$_}[0]:$members{$_}[1]" } sort { $a <=> $b } keys %members) or return 0;
-        my $answer = <$py> // '';
-        close $py;
-        return !$? && $answer eq "same\n" ? 1 : 0;
-    };
-    # Members the watch knows by exact identity but cannot reach through the root:
-    # each "<pid>:<sec>:<usec>" is read through libproc twice, with every descendant
-    # of those, each with its memory (the larger of resident size and footprint, KiB).
-    # A member is counted only when both reads give exactly the identity the watch
-    # recorded; a descendant only when its identity equals the one it had when the
-    # census listed it under that member and both of its reads agree. A member whose pid is in
-    # neither libproc nor the kernel's process table has provably ended and is
-    # dropped ("gone"). Anything else - a pid that now holds another start time (a
-    # replacement, in the same second or not), reads that disagree, a member present
-    # but unreadable, a memory read that fails - prints "unknown": that member is
-    # never adopted, never signalled, and the tick is unknown. Returns
-    # { pid => [sec, usec, KiB] }, or undef for an unknown tick (the caller then keeps
-    # its known set unchanged).
-    my $exact_members_py = <<'PYTHON';
-import importlib.util, struct, sys
-spec = importlib.util.spec_from_file_location("fmproc", sys.argv[1])
-fp = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fp)
-def unknown():
-    print("unknown")
-    sys.exit(0)
-# One census: every process with its parent and its identity, read in the same
-# snapshot, so a child is bound to the identity it had when it was listed.
-try:
-    children, present, listed = {}, set(), {}
-    for record in fp.kinfos():
-        pid = struct.unpack_from("i", record, fp.P_PID)[0]
-        ppid = struct.unpack_from("i", record, fp.E_PPID)[0]
-        children.setdefault(ppid, []).append(pid)
-        present.add(pid)
-        listed[pid] = tuple(fp.process_identity(record))
-except Exception:
-    unknown()
-def identity(pid):
-    return tuple(fp.process_identity(fp.kinfo(pid)))
-queue = []
-for item in sys.argv[2:]:
-    pid, sec, usec = (int(part) for part in item.split(":"))
-    try:
-        first = identity(pid)
-    except LookupError:
-        if pid in present:
-            unknown()
-        print("gone", pid)
-        continue
-    except Exception:
-        unknown()
-    if first != (sec, usec):
-        unknown()
-    queue.append((pid, first))
-seen = set()
-while queue:
-    pid, first = queue.pop()
-    if pid in seen:
-        continue
-    seen.add(pid)
-    try:
-        resident, footprint = fp.memory(pid)
-        second = identity(pid)
-    except Exception:
-        unknown()
-    if second != first:
-        unknown()
-    print("member", pid, second[0], second[1], max(resident, footprint) // 1024)
-    # A child is adopted only with the identity it had when the census listed it
-    # under this member; a child whose identity now differs (a recycled pid) or
-    # cannot be read makes the tick unknown.
-    for child in children.get(pid, []):
-        try:
-            now = identity(child)
-        except Exception:
-            unknown()
-        if now != listed.get(child):
-            unknown()
-        queue.append((child, now))
-PYTHON
-    my $exact_members = sub {
-        my @items = @_;
-        return {} unless @items;
-        return undef unless -r $helper;
-        no warnings 'exec';
-        open(my $py, '-|', $python, '-I', '-c', $exact_members_py, $helper, @items) or return undef;
-        my (%found, $unknown);
-        while (my $line = <$py>) {
-            if ($line =~ /\Amember ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)\n\z/) { $found{$1 + 0} = [$2 + 0, $3 + 0, $4 + 0]; }
-            elsif ($line !~ /\Agone [0-9]+\n\z/) { $unknown = 1; }
-        }
-        close $py;
-        return $? || $unknown ? undef : \%found;
-    };
     # KiB of the root's tree as the reader measured it (the larger of footprint and
-    # resident size), plus each member the watch knows by exact identity that left
-    # the tree, or undef (a miss) when the reader cannot give a bound reply. A late
-    # or unconfirmed reply is read once more in the same tick (the retry), which
-    # waits at most 1 s: a late reply gets 1 s more, an unconfirmed one a new
+    # resident size), with each member the watch knows by exact identity, or undef
+    # (a miss) when the reader cannot give a bound reply. Each request names those
+    # identities ("bind <pid>:<sec>:<usec> ..."), and the reader binds its reply in
+    # the same process (fm-proc-info.py bind_members), so a tick starts no process.
+    # A late or unconfirmed reply is read once more in the same tick (the retry),
+    # which waits at most 1 s: a late reply gets 1 s more, an unconfirmed one a new
     # request with 1 s; a retry that also misses is the tick's miss.
     my $tree_rss;
     $tree_rss = sub {
@@ -1461,7 +1339,7 @@ PYTHON
         local $SIG{PIPE} = 'IGNORE';
         my ($answer, $ready) = ('', '');
         vec($ready, fileno($from_reader), 1) = 1;
-        my $gone = !syswrite($to_reader, "\n");
+        my $gone = !syswrite($to_reader, join(' ', 'bind', map { "$_:$known{$_}[0]:$known{$_}[1]" } sort { $a <=> $b } keys %known) . "\n");
         my $asked = Time::HiRes::time();
         my $wait = $retry ? 1 : $reader_answered ? 0.5 : 2;
         while (1) {
@@ -1493,19 +1371,14 @@ PYTHON
             %reply = map { ($_->[0] + 0 => [$_->[1] + 0, $_->[2] + 0]) } @$named
                 if ref $named eq 'ARRAY' && @$named
                     && !grep { ref $_ ne 'ARRAY' || @$_ < 3 || grep { !defined $_ || !/\A[0-9]+\z/ } @$_[0, 1, 2] } @$named;
-            # A restarted reader knows only the root's group and its descendants: a
-            # member the watch already knew that left the tree is read again by its
-            # exact identity, with its descendants; one that still runs with that
-            # identity is counted, any other answer is a miss.
-            my $found = %reply && $verify_members->($root_pid, %reply)
-                ? $exact_members->(map { "$_:$known{$_}[0]:$known{$_}[1]" } grep { !$reply{$_} } keys %known) : undef;
+            # The reader bound the reply ("bound":true): it read every member again
+            # after its census and memory reads, dropped each that had ended, and
+            # kept each identity this request named that still runs, with its
+            # descendants (so a restarted reader keeps a member that left the tree).
+            # Any other reply is a miss.
             $miss_branch = 'unbound';
-            return $retry ? undef : $tree_rss->($root_pid, 1) unless $found;
-            for my $pid (keys %$found) {
-                next if $reply{$pid};
-                $kib += $found->{$pid}[2];
-                $reply{$pid} = [@{$found->{$pid}}[0, 1]];
-            }
+            return $retry ? undef : $tree_rss->($root_pid, 1)
+                unless $reply{$root_pid} && $answer =~ /,"bound":true\}\n\z/;
             %known = %reply;
             $libproc_samples++;
             return $kib;

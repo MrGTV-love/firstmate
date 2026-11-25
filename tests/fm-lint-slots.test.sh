@@ -3330,8 +3330,8 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 # call's arguments to FM_TEST_PY_LOG, fails at once under FM_TEST_PY_REFUSE=1,
 # and with FM_TEST_PY_MEMORY set (resident and footprint KiB) answers each line a
 # rss-tree reader is sent with the larger of the two as the reader's JSON reply,
-# naming the root by its real identity (read once when the reader starts), instead
-# of reading memory; with FM_TEST_PY_PLAN=<file> too,
+# naming the root by its real identity (read once when the reader starts) and
+# marked bound, instead of reading memory; with FM_TEST_PY_PLAN=<file> too,
 # the Nth rss-tree reader started follows line N of <file>: stall answers its
 # first line 4 s late, slow answers its first line 1 s late, slow-later answers
 # its second line 2 s late, exit exits before any reply, and anything else (or
@@ -3384,7 +3384,7 @@ print("%d,%d" % tuple(fp.process_identity(fp.kinfo(int(sys.argv[2])))))' "$1" "$
       slow:1) sleep 1 ;;
       slow-later:2) sleep 2 ;;
     esac
-    printf '{"rss_kib":%s,"members":[[%s,%s]],"uncounted":[]}\n' "$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')" "$3" "$ident"
+    printf '{"rss_kib":%s,"members":[[%s,%s]],"uncounted":[],"bound":true}\n'"$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')" "$3" "$ident"
   done
   exit 0
 fi
@@ -4461,12 +4461,14 @@ test_a_worker_started_directly_takes_nothing_from_the_callers_environment() {
 # FM_TEST_READER=dieafter:<n> makes the first reader (marked by $FM_TEST_READER_MARK)
 # answer <n> requests and then exit, and later readers run normally;
 # FM_TEST_READER=members makes every reader answer 300000 KiB naming the root (by
-# its real identity) and the member $FM_TEST_MEMBER ("<pid>:<sec>:<usec>");
-# FM_TEST_READER=membersonce makes the first reader (marked by $FM_TEST_READER_MARK)
-# answer once, 1000 KiB with the root and that member, and every later reader exit
-# at once; FM_TEST_READER=late:<n>:<secs> makes the first reader (marked by
+# its real identity) and the member $FM_TEST_MEMBER ("<pid>:<sec>:<usec>"), bound
+# by the reader's own check (fm-proc-info.py bind_members) on the real process
+# table; FM_TEST_READER=late:<n>:<secs> makes the first reader (marked by
 # $FM_TEST_READER_MARK) answer its <n>th request <secs> late and the others at once,
-# and later readers run normally.
+# and later readers run normally; FM_TEST_READER=phantom:<ended|unreadable> makes
+# every reader the real one, with one extra child of the root (a free pid) in each
+# census: "ended" is in neither the kernel's table nor libproc when read (it ended
+# after the census), "unreadable" is read by libproc but its identity read fails.
 fm_lint_write_stub_python() {
   local dir=$1 real
   real=$("$2" -c 'import sys; print(sys.executable)') || fail "python3 cannot name its interpreter"
@@ -4505,32 +4507,58 @@ if "-c" in args:
         args[i + 1] = program
     os.execv(REAL, [REAL] + args)
 mode = os.environ.get("FM_TEST_READER", "")
-def root_member():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("fp", args[0])
-    fp = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fp)
-    root = int(args[2])
-    return "[%d,%d,%d]" % ((root,) + tuple(fp.process_identity(fp.kinfo(root))))
 if len(args) >= 3 and args[1] == "rss-tree":
     if mode == "exit":
         sys.exit(1)
     if mode == "members":
-        pid, sec, usec = os.environ["FM_TEST_MEMBER"].split(":")
-        root = root_member()
-        while sys.stdin.readline():
-            print('{"rss_kib":300000,"members":[%s,[%s,%s,%s]],"uncounted":[]}' % (root, pid, sec, usec), flush=True)
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("fp", args[0])
+        fp = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fp)
+        pid, sec, usec = (int(part) for part in os.environ["FM_TEST_MEMBER"].split(":"))
+        root = int(args[2])
+        ident = tuple(fp.process_identity(fp.kinfo(root)))
+        for request in iter(sys.stdin.readline, ""):
+            bound = fp.bind_members(root, {root: ident, pid: (sec, usec)}) is not None
+            print('{"rss_kib":300000,"members":[[%d,%d,%d],[%d,%d,%d]],"uncounted":[],"bound":%s}'
+                  % (root, ident[0], ident[1], pid, sec, usec, "true" if bound else "false"), flush=True)
         sys.exit(0)
-    if mode == "membersonce":
-        mark = os.environ["FM_TEST_READER_MARK"]
-        if os.path.exists(mark):
-            sys.exit(1)
-        open(mark, "w").close()
-        pid, sec, usec = os.environ["FM_TEST_MEMBER"].split(":")
-        root = root_member()
-        if sys.stdin.readline():
-            print('{"rss_kib":1000,"members":[%s,[%s,%s,%s]],"uncounted":[]}' % (root, pid, sec, usec), flush=True)
-        sys.exit(0)
+    if mode.startswith("phantom:"):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("fp", args[0])
+        fp = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fp)
+        root = int(args[2])
+        real_kinfos, real_kinfo, real_memory = fp.kinfos, fp.kinfo, fp.memory
+        phantom = 99999
+        while phantom > 300:
+            try:
+                real_kinfo(phantom)
+            except LookupError:
+                break
+            phantom -= 1
+        record = bytearray(real_kinfo(root))
+        fp.struct.pack_into("qq", record, fp.P_START, 1, 1)
+        fp.struct.pack_into("i", record, fp.P_PID, phantom)
+        fp.struct.pack_into("i", record, fp.E_PPID, root)
+        record = bytes(record)
+        def kinfos(*selector):
+            yield from real_kinfos(*selector)
+            yield record
+        def kinfo(pid):
+            if pid != phantom:
+                return real_kinfo(pid)
+            if mode == "phantom:unreadable":
+                raise OSError("stub: identity read fails")
+            raise LookupError(pid)
+        def memory(pid):
+            if pid != phantom:
+                return real_memory(pid)
+            if mode == "phantom:unreadable":
+                return (1048576, 1048576)
+            raise LookupError(pid)
+        fp.kinfos, fp.kinfo, fp.memory = kinfos, kinfo, memory
+        sys.exit(fp.main([args[0], "rss-tree", str(root)]))
     if mode.startswith("late:"):
         mark = os.environ["FM_TEST_READER_MARK"]
         if not os.path.exists(mark):
@@ -4541,12 +4569,12 @@ if len(args) >= 3 and args[1] == "rss-tree":
             spec.loader.exec_module(fp)
             _, late, secs = mode.split(":")
             root, known, asked = int(args[2]), {}, 0
-            while sys.stdin.readline():
+            for request in iter(sys.stdin.readline, ""):
                 asked += 1
                 if asked == int(late):
                     time.sleep(float(secs))
                 try:
-                    answer = fp.rss_tree(root, known)
+                    answer = fp.rss_tree(root, known, request)
                 except Exception:
                     answer = "-"
                 print(answer, flush=True)
@@ -4562,7 +4590,7 @@ if len(args) >= 3 and args[1] == "rss-tree":
             fp = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(fp)
             root, known, asked = int(args[2]), {}, 0
-            while sys.stdin.readline():
+            for request in iter(sys.stdin.readline, ""):
                 asked += 1
                 if asked == int(mode.split(":")[1]):
                     for _ in range(2):
@@ -4570,7 +4598,7 @@ if len(args) >= 3 and args[1] == "rss-tree":
                         os.kill(os.getppid(), signal.SIGUSR1)
                     time.sleep(0.1)
                 try:
-                    answer = fp.rss_tree(root, known)
+                    answer = fp.rss_tree(root, known, request)
                 except Exception:
                     answer = "-"
                 print(answer, flush=True)
@@ -4584,11 +4612,11 @@ if len(args) >= 3 and args[1] == "rss-tree":
             fp = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(fp)
             root, known, answered = int(args[2]), {}, 0
-            while sys.stdin.readline():
+            for request in iter(sys.stdin.readline, ""):
                 if answered >= int(mode.split(":")[1]):
                     sys.exit(0)
                 try:
-                    answer = fp.rss_tree(root, known)
+                    answer = fp.rss_tree(root, known, request)
                 except Exception:
                     answer = "-"
                 print(answer, flush=True)
@@ -5312,65 +5340,106 @@ SH
   pass "over the bound the watch ends only the root's group, never the counted descendant that left it; a survivor fails the root after an over-cap end and after a normal end alike, with nothing sent to it; a completed tree passes (sends recorded, none delivered)"
 }
 
-# (Main 1791 item 1) The watch's exact-member reader, run as the watch runs it (its
-# program taken from bin/fm-lint-cache.pl) against a fake process table: a member is
-# counted only when two reads give exactly its recorded identity. A replacement
-# between the reads, a same-second replacement and a live member whose memory
-# cannot be read each print "unknown" (never a member, never nothing); a member whose
-# pid is in neither the identity read nor the process table is "gone". The control:
-# an unchanged member is counted with its recorded identity.
-fm_lint_exact_reader() {  # <first usec> <second usec> <memory: ok|unreadable> <pid present: yes|no>
+# (Main 1791 item 1, Main 3904) The rss-tree reader's own reply, as the watch asks
+# for it ("bind <pid>:<sec>:<usec> ..."), on a fake process table: root 100042 (its
+# own group), its child 100043, and member 100050, which the watch knows by identity
+# and which sits outside the root's tree. Each scenario changes what the census
+# lists, what a later identity read answers (another identity, ended, unreadable)
+# and whether libproc reads the memory (160 MiB each). Prints
+# "bound=<true|false|absent> members=<pids> kib=<n>".
+fm_lint_fake_reader() {  # <scenario>
   local program
-  program=$(perl -0ne 'print $1 if /my \$exact_members_py = <<.PYTHON.;\n(.*?)\nPYTHON\n/s' "$ROOT/bin/fm-lint-cache.pl")
-  [ -n "$program" ] || { printf 'NO-READER\n'; return; }
-  python3 -I -B -c "
-import importlib.util, sys, types
-import struct
-FIXTURE = (int(sys.argv[1]), int(sys.argv[2]), sys.argv[3] == 'ok', sys.argv[4] == 'yes')
-def kinfo_record(pid, ppid, sec, usec):
-    data = bytearray(648)
-    struct.pack_into('qq', data, 0, sec, usec)
-    struct.pack_into('i', data, 40, pid)
-    struct.pack_into('i', data, 560, ppid)
+  program=$(cat <<'PY'
+import importlib.util, json, os, struct, sys
+spec = importlib.util.spec_from_file_location("fp", sys.argv[1])
+fp = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fp)
+scenario = sys.argv[2]
+ROOT, CHILD, KNOWN = 100042, 100043, 100050
+def record(pid, ppid, sec, usec, stat=2, flag=0):
+    data = bytearray(fp.KINFO_SIZE)
+    struct.pack_into("qq", data, fp.P_START, sec, usec)
+    struct.pack_into("i", data, fp.P_PID, pid)
+    struct.pack_into("i", data, fp.P_FLAG, flag)
+    data[fp.P_STAT] = stat
+    struct.pack_into("i", data, fp.E_PPID, ppid)
+    struct.pack_into("i", data, fp.E_PGID, KNOWN if pid == KNOWN else ROOT)
+    struct.pack_into("I", data, fp.E_UID, os.geteuid())
     return bytes(data)
-class Loader:
-    def exec_module(self, module):
-        calls = []
-        first, second, memory_ok, alive = FIXTURE
-        def kinfo(pid):
-            if not alive:
-                raise LookupError(pid)
-            calls.append(pid)
-            return kinfo_record(42, 1, 100, first if len(calls) == 1 else second)
-        def memory(pid):
-            if not memory_ok:
-                raise LookupError(pid)
-            return (160 * 1048576, 160 * 1048576)
-        module.kinfos = lambda *a: iter([kinfo_record(42, 1, 100, first)] if alive else [kinfo_record(7, 1, 1, 1)])
-        module.kinfo = kinfo
-        module.P_PID, module.E_PPID = 40, 560
-        module.process_identity = lambda record: struct.unpack_from('qq', record, 0)
-        module.memory = memory
-importlib.util.spec_from_file_location = lambda *a: types.SimpleNamespace(loader=Loader())
-importlib.util.module_from_spec = lambda spec: types.SimpleNamespace()
-sys.argv = ['reader', 'helper', '42:100:1']
-exec(compile(sys.stdin.read(), 'reader', 'exec'))
-" "$@" <<<"$program"
+census = {ROOT: record(ROOT, 1, 100, 1), CHILD: record(CHILD, ROOT, 200, 1)}
+request = "bind"
+if scenario.startswith("known-"):
+    census[KNOWN] = record(KNOWN, 1, 300, 2 if scenario == "known-same-second" else 1)
+    request = "bind %d:100:1 %d:300:1" % (ROOT, KNOWN)
+if scenario == "known-ended":
+    del census[KNOWN]
+later = dict(census)   # what a later identity read answers; absent: not in the table
+readable = set(census)  # pids whose memory libproc reads
+ends = set()            # pids that end right after their memory read
+if scenario == "known-replaced":
+    later[KNOWN] = record(KNOWN, 1, 300, 2)
+elif scenario == "known-unreadable":
+    later[KNOWN] = None
+elif scenario == "child-ended":
+    ends.add(CHILD)
+elif scenario == "child-recycled":
+    later[CHILD] = record(CHILD, ROOT, 200, 2)
+elif scenario == "child-unreadable":
+    later[CHILD] = None
+elif scenario == "child-libproc-only":
+    del later[CHILD]
+elif scenario == "root-zombie":
+    later[ROOT] = record(ROOT, 1, 100, 1, stat=fp.SZOMB)
+elif scenario == "root-exiting":
+    later[ROOT] = record(ROOT, 1, 100, 1, flag=fp.P_WEXIT)
+elif scenario == "root-gone":
+    del later[ROOT]
+elif scenario == "plain":
+    request = ""
+ended = set()
+def kinfo(pid):
+    if pid in ended or pid not in later:
+        raise LookupError(pid)
+    if later[pid] is None:
+        raise OSError("unreadable")
+    return later[pid]
+def memory(pid):
+    if pid in ended or pid not in readable:
+        raise LookupError(pid)
+    if pid in ends:
+        ended.add(pid)
+    return (160 << 20, 160 << 20)
+fp.kinfos = lambda *selector: iter(list(census.values()))
+fp.kinfo, fp.memory = kinfo, memory
+reply = json.loads(fp.rss_tree(ROOT, {}, request + "\n"))
+print("bound=%s members=%s kib=%s" % (str(reply.get("bound", "absent")).lower(),
+      ",".join(str(member[0]) for member in sorted(reply["members"])), reply["rss_kib"]))
+PY
+)
+  python3 -I -B -c "$program" "$ROOT/bin/fm-proc-info.py" "$1"
 }
 
+# A member the watch knows by identity outside the root's tree is counted only when
+# the census lists it with exactly that identity and the read after the census
+# agrees. A replacement between the reads, a same-second replacement and a member
+# whose identity read fails are not bound; a member in neither the table nor
+# libproc has ended and is dropped. A request with no "bind" (fm-proc-budget's) gets
+# the reply it always had.
 test_the_exact_member_reader_counts_only_an_unchanged_identity() {
   local out
-  out=$(fm_lint_exact_reader 1 2 ok yes)
-  [ "$out" = unknown ] || fail "a replacement between the two identity reads was not unknown: '$out'"
-  out=$(fm_lint_exact_reader 2 2 ok yes)
-  [ "$out" = unknown ] || fail "a same-second replacement was not unknown: '$out'"
-  out=$(fm_lint_exact_reader 1 1 unreadable yes)
-  [ "$out" = unknown ] || fail "a live member whose memory cannot be read was not unknown: '$out'"
-  out=$(fm_lint_exact_reader 1 1 ok no)
-  [ "$out" = 'gone 42' ] || fail "a member absent from the identity read and the process table was not gone: '$out'"
-  out=$(fm_lint_exact_reader 1 1 ok yes)
-  [ "$out" = 'member 42 100 1 163840' ] || fail "an unchanged member was not counted with its recorded identity: '$out'"
-  pass "the exact-member reader counts a member only when two reads give its recorded identity; a replacement between reads, a same-second replacement and an unreadable live member are unknown; an absent pid is gone"
+  out=$(fm_lint_fake_reader known-replaced)
+  [ "$out" = "bound=false members=100042,100043,100050 kib=491520" ] || fail "a replacement between the census and the identity read was bound: '$out'"
+  out=$(fm_lint_fake_reader known-same-second)
+  [ "$out" = "bound=false members=100042,100043 kib=327680" ] || fail "a same-second replacement of a known member was bound: '$out'"
+  out=$(fm_lint_fake_reader known-unreadable)
+  [ "$out" = "bound=false members=100042,100043,100050 kib=491520" ] || fail "a known member whose identity read fails was bound: '$out'"
+  out=$(fm_lint_fake_reader known-ended)
+  [ "$out" = "bound=true members=100042,100043 kib=327680" ] || fail "a known member in neither the table nor libproc was not dropped as ended: '$out'"
+  out=$(fm_lint_fake_reader known-unchanged)
+  [ "$out" = "bound=true members=100042,100043,100050 kib=491520" ] || fail "an unchanged known member was not counted: '$out'"
+  out=$(fm_lint_fake_reader plain)
+  [ "$out" = "bound=absent members=100042,100043 kib=327680" ] || fail "a plain request did not get the unbound reply it always had: '$out'"
+  pass "the reader counts a known member only with its recorded identity; a replacement between reads, a same-second replacement and a failed identity read are not bound; an ended member is dropped; a plain request is unchanged"
 }
 
 # (Main 1791 item 2) The probe lane is a record naming the probe by its exact
@@ -5505,59 +5574,23 @@ test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root() {
   pass "a stop mark that could not be written still stopped the run: the unmeasured root failed, no second root was admitted, and the failure was said; with readers healthy both roots ran"
 }
 
-# (Main 1806 item 1) Descendants: the reader adopts a child only with the identity the
-# census listed it under its member. Scenarios (fake process table, the reader's own
-# program taken from bin/fm-lint-cache.pl): child 43 of member 42 now holds another
-# identity (a recycled pid) -> unknown; child 43's identity cannot be read -> unknown;
-# child 43 unchanged -> both counted (the control).
-fm_lint_descendant_reader() {  # <now: same|recycled|unreadable>
-  local program
-  program=$(perl -0ne 'print $1 if /my \$exact_members_py = <<.PYTHON.;\n(.*?)\nPYTHON\n/s' "$ROOT/bin/fm-lint-cache.pl")
-  [ -n "$program" ] || { printf 'NO-READER\n'; return; }
-  python3 -I -B -c "
-import importlib.util, struct, sys, types
-SCENARIO = sys.argv[1]
-def record(pid, ppid, sec, usec):
-    data = bytearray(648)
-    struct.pack_into('qq', data, 0, sec, usec)
-    struct.pack_into('i', data, 40, pid)
-    struct.pack_into('i', data, 560, ppid)
-    return bytes(data)
-CENSUS = [record(42, 1, 100, 1), record(43, 42, 200, 1)]
-class Loader:
-    def exec_module(self, module):
-        def kinfo(pid):
-            if pid == 42:
-                return CENSUS[0]
-            if SCENARIO == 'unreadable':
-                raise LookupError(pid)
-            return record(43, 1, 200, 2) if SCENARIO == 'recycled' else CENSUS[1]
-        module.kinfos = lambda *a: iter(CENSUS)
-        module.processes = lambda *a: iter([(42, 1), (43, 42)])
-        module.kinfo = kinfo
-        module.P_PID, module.E_PPID = 40, 560
-        module.process_identity = lambda r: struct.unpack_from('qq', r, 0)
-        module.memory = lambda pid: (160 * 1048576, 160 * 1048576)
-importlib.util.spec_from_file_location = lambda *a: types.SimpleNamespace(loader=Loader())
-importlib.util.module_from_spec = lambda spec: types.SimpleNamespace()
-sys.argv = ['reader', 'helper', '42:100:1']
-exec(compile(sys.stdin.read(), 'reader', 'exec'))
-" "$1" <<<"$program"
-}
-
+# (Main 1806 item 1, Main 3904) Descendants: the reader binds a child only with the
+# identity the census listed it under. Child 100043 now holds another identity (a
+# recycled pid), its identity read fails, or the kernel table no longer lists it
+# while libproc still reads it: not bound. The child ended after its memory read
+# (in neither the table nor libproc): dropped, and the reply is bound. The control:
+# the unchanged child is counted.
 test_the_exact_member_reader_adopts_a_child_only_with_its_listed_identity() {
-  local out
-  out=$(fm_lint_descendant_reader recycled)
-  if ! { [ "$(printf '%s\n' "$out" | tail -n 1)" = unknown ] && ! printf '%s\n' "$out" | grep -q '^member 43 '; }; then
-    fail "a child whose pid was recycled after the census was adopted: '$out'"
-  fi
-  out=$(fm_lint_descendant_reader unreadable)
-  [ "$(printf '%s\n' "$out" | tail -n 1)" = unknown ] || fail "a listed child whose identity cannot be read did not make the tick unknown: '$out'"
-  out=$(fm_lint_descendant_reader same)
-  if ! { printf '%s\n' "$out" | grep -qx 'member 42 100 1 163840' && printf '%s\n' "$out" | grep -qx 'member 43 200 1 163840'; }; then
-    fail "an unchanged child of an unchanged member was not counted: '$out'"
-  fi
-  pass "the reader adopts a child only with the identity the census listed it under its member; a recycled or unreadable child makes the tick unknown; an unchanged child is counted"
+  local out scenario
+  for scenario in child-recycled child-unreadable child-libproc-only; do
+    out=$(fm_lint_fake_reader "$scenario")
+    [ "${out%% *}" = bound=false ] || fail "a child that is not provably the listed process was bound ($scenario): '$out'"
+  done
+  out=$(fm_lint_fake_reader child-ended)
+  [ "$out" = "bound=true members=100042 kib=327680" ] || fail "a child that ended after the census was not dropped from a bound reply: '$out'"
+  out=$(fm_lint_fake_reader known-unchanged)
+  [ "$out" = "bound=true members=100042,100043,100050 kib=491520" ] || fail "an unchanged child was not counted: '$out'"
+  pass "the reader binds a child only with its listed identity; a recycled, unreadable or table-less child is not bound; an ended child is dropped; an unchanged child is counted"
 }
 
 # (Main 1806 item 2) An empty or damaged lane record holds the lane: the next run
@@ -5750,6 +5783,58 @@ PERL
   pass "a reply wait interrupted twice, with the reply in time, is no miss: the root runs to its own result (0), measured throughout"
 }
 
+# (Main 3904) The real reader runs with one extra child of the root in each census,
+# a free pid (FM_TEST_READER=phantom:<label>). "ended": the child is in neither the
+# kernel's table nor libproc when the reader reads it again (it ended after the
+# census), so it holds no memory. "unreadable": libproc reads its memory but its
+# identity read fails (a live member that cannot be read).
+fm_lint_phantom_watch() {  # <tmp> <ended|unreadable>: the watch's exit status
+  local rc=0
+  FM_TEST_SIGNAL_LOG="$1/signals.$2" FM_LINT_INTERNAL_PYTHON="$1/stub/python3" FM_TEST_READER="phantom:$2" \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$1/rss.$2" -- sleep 4 > "$1/err.$2" 2>&1 || rc=$?
+  printf '%s\n' "$rc"
+}
+
+# A member that ended between the census and its identity read is dropped, and the
+# tick is a sample, not a miss: the root runs to its own result (0), sampled through
+# its run. Before Main 3904 each such tick was unbound and the root exited 96.
+test_a_member_that_ended_after_the_census_is_a_sample_not_a_miss() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident watch runs on native macOS only): member ended after the census"
+    return
+  fi
+  local tmp real_python rc
+  tmp=$(fm_test_tmproot fm-lint-member-ended)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  rc=$(fm_lint_phantom_watch "$tmp" ended)
+  [ "$rc" -eq 0 ] || fail "a root whose member ended after the census exited $rc, expected 0: $(cat "$tmp/err.ended") $(cat "$tmp/rss.ended" 2>/dev/null)"
+  ! grep -q '^rss_unmeasured=1$' "$tmp/rss.ended" || fail "a member that ended after the census made the root unmeasured: $(cat "$tmp/rss.ended")"
+  grep -Eq '^rss_samples=libproc:[2-9]' "$tmp/rss.ended" || fail "the watch did not sample the root whose member ended: $(cat "$tmp/rss.ended")"
+  # A miss on the root's own last tick (its exit) is exempt and may be recorded.
+  [ "$(grep -c '^rss_miss=' "$tmp/rss.ended")" -le 1 ] || fail "ticks with a member that ended after the census were misses: $(cat "$tmp/rss.ended")"
+  pass "a member that ended between the census and its identity read is dropped and the tick is a sample: the root runs to its own result (0)"
+}
+
+# A live member whose identity cannot be read is still a miss: every tick is
+# unbound, nothing is sampled, and the root exits 96 (unmeasured).
+test_a_live_member_that_cannot_be_read_is_still_a_miss() {
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident watch runs on native macOS only): unreadable live member"
+    return
+  fi
+  local tmp real_python rc
+  tmp=$(fm_test_tmproot fm-lint-member-unreadable)
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  fm_lint_write_stub_python "$tmp/stub" "$real_python"
+  rc=$(fm_lint_phantom_watch "$tmp" unreadable)
+  [ "$rc" -eq 96 ] || fail "a root with a live member that cannot be read exited $rc, expected 96: $(cat "$tmp/err.unreadable") $(cat "$tmp/rss.unreadable" 2>/dev/null)"
+  grep -q '^rss_unmeasured=1$' "$tmp/rss.unreadable" || fail "the unbound ticks were not recorded as unmeasured: $(cat "$tmp/rss.unreadable")"
+  grep -q '^rss_miss=unbound,' "$tmp/rss.unreadable" || fail "the misses were not recorded as unbound: $(cat "$tmp/rss.unreadable")"
+  grep -q '^rss_samples=libproc:0$' "$tmp/rss.unreadable" || fail "a tick with an unreadable live member was sampled: $(cat "$tmp/rss.unreadable")"
+  pass "a live member whose identity cannot be read is a miss on every tick, and the root exits 96 (unmeasured)"
+}
+
 # (Main 2981, Main 2988) On a loaded host each one-shot check starts late, so a tick
 # that meets the root's own exit (a zombie, refused by the reply check and retried)
 # outlasts the 1 s timer and the next tick ran before the watch could reap the root:
@@ -5900,48 +5985,18 @@ print join(",", @f), "\n";' "$tmp" 2>&1)
   pass "only a fresh sample is proof; a published sample is read back and invalidated at once; a failed publication is invalidated in place; a record that cannot be invalidated is reported (and stays fresh, which the watch answers with the host lock)"
 }
 
-# (Main 1846 F1, Main 1885 item 2) The reply check, run on a fake process reader:
-# unchanged identities are bound; a recycled member (another second or the same
-# second), an ended or unreadable member, and a zombie or exiting root are unknown.
+# (Main 1846 F1, Main 1885 item 2, Main 3904) The reply check, run in the reader on
+# a fake process table: a root that is a zombie, exiting or gone makes the reply
+# unbound; an unchanged tree is bound.
 test_the_reply_check_binds_members_and_refuses_a_zombie_root() {
-  local program out
-  program=$(perl -0ne 'print $1 if /my \$verify_members_py = <<.PYTHON.;\n(.*?)\nPYTHON\n/s' "$ROOT/bin/fm-lint-cache.pl")
-  [ -n "$program" ] || fail "the reply check program is missing"
-  out=$(python3 -I -c '
-import sys, types, importlib.util, struct
-program = sys.argv[1]
-fake = types.ModuleType("fmproc")
-fake.P_STAT, fake.SZOMB, fake.P_FLAG, fake.P_WEXIT = 0, 5, 1, 0x2000
-state = {}
-def kinfo(pid):
-    if pid not in state:
-        raise LookupError(pid)
-    if state[pid] == "unreadable":
-        raise OSError("unreadable")
-    return state[pid]
-fake.kinfo = kinfo
-fake.process_identity = lambda record: record[2:4]
-importlib.util.spec_from_file_location = lambda *a: types.SimpleNamespace(loader=types.SimpleNamespace(exec_module=lambda m: m.__dict__.update(fake.__dict__)))
-importlib.util.module_from_spec = lambda spec: types.ModuleType("fmproc")
-struct.unpack_from = lambda fmt, record, offset: (record[1],)
-def run(table, items):
-    state.clear(); state.update(table)
-    sys.argv = ["x", "-", "10"] + items
-    try:
-        exec(compile(program, "reply-check", "exec"), {"__name__": "__main__"})
-    except SystemExit:
-        pass
-live = (0, 0, 100, 1)
-run({10: live, 43: (0, 0, 100, 5)}, ["10:100:1", "43:100:5"])
-run({10: live, 43: (0, 0, 100, 6)}, ["10:100:1", "43:100:5"])
-run({10: live, 43: (0, 0, 101, 5)}, ["10:100:1", "43:100:5"])
-run({10: live}, ["10:100:1", "43:100:5"])
-run({10: live, 43: "unreadable"}, ["10:100:1", "43:100:5"])
-run({10: (5, 0, 100, 1)}, ["10:100:1"])
-run({10: (0, 0x2000, 100, 1)}, ["10:100:1"])
-' "$program" 2>&1)
-  [ "$out" = "$(printf 'same\nunknown\nunknown\nunknown\nunknown\nunknown\nunknown')" ] || fail "the reply check changed: $out"
-  pass "a reply is bound only when every member keeps its identity and the root is neither a zombie nor exiting"
+  local out scenario
+  for scenario in root-zombie root-exiting root-gone; do
+    out=$(fm_lint_fake_reader "$scenario")
+    [ "${out%% *}" = bound=false ] || fail "a reply whose root is not live was bound ($scenario): '$out'"
+  done
+  out=$(fm_lint_fake_reader bound)
+  [ "$out" = "bound=true members=100042,100043 kib=327680" ] || fail "an unchanged tree was not bound: '$out'"
+  pass "a reply is bound only when its root is neither a zombie, exiting nor gone and its members keep their identities"
 }
 
 # (Main 1885 item 4) A hold is counted only on a sent STOP; a CONT that is not sent
@@ -6167,6 +6222,8 @@ test_a_stale_measurement_record_admits_no_new_root
 test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured
 test_a_late_reply_is_retried_once_in_the_same_tick
 test_an_interrupted_reply_wait_with_a_reply_in_time_is_no_miss
+test_a_member_that_ended_after_the_census_is_a_sample_not_a_miss
+test_a_live_member_that_cannot_be_read_is_still_a_miss
 test_a_root_exit_under_slow_checks_keeps_its_own_status
 test_a_compiled_launcher_switching_delegates_is_analysed_every_run
 test_resident_watch_replaces_a_stalled_reader

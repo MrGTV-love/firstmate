@@ -43,7 +43,15 @@ process group (while PID or its group still holds that id), except the reader
 itself, plus PID's descendants in any process group or session; it keeps each
 member it has observed by start identity after that member is orphaned. A
 process that leaves the group and is orphaned before any read observed it is
-never found. A live member whose
+never found. A request line `bind [PID:SEC:USEC ...]` also asks the reader to
+bind its reply in the same process: the identities given are kept as members
+too (with their descendants), and right after its census and memory reads the
+reader reads each member again by pid; the reply then ends with "bound" (true or
+false) and names only the members that still run. A member whose pid is in
+neither the kernel's process table nor libproc has ended and is dropped. A root
+that is missing, a zombie or exiting, a member that now has another start
+identity or cannot be read, and a given identity whose pid the census lists
+with another identity make "bound" false. A live member whose
 memory cannot be read is left out of the sum and listed in uncounted when its
 effective user is not this process's; one of this user makes rss_kib null, as
 does a read in which no live member was readable. A failed tree read prints
@@ -261,16 +269,19 @@ def process_identity(record):
     return struct.unpack_from("qq", record, P_START)
 
 
-def tree_snapshot(root, known, skip=()):
+def tree_snapshot(root, known, skip=(), census=None):
     """Find descendants across sessions and retain observed orphans by identity.
 
     The root's own process group also catches children reparented before the
     first snapshot. Start timestamps prevent retaining a recycled PID. The
-    calling process and any PID in skip are never members.
+    calling process and any PID in skip are never members. census, when given,
+    receives every listed PID with its identity.
     """
     records = {struct.unpack_from("i", record, P_PID)[0]: record for record in kinfos()}
     for pid in (os.getpid(), *skip):
         records.pop(pid, None)
+    if census is not None:
+        census.update((pid, tuple(process_identity(record))) for pid, record in records.items())
     children = {}
     queue = []
     group_owned = (root not in records or root not in known
@@ -297,9 +308,65 @@ def tree_snapshot(root, known, skip=()):
     return selected
 
 
-def rss_tree(root, known):
+def ended(pid):
+    """True only when pid is in neither the kernel's process table nor libproc."""
+    try:
+        kinfo(pid)
+        return False
+    except LookupError:
+        pass
+    try:
+        memory(pid)
+        return False
+    except LookupError:
+        return True
+
+
+def bind_members(root, members, expected=None, census=None):
+    """The reply check, made right after the census and the memory reads.
+
+    members maps each PID the census selected to its identity. Each is read
+    again: an equal identity proves the same process lived through the reads,
+    since a PID is not reused while its process lives, zombies included. A
+    member that has ended is dropped. Each expected identity (PID -> identity)
+    that the census did not select must have ended. Returns the members that
+    still run, or None when the root is missing, a zombie or exiting, or any
+    member or expected PID is another process or cannot be read.
+    """
+    if root not in members:
+        return None
+    bound = {}
+    try:
+        record = kinfo(root)
+        if record[P_STAT] == SZOMB or struct.unpack_from("i", record, P_FLAG)[0] & P_WEXIT:
+            return None
+        for pid, identity in members.items():
+            try:
+                now = tuple(process_identity(record if pid == root else kinfo(pid)))
+            except LookupError:
+                if pid != root and ended(pid):
+                    continue
+                return None
+            if now != tuple(identity):
+                return None
+            bound[pid] = now
+        for pid in (expected or {}):
+            if pid not in members and (pid in (census or {}) or not ended(pid)):
+                return None
+    except (OSError, LookupError, struct.error):
+        return None
+    return bound
+
+
+def rss_tree(root, known, request="\n"):
     """Strict libproc sample of the full tracked tree, not just its group."""
-    records = tree_snapshot(root, known)
+    words = request.split()
+    bind, expected, census = words[:1] == ["bind"], {}, {}
+    for item in words[1:] if bind else ():
+        pid, sec, usec = (int(part) for part in item.split(":"))
+        expected[pid] = (sec, usec)
+        known.setdefault(pid, (sec, usec))
+    records = tree_snapshot(root, known, census=census)
     resident, footprint = 0, 0
     readable, counted, uncounted = True, False, []
     for pid, record in records.items():
@@ -324,11 +391,18 @@ def rss_tree(root, known):
         counted = True
         resident += more_resident
         footprint += more_footprint
-    return json.dumps({
+    reply = {
         "rss_kib": max(resident, footprint) // 1024 if readable and (counted or not uncounted) else None,
         "members": [[pid, *process_identity(record)] for pid, record in records.items()],
         "uncounted": uncounted,
-    }, separators=(",", ":"))
+    }
+    if bind:
+        bound = bind_members(root, {pid: tuple(process_identity(record)) for pid, record in records.items()},
+                             expected, census)
+        if bound is not None:
+            reply["members"] = [[pid, *identity] for pid, identity in bound.items()]
+        reply["bound"] = bound is not None
+    return json.dumps(reply, separators=(",", ":"))
 
 
 def end_group(root, known):
@@ -356,10 +430,10 @@ def end_group(root, known):
         os.killpg(root, signal.SIGKILL)
 
 
-def mem_watch(root, reader=mem_tree):
-    while sys.stdin.readline():
+def mem_watch(root, reader=lambda root, request: mem_tree(root)):
+    for request in iter(sys.stdin.readline, ""):
         try:
-            answer = reader(root)
+            answer = reader(root, request)
         except (OSError, LookupError, struct.error, IndexError):
             answer = "-"
         print(answer, flush=True)
@@ -449,7 +523,12 @@ def main(argv_):
             for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
                 signal.signal(signum, signal.SIG_IGN)
         try:
-            return mem_watch(number, lambda root: rss_tree(root, known))
+            return mem_watch(number, lambda root, request: rss_tree(root, known, request))
+        except BrokenPipeError:
+            # Its supervisor closed the reply pipe (a discarded reader): exit
+            # quietly, with no traceback and no failed flush at exit.
+            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+            return 1
         finally:
             if guard:
                 end_group(number, known)
