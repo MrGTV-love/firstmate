@@ -3702,7 +3702,7 @@
         },
         {
           "file": "bin/fm-review-record.py",
-          "match": "refuse_away(state_dir(home))"
+          "match": "refuse_away(state_dir(home), args.command)"
         }
       ]
     },
