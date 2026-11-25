@@ -1,4 +1,4 @@
-## installed provider BEFORE run (2026-11-23T23:10:01Z)
+Tue Nov 24 22:46:46 UTC 2026
 /Users/charlesabrooker/.local/bin/treehouse
 v3.1.7-fm.b8ea2fd.slot-return-r3
 0b5b86a6cd7b106de6495a54f7b7701b42d1afd36cba26a7590380fe0b870b59  /Users/charlesabrooker/.local/bin/treehouse

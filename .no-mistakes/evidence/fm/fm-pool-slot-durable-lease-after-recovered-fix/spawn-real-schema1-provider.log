@@ -1,3 +1,3 @@
-skip - real-provider recovered-slot allocation: FM_TEST_TREEHOUSE_PROVIDER names no executable treehouse; the case did NOT run
+skip - real-provider recovered-slot allocation: /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse.b36d1a5 publishes no recovered_quarantine_holder; the case did NOT run
 ok - against a real schema-1 provider a recovered slot holding a current copy, on the old holder or on a schema-2 style holder, refuses before treehouse get with only the capability probe run, and the pool state and the copy are unchanged
-rc=0
+FM_TEST_TREEHOUSE_SCHEMA1_PROVIDER=$P FM_TEST_TREEHOUSE_PROVIDER=$P  -- bash   3.42s user 8.94s system 1% cpu 11:11.83 total

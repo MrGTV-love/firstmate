@@ -1,0 +1,11 @@
+# Search for a schema-2 Treehouse provider (one that publishes recovered_quarantine_holder)
+$ git -C ~/firstmate/projects/treehouse ls-remote origin  vs  for-each-ref refs/remotes/origin
+every origin branch head is already fetched locally
+$ git -C ~/firstmate/projects/treehouse log --all --oneline -S recovered_quarantine_holder
+(no commit on any branch adds recovered_quarantine_holder)
+$ /Users/charlesabrooker/.local/bin/treehouse capabilities --json   (isolated HOME)
+{"schema_version":1,"version":"v3.1.7-fm.b8ea2fd.slot-return-r3","persistent_recovered_leases":true}
+$ /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse capabilities --json   (isolated HOME)
+{"schema_version":1,"version":"v3.1.7-fm.b5d2805","persistent_recovered_leases":true}
+$ /Users/charlesabrooker/firstmate/data/fm-pool-slot-recovered-quarantine-provider/scratch/bin/treehouse.b36d1a5 capabilities --json   (isolated HOME)
+{"schema_version":1,"version":"v3.1.7-fm.b36d1a5","persistent_recovered_leases":true}

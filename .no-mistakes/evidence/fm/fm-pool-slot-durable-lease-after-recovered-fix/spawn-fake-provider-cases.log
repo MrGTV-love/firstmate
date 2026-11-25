@@ -1,0 +1,2 @@
+ok - a recovered lease keeps refusing allocation on a treehouse that does not prove persistent recovered leases, names the upgrade, and runs no pool command
+ok - neither an unproven nor a proven provider is asked for status to place an unleased slot (the unproven refusal names the upgrade, the proven one the lease remedy)

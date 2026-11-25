@@ -1,0 +1,15 @@
+## Same lab home. treehouse shim answers capabilities with a schema-2 proven document (STUB answer; every other command goes to the real installed binary)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+rc=0
+## argv:
+get --help
+capabilities --json
+
+## Orca-only lab home (config/backend=orca), installed treehouse unchanged on PATH (real schema-1 answer)
+MISSING: orca (install: brew install orca  # or the platform's package manager)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+rc=0
+## argv:
+(end argv)
