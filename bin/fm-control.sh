@@ -3116,6 +3116,8 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
      && [ "$(printf '%s\n' "${prior[@]}" | LC_ALL=C sort)" = "$(printf '%s\n' "${scope[@]}" | LC_ALL=C sort)" ]; then
     noop=1
   fi
+  # A write first resolves every pending audit record (step 3), which can restore the prior record, so --check claims no no-op.
+  [ -z "$FM_RR_PENDING" ] || noop=0
 
   # 7. Proof 3 (journal, backlog close), then proof 2 (agent stopped): refusing for a write, advisory otherwise.
   jclass=$(fm_control_relaunch_journal_verdict "$journal" "$ID")
@@ -3146,6 +3148,9 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
       # later advisory proofs never refuse it.
       if [ "$noop" = 1 ] && [ "$launch_proof" = ok ]; then
         would="already recorded"
+      fi
+      if [ -n "$FM_RR_PENDING" ] && [ "$launch_proof" = ok ]; then
+        would="reconcile-pending:$FM_RR_PENDING"
       fi
       echo "write_would=$would"
       [ "$noop" = 1 ] || echo "command: bin/fm-control.sh $ID rerecord-slot --manifest-sha $manifest_sha --note '<the ruling this carries out>'"

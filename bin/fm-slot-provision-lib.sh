@@ -1175,6 +1175,8 @@ FM_RR_AUDIT=
 FM_RR_ARCHIVE=
 FM_RR_P=
 FM_RR_S=
+# The audit records a --check run found pending or rolling-back, as comma-joined file names.
+FM_RR_PENDING=
 
 fm_slot_rerecord_fail() { # <reason> <detail>
   FM_SLOT_RERECORD_REASON=$1
@@ -1985,10 +1987,11 @@ fm_slot_rerecord_pending_state() { # <audit> <record>
 }
 
 # Step 10: sweep this task's leftover temporaries, then resolve every pending or rolling-back audit record by the record's
-# bytes (write), or report each one (check). Returns 1 with the refusal loaded for an unreadable audit record, and 2
+# bytes (write), or report each one and name it in FM_RR_PENDING (check). Returns 1 with the refusal loaded for an unreadable audit record, and 2
 # when a resumed restore failed (its error is already printed).
 fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
   local mode=$1 project=$2 copy=$3 branch=$4 entry audit result state
+  FM_RR_PENDING=
   if [ "$mode" = write ]; then
     for entry in "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord."* "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-restore."* \
       "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap."*; do
@@ -2012,6 +2015,7 @@ fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
     state=$(fm_slot_rerecord_pending_state "$audit" "$FM_RR_META")
     if [ "$mode" != write ]; then
       printf 'pending_audit=%s result=%s state=%s\n' "$audit" "$result" "$state"
+      FM_RR_PENDING=${FM_RR_PENDING:+$FM_RR_PENDING,}${audit##*/}
       continue
     fi
     case "$state" in

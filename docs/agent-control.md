@@ -577,10 +577,10 @@ The verb takes, in order, the task's control lock, its spawn lock (`state/.spawn
 | --- | --- | --- |
 | 1. Actor | refuses `actor_not_main` (a worker or the supervision branch) or `session_lock_not_owned` | the same |
 | 2. Locks | a live holder of the spawn lock refuses `launch_in_progress` | reported as `launch_proof=` |
-| 3. Earlier interrupted runs | swept and resolved by the record's bytes (below) | reported as `pending_audit=` lines |
+| 3. Earlier interrupted runs | swept and resolved by the record's bytes (below) | reported as `pending_audit=` lines; any such line makes `write_would=reconcile-pending:<audit records>` unless a launch owner holds the spawn lock, and the run prints `manifest_sha256=` and the command even when the record already matches |
 | 4. Snapshot and fingerprints | taken | taken |
 | 5. Content and location proofs | refuse by name | refuse by name |
-| 6. No-op | `already recorded`, exit 0, nothing written | `already recorded`, and `write_would=already recorded` unless a launch owner holds the spawn lock, because a write stops at the no-op before the later proofs |
+| 6. No-op | `already recorded`, exit 0, nothing written | `already recorded`, and `write_would=already recorded` unless a launch owner holds the spawn lock or an audit record is pending, because a write stops at the no-op before the later proofs |
 | 7. Journal, backlog close, then agent stopped | refuse by name | advisory `journal_proof=`, `backlog_close_proof=`, `stopped_proof=` and `write_would=` |
 | 8. Note and manifest digest | refuse by name | not run; prints `manifest_sha256=` and the command to run |
 | 9. Stage, verify, archive, rebind, publish, verify, commit | below | never |
@@ -646,6 +646,7 @@ Residuals:
 - a brand-new nested file leases its whole deepest tracked directory, and the `rule_c_entry=` lines show that breadth before the write;
 - a hand edit of the task record or the durable store bypasses every proof here;
 - an already-equal record is a no-op that re-runs only the content proofs, so a hand-synced record is judged only by replaying `fm_slot_rerecord_verdict` read-only against the pre-sync record;
+- that replay judges the identity, base and scope verdicts only, and `rerecord-slot --check` also runs the record, copy and no-strand proofs;
 - a SIGKILL, or a TERM or HUP while the publish rename is in flight, leaves a published record with a `pending` audit record until the next write run, and a relaunch in that window is judged by adoption alone;
 - in the restore window the record already holds the staged identity, which passes adoption, so a relaunch that started after an interrupted run released its locks could in principle be overwritten by that run's late restore rename; the window is one rename wide against a relaunch that takes seconds;
 - rerecord does not verify how the durable record was renewed.

@@ -691,6 +691,46 @@ test_L12_a_stale_spawn_lock_is_reclaimed() {
   rr_ok L12 "exit 0 as L10 over a dead holder's spawn lock; no spawn lock remains"
 }
 
+# rr_setup_L13 <name>: a write SIGKILLed after its publish leaves the staged record under a pending audit record (R6a),
+# then the copy's HEAD moves inside the scope, so the write's reconciliation must roll that record back. Sets RR_L13_AUDIT.
+rr_setup_L13() {
+  local p
+  rr_make_f "$1"
+  p=$(rr_sha "$RR_META")
+  rr_crash_run "$RR_META" after 1
+  RR_L13_AUDIT=$(rr_audit_for "$p") || fail "$1: no audit record after the crash"
+  [ "$(rr_field "$RR_L13_AUDIT" result)" = pending ] && [ "$(rr_sha "$RR_META")" = "$(rr_field "$RR_L13_AUDIT" staged_sha256)" ] \
+    || fail "$1: the crash did not leave the staged bytes under a pending audit record"
+  rr_branch_commit 'own change after the crash' src/owned.txt=owned-after-the-crash
+}
+
+# rr_expect_write_rolls_back_the_crash <id>: the write the --check reports on: it rolls the crashed write back, then
+# publishes its own.
+rr_expect_write_rolls_back_the_crash() {
+  local id=$1 out rc
+  out=$(rr_write); rc=$?
+  expect_code 0 "$rc" "$id write"$'\n'"$out"
+  assert_not_contains "$out" 'already recorded' "$id write"
+  [ "$(rr_field "$RR_L13_AUDIT" result)" = rolled-back ] || fail "$id: the crashed write's audit is '$(rr_field "$RR_L13_AUDIT" result)'"
+  [ "$(rr_results)" = 'published rolled-back' ] || fail "$id: audit results are '$(rr_results)'"
+}
+
+test_L13_check_names_a_pending_reconcile() {
+  local out rc before
+  rr_setup_L13 L13
+  before=$(rec_inventory)
+  out=$(rr_run --check); rc=$?
+  expect_code 0 "$rc" "L13"$'\n'"$out"
+  assert_contains "$out" "pending_audit=$RR_L13_AUDIT result=pending state=untouched-staged" "L13"
+  assert_contains "$out" "write_would=reconcile-pending:${RR_L13_AUDIT##*/}" "L13"
+  assert_contains "$out" "manifest_sha256=$(rr_msha)" "L13"
+  assert_contains "$out" "command: bin/fm-control.sh $RR_ID rerecord-slot --manifest-sha $(rr_msha) --note" "L13"
+  assert_not_contains "$out" 'already recorded' "L13"
+  [ "$before" = "$(rec_inventory)" ] || fail "L13: --check wrote something"
+  rr_expect_write_rolls_back_the_crash L13
+  rr_ok L13 "pending untouched-staged audit, HEAD moved inside scope: --check prints write_would=reconcile-pending naming the audit record, the digest and the command, and writes nothing; the write then rolls the crash back and publishes"
+}
+
 # --- end to end -----------------------------------------------------------------------------------
 
 test_E1_relaunch_after_rerecord_adopts() {
@@ -1792,6 +1832,22 @@ test_SF4o_control_owner_reread() {
     || fail "SF4o: the fixture's manifest does not name the other owner"
   rr_ok SF4o "SF4-owner-reread with the owner re-read also removed: published while the live manifest names another owner (adoption never compares owner); audit published"
 }
+# L13's control: drop the pending audit names after the reconciliation reports them, which restores the old no-op claim.
+test_S23_check_pending_noop_claim() {
+  local out rc
+  rr_setup_L13 S23-L13
+  rr_wrap fm-slot-provision-lib.sh fm_slot_rerecord_reconcile_pending
+  rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_reconcile_pending() { real_fm_slot_rerecord_reconcile_pending "$@" || return; FM_RR_PENDING=; }'
+  out=$(rr_run --check); rc=$?
+  expect_code 0 "$rc" "S23/L13: the shimmed --check did not finish"$'\n'"$out"
+  assert_contains "$out" "pending_audit=$RR_L13_AUDIT result=pending state=untouched-staged" "S23/L13"
+  assert_contains "$out" 'write_would=already recorded' "S23/L13: the shimmed --check did not claim the no-op"
+  assert_not_contains "$out" 'manifest_sha256=' "S23/L13"
+  assert_not_contains "$out" 'command: ' "S23/L13"
+  RR_CONTROL=
+  rr_expect_write_rolls_back_the_crash S23-L13
+  rr_ok S23 "L13 with the pending names dropped: --check claims write_would=already recorded with no digest or command, while the write rolls the crash back and publishes"
+}
 #__REGISTRY__
 control_relaunch_test_cases=(
 test_rec_inventory_oracle_rejects_both_mutants
@@ -1810,6 +1866,7 @@ test_L9b_the_live_complete_shape_with_the_agent_alive
 test_L10_a_failed_launch_journal_with_the_agent_stopped
 test_L11_an_uncommitted_file_under_a_new_directory_is_counted
 test_L12_a_stale_spawn_lock_is_reclaimed
+test_L13_check_names_a_pending_reconcile
 test_E1_relaunch_after_rerecord_adopts
 test_E2_relaunch_without_rerecord_refuses_base_mismatch
 test_H1_owner_mismatch
@@ -1912,5 +1969,6 @@ test_S22_committing_rolls_back
 test_SF4c_post_publish_comparison
 test_SF4_owner_reread_alone_refuses
 test_SF4o_control_owner_reread
+test_S23_check_pending_noop_claim
 )
 control_relaunch_run "$@"
