@@ -5653,8 +5653,8 @@
       "id": "spawn-local-source-selection",
       "owner": "bin/fm-spawn.sh",
       "sites": [
-        {"file": "bin/fm-spawn.sh", "match": "local-only source selection refused"},
-        {"file": "bin/fm-spawn.sh", "match": "refusing the stale source plan", "count": 2}
+        {"file": "bin/fm-spawn.sh", "match": "local-only source selection refused", "count": 2},
+        {"file": "bin/fm-spawn.sh", "match": "refusing the stale source plan", "count": 3}
       ],
       "invariant": "a local-only spawn never starts from a qualified local default that diverged, moved or became ambiguous since its source plan",
       "layer": "runtime-block",
