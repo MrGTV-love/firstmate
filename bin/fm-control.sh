@@ -19,6 +19,9 @@
 #                                         [--owned-path <tracked-path>]...
 #                                         (--note <text> | --note-file <path>)
 #        fm-control.sh <task-id> relaunch --recover-launch
+#        fm-control.sh <task-id> rerecord-slot --manifest-sha <sha256>
+#                                              (--note <text> | --note-file <path>)
+#        fm-control.sh <task-id> rerecord-slot --check
 # --recover-launch is Herdr-only inspection under the control lock.
 # Managed and stopped agents are left untouched. Unmanaged live agents are
 # reported without lifecycle input; native restoration does not prove ownership.
@@ -83,6 +86,28 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
+# rerecord-slot is metadata-only too: after a governed task's durable slot
+# record was renewed (an authorized forward merge plus a scope refresh), the
+# lock-owning main Firstmate re-records the task record's slot_base_sha= and
+# slot_owned_path= lines from that renewed record, so the next relaunch's
+# adoption judges the renewed lease. It writes nothing else: never the
+# manifest, the copy, a ref, the brief, a pool claim, the endpoint or the
+# relaunch journal; it never fetches, and never starts, stops or sends input
+# to an agent. It refuses by name unless the renewed record is this task's own
+# lease for its copy, branch and owner, its base is a forward move to the
+# copy's current merge-base with origin/<default>, its scope is the recorded
+# scope plus the minimal cover of every path the branch changed, the agent is
+# proven stopped, no launch owner holds the task's spawn lock, no relaunch
+# transaction is in flight, no backlog close is pending, and --manifest-sha
+# names the manifest bytes now. The prior record is archived and an audit
+# record kept under data/<id>/slot-rerecord/; a failure after publish restores
+# the prior bytes. --check prints the same verdict, the advisory stopped,
+# journal and launch proofs, and the digest to bind, and writes nothing. On
+# Herdr, proving a missing endpoint absent may start the session server, as
+# relaunch's own proof does. bin/fm-slot-provision-lib.sh's fm_slot_rerecord_*
+# functions own the proofs and the transaction; docs/agent-control.md
+# "Re-recording a renewed slot identity" owns every refusal and the operator
+# contract.
 # adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
 # under the task's control and metadata locks. The lock-owning main Firstmate
 # alone may run it: a worker, the supervision branch, or a session that does
@@ -387,6 +412,12 @@ CONTROL_META_TMP=
 CONTROL_PROJECT_LOCK=
 CONTROL_PROJECT_LOCK_HELD=0
 REASSOCIATE_ACTIVE=0
+# rerecord-slot's transaction stage (the stage rules are fm_slot_rerecord_trap_action's), its private snapshot
+# directory, and the task spawn lock it holds to exit. Initialized here so an inherited value cannot select a trap action.
+RERECORD_STAGE=
+RERECORD_SNAP=
+CONTROL_SPAWN_LOCK=
+CONTROL_SPAWN_LOCK_HELD=0
 # The extra locks reassociate --also holds for its other tasks.
 RA_CONTROL_LOCKS=()
 RA_META_LOCKS=()
@@ -405,6 +436,13 @@ control_cleanup() {
      && declare -F reassociate_rollback >/dev/null 2>&1; then
     reassociate_rollback || true
   fi
+  if [ -n "$RERECORD_STAGE" ] && declare -F fm_slot_rerecord_trap_action >/dev/null 2>&1; then
+    case "$(fm_slot_rerecord_trap_action "$RERECORD_STAGE")" in
+      discard) fm_slot_rerecord_discard_staged || true ;;
+      rollback) fm_slot_rerecord_rollback || true ;;
+    esac
+  fi
+  [ -z "$RERECORD_SNAP" ] || rm -rf -- "$RERECORD_SNAP"
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
   [ -z "$RELAUNCH_PAIR_DIR" ] || rm -rf -- "$RELAUNCH_PAIR_DIR"
   if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
@@ -422,6 +460,10 @@ control_cleanup() {
   if [ "$CONTROL_PROJECT_LOCK_HELD" = 1 ]; then
     CONTROL_PROJECT_LOCK_HELD=0
     fm_project_lock_release "$CONTROL_PROJECT_LOCK" || true
+  fi
+  if [ "$CONTROL_SPAWN_LOCK_HELD" = 1 ]; then
+    CONTROL_SPAWN_LOCK_HELD=0
+    fm_lock_release "$CONTROL_SPAWN_LOCK" || true
   fi
   if [ "$CONTROL_LOCK_HELD" = 1 ]; then
     CONTROL_LOCK_HELD=0
@@ -472,6 +514,9 @@ RELOCATE_TO=
 RELOCATE_SET=0
 control_want_value=
 RECOVER_LAUNCH=0
+RERECORD_CHECK=0
+RERECORD_MANIFEST_SHA=
+RERECORD_MANIFEST_SHA_SET=0
 OWNED_PATHS=()
 ALSO_IDS=()
 ALSO_COPIES=()
@@ -507,6 +552,7 @@ for control_arg in "$@"; do
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
       owned-path) OWNED_PATHS+=("$control_arg") ;;
       also) parse_also "$control_arg" ;;
+      manifest-sha) RERECORD_MANIFEST_SHA=$control_arg; RERECORD_MANIFEST_SHA_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
         NOTE=$(cat "$control_arg")
@@ -539,6 +585,9 @@ for control_arg in "$@"; do
       NOTE=$(cat "${control_arg#--note-file=}")
       NOTE_SET=1
       ;;
+    --manifest-sha) control_want_value="manifest-sha" ;;
+    --manifest-sha=*) RERECORD_MANIFEST_SHA=${control_arg#--manifest-sha=}; RERECORD_MANIFEST_SHA_SET=1 ;;
+    --check) RERECORD_CHECK=1 ;;
     --claude-debug) CLAUDE_DEBUG=1 ;;
     --recover-launch) RECOVER_LAUNCH=1 ;;
     --reconcile-only) RECONCILE_ONLY=1 ;;
@@ -554,7 +603,15 @@ fi
   || die "--also applies to 'reassociate' only"
 [ "${#OWNED_PATHS[@]}" = 0 ] || { [ "$VERB" = relaunch ] && [ "$RECOVER_LAUNCH" = 0 ]; } \
   || die "--owned-path applies to 'relaunch' only and cannot be combined with --recover-launch"
-if [ "$VERB" = reassociate ]; then
+{ [ "$RERECORD_CHECK" = 0 ] && [ "$RERECORD_MANIFEST_SHA_SET" = 0 ]; } || [ "$VERB" = rerecord-slot ] \
+  || die "--check and --manifest-sha apply to 'rerecord-slot' only"
+if [ "$VERB" = rerecord-slot ]; then
+  # rerecord-slot takes --manifest-sha and --note (or --note-file), or --check alone; every other option is refused.
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+    || die "--harness, --model, --effort, --claude-debug, --captain-model-pin, --recover-launch, --reconcile-only, and --worktree do not apply to 'rerecord-slot', which takes --manifest-sha and --note, or --check"
+  [ "$RERECORD_CHECK" = 0 ] || { [ "$NOTE_SET" = 0 ] && [ "$RERECORD_MANIFEST_SHA_SET" = 0 ]; } \
+    || die "rerecord-slot --check writes nothing, so it takes neither --note, --note-file, nor --manifest-sha"
+elif [ "$VERB" = reassociate ]; then
   # reassociate takes --worktree, --also, and --note; every other relaunch option stays refused.
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
     || die "--harness, --model, --effort, --claude-debug, --captain-model-pin, --recover-launch, and --reconcile-only apply to 'relaunch' only"
@@ -2819,7 +2876,7 @@ do_relaunch() {
       slot_scope=()
       while IFS= read -r owned_path; do slot_scope+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
       fm_slot_adopt_check "$slot_project" "$slot_copy" "$ID" "$slot_branch" "$META" "$STATE" \
-        || die "refused relaunch of governed task $ID: its recorded slot manifest cannot be adopted for $slot_copy; preserve and reconcile it first; the running agent was not stopped"
+        || die "refused relaunch of governed task $ID: its recorded slot manifest cannot be adopted for $slot_copy; preserve and reconcile it first (a base_mismatch or scope_mismatch after the durable slot record was renewed is re-recorded with fm-control.sh $ID rerecord-slot --check, then without --check); the running agent was not stopped"
       fm_slot_drift_report "$slot_copy" "$ID" "$slot_branch" "$(fm_meta_get "$META" slot_base_sha)" "${slot_scope[@]}"
     else
       slot_branch=$(fm_meta_get "$META" branch)
@@ -2937,6 +2994,230 @@ do_relaunch() {
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }
 
+# --- rerecord-slot: re-record a renewed slot identity -----------------------
+#
+# Metadata-only: the task record's slot_base_sha= and slot_owned_path= lines are
+# re-read from the task's own renewed durable slot record. Every proof, the
+# staging, the checks, the archive, the commit, the rollback and the stage
+# rules are bin/fm-slot-provision-lib.sh's fm_slot_rerecord_* functions; this
+# function only sequences them and takes the locks. Each is called directly,
+# never in a command substitution, so the whole run is this one shell.
+
+rerecord_refuse() {
+  fm_slot_rerecord_refuse "$FM_SLOT_RERECORD_REASON" "$FM_SLOT_RERECORD_DETAIL"
+  exit 1
+}
+
+do_rerecord_slot() {
+  local project copy branch manifest snap prior_sha manifest_sha head old_base new_base noop=0 line
+  local default tip jclass launch_proof=ok journal_proof stopped_proof=ok backlog_proof=ok would=pass
+  local staged_sha added=0 released=0 side=0 entries note_json rc
+  local -a prior=() scope=()
+  local journal="$STATE/$ID.control-relaunch"
+
+  # 1. A1: the lock-owning main Firstmate only (one rule for the write and for --check).
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_slot_rerecord_authorized "$STATE" || rerecord_refuse
+
+  # 2. Locks: control (held), spawn (tried, never waited for), then project and meta.
+  if fm_slot_rerecord_prove_no_launch "$STATE" "$ID"; then
+    if [ -n "$FM_SLOT_RERECORD_SPAWN_LOCK" ]; then
+      CONTROL_SPAWN_LOCK=$FM_SLOT_RERECORD_SPAWN_LOCK
+      CONTROL_SPAWN_LOCK_HELD=1
+    fi
+  else
+    [ "$RERECORD_CHECK" = 1 ] || rerecord_refuse
+    launch_proof=$FM_SLOT_RERECORD_REASON
+  fi
+  if [ "$RERECORD_CHECK" = 1 ] && [ "$CONTROL_SPAWN_LOCK_HELD" = 1 ]; then
+    CONTROL_SPAWN_LOCK_HELD=0
+    fm_lock_release "$CONTROL_SPAWN_LOCK" || true
+  fi
+  project=$(fm_meta_get "$META" project)
+  if [ "$RERECORD_CHECK" = 0 ]; then
+    CONTROL_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$project") \
+      || die "cannot resolve the shared Treehouse project lock for $project; nothing was changed"
+    fm_project_lock_try "$CONTROL_PROJECT_LOCK" "rerecord-slot $ID" \
+      || die "another task copy allocation, return, or reassociation is in progress for $project; rerecord-slot refuses to race it, nothing was changed"
+    CONTROL_PROJECT_LOCK_HELD=1
+  fi
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+
+  FM_RR_STATE=$STATE
+  FM_RR_ID=$ID
+  FM_RR_META=$META
+  FM_RR_DIR="$DATA/$ID/slot-rerecord"
+  copy=$(fm_meta_get "$META" worktree)
+  branch=$(fm_meta_get "$META" branch)
+  [ -n "$branch" ] || branch=fm/$ID
+
+  # 3. Earlier interrupted runs: swept and resolved (write) or reported (--check).
+  if [ "$RERECORD_CHECK" = 1 ]; then
+    fm_slot_rerecord_reconcile_pending check "$project" "$copy" "$branch" || rerecord_refuse
+  else
+    rc=0
+    fm_slot_rerecord_reconcile_pending write "$project" "$copy" "$branch" || rc=$?
+    case $rc in
+      0) ;;
+      2) exit 1 ;;
+      *) rerecord_refuse ;;
+    esac
+  fi
+
+  # 4. Fingerprint P, M and H, and snapshot the record and manifest bytes.
+  RERECORD_SNAP=$(mktemp -d "$STATE/.$ID.meta.rerecord-snap.XXXXXX") \
+    || die "could not create the private snapshot for task $ID; nothing was changed"
+  chmod 700 "$RERECORD_SNAP"
+  snap=$RERECORD_SNAP
+  cp -p -- "$META" "$snap/record" || die "could not snapshot task $ID's record; nothing was changed"
+  prior_sha=$(fm_slot_rerecord_sha "$snap/record") || die "could not read task $ID's record; nothing was changed"
+  manifest=$(fm_meta_get "$snap/record" slot_manifest)
+  manifest_sha=
+  if [ -n "$manifest" ] && [ -f "$manifest" ] && [ ! -L "$manifest" ] && cp -- "$manifest" "$snap/manifest.json" 2>/dev/null; then
+    manifest_sha=$(fm_slot_rerecord_sha "$snap/manifest.json") || manifest_sha=
+  else
+    : > "$snap/manifest.json"
+  fi
+  head=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --verify HEAD 2>/dev/null) || head=
+
+  # 5. Content and location proofs (1, 4, 5, 6, 7).
+  fm_slot_rerecord_prove_shape "$snap/record" || rerecord_refuse
+  fm_slot_rerecord_prove_records "$project" "$copy" "$manifest" || rerecord_refuse
+  fm_slot_rerecord_identity_verdict "$snap/manifest.json" "$copy" "$branch" "$ID" > "$snap/identity" || true
+  fm_slot_rerecord_verdict_ok "$snap/identity" manifest_unreadable || rerecord_refuse
+  fm_slot_rerecord_prove_copy "$project" "$copy" "$branch" "$ID" "$META" "$STATE" "$snap/manifest.json" || rerecord_refuse
+  old_base=$(fm_meta_get "$snap/record" slot_base_sha)
+  fm_slot_rerecord_base_verdict "$snap/manifest.json" "$copy" "$project" "$old_base" "$head" > "$snap/base" || true
+  fm_slot_rerecord_verdict_ok "$snap/base" base_invalid || rerecord_refuse
+  default=$(fm_task_copy_default_branch "$project" 2>/dev/null) || default=
+  tip=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --verify --quiet "refs/remotes/origin/$default^{commit}" 2>/dev/null) || tip=
+  fm_slot_own_line_paths "$copy" "$tip" "$head" > "$snap/own-line" 2>"$snap/own-line.err" ||
+    { fm_slot_rerecord_fail scope_entry_not_own_work "the task's own first-parent line could not be read from the copy, so no entry can be attributed"; rerecord_refuse; }
+  fm_slot_rerecord_uncommitted_paths "$copy" > "$snap/uncommitted" 2>"$snap/uncommitted.err" ||
+    { fm_slot_rerecord_fail scope_release_strands_work "the copy's uncommitted set could not be read, so no stranded work is proved absent"; rerecord_refuse; }
+  while IFS= read -r line; do prior+=("$line"); done < <(sed -n 's/^slot_owned_path=//p' "$snap/record")
+  fm_slot_rerecord_scope_verdict "$snap/manifest.json" "$copy" "$head" "$snap/own-line" "$snap/uncommitted" \
+    ${prior[@]+"${prior[@]}"} > "$snap/scope" || true
+  fm_slot_rerecord_verdict_ok "$snap/scope" scope_invalid || rerecord_refuse
+  fm_slot_rerecord_prove_no_strand "$snap/uncommitted" "$snap/manifest.json" ${prior[@]+"${prior[@]}"} || rerecord_refuse
+
+  # The report lines, printed for every run that reached here.
+  sed -n '2,$p' "$snap/scope"
+  new_base=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["base_sha"])' "$snap/manifest.json")
+  while IFS= read -r line; do scope+=("$line"); done < <(python3 -I -c 'import json, sys
+for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
+    print(path)' "$snap/manifest.json")
+
+  # 6. No-op: the record already carries the manifest's base and scope.
+  if [ "$old_base" = "$new_base" ] \
+     && [ "$(printf '%s\n' "${prior[@]}" | LC_ALL=C sort)" = "$(printf '%s\n' "${scope[@]}" | LC_ALL=C sort)" ]; then
+    noop=1
+  fi
+
+  # 7. Proof 3 (journal, backlog close), then proof 2 (agent stopped): refusing for a write, advisory otherwise.
+  jclass=$(fm_control_relaunch_journal_verdict "$journal" "$ID")
+  journal_proof=$jclass
+  if [ "$RERECORD_CHECK" = 1 ] || [ "$noop" = 1 ]; then
+    fm_slot_rerecord_journal_disposition "$jclass" "$journal" || { [ "$would" != pass ] || would="refuse:$FM_SLOT_RERECORD_REASON"; }
+    [ "$launch_proof" = ok ] || would="refuse:$launch_proof"
+    if ! fm_slot_rerecord_prove_no_backlog_close "$STATE" "$ID"; then
+      backlog_proof=$FM_SLOT_RERECORD_REASON
+      [ "$would" != pass ] || would="refuse:$backlog_proof"
+    fi
+    if ! fm_slot_rerecord_prove_stopped "$BACKEND" "$T" "$WT"; then
+      stopped_proof=$FM_SLOT_RERECORD_REASON
+      [ "$would" != pass ] || would="refuse:$stopped_proof"
+    fi
+    if [ "$noop" = 1 ]; then
+      echo "rerecord-slot $ID: already recorded"
+    else
+      echo "manifest_sha256=$manifest_sha"
+      echo "base=$old_base -> $new_base"
+    fi
+    echo "launch_proof=$launch_proof"
+    echo "journal_proof=$journal_proof"
+    echo "backlog_close_proof=$backlog_proof"
+    echo "stopped_proof=$stopped_proof"
+    if [ "$RERECORD_CHECK" = 1 ]; then
+      echo "write_would=$would"
+      [ "$noop" = 1 ] || echo "command: bin/fm-control.sh $ID rerecord-slot --manifest-sha $manifest_sha --note '<the ruling this carries out>'"
+    fi
+    exit 0
+  fi
+  fm_slot_rerecord_journal_disposition "$jclass" "$journal" || rerecord_refuse
+  fm_slot_rerecord_prove_no_backlog_close "$STATE" "$ID" || rerecord_refuse
+  fm_slot_rerecord_prove_stopped "$BACKEND" "$T" "$WT" || rerecord_refuse
+
+  # 8. The note and the reviewed manifest bytes.
+  fm_slot_rerecord_note_ok "$NOTE" || rerecord_refuse
+  fm_slot_rerecord_binding_ok "$manifest" "$RERECORD_MANIFEST_SHA" || rerecord_refuse
+
+  # 9. Stage, verify, archive, rebind, publish, verify, commit.
+  FM_RR_P=$prior_sha
+  FM_RR_STAGED=$(mktemp "$STATE/.$ID.meta.rerecord.XXXXXX") || die "could not stage task $ID's record; nothing was changed"
+  RERECORD_STAGE=staged
+  fm_slot_rerecord_stage "$snap/record" "$snap/manifest.json" "$FM_RR_STAGED" \
+    || die "could not stage task $ID's record; nothing was changed"
+  fm_slot_rerecord_precheck "$FM_RR_STAGED" "$snap/record" "$snap/manifest.json" \
+    "$(fm_task_copy_canonical_dir "$copy")" "$branch" || rerecord_refuse
+  staged_sha=$(fm_slot_rerecord_sha "$FM_RR_STAGED") || die "could not read task $ID's staged record; nothing was changed"
+  FM_RR_S=$staged_sha
+  note_json=$(python3 -I -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$NOTE") \
+    || die "could not encode the note; nothing was changed"
+  {
+    echo "task=$ID"
+    echo "prior_sha256=$prior_sha"
+    echo "staged=$FM_RR_STAGED"
+    echo "staged_sha256=$staged_sha"
+    echo "prior_block_sha256=$(fm_slot_rerecord_block_sha "$snap/record")"
+    echo "staged_block_sha256=$(fm_slot_rerecord_block_sha "$FM_RR_STAGED")"
+    echo "manifest=$manifest"
+    echo "manifest_sha256=$manifest_sha"
+    echo "old_base=$old_base"
+    echo "new_base=$new_base"
+    echo "head=$head"
+    sed -n '2,$p' "$snap/scope"
+    echo "note=$note_json"
+  } > "$snap/audit-body" || die "could not prepare the audit record; nothing was changed"
+  fm_slot_rerecord_archive "$FM_RR_DIR" "$snap/record" "$prior_sha" "$snap/audit-body" || rerecord_refuse
+  fm_slot_rerecord_inputs_unchanged "$META" "$prior_sha" "$manifest" "$manifest_sha" "$copy" "$head" || rerecord_refuse
+  fm_slot_rerecord_binding_ok "$manifest" "$RERECORD_MANIFEST_SHA" || rerecord_refuse
+  RERECORD_STAGE=publishing
+  if fm_backlog_atomic_transition publish "$FM_RR_STAGED" "$META" "task record" "$STATE"; then
+    RERECORD_STAGE=published
+    FM_RR_STAGED=
+  elif [ "$(fm_slot_rerecord_sha "$META")" = "$staged_sha" ]; then
+    # The rename reported failure but landed (N1): judge it published and restore the prior record.
+    RERECORD_STAGE=published
+    FM_RR_STAGED=
+    fm_slot_rerecord_rollback || exit 1
+    die "task $ID's record publish reported failure after it landed; the prior record was restored from $FM_RR_ARCHIVE"
+  else
+    RERECORD_STAGE=staged
+    die "${FM_BACKLOG_TRANSITION_ERROR:-the task record could not be published}; the record of task $ID is unchanged"
+  fi
+  if ! fm_slot_rerecord_postcheck "$META" "$staged_sha" "$manifest" "$manifest_sha" "$copy" "$head" \
+    "$project" "$ID" "$branch" "$STATE" "$snap/adopt-err"; then
+    line=$FM_SLOT_RERECORD_DETAIL
+    fm_slot_rerecord_rollback || exit 1
+    fm_slot_rerecord_refuse adopt_postcheck_failed "$line; the prior record was restored from $FM_RR_ARCHIVE"
+    exit 1
+  fi
+  if ! fm_slot_rerecord_commit; then
+    fm_slot_rerecord_rollback || exit 1
+    die "the audit record $FM_RR_AUDIT could not be closed as published, so task $ID's prior record was restored from $FM_RR_ARCHIVE"
+  fi
+
+  entries=${#scope[@]}
+  added=$(grep -c '^added_scope=' "$snap/scope" || true)
+  released=$(grep -c '^released_scope=' "$snap/scope" || true)
+  side=$(grep -c '^side_branch_' "$snap/scope" || true)
+  echo "rerecord-slot $ID: base $old_base -> $new_base; scope $entries entries ($added added, $released released, $side side-branch); prior record archived at $FM_RR_ARCHIVE"
+}
+
 # --- verbs ------------------------------------------------------------------
 
 case "$VERB" in
@@ -2978,5 +3259,8 @@ case "$VERB" in
     ;;
   relaunch)
     do_relaunch
+    ;;
+  rerecord-slot)
+    do_rerecord_slot
     ;;
 esac

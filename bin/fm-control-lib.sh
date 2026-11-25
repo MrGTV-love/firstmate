@@ -14,8 +14,9 @@
 #
 # This file owns three capability tables plus their pure artifact-path tables.
 # fm_control_endpoint_absence_verdict and its worktree-holder helper perform
-# backend and process reads; the tables remain pure, and sourcing this file
-# performs no probes:
+# backend and process reads, and fm_control_relaunch_journal_verdict reads one
+# journal file; the tables remain pure, and sourcing this file performs no
+# probes:
 #
 #   1. Verb allowlist. There is no arbitrary-text and no generic raw-key entry
 #      point on the control plane; a caller either names an allowlisted verb or
@@ -52,12 +53,13 @@ authorize-continuation
 reassociate
 adopt
 stay
+rerecord-slot
 EOF
 }
 
 fm_control_verb_allowed() {  # <verb>
   case "${1-}" in
-    interrupt|exit|relaunch|authorize-continuation|reassociate|adopt|stay) return 0 ;;
+    interrupt|exit|relaunch|authorize-continuation|reassociate|adopt|stay|rerecord-slot) return 0 ;;
   esac
   return 1
 }
