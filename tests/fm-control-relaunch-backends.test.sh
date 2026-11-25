@@ -859,7 +859,7 @@ test_recovery_inspection_report_follows_the_judged_record() {
       assert_not_contains "$out" "recovery-skipped" "$case: a judged claude record was skipped"
     else
       expect_code 0 "$rc" "$case: a judged omp record must skip"$'\n'"$out"
-      assert_contains "$out" "recovery-skipped $id launch=unmanaged: live omp agent carries" "$case: the omp skip names its cause"
+      assert_contains "$out" "recovery-skipped $id launch=unmanaged: $OMP_UNPINNED_SKIP" "$case: the omp skip names its cause"
     fi
     assert_not_contains "$(cat "$dir/fake/herdr-log")" "pane send-" "$case: the inspection sent lifecycle input"
   done
@@ -959,6 +959,9 @@ test_reboot_recovery_inspects_without_native_attribution() {
           case "$scenario" in
             managed|managed-claude) verdict=managed ;;
             unreadable) verdict=unknown ;;
+            # A pinned omp whose session record names another session is
+            # unmanaged for its session record, not for a missing pin.
+            pinned-personal) [ "$proof" != env-v1 ] || verdict=unmanaged-session ;;
             # A versioned claude launch whose readable environment carries no pin is
             # an unpinned native restore, reported as such; a legacy record keeps unknown.
             unknown-harness) verdict=unknown; [ "$proof" != env-v1 ] || verdict=unmanaged-claude ;;
@@ -966,12 +969,14 @@ test_reboot_recovery_inspects_without_native_attribution() {
           [ "$proof" != legacy ] || [ "$verdict" = managed ] || verdict=legacy-$verdict
           case "$mode/$verdict" in
             direct/managed) expected_out="recovery-skipped $id launch=managed" ;;
-            direct/unmanaged) expected_out="recovery-skipped $id launch=unmanaged: live omp agent carries" ;;
+            direct/unmanaged) expected_out="recovery-skipped $id launch=unmanaged: $OMP_UNPINNED_SKIP" ;;
+            direct/unmanaged-session) expected_out="recovery-skipped $id launch=unmanaged: $OMP_SESSION_SKIP" ;;
             direct/unknown) expected_out="launch recovery for $id cannot prove its live launch settings; no lifecycle action taken" ;;
             direct/unmanaged-claude) expected_out="launch recovery for $id found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken" ;;
             direct/legacy-unmanaged) expected_out="recovery-skipped $id launch=legacy record; exit and relaunch are allowed" ;;
             direct/legacy-unknown) expected_out="recovery-skipped $id launch=legacy-unproven" ;;
-            sweep/unmanaged) expected_out="REBOOT_RECOVERY: $id: live omp agent carries" ;;
+            sweep/unmanaged) expected_out="REBOOT_RECOVERY: $id: $OMP_UNPINNED_SKIP" ;;
+            sweep/unmanaged-session) expected_out="REBOOT_RECOVERY: $id: $OMP_SESSION_SKIP" ;;
             sweep/unknown) expected_out="REBOOT_RECOVERY: $id: live launch settings are unreadable; no lifecycle action taken" ;;
             sweep/unmanaged-claude) expected_out="REBOOT_RECOVERY: $id: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken" ;;
             sweep/legacy-unmanaged) expected_out="REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" ;;
@@ -1041,10 +1046,10 @@ test_reboot_recovery_skips_busy_native_drafts_without_mutation() {
         fi
         expect_code 0 "$rc" "$kind/$mode/$draft inspection must skip a retained busy native draft"$'\n'"$out"
         if [ "$mode" = direct ]; then
-          assert_contains "$out" "recovery-skipped $id launch=unmanaged: live omp agent carries" \
+          assert_contains "$out" "recovery-skipped $id launch=unmanaged: $OMP_UNPINNED_SKIP" \
             "$kind/$mode/$draft direct inspection must report the unmanaged launch"
         else
-          assert_contains "$out" "REBOOT_RECOVERY: $id: live omp agent carries" \
+          assert_contains "$out" "REBOOT_RECOVERY: $id: $OMP_UNPINNED_SKIP" \
             "$kind/$mode/$draft sweep must report the unmanaged launch"
         fi
         [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] \
@@ -1091,7 +1096,7 @@ test_reboot_recovery_skips_unpinned_foreground_without_mutation() {
       if [ "$mode" = direct ]; then
         assert_contains "$out" "launch=unmanaged" "readable unpinned foreground must be unmanaged for recorded omp"
       else
-        assert_contains "$out" "REBOOT_RECOVERY: $id: live omp agent carries" \
+        assert_contains "$out" "REBOOT_RECOVERY: $id: $OMP_UNPINNED_SKIP" \
           "readable unpinned foreground sweep must report the unmanaged launch for recorded omp"
       fi
       [ "$before" = "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/data/$id/brief.md" "$dir/wt/unlanded.txt")" ] \
@@ -1231,7 +1236,7 @@ test_bootstrap_inspects_the_derived_home_when_fm_home_is_unset() {
     FM_BOOTSTRAP_NETWORK=only FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
     FM_CONTROL_LAUNCH_WAIT=0.05 "$ROOT/bin/fm-bootstrap.sh" 2>&1) || rc=$?
   expect_code 0 "$rc" "network bootstrap must inspect its resolved home"$'\n'"$out"
-  assert_contains "$out" "REBOOT_RECOVERY: $id: live omp agent carries" \
+  assert_contains "$out" "REBOOT_RECOVERY: $id: $OMP_UNPINNED_SKIP" \
     "network bootstrap must report the unmanaged launch recorded in its derived home"
   assert_absent "$dir/home/state/$id.control-relaunch" "bootstrap must not checkpoint unmanaged native launch"
   assert_absent "$dir/fake/launched-command" "bootstrap must not replace unmanaged native launch"
@@ -1265,7 +1270,7 @@ test_secondmate_reboot_recovery_preserves_profile_and_child_work() {
   [ "$(meta_field "$dir" "$id" window)" = "$HERDR_CASE_SESSION:%7" ] || fail 'recovery moved the secondmate pane'
   [ "$before" = "$(shasum -a 256 "$dir/wt/unlanded.txt" "$dir/wt/data/charter.md" "$dir/wt/state/child.meta")" ] \
     || fail 'recovery changed secondmate child work or its charter'
-  assert_contains "$out" "recovery-skipped $id launch=unmanaged: live omp agent carries" \
+  assert_contains "$out" "recovery-skipped $id launch=unmanaged: $OMP_UNPINNED_SKIP" \
     "secondmate inspection must report its unmanaged launch"
   assert_absent "$dir/home/state/$id.control-relaunch" "secondmate inspection must not reconcile or checkpoint child work"
   assert_absent "$dir/fake/launched-command" "secondmate inspection must not launch a replacement"
@@ -1298,7 +1303,7 @@ test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation() {
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "first tick must inspect unmanaged a"$'\n'"$out"
-  assert_contains "$out" "REBOOT_RECOVERY: $id_a: live omp agent carries" \
+  assert_contains "$out" "REBOOT_RECOVERY: $id_a: $OMP_UNPINNED_SKIP" \
     "first tick must report unmanaged a"
   [ "$(cat "$b/home/state/.reboot-recovery-cursor")" = "$id_a" ] || fail 'first tick did not stop after a'
   [ ! -s "$b/fake/herdr-log" ] || fail 'one tick inspected a second recorded task'
@@ -1307,7 +1312,7 @@ test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation() {
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "next tick must inspect b despite pending a"$'\n'"$out"
-  assert_contains "$out" "REBOOT_RECOVERY: $id_b: live omp agent carries" \
+  assert_contains "$out" "REBOOT_RECOVERY: $id_b: $OMP_UNPINNED_SKIP" \
     "second tick must report unmanaged b"
   gen_b=$(meta_field "$b" "$id_b" spawn_gen)
   [ "$gen_b" = old ] || fail 'inspection replaced unmanaged b'
@@ -1360,7 +1365,7 @@ test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once() {
     expect_code 0 "$rc" "tick $tick must inspect without failing"$'\n'"$out"
     [ -n "$out" ] || continue
     notices=$((notices + 1))
-    assert_contains "$out" "live omp agent carries" "tick $tick must report an unmanaged launch"
+    assert_contains "$out" "$OMP_UNPINNED_SKIP" "tick $tick must report an unmanaged launch"
     [ "$tick" -le 5 ] || fail "tick $tick repeated an unchanged unmanaged notice: $out"
     noticed=$(cat "$home/home/state/.reboot-recovery-cursor")
     case "$seen" in *" $noticed "*) fail "unmanaged $noticed woke twice" ;; esac
@@ -1377,11 +1382,11 @@ test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once() {
     expect_code 0 "$rc" "restored identity tick $tick must inspect without failing"$'\n'"$out"
     [ -n "$out" ] || continue
     notices=$((notices + 1))
-    assert_contains "$out" "$id: live omp agent carries" "only the restored identity may notify again"
+    assert_contains "$out" "$id: $OMP_UNPINNED_SKIP" "only the restored identity may notify again"
   done
   [ "$notices" = 1 ] || fail "a changed restored-agent identity must notify exactly once, got $notices"
   out=$(run_control "$home" recover) || true
-  [ "$(printf '%s\n' "$out" | grep -c 'live omp agent carries')" = 5 ] \
+  [ "$(printf '%s\n' "$out" | grep -cF "$OMP_UNPINNED_SKIP")" = 5 ] \
     || fail "unbounded recover must still report every unmanaged launch: $out"
   pass 'bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes'
 }
@@ -1437,7 +1442,7 @@ SH
   rc=0
   out=$(run_control "$b" recover --one) || rc=$?
   expect_code 0 "$rc" "next bounded tick must inspect b without reentering a"$'\n'"$out"
-  assert_contains "$out" "REBOOT_RECOVERY: $id_b: live omp agent carries" \
+  assert_contains "$out" "REBOOT_RECOVERY: $id_b: $OMP_UNPINNED_SKIP" \
     "next bounded tick must report unmanaged b"
   assert_absent "$b/home/state/$id_b.control-relaunch" "unmanaged b inspection must not checkpoint"
   assert_absent "$b/fake/launched-command" "unmanaged b inspection must not replace"
@@ -1784,6 +1789,10 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
 CLAUDE_RESTORE_UUID=5a3eec19-de12-4999-bed2-bbd561089154
 CLAUDE_UNPINNED_CAUSE="live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record"
 CLAUDE_PINNED_ELSEWHERE_CAUSE="live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record"
+# The recovery reports of an unpinned omp agent, and of a pinned one whose
+# session record does not name it: each cause and its outcome.
+OMP_UNPINNED_SKIP="live omp agent carries no launch pin matching this record (a native resume or restore), and there is no omp adoption route, so nothing can authorize it; no lifecycle action taken"
+OMP_SESSION_SKIP="live omp agent carries this record's launch pin, but its omp session record does not name this live process and its current session; no lifecycle action taken"
 
 prepare_claude_restore() { # <case-name>
   recovery_case_or_skip "claude-restore-$1" "claude-restore-$1" || fail "claude restore needs jq"
@@ -1828,10 +1837,10 @@ test_claude_restore_has_no_adoption_route() {
   pass "claude restore: no adoption route; every consumer refuses with the named reason and never names adopt"
 }
 
-# The lock-owning main Firstmate's adopt of a claude task is refused as not omp,
-# exactly as on base. The lock-owner check needs /bin/ps, so a sandbox that
-# denies it stops earlier; this case needs a native run.
-test_claude_restore_adopt_refuses_as_not_omp() {
+# The lock-owning main Firstmate's adopt of a claude task is refused because no
+# adoption route remains (Main 1901). The lock-owner check needs /bin/ps, so a
+# sandbox that denies it stops earlier; this case needs a native run.
+test_claude_restore_adopt_refuses_with_no_adoption_route() {
   local dir id out rc=0
   prepare_claude_restore adopt-not-omp
   dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
@@ -1879,6 +1888,9 @@ test_claude_restore_restart_decides_attribution_before_its_first_effect() {
   rc=0
   out=$(FM_SECONDMATE_PERSIST_WAIT=0 CONTROL="$ROOT/bin/fm-secondmate-restart.sh" run_control "$dir" "$id") || rc=$?
   assert_not_contains "$out" "cannot be positively attributed" "a pinned lane passes the restart's attribution preflight"
+  expect_code 3 "$rc" "a pinned lane that does not confirm is left for its fallback"$'\n'"$out"
+  assert_contains "$out" "it did not confirm within 0s that its open work is written down" \
+    "a pinned lane is sent the persistence request and reaches its persistence deadline"
   pass "claude restore: the restart decides attribution before any pending reply, inbox write, request or nudge"
 }
 
@@ -2198,7 +2210,7 @@ control_relaunch_test_cases=(
 test_omp_adoption_route_is_removed
 test_recovery_inspection_report_follows_the_judged_record
 test_claude_restore_has_no_adoption_route
-test_claude_restore_adopt_refuses_as_not_omp
+test_claude_restore_adopt_refuses_with_no_adoption_route
 test_claude_restore_restart_decides_attribution_before_its_first_effect
 test_claude_restore_stopped_by_hand_relaunches_with_a_new_pin
 test_claude_restart_rechecks_attribution_before_its_fallback_nudge
