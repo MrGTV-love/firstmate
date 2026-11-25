@@ -1102,6 +1102,133 @@ test_verified_reclaim_keeps_new_sidecar() {
   pass "session-lock: a verified reclaim keeps the new sidecar beside the new pid"
 }
 
+# A failed process read of a live lock holder is unknown, never dead. kill -0
+# proves the holder exists; when ps then cannot say what it is, fm-lock.sh must
+# not take the lock from it. Rows (a1)-(a7) drive fm_harness_pid_alive behind a
+# stand-in ps (kill stubbed alive, so only the read decides); rows (b)-(e) run
+# the real bin/fm-lock.sh from a fake claude chain whose stand-in ps answers the
+# chain's own reads from the real ps and fails only for the holder pid.
+holder_ps_fixture() {  # <fakebin>: ps stub steered by FM_TEST_HOLDER_PID/MODE
+  cat > "$1/ps" <<'SH'
+#!/usr/bin/env bash
+set -u
+field= pid=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) field=$2; shift 2 ;;
+    -p) pid=$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+if [ "$pid" = "${FM_TEST_HOLDER_PID:-}" ]; then
+  case "${FM_TEST_HOLDER_MODE:-}:$field" in
+    comm-exit2:comm=) echo 'ps: operation not permitted' >&2; exit 2 ;;
+    comm-exit1-stderr:comm=) echo 'ps: sysctl failed' >&2; exit 1 ;;
+    comm-exit1-stdout:comm=) echo junk; exit 1 ;;
+    comm-126:comm= | comm-126:args=) exit 126 ;;
+    args-exit2:args=) echo 'ps: operation not permitted' >&2; exit 2 ;;
+    absent:comm= | absent:args=) exit 1 ;;
+    harness:comm=) echo claude; exit 0 ;;
+    harness:args=) echo 'claude --resume'; exit 0 ;;
+    other:comm=) echo sleep; exit 0 ;;
+    other:args=) echo 'sleep 300'; exit 0 ;;
+    args-exit2:comm=) echo claude; exit 0 ;;
+  esac
+fi
+# Not exec: a confined worker refuses to run ps, and the 126 a plain run
+# reports is the status the library falls back from.
+"$FM_TEST_REAL_PS" -o "$field" -p "$pid"
+exit $?
+SH
+  chmod +x "$1/ps"
+}
+
+alive_status() {  # <fakebin> <mode> [<proc-info-override>] -> prints fm_harness_pid_alive's status
+  local fakebin=$1 mode=$2 override=${3:-}
+  FM_TEST_HOLDER_PID=810 FM_TEST_HOLDER_MODE=$mode FM_TEST_REAL_PS=$(command -v ps) \
+    lib_eval "$fakebin" "${override:+_FM_SESSION_LOCK_PROC_INFO='$override'}
+      fm_harness_pid_alive 810; printf '%s' \$?" 2>/dev/null
+}
+
+# Run the real fm-lock.sh from a fake claude chain; prints nothing, writes
+# $dir/state/acquire.{out,rc}. The holder pid is recorded in the lock first.
+acquire_against_holder() {  # <dir> <fakebin> <holder-pid> <mode>
+  local dir=$1 fakebin=$2 holder=$3 mode=$4
+  mkdir -p "$dir/state"
+  printf '%s\n' "$holder" > "$dir/state/.lock"
+  cp "$dir/state/.lock" "$dir/state/lock-before"
+  env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
+    FM_HOME="$dir" FM_LOCK="$ROOT/bin/fm-lock.sh" PATH="$fakebin:$PATH" \
+    FM_TEST_HOLDER_PID="$holder" FM_TEST_HOLDER_MODE="$mode" FM_TEST_REAL_PS="$REAL_PS" \
+    "$NAMED_CLAUDE" -c '
+      "$FM_LOCK" > "$FM_HOME/state/acquire.out" 2>&1
+      printf "%s\n" "$?" > "$FM_HOME/state/acquire.rc"
+      printf "%s\n" "$$" > "$FM_HOME/state/chain-pid"
+    '
+}
+
+test_unreadable_live_holder_is_unknown_and_never_taken_over() {
+  local fakebin got dir holder harness_dir fake_info
+  REAL_PS=$(command -v ps)
+  fakebin=$(fm_fakebin "$TMP_ROOT/holder-read")
+  holder_ps_fixture "$fakebin"
+
+  # (a) the library's three outcomes.
+  got=$(alive_status "$fakebin" harness); [ "$got" = 0 ] || fail "a1: a verified harness answered $got, expected 0"
+  got=$(alive_status "$fakebin" other); [ "$got" = 1 ] || fail "a2: a live non-harness answered $got, expected 1"
+  got=$(alive_status "$fakebin" absent); [ "$got" = 1 ] || fail "a3: ps exit 1 with no output (an absent pid) answered $got, expected 1"
+  got=$(alive_status "$fakebin" comm-exit2); [ "$got" = 2 ] || fail "a4: a comm read exiting 2 answered $got, expected unknown 2"
+  got=$(alive_status "$fakebin" comm-exit1-stderr); [ "$got" = 2 ] || fail "a5: a comm read exiting 1 with stderr answered $got, expected 2"
+  got=$(alive_status "$fakebin" comm-exit1-stdout); [ "$got" = 2 ] || fail "a5: a comm read exiting 1 with stdout answered $got, expected 2"
+  got=$(alive_status "$fakebin" args-exit2); [ "$got" = 2 ] || fail "a6: a failed args read after a good comm read answered $got, expected 2"
+  fake_info="$TMP_ROOT/holder-read/proc-info-fails.sh"
+  printf '#!/bin/sh\nexit 1\n' > "$fake_info"; chmod +x "$fake_info"
+  got=$(alive_status "$fakebin" comm-126 "$fake_info"); [ "$got" = 2 ] || fail "a7: ps exit 126 with an empty fallback answered $got, expected 2, never absence"
+  got=$(alive_status "$fakebin" comm-126 /nonexistent/fm-proc-info.py); [ "$got" = 2 ] || fail "a7: ps exit 126 with an unusable fallback answered $got, expected 2"
+  pass "session-lock: fm_harness_pid_alive answers 0 live harness, 1 dead or not a harness, 2 unreadable"
+
+  # A live holder outside the chain: a plain sleep, and one named claude.
+  harness_dir="$TMP_ROOT/holder-read/harness"
+  mkdir -p "$harness_dir"
+  ln -s /bin/sleep "$harness_dir/claude"
+  /bin/sleep 300 & holder=$!
+  BG_FIXTURE_PIDS+=("$holder")
+  kill -0 "$holder" || fail "the live holder fixture did not start"
+
+  # (b) kill -0 succeeds, the read fails: refuse, lock untouched.
+  dir="$TMP_ROOT/holder-read/b"
+  acquire_against_holder "$dir" "$fakebin" "$holder" comm-exit2
+  expect_code 1 "$(tr -d '[:space:]' < "$dir/state/acquire.rc")" "b: an unreadable live holder did not refuse the acquire: $(cat "$dir/state/acquire.out")"
+  [ "$(cat "$dir/state/acquire.out")" = "error: cannot read process $holder; holder not proven dead; operate read-only until resolved" ] \
+    || fail "b: wrong refusal text: $(cat "$dir/state/acquire.out")"
+  cmp -s "$dir/state/lock-before" "$dir/state/.lock" || fail "b: the refusal changed the lock file"
+
+  # (c) working ps, live non-harness holder: the lock is taken as before.
+  dir="$TMP_ROOT/holder-read/c"
+  acquire_against_holder "$dir" "$fakebin" "$holder" other
+  expect_code 0 "$(tr -d '[:space:]' < "$dir/state/acquire.rc")" "c: a live non-harness holder blocked the acquire: $(cat "$dir/state/acquire.out")"
+  [ "$(tr -d '[:space:]' < "$dir/state/.lock")" = "$(tr -d '[:space:]' < "$dir/state/chain-pid")" ] \
+    || fail "c: the lock was not taken from a non-harness holder"
+
+  # (d) working ps, live verified-harness holder: the existing refusal text.
+  dir="$TMP_ROOT/holder-read/d"
+  acquire_against_holder "$dir" "$fakebin" "$holder" harness
+  expect_code 1 "$(tr -d '[:space:]' < "$dir/state/acquire.rc")" "d: a live harness holder did not refuse the acquire: $(cat "$dir/state/acquire.out")"
+  [ "$(cat "$dir/state/acquire.out")" = "error: another live firstmate session holds the lock (pid $holder); operate read-only until resolved" ] \
+    || fail "d: the live-owner refusal text changed: $(cat "$dir/state/acquire.out")"
+  cmp -s "$dir/state/lock-before" "$dir/state/.lock" || fail "d: the refusal changed the lock file"
+
+  # (e) a recorded pid that is gone: the lock is taken as before.
+  /bin/sleep 300 & holder=$!
+  kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+  dir="$TMP_ROOT/holder-read/e"
+  acquire_against_holder "$dir" "$fakebin" "$holder" absent
+  expect_code 0 "$(tr -d '[:space:]' < "$dir/state/acquire.rc")" "e: a gone holder blocked the acquire: $(cat "$dir/state/acquire.out")"
+  [ "$(tr -d '[:space:]' < "$dir/state/.lock")" = "$(tr -d '[:space:]' < "$dir/state/chain-pid")" ] \
+    || fail "e: the lock was not taken from a gone holder"
+  pass "session-lock: fm-lock.sh refuses an unreadable live holder, and still takes a gone or non-harness holder's lock"
+}
+
 test_version_named_session_is_identified_on_both_platforms
 test_harness_at_namespace_pid1_is_examined
 test_ordinary_paths_are_never_harness_processes
@@ -1118,3 +1245,4 @@ test_same_session_confirmation_does_not_steal_after_wait
 test_failed_lock_write_restores_previous_sidecar
 test_failed_lock_write_removes_new_sidecar_when_none_existed
 test_verified_reclaim_keeps_new_sidecar
+test_unreadable_live_holder_is_unknown_and_never_taken_over

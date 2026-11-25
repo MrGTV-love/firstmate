@@ -20,6 +20,10 @@
 #                     the watchdog freshness policy in docs/watchdog.md holds.
 #   session-missing   supervision is needed and the session lock names no live
 #                     harness process (fm_harness_pid_alive).
+#   unknown-session   supervision is needed and the lock holder exists but its
+#                     process read failed (fm_harness_pid_alive status 2), so
+#                     nothing proves the session missing. No recovery runs;
+#                     the next check reads it again.
 #   dead-arm-owner    the session is live, the Claude auto-arm ledger still
 #                     says outcome=arming, its owner pid is dead, and the
 #                     beacon is stale: the arm died without a terminal record.
@@ -154,7 +158,7 @@ WATCHDOG_VERDICT=
 WATCHDOG_STUCK_PID=
 WATCHDOG_STUCK_IDENTITY=
 watchdog_verdict() {
-  local lock_pid age watcher_pid progress_rc=0
+  local lock_pid age watcher_pid progress_rc=0 alive_rc
   WATCHDOG_VERDICT=healthy
   WATCHDOG_STUCK_PID=
   WATCHDOG_STUCK_IDENTITY=
@@ -164,7 +168,17 @@ watchdog_verdict() {
     return 0
   fi
   lock_pid=$(sed -n '1p' "$STATE/.lock" 2>/dev/null || true)
-  if [ -z "$lock_pid" ] || ! fm_harness_pid_alive "$lock_pid"; then
+  if [ -z "$lock_pid" ]; then
+    WATCHDOG_VERDICT="session-missing"
+    return 0
+  fi
+  alive_rc=0
+  fm_harness_pid_alive "$lock_pid" || alive_rc=$?
+  if [ "$alive_rc" -eq 2 ]; then
+    WATCHDOG_VERDICT="unknown-session"
+    return 0
+  fi
+  if [ "$alive_rc" -ne 0 ]; then
     WATCHDOG_VERDICT="session-missing"
     return 0
   fi
@@ -321,6 +335,11 @@ watchdog_main() {
       echo "watchdog: $first"
       return 0 ;;
   esac
+  if [ "$first" = unknown-session ]; then
+    log "verdict $first; no recovery while the lock holder cannot be read"
+    echo "watchdog: $first - lock holder cannot be read; no recovery run"
+    return 0
+  fi
   episode_read
   now_epoch=$(now)
   if [ "$EP_LAST_ATTEMPT" -gt 0 ] && [ $((now_epoch - EP_LAST_ATTEMPT)) -lt "$RETRY_SECS" ]; then

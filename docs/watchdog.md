@@ -20,7 +20,7 @@ It reads the home's existing evidence, optionally runs an operator-owned resume 
 ## What one check does
 
 Each run reads `state/.last-watcher-beat`, the session lock, and the Claude auto-arm ledger `state/.claude-autoarm-epoch` through the helpers in `bin/fm-wake-lib.sh`.
-It reaches one verdict: `idle`, `healthy`, `session-missing`, `dead-arm-owner`, or `stale-watcher`.
+It reaches one verdict: `idle`, `healthy`, `session-missing`, `unknown-session`, `dead-arm-owner`, or `stale-watcher`.
 A launchd job runs outside every harness, so the check derives the supervision model from the ledger: a Claude primary when the ledger exists, a persistent watcher otherwise.
 `FM_SUPERVISION_MODEL` pins the model when that guess is wrong.
 Pi and omp homes use the extension model and are not covered by the derivation.

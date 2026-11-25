@@ -177,13 +177,53 @@ EOF
   printf '%s\n' "$outermost"
 }
 
-# True if $1 is a live process that looks like a verified harness.
+# Read one process fact (comm or args) of a pid that kill -0 just proved
+# exists, and tell an absent process apart from a failed read. Prints the fact
+# and returns 0 when ps answered; returns 1 only when ps proves the pid is gone
+# (exit 1 with empty stdout and empty stderr); returns 2 for every other
+# outcome - a ps exit of 2 or more, an exit 1 that printed anything, or an exit
+# 126 whose bin/fm-proc-info.py fallback printed nothing. A confined worker's
+# ps exits 126 and the fallback exits 1 with no output for an absent and an
+# unreadable pid alike, so that pair never reads as absence. This is a small
+# local read because fm_session_lock_proc drops stderr and the exit status
+# alone cannot tell absence from failure.
+_fm_harness_pid_read() {  # <comm|args> <pid>
+  local errfile out status err
+  errfile=$(mktemp "${TMPDIR:-/tmp}/fm-pid-read.XXXXXX" 2>/dev/null) || return 2
+  out=$(ps -o "$1=" -p "$2" 2>"$errfile")
+  status=$?
+  err=$(cat "$errfile" 2>/dev/null) || status=2
+  rm -f "$errfile" 2>/dev/null
+  if [ "$status" -eq 126 ]; then
+    out=$(python3 "$_FM_SESSION_LOCK_PROC_INFO" "$1" "$2" 2>/dev/null) || return 2
+    [ -n "$out" ] || return 2
+    printf '%s\n' "$out"
+    return 0
+  fi
+  case "$status" in
+    0) printf '%s\n' "$out"; return 0 ;;
+    1) [ -z "$out" ] && [ -z "$err" ] && return 1 ;;
+  esac
+  return 2
+}
+
+# Three outcomes for pid $1:
+#   0  a live process that looks like a verified harness.
+#   1  proven not a live harness: the pid is gone (kill -0 fails, or ps proves
+#      it absent) or it is a live process that is not a verified harness.
+#   2  unknown: kill -0 says the pid exists but the comm or args read failed, so
+#      nothing proves the holder dead. A caller that would act on "not alive"
+#      by taking something over must refuse on 2.
+# A caller that tests only the exit status as a boolean reads 2 as not alive.
 fm_harness_pid_alive() {
-  local pid=$1 comm args
+  local pid=$1 comm args rc
   kill -0 "$pid" 2>/dev/null || return 1
-  comm=$(fm_session_lock_proc comm "$pid") || return 1
-  args=$(fm_session_lock_proc args "$pid")
-  fm_harness_process_matches "$comm" "$args"
+  comm=$(_fm_harness_pid_read comm "$pid") && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || return "$rc"
+  args=$(_fm_harness_pid_read args "$pid") && rc=0 || rc=$?
+  [ "$rc" -eq 0 ] || return "$rc"
+  fm_harness_process_matches "$comm" "$args" && return 0
+  return 1
 }
 
 # --- trusted same-session identity -------------------------------------------
@@ -365,18 +405,23 @@ EOF
 # contiguous harness ancestry that was not recorded by this same trusted Claude
 # session. Sets FM_SESSION_LOCK_FOREIGN_OWNER_PID for a diagnostic caller.
 # Malformed, missing, dead, and ancestry-uncertain locks are not foreign-owner
-# evidence.
+# evidence; a holder that exists but cannot be read is.
 # shellcheck disable=SC2034 # Output global, read by the sourcing guard caller.
 FM_SESSION_LOCK_FOREIGN_OWNER_PID=
 fm_session_lock_foreign_owner_live() {
-  local state=$1 lock_pid pids pid
+  local state=$1 lock_pid pids pid alive_rc
   FM_SESSION_LOCK_FOREIGN_OWNER_PID=
   [ -f "$state/.lock" ] && [ ! -L "$state/.lock" ] || return 1
   lock_pid=$(cat "$state/.lock" 2>/dev/null || true)
   case "$lock_pid" in
     ''|*[!0-9]*) return 1 ;;
   esac
-  fm_harness_pid_alive "$lock_pid" || return 1
+  # Status 2 (the holder exists but its process read failed) is foreign-owner
+  # evidence too: the holder is not proven dead, so the caller must stay
+  # read-only rather than arm or block as if the home had no live owner.
+  alive_rc=0
+  fm_harness_pid_alive "$lock_pid" || alive_rc=$?
+  [ "$alive_rc" -ne 1 ] || return 1
   if fm_session_lock_requires_native_id "$state"; then
     fm_session_lock_owned_by_self "$state" && return 1
     FM_SESSION_LOCK_FOREIGN_OWNER_PID=$lock_pid
