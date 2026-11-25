@@ -844,7 +844,64 @@ fm_slot_adopt_sibling_claim() { # <slot> <copy> <state-dir>
   return 1
 }
 
-FM_SLOT_DRIFT_PY=$(cat <<'FMDRIFTPY'
+# The task's own line, one owner for the drift report and rerecord-slot's side-branch labels: the first-parent
+# non-merge commits from <tip> to <head>, plus each first-parent merge's combined diff (the paths it authored itself).
+# own_line(git, tip, head) returns the set of paths as bytes; git is the caller's runner (raising on an exit outside ok).
+FM_SLOT_OWN_LINE_DEF=$(cat <<'FMOWNLINEPY'
+import os
+import subprocess
+
+
+def own_line(git, tip, head):
+    def split(raw):
+        return [part for part in raw.split(b"\0") if part]
+    own = set(split(git("log", "--first-parent", "--no-merges", "--no-renames", "--name-only", "-z", "--format=", head, "--not", tip).stdout))
+    for merge in git("rev-list", "--first-parent", "--merges", head, "--not", tip).stdout.decode().split():
+        own |= set(split(git("show", "--cc", "--name-only", "-z", "--format=", merge, ok=(0, 128)).stdout))
+    return own
+FMOWNLINEPY
+)
+
+# The index-flagged tracked paths (assume-unchanged, skip-worktree) whose existence, type, mode or bytes differ, which
+# git status cannot report: one owner for the drift report and rerecord-slot's strand check. flagged_changed(git, copy)
+# returns the paths as bytes.
+FM_SLOT_FLAGGED_DEF=$(cat <<'FMFLAGGEDPY'
+import os
+import subprocess
+
+
+def flagged_changed(git, copy):
+    env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+    found = []
+    for flagged in [part for part in git("ls-files", "-v", "-z").stdout.split(b"\0") if part]:
+        tag, path = flagged[:1], flagged[2:]
+        if not (tag.islower() or tag == b"S"):
+            continue
+        full = os.path.join(os.fsencode(copy), path)
+        if not os.path.lexists(full):
+            # An assume-unchanged path that is gone was deleted by the task, which status cannot show; a skip-worktree path
+            # that is absent is what sparse checkout leaves unmaterialized on purpose, so it is not a difference.
+            if tag.islower() and tag != b"s":
+                found.append(path)
+            continue
+        entry = git("ls-files", "-s", "-z", "--", os.fsdecode(path)).stdout.split(b"\0")[0].split()
+        if len(entry) < 2:
+            continue
+        mode = entry[0].decode()
+        if os.path.islink(full):
+            blob = subprocess.run(["git", "-C", copy, "hash-object", "--stdin"], input=os.readlink(full), capture_output=True, env=env)
+            differs = mode != "120000" or blob.stdout.decode().strip() != entry[1].decode()
+        else:
+            blob = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True, env=env)
+            want_mode = "100755" if os.stat(full).st_mode & 0o100 else "100644"
+            differs = blob.stdout.decode().strip() != entry[1].decode() or want_mode != mode
+        if differs:
+            found.append(path)
+    return found
+FMFLAGGEDPY
+)
+
+FM_SLOT_DRIFT_BODY=$(cat <<'FMDRIFTPY'
 import os
 import re
 import subprocess
@@ -959,14 +1016,9 @@ for tip_head in heads:
         fork = base
         limits.append("the default branch tip or the fork point is unavailable; the recorded base %s is the reference, so inherited upstream paths may be listed as uncertain" % base[:12])
     net = set(names(git("diff", "--no-renames", "-z", "--name-only", "--ignore-submodules=none", fork, tip_head).stdout))
-    own = set()
-    if known:
-        # The task's own line: the commits on the first-parent chain, a merge counting only for the paths it authored
-        # itself (the combined diff). A path that reaches HEAD only through a merged side branch, such as another task's
-        # branch, is not established as this task's work, so it is listed uncertain, never proven (D3 R3).
-        own |= set(names(git("log", "--first-parent", "--no-merges", "--no-renames", "--name-only", "-z", "--format=", tip_head, "--not", tip).stdout))
-        for merge in git("rev-list", "--first-parent", "--merges", tip_head, "--not", tip).stdout.decode().split():
-            own |= set(names(git("show", "--cc", "--name-only", "-z", "--format=", merge, ok=(0, 128)).stdout))
+    # The task's own line (FM_SLOT_OWN_LINE_DEF). A path that reaches HEAD only through a merged side branch, such as
+    # another task's branch, is not established as this task's work, so it is listed uncertain, never proven (D3 R3).
+    own = own_line(git, tip, tip_head) if known else set()
     for path in net:
         (add if known and path in own else uncertain)(path)
     if known:
@@ -1021,31 +1073,9 @@ while i < len(raw):
             uncertain(path, "ignored")
     else:
         add(path.rstrip(b"/") if code == b"??" and path.endswith(b"/") else path)
-# Tracked paths that status cannot report (assume-unchanged, skip-worktree) whose existence, type, mode or bytes differ.
-for flagged in names(git("ls-files", "-v", "-z").stdout):
-    tag, path = flagged[:1], flagged[2:]
-    if not (tag.islower() or tag == b"S"):
-        continue
-    full = os.path.join(os.fsencode(copy), path)
-    if not os.path.lexists(full):
-        # An assume-unchanged path that is gone was deleted by the task, which status cannot show; a skip-worktree path
-        # that is absent is what sparse checkout leaves unmaterialized on purpose, so it is not a difference.
-        if tag.islower() and tag != b"s":
-            add(path)
-        continue
-    entry = git("ls-files", "-s", "-z", "--", os.fsdecode(path)).stdout.split(b"\0")[0].split()
-    if len(entry) < 2:
-        continue
-    mode = entry[0].decode()
-    if os.path.islink(full):
-        blob = subprocess.run(["git", "-C", copy, "hash-object", "--stdin"], input=os.readlink(full), capture_output=True, env=env)
-        differs = mode != "120000" or blob.stdout.decode().strip() != entry[1].decode()
-    else:
-        blob = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True, env=env)
-        want_mode = "100755" if os.stat(full).st_mode & 0o100 else "100644"
-        differs = blob.stdout.decode().strip() != entry[1].decode() or want_mode != mode
-    if differs:
-        add(path)
+# Tracked paths that status cannot report (FM_SLOT_FLAGGED_DEF).
+for path in flagged_changed(git, copy):
+    add(path)
 print("drift-count\t%d" % len(proven))
 for path in sorted(proven):
     labels = [proven[path]] + sorted(status.get(path, ()))
@@ -1054,6 +1084,9 @@ for limit in dict.fromkeys(limits):
     print("limitation\t" + limit)
 FMDRIFTPY
 )
+FM_SLOT_DRIFT_PY="$FM_SLOT_OWN_LINE_DEF
+$FM_SLOT_FLAGGED_DEF
+$FM_SLOT_DRIFT_BODY"
 
 # The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals.
 # Reads only; the recorded scope, manifest and record are never edited by what this reports.

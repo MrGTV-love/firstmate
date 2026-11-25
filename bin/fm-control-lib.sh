@@ -355,6 +355,54 @@ fm_control_backend_state_verified() {  # <backend>
   return 1
 }
 
+# fm_control_relaunch_journal_verdict: the ONE classification of a task's
+# relaunch journal (state/<id>.control-relaunch), shared by reassociate and
+# rerecord-slot, each of which maps the classes to its own verdicts. It reads
+# only the file and prints one class:
+#   absent               no journal;
+#   unreadable           not a regular file, a symlink, unreadable, or its
+#                        task= is not this task;
+#   complete             phase=complete;
+#   failed-closed        a failed:* phase whose rollback kept or restored the
+#                        prior incarnation (prior-record-kept,
+#                        prior-record-kept-agent-dead, instructions-restored);
+#   failed-needs-stopped a failed:* phase that left the old agent alive or its
+#                        state unproven (instructions-restored-agent-alive,
+#                        instructions-restored-agent-state-<s>);
+#   failed-open          any other or missing rollback on a failed:* phase;
+#   in-flight            every other phase, a missing one and a bare failed:.
+fm_control_relaunch_journal_verdict() {  # <journal> <task-id>
+  local journal=${1-} id=${2-} phase rollback
+  if [ ! -e "$journal" ] && [ ! -L "$journal" ]; then
+    printf 'absent\n'
+    return 0
+  fi
+  if [ ! -f "$journal" ] || [ -L "$journal" ] || [ ! -r "$journal" ] \
+     || ! cat -- "$journal" >/dev/null 2>&1 \
+     || [ "$(fm_backend_meta_exact_value "$journal" task)" != "$id" ]; then
+    printf 'unreadable\n'
+    return 0
+  fi
+  phase=$(fm_backend_meta_exact_value "$journal" phase) || phase=
+  case "$phase" in
+    complete) printf 'complete\n' ;;
+    failed:?*)
+      rollback=$(fm_backend_meta_exact_value "$journal" rollback) || rollback=
+      case "$rollback" in
+        instructions-restored-agent-state-*)
+          case "${rollback#instructions-restored-agent-state-}" in
+            ''|*[!A-Za-z0-9._-]*) rollback= ;;
+          esac ;;
+      esac
+      case "$rollback" in
+        prior-record-kept|prior-record-kept-agent-dead|instructions-restored) printf 'failed-closed\n' ;;
+        instructions-restored-agent-alive|instructions-restored-agent-state-?*) printf 'failed-needs-stopped\n' ;;
+        *) printf 'failed-open\n' ;;
+      esac ;;
+    *) printf 'in-flight\n' ;;
+  esac
+}
+
 fm_control_lsof_path() (
   set -o pipefail
   printf '%s' "$1" | LC_ALL=C od -An -v -tu1 | LC_ALL=C awk '

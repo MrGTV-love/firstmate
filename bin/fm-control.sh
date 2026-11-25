@@ -920,36 +920,18 @@ reassociate_check() {  # <record-index>
   # authoritative record. Those rollbacks need no liveness proof, as with no
   # journal, except the two that left the old agent alive or unproven stopped:
   # those still need the backend to prove it stopped or its endpoint missing.
-  local journal="$STATE/$ID.control-relaunch" phase rollback closed=0
-  if [ -e "$journal" ] || [ -L "$journal" ]; then
-    if [ -f "$journal" ] && [ ! -L "$journal" ] && [ -r "$journal" ] \
-       && cat -- "$journal" >/dev/null 2>&1 \
-       && [ "$(fm_backend_meta_exact_value "$journal" task)" = "$ID" ]; then
-      phase=$(fm_backend_meta_exact_value "$journal" phase) || phase=
-      case "$phase" in
-        complete) closed=1 ;;
-        failed:?*)
-          rollback=$(fm_backend_meta_exact_value "$journal" rollback) || rollback=
-          case "$rollback" in
-            instructions-restored-agent-state-*)
-              case "${rollback#instructions-restored-agent-state-}" in
-                ''|*[!A-Za-z0-9._-]*) rollback= ;;
-              esac ;;
-          esac
-          case "$rollback" in
-            prior-record-kept|prior-record-kept-agent-dead|instructions-restored)
-              closed=1; RA_JOURNALS[m]=$journal ;;
-            instructions-restored-agent-alive|instructions-restored-agent-state-?*)
-              case "$(fm_backend_agent_state "$FM_BACKEND_VALIDATED_BACKEND" "$FM_BACKEND_VALIDATED_TARGET")" in
-                dead|missing) closed=1; RA_JOURNALS[m]=$journal ;;
-                *) die "task $ID's agent is not proven stopped; reconcile it before archiving its rolled-back relaunch journal and reassociating" ;;
-              esac ;;
-          esac ;;
-      esac
-    fi
-    [ "$closed" = 1 ] \
-      || die "task $ID has an unfinished relaunch transaction at $journal; reconcile it before reassociating"
-  fi
+  # The classes are fm_control_relaunch_journal_verdict's (bin/fm-control-lib.sh).
+  local journal="$STATE/$ID.control-relaunch"
+  case "$(fm_control_relaunch_journal_verdict "$journal" "$ID")" in
+    absent|complete) ;;
+    failed-closed) RA_JOURNALS[m]=$journal ;;
+    failed-needs-stopped)
+      case "$(fm_backend_agent_state "$FM_BACKEND_VALIDATED_BACKEND" "$FM_BACKEND_VALIDATED_TARGET")" in
+        dead|missing) RA_JOURNALS[m]=$journal ;;
+        *) die "task $ID's agent is not proven stopped; reconcile it before archiving its rolled-back relaunch journal and reassociating" ;;
+      esac ;;
+    *) die "task $ID has an unfinished relaunch transaction at $journal; reconcile it before reassociating" ;;
+  esac
 
   RA_BRIEFS[m]=$brief
   [ -f "$brief" ] && [ ! -L "$brief" ] \
