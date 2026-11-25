@@ -822,7 +822,7 @@ def advance(home, task, url, meta, side):
         if not head.get("outcome"):
             head["outcome"] = {"kind": "merged", "detail": url}
             phase(side, sha, "merged", url)
-            emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}")
+            emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried_note(sha, head.get('read_sha', sha))}")
         side.save()
         return
     if head.get("outcome") or str(view.get("state", "")).upper() != "OPEN":
@@ -956,9 +956,13 @@ def protected_reasons(url, sha, meta):
     return sorted(set(reasons))
 
 
-def merge(home, task, url, sha, side, meta, read_sha=None):
+def carried_note(sha, read_sha):
+    return f" on the PASS carried from {read_sha[:12]}" if read_sha != sha else ""
+
+
+def merge(home, task, url, sha, side, meta, read_sha):
     head = side.head(sha)
-    reasons = protected_reasons(url, read_sha or sha, meta)
+    reasons = protected_reasons(url, read_sha, meta)
     if reasons:
         # Not terminal: the evidence is read again every pass, so a readable report or a repaired history is judged anew.
         reason = "; ".join(reasons)
@@ -972,14 +976,14 @@ def merge(home, task, url, sha, side, meta, read_sha=None):
         return
     done = run([str(BIN / "fm-pr-merge.sh"), task, url], home)
     if done.returncode == 0 and re.search(rf"(?m)^verified: {re.escape(url)} is queued ", done.stdout):
+        head["read_sha"] = read_sha
         phase(side, sha, "queued", url)
-        emit(home, task, side, sha, "queued", f"queued: {url} at {sha[:12]} is in the merge queue")
+        emit(home, task, side, sha, "queued", f"queued: {url} at {sha[:12]} is in the merge queue{carried_note(sha, read_sha)}")
         return
     if done.returncode == 0:
         head["outcome"] = {"kind": "merged", "detail": url}
         phase(side, sha, "merged", url)
-        carried = f" on the PASS carried from {read_sha[:12]}" if read_sha and read_sha != sha else ""
-        emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried}")
+        emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried_note(sha, read_sha)}")
         return
     output = [line.strip() for line in (done.stderr + done.stdout).splitlines() if line.strip()]
     errors = [line for line in output if line.startswith("error:")]

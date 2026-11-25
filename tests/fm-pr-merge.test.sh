@@ -3110,9 +3110,10 @@ test_auto_review_three_prs_through_the_housekeeping_pass() {
 }
 
 test_auto_review_carries_a_pass_across_a_clean_base_update() {
-  local scenario case_dir base2 merged
-  for scenario in clean unread; do
+  local scenario case_dir base2 merged h1 h2
+  for scenario in clean queued unread; do
     case_dir=$(auto_case "carry-$scenario")
+    [ "$scenario" = queued ] && write_github_outcome "$case_dir" OPEN false true main
     # The read returns while the check runs again, so the PASS at h1 is recorded and nothing merges.
     auto_step "$case_dir"; auto_wait "$case_dir"
     jq '.statusCheckRollup[0].status = "IN_PROGRESS"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
@@ -3128,7 +3129,7 @@ test_auto_review_carries_a_pass_across_a_clean_base_update() {
     git -C "$case_dir/wt" push -q origin main
     printf '%s\n' "$base2" > "$case_dir/github-base"
     git -C "$case_dir/wt" checkout -q fm/fixture
-    if [ "$scenario" = clean ]; then
+    if [ "$scenario" != unread ]; then
       git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' merge -q --no-edit main
     else
       git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' merge -q --no-commit --no-ff main >/dev/null 2>&1
@@ -3141,17 +3142,27 @@ test_auto_review_carries_a_pass_across_a_clean_base_update() {
     merged=$(sed -n 's/.*--match-head-commit \([0-9a-f]*\).*/\1/p' "$case_dir/gh.log")
     expect_code 1 "$(auto_merges "$case_dir")" "carry-$scenario: h2 merges exactly once"
     expect_code "$(auto_sha "$case_dir" h2)" "$merged" "carry-$scenario: the merge names the live head"
+    h1=$(auto_sha "$case_dir" h1 | cut -c1-12); h2=$(auto_sha "$case_dir" h2 | cut -c1-12)
     if [ "$scenario" = clean ]; then
       expect_code 1 "$(auto_calls "$case_dir")" "carry-clean: a clean base update requests no new read"
       expect_code 1 "$(auto_reviews "$case_dir")" "carry-clean: no new verdict is needed"
-      assert_grep "on the PASS carried from $(auto_sha "$case_dir" h1 | cut -c1-12)" "$(auto_event_file "$case_dir")" "carry-clean: the merged event names the carried head"
+      assert_grep "merged: $AUTO_URL at $h2 on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-clean: the merged event names the carried head"
+    elif [ "$scenario" = queued ]; then
+      expect_code 1 "$(auto_calls "$case_dir")" "carry-queued: a clean base update requests no new read"
+      expect_code "queued $AUTO_URL" "$(auto_state "$case_dir")" "carry-queued: the carried PASS queues the live head"
+      assert_grep "queued: $AUTO_URL at $h2 is in the merge queue on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-queued: the queued event names the carried head"
+      jq '.state = "MERGED"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+      auto_step "$case_dir"
+      expect_code "merged $AUTO_URL" "$(auto_state "$case_dir")" "carry-queued: the forge's merged state resolves the queue"
+      assert_grep "merged: $AUTO_URL at $h2 on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-queued: the merged event names the carried head"
+      expect_code 1 "$(auto_merges "$case_dir")" "carry-queued: still one merge call"
     else
       expect_code 2 "$(auto_calls "$case_dir")" "carry-unread: an update hiding an unread line is read again"
       expect_code 2 "$(auto_reviews "$case_dir")" "carry-unread: the new head's own PASS is recorded"
     fi
     auto_dump "$case_dir" "carry-over $scenario"
   done
-  pass "through the real pass and fm-pr-merge.sh, a clean base update merges on the carried PASS while an update hiding an unread line is read again"
+  pass "through the real pass and fm-pr-merge.sh, a clean base update merges on the carried PASS, directly or through a merge queue, while an update hiding an unread line is read again"
 }
 
 # Round 4 (Main 3137): behavior tests, each with a fail case and a pass case.
