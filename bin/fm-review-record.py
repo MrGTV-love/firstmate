@@ -123,7 +123,8 @@ which is then not an ancestor of R and refuses; a merge of a branch that is
 not on the base is unread content and refuses. The proof trusts
 --base to be a commit on the PR's base branch (every caller passes the live
 forge's base SHA; GitLab's is its stored merge base) and trusts the task
-worktree's object store and git config;
+worktree's object store, but runs the merge in an empty scratch repository
+so no worktree config, attribute or merge driver shapes it;
 see docs/configuration.md 'Review carry-over across a
 base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
@@ -500,6 +501,32 @@ def derived_authors(home, pr, head, task, base):
 CARRIED_FACT = "review carried from {head}: the live head is that reviewed change merged cleanly with its base"
 
 
+def isolated_merge_tree(scratch, objects, object_format, point, reviewed):
+    """Run git merge-tree --write-tree in an empty repository that borrows objects.
+
+    merge-tree writes the merged trees as objects and honors merge drivers,
+    attributes and configuration. The scratch repository reads the task's
+    objects through alternates, so the task store is unchanged, and it carries
+    no configuration, attributes, replace refs or grafts, so nothing the task
+    worktree, its .git directory or the caller's environment holds can shape
+    the merge: the result is plain git's own merge of the two commits.
+    """
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    repo = os.path.join(scratch, "proof.git")
+    env.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_ATTR_NOSYSTEM": "1",
+                "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull,
+                "XDG_CONFIG_HOME": scratch, "HOME": scratch, "GIT_TERMINAL_PROMPT": "0"})
+    made = subprocess.run(["git", "init", "-q", "--bare", "--template=", f"--object-format={object_format}", repo],
+                          capture_output=True, text=True, check=False, env=env)
+    if made.returncode:
+        return made
+    with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
+        handle.write(objects + "\n")
+    env["GIT_DIR"] = repo
+    return subprocess.run(["git", "-c", f"core.attributesFile={os.devnull}", "merge-tree", "--write-tree",
+                           "--no-messages", point, reviewed], capture_output=True, text=True, check=False, env=env)
+
+
 def carry_over_refusal(home, task, head, reviewed, base, others):
     """None when the live head's tree is exactly the reviewed head merged with base content.
 
@@ -536,18 +563,23 @@ def carry_over_refusal(home, task, head, reviewed, base, others):
     objects = run("rev-parse", "--path-format=absolute", "--git-path", "objects")
     if objects.returncode or not objects.stdout.strip():
         return "cannot locate the task worktree's object store"
-    # merge-tree writes the merged trees as objects; keep them out of the task's store.
+    object_format = run("rev-parse", "--show-object-format")
+    if object_format.returncode or not object_format.stdout.strip():
+        return "cannot read the task worktree's object format"
     with tempfile.TemporaryDirectory(prefix="fm-review-carry-") as scratch:
-        merged = run("merge-tree", "--write-tree", "--no-messages", point.stdout.strip(), reviewed,
-                     extra={"GIT_OBJECT_DIRECTORY": scratch, "GIT_ALTERNATE_OBJECT_DIRECTORIES": objects.stdout.strip()})
+        merged = isolated_merge_tree(scratch, objects.stdout.strip(), object_format.stdout.strip(), point.stdout.strip(), reviewed)
     if merged.returncode == 1:
         return "the reviewed head does not merge cleanly with the base content the live head contains"
     if merged.returncode:
-        return f"git merge-tree could not compute the merge (exit {merged.returncode}): {merged.stderr.strip()[:160]}"
+        detail = " ".join(line for line in merged.stderr.splitlines() if line.strip() and not line.startswith("hint:"))
+        return f"git merge-tree could not compute the merge (exit {merged.returncode}): {detail[:400]}"
+    lines = merged.stdout.splitlines()
+    if len(lines) != 1 or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", lines[0]):
+        return "git merge-tree printed something other than one tree id, so the merge cannot be judged"
     live = run("rev-parse", "--verify", f"{head}^{{tree}}")
     if live.returncode:
         return f"cannot read the tree of live head {head}"
-    if merged.stdout.split("\n", 1)[0].strip() != live.stdout.strip():
+    if lines[0] != live.stdout.strip():
         return "the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read"
     return None
 

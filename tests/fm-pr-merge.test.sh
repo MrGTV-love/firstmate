@@ -3111,9 +3111,9 @@ test_auto_review_three_prs_through_the_housekeeping_pass() {
 
 test_auto_review_carries_a_pass_across_a_clean_base_update() {
   local scenario case_dir base2 merged h1 h2
-  for scenario in clean queued unread; do
+  for scenario in clean queued left unread; do
     case_dir=$(auto_case "carry-$scenario")
-    [ "$scenario" = queued ] && write_github_outcome "$case_dir" OPEN false true main
+    case "$scenario" in queued | left) write_github_outcome "$case_dir" OPEN false true main ;; esac
     # The read returns while the check runs again, so the PASS at h1 is recorded and nothing merges.
     auto_step "$case_dir"; auto_wait "$case_dir"
     jq '.statusCheckRollup[0].status = "IN_PROGRESS"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
@@ -3156,13 +3156,25 @@ test_auto_review_carries_a_pass_across_a_clean_base_update() {
       expect_code "merged $AUTO_URL" "$(auto_state "$case_dir")" "carry-queued: the forge's merged state resolves the queue"
       assert_grep "merged: $AUTO_URL at $h2 on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-queued: the merged event names the carried head"
       expect_code 1 "$(auto_merges "$case_dir")" "carry-queued: still one merge call"
+    elif [ "$scenario" = left ]; then
+      assert_grep "queued: $AUTO_URL at $h2 is in the merge queue on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-left: the queued event names the carried head"
+      write_github_outcome "$case_dir" OPEN false false main
+      auto_step "$case_dir"
+      expect_code "held: left the merge queue and is still open" "$(auto_state "$case_dir")" "carry-left: the head that left the queue is held for Main"
+      # Main merges the held head through its own fm-pr-merge.sh call, on its own basis.
+      jq '.state = "MERGED"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+      auto_step "$case_dir"
+      expect_code "merged $AUTO_URL" "$(auto_state "$case_dir")" "carry-left: the forge's merged state ends the head merged"
+      assert_grep "merged: $AUTO_URL at $h2" "$(auto_event_file "$case_dir")" "carry-left: the merge is recorded"
+      assert_no_grep "merged: $AUTO_URL at $h2 on the PASS carried from" "$(auto_event_file "$case_dir")" "carry-left: Main's merge after the queue exit must not name a carry"
+      expect_code 1 "$(auto_merges "$case_dir")" "carry-left: the lane never merges again"
     else
       expect_code 2 "$(auto_calls "$case_dir")" "carry-unread: an update hiding an unread line is read again"
       expect_code 2 "$(auto_reviews "$case_dir")" "carry-unread: the new head's own PASS is recorded"
     fi
     auto_dump "$case_dir" "carry-over $scenario"
   done
-  pass "through the real pass and fm-pr-merge.sh, a clean base update merges on the carried PASS, directly or through a merge queue, while an update hiding an unread line is read again"
+  pass "through the real pass and fm-pr-merge.sh, a clean base update merges on the carried PASS, directly or through a merge queue, a carry note never follows a head that left the queue to Main, while an update hiding an unread line is read again"
 }
 
 # Round 4 (Main 3137): behavior tests, each with a fail case and a pass case.

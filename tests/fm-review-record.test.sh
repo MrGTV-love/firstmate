@@ -734,7 +734,7 @@ test_carry_over_refusal_comes_from_the_tree_proof() {
 import sys
 path = sys.argv[1]
 text = open(path).read()
-needle = 'if merged.stdout.split("\\n", 1)[0].strip() != live.stdout.strip():'
+needle = 'if lines[0] != live.stdout.strip():'
 assert text.count(needle) == 1, "tree comparison line not found exactly once"
 open(path, "w").write(text.replace(needle, "if False:"))
 PY
@@ -962,15 +962,15 @@ test_carry_over_writes_nothing_to_the_task_object_store() {
 import sys
 path = sys.argv[1]
 text = open(path).read()
-needle = 'extra={"GIT_OBJECT_DIRECTORY": scratch, "GIT_ALTERNATE_OBJECT_DIRECTORIES": objects.stdout.strip()}'
-assert text.count(needle) == 1, "scratch override not found exactly once"
-open(path, "w").write(text.replace(needle, "extra=None"))
+needle = 'merged = isolated_merge_tree(scratch, objects.stdout.strip(), object_format.stdout.strip(), point.stdout.strip(), reviewed)'
+assert text.count(needle) == 1, "isolated merge call not found exactly once"
+open(path, "w").write(text.replace(needle, 'merged = run("merge-tree", "--write-tree", "--no-messages", point.stdout.strip(), reviewed)'))
 PY2
   NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
     --head "$live" --task task-x1 --base "$base" >/dev/null 2>&1 || true
   after=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
   [ "$before" != "$after" ] || fail "control: without the scratch store the refusing proof must write to the task store, or this case observes nothing"
-  pass "the carry-over proof writes its merged trees to scratch, and removing that override makes the store change"
+  pass "the carry-over proof writes its merged trees to a scratch repository, and running it in the worktree makes the store change"
 }
 
 test_carry_over_ignores_grafts() {
@@ -1047,7 +1047,101 @@ PY2
   pass "the proof ignores a graft that would pass unread side work off as base content"
 }
 
+plant_proof_in_worktree() {  # <copy_dir>: copy bin/ with the merge proof run in the task worktree
+  cp -R "$ROOT/bin" "$1"
+  python3 - "$1/fm-review-record.py" <<'PY2' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = 'merged = isolated_merge_tree(scratch, objects.stdout.strip(), object_format.stdout.strip(), point.stdout.strip(), reviewed)'
+assert text.count(needle) == 1, "isolated merge call not found exactly once"
+open(path, "w").write(text.replace(needle, 'merged = run("merge-tree", "--write-tree", "--no-messages", point.stdout.strip(), reviewed)'))
+PY2
+}
+
+test_carry_over_ignores_a_merge_driver_in_the_task_worktree() {
+  # GLM-5.4 round-3 findings 1 and 2: the PR author's worker can write the task
+  # worktree's config and attributes. A merge driver there resolves a conflict
+  # with bytes no reader saw; the proof must still see the conflict. A copy that
+  # runs the proof in the worktree must carry, so this case observes the harm.
+  local case_dir live out rc=0 copy
+  case_dir=$(make_carry_case carry-driver)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q trunk
+  printf 'base version\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm 'base edits the same file'
+  TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" config merge.forge.driver "printf 'unread driver bytes\\n' > %A"
+  printf 'app.txt merge=forge\n' > "$case_dir/wt/.gitattributes"
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit trunk >/dev/null 2>&1 || fail "the driver must resolve the conflict"
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  [ "$(cat "$case_dir/wt/app.txt")" = "unread driver bytes" ] || fail "fixture: the driver wrote the merged file"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a worktree merge driver must not hide a conflict resolution: $out"
+  expect_not_qualified "$out" "does not merge cleanly" "worktree merge driver"
+  # The same driver through the caller's environment and .git/info/attributes.
+  cgit "$case_dir" config --unset merge.forge.driver
+  rm "$case_dir/wt/.gitattributes"
+  mkdir -p "$case_dir/wt/.git/info"
+  printf 'app.txt merge=forge\n' > "$case_dir/wt/.git/info/attributes"
+  rc=0
+  out=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=merge.forge.driver GIT_CONFIG_VALUE_0="printf 'unread driver bytes\\n' > %A" \
+    verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "an environment merge driver must not hide a conflict resolution: $out"
+  expect_not_qualified "$out" "does not merge cleanly" "environment merge driver"
+  copy="$TMP_ROOT/driver-honoring-bin"
+  plant_proof_in_worktree "$copy"
+  rc=0
+  out=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=merge.forge.driver GIT_CONFIG_VALUE_0="printf 'unread driver bytes\\n' > %A" \
+    NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
+    --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "control: a proof run in the worktree must honor the driver and carry, or this case observes nothing: $out"
+  pass "the proof ignores merge drivers and attributes from the task worktree and the caller's environment"
+}
+
+test_carry_over_ignores_replace_refs() {
+  # GLM-5.4 round-3 finding 4: a replace ref on the base tip that gives it the
+  # unread side commit as a second parent. A copy without the proof's
+  # replace-ref setting must accept it, so this case observes the harm.
+  local case_dir side live out rc=0 copy
+  case_dir=$(make_carry_case carry-replace-base)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q -b side "$BASE"
+  printf 'unread side work\n' > "$case_dir/wt/side.txt"
+  cgit "$case_dir" add side.txt
+  cgit "$case_dir" commit -qm 'unread side work'
+  side=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit side
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" replace --graft "$TRUNK" "$BASE" "$side" || fail "fixture: replace ref"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a replace ref must not turn unread side work into base content: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "base replace ref"
+  copy="$TMP_ROOT/replace-honoring-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY2' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = '    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull}\n'
+assert text.count(needle) == 1, "proof env line not found exactly once"
+open(path, "w").write(text.replace(needle, '    env = {**os.environ, "GIT_GRAFT_FILE": os.devnull}\n'))
+PY2
+  rc=0
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
+    --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "control: with replace refs honored the side work must carry, or this case observes nothing: $out"
+  pass "the proof ignores a replace ref that would pass unread side work off as base content"
+}
+
 fm_test_run_cases \
+  test_carry_over_ignores_a_merge_driver_in_the_task_worktree \
+  test_carry_over_ignores_replace_refs \
   test_carry_over_refuses_a_branch_that_is_not_on_the_base \
   test_carry_over_ignores_a_graft_that_fakes_base_content \
   test_carry_over_refuses_a_base_older_than_the_update \

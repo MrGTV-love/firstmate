@@ -82,7 +82,7 @@ The protected-class decision reads every review row recorded for the exact head,
 (for a PASS verify carried from an earlier head, the rows of that reviewed head, whose change is the same):
 any yes, missing or malformed answer, any report that is gone or no longer matches its recorded digest,
 and any unreadable history holds the merge, and a later `no` never clears an earlier answer. A recorded
-routine PASS that verify accepts, with every exact-head report answering `no`, goes to the merge gate
+routine PASS that verify accepts, with every report at the read head answering `no`, goes to the merge gate
 whether or not this lane requested it. A wake that could not be appended is kept pending in the sidecar,
 is not counted as emitted, and every pass retries it. A local-only task never reaches this script's merge
 path, and an away record is left to bin/fm-pr-merge.sh's own away handling.
@@ -834,6 +834,7 @@ def advance(home, task, url, meta, side):
         if queue_state(url) == "wait":
             return
         head["left_queue"] = True
+        head.pop("read_sha", None)
         phase(side, sha, "held", "left the merge queue and is still open")
         emit(home, task, side, sha, "left-queue", f"held: {url} at {sha[:12]} left the merge queue and is still open; the merge is Main's",
              f"{url} left the merge queue at {sha[:12]} and is still open; not queued again, Main decides why and whether to merge it")

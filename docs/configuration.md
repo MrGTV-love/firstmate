@@ -15,7 +15,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
-| Automatic exact-head review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
+| Automatic review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
@@ -166,8 +166,11 @@ Carry-over judges that harm directly: an equal tree proves every byte H adds bey
 A conflict resolution counts as new content even when it keeps the reviewed side, because a hand resolution is where an unread line most easily hides.
 The base content H holds comes from a commit on the base branch, so it passed that branch's own landing gate; a force-push of the base branch itself is outside this guard, as it is for every gate.
 The proof trusts `--base` to be a commit on the PR's base branch, which every caller takes from the live forge: GitHub `baseRefOid` and Forgejo `.base.sha` name the base branch's commit, and GitLab `diff_refs.base_sha` names GitLab's stored merge base of the source and target, which is on the target branch and is taken only when `diff_refs.head_sha` matches the live head.
-It also trusts the task worktree's object store and its git configuration (a configured merge driver shapes the merged tree), as author derivation already trusts that worktree; neither is PR content. Verify, both in this proof and in author derivation, ignores replace refs and `.git/info/grafts`, which could otherwise fake ancestry or hide commits.
-The merged trees the proof builds are written to a scratch object directory, never the task's store, and a `git merge-tree` failure other than a conflict is reported as itself.
+It also trusts the task worktree's object store for the commits' content, as author derivation already does.
+It does not trust that worktree's configuration or attributes, which the PR author's own worker can write: `git merge-tree` runs in an empty scratch repository that reads the task's objects through alternates and carries no configuration, attributes, replace refs or grafts, with the caller's `GIT_*` environment, system and global configuration and global attributes removed, so no merge driver or attribute can shape the merged tree and the task's store is unchanged.
+Only a single tree id on standard output is accepted as the merged tree; any other output refuses.
+Verify, both in this proof and in author derivation, ignores replace refs and `.git/info/grafts`, which could otherwise fake ancestry or hide commits.
+A `git merge-tree` failure other than a conflict is reported with git's own error text, `hint:` lines removed.
 A base older than the base content the live head holds refuses whenever the merged tree then differs from the live head's tree, which is usual; it carries when R already holds that newer base content or the newer commits changed nothing, which is safe because the live head adds no byte beyond R and base content. The regressions exercise GitHub only.
 A carried PASS also requires that no review row names the live head and that every other head with a review row is an ancestor of R, so a read of any later version of the change, such as a FAIL at an earlier clean update, cannot be skipped in any row order; a FAIL fixed by commits on top of it leaves carry-over available.
 When `bin/fm-pr-auto-review.py` merges, directly or through a merge queue, its `merged` event in the lane's sidecar, and its `queued` event on the queue path, names the carried source head; a merge through Main's `bin/fm-pr-merge.sh` call records no carry, and `state/review-records.jsonl` keeps its verdict rows but no row for the live head or the carry, so that a carry happened is not durably recorded on that path.
@@ -175,7 +178,7 @@ Any reviewed head that a rebase, amend or squash leaves off R's ancestry, PASS o
 A rewrite that keeps the reviewed tree, such as an amended message or a squash, carries only when no review row names the head it replaced; a clean merge of a branch that is not on the base is unread content and refuses.
 The residual risk is an interaction between R and newer base content that the reader never saw together; required checks at the exact live head, which `bin/fm-pr-merge.sh` still demands, are the guard for that, as they were for any two PRs reviewed separately.
 Accepted carry-overs are disclosed as the fact `review carried from <R>` in verify's text output and as `carried_from` in `--json`.
-The regressions, including a sensitivity control that removes only the tree comparison and shows the unread change then passes, are in [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh).
+The regressions, including sensitivity controls that remove only the tree comparison, the scratch repository, the graft setting or the replace-ref setting and show the matching unread change then passes, are in [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh).
 
 ### Friction ledger
 
