@@ -164,6 +164,7 @@
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
     "teardown-entry-preflight",
+    "dsh-resume-binding-read",
     "guard-lint-touched-registry"
   ],
   "guards": [
@@ -7494,6 +7495,36 @@
       "tier": "C",
       "harm": "irreversible",
       "layer_note": "added by the Slack thread-reply change; deny without a guard event: the command exits non-zero with slack: refused: <reason> (unknown_request_thread, unknown_reply_target, not_an_owner_message, message_not_found, invalid_message_ts, empty_answer, answer_too_long, invalid_arguments, source_not_bound, dm_not_prepared, stored_channel_not_owner_dm, dm_user_changed or a configuration refusal) and posts or prints nothing; without the guard an answer could land outside the request's thread or in a conversation that is not the owner's DM, and a stranger's or bot's text could reach Firstmate as if it were the owner's; tests/fm_slack_reply_test.py ReplyPostTest, ReadTest and SafetyTest and tests/fm-slack-reply.test.sh REPLY-2 and REPLY-9 prove each refusal and the legitimate control beside it"
+    },
+    {
+      "id": "dsh-resume-binding-read",
+      "version": "1",
+      "owner": "bin/fm-dsh.py",
+      "sites": [
+        {"file": "bin/fm-dsh.py", "match": "REFUSED: saved DSH binding read failed"},
+        {"file": "bin/fm-dsh.py", "match": "record_binding_read(state, task, \"deny\")"}
+      ],
+      "invariant": "On a same-DSH relaunch, a non-ENOENT filesystem read failure of the saved DSH binding in fm-dsh.py resume never selects fresh preparation.",
+      "layer": "runtime-block",
+      "source": "The initial read of the task's <state>/<id>.dsh-session by fm-dsh.py resume, called by the same-DSH relaunch in bin/fm-spawn.sh.",
+      "trigger": "A same-DSH relaunch's initial saved-binding read by fm-dsh.py resume raises a filesystem OSError other than FileNotFoundError.",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Restore read access to the same saved record named in the refusal, then retry the same relaunch with bin/fm-control.sh <task-id> relaunch --note <progress>; never remove or replace the binding.",
+      "budget": 1,
+      "budget_reason": "One binding read per invocation; a refusal returns to the caller without an automatic retry.",
+      "telemetry": "The same-DSH task relaunch opts into state/guard-events.jsonl: one deny with source_ok=false on the guarded read error or one allow with source_ok=true on a completed text read. Missing targets and legacy decode fallbacks are not counted. Standalone resume does not record by default.",
+      "test": "tests/fm-dsh-resume-binding.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "The read is reached at replacement launch, not a pre-stop proof of the old endpoint or a proof of later session compatibility.",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "remedy_verified": "fixture",
+      "layer_note": "A readable incompatible or unparseable binding still follows the legacy fallback; an allow is evidence of readability, not proof that a conversation can resume. An absent target is not affirmative proof that its directory entry was absent. prepare, prepare-primary and fresh launch treat a non-ENOENT read failure of the saved binding as no previous binding and replace it; that behavior is outside this guard and is not verified by its test."
     },
     {
       "id": "pipeline-start-unreadable-source",
