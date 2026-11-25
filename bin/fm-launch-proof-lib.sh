@@ -495,6 +495,30 @@ fm_launch_proof_platform_descendant() { # <process-table> <pid> <kid>
   return 1
 }
 
+# <pid> <start time> rows of every process, the identity of each. Fails on a
+# failed or empty read, a malformed row, or a read that does not list <anchor>
+# (the attributed agent), so a read that is not this host's table is no proof.
+fm_launch_proof_starts() { # <anchor-pid>
+  local out
+  out=$(set -o pipefail; LC_ALL=C ps -axo pid=,lstart= 2>/dev/null) && [ -n "$out" ] || return 1
+  awk -v a="$1" 'NF != 6 || $1 !~ /^[0-9]+$/ {bad = 1} $1 == a {seen = 1} END {exit bad || !seen}' <<< "$out" || return 1
+  printf '%s\n' "$out"
+}
+
+# Whether group member <kid> has exited since <starts>, the identity read taken
+# after the group table: <starts> does not list it, or a later complete read
+# lists no process <kid> with the start time <starts> gives. A member that is
+# still alive, and any failed read, is never gone.
+fm_launch_proof_member_gone() { # <starts> <agent-pid> <kid>
+  local first now
+  [ -n "$1" ] || return 1
+  first=$(awk -v p="$3" '$1 == p {$1 = ""; print; exit}' <<< "$1")
+  [ -n "$first" ] || return 0
+  now=$(fm_launch_proof_starts "$2") || return 1
+  now=$(awk -v p="$3" '$1 == p {$1 = ""; print; exit}' <<< "$now")
+  [ "$now" != "$first" ]
+}
+
 # The refusal checks an agent whose token matches its versioned record must
 # pass before it is managed, for every harness (Main 1709 ruling 1, Main 1713
 # (1), Main 1716 (A) and (C), Main 1777 (1)). In this order: the process table, each other member of the agent's
@@ -503,11 +527,13 @@ fm_launch_proof_platform_descendant() { # <process-table> <pid> <kid>
 # agent's platform helper, fm_launch_proof_platform_descendant), the descendant
 # rule (every other member is an ancestor of the agent in its group or a proven
 # descendant of it), the agent's kernel working directory (the recorded home or
-# worktree), and the claim inventory. None is proof: each can only refuse. E3
+# worktree), and the claim inventory. A member whose own environment or parent
+# read fails, and whose identity (pid and start time) shows it has exited since
+# the table read, is no live member and is skipped (fm_launch_proof_member_gone). None is proof: each can only refuse. E3
 # (k), a matching pin keeping its base outcome, applies only after all pass.
 # Prints <verdict><TAB><cause>, the cause empty when the verdict's own applies.
 fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
-  local meta=$1 pid=$2 gen=$3 table group kid environment pinned foreign='' unread='' rc cwd home root claim seen
+  local meta=$1 pid=$2 gen=$3 table group kid environment pinned foreign='' unread='' rc cwd home root claim seen starts
   local -a members=()
   table=$(set -o pipefail; LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) && [ -n "$table" ] || {
     printf 'unknown\tthe process table could not be read completely, so the agent'"'"'s process group cannot be judged'
@@ -537,12 +563,14 @@ fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
     for rc in "${members[@]+"${members[@]}"}"; do [ "$rc" != "$kid" ] || seen=1; done
     [ "$seen" = 1 ] || members+=("$kid")
   done
+  starts=$(fm_launch_proof_starts "$pid") || starts=''
   for kid in "${members[@]+"${members[@]}"}"; do
     if environment=$(fm_remote_herdr_process_env "$kid") \
       && printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)='; then
       pinned=$(printf '%s\n' "$environment" | sed -n 's/^FM_SPAWN_GEN=//p')
       if [ -n "$pinned" ] && [ "$pinned" != "$gen" ] && [ -z "$foreign" ]; then foreign=$kid; fi
-    elif [ -z "$unread" ] && ! fm_launch_proof_platform_descendant "$table" "$pid" "$kid"; then
+    elif [ -z "$unread" ] && ! fm_launch_proof_platform_descendant "$table" "$pid" "$kid" \
+      && ! fm_launch_proof_member_gone "$starts" "$pid" "$kid"; then
       unread=$kid
     fi
   done
@@ -556,7 +584,9 @@ fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
     if [ "$rc" = 1 ]; then rc=0; fm_launch_proof_chain "$table" "$kid" "$pid" || rc=$?; fi
     case "$rc" in
       0) ;;
-      2) printf 'unknown\tthe parent chain of live group process %s changed between reads' "$kid"; return ;;
+      2)
+        ! fm_launch_proof_member_gone "$starts" "$pid" "$kid" || continue
+        printf 'unknown\tthe parent chain of live group process %s changed between reads' "$kid"; return ;;
       *) printf 'contested\tlive group process %s is not the agent, its launcher, or a proven descendant of the agent' "$kid"; return ;;
     esac
   done

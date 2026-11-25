@@ -565,15 +565,33 @@ test_launch_proof_claude_refusal_checks() (
         else cat "$T/w/table"; fi ;;
       '-p '*' -o ppid=')
         local p=$2
+        [ ! -f "$T/w/gone-$p" ] || return 1
         if [ -f "$T/w/live-ppid-$p" ]; then cat "$T/w/live-ppid-$p"; else awk -v p="$p" '$1 == p {print $2}' "$T/w/table"; fi ;;
+      # Each process's identity: one start time, another once staged (a reused
+      # pid); a gone process is not listed.
+      '-axo pid=,lstart=')
+        [ ! -f "$T/w/starts-fail" ] || return 1
+        local p
+        while read -r p _; do
+          [ ! -f "$T/w/gone-$p" ] || continue
+          [ ! -f "$T/w/starts-no-agent" ] || [ "$p" != 53539 ] || continue
+          if [ -f "$T/w/start-$p" ]; then printf '%s %s\n' "$p" "$(cat "$T/w/start-$p")"
+          else printf '%s Mon Oct 27 16:58:42 2026\n' "$p"; fi
+        done < "$T/w/table" ;;
       *) return 1 ;;
     esac
   }
+  # A member staged to quit exits while its environment is read (quit-on-env:
+  # the read fails), just after it (quit-after-env), or is replaced by another
+  # process with its pid at each read (reuse-on-env).
   # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_remote_herdr_process_env() {
     printf x >> "$T/w/reads-$1"
+    if [ -f "$T/w/quit-on-env-$1" ]; then : > "$T/w/gone-$1"; return 1; fi
+    if [ -f "$T/w/reuse-on-env-$1" ]; then printf 'Tue Nov 25 10:00:%02d 2026' "$(wc -c < "$T/w/reads-$1")" > "$T/w/start-$1"; return 1; fi
     [ -f "$T/w/env-$1" ] || return 1
     cat "$T/w/env-$1"
+    [ ! -f "$T/w/quit-after-env-$1" ] || : > "$T/w/gone-$1"
   }
   # The executable path of a member, read without its environment: none unless
   # staged; exe-fail prints the staged path and then fails.
@@ -660,6 +678,49 @@ test_launch_proof_claude_refusal_checks() (
   printf '%s\n' '[{"pid":400,"name":"zsh","argv0":"-zsh"},{"pid":56557,"name":"railway","argv0":"railway"},{"pid":53733,"name":"2.1.316","argv0":"claude"},{"pid":53539,"name":"node","argv0":"node"}]' > "$T/w/fg"
   printf '/bin/zsh' > "$T/w/exe-400"
   judged unknown 'an unreadable platform binary that is the agent'"'"'s ancestor, not its descendant' 'environment of live group process 400 cannot be read'
+  world; printf '%s\n' '60001 53733 53539' >> "$T/w/table"; printf '/bin/sh' > "$T/w/exe-60001"
+  judged managed '(k) S9c: a managed claude in startup whose unreadable startup child is /bin/sh keeps its base outcome'
+
+  # A group member that quits between the table read and its own reads is no
+  # live member. Its identity (pid and start time) is read again, and only a
+  # member shown gone is skipped.
+  member_quits() { # <stage>: world with a short-lived member 60003 (no exe)
+    world; printf '%s\n' '60003 53733 53539' >> "$T/w/table"
+    case "$1" in
+      on-env) : > "$T/w/quit-on-env-60003" ;;
+      after-env) printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-60003"; : > "$T/w/quit-after-env-60003" ;;
+      reuse) : > "$T/w/reuse-on-env-60003" ;;
+    esac
+  }
+  member_quits on-env
+  judged managed '(k) a member that exits while its environment is read is skipped'
+  member_quits after-env
+  judged managed '(k) a member that exits after its environment read, before the descendant rule, is skipped'
+  member_quits reuse
+  judged managed '(k) a member whose pid now names a process with another start time has exited and is skipped'
+  member_quits live
+  judged unknown 'a live member whose environment cannot be read, its identity unchanged, still refuses' 'environment of live group process 60003 cannot be read'
+  member_quits on-env; : > "$T/w/starts-fail"
+  judged unknown 'a failed environment read with a failed identity read is no proof of exit' 'environment of live group process 60003 cannot be read'
+  member_quits on-env; : > "$T/w/starts-no-agent"
+  judged unknown 'an identity read that does not list the agent is no proof of exit' 'environment of live group process 60003 cannot be read'
+  member_quits after-env; : > "$T/w/starts-fail"
+  judged unknown 'a failed parent read with a failed identity read is no proof of exit' 'parent chain of live group process 60003 changed'
+  # Mutants: a re-check that never proves exit brings the unknown back; one
+  # that skips without reading the identity lets a live unreadable member pass.
+  # mutant <stage> never|always: the verdict with the re-check replaced by one
+  # that never, or always, finds the member gone.
+  mutant() (
+    member_quits "$1"
+    FM_TEST_MUTANT=$2
+    # shellcheck disable=SC2329 # the library under test calls this stand-in
+    fm_launch_proof_member_gone() { [ "$FM_TEST_MUTANT" = always ]; }
+    fm_launch_proof_herdr "$META"
+  )
+  for stage in on-env after-env reuse; do
+    assert_equals unknown "$(mutant "$stage" never)" "mutant without the identity re-check is caught ($stage)"
+  done
+  assert_equals managed "$(mutant live always)" 'mutant that skips without the identity re-check is caught (live member)'
 
   # The descendant rule, as a refusal only.
   world; printf '%s\n' '60000 500 53539' >> "$T/w/table"; printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=%s\n' "$G" > "$T/w/env-60000"
@@ -1165,7 +1226,25 @@ test_launch_proof_pid_exe_reads_the_live_path() {
   pass 'the executable path reader reads a live process and fails for one that is gone'
 }
 
+# The identity reader reads this host's table: a live process keeps its start
+# time, and one that has exited is gone.
+test_launch_proof_member_gone_reads_the_live_table() {
+  local child starts
+  /bin/sleep 30 &
+  # shellcheck disable=SC2031 # $! is set by the & on the line before
+  child=$!
+  starts=$(fm_launch_proof_starts "$$") || fail 'the identity read failed or did not list this shell'
+  fm_launch_proof_member_gone "$starts" "$$" "$child" && fail 'a live process was read as gone'
+  kill "$child" 2>/dev/null || true
+  wait "$child" 2>/dev/null || true
+  fm_launch_proof_member_gone "$starts" "$$" "$child" || fail 'a process that has exited was not read as gone'
+  fm_launch_proof_starts 0 >/dev/null && fail 'an identity read that does not list its anchor was accepted'
+  fm_launch_proof_member_gone '' "$$" "$child" && fail 'no identity read was taken as proof of exit'
+  pass 'the identity reader reads a live process and sees one that has exited'
+}
+
 fm_test_only
+test_launch_proof_member_gone_reads_the_live_table
 test_launch_proof_pid_exe_reads_the_live_path
 test_launch_proof_recorded_native_identity
 test_launch_proof_pinned_personal_switch
