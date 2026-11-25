@@ -113,8 +113,11 @@
 # live pid, task_session_file, and current_session_file. Publication claims the
 # record by an atomic rename, confirms the claimed bytes are the compared ones,
 # and links the new record in only where nothing exists, so a writer that
-# published in the gap keeps its record. A failed install restores the claim, and
-# a claim that cannot be restored is kept and named, never deleted.
+# published in the gap keeps its record. While the path is empty the omp
+# extension reads the claim, so such a writer keeps the task anchor. A failed
+# install restores the claim, and a claim that cannot be restored, or whose
+# task_session_file the record at the path does not keep, is kept and named,
+# never deleted.
 # It never unlocks a session, touches project files, starts or stops an agent,
 # or sends lifecycle input.
 # This widens lifecycle authorization: a repaired record can authorize a
@@ -417,10 +420,17 @@ control_cleanup() {
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
   if [ -n "$CONTROL_RECORD_CLAIM" ]; then
     # An interrupted or failed adopt gives the claimed record back unless a writer already
-    # replaced it. The claim is the last copy of the old record, so it is removed only once
-    # a record exists at the record path; when the restore itself fails it is kept.
-    if [ -e "$CONTROL_RECORD_PATH" ] || ln -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" 2>/dev/null; then
+    # replaced it. The claim is the last copy of the old record and its task anchor, so it is
+    # removed only once the record path holds it or a record keeping its task_session_file.
+    local claimed_anchor
+    claimed_anchor=$(jq -r '.task_session_file // empty' "$CONTROL_RECORD_CLAIM" 2>/dev/null)
+    if ln -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" 2>/dev/null \
+      || cmp -s -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" \
+      || { [ -n "$claimed_anchor" ] \
+        && [ "$claimed_anchor" = "$(jq -r '.task_session_file // empty' "$CONTROL_RECORD_PATH" 2>/dev/null)" ]; }; then
       rm -f -- "$CONTROL_RECORD_CLAIM"
+    elif [ -e "$CONTROL_RECORD_PATH" ]; then
+      echo "adopt kept the original session record at $CONTROL_RECORD_CLAIM: the record another writer published at $CONTROL_RECORD_PATH does not keep its task_session_file; compare them before removing the kept copy" >&2
     else
       echo "adopt could not restore the original session record at $CONTROL_RECORD_PATH; its only surviving copy is kept at $CONTROL_RECORD_CLAIM - restore it with: ln -- '$CONTROL_RECORD_CLAIM' '$CONTROL_RECORD_PATH'" >&2
     fi

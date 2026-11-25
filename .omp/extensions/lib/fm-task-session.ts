@@ -1,7 +1,7 @@
 // Current-session proof for managed omp tasks. All writes are synchronous so
 // lifecycle observers cannot see the previous session after a switch completes.
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 
 type Context = { sessionManager?: { getSessionFile?: () => string | undefined }; ui?: { notify?: (message: string, level: string) => void } };
@@ -46,11 +46,19 @@ export function createTaskSessionProof(state: string, id: string, registry: Regi
     const values = readFileSync(meta, "utf8").split(/\r?\n/).filter(line => line.startsWith("spawn_gen="));
     return values.length === 1 && values[0] === `spawn_gen=${gen}`;
   }
-  function previous(): Proof | null {
-    let text: string;
-    try { text = readFileSync(path, "utf8"); } catch (error) {
+  function readIfPresent(file: string): string | null {
+    try { return readFileSync(file, "utf8"); } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;
+    }
+  }
+  function previous(): Proof | null {
+    let text = readIfPresent(path);
+    if (text === null) {
+      const claims = readdirSync(state).filter(name => name.startsWith(`.${id}.omp-session.claim.`));
+      if (claims.length > 1) throw new Error("ambiguous claimed session proof");
+      text = (claims.length === 1 ? readIfPresent(resolve(state, claims[0])) : null) ?? readIfPresent(path);
+      if (text === null) return null;
     }
     const value = JSON.parse(text);
     if (value?.version !== 1 || typeof value.spawn_gen !== "string" || !Number.isSafeInteger(value.pid) || value.pid <= 0 || typeof value.task_session_file !== "string" || !isAbsolute(value.task_session_file) || typeof value.current_session_file !== "string" || (value.current_session_file !== "" && !isAbsolute(value.current_session_file))) throw new Error("invalid existing session proof; refusing to rebind task session");

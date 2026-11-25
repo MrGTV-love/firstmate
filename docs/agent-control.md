@@ -235,6 +235,8 @@ A record naming another live omp process, or a live Bun process that may be the 
 Herdr still registering the original task file never overrides that evidence.
 A recorded PID that is gone, or that a process other than omp has since reused (for example after a reboot), does not block repair, even when that process is another harness's agent.
 Publication claims the record by an atomic rename, confirms the claimed bytes are the ones the proofs were gathered from, and installs the new record only where nothing exists, so a record that a writer published after the last comparison is handed back and never overwritten.
+While the claim leaves the record path empty, the omp extension reads the task anchor from the claim, so a writer that publishes in that gap keeps the task's `task_session_file`.
+A claim is removed only once the record path holds it or a record with the same `task_session_file`; otherwise adopt keeps the claim and names it.
 Every refusal names the missing proof, and no refusal lowers the workspace or duplicate-pane requirements.
 
 **This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**

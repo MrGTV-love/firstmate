@@ -2322,39 +2322,65 @@ test_omp_bun_adoption_does_not_overwrite_a_late_writer() {
 }
 
 test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install() {
-  local dir id record line rc=0 out adopt_job a_record claims
-  prepare_bun_adoption claim-install-writer
-  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
-  arm_install_barrier "$dir" "$id"
-  exec 6<> "$dir/fake/barrier-events"
-  (
-    rc=0
-    run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
-    printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
-  ) &
-  adopt_job=$!
-  read -r -t 120 line <&6 || fail "adoption never reached the install step"
-  [ "$line" = 'reached install' ] || fail "adoption never reached the install step: $line"
-  # The record is claimed and the path is absent; a different live writer publishes into that gap.
-  [ ! -e "$record" ] || fail "the record path must be absent between the claim and the install, or the case is vacuous"
-  claims=("$dir"/home/state/.*omp-session.claim.*)
-  [ -f "${claims[0]}" ] || fail "the claimed record must exist between the claim and the install"
-  a_record=$(jq -c '.pid=2000000002 | .current_session_file=.task_session_file' "${claims[0]}")
-  printf '%s\n' "$a_record" > "$dir/writer-record.expected"
-  cp "$dir/writer-record.expected" "$dir/home/state/.late-writer.tmp"
-  /bin/mv -f "$dir/home/state/.late-writer.tmp" "$record"
-  printf 'go\n' > "$dir/fake/barrier-resume"
-  read -r -t 120 line <&6 || fail "adoption never finished after the writer published"
-  case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly: $line" ;; esac
-  wait "$adopt_job"
-  exec 6>&-
-  out=$(cat "$dir/adopt.out")
-  [ "$rc" -ne 0 ] || fail "adoption overwrote a record published between its claim and its install: $out"
-  assert_contains "$out" 'that record was not overwritten' "the refusal says the writer's record was kept"
-  cmp -s "$dir/writer-record.expected" "$record" || fail "the record a writer published between the claim and the install must stay byte-identical (saved bytes versus the file, newlines included)"
-  assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a refused adoption leaves no staged or claimed record"
-  bun_stop_all
-  pass "omp bun adoption: a record published between the claim and the install is never overwritten"
+  local writer dir id record line rc out adopt_job a_record claims task personal
+  for writer in extension anchorless; do
+    prepare_bun_adoption "claim-install-$writer"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    task="$dir/wt/recorded-session.jsonl" personal="$dir/wt/personal-session.jsonl"
+    cp "$record" "$dir/record.original"
+    write_recovery_native_session "$personal" "$dir/wt" "personal conversation"
+    [ "$writer" != extension ] || start_adoption_extension "$dir" "$id"
+    arm_install_barrier "$dir" "$id"
+    exec 6<> "$dir/fake/barrier-events"
+    (
+      rc=0
+      run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
+      printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
+    ) &
+    adopt_job=$!
+    read -r -t 120 line <&6 || fail "adoption never reached the install step ($writer)"
+    [ "$line" = 'reached install' ] || fail "adoption never reached the install step ($writer): $line"
+    # The record is claimed and the path is absent; a different live writer publishes into that gap.
+    [ ! -e "$record" ] || fail "the record path must be absent between the claim and the install, or the case is vacuous ($writer)"
+    claims=("$dir"/home/state/.*omp-session.claim.*)
+    [ -f "${claims[0]}" ] || fail "the claimed record must exist between the claim and the install ($writer)"
+    case "$writer" in
+      extension)
+        # The REAL extension, pinned to the task generation and not named by the record, activates another conversation.
+        extension_event personal ;;
+      anchorless)
+        # A writer that cannot see the claim takes its own session as the task anchor.
+        a_record=$(jq -c --arg personal "$personal" '.pid=2000000002 | .task_session_file=$personal | .current_session_file=$personal' "$dir/record.original")
+        printf '%s\n' "$a_record" > "$dir/home/state/.late-writer.tmp"
+        /bin/mv -f "$dir/home/state/.late-writer.tmp" "$record" ;;
+    esac
+    cp "$record" "$dir/writer-record.expected"
+    printf 'go\n' > "$dir/fake/barrier-resume"
+    read -r -t 120 line <&6 || fail "adoption never finished after the writer published ($writer)"
+    case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly ($writer): $line" ;; esac
+    wait "$adopt_job"
+    exec 6>&-
+    out=$(cat "$dir/adopt.out")
+    [ "$writer" != extension ] || stop_adoption_extension
+    [ "$rc" -ne 0 ] || fail "adoption overwrote a record published between its claim and its install ($writer): $out"
+    assert_contains "$out" 'that record was not overwritten' "the refusal says the writer's record was kept ($writer)"
+    cmp -s "$dir/writer-record.expected" "$record" || fail "the record a writer published between the claim and the install must stay byte-identical ($writer)"
+    case "$writer" in
+      extension)
+        jq -e --arg task "$task" --arg personal "$personal" --argjson pid "$EXT_PROC_PID" \
+          '.pid==$pid and .task_session_file==$task and .current_session_file==$personal' "$record" >/dev/null \
+          || fail "a writer that published while the record was claimed lost the task anchor: $(cat "$record")"
+        assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a refused adoption whose writer kept the anchor leaves no staged or claimed record" ;;
+      anchorless)
+        claims=("$dir"/home/state/.*omp-session.claim.*)
+        [ -f "${claims[0]}" ] || fail "the claim holding the only copy of the task anchor was deleted"
+        cmp -s "$dir/record.original" "${claims[0]}" || fail "the kept claim must hold the original record byte for byte"
+        assert_contains "$out" "${claims[0]}" "the operator is told where the kept copy is"
+        assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session.adopt.*' | wc -l | tr -d ' ')" "a refused adoption leaves no staged record" ;;
+    esac
+    bun_stop_all
+  done
+  pass "omp bun adoption: a record published between the claim and the install is never overwritten, keeps the task anchor from the claim, and a claim holding the only anchor is kept"
 }
 
 # ln shim: while <mode> is set, a link whose destination is the session record fails.
