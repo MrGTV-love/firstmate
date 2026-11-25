@@ -665,6 +665,32 @@ test_the_flagged_path_check_starts_a_fixed_number_of_git_processes() {
   pass "drift: the flagged-path check starts a fixed number of git processes ($few for 6 flagged paths, $many for 60)"
 }
 
+# A run killed between mktemp and mv leaves STATE/.<id>.drift-report.XXXXXX behind; the next write removes this id's own
+# leftovers of that exact shape and nothing else.
+test_a_killed_runs_leftover_temp_is_removed_by_the_next_write() {
+  local out keep
+  make_world drift-leftover
+  printf 'own\n' >"$W_SLOT/docs/own.txt"
+  printf 'stale\n' >"$W_STATE/.t.drift-report.Ab3xY9"
+  printf 'stale\n' >"$W_STATE/.t.drift-report.zz00ZZ"
+  for keep in .t.drift-report.Ab3xY9z .t.drift-report.Ab3x .t.drift-report.Ab3-Y9 .u.drift-report.Ab3xY9 .tt.drift-report.Ab3xY9 \
+    t.drift-report.Ab3xY9; do
+    printf 'keep\n' >"$W_STATE/$keep"
+  done
+  out=$(drift)
+  assert_contains "$out" 'drift: proven docs/own.txt' 'the report did not run'
+  [ -f "$W_STATE/t.drift-report.txt" ] || fail 'the report file was not written'
+  [ ! -e "$W_STATE/.t.drift-report.Ab3xY9" ] && [ ! -e "$W_STATE/.t.drift-report.zz00ZZ" ] \
+    || fail "a leftover temp of this id survived: $(ls -A "$W_STATE")"
+  for keep in .t.drift-report.Ab3xY9z .t.drift-report.Ab3x .t.drift-report.Ab3-Y9 .u.drift-report.Ab3xY9 .tt.drift-report.Ab3xY9 \
+    t.drift-report.Ab3xY9; do
+    [ -f "$W_STATE/$keep" ] || fail "a file that is not this id's leftover temp was removed: $keep"
+  done
+  assert_equals $'.t.drift-report.Ab3-Y9\n.t.drift-report.Ab3x\n.t.drift-report.Ab3xY9z' \
+    "$(cd "$W_STATE" && find . -maxdepth 1 -name '.t.drift-report.*' | sed 's|^\./||' | LC_ALL=C sort)" 'the write left its own temp behind'
+  pass "drift: a killed run's leftover temp is removed by the next write; other ids and other names are kept"
+}
+
 # B1 (exact-head read of 6acb4545): a governed task's own valid manifest is adopted. The record check must not overwrite
 # the manifest verdict, so the repository root the adoption judged is the manifest's own repo root, not the word ok.
 test_a_governed_tasks_own_manifest_is_adopted_with_the_manifest_repo_root() {
@@ -714,6 +740,7 @@ test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift
 test_many_ignored_paths_print_a_sample_and_write_the_complete_report
 test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides
 test_the_flagged_path_check_starts_a_fixed_number_of_git_processes
+test_a_killed_runs_leftover_temp_is_removed_by_the_next_write
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run

@@ -1141,6 +1141,10 @@ fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   report=$(fm_slot_drift_text "$id" "$out" "$rc")
   if [ -n "${STATE:-}" ] && [ -d "$STATE" ]; then
     file=$STATE/$id.drift-report.txt
+    # A run killed between mktemp and mv leaves its temp behind, so each write first removes this id's own leftovers,
+    # which match mktemp's exact name: the prefix and six letters or digits. A concurrent same-id run whose temp this
+    # removes either rewrites it or fails its mv and prints its complete report instead, so no report is lost.
+    rm -f -- "$STATE/.$id.drift-report."[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]] 2>/dev/null
     # mv into a directory (or a link to one) would move the file inside it, so that path counts as unwritable.
     if [ -d "$file" ] || ! tmp=$(mktemp "$STATE/.$id.drift-report.XXXXXX" 2>/dev/null); then
       file=''
