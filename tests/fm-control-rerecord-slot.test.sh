@@ -771,6 +771,14 @@ rr_expect_write_keeps_the_crash() {
   [ "$(rr_field "$RR_L13_AUDIT" result)" = "$2" ] || fail "$id: the crashed write's audit is '$(rr_field "$RR_L13_AUDIT" result)', not $2"
 }
 
+# rr_expect_rollback_tail <id> <output> <audit>: a refusal after step 3 rolled <audit> back names that audit and the
+# restored record, and does not claim that no record was changed.
+rr_expect_rollback_tail() {
+  assert_contains "$2" "audit $3 rolled-back (the task record was restored to the prior record's bytes)" "$1: the refusal tail must name the rolled-back audit and the restored record"
+  assert_contains "$2" "; no manifest, copy or journal was changed" "$1: the refusal tail must say what was not changed"
+  assert_not_contains "$2" "no record, manifest, copy or journal was changed" "$1: the refusal tail must not claim the record was unchanged"
+}
+
 test_L14_check_pending_rollback_with_a_live_agent() {
   local out rc
   rr_setup_L13 L14
@@ -781,7 +789,8 @@ test_L14_check_pending_rollback_with_a_live_agent() {
   [ "$rc" != 0 ] || fail "L14: the write was expected to refuse"$'\n'"$out"
   assert_contains "$out" 'error: slot rerecord refused: agent_not_proven_stopped' "L14 write"
   [ "$(rr_field "$RR_L13_AUDIT" result)" = rolled-back ] || fail "L14: the write did not roll the crash back first (audit '$(rr_field "$RR_L13_AUDIT" result)')"
-  rr_ok L14 "pending untouched-staged audit, HEAD moved, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines, writes nothing; the write rolls the crash back, then refuses agent_not_proven_stopped"
+  rr_expect_rollback_tail L14 "$out" "$RR_L13_AUDIT"
+  rr_ok L14 "pending untouched-staged audit, HEAD moved, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines, writes nothing; the write rolls the crash back, then refuses agent_not_proven_stopped and its tail names the rolled-back audit and the restored record"
 }
 
 test_L15_check_pending_recovery_with_a_live_agent() {
@@ -977,6 +986,8 @@ test_H13c_note_required() { rr_setup_H13c H13c; rr_expect_refusal H13c note_requ
 test_H14_manifest_sha_mismatch() {
   rr_setup_H14 H14
   rr_expect_refusal H14 manifest_sha_mismatch --manifest-sha "$RR_STALE_SHA" --note "$RR_NOTE"
+  assert_contains "$RR_OUT" "; no record, manifest, copy or journal was changed" "H14: a refusal with no pending audit must say nothing was changed"
+  assert_not_contains "$RR_OUT" "reconciled" "H14: a refusal with no pending audit must not name a reconciliation"
 }
 test_H15_local_only_source_unsupported() { rr_h H15 local_only_source_unsupported; }
 test_H17_scope_entry_not_own_work_nested() { rr_h H17 'scope_entry_not_own_work: tools'; }
@@ -1268,7 +1279,8 @@ test_R6b_recovery_rolls_back_against_a_changed_manifest() {
   assert_contains "$out" 'error: slot rerecord refused: manifest_sha_mismatch' "R6b"
   [ "$(rr_sha "$RR_META")" = "$p" ] || fail "R6b: the crashed write was not rolled back"
   [ "$(rr_field "$a" result)" = rolled-back ] || fail "R6b: audit is '$(rr_field "$a" result)'"
-  rr_ok R6b "second run rolls the crashed write back (record P, first audit rolled-back), then refuses manifest_sha_mismatch"
+  rr_expect_rollback_tail R6b "$out" "$a"
+  rr_ok R6b "second run rolls the crashed write back (record P, first audit rolled-back), then refuses manifest_sha_mismatch and its tail names the rolled-back audit and the restored record"
 }
 
 test_R6c_another_writer_supersedes_the_crashed_write() {

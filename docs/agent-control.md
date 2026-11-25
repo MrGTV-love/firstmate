@@ -585,7 +585,13 @@ The verb takes, in order, the task's control lock, its spawn lock (`state/.spawn
 | 8. Note and manifest digest | refuse by name | not run; prints `manifest_sha256=` and the command to run |
 | 9. Stage, verify, archive, rebind, publish, verify, commit | below | never |
 
-Every refusal prints `error: slot rerecord refused: <reason>: <detail>` and changes no record, manifest, copy, or journal.
+Every refusal prints `error: slot rerecord refused: <reason>: <detail>` and changes no manifest, copy, or journal.
+A refusal ends `; no record, manifest, copy or journal was changed` when the run's step 3 reconciliation acted on no audit record.
+When that reconciliation acted on audit records, the refusal ends instead with `; before refusing, this run reconciled earlier interrupted runs:` and one entry per audit record, then `; no manifest, copy or journal was changed`.
+Each entry reads `audit <file> <result> (<effect>)`.
+For `rolled-back` after a restore, the effect is `the task record was restored to the prior record's bytes`.
+For `published-recovered` and `superseded-new`, the effect is `the audit was closed with the record left as published`.
+For `abandoned`, `superseded-prior`, `superseded-other`, and a `rolled-back` audit whose record already held the prior bytes, the effect is `the audit was closed with the task record left unchanged`.
 The content proofs read a private snapshot of the record and manifest bytes; the location proofs read live paths.
 
 - **Shape:** `not_ship_or_scout` (not exactly one `kind=` line, or another kind); `not_recorded` (no slot manifest, base, or scope); `not_adoption_route` (`recovery=slot-provision-refused`); `local_only_source_unsupported` (a `slot_source_ref=` record).
