@@ -1272,10 +1272,12 @@ LIFECYCLE_CASES = {
     "empty-long-s-approvals": ("empty", ("approvals",), True),
     "empty-upper-drop": ("empty", ("drop",), True),
     "empty-rename-prepared-upper-approvals": ("empty", ("approvals",), True),
-    "own-git-file-write": ("empty", ("own-git",), True),
-    "own-git-file-replace": ("empty", ("own-git",), True),
-    "own-commondir-write": ("empty", ("own-git",), True),
-    "own-commondir-replace": ("empty", ("own-git",), True),
+    "own-git-file-write": ("empty", ("own-git-file",), True),
+    "own-git-file-replace": ("empty", ("own-git-file",), True),
+    "own-git-file-hard-link-out": ("empty", ("own-git-file",), True),
+    "own-commondir-write": ("empty", ("own-commondir",), True),
+    "own-commondir-replace": ("empty", ("own-commondir",), True),
+    "own-commondir-hard-link-out": ("empty", ("own-commondir",), True),
     "replace-empty-approvals": ("records-empty", ("approvals",), True),
     "replace-empty-drop": ("records-empty", ("drop",), True),
     "swap-approvals": ("records-empty", ("approvals",), True),
@@ -1307,8 +1309,10 @@ LIFECYCLE_CASES = {
 # A copy of the head profile without each rule's lines: approvals and drop
 # are a record folder's own denies, lifecycle the lifecycle folder's literal
 # deny, common and project every deny naming that folder or a folder above
-# it, and own-git the two denies on the worker's own .git file and commondir.
-LIFECYCLE_MUTANTS = (("approvals",), ("drop",), ("lifecycle",), ("lifecycle", "approvals"), ("common",), ("project",), ("own-git",))
+# it, and own-git-file and own-commondir the deny on the worker's own .git
+# file and on its commondir.
+LIFECYCLE_MUTANTS = (("approvals",), ("drop",), ("lifecycle",), ("lifecycle", "approvals"), ("common",), ("project",), ("own-git-file",),
+                     ("own-commondir",))
 # With only the lifecycle folder's deny removed, a lifecycle folder made under
 # another spelling holds record folders whose path the record denies may not
 # name; no measurement covers that cell, so it is reported, not judged.
@@ -1420,8 +1424,11 @@ def lifecycle_steps(case, p):
         # Repointing the shared Git directory Git resolves for this worktree.
         "own-git-file-write": [lambda: own_git.write_text(f"gitdir: {s}\n")],
         "own-git-file-replace": [replace(own_git)],
+        # A second name in a writable place would let a write reach the file.
+        "own-git-file-hard-link-out": [lambda: os.link(own_git, s / "git-alias"), append(s / "git-alias")],
         "own-commondir-write": [lambda: commondir.write_text(f"{s}\n")],
         "own-commondir-replace": [replace(commondir)],
+        "own-commondir-hard-link-out": [lambda: os.link(commondir, s / "commondir-alias"), append(s / "commondir-alias")],
         "replace-empty-approvals": [lambda: os.rename(prep["approvals"], a)],
         "replace-empty-drop": [lambda: os.rename(prep["drop"], d)],
         "swap-approvals": [lambda: swap(prep["approvals"], a)],
@@ -1603,9 +1610,10 @@ def lifecycle_rule_lines(rule, lines, p, built_with):
         wanted = {f"(deny file-write* (subpath {folder}))"} | ({f"(deny file-write* (literal {folder}))"} if built_with[rule] else set())
     elif rule == "lifecycle":
         wanted = {f"(deny file-write* (literal {json.dumps(str(p['lifecycle']))}))"}
-    elif rule == "own-git":
-        wanted = {f"(deny file-write* (literal {json.dumps(str(p['worktree'] / '.git'))}))",
-                  f"(deny file-write* (literal {json.dumps(str(p['gitdir'] / 'commondir'))}))"}
+    elif rule == "own-git-file":
+        wanted = {f"(deny file-write* (literal {json.dumps(str(p['worktree'] / '.git'))}))"}
+    elif rule == "own-commondir":
+        wanted = {f"(deny file-write* (literal {json.dumps(str(p['gitdir'] / 'commondir'))}))"}
     else:
         named = {str(p[rule])} | {str(parent) for parent in p[rule].parents}
         wanted = set()
