@@ -600,8 +600,19 @@
 #   and a shell that starts late finds the attempt already claimed and runs nothing.
 #   It uses the assigned copy, never another worktree. Governed
 #   scouts start on fm/<id> so default promotion can adopt the same declaration.
-#   Relaunch reuses recorded scope and must pass the actual clean-slot contract;
-#   dirty relaunches refuse rather than bypassing attestation. --owned-path on a
+#   A relaunch is not a new scope declaration. When the record names its slot
+#   manifest and the relaunch is neither a relocation nor the recovery of a refused
+#   first provisioning, it adopts that recorded manifest (bin/fm-slot-provision-lib.sh
+#   fm_slot_adopt_check) and never runs the provisioner: the manifest must belong to
+#   this task's own copy, branch, base and scope and the copy-custody owners must
+#   agree, else it refuses by name with nothing changed. The task's own commits and
+#   uncommitted edits outside its recorded scope never block it and never change
+#   the scope; they are printed as a drift report. A pool slot another task claims refuses
+#   the relaunch by name unless that task's record places its copy inside the slot; no other peer claim is checked, and Vernant's push-time
+#   owned_paths gate stays the control. A relaunch with no recorded manifest keeps
+#   the provisioning route and must pass the clean-slot contract (a copy that
+#   predates the provisioner runs the primary clone's current main, verified byte for
+#   byte against the default branch tip). --owned-path on a
 #   relaunch never overrides recorded scope: it is accepted only to scope a task
 #   with none recorded (for example, admitted before its project was governed),
 #   which then runs the same governed preparation; elsewhere it refuses. If that
@@ -1170,6 +1181,7 @@ BRANCH_PREFIX_SET=0
 BASE_BRANCH=
 BASE_BRANCH_SET=0
 SLOT_OWNED_PATHS=()
+SLOT_ADOPT=0
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
 CAPTAIN_MODEL_PIN=
@@ -4788,7 +4800,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
         { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
         awk '{ sub(/\r$/, ""); print }' "$SOURCE_BRIEF" &&
         printf '\n# Dispatch egress capabilities\nRecorded destination classes: %s.\nNative semantic find is available only with semantic-search authorization and existing project/helper eligibility; otherwise it is absent.\nNever write or enlarge the task grant from a worker.\n' "$TASK_EGRESS" &&
-        { if [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
+        { if [ "$FM_SLOT_ADOPTED" = 1 ]; then fm_slot_contract_adopted "$BRANCH"; elif [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
         { [ -z "${1:-}" ] || cat "$1"; } &&
         if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
           fm_brief_intent_overlay "$CAPTAIN_INTENT" "$SOURCE_BRIEF"
@@ -6628,7 +6640,11 @@ spawn_slot_refused() {
       rm -f -- "$recovery"
     }
   fi
-  printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy and endpoint retained: $WT; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
+  if [ "$SLOT_ADOPT" = 1 ]; then
+    printf '%s\n' "$(status_stamp_line "blocked: slot adoption refused before admission; assigned copy and endpoint retained: $WT; see the spawn output for the refusal by name")" >>"$STATE/$ID.status"
+  else
+    printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy and endpoint retained: $WT; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
+  fi
   echo "error: assigned copy $WT and endpoint $T retained; no worker admitted" >&2
   exit 1
 }
@@ -6651,6 +6667,7 @@ while :; do
 spawn_validate_local_base "$WT" || exit 1
 SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
+SLOT_ADOPT=0
 if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
   if fm_slot_required "$PROJ_ABS" "$WT"; then
     fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1 || {
@@ -6691,6 +6708,10 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   if [ "$RELAUNCH" -eq 0 ]; then
     SLOT_FRESH_BASE=1
     fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+  elif fm_slot_adopt_route "$RELAUNCH_META" "$RELAUNCH_RELOCATING"; then
+    # The task's own recorded manifest is adopted, never re-provisioned (Main 115, rule S): nothing is
+    # prepared, moved or declared here, and the decision is taken once below.
+    SLOT_ADOPT=1
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
     if [ -n "$prepared_head" ]; then
@@ -6835,7 +6856,16 @@ spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
   [ "$rc" -le 255 ] || { echo 'error: assigned-copy provisioner completion status is out of range' >&2; return 1; }
   return "$rc"
 }
-if [ "$SLOT_GOVERNED" = 1 ]; then
+[ "$RELAUNCH" -eq 0 ] || ! fm_slot_primary_route_allowed "$RELAUNCH_META" || FM_SLOT_PRIMARY_PROVISIONER=1
+if [ "$SLOT_GOVERNED" = 1 ] && [ "$SLOT_ADOPT" = 1 ]; then
+  fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+  fm_slot_drift_report "$WT" "$ID" "$BRANCH" "$FM_SLOT_BASE_SHA" "${SLOT_OWNED_PATHS[@]}"
+  render_launch_brief || exit 1
+elif [ "$SLOT_GOVERNED" = 1 ]; then
+  # A relaunch that provisions a manifest on its own copy asks the adoption's custody owner first: a clean copy another
+  # task holds is refused by name and the provisioner is not run (D7 (e)). A fresh spawn and a relocation keep their routes.
+  [ "$RELAUNCH" -eq 0 ] || [ "$RELAUNCH_RELOCATING" = 1 ] ||
+    fm_slot_provision_custody "$PROJ_ABS" "$WT" "$ID" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
   fm_slot_provision spawn_slot_run_in_pane "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
     "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "$SLOT_SOURCE_REF" "$SLOT_SOURCE_SHA" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused
   render_launch_brief || exit 1
@@ -6991,6 +7021,146 @@ exclude_path() {
   mkdir -p "$(dirname "$EXCL")"
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >>"$EXCL"
 }
+# The identity of a launch artifact for the edit check: a regular file by its bytes, a symlink by its target text.
+spawn_wiring_sha() { # <path>: type, mode and bytes (a symlink by its target text), so a mode-only edit is an edit
+  python3 - "$1" <<'PY'
+import hashlib, os, stat, sys
+path = sys.argv[1]
+info = os.lstat(path)
+if stat.S_ISLNK(info.st_mode):
+    body = b"link:" + os.fsencode(os.readlink(path))
+elif stat.S_ISREG(info.st_mode):
+    with open(path, "rb") as handle:
+        body = handle.read()
+else:
+    body = b"other"
+print("%s:%o:%o" % (hashlib.sha256(body).hexdigest(), stat.S_IFMT(info.st_mode), stat.S_IMODE(info.st_mode)))
+PY
+}
+SPAWN_KEPT_SETTINGS=
+# The worker's kept settings are not lost to the fresh wiring: their hook and permission entries stay effective beside it.
+# Firstmate's own previous entries (busy and guard hooks of this task) are dropped from the kept side so they do not
+# pile up; no other key of the worker's file is carried into the active file, so an override such as disableAllHooks
+# or an env entry is never applied, and the mode is restored. The kept copy itself stays byte for byte at its kept path.
+# A kept file that does not parse stays byte for byte at its kept path and the report says so; the base for the merge is then
+# the most recent parseable version the launch can establish: the version staged in the index, else the committed one, so a
+# protection of a tracked file stays effective beside the fresh wiring (D1); an ignored file has no such version, so the fresh
+# wiring is written without it and the protections that exist only in the unparseable bytes are not effective.
+spawn_merge_kept_settings() { # <kept-path> <active-path>
+  python3 - "$1" "$2" "$ID" "$WT" <<'PY' || return 1
+import json, os, stat, subprocess, sys
+kept, active, task, worktree = sys.argv[1:5]
+try:
+    with open(kept, encoding="utf-8") as handle:
+        old = json.load(handle)
+    if not isinstance(old, dict):
+        raise ValueError("not a JSON object")
+except (OSError, ValueError) as exc:
+    old = None
+    source = ""
+    rel = os.path.relpath(active, worktree)
+    for ref in (":" + rel, "HEAD:" + rel):
+        shown = subprocess.run(["git", "-C", worktree, "show", ref], capture_output=True, stdin=subprocess.DEVNULL)
+        if shown.returncode != 0:
+            continue
+        try:
+            candidate = json.loads(shown.stdout.decode("utf-8"))
+        except ValueError:
+            continue
+        if isinstance(candidate, dict):
+            old, source = candidate, ("the version staged in the index" if ref.startswith(":") else "the committed version")
+            break
+    if old is None:
+        print("the kept settings %s do not parse (%s): they stay byte for byte at that path, the fresh wiring is written without them, and protections that exist only in those bytes are NOT effective" % (kept, exc), file=sys.stderr)
+        sys.exit(0)
+    print("the kept settings %s do not parse (%s): they stay byte for byte at that path; the hook and permission entries of %s stay effective beside the fresh wiring, and protections that exist only in the unparseable bytes are NOT effective" % (kept, exc, source), file=sys.stderr)
+with open(active, encoding="utf-8") as handle:
+    fresh = json.load(handle)
+ours = ("fm-busy-event.sh", "fm-jev-guard-hook.sh")
+def foreign(entry):
+    hooks = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(hooks, list):
+        return True
+    return not all(isinstance(h, dict) and any(m in str(h.get("command", "")) for m in ours) and task in str(h.get("command", "")) for h in hooks)
+merged = dict(fresh)
+merged_hooks = dict(old.get("hooks") if isinstance(old.get("hooks"), dict) else {})
+for event, entries in (fresh.get("hooks") or {}).items():
+    kept_entries = [e for e in merged_hooks.get(event, []) if foreign(e)] if isinstance(merged_hooks.get(event, []), list) else []
+    merged_hooks[event] = kept_entries + entries
+merged["hooks"] = merged_hooks
+rules = old.get("permissions") if isinstance(old.get("permissions"), dict) else {}
+rules = {k: rules[k] for k in ("allow", "deny", "ask") if k in rules}
+if rules:
+    merged["permissions"] = rules
+with open(active, "w", encoding="utf-8") as handle:
+    json.dump(merged, handle, separators=(",", ":"))
+    handle.write("\n")
+os.chmod(active, stat.S_IMODE(os.stat(kept).st_mode))
+print("merged the worker's kept hook and permission entries into the fresh wiring at %s; its other keys are not carried over" % active, file=sys.stderr)
+PY
+}
+# state/<id>.wiring-sha records each worktree launch artifact as it was written. A relaunch into the same copy that
+# finds one differing from its record, or with no record, keeps the original beside it under a collision-safe name,
+# excluded from Git, and says where; an artifact still equal to its record is regenerated without a kept copy.
+spawn_keep_edited_wiring() { # <prior-harness>
+  local harness path rel want got kept n
+  harness=$(fm_control_harness_family "$1") || return 0
+  while IFS= read -r path; do
+    case "$path" in "$WT"/*) ;; *) continue ;; esac
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    rel=${path#"$WT"/}
+    got=$(spawn_wiring_sha "$path") || return 1
+    want=$(awk -v r="$rel" '$2 == r { v = $1 } END { print v }' "$STATE_REAL/$ID.wiring-sha" 2>/dev/null || true)
+    if [ -n "$want" ] && [ "$want" = "$got" ]; then
+      # Unchanged since written. A settings file that already carries the worker's merged entries is the base for
+      # the next merge, so those entries survive the regeneration; no new kept copy is needed (the first one stays).
+      if [ "$rel" = .claude/settings.local.json ] &&
+        [ "$(awk -v r="$rel" '$2 == r { v = $3 } END { print v }' "$STATE_REAL/$ID.wiring-sha" 2>/dev/null)" = merged ]; then
+        cp -p -- "$path" "$STATE_REAL/$ID.settings-merge-base" || return 1
+        SPAWN_KEPT_SETTINGS=$STATE_REAL/$ID.settings-merge-base
+      fi
+      continue
+    fi
+    n=0
+    kept="$path.fm-kept.$(date +%s).$n"
+    while [ -e "$kept" ] || [ -L "$kept" ]; do n=$((n + 1)); kept="$path.fm-kept.$(date +%s).$n"; done
+    cp -pP -- "$path" "$kept" || return 1
+    [ "$(spawn_wiring_sha "$kept")" = "$got" ] || return 1
+    [ "$rel" != .claude/settings.local.json ] || SPAWN_KEPT_SETTINGS=$kept
+    exclude_path "${kept#"$WT"/}"
+    echo "kept the worker's edited launch artifact $rel byte for byte at ${kept#"$WT"/}; the fresh wiring is written beside it" >&2
+    # Only the settings file is merged, so the edits of any other launch artifact are set aside and recoverable but not
+    # effective; say so once, loudly, so no edited protection is lost silently (Main 3659).
+    if [ "$rel" != .claude/settings.local.json ]; then
+      if [ -z "$want" ]; then
+        # No launch record exists to say whether the worker edited it, so no edit is claimed.
+        echo "kept aside; no prior launch record to compare: $rel is set aside at $kept and the regenerated $rel replaced it" >&2
+      else
+        echo "WARNING: the worker's edits to $rel are set aside at $kept and are no longer active; the regenerated $rel replaced them" >&2
+      fi
+    fi
+  done <<EOF
+$(fm_control_harness_wiring_paths "$harness" "$WT" "$STATE_REAL" "$ID" "$KIND")
+EOF
+}
+spawn_record_wiring() {
+  local path rel
+  : >"$STATE_REAL/$ID.wiring-sha.tmp" || return 0
+  while IFS= read -r path; do
+    case "$path" in "$WT"/*) ;; *) continue ;; esac
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    rel=${path#"$WT"/}
+    # A merged settings file carries the worker's own entries: its record says so, so the next relaunch merges from it.
+    if [ -n "$SPAWN_KEPT_SETTINGS" ] && [ "$rel" = .claude/settings.local.json ]; then
+      printf '%s %s merged\n' "$(spawn_wiring_sha "$path")" "$rel" >>"$STATE_REAL/$ID.wiring-sha.tmp"
+      continue
+    fi
+    printf '%s %s\n' "$(spawn_wiring_sha "$path")" "$rel" >>"$STATE_REAL/$ID.wiring-sha.tmp"
+  done <<EOF
+$(fm_control_harness_wiring_paths "$(fm_control_harness_family "$HARNESS" 2>/dev/null || true)" "$WT" "$STATE_REAL" "$ID" "$KIND")
+EOF
+  mv -f -- "$STATE_REAL/$ID.wiring-sha.tmp" "$STATE_REAL/$ID.wiring-sha" 2>/dev/null || rm -f -- "$STATE_REAL/$ID.wiring-sha.tmp"
+}
 if [ "$RELAUNCH" -eq 1 ]; then
   # The fresh copy of a relocation is not firstmate's yet: this is the one place
   # that overwrites and deletes harness files in it, so the check that none of
@@ -7004,6 +7174,14 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # files and turn-end token registry entries behind, and even a same-harness
   # relaunch would orphan the retired busy generation's token
   # (bin/fm-control-lib.sh owns where those artifacts live).
+  # An adopted relaunch resumes the worker's own copy, so a launch artifact the worker edited since the last launch
+  # (its settings, its plugin) is kept byte for byte beside the fresh wiring instead of being deleted with it.
+  if [ "$SLOT_ADOPT" = 1 ]; then
+    spawn_keep_edited_wiring "$RELAUNCH_PRIOR_HARNESS" || {
+      echo "error: could not keep the worker's edited launch artifacts for task $ID; refusing to replace them" >&2
+      exit 1
+    }
+  fi
   clear_relaunch_harness_wiring "$RELAUNCH_PRIOR_HARNESS" "$WT" "$STATE_REAL" "$ID" "$KIND" || {
     echo "error: could not retire $RELAUNCH_PRIOR_HARNESS wiring for task $ID; refusing to arm the replacement" >&2
     exit 1
@@ -7300,6 +7478,9 @@ BUSY_GEN=
       mkdir -p "$WT/.claude"
       printf '{%s}\n' "$hooks_json" >"$WT/.claude/settings.local.json"
       exclude_path '.claude/settings.local.json'
+      if [ -n "$SPAWN_KEPT_SETTINGS" ]; then
+        spawn_merge_kept_settings "$SPAWN_KEPT_SETTINGS" "$WT/.claude/settings.local.json" || exit 1
+      fi
     fi
     ;;
   devin)
@@ -7709,6 +7890,7 @@ EOF
     fi
     ;;
   esac
+[ "$KIND" = secondmate ] || spawn_record_wiring
 
 # Per-task git hooksPath for local credential checks and AI trailer stripping.
 # Installed for every kind, including secondmate; keeping trailers disables
@@ -8552,6 +8734,15 @@ if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   exit 1
 fi
 sleep 0.3
+# The copy that was checked is the copy the worker starts in: the adopted slot is judged once more after everything
+# slow (brief, skill selection, wiring) and immediately before the launch is delivered.
+if [ "$SLOT_ADOPT" = 1 ]; then
+  FM_SLOT_ADOPT_WIRED=1
+  fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+elif [ "$SLOT_GOVERNED" = 1 ] && [ "$RELAUNCH" -eq 1 ] && [ "$RELAUNCH_RELOCATING" != 1 ]; then
+  # The provisioning route's custody, judged once more immediately before the launch is delivered (D7 (e)).
+  fm_slot_provision_custody "$PROJ_ABS" "$WT" "$ID" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+fi
 spawn_send_or_abort "launch command" spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
