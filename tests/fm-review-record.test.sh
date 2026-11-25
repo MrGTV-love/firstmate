@@ -1011,6 +1011,14 @@ test_correction_rejections_leave_the_ledger_untouched() {
   printf 'mode: away\n' > "$case_dir/home/state/.afk-contract"
   REJECT_CODE=2 expect_correction_rejected "C4 a correction while an away record exists" "away" \
     "$case_dir" "$HEAD1" exclude-review 1700000050 claude-opus-5-5 "$DIGEST_A"
+  out=$(record_correction "$case_dir" "$HEAD1" exclude-review 1700000050 claude-opus-5-5 "$DIGEST_A") || true
+  assert_contains "$out" "correction authority" "C4 an away correction must name correction authority"
+  assert_not_contains "$out" "merge word" "C4 an away correction must not ask for a merge word"
+  before=$(ledger_sum "$case_dir")
+  out=$(FM_HOME="$case_dir/home" "$RECORD" captain-word --pr "$URL" --head "$HEAD1" --words 'merge it') || true
+  assert_contains "$out" "captain-word refused: the away-posture record $case_dir/home/state/.afk-contract exists, so the captain is away and away words are never captain words; the captain must give the merge word after return" \
+    "C4 an away captain-word must keep its message"
+  assert_equals "$before" "$(ledger_sum "$case_dir")" "C4 an away captain-word must leave the ledger byte-identical"
   rm -f "$case_dir/home/state/.afk-contract"
   # No history at all: nothing to name, and no ledger is created.
   case_dir=$(make_case rejection-no-ledger gpt-5.1)

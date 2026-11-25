@@ -202,7 +202,7 @@ every command reading the ledger, writes included, fails for every PR in that
 home with 'review record history is invalid', so such code fails closed rather
 than ignoring a correction.
 Ledgers without correction rows read exactly as before. See docs/configuration.md
-'Unrecorded pipeline author families' for the guard's harm-model reassessment.
+'Review record corrections' for the guard's harm-model reassessment.
 review requires --report to name a regular, non-symlink, readable local file whose
 first line is exactly VERDICT: <PASS|FAIL> head=<head>, matching --verdict and --head.
 It records the report path and whole-file report_sha256 at record time; verification
@@ -376,12 +376,16 @@ def state_dir(home):
     return state
 
 
-def refuse_away(state):
+def refuse_away(state, kind):
     result = subprocess.run(["bash", "-c", '. "$1/fm-afk-contract.sh" || exit 2; fm_afk_contract_away_present "$2" || exit 1',
                              "fm-review-record", str(BIN), str(state)], capture_output=True, text=True, check=False)
     if result.returncode == 0:
+        if kind == "correction":
+            raise RecordError(f"the away-posture record {state / '.afk-contract'} exists, so the captain is away and away words never carry correction authority; the captain must give the correction authority after return")
         raise RecordError(f"captain-word refused: the away-posture record {state / '.afk-contract'} exists, so the captain is away and away words are never captain words; the captain must give the merge word after return")
     if result.returncode != 1:
+        if kind == "correction":
+            raise RecordError(f"the away-posture record under {state} could not be read, so correction authority cannot be checked")
         raise RecordError(f"captain-word refused: the away-posture record under {state} could not be read")
 
 
@@ -884,7 +888,7 @@ def main():
             row["report_sha256"] = report_digest(args.report, args.verdict, args.head)
         if args.command in ("captain-word", "correction"):
             try:
-                refuse_away(state_dir(home))
+                refuse_away(state_dir(home), args.command)
             except RecordError as exc:
                 if args.command == "captain-word":
                     raise

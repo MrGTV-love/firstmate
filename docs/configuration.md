@@ -106,7 +106,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
 - The heartbeat guard-workaround report `state/.guard-workarounds-next`, written by `bin/fm-watch.sh` as file output only; no wake presents it.
-- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, pipeline-only unknown-family relief, named-group coverage, and its format; see [Unrecorded pipeline author families](#unrecorded-pipeline-author-families) for the gate's harm-model reassessment.
+- The append-only review-verdict, captain-word and correction ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, pipeline-only unknown-family relief, named-group coverage, corrections, and its format; see [Unrecorded pipeline author families](#unrecorded-pipeline-author-families) and [Review record corrections](#review-record-corrections) for the gate's harm-model reassessments.
 - The append-only launch author history `state/<id>.launch-models`, published by `bin/fm-spawn.sh`, whose header owns its format and relaunch behavior.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
@@ -151,6 +151,20 @@ That record is short-lived and is not an archive: the merge poll in `bin/fm-watc
 [`bin/fm-merge-authority-lib.sh`](../bin/fm-merge-authority-lib.sh) owns its optional-line extension and backward-compatible reader; legacy records without the fact remain readable.
 A portable authenticated run-author evidence carrier needs a separate producer, transfer, trust and replay contract and is not provided by this relief.
 The regressions are [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh) and [`tests/fm-pr-merge.test.sh`](../tests/fm-pr-merge.test.sh).
+
+### Review record corrections
+
+The `correction` record kind is owned by [`bin/fm-review-record.py`](../bin/fm-review-record.py)'s header and `--help`.
+
+#### Correction harm-model reassessment
+
+A correction does not loosen a deny or allow-list.
+A correction widens what the guard permits in one bounded way: it can exclude one earlier PASS review row, or supersede one typed `author_groups` entry in such a row.
+A correction never clears a derived group, a FAIL row or an escalation trigger.
+A correction does not touch customer data, billing or spend.
+Installed code from before correction rows existed fails closed on a correction row: it reports the review record history as invalid for every PR in that home.
+A correction carries its own authority words and epoch, and it is never merge authority.
+The authority words are a free string, as captain-word words are, and no check proves that the captain said them.
 
 ### Friction ledger
 
