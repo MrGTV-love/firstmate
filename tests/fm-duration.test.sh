@@ -334,6 +334,7 @@ done.touch()
 # A sampler wrapper for the telemetry cases: FM_TEST_CLOCK scales the clock,
 # FM_TEST_BLIND=FROM:TO blinds tree_cpu between those real seconds after
 # start, FM_TEST_BLIND_PERIOD=P:B blinds the first B real seconds of every P,
+# FM_TEST_BLIND_WHEN=PATH blinds it once PATH exists,
 # FM_TEST_NOT_RUNNABLE hides runnable state so CPU alone decides, and
 # FM_TEST_PLATFORM stands in for sys.platform after the module has loaded.
 sampler = tmp / 'sampler-run.py'
@@ -348,13 +349,14 @@ sys.modules['fm_duration'] = module
 spec.loader.exec_module(module)
 blind_from, blind_to = map(float, os.environ.get('FM_TEST_BLIND', '-1:-1').split(':'))
 period, blind_part = map(float, os.environ.get('FM_TEST_BLIND_PERIOD', '0:0').split(':'))
+blind_when = os.environ.get('FM_TEST_BLIND_WHEN')
 if os.environ.get('FM_TEST_PLATFORM'):
     sys.platform = os.environ['FM_TEST_PLATFORM']
 sampled = module.tree_cpu
 def tree_cpu(pid, observed):
     cpu, runnable = sampled(pid, observed)
     at = real() - start
-    if blind_from <= at < blind_to or (period and at % period < blind_part):
+    if blind_from <= at < blind_to or (period and at % period < blind_part) or (blind_when and os.path.exists(blind_when)):
         return None, False
     return cpu, runnable and not os.environ.get('FM_TEST_NOT_RUNNABLE')
 module.tree_cpu = tree_cpu
@@ -462,6 +464,38 @@ for share, seconds, key, killed in (('0.05', '3600', 'cleanup.creep-below', True
         assert 2.5 <= waited < 20 and not done.exists(), f'{key}: a cleanup creeping below the floor was not killed after the bound: {waited:.1f}s'
     else:
         assert done.exists() and waited >= 8, f'{key}: a cleanup working above the floor did not finish: {waited:.1f}s'
+
+# A blind sample pauses the no-progress clock only before a stop. Under a 10x
+# clock with a 2 real second bound, a silent leader that ignores TERM (it only
+# marks when TERM arrives) and is blind for the whole run is not tripped for
+# inactivity, reaches the 20 real second absolute stop, and its blind cleanup
+# is killed about one bound after TERM, not at the cleanup's own absolute
+# limit 20 real seconds later.
+term_ignorer = """import pathlib, signal, sys, time
+signal.signal(signal.SIGTERM, lambda *_: pathlib.Path(sys.argv[1]).touch())
+while True:
+    time.sleep(1)
+"""
+
+
+def blind_cleanup_run(key, termed, **extra):
+    result, _ = sampler_run(key, term_ignorer, [termed], FM_TEST_CLOCK='10', **extra)
+    assert result.returncode == 124 and termed.exists() and 'cpu_telemetry_unavailable' in result.stderr, (key, result.returncode, result.stderr)
+    return result, time.time() - termed.stat().st_mtime
+
+
+blind_run, blind_run_waited = blind_cleanup_run('cleanup.blind-run', tmp / 'blind-run.termed', FM_TEST_BLIND='0:100000',
+                                                FM_DURATION_NO_PROGRESS_SECS='20', FM_DURATION_ABSOLUTE_SECS='200')
+assert 'absolute_limit' in blind_run.stderr and 'no_progress' not in blind_run.stderr, blind_run.stderr
+assert 1.5 <= blind_run_waited < 12, f'a blind cleanup was not killed one bound after the absolute stop: {blind_run_waited:.1f}s'
+
+# A no-progress stop whose cleanup is blind from TERM on is killed one bound
+# (6 real seconds) after the stop, not held to the 60 real second absolute limit.
+after_stop, after_stop_waited = blind_cleanup_run('cleanup.blind-after-stop', tmp / 'blind-after-stop.termed',
+                                                  FM_TEST_BLIND_WHEN=str(tmp / 'blind-after-stop.termed'),
+                                                  FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert 'no_progress' in after_stop.stderr and 'absolute_limit' not in after_stop.stderr, after_stop.stderr
+assert 5 <= after_stop_waited < 30, f'a cleanup blind after a no-progress stop was not killed one bound after it: {after_stop_waited:.1f}s'
 
 # A refused table location is named as refused, not as recording turned off.
 refused_repo = make_repo('refused-table')

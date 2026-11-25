@@ -130,8 +130,8 @@ such as Docker containers, networks and volumes that the Docker daemon holds,
 survive the stop, so such a command must stop and remove its own resources in
 its TERM handling or its owner's cleanup; run neither finds nor removes them.
 For run, a blind stretch is neither idle time nor progress, from the start of
-the run onward: each sample that cannot read complete tree CPU pauses the
-no-progress clock for the interval it ends, and the CPU window restarts once
+the run onward until a stop begins: each sample that cannot read complete
+tree CPU pauses the no-progress clock for the interval it ends, and the CPU window restarts once
 samples return, so CPU gained across the gap is not credited as progress. A
 no-progress stop therefore needs the bound in sighted time; a run that stays
 blind is bounded only by the absolute stop. keep-going keeps its base rule:
@@ -167,7 +167,9 @@ the group only when the leader has exited and group members remain, on a second
 forwarded signal, when the cleanup shows no output and no process-tree CPU
 progress (for run, CPU above the same idle floor) for the same no-progress
 interval (counted from the stop, or from the cleanup's last progress), or when
-the cleanup itself has run for the same absolute limit. A TERM cleanup that
+the cleanup itself has run for the same absolute limit. During a cleanup a blind
+sample is not progress and does not pause that interval, so a cleanup that
+stays blind is still killed after it. A TERM cleanup that
 waits quietly on another owner, such as a Docker teardown blocked on the
 daemon, should therefore print progress while it waits. A true no-progress or absolute stop still records a timed-out
 sample, so repeated stops file the same repair work as any other real limit.
@@ -1845,7 +1847,7 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
     observed_cpu = {}
     cpu_window = collections.deque()  # (time, tree CPU) samples inside the idle-floor window
     window_gain = 0.0
-    # A blind sample is neither idle time nor progress (run only): the interval it ends does not
+    # A blind sample is neither idle time nor progress (run only, before a stop): the interval it ends does not
     # advance the no-progress clock, and the CPU window restarts after the gap, so CPU gained
     # across the gap is never read as progress either.
     last_sampled = started
@@ -1877,7 +1879,8 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
                     warn_blind_telemetry()
                 sampled_at = time.monotonic()
                 if blind and inactivity is None:
-                    last_progress = min(sampled_at, last_progress + (sampled_at - last_sampled))  # pause the clock
+                    if not stopping_since:
+                        last_progress = min(sampled_at, last_progress + (sampled_at - last_sampled))  # pause the clock
                     cpu_window.clear()
                 last_sampled = sampled_at
                 if sample is not None:
