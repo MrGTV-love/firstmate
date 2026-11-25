@@ -567,28 +567,39 @@ test_launch_proof_claude_refusal_checks() (
         local p=$2
         [ ! -f "$T/w/gone-$p" ] || return 1
         if [ -f "$T/w/live-ppid-$p" ]; then cat "$T/w/live-ppid-$p"; else awk -v p="$p" '$1 == p {print $2}' "$T/w/table"; fi ;;
-      # Each process's identity: one start time, another once staged (a reused
-      # pid); a gone process is not listed.
-      '-axo pid=,lstart=')
-        [ ! -f "$T/w/starts-fail" ] || return 1
-        local p
-        while read -r p _; do
-          [ ! -f "$T/w/gone-$p" ] || continue
-          [ ! -f "$T/w/starts-no-agent" ] || [ "$p" != 53539 ] || continue
-          if [ -f "$T/w/start-$p" ]; then printf '%s %s\n' "$p" "$(cat "$T/w/start-$p")"
-          else printf '%s Mon Oct 27 16:58:42 2026\n' "$p"; fi
-        done < "$T/w/table" ;;
+      # A live process's state and group: a zombie is Z, a reused pid is in the
+      # staged group; a gone process, or a staged failure, is not read.
+      '-o stat=,pgid= -p '*)
+        local p=$4
+        [ ! -f "$T/w/gone-$p" ] && [ ! -f "$T/w/stat-fail-$p" ] || return 1
+        if [ -f "$T/w/zombie-$p" ]; then printf 'Z '; else printf 'S '; fi
+        if [ -f "$T/w/moved-$p" ]; then cat "$T/w/moved-$p"; else awk -v p="$p" '$1 == p {print $3}' "$T/w/table"; fi ;;
+      # A start time that reads 1 s later at each read once drift is staged.
+      '-p '*' -o lstart=')
+        local p=$2
+        printf x >> "$T/w/lstart-reads-$p"
+        if [ -f "$T/w/lstart-drift-$p" ]; then printf 'Mon Oct 27 16:58:%02d 2026\n' "$(wc -c < "$T/w/lstart-reads-$p")"
+        else printf 'Mon Oct 27 16:58:42 2026\n'; fi ;;
       *) return 1 ;;
     esac
   }
+  # kill -0 finds no gone process (ESRCH) and is refused for a staged process of
+  # another user (EPERM); every other kill is the real one.
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
+  kill() {
+    [ "${1:-}" = -0 ] || { builtin kill "$@"; return; }
+    if [ -f "$T/w/gone-$2" ]; then printf 'kill: (%s) - No such process\n' "$2" >&2; return 1; fi
+    if [ -f "$T/w/eperm-$2" ]; then printf 'kill: (%s) - Operation not permitted\n' "$2" >&2; return 1; fi
+    return 0
+  }
   # A member staged to quit exits while its environment is read (quit-on-env:
-  # the read fails), just after it (quit-after-env), or is replaced by another
-  # process with its pid at each read (reuse-on-env).
+  # the read fails), just after it (quit-after-env), or exits and is left
+  # unreaped during the read (zombie-on-env).
   # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_remote_herdr_process_env() {
     printf x >> "$T/w/reads-$1"
     if [ -f "$T/w/quit-on-env-$1" ]; then : > "$T/w/gone-$1"; return 1; fi
-    if [ -f "$T/w/reuse-on-env-$1" ]; then printf 'Tue Nov 25 10:00:%02d 2026' "$(wc -c < "$T/w/reads-$1")" > "$T/w/start-$1"; return 1; fi
+    if [ -f "$T/w/zombie-on-env-$1" ]; then : > "$T/w/zombie-$1"; return 1; fi
     [ -f "$T/w/env-$1" ] || return 1
     cat "$T/w/env-$1"
     [ ! -f "$T/w/quit-after-env-$1" ] || : > "$T/w/gone-$1"
@@ -682,45 +693,57 @@ test_launch_proof_claude_refusal_checks() (
   judged managed '(k) S9c: a managed claude in startup whose unreadable startup child is /bin/sh keeps its base outcome'
 
   # A group member that quits between the table read and its own reads is no
-  # live member. Its identity (pid and start time) is read again, and only a
-  # member shown gone is skipped.
-  member_quits() { # <stage>: world with a short-lived member 60003 (no exe)
+  # live member, on positive proof only: kill -0 finds no such process, ps shows
+  # it exited and unreaped (Z), or its pid is now in another process group.
+  member_quits() { # <stage>: world with a short-lived /bin/sh member 60003
     world; printf '%s\n' '60003 53733 53539' >> "$T/w/table"
     case "$1" in
-      on-env) : > "$T/w/quit-on-env-60003" ;;
+      on-env) printf '/bin/sh' > "$T/w/exe-60003"; : > "$T/w/quit-on-env-60003" ;;
       after-env) printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-60003"; : > "$T/w/quit-after-env-60003" ;;
-      reuse) : > "$T/w/reuse-on-env-60003" ;;
+      zombie) : > "$T/w/zombie-on-env-60003" ;;
+      reused) printf '777' > "$T/w/moved-60003" ;;
+      eperm) : > "$T/w/eperm-60003" ;;
+      stat-fail) : > "$T/w/stat-fail-60003" ;;
+      drift) : > "$T/w/lstart-drift-60003" ;;
     esac
   }
   member_quits on-env
-  judged managed '(k) a member that exits while its environment is read is skipped'
+  judged managed '(k) (i) a /bin/sh member that quits while its environment is read is skipped'
   member_quits after-env
-  judged managed '(k) a member that exits after its environment read, before the descendant rule, is skipped'
-  member_quits reuse
-  judged managed '(k) a member whose pid now names a process with another start time has exited and is skipped'
+  judged managed '(k) a member that quits after its environment read, before the descendant rule, is skipped'
+  member_quits zombie
+  judged managed '(k) (ii) a member that exited and is not reaped (state Z) is skipped'
+  member_quits reused
+  judged managed '(k) a member whose pid now belongs to another process group is skipped'
   member_quits live
-  judged unknown 'a live member whose environment cannot be read, its identity unchanged, still refuses' 'environment of live group process 60003 cannot be read'
-  member_quits on-env; : > "$T/w/starts-fail"
-  judged unknown 'a failed environment read with a failed identity read is no proof of exit' 'environment of live group process 60003 cannot be read'
-  member_quits on-env; : > "$T/w/starts-no-agent"
-  judged unknown 'an identity read that does not list the agent is no proof of exit' 'environment of live group process 60003 cannot be read'
-  member_quits after-env; : > "$T/w/starts-fail"
-  judged unknown 'a failed parent read with a failed identity read is no proof of exit' 'parent chain of live group process 60003 changed'
-  # Mutants: a re-check that never proves exit brings the unknown back; one
-  # that skips without reading the identity lets a live unreadable member pass.
-  # mutant <stage> never|always: the verdict with the re-check replaced by one
-  # that never, or always, finds the member gone.
+  judged unknown '(iii) a live unreadable member still refuses' 'environment of live group process 60003 cannot be read'
+  member_quits drift
+  judged unknown '(iv) a live unreadable member whose start time reads 1 s later still refuses' 'environment of live group process 60003 cannot be read'
+  member_quits eperm
+  judged unknown 'a live unreadable member that kill -0 may not signal still refuses' 'environment of live group process 60003 cannot be read'
+  member_quits stat-fail
+  judged unknown 'a live unreadable member whose state read fails still refuses' 'environment of live group process 60003 cannot be read'
+  # mutant <stage> <kind>: the verdict with the exit proof replaced by one that
+  # never proves exit, always does, trusts only kill -0, or trusts a start-time
+  # difference.
   mutant() (
     member_quits "$1"
-    FM_TEST_MUTANT=$2
-    # shellcheck disable=SC2329 # the library under test calls this stand-in
-    fm_launch_proof_member_gone() { [ "$FM_TEST_MUTANT" = always ]; }
+    case "$2" in
+      never) fm_launch_proof_member_gone() { return 1; } ;;
+      always) fm_launch_proof_member_gone() { return 0; } ;;
+      kill-only) fm_launch_proof_member_gone() { ! kill -0 "$2" 2>/dev/null; } ;;
+      lstart) fm_launch_proof_member_gone() { [ "$(ps -p "$2" -o lstart=)" != "$(ps -p "$2" -o lstart=)" ]; } ;;
+    esac
     fm_launch_proof_herdr "$META"
   )
-  for stage in on-env after-env reuse; do
-    assert_equals unknown "$(mutant "$stage" never)" "mutant without the identity re-check is caught ($stage)"
+  for stage in on-env after-env zombie reused; do
+    assert_equals unknown "$(mutant "$stage" never)" "mutant that never proves exit is caught ($stage)"
   done
-  assert_equals managed "$(mutant live always)" 'mutant that skips without the identity re-check is caught (live member)'
+  for stage in zombie reused; do
+    assert_equals unknown "$(mutant "$stage" kill-only)" "mutant that trusts only kill -0 is caught ($stage)"
+  done
+  assert_equals managed "$(mutant live always)" 'mutant that always proves exit is caught (live member)'
+  assert_equals managed "$(mutant drift lstart)" 'mutant that takes a start-time difference as exit is caught (drift)'
 
   # The descendant rule, as a refusal only.
   world; printf '%s\n' '60000 500 53539' >> "$T/w/table"; printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=%s\n' "$G" > "$T/w/env-60000"
@@ -1226,21 +1249,43 @@ test_launch_proof_pid_exe_reads_the_live_path() {
   pass 'the executable path reader reads a live process and fails for one that is gone'
 }
 
-# The identity reader reads this host's table: a live process keeps its start
-# time, and one that has exited is gone.
+# The exit proof reads this host's processes: a live member of its group is not
+# gone; one in another group, an unreaped zombie, and one that has exited are.
 test_launch_proof_member_gone_reads_the_live_table() {
-  local child starts
+  local child group parent zombie='' stat=''
   /bin/sleep 30 &
   # shellcheck disable=SC2031 # $! is set by the & on the line before
   child=$!
-  starts=$(fm_launch_proof_starts "$$") || fail 'the identity read failed or did not list this shell'
-  fm_launch_proof_member_gone "$starts" "$$" "$child" && fail 'a live process was read as gone'
+  group=$(LC_ALL=C ps -o pgid= -p "$child" | tr -d ' ')
+  fm_launch_proof_member_gone "$group" "$child" && fail 'a live member of its group was read as gone'
+  fm_launch_proof_member_gone 1 "$child" || fail 'a pid now in another process group was not read as gone'
   kill "$child" 2>/dev/null || true
   wait "$child" 2>/dev/null || true
-  fm_launch_proof_member_gone "$starts" "$$" "$child" || fail 'a process that has exited was not read as gone'
-  fm_launch_proof_starts 0 >/dev/null && fail 'an identity read that does not list its anchor was accepted'
-  fm_launch_proof_member_gone '' "$$" "$child" && fail 'no identity read was taken as proof of exit'
-  pass 'the identity reader reads a live process and sees one that has exited'
+  fm_launch_proof_member_gone "$group" "$child" || fail 'a process that has exited was not read as gone'
+  fm_launch_proof_member_gone "$group" '' && fail 'an empty pid was read as gone'
+  # A parent that never reaps leaves its exited child a zombie.
+  python3 -I -c '
+import os, sys, time
+pid = os.fork()
+if pid == 0:
+    os._exit(0)
+with open(sys.argv[1], "w") as f:
+    f.write(str(pid))
+time.sleep(30)
+' "$TMP/zombie-pid" &
+  # shellcheck disable=SC2031 # $! is set by the & on the line before
+  parent=$!
+  for _ in $(seq 1 200); do
+    [ -s "$TMP/zombie-pid" ] && zombie=$(cat "$TMP/zombie-pid")
+    [ -z "$zombie" ] || stat=$(LC_ALL=C ps -o stat= -p "$zombie" 2>/dev/null | tr -d ' ') || stat=''
+    case "$stat" in Z*) break ;; esac
+    sleep 0.05
+  done
+  case "$stat" in Z*) ;; *) kill "$parent" 2>/dev/null || true; wait "$parent" 2>/dev/null || true; fail 'the zombie fixture did not start' ;; esac
+  fm_launch_proof_member_gone "$group" "$zombie" || fail 'an exited, unreaped member was not read as gone'
+  kill "$parent" 2>/dev/null || true
+  wait "$parent" 2>/dev/null || true
+  pass 'the exit proof keeps a live member and sees one in another group, a zombie, and one that has exited'
 }
 
 fm_test_only
