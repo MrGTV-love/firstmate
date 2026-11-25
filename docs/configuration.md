@@ -84,7 +84,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Project and secondmate registries.
 - Captain preferences and optional shared captain preferences.
 - Learnings, backlog, briefs, scout reports, and the optional per-task no-mistakes pipeline-spend ledger.
-- Host-local command durations in `command-durations.jsonl`, produced by `bin/fm-duration.py`; its header and help own timing calibration and repeated-timeout work publication.
+- Host-local command durations in `command-durations.jsonl` and `run`'s stop-time process snapshots under `command-duration-trips/` beside it, produced by `bin/fm-duration.py`; its header and help own timing calibration, repeated-timeout work publication and snapshot contents and retention.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - The append-only held-copy record `held-foreign-copies.log`, written by `bin/fm-teardown.sh` once a task has closed beside foreign copies it leaves standing; it lists them and returns nothing, and [Agent control](agent-control.md)'s held-copy rule owns its fields.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.

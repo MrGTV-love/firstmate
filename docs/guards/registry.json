@@ -128,6 +128,7 @@
     "jev-block-renderer",
     "spawn-write-confinement-raw-parse",
     "slot-provision-attestation",
+    "slot-adopt-kept-wiring",
     "spawn-local-source-selection",
     "jev-tool-coverage",
     "jev-egress-grant",
@@ -163,6 +164,7 @@
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
     "teardown-entry-preflight",
+    "guard-lint-touched-registry",
     "teardown-by-path"
   ],
   "guards": [
@@ -873,8 +875,8 @@
       "owner": "bin/fm-duration.py",
       "invariant": "Duration accounting never writes operational state into a foreign project checkout.",
       "layer": "runtime-block",
-      "source": "the resolved duration-ledger path, Git top level and Firstmate data-directory containment; existing decision points: site:bin/fm-duration.py:3702c3b723",
-      "trigger": "refuses to write the duration ledger inside a git work tree that is not a firstmate checkout data dir (e.g. a project copy)",
+      "source": "the resolved duration-ledger path, Git top level and Firstmate data-directory containment; existing decision points: site:bin/fm-duration.py:3702c3b723 (the ledger refusal) and site:bin/fm-duration.py:cb50826569 (the trip snapshot's refused-recording reason in write_trip_snapshot, whose snapshot write re-applies the same containment check before creating the file beside the table)",
+      "trigger": "refuses to write the duration ledger inside a git work tree that is not a firstmate checkout data dir (e.g. a project copy); on a no-progress or absolute stop the trip snapshot is then not written beside the table, its trip line names the refusal, and its rows go to stderr instead",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Select the owning Firstmate data directory with FM_DURATION_HOME=<firstmate-home>/data before retrying python3 bin/fm-duration.py run <key> -- <command>.",
@@ -894,6 +896,10 @@
         {
           "file": "bin/fm-duration.py",
           "match": "return refuse(f'{path} is inside a git work tree that is not a firstmate checkout data directory')"
+        },
+        {
+          "file": "bin/fm-duration.py",
+          "match": "reason = ('recording refused' if REFUSED else 'recording is off') if table is None else ''"
         }
       ]
     },
@@ -5546,25 +5552,61 @@
       "id": "slot-provision-attestation",
       "owner": "bin/fm-slot-provision-lib.sh",
       "sites": [
-        {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioning refused:", "count": 4},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioning refused:", "count": 9},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refused slot has an invalid prepared commit identity", "count": 2},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refusing to reset or overwrite it"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner refused task"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner source changed after it was verified"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner source gained files after it was verified"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "error: slot adoption refused:"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "fm_slot_adopt_refuse ", "count": 18},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "a relaunch is not a new scope declaration"},
+        {"file": "bin/fm-task-copy-lib.sh", "match": "so no other holder of $path is proved absent"},
+        {"file": "bin/fm-session-end-relaunch-lib.sh", "match": "s/.*slot adoption refused: "},
+        {"file": "bin/fm-session-end-relaunch-lib.sh", "match": "s/.*slot provisioning refused: "},
+        {"file": "bin/fm-session-end-relaunch-lib.sh", "match": "not retried by the scan until its cause changes"},
         {"file": "bin/fm-spawn.sh", "match": "could not record the refused slot checkpoint"},
         {"file": "bin/fm-spawn.sh", "match": "could not be confirmed stopped"},
         {"file": "bin/fm-control.sh", "match": "refused invalid --owned-path"},
-        {"file": "bin/fm-control.sh", "match": "refused relaunch of governed task", "count": 2}
+        {"file": "bin/fm-control.sh", "match": "refused relaunch of governed task", "count": 4}
       ],
       "invariant": "a governed assigned copy never admits a worker or ship transition without a matching PASS attestation from the project provisioner",
       "layer": "runtime-block",
-      "source": "the report and manifest of the copy's scripts/git-stability/provision_existing_slot.py, plus the copy's git status, operation markers, common dir and task branch",
-      "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme",
+      "source": "on the provisioning route, the report and manifest of the copy's scripts/git-stability/provision_existing_slot.py, plus the copy's git status, operation markers, common dir and task branch; on the adoption route of a same-task relaunch, the slot manifest the task record names, the copy's repository, branch and base, the copy-custody owners, and the copy's own out-of-scope commits and edits for the drift report",
+      "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme; or, on the adoption route, the recorded manifest is missing, unreadable, not this task's own, or disagrees with the copy, owner, branch, base or scope, the copy is not isolated or belongs to another repository, or a copy-custody owner refuses (fm_slot_adopt_check refuses with `error: slot adoption refused: <reason>`)",
       "remedy": "preserve and reconcile the assigned copy's scratch state, then bin/fm-control.sh <task> relaunch --note <reason>, or bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off> --owned-path <tracked-path>",
       "budget": 1,
-      "test": "tests/fm-spawn-dispatch-profile.test.sh",
+      "test": "tests/fm-slot-adopt.test.sh",
       "tier": "C",
       "harm": "irreversible",
-      "layer_note": "deny without a guard event: bin/fm-spawn.sh and bin/fm-promote.sh stop before admission and print the refusal and the provisioner report on stderr, and bin/fm-control.sh refuses an unattestable governed relaunch before stopping the running agent; a refused spawn keeps the copy and records recovery=slot-provision-refused"
+      "layer_note": "deny without a guard event: bin/fm-spawn.sh and bin/fm-promote.sh stop before admission and print the refusal and the provisioner report on stderr, and bin/fm-control.sh refuses an unattestable governed relaunch before stopping the running agent; a refused spawn keeps the copy and records recovery=slot-provision-refused; on the adoption route bin/fm-control.sh runs fm_slot_adopt_check before the stop, and bin/fm-spawn.sh runs it again at launch and a last time after the stop, the wiring rewrite and the record publish, just before delivery, so a last-check refusal leaves the wiring and task record already written while the recorded manifest and scope stay unchanged; a relaunch never runs the provisioner on this route and prints own out-of-scope paths as a drift report instead of refusing; the provisioning route is also covered by tests/fm-spawn-dispatch-profile.test.sh and the adoption route by tests/fm-control-relaunch-adopt.test.sh"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slot-adopt-kept-wiring",
+      "owner": "bin/fm-spawn.sh",
+      "sites": [
+        {"file": "bin/fm-spawn.sh", "match": "could not keep the worker's edited launch artifacts for task $ID; refusing to replace them"}
+      ],
+      "invariant": "an adopted relaunch never replaces a launch artifact the worker edited since the last launch until a byte-for-byte kept copy of it is written and verified",
+      "layer": "runtime-block",
+      "source": "the per-task wiring record state/<id>.wiring-sha and the bytes of each harness launch artifact in the adopted copy",
+      "trigger": "an adopted relaunch finds a launch artifact whose bytes differ from the wiring record and cannot read it, copy it beside itself, or verify the copy byte for byte",
+      "remedy": "preserve the worker's edited launch artifact in the copy, then bin/fm-control.sh <task> relaunch --note <reason>",
+      "budget": 1,
+      "test": "tests/fm-control-relaunch-adopt.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "layer_note": "deny without a guard event: bin/fm-spawn.sh stops the adopted relaunch before the old wiring is retired and prints the refusal on stderr"
     },
     {
       "decision": "deny",
@@ -7554,6 +7596,35 @@
         }
       ],
       "layer_note": "Registers the existing per-line protection, not a new refusal or permission. test_malformed_check_events_keep_delivery_and_cadence drives the real watcher with missing delimiters, invalid identities, valid events and ordinary state; it checks malformed payload exclusion and reported counts while valid delivery, coalescing and cadence continue. The site mapping preserves S1/S2 visibility rather than removing refusal vocabulary from the scan."
+    },
+    {
+      "id": "guard-lint-touched-registry",
+      "version": "1",
+      "owner": "bin/fm-guard-lint.sh",
+      "sites": [
+        {"file": "bin/fm-guard-lint.sh", "match": "fm-guard-event.sh\" guard-lint-touched-registry"}
+      ],
+      "invariant": "An unallowlisted finding on an added or edited registry entry blocks new-or-touched lint by that entry's literal ID.",
+      "layer": "machine-check",
+      "source": "The working docs/guards/registry.json, the Git blob at the same path at --base, and the unallowlisted findings computed by bin/fm-guard-lint.sh.",
+      "trigger": "In new-or-touched mode an unallowlisted finding has the same literal ID as a guard absent from --base, or whose complete rows for that ID (duplicates counted, row order ignored) differ from the base rows for that ID.",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "fail_direction_note": "An unavailable base registry blob or an unreadable current guards array prevents a clean invocation. This check does not validate the contents of the historical blob.",
+      "remedy": "Keep the intended edit, correct the field identified in the touched guard's finding, then rerun bin/fm-guard-lint.sh --mode new-or-touched --base <same-base-ref>.",
+      "budget": 1,
+      "budget_reason": "One verdict per invocation; no cross-invocation counter or escalation is implemented for this check.",
+      "telemetry": "One best-effort guard-lint-touched-registry event per reached literal-ID stage through bin/fm-guard-event.sh: deny for a matched finding, allow for no match, or error with source_ok false if the stage could not be evaluated. The writer uses the explicit log or the established caller home's default log. The pull-request CI step uses a runner-temporary log with actor gate and retains it as an artifact. An unavailable sink does not change lint output or verdict; later site and allowlist checks can still fail lint.",
+      "test": "tests/fm-guard-lint.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active"
     },
     {
       "id": "teardown-by-path",
