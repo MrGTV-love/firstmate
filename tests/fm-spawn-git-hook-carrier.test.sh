@@ -555,7 +555,11 @@ test_keep_ai_trailers_keeps_the_scan() {
 # nothing further, when the pane's git honours neither carrier. The harness
 # stand-in records whether it ever started.
 test_spawn_fails_when_the_pane_refuses() {
-  command -v tmux >/dev/null 2>&1 || { printf 'skip: tmux absent; real-endpoint refusal not exercised\n'; return; }
+  if ! command -v tmux >/dev/null 2>&1; then
+    [ "${CI:-}" != true ] || fail "tmux is absent; CI must provide it so the real-endpoint refusal cases run"
+    printf 'skip: tmux absent; real-endpoint refusal not exercised\n'
+    return
+  fi
   real_endpoint_spawn refuse 100
   [ "$REAL_STATUS" -ne 0 ] || fail "spawn reported success although the pane refused the launch: $REAL_OUT"
   assert_contains "$REAL_OUT" "honours neither task Git hook carrier" "spawn did not name the refusal"
@@ -569,7 +573,9 @@ test_spawn_fails_when_the_pane_refuses() {
   assert_absent "$REAL_HOME/state/$REAL_ID.git-hooks" "a refused fresh spawn left its hooks dir"
   assert_absent "$REAL_HOME/state/$REAL_ID.status" "a refused fresh spawn left a status line for an unpublished task"
   # The nearest legitimate launch: the same endpoint with an ordinary git.
-  real_endpoint_spawn admit 100
+  # A healthy pane's verdict ends the wait at once; the large bound only keeps
+  # a slow pane on a loaded host from failing this leg for the wrong reason.
+  real_endpoint_spawn admit 3000
   expect_code 0 "$REAL_STATUS" "spawn failed on a pane whose git honours the carrier: $REAL_OUT"
   assert_present "$REAL_DIR/harness-started" "the harness did not start on a healthy pane"
   case " $REAL_WINDOWS " in
@@ -635,6 +641,13 @@ SH
   # configuration channel before running the real git.
   if [ "$mode" = admit ]; then
     ln -s "$REAL_GIT" "$dir/gitbin/git"
+  elif [ "$mode" = relaunch ]; then
+    # Healthy for the first launch; once <case>/refuse exists it ignores both
+    # carriers, so the relaunch into the same pane is refused.
+    printf '#!/bin/sh
+if [ -e %s ]; then unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT; fi
+exec %s "$@"
+' "'$dir/refuse'" "$REAL_GIT" > "$dir/gitbin/git"
   elif [ "$mode" = ctl ]; then
     # The control's pane reaches its refusal slowly (the selector's final
     # core.hooksPath check), so spawn's single immediate look without the wait
@@ -674,6 +687,14 @@ SH
   # already read that refusal and removed the task temp root holding it.
   case "$mode" in
     admit) real_endpoint_await test -e "$dir/harness-started" || fail "admit: the harness never started" ;;
+    relaunch)
+      real_endpoint_await test -e "$dir/harness-started" || fail "relaunch: the first launch never started its harness"
+      rm -f "$dir/harness-started"
+      : > "$dir/refuse"
+      REAL_RELAUNCH_OUT=$(TMUX='' FM_GIT_HOOKS_VERDICT_POLLS=3000 fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)
+      REAL_RELAUNCH_STATUS=$?
+      REAL_RELAUNCH_WINDOWS=$("$real_tmux" -S "$socket" list-windows -a -F '#{window_name}' 2>/dev/null | tr '\n' ' ')
+      ;;
     ctl) real_endpoint_await refusal_recorded "/tmp/fm-$id" || fail "ctl: the pane never recorded its refusal" ;;
   esac
   "$real_tmux" -S "$socket" kill-server 2>/dev/null || :
@@ -709,6 +730,30 @@ test_removed_hooks_dir_runs_no_hooks() {
   pass "once teardown removes the hooks dir, a process still carrying the rows runs no fm hooks, as the legacy carrier's dangling hooksPath does"
 }
 
+# A refused RELAUNCH keeps the task: its pane, its hooks dir and its record
+# stay, and the refusal is written to the task's status.
+test_relaunch_refusal_keeps_the_task() {
+  if ! command -v tmux >/dev/null 2>&1; then
+    [ "${CI:-}" != true ] || fail "tmux is absent; CI must provide it so the real-endpoint refusal cases run"
+    printf 'skip: tmux absent; relaunch refusal not exercised\n'
+    return
+  fi
+  real_endpoint_spawn relaunch 3000
+  expect_code 0 "$REAL_STATUS" "the first launch of the relaunch case failed: $REAL_OUT"
+  [ "$REAL_RELAUNCH_STATUS" -ne 0 ] || fail "a relaunch into a refusing pane reported success: $REAL_RELAUNCH_OUT"
+  assert_contains "$REAL_RELAUNCH_OUT" "honours neither task Git hook carrier" "the relaunch refusal gave no reason"
+  assert_absent "$REAL_DIR/harness-started" "the harness started although the relaunch was refused"
+  case " $REAL_RELAUNCH_WINDOWS " in
+    *" fm-$REAL_ID "*) ;;
+    *) fail "a refused relaunch closed the task's pane (windows: $REAL_RELAUNCH_WINDOWS)" ;;
+  esac
+  assert_present "$REAL_HOME/state/$REAL_ID.git-hooks" "a refused relaunch removed the task's hooks dir"
+  assert_present "$REAL_HOME/state/$REAL_ID.meta" "a refused relaunch removed the task record"
+  assert_contains "$(cat "$REAL_HOME/state/$REAL_ID.status" 2>/dev/null)" "refused to start a worker without the task Git hooks" \
+    "a refused relaunch wrote no status line"
+  pass "a refused relaunch keeps the task's pane, hooks dir and record and writes the refusal to its status"
+}
+
 tests=(
   test_listed_harness_runs_the_config_carrier
   test_git_without_config_hooks_falls_back_to_legacy
@@ -720,6 +765,7 @@ tests=(
   test_keep_ai_trailers_keeps_the_scan
   test_spawn_fails_when_the_pane_refuses
   test_removed_hooks_dir_runs_no_hooks
+  test_relaunch_refusal_keeps_the_task
 )
 fm_test_run_cases "${tests[@]}" -- "$@"
 
