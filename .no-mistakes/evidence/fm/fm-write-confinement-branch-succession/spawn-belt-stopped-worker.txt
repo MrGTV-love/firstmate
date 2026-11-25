@@ -1,0 +1,19 @@
+=== stop the worker
+$ fm-control.sh fm-succ-lab-task exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+stopped fm-succ-lab-task harness=claude backend=tmux endpoint=fmlab:fm-fm-succ-lab-task worktree=/Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/fx/slots/22/project
+[exit 0]
+pane cmd now: zsh
+
+=== C1 fm-spawn --relaunch final belt: hand-edited slot_manifest= with a recorded successor, agent stopped
+$ fm-spawn.sh fm-succ-lab-task --relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+warning: /Users/charlesabrooker/tmp/fm-lab.vbmaC0/data/fm-succ-lab-task/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: relaunch refused: task fm-succ-lab-task is slot-governed and records successor branch fm/fm-succ-lab-task-v2, and a slot-governed launch adopts or provisions its copy on its recorded branch alone, so it cannot apply the successor; this launch wrote no task record and no write profile. Repair: preserve task fm-succ-lab-task's worktree and record, then remove its successor_branch= and successor_proved_tip= lines from the record and run bash bin/fm-control.sh fm-succ-lab-task relaunch --note <why>
+[exit 1]
+record UNCHANGED
+profile file UNCHANGED
+pane cmd now: zsh
+
+=== deny events:
+{"rule":"relaunch","decision":"deny","successor":"fm/fm-succ-lab-task-v2"}

@@ -1,0 +1,22 @@
+ok - the Scott fixture: copy on the old branch, S, B and P mutually diverged, the unpublished commit reachable only from the gate, no pr= line
+ok - the Scott shape: the successor is admitted by the task's own archive branch with the archived head as its proved tip, and a branch with no proof is refused
+ok - the Scott shape: develop, release/1.x and another lineage's name at a task archive tip are refused for the name family, and a name in the family there is admitted
+ok - Scott shape: the receipt names route=archive-tip and the matched archive, and the guard writes an event with route and successor at record time (archive-tip) and at the launch that applies the grant (proved-tip)
+ok - Scott shape: a hand-edited record naming a missing branch, a branch checked out in another work tree, a branch without the proved tip, a name outside the family or no proved tip is refused at the relaunch with no profile line for it
+ok - Scott shape: a repeated call re-admits the recorded successor one commit past its proved tip and refuses it once its history lacks that tip
+ok - Scott shape: the relaunch admits the successor one commit past its proved tip, and refuses one without it before stopping the worker, changing nothing
+ok - Scott shape: a recorded successor that another task records as its branch is refused at the relaunch, and admitted once no other task records it
+ok - Scott shape: a hand-edited record whose proved tip is the project's first commit is refused at the relaunch and by the launch owner
+ok - Scott shape: an archive pointed at the first commit proves nothing at admission, at the relaunch or at the launch
+ok - Scott shape: the launch owner refuses a successor without its proved tip under successor-branch-admission, with a repair for the record
+note: a relaunch without the successor changed in the copy: .claude/settings.local.json
+note: the relaunch with the successor changed in the copy:  .claude/settings.local.json
+ok - Scott shape: the operation leaves the copy byte-identical, and the relaunch changes only what a relaunch without the successor changes
+ok - Scott shape: a launch refuses the grant while another task's record cannot be read, and carries it once the inventory is readable
+ok - Scott shape: a launch refuses the grant for a copy outside the project's ref store, and carries it for the matching copy
+ok - Scott shape: a launch whose grant event cannot be written launches with the successor in its profile
+note: the relaunch changed the project Git directory only at: info/exclude
+note: the relaunch made these no-mistakes calls:  1 axi status;
+ok - Scott shape: the operation writes only the record and brief, and the real relaunch keeps the gate refs, the unpublished commit, the old and successor refs, the copy and the run binding
+ok - Scott shape: removing the record's successor line and relaunching drops the grant from the profile
+ok - Scott shape: a hand-edited successor record that the operation would refuse never reaches a launch profile

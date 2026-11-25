@@ -1,0 +1,81 @@
+=== BEFORE
+record+state=f973b835db7581bc brief/data=ac9cbf22b592c910 project.git=5f12b0e3a03ec6cc copy=1d16579c39b1efda gate=b3138f45eb516ca1 refs=d36de55140b6dbd1
+--- record before:
+window=fmlab:fm-fm-succ-lab-task
+endpoint_task_id=fm-succ-lab-task
+worktree=/Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/fx/slots/22/project
+project=/Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/fx/project
+harness=claude
+kind=ship
+mode=no-mistakes
+yolo=off
+branch=fm/fm-succ-lab-task
+tasktmp=/Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/fx/tmp/fm-fm-succ-lab-task
+write_confinement=seatbelt-v1
+claude_session_id=00000000-0000-4000-8000-000000000000
+model=claude-sonnet-5-5[1m]
+effort=high
+jev_guard_policy=FIRSTMATE_JEV_GUARD_V1
+egress=[]
+skill_selection=picked
+skill_selection_picked=firstmate-coding-guidelines
+busy_gen=g0.0.0
+spawn_gen=s0.0.0
+dispatch_rule=rule_6
+
+=== S1 Main records the successor (route=archive-tip, --tip = pipeline head P read from the run binding)
+$ fm-control.sh fm-succ-lab-task successor --branch fm/fm-succ-lab-task-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note Scott v2 custody: worker continues on the successor
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+successor-recorded fm-succ-lab-task branch=fm/fm-succ-lab-task successor_branch=fm/fm-succ-lab-task-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+action: task=fm-succ-lab-task prior_branch=fm/fm-succ-lab-task successor_branch=fm/fm-succ-lab-task-v2; recorded; wrote /Users/charlesabrooker/tmp/fm-lab.vbmaC0/state/fm-succ-lab-task.meta and /Users/charlesabrooker/tmp/fm-lab.vbmaC0/data/fm-succ-lab-task/brief.md; proof: route=archive-tip archive=archive/fm-succ-lab-task-pipeline-6db21b5e: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 of the task's own archive branch archive/fm-succ-lab-task-pipeline-6db21b5e; no work tree, ref, index, process, run record or profile file was touched
+route: route=archive-tip archive=archive/fm-succ-lab-task-pipeline-6db21b5e successor=fm/fm-succ-lab-task-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.vbmaC0 bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M88J0JK0HA25YV7KMM8E7HHT/bin/fm-control.sh fm-succ-lab-task relaunch --note apply\ recorded\ successor\ branch\ fm/fm-succ-lab-task-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/fm-succ-lab-task and successor fm/fm-succ-lab-task-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+[exit 0]
+=== AFTER
+record+state=a8a3d37b512410ce brief/data=2346fc9d1b29a42e project.git=5f12b0e3a03ec6cc copy=1d16579c39b1efda gate=b3138f45eb516ca1 refs=d36de55140b6dbd1
+--- record diff:
+9a10,11
+> successor_branch=fm/fm-succ-lab-task-v2
+> successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+--- brief diff:
+9a10,18
+> 
+> ## Successor branch (2026-11-25T10:37:14Z)
+> 
+> This task now records a successor branch in the same copy.
+> Prior branch: fm/fm-succ-lab-task (still recorded; the Ship branch line above is unchanged).
+> Successor branch: fm/fm-succ-lab-task-v2
+> The write profile of this task's next launch allows writes to exactly its prior branch, the successor branch (each with its lock and reflog) and its archive recovery branches, and nothing more; a slot-governed launch never applies a successor.
+> 
+> Scott v2 custody: worker continues on the successor
+--- copy HEAD: refs/heads/fm/fm-succ-lab-task  worktrees:
+/Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/fx/project           a2e45ca [main]
+/Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/fx/slots/22/project  8435a6f [fm/fm-succ-lab-task]
+--- guard events:
+{"ts":"2026-11-25T10:37:15Z","guard":"successor-branch-admission","rule":"record","task":"fm-succ-lab-task","version":"1","system":"firstmate","session":"fm-succ-lab-task","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true,"route":"archive-tip","successor":"fm/fm-succ-lab-task-v2"}
+
+=== S2 repeat the same call (no --tip)
+$ fm-control.sh fm-succ-lab-task successor --branch fm/fm-succ-lab-task-v2 --note again
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+successor-already-recorded fm-succ-lab-task branch=fm/fm-succ-lab-task successor_branch=fm/fm-succ-lab-task-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+action: task=fm-succ-lab-task prior_branch=fm/fm-succ-lab-task successor_branch=fm/fm-succ-lab-task-v2; none: task fm-succ-lab-task already records successor_branch=fm/fm-succ-lab-task-v2; wrote nothing; proof: route=proved-tip: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 still contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved at its admission; no work tree, ref, index, process, run record or profile file was touched
+route: route=proved-tip successor=fm/fm-succ-lab-task-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: none needed: re-admitted from the record's successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.vbmaC0 bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M88J0JK0HA25YV7KMM8E7HHT/bin/fm-control.sh fm-succ-lab-task relaunch --note apply\ recorded\ successor\ branch\ fm/fm-succ-lab-task-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/fm-succ-lab-task and successor fm/fm-succ-lab-task-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+[exit 0]
+UNCHANGED by repeat
+
+=== A9 a second, different successor
+$ fm-control.sh fm-succ-lab-task successor --branch fm/fm-succ-lab-task-v3 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note second
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+error: task fm-succ-lab-task already records successor branch fm/fm-succ-lab-task-v2; one successor per task, so nothing was changed
+[exit 1]
+UNCHANGED by second-successor refusal
+
+=== FINAL
+record+state=a8a3d37b512410ce brief/data=2346fc9d1b29a42e project.git=2823bb635e8ad6c8 copy=1d16579c39b1efda gate=b3138f45eb516ca1 refs=d36de55140b6dbd1

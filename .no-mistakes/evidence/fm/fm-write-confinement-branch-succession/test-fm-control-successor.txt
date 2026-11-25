@@ -1,0 +1,41 @@
+ok - successor: records successor_branch= beside the prior branch, keeps the Ship branch line, and a second identical call changes nothing and says so
+ok - successor: the line goes before any pr= line, so the PR monitor still parses the record
+ok - successor: the receipt names owner, action and a next command that relaunch accepts
+note: the relaunch changed the project Git directory only at: info/exclude logs/refs/heads/archive refs/heads/archive
+note: relaunch rewrote only the worker wiring: .claude .claude/settings.local.json 
+note: the relaunch made these no-mistakes calls:  2 axi status;
+ok - successor: the operation touches no tree, ref, process, run resource or profile, and the relaunch keeps both copies and the run-owned resources
+ok - successor: a worker, the supervision branch and a session that does not own the home lock are refused without changing anything
+ok - successor: a scout, secondmate, remote or unknown task, an unfinished relaunch, a pending close and a bad brief refuse without changing anything
+ok - successor: a bad name, the recorded or base branch, an archive name and another task's branch or successor refuse without changing anything
+ok - successor: a missing ref, the default branch, another copy's branch, a non-descendant, a missing prior branch, a detached or gone copy, a foreign archive, missing arguments and a second successor refuse without changing anything
+ok - successor: develop and release/1.x are refused for the name family on the checked-out route, and a name in the family there is admitted
+ok - successor: the archive-tip route refuses another id, another task, a wrong or uppercase hex and an id-extending name, and admits the task's own submitted and pipeline archive names
+ok - successor: the archive-tip route admits a branch past the task's archive tip with that tip as the proved tip, and refuses a branch whose history lacks it
+ok - successor: a repeated call re-admits a recorded successor that moved on past its proved tip, and refuses one reset to history without it
+ok - successor: a first admission refuses without the --tip Main read or with another sha, admits with it and records it, and a repeat needs no --tip
+ok - successor: the receipt names route=checked-out, the guard writes an allow event with route and successor at record time, and a refusal writes a deny event
+ok - successor: a case variant of another task's branch or successor, the recorded, base or default branch is refused, and a name that differs by more than case is admitted
+ok - successor: the real metrics reader attributes the record's allow and the refusal's deny to the registered admission guard and knows its harm
+ok - successor: an unreadable other task record refuses the admission, a readable owner refuses the name, and a readable inventory without an owner admits it
+ok - successor: a branch also checked out in a second work tree is refused whichever is listed first, and the single-copy control is admitted
+ok - successor: a recorded copy in another repository is refused, and the copy that shares the project's ref store is admitted
+ok - successor: a publication that fails after the rename restores the record, the instructions and the profile, with no backup or lock left
+ok - successor: a refusal changes no task file and writes one successor-branch-admission deny event
+ok - successor: an event log that cannot take a row changes neither a refusal nor a record
+ok - successor: a fresh spawn onto another task's recorded successor refuses and changes nothing, and with no record it goes on as before
+ok - successor: promoting a scout onto another task's recorded successor refuses and changes nothing, and other promotions write what a promotion with no record writes
+ok - successor: a governed scout relaunch onto another task's recorded successor refuses and changes nothing, and otherwise relaunches as before; the launch owner's refusal offers a scout only the end of the succession and a ship also reassociation
+ok - successor: fm-control relaunch refuses a scout or ship branch another task records as its successor before it stops the running agent
+ok - successor: the note file is read only after admission, never for a refusal
+ok - successor: the composer-dialog file survives a refusal, the record and a repeat
+ok - successor: a note with a Ship branch line is refused, and the instructions keep one Ship branch line through a record and its repeat
+ok - successor: the receipt of a launch no profile governs says the launch is unconfined
+ok - successor: a task whose record names a slot manifest, or whose project is slot-governed, is refused before anything is written
+ok - successor: both relaunch owners refuse a slot-governed task whose record names a successor, before the stop and before any write, with a deny event
+ok - successor: a failure injected at each write step leaves the record and the brief exactly as before and no lock behind
+ok - successor: two calls serialize on the lifecycle lock, and the call waits on the metadata lock before it writes
+ok - successor: the profile the next relaunch generates gains exactly the successor's literal allow lines
+DIGEST no-successor-relaunch-profile=4e7edb649908a43e0477be81b3e5ee6e0b51ab2aaf3deb665972af39d6ef8acf
+ok - successor: a relaunch of a task with no successor generates the profile it always did
+ok - successor: --branch stays refused, with the same message, on every other verb, and successor takes no --check

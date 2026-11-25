@@ -1,0 +1,10 @@
+=== D1 remove successor_branch= and successor_proved_tip= from the record, then relaunch
+0
+$ fm-spawn.sh fm-succ-lab-task --relaunch
+skill selection for fm-succ-lab-task: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+spawned fm-succ-lab-task harness=claude kind=ship mode=no-mistakes yolo=off window=fmlab:fm-fm-succ-lab-task worktree=/Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/fx/slots/22/project
+[exit 0]
+profile lines naming the successor: 0

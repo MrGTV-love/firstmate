@@ -1,0 +1,7 @@
+! bash /Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/bin/probe.sh recorded-not-relaunched
+  ⎿  PROBE sandboxed=yes FM_TASK_ID=fm-succ-lab-task
+     PROBE successor fm/fm-succ-lab-task-v2 -> child of P: DENIED: fatal: update_ref failed for ref 'refs/heads/fm/fm-succ-lab-task-v2': cannot lock ref 'refs/heads/fm/fm-succ-lab-task-v2': Unable to
+     PROBE unrecorded sibling fm/fm-succ-lab-task-v3: DENIED: fatal: update_ref failed for ref 'refs/heads/fm/fm-succ-lab-task-v3': cannot lock ref 'refs/heads/fm/fm-succ-lab-task-v3': Unable to
+     PROBE default branch main: DENIED: fatal: update_ref failed for ref 'refs/heads/main': cannot lock ref 'refs/heads/main': Unable to create
+     PROBE prefix-sharing fm/fm-succ-lab-task-v2x: DENIED: fatal: update_ref failed for ref 'refs/heads/fm/fm-succ-lab-task-v2x': cannot lock ref 'refs/heads/fm/fm-succ-lab-task-v2x': Unable to create
+     PROBE refs now: v2=6db21b5eb716310ad6356746ee9786e40eb9b4d6 v3=none main=a2e45ca0cf7881cf24a599790e82a935d1a627b9

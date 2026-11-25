@@ -1,0 +1,33 @@
+=== B1 hand-edited successor_proved_tip (old branch tip S, not in successor history), then relaunch
+agent before: pane_pid=32612 children=44514  cmd=2.1.332
+$ fm-control.sh fm-succ-lab-task relaunch --note should refuse: tip edited
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+error: task fm-succ-lab-task records successor branch 'fm/fm-succ-lab-task-v2', which is no longer proved to be this task's: successor branch 'fm/fm-succ-lab-task-v2' at f46f51dfe16d14f5ed2c200ad9d450bc56893ebd no longer contains the tip 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7 proved at its admission; refused before stopping the running agent; repair: preserve task fm-succ-lab-task's worktree and record, then make the successor branch contain its recorded successor_proved_tip= again, or remove its successor_branch= and successor_proved_tip= lines from the record, and run fm-control fm-succ-lab-task relaunch again
+[exit 1]
+agent after:  pane_pid=32612 children=44514  cmd=2.1.332
+record UNCHANGED by refused relaunch
+fm-succ-lab-task.control-relaunch
+fm-succ-lab-task.control-relaunch.brief-prior
+fm-succ-lab-task.control-relaunch.meta-prior
+fm-succ-lab-task.control-relaunch.note
+
+=== B2 hand-edited slot_manifest= on a task that records a successor, then relaunch
+agent before: pane_pid=32612 children=44514  cmd=2.1.332
+$ fm-control.sh fm-succ-lab-task relaunch --note should refuse: governed
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+error: relaunch refused: task fm-succ-lab-task is slot-governed and records successor branch fm/fm-succ-lab-task-v2, and a slot-governed launch adopts or provisions its copy on its recorded branch alone, so it cannot apply the successor; the running agent was not stopped. Repair: preserve task fm-succ-lab-task's worktree and record, then remove its successor_branch= and successor_proved_tip= lines from the record and run fm-control fm-succ-lab-task relaunch again
+[exit 1]
+agent after:  pane_pid=32612 children=44514  cmd=2.1.332
+record UNCHANGED by refused relaunch
+
+=== B2b same record, fm-spawn --relaunch directly (final belt)
+$ fm-spawn.sh fm-succ-lab-task --relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+error: task fm-succ-lab-task's endpoint reads 'alive'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh fm-succ-lab-task exit)
+[exit ]
+agent after:  pane_pid=32612 children=44514  cmd=2.1.332
+record UNCHANGED
+
+=== deny events:
+{"rule":"relaunch","decision":"deny","successor":"fm/fm-succ-lab-task-v2"}
+{"rule":"relaunch","decision":"deny","successor":"fm/fm-succ-lab-task-v2"}

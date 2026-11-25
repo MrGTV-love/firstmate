@@ -1,0 +1,10 @@
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab.vbmaC0 bash bin/fm-control.sh fm-succ-lab-task relaunch --note 'apply recorded successor branch fm/fm-succ-lab-task-v2'   (the receipt's next: command)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/tmp/fm-lab.vbmaC0/data/fm-succ-lab-task/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for fm-succ-lab-task: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+relaunched fm-succ-lab-task harness=claude from=claude model=default effort=default backend=tmux endpoint=fmlab:fm-fm-succ-lab-task worktree=/Users/charlesabrooker/tmp/fm-succ-fx.1IZ4MZ/fx/slots/22/project
+[exit 0]

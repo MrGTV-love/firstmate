@@ -1,0 +1,23 @@
+=== A7 slot-governed: record names slot_manifest=
+$ fm-control.sh fm-succ-lab-task successor --branch fm/fm-succ-lab-task-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note governed
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+error: task fm-succ-lab-task is slot-governed (its record names a slot manifest, or its project or copy has scripts/git-stability/provision_existing_slot.py), and a slot-governed launch adopts or provisions its copy on the recorded branch alone, so no launch could apply a successor; nothing was changed
+[exit 1]
+before: record+state=a62418742c8fb9f6 brief/data=ac9cbf22b592c910 project.git=5f12b0e3a03ec6cc copy=1d16579c39b1efda gate=b3138f45eb516ca1 refs=d36de55140b6dbd1
+after:  record+state=a62418742c8fb9f6 brief/data=ac9cbf22b592c910 project.git=5f12b0e3a03ec6cc copy=1d16579c39b1efda gate=b3138f45eb516ca1 refs=d36de55140b6dbd1
+UNCHANGED
+0
+
+=== A8 slot-governed: project has scripts/git-stability/provision_existing_slot.py
+$ fm-control.sh fm-succ-lab-task successor --branch fm/fm-succ-lab-task-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note governed
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.vbmaC0
+error: task fm-succ-lab-task is slot-governed (its record names a slot manifest, or its project or copy has scripts/git-stability/provision_existing_slot.py), and a slot-governed launch adopts or provisions its copy on the recorded branch alone, so no launch could apply a successor; nothing was changed
+[exit 1]
+before: record+state=f973b835db7581bc brief/data=ac9cbf22b592c910 project.git=5f12b0e3a03ec6cc copy=1d16579c39b1efda gate=b3138f45eb516ca1 refs=d36de55140b6dbd1
+after:  record+state=f973b835db7581bc brief/data=ac9cbf22b592c910 project.git=5f12b0e3a03ec6cc copy=1d16579c39b1efda gate=b3138f45eb516ca1 refs=d36de55140b6dbd1
+UNCHANGED
+0
+
+=== deny events written for A7/A8:
+{"ts":"2026-11-25T10:36:54Z","guard":"successor-branch-admission","rule":"slot-governed","task":"fm-succ-lab-task","version":"1","system":"firstmate","session":"fm-succ-lab-task","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true,"successor":"fm/fm-succ-lab-task-v2"}
+{"ts":"2026-11-25T10:36:59Z","guard":"successor-branch-admission","rule":"slot-governed","task":"fm-succ-lab-task","version":"1","system":"firstmate","session":"fm-succ-lab-task","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true,"successor":"fm/fm-succ-lab-task-v2"}
