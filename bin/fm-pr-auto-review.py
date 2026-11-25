@@ -34,7 +34,9 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
      families still uncovered and one read is requested for them. While the PR sits in a merge
      queue that fm-pr-merge.sh reported, nothing is called again while the forge reports it queued; once
      the forge reports it out of the queue and still open, the head is held for Main once with one wake and
-     fm-pr-merge.sh is never called again for that head, and a merged PR still ends merged.
+     fm-pr-merge.sh is never called again for that head, and a merged PR still ends merged. A queued or
+     merged event names a carried PASS only when fm-pr-merge.sh's own verify reported that carry; a merge
+     the lane only observes after a queue names the carry as the basis the lane queued the head on.
 Counting rule: for one head and one reader model there is at most one request, whether it is
 outstanding, finished or failed, so a repeat pass, a restart or a second caller makes no duplicate.
 While a read is outstanding no further read is requested for that head. A model whose read failed
@@ -822,7 +824,9 @@ def advance(home, task, url, meta, side):
         if not head.get("outcome"):
             head["outcome"] = {"kind": "merged", "detail": url}
             phase(side, sha, "merged", url)
-            emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried_note(sha, head.get('read_sha', sha))}")
+            # Whoever merged it, the lane knows only the basis it queued the head on.
+            queued = f"; this lane queued it on the PASS carried from {head['queued_carry'][:12]}" if head.get("queued_carry") else ""
+            emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{queued}")
         side.save()
         return
     if head.get("outcome") or str(view.get("state", "")).upper() != "OPEN":
@@ -834,7 +838,7 @@ def advance(home, task, url, meta, side):
         if queue_state(url) == "wait":
             return
         head["left_queue"] = True
-        head.pop("read_sha", None)
+        head.pop("queued_carry", None)
         phase(side, sha, "held", "left the merge queue and is still open")
         emit(home, task, side, sha, "left-queue", f"held: {url} at {sha[:12]} left the merge queue and is still open; the merge is Main's",
              f"{url} left the merge queue at {sha[:12]} and is still open; not queued again, Main decides why and whether to merge it")
@@ -957,8 +961,18 @@ def protected_reasons(url, sha, meta):
     return sorted(set(reasons))
 
 
-def carried_note(sha, read_sha):
-    return f" on the PASS carried from {read_sha[:12]}" if read_sha != sha else ""
+def merge_carry(output):
+    """The head fm-pr-merge.sh's own verify says it carried a PASS from, or None.
+
+    The lane's earlier verify may have seen another basis: a captain word or an
+    exact-head PASS recorded since then is what the merge call then relied on.
+    """
+    found = re.findall(r"(?m)^review: review carried from ([0-9a-f]{40}|[0-9a-f]{64}):", output)
+    return found[-1] if found else None
+
+
+def carried_note(carry):
+    return f" on the PASS carried from {carry[:12]}" if carry else ""
 
 
 def merge(home, task, url, sha, side, meta, read_sha):
@@ -977,14 +991,16 @@ def merge(home, task, url, sha, side, meta, read_sha):
         return
     done = run([str(BIN / "fm-pr-merge.sh"), task, url], home)
     if done.returncode == 0 and re.search(rf"(?m)^verified: {re.escape(url)} is queued ", done.stdout):
-        head["read_sha"] = read_sha
+        carry = merge_carry(done.stderr + done.stdout)
+        if carry:
+            head["queued_carry"] = carry
         phase(side, sha, "queued", url)
-        emit(home, task, side, sha, "queued", f"queued: {url} at {sha[:12]} is in the merge queue{carried_note(sha, read_sha)}")
+        emit(home, task, side, sha, "queued", f"queued: {url} at {sha[:12]} is in the merge queue{carried_note(carry)}")
         return
     if done.returncode == 0:
         head["outcome"] = {"kind": "merged", "detail": url}
         phase(side, sha, "merged", url)
-        emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried_note(sha, read_sha)}")
+        emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried_note(merge_carry(done.stderr + done.stdout))}")
         return
     output = [line.strip() for line in (done.stderr + done.stdout).splitlines() if line.strip()]
     errors = [line for line in output if line.startswith("error:")]

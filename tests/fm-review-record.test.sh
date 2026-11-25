@@ -1082,6 +1082,12 @@ test_carry_over_ignores_a_merge_driver_in_the_task_worktree() {
   out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
   expect_code 1 "$rc" "a worktree merge driver must not hide a conflict resolution: $out"
   expect_not_qualified "$out" "does not merge cleanly" "worktree merge driver"
+  copy="$TMP_ROOT/driver-honoring-bin"
+  plant_proof_in_worktree "$copy"
+  rc=0
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
+    --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "control: a proof run in the worktree must honor the worktree config and root .gitattributes and carry: $out"
   # The same driver through the caller's environment and .git/info/attributes.
   cgit "$case_dir" config --unset merge.forge.driver
   rm "$case_dir/wt/.gitattributes"
@@ -1092,8 +1098,6 @@ test_carry_over_ignores_a_merge_driver_in_the_task_worktree() {
     verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
   expect_code 1 "$rc" "an environment merge driver must not hide a conflict resolution: $out"
   expect_not_qualified "$out" "does not merge cleanly" "environment merge driver"
-  copy="$TMP_ROOT/driver-honoring-bin"
-  plant_proof_in_worktree "$copy"
   rc=0
   out=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=merge.forge.driver GIT_CONFIG_VALUE_0="printf 'unread driver bytes\\n' > %A" \
     NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
@@ -1139,7 +1143,133 @@ PY2
   pass "the proof ignores a replace ref that would pass unread side work off as base content"
 }
 
+conflicted_driver_case() {  # <name>; prints the case dir; sets TRUNK and LIVE to a driver-resolved update
+  local case_dir
+  case_dir=$(make_carry_case "$1")
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q trunk
+  printf 'base version\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm 'base edits the same file'
+  cgit "$case_dir" checkout -q pr
+  printf '%s\n' "$case_dir"
+}
+
+test_carry_over_ignores_global_config_and_global_attributes() {
+  # DeepSeek round-4 finding 4: a merge driver and attribute mapping from the
+  # caller's global configuration, at ~/.gitconfig with core.attributesFile and
+  # at $XDG_CONFIG_HOME/git/config with git/attributes. Each location is
+  # removed twice (GIT_CONFIG_GLOBAL or core.attributesFile, and the scratch
+  # HOME and XDG_CONFIG_HOME), so no one-line removal flips the result; the
+  # control runs the proof unisolated and must carry, so the fixture is real.
+  # System configuration and system attributes are removed too, but a test
+  # cannot plant those files, so they are not exercised here.
+  local layout case_dir fake live out rc copy
+  copy="$TMP_ROOT/global-honoring-bin"
+  plant_proof_in_worktree "$copy"
+  for layout in home xdg; do
+    case_dir=$(conflicted_driver_case "carry-global-$layout")
+    TRUNK=$(cgit "$case_dir" rev-parse trunk)
+    fake="$case_dir/fake-home"
+    mkdir -p "$fake/xdg/git"
+    if [ "$layout" = home ]; then
+      printf 'app.txt merge=forge\n' > "$fake/attrs"
+      git config --file "$fake/.gitconfig" merge.forge.driver "printf 'unread driver bytes\\n' > %A"
+      git config --file "$fake/.gitconfig" core.attributesFile "$fake/attrs"
+    else
+      printf 'app.txt merge=forge\n' > "$fake/xdg/git/attributes"
+      git config --file "$fake/xdg/git/config" merge.forge.driver "printf 'unread driver bytes\\n' > %A"
+    fi
+    # The suite runs every case with GIT_CONFIG_GLOBAL=/dev/null; these calls
+    # lift only that, so the planted files are the caller's real global config.
+    ( unset GIT_CONFIG_GLOBAL; export HOME="$fake" XDG_CONFIG_HOME="$fake/xdg"
+      cgit "$case_dir" merge -q --no-edit trunk >"$case_dir/merge.out" 2>&1 ) \
+      || fail "$layout: the global driver must resolve the conflict: $(cat "$case_dir/merge.out")"
+    live=$(cgit "$case_dir" rev-parse HEAD)
+    [ "$(cat "$case_dir/wt/app.txt")" = "unread driver bytes" ] || fail "$layout fixture: the global driver wrote the merged file"
+    rc=0
+    out=$( unset GIT_CONFIG_GLOBAL; export HOME="$fake" XDG_CONFIG_HOME="$fake/xdg"
+      verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    expect_code 1 "$rc" "$layout: a global merge driver must not hide a conflict resolution: $out"
+    expect_not_qualified "$out" "does not merge cleanly" "$layout global merge driver"
+    rc=0
+    out=$( unset GIT_CONFIG_GLOBAL; export HOME="$fake" XDG_CONFIG_HOME="$fake/xdg"
+      NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
+        --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
+    expect_code 0 "$rc" "$layout control: an unisolated proof must honor the global driver and carry: $out"
+  done
+  pass "the proof ignores merge drivers and attributes from the caller's global configuration in both locations"
+}
+
+test_carry_over_scratch_lives_beside_the_review_records() {
+  # DeepSeek round-4 finding 5: the scratch repository is made in the state
+  # directory that holds the review records, not the shared temporary
+  # directory, and is gone afterwards. A git shim logs where git init runs.
+  local case_dir live out rc=0 shim made
+  case_dir=$(make_carry_case carry-scratch-place)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  shim="$case_dir/shim"
+  mkdir -p "$shim"
+  cat > "$shim/git" <<SH
+#!/usr/bin/env bash
+[ "\$1" != init ] || printf '%s\n' "\${@: -1}" >> "$case_dir/init.log"
+exec $(command -v git) "\$@"
+SH
+  chmod +x "$shim/git"
+  out=$(PATH="$shim:$PATH" TMPDIR="$case_dir/shared-tmp" verify_on "$case_dir" "$live" "$TRUNK") || rc=$?
+  expect_code 0 "$rc" "the clean update must carry: $out"
+  made=$(cat "$case_dir/init.log" 2>/dev/null || true)
+  [ -n "$made" ] || fail "the proof ran no git init"
+  case "$made" in
+    "$case_dir/home/state/.review-carry-"*/proof.git) ;;
+    *) fail "the scratch repository must be made in the state directory, not elsewhere: $made" ;;
+  esac
+  [ -z "$(find "$case_dir/home/state" -maxdepth 1 -name '.review-carry-*')" ] || fail "the scratch directory must be removed after the proof"
+  pass "the proof's scratch repository is made beside the review records and removed afterwards"
+}
+
+test_carry_over_refuses_when_the_state_directory_takes_no_scratch() {
+  # An unwritable state directory is a typed refusal with its reason, never a traceback.
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-scratch-denied)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  chmod 500 "$case_dir/home/state"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  chmod 700 "$case_dir/home/state"
+  expect_code 1 "$rc" "no scratch repository must refuse: $out"
+  expect_not_qualified "$out" "cannot make the proof's scratch repository" "unwritable state directory"
+  pass "a state directory that takes no scratch repository refuses carry-over with its reason"
+}
+
+test_carry_over_refuses_after_a_rewrite_was_itself_read() {
+  # A same-tree rewrite carries from R, but once the rewrite has its own read,
+  # the head it replaced is a reviewed head off the newest reviewed head's
+  # ancestry, so a later base update refuses and needs a fresh read.
+  local case_dir rewrite live out rc=0
+  case_dir=$(make_carry_case carry-rewrite-read)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" commit -q --amend -m 'ship change, reworded'
+  rewrite=$(cgit "$case_dir" rev-parse HEAD)
+  record_review "$case_dir" "$rewrite" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at the rewrite"
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "an update of a rewrite that was itself read must refuse: $out"
+  expect_not_qualified "$out" "which the reviewed head does not build on" "read rewrite"
+  pass "once a same-tree rewrite is itself read, a later base update needs a fresh read"
+}
+
 fm_test_run_cases \
+  test_carry_over_ignores_global_config_and_global_attributes \
+  test_carry_over_scratch_lives_beside_the_review_records \
+  test_carry_over_refuses_when_the_state_directory_takes_no_scratch \
+  test_carry_over_refuses_after_a_rewrite_was_itself_read \
   test_carry_over_ignores_a_merge_driver_in_the_task_worktree \
   test_carry_over_ignores_replace_refs \
   test_carry_over_refuses_a_branch_that_is_not_on_the_base \

@@ -117,16 +117,17 @@ consume verify: bin/fm-pr-merge.sh, bin/fm-pr-auto-review.py and
 bin/fm_open_loops.py. plan still answers for the exact head only; the
 auto-review lane asks verify first, so plan runs only when carry-over refused.
 A merge or rebase of the base into a reviewed PR therefore needs no new read,
-and neither does a rewrite that keeps the reviewed tree (an amended message,
-a squash, an empty commit) unless a review row names the head it replaced,
-which is then not an ancestor of R and refuses; a merge of a branch that is
-not on the base is unread content and refuses. The proof trusts
---base to be a commit on the PR's base branch (every caller passes the live
-forge's base SHA; GitLab's is its stored merge base) and trusts the task
+and neither does a rewrite of R that keeps its tree (an amended message, a
+squash, an empty commit): it carries from R. Once such a rewrite is itself
+read, a later update of it refuses carry-over, because the head it replaced is
+a reviewed head that is not an ancestor of the newest reviewed head. A merge
+of a branch that is not on the base is unread content and refuses. The proof
+trusts --base to be a commit on the PR's base branch (every caller passes the
+live forge's base SHA; GitLab's is its stored merge base) and trusts the task
 worktree's object store, but runs the merge in an empty scratch repository
-so no worktree config, attribute or merge driver shapes it;
-see docs/configuration.md 'Review carry-over across a
-base update' for the harm-model reassessment.
+under the state directory, beside the review records, so no worktree config,
+attribute or merge driver shapes it; see docs/configuration.md 'Review
+carry-over across a base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
 kimi, llama, and the exact native Claude names opus, sonnet, haiku, which are
@@ -542,9 +543,9 @@ def carry_over_refusal(home, task, head, reviewed, base, others):
     # Replace refs and grafts can both rewrite ancestry, so the proof reads neither.
     env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull}
 
-    def run(*args, extra=None):
+    def run(*args):
         return subprocess.run(["git", "-C", str(worktree), *args], capture_output=True, text=True,
-                              check=False, env={**env, **(extra or {})})
+                              check=False, env=env)
 
     for ref in (head, reviewed, base):
         if run("cat-file", "-e", f"{ref}^{{commit}}").returncode:
@@ -566,7 +567,13 @@ def carry_over_refusal(home, task, head, reviewed, base, others):
     object_format = run("rev-parse", "--show-object-format")
     if object_format.returncode or not object_format.stdout.strip():
         return "cannot read the task worktree's object format"
-    with tempfile.TemporaryDirectory(prefix="fm-review-carry-") as scratch:
+    # The scratch repository lives beside the review records, so only a writer
+    # that could already forge a review row can reach it while the merge runs.
+    try:
+        holder = tempfile.TemporaryDirectory(prefix=".review-carry-", dir=state_dir(home))
+    except OSError as exc:
+        return f"cannot make the proof's scratch repository in the state directory: {exc.strerror or exc}"
+    with holder as scratch:
         merged = isolated_merge_tree(scratch, objects.stdout.strip(), object_format.stdout.strip(), point.stdout.strip(), reviewed)
     if merged.returncode == 1:
         return "the reviewed head does not merge cleanly with the base content the live head contains"
