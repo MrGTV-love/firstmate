@@ -5,6 +5,7 @@
   "audited": 30,
   "beyond_audit_active": [
     "turnend-ask-gate",
+    "spawn-git-hook-carrier",
     "live-lab-processes-stopped-before-remove",
     "merge-local-ff-only",
     "merge-unproved-outcome",
@@ -297,6 +298,36 @@
       "tier": "C",
       "harm": "reversible",
       "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
+    {
+      "id": "spawn-git-hook-carrier",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "no worker starts in a pane whose git honours neither task Git hook carrier, or whose GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS is malformed",
+      "source": "the launch's own carrier selector (fm_launch_git_hooks in the staged launch text) run in the pane shell and again after env -i, which records a refusal reason in the task temp root",
+      "trigger": "git does not resolve on the pane PATH, GIT_CONFIG_COUNT is not a number, GIT_CONFIG_PARAMETERS is malformed, or the pane's git honours neither the config rows nor the numbered core.hooksPath",
+      "remedy": "fix the named pane condition (put git on the pane PATH, unset the malformed GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS, or use a git that honours the config rows or a numbered core.hooksPath), then spawn or relaunch again",
+      "test": "tests/fm-spawn-git-hook-carrier.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "SPAWN_BRIEF_FAILURE_REASON=\"the launch refused to start a worker without the task Git hooks: $reason\""
+        }
+      ],
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-block",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "The refusal happens in the pane before the harness starts; fm-spawn reports it by failing the spawn with the recorded reason. A fresh spawn then closes its endpoint and the abort cleanup removes the hooks dir and unpublishes the task, leaving no status line; a relaunch keeps its pane and records a failed: status line. Uninstrumented: no guard event is appended."
     },
     {
       "id": "secondmate-sync",
@@ -875,8 +906,8 @@
       "owner": "bin/fm-duration.py",
       "invariant": "Duration accounting never writes operational state into a foreign project checkout.",
       "layer": "runtime-block",
-      "source": "the resolved duration-ledger path, Git top level and Firstmate data-directory containment; existing decision points: site:bin/fm-duration.py:3702c3b723",
-      "trigger": "refuses to write the duration ledger inside a git work tree that is not a firstmate checkout data dir (e.g. a project copy)",
+      "source": "the resolved duration-ledger path, Git top level and Firstmate data-directory containment; existing decision points: site:bin/fm-duration.py:3702c3b723 (the ledger refusal) and site:bin/fm-duration.py:cb50826569 (the trip snapshot's refused-recording reason in write_trip_snapshot, whose snapshot write re-applies the same containment check before creating the file beside the table)",
+      "trigger": "refuses to write the duration ledger inside a git work tree that is not a firstmate checkout data dir (e.g. a project copy); on a no-progress or absolute stop the trip snapshot is then not written beside the table, its trip line names the refusal, and its rows go to stderr instead",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Select the owning Firstmate data directory with FM_DURATION_HOME=<firstmate-home>/data before retrying python3 bin/fm-duration.py run <key> -- <command>.",
@@ -896,6 +927,10 @@
         {
           "file": "bin/fm-duration.py",
           "match": "return refuse(f'{path} is inside a git work tree that is not a firstmate checkout data directory')"
+        },
+        {
+          "file": "bin/fm-duration.py",
+          "match": "reason = ('recording refused' if REFUSED else 'recording is off') if table is None else ''"
         }
       ]
     },
@@ -7119,7 +7154,7 @@
       "tier": "C",
       "harm": "reversible",
       "remedy_verified": "fixture",
-      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
+      "layer_note": "per-task hooks installed by bin/fm-git-strip-ai-trailers.sh, carried as selected by bin/fm-spawn.sh: under the config carrier the commit scan runs at commit-msg, after the repository pre-commit hook, and the push scan runs at pre-push beside the repository hook, which git feeds its own copy of the ref-update input; under the legacy carrier the pre-commit wrapper scans after the repository hook and the pre-push wrapper scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
     },
     {
       "decision": "deny",
@@ -7144,7 +7179,7 @@
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture",
-      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
+      "layer_note": "per-task hooks installed by bin/fm-git-strip-ai-trailers.sh, carried as selected by bin/fm-spawn.sh: under the config carrier the commit scan runs at commit-msg, after the repository pre-commit hook, and the push scan runs at pre-push beside the repository hook, which git feeds its own copy of the ref-update input; under the legacy carrier the pre-commit wrapper scans after the repository hook and the pre-push wrapper scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
     },
     {
       "decision": "deny",

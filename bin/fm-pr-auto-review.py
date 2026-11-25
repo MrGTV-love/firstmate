@@ -13,8 +13,8 @@ head and never waits: a read runs detached and a later pass collects it.
 
 A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitHub pr=:
   1. reads the PR once through `gh pr view`; a closed or merged PR ends the work, an unreadable forge
-     changes nothing, and a new head starts a new sequence, so a PASS recorded for an older head is
-     never counted (bin/fm-review-record.py binds every record to its exact head);
+     changes nothing, and a new head starts a new sequence, so a PASS recorded for an older head counts
+     only when bin/fm-review-record.py verify carries it across a clean base update (step 4);
   2. collects the reads it requested earlier for the live head: a finished report is recorded through
      `fm-review-record.py review`, an INCOMPLETE report is held, a FAIL that cannot be recorded still
      ends the head at fail, and a crashed, unusable or nonzero-exit read burns that model for the head
@@ -27,7 +27,8 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
      own, never the aggregate state alone) and every check the base branch requires has reported. This is
      a fail-closed prefilter for spending a read, never the merge gate: bin/fm-pr-merge.sh re-reads every
      condition live and stays the only authority;
-  4. asks `fm-review-record.py verify --json`. A qualifying independent-review PASS goes to
+  4. asks `fm-review-record.py verify --json`. A qualifying independent-review PASS, including one verify
+     carried from an earlier head across a clean base update (its carried_from field), goes to
      bin/fm-pr-merge.sh <task> <url> with no other argument, never an override, waiver or captain word,
      and a captain-word basis is left to Main. Otherwise `fm-review-record.py plan` names the author
      families still uncovered and one read is requested for them. While the PR sits in a merge
@@ -77,10 +78,11 @@ Before any reader is dispatched the contract must be complete: a non-empty brief
 non-empty Definition Of Done (the brief's `## Definition Of Done (task)` section, the file its unfenced in-section
 `DoD file:` line names under data/, or data/dod/<task>.md, all read through bin/fm-dod-lib.sh's section reader) and
 that named file; otherwise the head is held as `review pack not built: contract source missing: <names>` and nothing runs.
-The protected-class decision reads every review row recorded for the exact head, whoever recorded it:
+The protected-class decision reads every review row recorded for the exact head, whoever recorded it
+(for a PASS verify carried from an earlier head, the rows of that reviewed head, whose change is the same):
 any yes, missing or malformed answer, any report that is gone or no longer matches its recorded digest,
 and any unreadable history holds the merge, and a later `no` never clears an earlier answer. A recorded
-routine PASS that verify accepts, with every exact-head report answering `no`, goes to the merge gate
+routine PASS that verify accepts, with every report at the read head answering `no`, goes to the merge gate
 whether or not this lane requested it. A wake that could not be appended is kept pending in the sidecar,
 is not counted as emitted, and every pass retries it. A local-only task never reaches this script's merge
 path, and an away record is left to bin/fm-pr-merge.sh's own away handling.
@@ -820,7 +822,7 @@ def advance(home, task, url, meta, side):
         if not head.get("outcome"):
             head["outcome"] = {"kind": "merged", "detail": url}
             phase(side, sha, "merged", url)
-            emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}")
+            emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried_note(sha, head.get('read_sha', sha))}")
         side.save()
         return
     if head.get("outcome") or str(view.get("state", "")).upper() != "OPEN":
@@ -832,6 +834,7 @@ def advance(home, task, url, meta, side):
         if queue_state(url) == "wait":
             return
         head["left_queue"] = True
+        head.pop("read_sha", None)
         phase(side, sha, "held", "left the merge queue and is still open")
         emit(home, task, side, sha, "left-queue", f"held: {url} at {sha[:12]} left the merge queue and is still open; the merge is Main's",
              f"{url} left the merge queue at {sha[:12]} and is still open; not queued again, Main decides why and whether to merge it")
@@ -852,7 +855,9 @@ def advance(home, task, url, meta, side):
             emit(home, task, side, sha, "captain-word", f"held: a captain merge word is recorded at {sha[:12]}; the merge is Main's",
                  f"a captain merge word is recorded at {sha[:12]}; the merge is Main's")
             return
-        merge(home, task, url, sha, side, meta)
+        # A PASS verify carried from an earlier head answers the protected-class question for this one:
+        # verify proved this head adds no change that read did not see.
+        merge(home, task, url, sha, side, meta, outcome.get("carried_from") or sha)
         return
     standing = latest_review(home, url)
     if standing and standing.get("head") == sha and standing.get("verdict") == "FAIL":
@@ -916,7 +921,9 @@ def advance(home, task, url, meta, side):
 
 
 def protected_reasons(url, sha, meta):
-    """Why this head is not a routine merge; empty only when every exact-head recorded review answers `Protected class: no`.
+    """Why this head is not a routine merge; empty only when every review recorded at sha answers `Protected class: no`.
+
+    For a PASS verify carried from an earlier head, the caller passes that reviewed head as sha.
 
     Every review row recorded for the head counts, whoever wrote it and in whatever order: an answer of yes,
     a missing or malformed answer, a report that is gone, changed since it was recorded or does not match
@@ -950,9 +957,13 @@ def protected_reasons(url, sha, meta):
     return sorted(set(reasons))
 
 
-def merge(home, task, url, sha, side, meta):
+def carried_note(sha, read_sha):
+    return f" on the PASS carried from {read_sha[:12]}" if read_sha != sha else ""
+
+
+def merge(home, task, url, sha, side, meta, read_sha):
     head = side.head(sha)
-    reasons = protected_reasons(url, sha, meta)
+    reasons = protected_reasons(url, read_sha, meta)
     if reasons:
         # Not terminal: the evidence is read again every pass, so a readable report or a repaired history is judged anew.
         reason = "; ".join(reasons)
@@ -966,13 +977,14 @@ def merge(home, task, url, sha, side, meta):
         return
     done = run([str(BIN / "fm-pr-merge.sh"), task, url], home)
     if done.returncode == 0 and re.search(rf"(?m)^verified: {re.escape(url)} is queued ", done.stdout):
+        head["read_sha"] = read_sha
         phase(side, sha, "queued", url)
-        emit(home, task, side, sha, "queued", f"queued: {url} at {sha[:12]} is in the merge queue")
+        emit(home, task, side, sha, "queued", f"queued: {url} at {sha[:12]} is in the merge queue{carried_note(sha, read_sha)}")
         return
     if done.returncode == 0:
         head["outcome"] = {"kind": "merged", "detail": url}
         phase(side, sha, "merged", url)
-        emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}")
+        emit(home, task, side, sha, "merged", f"merged: {url} at {sha[:12]}{carried_note(sha, read_sha)}")
         return
     output = [line.strip() for line in (done.stderr + done.stdout).splitlines() if line.strip()]
     errors = [line for line in output if line.startswith("error:")]
