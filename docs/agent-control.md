@@ -18,7 +18,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
 
 `bin/fm-control-lib.sh` is the single executable owner of three capability tables, which have no side effects, so they can be read as a contract:
 
-- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`, `adopt`.
+- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`, `adopt`, `rerecord-slot`.
   There is no arbitrary-text and no generic raw-key entry point.
   A caller either names an allowlisted verb or is refused.
 - **Per-harness mechanics**: the key that cancels a running turn, how many times it must be delivered, whether the composer needs clearing afterwards, the command that exits the agent, and which task kinds the adapter is verified to run.
@@ -26,7 +26,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
   `bin/fm-send.sh`'s `--key` path reads the composer-clear table from this owner too, rather than keeping a second copy of it.
 - **Per-backend capability**: which named keys a runtime backend can deliver, and whether it has a recovery-grade agent-state classifier able to prove an agent stopped.
 
-The [endpoint-absence proof](#reclaiming-a-task-whose-endpoint-is-gone) and its worktree-holder helper perform backend and process reads; the capability tables remain pure, and sourcing the file performs no probes.
+The [endpoint-absence proof](#reclaiming-a-task-whose-endpoint-is-gone) and its worktree-holder helper perform backend and process reads, and the relaunch-journal verdict (`fm_control_relaunch_journal_verdict`) reads one journal file; the capability tables remain pure, and sourcing the file performs no probes.
 
 A recorded `harness=` is not always an exact adapter name: a task launched from a raw command records that command's basename instead.
 `fm_control_harness_family` is the one place that prefix rule is stated, and an unrecognized value resolves to no adapter rather than being guessed into one.
@@ -42,6 +42,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | `adopt` | Repair a live local Herdr omp task's session record without sending input or restarting anything. | The recorded pane, unique foreground PID, unique deepest workspace match, exclusive local pane claim, and unchanged generation are proved before publishing; see [Repairing a restored omp session record](#repairing-a-restored-omp-session-record). |
 | `authorize-continuation` | Clear a ship or scout's recorded reconciliation-only restriction without launching or messaging a worker. | Only `recovery=reconcile-only` is removed atomically; unrelated metadata, holds, and dependencies are preserved. |
 | `reassociate` | Re-point a ship or scout's record at the replacement copy its work moved to, without stopping, starting, or removing anything. With `--also <task>=<copy>` it re-points several records that share one pool slot root in the same call. | The record names the replacement copy and the copy it left as `prior_worktree=` (or `released_worktree=` for a pool slot it left); the old copy, the endpoint, and any pipeline run are untouched. Every record named in one call is re-pointed or none is. See [Reassociating a task with a replacement copy](#reassociating-a-task-with-a-replacement-copy). |
+| `rerecord-slot` | Re-record a governed ship or scout's slot identity (`slot_base_sha=` and `slot_owned_path=`) from its own renewed durable slot record, without stopping, starting, or messaging anything; `--check` reports the verdict and writes nothing. | The record carries the renewed base and scope, the prior record is archived with an audit record, and the real adoption check admits the published record; any failure after publish restores the prior bytes. See [Re-recording a renewed slot identity](#re-recording-a-renewed-slot-identity). |
 
 An exit that delivers lifecycle input but cannot prove the agent stopped fails with `exit=unconfirmed`, reports the observed agent state and any interrupt cancellation claim, and never claims that nothing changed.
 Interrupt never rewrites busy state as proof of its own success.
@@ -145,6 +146,7 @@ The [verification record](verification/runtime-backends.md#claude-background-tas
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which uses the checkpointed worktree without allocating one, adopts the recorded endpoint when it still exists, clears the previous harness's per-task wiring, and arms a fresh busy generation.
    When the recorded endpoint is proven gone rather than merely idle or unreachable, the launch owner creates one fresh endpoint in that worktree and republishes the binding, subject to the backend policy in [Reclaiming a task whose endpoint is gone](#reclaiming-a-task-whose-endpoint-is-gone).
    A relaunch of a governed task is not a new scope declaration: when the record names its slot manifest, the relaunch adopts that recorded manifest and never runs the project's provisioner (`fm_slot_adopt_check` in `bin/fm-slot-provision-lib.sh` owns the decision).
+   After the project renews the durable slot record (a forward merge plus a scope refresh), the task record still holds the old identity and adoption refuses `base_mismatch` or `scope_mismatch`; [Re-recording a renewed slot identity](#re-recording-a-renewed-slot-identity) is the supported step that renews it.
    The manifest must belong to this task's own copy, branch, base and scope, and the existing copy-custody owners must agree, or the relaunch refuses by name before the agent is stopped, with the manifest, record and copy unchanged.
    When the provisioner keeps both a durable and a legacy record for the copy, the recorded pointer must name the durable one and the two must agree on owner, branch, base and scope; a creation timestamp is not compared.
    The recorded pointer, when named like a provisioner record, must sit in one of the two record stores the relaunch computes from `CODEX_HOOK_STATE_DIR` and `WORKTREE_LIFECYCLE_STORE_DIR`; any other store refuses as `manifest_store_unknown`, so relaunch with the store configuration the task was provisioned with.
@@ -550,6 +552,104 @@ The shared project-lock wait follows observed holder progress rather than total 
 
 Standalone PR registration locks its task-copy snapshot before retirement recovery, guard execution, or any forge request, and refuses publication if the recorded worktree or branch changed while the PR was being checked.
 
+### Re-recording a renewed slot identity
+
+A relaunch judges a governed task by the slot identity copied into its record at spawn (`slot_base_sha=` and the `slot_owned_path=` lines).
+When the project renews the task's durable slot record after an authorized forward merge and scope refresh, nothing renews the task record, so every relaunch refuses `base_mismatch` or `scope_mismatch`.
+The actual lock-owning main Firstmate first runs `fm-control <task-id> rerecord-slot --check`, reviews what it prints, and then runs `fm-control <task-id> rerecord-slot --manifest-sha <sha256> --note <the ruling it carries out>`.
+The verb rewrites only those slot lines, from the renewed record, and judges the renewed record by the same proofs whether or not the write is asked for.
+It never writes the manifest, the copy, a ref, the brief, a pool claim, the endpoint, or the relaunch journal; it never fetches; and it never starts, stops, or sends input to an agent.
+On Herdr, proving a `missing` endpoint absent can start the Herdr session server, as relaunch's own absence proof does; what a server start restores is not established, and `--check` runs that proof too.
+The adoption decision itself is unchanged, and the next relaunch is the ordinary `relaunch --note`, whose adoption checks run as before.
+The changed slot lines also change the session-end refusal fingerprint, which permits one new automatic attempt.
+
+The guarantees, at Strict tier for a cooperative actor:
+
+- the published identity names this task's own durable record for its recorded copy, branch, and owner (`owner_id` must equal the task id, which adoption does not compare);
+- the published base is a forward move of the recorded base to `merge-base origin/<default> HEAD` in the copy;
+- the published scope is the recorded scope plus the minimal cover of every path the branch changed since the manifest base, every changed path is covered, and an entry whose covered changes reached the branch only through a merged side branch is reported, never refused;
+- the record, manifest, and copy `HEAD` are fingerprinted before the first proof and compared again at the rebind just before publish, the manifest and `HEAD` again after publish, the live manifest's owner is re-read, and the real adoption check must admit the published record;
+- only the lock-owning main Firstmate writes, the write carries a note, and `--manifest-sha` must equal the sha256 of the manifest bytes now; the ruling the note names is recorded, not verified, and no separation of requester and approver is claimed.
+
+The verb takes, in order, the task's control lock, its spawn lock (`state/.spawn-<id>.lock`, tried without waiting and held to exit), the shared Treehouse project lock (tried once), and the record lock; `--check` tries the spawn lock and releases it at once, then takes only the record lock.
+
+| Step | Write run | `--check` |
+| --- | --- | --- |
+| 1. Actor | refuses `actor_not_main` (a worker or the supervision branch) or `session_lock_not_owned` | the same |
+| 2. Locks | a live holder of the spawn lock refuses `launch_in_progress` | reported as `launch_proof=` |
+| 3. Earlier interrupted runs | swept and resolved by the record's bytes (below) | reported as `pending_audit=` lines |
+| 4. Snapshot and fingerprints | taken | taken |
+| 5. Content and location proofs | refuse by name | refuse by name |
+| 6. No-op | `already recorded`, exit 0, nothing written | `already recorded` |
+| 7. Journal, backlog close, then agent stopped | refuse by name | advisory `journal_proof=`, `backlog_close_proof=`, `stopped_proof=` and `write_would=` |
+| 8. Note and manifest digest | refuse by name | not run; prints `manifest_sha256=` and the command to run |
+| 9. Stage, verify, archive, rebind, publish, verify, commit | below | never |
+
+Every refusal prints `error: slot rerecord refused: <reason>: <detail>` and changes no record, manifest, copy, or journal.
+The content proofs read a private snapshot of the record and manifest bytes; the location proofs read live paths.
+
+- **Shape:** `not_ship_or_scout` (not exactly one `kind=` line, or another kind); `not_recorded` (no slot manifest, base, or scope); `not_adoption_route` (`recovery=slot-provision-refused`); `local_only_source_unsupported` (a `slot_source_ref=` record).
+- **Records:** `manifest_missing` (the pointer is not a regular file), and adoption's own `manifest_store_unknown`, `manifest_shadowed`, `manifest_records_disagree`, and `manifest_unreadable`.
+- **Identity and copy:** `lifecycle_state_mismatch`, `worktree_path_mismatch`, `branch_mismatch`, `owner_mismatch`, `repository_mismatch`, `not_isolated`, `operation_in_progress` (the copy is not on its branch, or carries a merge, cherry-pick, revert, rebase, or sequencer marker; unlike adoption, no rebase allowance), and the copy-custody reasons by name.
+- **Base:** `default_branch_unreadable`, `base_ref_mismatch` (the manifest must name `origin/<default>`), `base_invalid` (not a full commit id), `base_not_forward`, `base_not_on_default`, `base_not_in_head`, and `base_not_merge_base`.
+  A project whose default branch resolves only locally has no `origin/<default>`, so it refuses `default_branch_unreadable` or `base_ref_mismatch`.
+  The verb never fetches, so a stale local `origin/<default>` refuses `base_not_merge_base` until the primary clone is fetched.
+- **Scope:** `scope_invalid`, `scope_not_canonical`, `scope_not_tracked`, `scope_uncovered_change` (naming every uncovered changed path), `scope_entry_not_own_work`, and `scope_release_strands_work`.
+  Every renewed entry must already be in canonical form (`PurePosixPath(entry).as_posix()`, so no trailing slash); the provisioner accepts `lib/`, and this refusal is fixed by renewing with the canonical entry.
+  A recorded entry is normalized to that form before every coverage test, so a recorded `src/` still covers `src/other.txt`.
+- **Write preconditions:** `relaunch_unfinished`, `backlog_close_pending`, `agent_not_proven_stopped`, `launch_in_progress`, `note_required`, `manifest_sha_mismatch`, and `input_changed_during_rerecord`.
+- **Transaction:** `adopt_precheck_failed`, `archive_unverified`, `adopt_postcheck_failed`, and `rerecord_audit_unreadable`.
+
+Each renewed entry is admitted by the first of these that holds: (a) it lies inside a recorded entry; (b) it is a path the branch changed; (c) it is the deepest directory tracked at the manifest base that holds a file the branch added.
+The output and the audit record carry `added_scope=<entry> rule=b|c`, a `rule_c_entry=` line per directory lease with the added files it covers and the tracked files it newly leases (`tracked_newly_covered`, `untouched`), the uncommitted paths it newly covers, an `added_uncommitted_newly_covered=` total, a `released_scope=` line per recorded entry the renewal no longer covers, and `scope_split=`.
+An added entry whose covered changes came only, or partly, through a merged side branch prints `side_branch_only=` or `side_branch_mixed=`; the labels follow the commit graph's first-parent line, so a fast-forwarded or cherry-picked peer branch is never labelled, and a path the drift report proves only through the reflog can be.
+A release may not strand work: an uncommitted path (from `git status`, plus index-flagged tracked paths that differ) that a recorded entry covers and no renewed entry does refuses `scope_release_strands_work`.
+
+The relaunch journal is read once through the shared classes of `fm_control_relaunch_journal_verdict`:
+
+- `absent` and `complete` proceed;
+- every `failed:*` class proceeds to the stopped proof, which judges it by sampling the endpoint the record names;
+- an in-flight phase (any other phase, a missing one, or a bare `failed:`) and an unreadable, symlinked, or other-task journal refuse `relaunch_unfinished`.
+
+| Rollback value | Record the task file holds | What the stopped proof samples |
+| --- | --- | --- |
+| `instructions-restored`, `instructions-restored-agent-alive`, `prior-record-kept-agent-dead`, `instructions-restored-agent-state-<s>` | the prior record | the old agent |
+| `none-new-agent-confirmed`, `none-new-record-kept` | the record the launch owner published | the replacement |
+| `prior-record-kept` | the prior record | the old agent, already stopped; a launch owner still running is caught by the spawn lock |
+
+The verb never moves, edits, or archives the journal, and nothing restores `<journal>.meta-prior` into the task record.
+An in-flight journal arises only when a relaunch dies without its trap or its failure-journal write fails; with a renewed manifest it has no supported exit yet, because closing it belongs to relaunch recovery, which this verb never touches; that follow-up is the fm-repair backlog item `fm-relaunch-inflight-journal-recovery`, which the refusal names.
+
+The agent must be proven stopped: the backend reads `dead`, or `missing` with the absence proof reading `dead` or `gone`; zellij, Orca, and cmux always refuse.
+The legitimate path for a live task is `exit`, then `rerecord-slot`, then `relaunch`.
+The spawn-lock proof exists because the control lock does not exclude a launch owner: a TERM or HUP to `fm-control relaunch` writes a `failed:*` journal and releases the control lock while its `fm-spawn` child keeps running and holding the spawn lock.
+A live holder refuses `launch_in_progress`, naming the holder of the task's spawn lock and its pid; the holder may also be a session cleanup or a remote secondmate spawn, which take the same lock.
+The refusal ends when the holder exits, or when a holder that died without its trap is reclaimed by the next run; a holder that never exits, or a reused pid, belongs to the [`stuck-crewmate-recovery`](../.agents/skills/stuck-crewmate-recovery/SKILL.md) path.
+
+The write is one transaction under `RERECORD_STAGE`, which the EXIT trap reads through `fm_slot_rerecord_trap_action`:
+
+1. Stage the snapshot with its slot block replaced by the manifest's base and `owned_paths` verbatim, read it back, require every other line unchanged and adoption's own verdict to admit it (`adopt_precheck_failed`).
+2. Archive the prior record as `data/<id>/slot-rerecord/prior-meta.<UTC>.<P12>.<n>` and verify it (`archive_unverified`), then write a `pending` audit record `<UTC>.<P12>.<n>.record` that appears only once complete; both names are reserved exclusively, the directory is 0700 and the files 0600, and the note is stored JSON-encoded on one line, so it cannot forge another line.
+3. Rebind: the record, manifest, and `HEAD` fingerprints and `--manifest-sha` must still hold (`input_changed_during_rerecord`, `manifest_sha_mismatch`).
+4. Publish through the task-record publisher; a rename that reports failure is judged by the record's bytes.
+5. Verify the published record, the manifest, and `HEAD`, re-read the live manifest's owner, and run the real adoption check; any failure refuses `adopt_postcheck_failed` and restores the prior bytes from the archive.
+6. Commit the audit record as `published`; a commit rename that did not land rolls back.
+
+The trap discards the staged record while it is unpublished, rolls back after publish, and changes nothing while the publish rename, the commit rename, or the restore's own rename may still be in flight; each of those windows is closed by the next write run.
+Every write run first removes this task's leftover temporaries (`state/.<id>.meta.rerecord.*`, `.rerecord-restore.*`, `.rerecord-snap.*`), so a rename an earlier run left in flight can no longer land, and then resolves each `pending` or `rolling-back` audit record by the record's bytes: unchanged prior bytes close it `abandoned` or `rolled-back`; the staged bytes re-run the post-publish verification (`published-recovered`) or resume the rollback; a record another writer changed closes it `superseded-new`, `superseded-prior`, or `superseded-other` without touching the task record.
+An audit record that cannot be read refuses `rerecord_audit_unreadable`; moving that private file aside closes the refusal.
+On this host's bash 3.2.57 a TERM or HUP runs the EXIT trap at once even while a foreground child runs, and the cases in `tests/fm-control-rerecord-slot.test.sh` probe the bash they run under before judging the in-flight windows.
+
+Residuals:
+
+- rerecord cannot tell whether the branch's changes were in the task's brief; the note's ruling carries that judgment and Vernant's push-time `owned_paths` gate stays the control on pushes;
+- a brand-new nested file leases its whole deepest tracked directory, and the `rule_c_entry=` lines show that breadth before the write;
+- a hand edit of the task record or the durable store bypasses every proof here;
+- an already-equal record is a no-op that re-runs only the content proofs, so a hand-synced record is judged only by replaying `fm_slot_rerecord_verdict` read-only against the pre-sync record;
+- a SIGKILL, or a TERM or HUP while the publish rename is in flight, leaves a published record with a `pending` audit record until the next write run, and a relaunch in that window is judged by adoption alone;
+- in the restore window the record already holds the staged identity, which passes adoption, so a relaunch that started after an interrupted run released its locks could in principle be overwritten by that run's late restore rename; the window is one rename wide against a relaunch that takes seconds;
+- rerecord does not verify how the durable record was renewed.
+
 ### Reclaiming a task whose endpoint is gone
 
 A terminal can disappear while its task's worktree, branch, commits, and uncommitted changes survive.
@@ -742,7 +842,8 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 - `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, and rollback.
 - `tests/fm-control-relaunch-adopt.test.sh` - an adopted relaunch of a governed task with its own recorded manifest: the provisioner never runs, the recorded scope is unchanged, the task's own out-of-scope work is admitted and printed, and a foreign manifest or a copy another task records is refused by name.
 - `tests/fm-control-relaunch-provision.test.sh` - a relaunch with no recorded manifest: the provisioning route, the foreseeable refusals named before the stop, and the `scope_mismatch` and `manifest_exists` refusals.
-- `tests/fm-slot-adopt.test.sh` - unit cases for the adoption decision and its helpers in `bin/fm-slot-provision-lib.sh` and `bin/fm-task-copy-lib.sh`.
+- `tests/fm-slot-adopt.test.sh` - unit cases for the adoption decision and its helpers in `bin/fm-slot-provision-lib.sh` and `bin/fm-task-copy-lib.sh`, and the read-only replay verdict `fm_slot_rerecord_verdict`.
+- `tests/fm-control-rerecord-slot.test.sh` - `rerecord-slot` through the real entry point: every legitimate, harmful, named-refusal, crash, signal and recovery case and its sensitivity control, the journal classes, and the end-to-end relaunch before and after a re-record.
 - `tests/fm-control-relaunch-recovery.test.sh` - Herdr reclaim, sequential tmux-to-Herdr reclaim, tmux absence scoped to the recorded endpoint despite unrelated servers, refusal of other configured backends, conservative process-read refusals, and refusals on a live window, a worktree-holding agent, or unreadable evidence; missing-worktree relocation cases cover recorded-head containment, foreign harness-file preservation, failure-journal recovery, concurrent destination ownership, and unpublished pool-claim cleanup.
 - `tests/fm-control-relaunch-backends.test.sh` - positive live Herdr ownership and no-pin refusals across every lifecycle verb, and unmanaged native restore inspection and bounded copied-home diagnostics; omp session-record `adopt` cases cover each named proof refusal, the caller gates, refusal of a non-agent or other-harness foreground process under a lingering omp registration, refusal of a record that already names the live PID or names another live omp process, repair over a recorded PID reused by a process that is not an agent or by another harness's agent, and refusal of a pinned or unreadable-environment process before staging while the real extension activates a personal session.
 - `tests/fm-launch-proof.test.sh` - versioned and legacy managed incarnation proof across supported harnesses, native restore and same-PID personal-session switches remaining unmanaged, and conservative foreground and process-environment refusals.
