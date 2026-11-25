@@ -901,6 +901,28 @@ def flagged_changed(git, copy):
 FMFLAGGEDPY
 )
 
+# One parser of `git status --porcelain=v1 -z` output for the drift report and rerecord-slot's uncommitted set: each
+# caller runs its own status command and passes the raw bytes. status_entries(raw) yields (code, path, other), where
+# other is the second path of a rename or copy entry (both ends are reported) and None for every other entry.
+FM_SLOT_STATUS_DEF=$(cat <<'FMSTATUSPY'
+def status_entries(raw):
+    fields = raw.split(b"\0")
+    i = 0
+    while i < len(fields):
+        entry = fields[i]
+        i += 1
+        if len(entry) < 4:
+            continue
+        code, path = entry[:2], entry[3:]
+        if code[:1] in b"RC":
+            other = fields[i] if i < len(fields) else b""
+            i += 1
+            yield code, path, other
+            continue
+        yield code, path, None
+FMSTATUSPY
+)
+
 FM_SLOT_DRIFT_BODY=$(cat <<'FMDRIFTPY'
 import os
 import re
@@ -1050,19 +1072,12 @@ if shallow:
     limits.append("the copy is a shallow clone, so history before its cut-off cannot show who changed a path; the list may be incomplete")
 # The working copy: modified, deleted, untracked (every file), renamed or copied (both ends), and ignored.
 raw = git("-c", "core.fileMode=true", "status", "--porcelain=v1", "-z", "--untracked-files=all",
-          "--ignore-submodules=none", "--ignored=traditional").stdout.split(b"\0")
-i = 0
-while i < len(raw):
-    entry = raw[i]
-    i += 1
-    if len(entry) < 4:
-        continue
-    code, path = entry[:2], entry[3:]
-    if code[:1] in b"RC":
+          "--ignore-submodules=none", "--ignored=traditional").stdout
+for code, path, other in status_entries(raw):
+    if other is not None:
         add(path)
-        if i < len(raw) and raw[i]:
-            add(raw[i])
-        i += 1
+        if other:
+            add(other)
         continue
     if code == b"!!":
         if wiring_only(path.rstrip(b"/")):
@@ -1086,6 +1101,7 @@ FMDRIFTPY
 )
 FM_SLOT_DRIFT_PY="$FM_SLOT_OWN_LINE_DEF
 $FM_SLOT_FLAGGED_DEF
+$FM_SLOT_STATUS_DEF
 $FM_SLOT_DRIFT_BODY"
 
 # The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals.
@@ -1134,8 +1150,9 @@ EOF
 # is a forward move to the copy's current merge-base with the project default branch, and its scope is the previously
 # recorded scope plus the minimal cover of every path the branch changed.
 # What they read: the task record and the manifest (copied once into a private snapshot, whose bytes every content
-# verdict reads), the copy's git history, refs, operation markers and working-copy status (git reads run with
-# GIT_OPTIONAL_LOCKS=0), the copy-custody owners, the relaunch journal, the backlog-close marker, the endpoint's agent
+# verdict reads), the copy's git history, refs, operation markers and working-copy status (this block's own git reads
+# run with GIT_OPTIONAL_LOCKS=0; the shared isolation and custody checks it calls read as they always have), the
+# copy-custody owners, the relaunch journal, the backlog-close marker, the endpoint's agent
 # state and the per-task spawn lock. The verdicts (fm_slot_rerecord_*_verdict and fm_slot_rerecord_verdict) and the
 # proofs write nothing. The only writers are fm_slot_rerecord_stage (a staged record under state/), fm_slot_rerecord_archive
 # (the prior record and the audit record under data/<id>/slot-rerecord/), fm_slot_rerecord_audit_set (audit result
@@ -1347,9 +1364,9 @@ fm_slot_rerecord_prove_copy() { # <project> <copy> <branch> <task-id> <meta> <st
   local project=$1 copy=$2 branch=$3 id=$4 meta=$5 state=$6 manifest=$7 common slot_common root head marker git_path
   fm_task_copy_isolated "$copy" "$project" ||
     { fm_slot_rerecord_fail not_isolated "$FM_TASK_COPY_REASON"; return 1; }
-  common=$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
+  common=$(GIT_OPTIONAL_LOCKS=0 git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     { fm_slot_rerecord_fail repository_mismatch "the repository of $project cannot be read"; return 1; }
-  slot_common=$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
+  slot_common=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     { fm_slot_rerecord_fail repository_mismatch "the repository of $copy cannot be read"; return 1; }
   [ "$common" = "$slot_common" ] ||
     { fm_slot_rerecord_fail repository_mismatch "$copy is not a checkout of $project's repository"; return 1; }
@@ -1360,7 +1377,7 @@ except Exception:
     value = None
 print(value if isinstance(value, str) else "")' "$manifest" 2>/dev/null) || root=
   if [ -z "$root" ] || ! { [ "$(dirname "$common")" -ef "$root" ] ||
-    [ "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$common" ]; }; then
+    [ "$(GIT_OPTIONAL_LOCKS=0 git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$common" ]; }; then
     fm_slot_rerecord_fail repository_mismatch "the manifest's repository root '${root}' is not this task's repository"
     return 1
   fi
@@ -1368,7 +1385,7 @@ print(value if isinstance(value, str) else "")' "$manifest" 2>/dev/null) || root
   [ "$head" = "refs/heads/$branch" ] ||
     { fm_slot_rerecord_fail operation_in_progress "the copy is on ${head:-a detached HEAD}, not refs/heads/$branch"; return 1; }
   for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply sequencer; do
-    git_path=$(git -C "$copy" rev-parse --path-format=absolute --git-path "$marker" 2>/dev/null) ||
+    git_path=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --path-format=absolute --git-path "$marker" 2>/dev/null) ||
       { fm_slot_rerecord_fail operation_in_progress "the copy's $marker marker cannot be located"; return 1; }
     [ ! -e "$git_path" ] ||
       { fm_slot_rerecord_fail operation_in_progress "the copy has $marker, so a git operation is in progress"; return 1; }
@@ -1469,6 +1486,7 @@ for path in sorted(own_line(git, tip, head)):
 # index-flagged tracked path that differs (FM_SLOT_FLAGGED_DEF). Ignored files are not in it.
 fm_slot_rerecord_uncommitted_paths() { # <copy>
   python3 -I -c "$FM_SLOT_FLAGGED_DEF
+$FM_SLOT_STATUS_DEF
 import sys
 
 copy = sys.argv[1]
@@ -1483,19 +1501,11 @@ def git(*args, ok=(0,)):
 
 
 found = set()
-raw = git('status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none').stdout.split(b'\0')
-i = 0
-while i < len(raw):
-    entry = raw[i]
-    i += 1
-    if len(entry) < 4:
-        continue
-    code, path = entry[:2], entry[3:]
+raw = git('status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none').stdout
+for code, path, other in status_entries(raw):
     found.add(path)
-    if code[:1] in b'RC':
-        if i < len(raw) and raw[i]:
-            found.add(raw[i])
-        i += 1
+    if other:
+        found.add(other)
 found.update(flagged_changed(git, copy))
 for path in sorted(found):
     sys.stdout.buffer.write(path + b'\0')
@@ -1721,9 +1731,19 @@ fm_slot_rerecord_verdict() { # <manifest> <copy> <project> <task-id> <branch> <r
     return "$rc"
   fi
   default=$(fm_task_copy_default_branch "$project" 2>/dev/null) || default=
-  tip=$(git -C "$copy" rev-parse --verify --quiet "refs/remotes/origin/$default^{commit}" 2>/dev/null) || tip=
-  fm_slot_own_line_paths "$copy" "$tip" "$head" > "$work/own" 2>/dev/null || rc=1
-  fm_slot_rerecord_uncommitted_paths "$copy" > "$work/uncommitted" 2>/dev/null || rc=1
+  tip=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --verify --quiet "refs/remotes/origin/$default^{commit}" 2>/dev/null) || tip=
+  # The same refusals the verb gives when these reads fail: without them every added entry would read as side-branch
+  # work and no stranded work would be proved absent.
+  if ! fm_slot_own_line_paths "$copy" "$tip" "$head" > "$work/own" 2>/dev/null; then
+    printf 'scope_entry_not_own_work\tthe task'"'"'s own first-parent line could not be read from the copy, so no entry can be attributed\n'
+    rm -rf -- "$work"
+    return 1
+  fi
+  if ! fm_slot_rerecord_uncommitted_paths "$copy" > "$work/uncommitted" 2>/dev/null; then
+    printf 'scope_release_strands_work\tthe copy'"'"'s uncommitted set could not be read, so no stranded work is proved absent\n'
+    rm -rf -- "$work"
+    return 1
+  fi
   fm_slot_rerecord_scope_verdict "$manifest" "$copy" "$head" "$work/own" "$work/uncommitted" "$@" || rc=1
   rm -rf -- "$work"
   return "$rc"

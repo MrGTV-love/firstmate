@@ -580,7 +580,7 @@ The verb takes, in order, the task's control lock, its spawn lock (`state/.spawn
 | 3. Earlier interrupted runs | swept and resolved by the record's bytes (below) | reported as `pending_audit=` lines |
 | 4. Snapshot and fingerprints | taken | taken |
 | 5. Content and location proofs | refuse by name | refuse by name |
-| 6. No-op | `already recorded`, exit 0, nothing written | `already recorded` |
+| 6. No-op | `already recorded`, exit 0, nothing written | `already recorded`, and `write_would=already recorded` unless a launch owner holds the spawn lock, because a write stops at the no-op before the later proofs |
 | 7. Journal, backlog close, then agent stopped | refuse by name | advisory `journal_proof=`, `backlog_close_proof=`, `stopped_proof=` and `write_would=` |
 | 8. Note and manifest digest | refuse by name | not run; prints `manifest_sha256=` and the command to run |
 | 9. Stage, verify, archive, rebind, publish, verify, commit | below | never |

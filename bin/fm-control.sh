@@ -3142,6 +3142,11 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     echo "backlog_close_proof=$backlog_proof"
     echo "stopped_proof=$stopped_proof"
     if [ "$RERECORD_CHECK" = 1 ]; then
+      # A write on an already-recorded task stops at the no-op (step 6) and reads only the spawn lock before it, so the
+      # later advisory proofs never refuse it.
+      if [ "$noop" = 1 ] && [ "$launch_proof" = ok ]; then
+        would="already recorded"
+      fi
       echo "write_would=$would"
       [ "$noop" = 1 ] || echo "command: bin/fm-control.sh $ID rerecord-slot --manifest-sha $manifest_sha --note '<the ruling this carries out>'"
     fi

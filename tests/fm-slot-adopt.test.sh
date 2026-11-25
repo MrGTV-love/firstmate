@@ -538,7 +538,7 @@ test_a_pointer_in_an_unknown_record_store_is_refused_and_a_known_one_adopted() {
 # a forward-merged branch whose renewal adds the directory of a new file is admitted with its labels, and a renewal that
 # adds an untouched tracked file, or keeps a base that is no longer the merge-base, is refused by name. Nothing is written.
 test_the_rerecord_replay_verdict_judges_a_renewed_manifest() {
-  local m1 out
+  local m1 out rc
   make_world rerecord-replay
   mkdir -p "$W_PROJ/lib"
   printf 'a\n' >"$W_PROJ/lib/a.txt"
@@ -575,8 +575,18 @@ PY2
   renew "$W_BASE" src lib
   out=$(fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
   assert_contains "$out" 'base_not_merge_base' 'a base that is no longer the merge-base was admitted'
+  # A copy whose own line or uncommitted set cannot be read is refused by name, never reported ok with every added entry
+  # labelled side-branch. The copy is made unreadable to git only for the one read under test.
+  renew "$m1" src lib
+  out=$(fm_slot_own_line_paths() { return 1; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src); rc=$?
+  [ "$rc" -ne 0 ] || fail "an unreadable own line still exited 0: $out"
+  [ "$out" = "scope_entry_not_own_work"$'\t'"the task's own first-parent line could not be read from the copy, so no entry can be attributed" ] \
+    || fail "an unreadable own line was not refused by name: $out"
+  out=$(fm_slot_rerecord_uncommitted_paths() { return 1; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src); rc=$?
+  [ "$rc" -ne 0 ] || fail "an unreadable uncommitted set still exited 0: $out"
+  [ "${out%%$'\t'*}" = scope_release_strands_work ] || fail "an unreadable uncommitted set was not refused by name: $out"
   [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail 'the replay changed the copy'
-  pass "rerecord replay: a forward-merged renewal is admitted with its labels; an untouched entry and a stale base are refused by name; the copy is unchanged"
+  pass "rerecord replay: a forward-merged renewal is admitted with its labels; an untouched entry, a stale base, and an unreadable own line or uncommitted set are refused by name; the copy is unchanged"
 }
 
 CASES=(

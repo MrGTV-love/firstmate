@@ -630,11 +630,12 @@ test_L9b_the_live_complete_shape_with_the_agent_alive() {
     assert_contains "$out" 'already recorded' "L9b $mode"
     assert_contains "$out" 'journal_proof=complete' "L9b $mode"
     assert_contains "$out" 'stopped_proof=agent_not_proven_stopped' "L9b $mode"
+    [ "$mode" != check ] || assert_contains "$out" 'write_would=already recorded' "L9b: --check must predict the write's no-op"
   done
   [ "$before" = "$(rec_inventory)" ] || fail "L9b: something was written"
   [ "$jsum" = "$(rr_sha "$RR_DIR/home/state/$RR_ID.control-relaunch")" ] || fail "L9b: the journal changed"
   [ -z "$(rr_sendkeys)" ] || fail "L9b: lifecycle input was sent"
-  rr_ok L9b "--check and write exit 0 already recorded with journal_proof=complete and stopped_proof=agent_not_proven_stopped; nothing written; send-keys empty"
+  rr_ok L9b "--check and write exit 0 already recorded with journal_proof=complete and stopped_proof=agent_not_proven_stopped; --check predicts write_would=already recorded; nothing written; send-keys empty"
 }
 
 rr_setup_L10() {
@@ -965,17 +966,33 @@ test_N17_actor_not_main_branch() { rr_h N17 actor_not_main; RR_ACTOR=; }
 test_N18_manifest_unreadable() { rr_h N18 manifest_unreadable; }
 
 # Every option the verb does not take refuses before anything is read.
+# Each refused option is named by its own parse refusal, so a dropped option check cannot pass by refusing later.
 test_options_are_refused() {
-  local out rc
+  local out rc args want before
   rr_make_f options
-  for args in '--check --note x' '--check --manifest-sha abc' '--harness codex --note x' '--worktree /tmp --note x' '--owned-path src --note x'; do
+  before=$(rec_inventory)
+  while IFS='|' read -r args want; do
     # shellcheck disable=SC2086
     out=$(rr_run $args); rc=$?
-    [ "$rc" != 0 ] || fail "options: '$args' was accepted"
+    expect_code 1 "$rc" "options: '$args'"$'\n'"$out"
+    assert_contains "$out" "error: $want" "options: '$args' was not refused by its own parse check"
+    assert_not_contains "$out" 'slot rerecord refused' "options: '$args' reached the proofs"
+  done <<'EOF'
+--check --note x|rerecord-slot --check writes nothing, so it takes neither --note, --note-file, nor --manifest-sha
+--check --manifest-sha abc|rerecord-slot --check writes nothing, so it takes neither --note, --note-file, nor --manifest-sha
+--harness codex --note x|--harness, --model, --effort, --claude-debug, --captain-model-pin, --recover-launch, --reconcile-only, and --worktree do not apply to 'rerecord-slot'
+--worktree /tmp --note x|--harness, --model, --effort, --claude-debug, --captain-model-pin, --recover-launch, --reconcile-only, and --worktree do not apply to 'rerecord-slot'
+--owned-path src --note x|--owned-path applies to 'relaunch' only
+--manifest-sha|--manifest-sha requires a value
+EOF
+  for args in '--check' '--manifest-sha abc'; do
+    # shellcheck disable=SC2086
+    out=$(run_control "$RR_DIR" "$RR_ID" exit $args); rc=$?
+    expect_code 1 "$rc" "options: exit $args"$'\n'"$out"
+    assert_contains "$out" "error: --check and --manifest-sha apply to 'rerecord-slot' only" "options: exit $args"
   done
-  out=$(run_control "$RR_DIR" "$RR_ID" exit --check); rc=$?
-  [ "$rc" != 0 ] && assert_contains "$out" "apply to 'rerecord-slot' only" "options: --check on another verb"
-  rr_ok OPTIONS "--check with a note or digest, relaunch and reassociate options, and --check on another verb all refuse"
+  [ "$before" = "$(rec_inventory)" ] || fail "options: a refused option wrote something"
+  rr_ok OPTIONS "each refused option prints its own parse refusal (exit 1, never a proof refusal), and --check or --manifest-sha on another verb names rerecord-slot; nothing written"
 }
 
 # --- faults, crashes and signals (R) ----------------------------------------------------------------
@@ -1753,6 +1770,28 @@ test_SF4c_post_publish_comparison() {
   rr_control_run SF4c SF4-head
   rr_ok SF4c "SF4-head with only the post-publish comparison removed: published with a stale HEAD; audit published"
 }
+# Should-fix 2: the post-publish owner re-read is decisive on its own. The owner changes after the rebind returned, and
+# only the post-publish comparison is removed, so the identity re-read is the one check that can see it.
+rr_skip_post_publish_comparison() {
+  rr_wrap fm-slot-provision-lib.sh fm_slot_rerecord_inputs_unchanged
+  rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_inputs_unchanged() { local n; n=\$(cat '$RR_DIR/inputs-calls' 2>/dev/null || echo 0); n=\$((n + 1)); echo \$n > '$RR_DIR/inputs-calls'; if [ \"\$n\" = 1 ]; then real_fm_slot_rerecord_inputs_unchanged \"\$@\"; return; fi; return 0; }"
+}
+test_SF4_owner_reread_alone_refuses() {
+  rr_setup_SF4owner SF4-owner-reread
+  rr_skip_post_publish_comparison
+  rr_expect_postcheck_rollback SF4-owner-reread
+  assert_contains "$RR_OUT" "the live manifest no longer names this task's lease: owner_mismatch" "SF4-owner-reread: the refusal must come from the owner re-read"
+  rr_ok SF4-owner-reread "owner changed after the rebind, post-publish comparison removed: the owner re-read alone refuses adopt_postcheck_failed naming the lease (owner_mismatch); rolled back, audit rolled-back"
+}
+test_SF4o_control_owner_reread() {
+  rr_setup_SF4owner SF4o
+  rr_skip_post_publish_comparison
+  rr_shim_allow fm_slot_rerecord_identity_verdict ok
+  rr_control_run SF4o SF4-owner-reread
+  [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["owner_id"])' "$RR_MANIFEST")" = other-task ] \
+    || fail "SF4o: the fixture's manifest does not name the other owner"
+  rr_ok SF4o "SF4-owner-reread with the owner re-read also removed: published while the live manifest names another owner (adoption never compares owner); audit published"
+}
 #__REGISTRY__
 control_relaunch_test_cases=(
 test_rec_inventory_oracle_rejects_both_mutants
@@ -1871,5 +1910,7 @@ test_S20_publishing_rolls_back
 test_S21_backlog_close
 test_S22_committing_rolls_back
 test_SF4c_post_publish_comparison
+test_SF4_owner_reread_alone_refuses
+test_SF4o_control_owner_reread
 )
 control_relaunch_run "$@"
