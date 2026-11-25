@@ -812,6 +812,51 @@ test_L16_check_pending_superseded_new_with_a_live_agent() {
   rr_ok L16 "pending superseded-new audit, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines; the write relabels the audit superseded-new and exits 0 already recorded"
 }
 
+# rr_fail_mktemp <pattern>: the verb's mktemp fails for every argument list the case pattern <pattern> matches.
+rr_fail_mktemp() {
+  printf '#!/usr/bin/env bash\ncase "$*" in %s) exit 1 ;; esac\nexec %s "$@"\n' "$1" "$(command -v mktemp)" > "$RR_DIR/fakebin/mktemp"
+  chmod +x "$RR_DIR/fakebin/mktemp"
+}
+
+# An error after step 3 rolled a crashed write back names that reconciliation; with no pending audit record the same
+# error still says nothing was changed.
+test_L17_an_error_after_a_rollback_names_the_reconciliation() {
+  local out rc p
+  rr_setup_L13 L17
+  p=$(rr_field "$RR_L13_AUDIT" prior_sha256)
+  rr_fail_mktemp '*.meta.rerecord-snap.XXXXXX'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "L17: the write was expected to stop on the snapshot error"$'\n'"$out"
+  assert_contains "$out" "could not create the private snapshot for task $RR_ID; before stopping, this run reconciled earlier interrupted runs: audit $RR_L13_AUDIT rolled-back (the task record was restored to the prior record's bytes); no manifest, copy or journal was changed" "L17"
+  assert_not_contains "$out" 'nothing was changed' "L17"
+  [ "$(rr_sha "$RR_META")" = "$p" ] || fail "L17: the record is not the prior record"
+  [ "$(rr_field "$RR_L13_AUDIT" result)" = rolled-back ] || fail "L17: the crashed write's audit is '$(rr_field "$RR_L13_AUDIT" result)'"
+  rr_make_f L17-no-pending
+  rr_fail_mktemp '*.meta.rerecord-snap.XXXXXX'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "L17 no pending: the write was expected to stop on the snapshot error"$'\n'"$out"
+  assert_contains "$out" "could not create the private snapshot for task $RR_ID; nothing was changed" "L17 no pending"
+  assert_not_contains "$out" 'reconciled earlier interrupted runs' "L17 no pending"
+  rr_ok L17 "a snapshot error after step 3 rolled a crash back names the rolled-back audit and the restored record, not 'nothing was changed'; with no pending audit the same error says nothing was changed"
+}
+
+# An audit record the reconciliation cannot rewrite is named as not closed, with the result it still carries.
+test_L18_an_audit_that_cannot_be_rewritten_is_named_as_not_closed() {
+  local out rc p
+  rr_setup_L13 L18
+  rr_alive
+  p=$(rr_field "$RR_L13_AUDIT" prior_sha256)
+  rr_fail_mktemp '*/.audit.XXXXXX'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "L18: the write was expected to refuse"$'\n'"$out"
+  assert_contains "$out" 'error: slot rerecord refused: agent_not_proven_stopped' "L18"
+  assert_contains "$out" "audit $RR_L13_AUDIT could not be closed as rolled-back (the task record was restored to the prior record's bytes; the audit stays pending)" "L18"
+  assert_not_contains "$out" "audit $RR_L13_AUDIT rolled-back (" "L18"
+  [ "$(rr_field "$RR_L13_AUDIT" result)" = pending ] || fail "L18: the audit is '$(rr_field "$RR_L13_AUDIT" result)', not pending"
+  [ "$(rr_sha "$RR_META")" = "$p" ] || fail "L18: the record is not the prior record"
+  rr_ok L18 "the audit record cannot be rewritten: the record is restored, the audit stays pending, and the refusal tail says it could not be closed as rolled-back"
+}
+
 # --- end to end -----------------------------------------------------------------------------------
 
 test_E1_relaunch_after_rerecord_adopts() {
@@ -959,6 +1004,41 @@ test_H9b_scope_release_strands_hidden_work() {
 test_H9c_a_trailing_slash_prior_entry_is_normalized() {
   rr_setup_H9c H9c
   rr_expect_refusal H9c 'scope_release_strands_work: src/other.txt'
+}
+# A flagged path that the flag read lists but the one index read omits cannot be compared, so it counts as changed: the
+# narrowing that releases it refuses. The copy's git answers ls-files -s -z without src/other.txt's entry.
+rr_setup_H9d() {
+  local real
+  rr_setup_L5 "$1"
+  git -C "$RR_DIR/wt" update-index --assume-unchanged src/other.txt
+  real=$(command -v git)
+  cat > "$RR_DIR/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" ls-files -s -z "*)
+    '$real' "\$@" | python3 -I -c 'import sys; rows = sys.stdin.buffer.read().split(b"\\0"); sys.stdout.buffer.write(b"\\0".join(r for r in rows if not r.endswith(b"\\tsrc/other.txt")))'
+    exit "\${PIPESTATUS[0]}" ;;
+esac
+exec '$real' "\$@"
+SH
+  chmod +x "$RR_DIR/fakebin/git"
+}
+test_H9d_a_flagged_path_missing_from_the_index_read_strands() {
+  rr_setup_H9d H9d
+  rr_expect_refusal H9d 'scope_release_strands_work: src/other.txt'
+}
+# A hidden edit under a name holding a space strands like any other.
+rr_setup_H9e() {
+  rr_make_f "$1" --no-renew
+  RR_M2=$(rr_main_commit 'main M2' 'src/sp ace.txt=spaced')
+  rr_branch_merge_main
+  rr_renew --base-sha "$RR_M2" --owned-path src/owned.txt --owned-path lib --owned-path tools/x.sh
+  git -C "$RR_DIR/wt" update-index --assume-unchanged 'src/sp ace.txt'
+  printf 'hidden edit\n' > "$RR_DIR/wt/src/sp ace.txt"
+}
+test_H9e_a_hidden_edit_under_a_spaced_name_strands() {
+  rr_setup_H9e H9e
+  rr_expect_refusal H9e 'scope_release_strands_work: src/sp ace.txt'
 }
 test_H10_manifest_shadowed() { rr_h H10 manifest_shadowed; }
 test_H11_agent_not_proven_stopped() {
@@ -1977,6 +2057,8 @@ test_L13_check_names_a_pending_reconcile
 test_L14_check_pending_rollback_with_a_live_agent
 test_L15_check_pending_recovery_with_a_live_agent
 test_L16_check_pending_superseded_new_with_a_live_agent
+test_L17_an_error_after_a_rollback_names_the_reconciliation
+test_L18_an_audit_that_cannot_be_rewritten_is_named_as_not_closed
 test_E1_relaunch_after_rerecord_adopts
 test_E2_relaunch_without_rerecord_refuses_base_mismatch
 test_H1_owner_mismatch
@@ -1990,6 +2072,8 @@ test_H8_scope_uncovered_change
 test_H9_scope_release_strands_work
 test_H9b_scope_release_strands_hidden_work
 test_H9c_a_trailing_slash_prior_entry_is_normalized
+test_H9d_a_flagged_path_missing_from_the_index_read_strands
+test_H9e_a_hidden_edit_under_a_spaced_name_strands
 test_H10_manifest_shadowed
 test_H11_agent_not_proven_stopped
 test_H12_relaunch_unfinished_in_flight

@@ -931,6 +931,8 @@ def flagged_changed(git, copy):
             continue
         entry = index.get(path, [])
         if len(entry) < 2:
+            # The index read lists no entry for a path its flag read listed, so its bytes cannot be compared: it differs.
+            found.append(path)
             continue
         mode, want = entry[0].decode(), entry[1].decode()
         if os.path.islink(full):
@@ -1281,16 +1283,36 @@ fm_slot_rerecord_fail() { # <reason> <detail>
   return 1
 }
 
+# What a run that stops before its own publish changed: <unchanged> when its step 3 reconciliation acted on no audit
+# record, otherwise every reconciliation entry.
+fm_slot_rerecord_changes() { # <refusing|stopping> <unchanged>
+  if [ -z "$FM_RR_RECONCILED" ]; then
+    printf '%s\n' "$2"
+  else
+    printf 'before %s, this run reconciled earlier interrupted runs: %s; no manifest, copy or journal was changed\n' \
+      "$1" "$FM_RR_RECONCILED"
+  fi
+}
+
 fm_slot_rerecord_refuse() { # <reason> <detail>
-  local tail='no record, manifest, copy or journal was changed'
-  [ -z "$FM_RR_RECONCILED" ] ||
-    tail="before refusing, this run reconciled earlier interrupted runs: $FM_RR_RECONCILED; no manifest, copy or journal was changed"
-  echo "error: slot rerecord refused: $1${2:+: $2}; $tail" >&2
+  echo "error: slot rerecord refused: $1${2:+: $2}; $(fm_slot_rerecord_changes refusing 'no record, manifest, copy or journal was changed')" >&2
   return 1
 }
 
 fm_slot_rerecord_reconciled() { # <audit> <result> <effect>
   FM_RR_RECONCILED="${FM_RR_RECONCILED:+$FM_RR_RECONCILED, }audit $1 $2 ($3)"
+}
+
+# Step 3: record that the reconciliation left the task record as <record-effect> and closed <audit> as <result>, when the
+# audit record carries <result>; otherwise record that it could not be closed and the result it still carries.
+fm_slot_rerecord_closed() { # <audit> <result> <closed-effect> <record-effect>
+  local now
+  now=$(fm_slot_rerecord_field "$1" result)
+  if [ "$now" = "$2" ]; then
+    fm_slot_rerecord_reconciled "$1" "$2" "$3"
+  else
+    fm_slot_rerecord_reconciled "$1" "could not be closed as $2" "$4; the audit stays ${now:-unreadable}"
+  fi
 }
 
 fm_slot_rerecord_sha() { # <file>
@@ -2127,10 +2149,10 @@ fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
       untouched-prior)
         if [ "$result" = pending ]; then
           fm_slot_rerecord_audit_set "$audit" abandoned
-          fm_slot_rerecord_reconciled "$audit" abandoned "the audit was closed with the task record left unchanged"
+          fm_slot_rerecord_closed "$audit" abandoned "the audit was closed with the task record left unchanged" "the task record was left unchanged"
         else
           fm_slot_rerecord_audit_set "$audit" rolled-back
-          fm_slot_rerecord_reconciled "$audit" rolled-back "the audit was closed with the task record left unchanged"
+          fm_slot_rerecord_closed "$audit" rolled-back "the audit was closed with the task record left unchanged" "the task record was left unchanged"
         fi
         ;;
       untouched-staged)
@@ -2143,12 +2165,13 @@ fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
           "$copy" "$(fm_slot_rerecord_field "$audit" head)" "$project" "$FM_RR_ID" "$branch" "$FM_RR_STATE" \
           "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap.adopt-err"; then
           fm_slot_rerecord_audit_set "$audit" published-recovered
-          fm_slot_rerecord_reconciled "$audit" published-recovered "the audit was closed with the record left as published"
+          fm_slot_rerecord_closed "$audit" published-recovered "the audit was closed with the record left as published" "the record was left as published"
         else
           rm -f -- "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap.adopt-err"
           RERECORD_STAGE=published
           fm_slot_rerecord_rollback || return 2
-          fm_slot_rerecord_reconciled "$audit" rolled-back "the task record was restored to the prior record's bytes"
+          fm_slot_rerecord_closed "$audit" rolled-back "the task record was restored to the prior record's bytes" \
+            "the task record was restored to the prior record's bytes"
           echo "note: the interrupted re-record of task $FM_RR_ID recorded in $audit was rolled back${FM_SLOT_RERECORD_DETAIL:+ ($FM_SLOT_RERECORD_DETAIL)}" >&2
         fi
         rm -f -- "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap.adopt-err"
@@ -2160,11 +2183,11 @@ fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
         ;;
       superseded-new)
         fm_slot_rerecord_audit_set "$audit" "$state"
-        fm_slot_rerecord_reconciled "$audit" "$state" "the audit was closed with the record left as published"
+        fm_slot_rerecord_closed "$audit" "$state" "the audit was closed with the record left as published" "the record was left as published"
         ;;
       superseded-prior|superseded-other)
         fm_slot_rerecord_audit_set "$audit" "$state"
-        fm_slot_rerecord_reconciled "$audit" "$state" "the audit was closed with the task record left unchanged"
+        fm_slot_rerecord_closed "$audit" "$state" "the audit was closed with the task record left unchanged" "the task record was left unchanged"
         ;;
     esac
   done

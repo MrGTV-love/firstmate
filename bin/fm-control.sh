@@ -3069,11 +3069,11 @@ do_rerecord_slot() {
 
   # 4. Fingerprint P, M and H, and snapshot the record and manifest bytes.
   RERECORD_SNAP=$(mktemp -d "$STATE/.$ID.meta.rerecord-snap.XXXXXX") \
-    || die "could not create the private snapshot for task $ID; nothing was changed"
+    || die "could not create the private snapshot for task $ID; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   chmod 700 "$RERECORD_SNAP"
   snap=$RERECORD_SNAP
-  cp -p -- "$META" "$snap/record" || die "could not snapshot task $ID's record; nothing was changed"
-  prior_sha=$(fm_slot_rerecord_sha "$snap/record") || die "could not read task $ID's record; nothing was changed"
+  cp -p -- "$META" "$snap/record" || die "could not snapshot task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+  prior_sha=$(fm_slot_rerecord_sha "$snap/record") || die "could not read task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   manifest=$(fm_meta_get "$snap/record" slot_manifest)
   manifest_sha=
   if [ -n "$manifest" ] && [ -f "$manifest" ] && [ ! -L "$manifest" ] && cp -- "$manifest" "$snap/manifest.json" 2>/dev/null; then
@@ -3168,16 +3168,16 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
 
   # 9. Stage, verify, archive, rebind, publish, verify, commit.
   FM_RR_P=$prior_sha
-  FM_RR_STAGED=$(mktemp "$STATE/.$ID.meta.rerecord.XXXXXX") || die "could not stage task $ID's record; nothing was changed"
+  FM_RR_STAGED=$(mktemp "$STATE/.$ID.meta.rerecord.XXXXXX") || die "could not stage task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   RERECORD_STAGE=staged
   fm_slot_rerecord_stage "$snap/record" "$snap/manifest.json" "$FM_RR_STAGED" \
-    || die "could not stage task $ID's record; nothing was changed"
+    || die "could not stage task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   fm_slot_rerecord_precheck "$FM_RR_STAGED" "$snap/record" "$snap/manifest.json" \
     "$(fm_task_copy_canonical_dir "$copy")" "$branch" || rerecord_refuse
-  staged_sha=$(fm_slot_rerecord_sha "$FM_RR_STAGED") || die "could not read task $ID's staged record; nothing was changed"
+  staged_sha=$(fm_slot_rerecord_sha "$FM_RR_STAGED") || die "could not read task $ID's staged record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   FM_RR_S=$staged_sha
   note_json=$(python3 -I -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$NOTE") \
-    || die "could not encode the note; nothing was changed"
+    || die "could not encode the note; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   {
     echo "task=$ID"
     echo "prior_sha256=$prior_sha"
@@ -3192,7 +3192,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     echo "head=$head"
     sed -n '2,$p' "$snap/scope"
     echo "note=$note_json"
-  } > "$snap/audit-body" || die "could not prepare the audit record; nothing was changed"
+  } > "$snap/audit-body" || die "could not prepare the audit record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   fm_slot_rerecord_archive "$FM_RR_DIR" "$snap/record" "$prior_sha" "$snap/audit-body" || rerecord_refuse
   fm_slot_rerecord_inputs_unchanged "$META" "$prior_sha" "$manifest" "$manifest_sha" "$copy" "$head" || rerecord_refuse
   fm_slot_rerecord_binding_ok "$manifest" "$RERECORD_MANIFEST_SHA" || rerecord_refuse
@@ -3208,7 +3208,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     die "task $ID's record publish reported failure after it landed; the prior record was restored from $FM_RR_ARCHIVE"
   else
     RERECORD_STAGE=staged
-    die "${FM_BACKLOG_TRANSITION_ERROR:-the task record could not be published}; the record of task $ID is unchanged"
+    die "${FM_BACKLOG_TRANSITION_ERROR:-the task record could not be published}; $(fm_slot_rerecord_changes stopping "the record of task $ID is unchanged")"
   fi
   if ! fm_slot_rerecord_postcheck "$META" "$staged_sha" "$manifest" "$manifest_sha" "$copy" "$head" \
     "$project" "$ID" "$branch" "$STATE" "$snap/adopt-err"; then

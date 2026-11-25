@@ -595,6 +595,8 @@ Each entry reads `audit <file> <result> (<effect>)`.
 For `rolled-back` after a restore, the effect is `the task record was restored to the prior record's bytes`.
 For `published-recovered` and `superseded-new`, the effect is `the audit was closed with the record left as published`.
 For `abandoned`, `superseded-prior`, `superseded-other`, and a `rolled-back` audit whose record already held the prior bytes, the effect is `the audit was closed with the task record left unchanged`.
+When the audit record could not be rewritten with its result, the entry reads `audit <file> could not be closed as <result> (<record effect>; the audit stays <result it still carries>)`, where the record effect is `the task record was restored to the prior record's bytes`, `the record was left as published`, or `the task record was left unchanged`.
+A write run that stops on an error after step 3 and before its own publish ends its message by the same rule: `nothing was changed` (or `the record of task <id> is unchanged` after a failed publish) when the reconciliation acted on no audit record, and otherwise `before stopping, this run reconciled earlier interrupted runs:` with the same entries, then `; no manifest, copy or journal was changed`.
 The content proofs read a private snapshot of the record and manifest bytes; the location proofs read live paths.
 
 - **Shape:** `not_ship_or_scout` (not exactly one `kind=` line, or another kind); `not_recorded` (no slot manifest, base, or scope); `not_adoption_route` (`recovery=slot-provision-refused`); `local_only_source_unsupported` (a `slot_source_ref=` record).

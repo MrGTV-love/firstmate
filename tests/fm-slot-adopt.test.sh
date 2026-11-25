@@ -547,6 +547,9 @@ test_many_ignored_paths_print_a_sample_and_write_the_complete_report() {
   pass "drift: many ignored paths print every proven path, a bounded counted sample and the file holding the complete report"
 }
 
+# fm_drift_escape_line <path>: <path> on one line as the report writes it (a backslash doubled, a newline as \x0a).
+fm_drift_escape_line() { local p=${1//\\/\\\\}; printf '%s\n' "${p//$'\n'/\\x0a}"; }
+
 # fm_drift_flagged_oracle <copy>: the flagged (assume-unchanged or skip-worktree) paths whose existence, type, mode or
 # bytes differ, decided one path at a time with one ls-files and one hash-object each, one path per line, sorted.
 # It reads each path's own index entry by exact name (:(literal)), as the report does, so a name git would read as a
@@ -558,34 +561,32 @@ fm_drift_flagged_oracle() {
     tag=${entry:0:1} path=${entry:2}
     case "$tag" in [[:lower:]]|S) ;; *) continue ;; esac
     if [ ! -e "$copy/$path" ] && [ ! -L "$copy/$path" ]; then
-      case "$tag" in s) ;; [[:lower:]]) printf '%s\n' "$path" ;; esac
+      case "$tag" in s) ;; [[:lower:]]) fm_drift_escape_line "$path" ;; esac
       continue
     fi
     entry=$(git -C "$copy" ls-files -s -- ":(literal)$path")
     mode=${entry%% *} want=${entry#* } want=${want%% *}
     if [ -L "$copy/$path" ]; then
       have=$(printf '%s' "$(readlink "$copy/$path")" | git -C "$copy" hash-object --stdin)
-      [ "$mode" = 120000 ] && [ "$have" = "$want" ] || printf '%s\n' "$path"
+      [ "$mode" = 120000 ] && [ "$have" = "$want" ] || fm_drift_escape_line "$path"
     elif [ ! -f "$copy/$path" ]; then
-      printf '%s\n' "$path"
+      fm_drift_escape_line "$path"
     else
       have=$(git -C "$copy" hash-object -- "$path")
       if [ -x "$copy/$path" ]; then [ "$mode" = 100755 ] || have=; else [ "$mode" = 100644 ] || have=; fi
-      [ "$have" = "$want" ] || printf '%s\n' "$path"
+      [ "$have" = "$want" ] || fm_drift_escape_line "$path"
     fi
   done | LC_ALL=C sort
 }
 
-# Tracked paths hidden from status by assume-unchanged or skip-worktree: changed bytes, an exec-bit flip, a file turned
-# into a directory, a symlink retarget and a symlink turned into a file are listed; unchanged bytes, a checkout's own
-# line-ending conversion and a sparse absence are not. The batched check decides exactly what a per-path check decides,
-# including for a path git reads specially on a line (a leading quote). A name git would read as a pathspec is judged
-# by its own index entry: an unchanged docs/g*x is not listed although docs/g!x, which its pattern also matches and
-# which sorts first, holds other bytes, and a changed :colon.txt is listed (git reads ":colon.txt" as the pathspec
-# colon.txt, which matches no entry here, so a lookup by pathspec skipped it).
-test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides() {
-  local out f reported expected
-  make_world drift-flagged
+# fm_drift_flagged_world <name>: a copy whose tracked paths are hidden from status by assume-unchanged or skip-worktree:
+# changed bytes, an exec-bit flip, a file turned into a directory, a symlink retarget and a symlink turned into a file,
+# and changed names holding a space, a newline or a leading dash; unchanged bytes, a checkout's own line-ending
+# conversion and a sparse absence beside them. Sets FM_DRIFT_FLAGGED_EXPECTED to the changed paths as the report writes
+# them, sorted.
+fm_drift_flagged_world() {
+  local f nl=$'docs/new\nline.txt'
+  make_world "$1"
   for f in au-bytes au-same au-exec sw-bytes sw-same sw-dir crlf-same crlf-changed sw-gone; do
     printf 'line one\nline two\n' >"$W_PROJ/docs/$f.txt"
   done
@@ -593,6 +594,9 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
   printf 'star\n' >"$W_PROJ/docs/g*x"
   printf 'bang, other bytes\n' >"$W_PROJ/docs/g!x"
   printf 'colon\n' >"$W_PROJ/:colon.txt"
+  printf 'space\n' >"$W_PROJ/docs/sp ace.txt"
+  printf 'newline\n' >"$W_PROJ/$nl"
+  printf 'dash\n' >"$W_PROJ/-dash.txt"
   ln -s target-one "$W_PROJ/docs/link-retarget"
   ln -s target-two "$W_PROJ/docs/link-to-file"
   printf 'docs/crlf-*.txt text eol=crlf\n' >"$W_PROJ/.gitattributes"
@@ -602,9 +606,9 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
   W_BASE=$(git -C "$W_SLOT" rev-parse HEAD)
   git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
   grep -q $'\r' "$W_SLOT/docs/crlf-same.txt" || fail 'the fixture is vacuous: checkout did not write CRLF line endings'
-  git -C "$W_SLOT" update-index --assume-unchanged docs/au-bytes.txt docs/au-same.txt docs/au-exec.txt docs/link-retarget
+  git -C "$W_SLOT" update-index --assume-unchanged docs/au-bytes.txt docs/au-same.txt docs/au-exec.txt docs/link-retarget "$nl"
   git -C "$W_SLOT" update-index --skip-worktree docs/sw-bytes.txt docs/sw-same.txt docs/sw-dir.txt docs/crlf-same.txt \
-    docs/crlf-changed.txt docs/sw-gone.txt docs/link-to-file '"quoted.txt' 'docs/g*x' :colon.txt
+    docs/crlf-changed.txt docs/sw-gone.txt docs/link-to-file '"quoted.txt' 'docs/g*x' :colon.txt 'docs/sp ace.txt' ./-dash.txt
   [ "$(git -C "$W_SLOT" ls-files -s -- 'docs/g*x' | head -n 1 | cut -f 2)" = 'docs/g!x' ] \
     || fail 'the fixture is vacuous: the docs/g*x pathspec does not match docs/g!x first'
   printf 'line one\nline 2!!\n' >"$W_SLOT/docs/au-bytes.txt"
@@ -617,14 +621,62 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
   rm "$W_SLOT/docs/link-to-file" && printf 'target-two' >"$W_SLOT/docs/link-to-file"
   printf 'quoted, changed\n' >"$W_SLOT/\"quoted.txt"
   printf 'colon, changed\n' >"$W_SLOT/:colon.txt"
+  printf 'space, changed\n' >"$W_SLOT/docs/sp ace.txt"
+  printf 'newline, changed\n' >"$W_SLOT/$nl"
+  printf 'dash, changed\n' >"$W_SLOT/-dash.txt"
   [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail "the fixture is not hidden from status: $(git -C "$W_SLOT" status --porcelain)"
+  FM_DRIFT_FLAGGED_EXPECTED=$(printf '%s\n' '"quoted.txt' :colon.txt -dash.txt docs/au-bytes.txt docs/au-exec.txt \
+    docs/crlf-changed.txt docs/link-retarget docs/link-to-file 'docs/new\x0aline.txt' 'docs/sp ace.txt' docs/sw-bytes.txt \
+    docs/sw-dir.txt | LC_ALL=C sort)
+}
+
+fm_drift_flagged_reported() { printf '%s\n' "$1" | sed -n 's/^  drift: proven //p' | LC_ALL=C sort; }
+
+# The hidden changes of fm_drift_flagged_world are listed and the rest are not. The batched check decides exactly what a
+# per-path check decides, including for a path git reads specially on a line (a leading quote or a newline). A name git
+# would read as a pathspec is judged by its own index entry: an unchanged docs/g*x is not listed although docs/g!x,
+# which its pattern also matches and which sorts first, holds other bytes, and a changed :colon.txt is listed (git reads
+# ":colon.txt" as the pathspec colon.txt, which matches no entry here, so a lookup by pathspec skipped it).
+test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides() {
+  local out reported
+  fm_drift_flagged_world drift-flagged
   out=$(STATE='' drift)
-  reported=$(printf '%s\n' "$out" | sed -n 's/^  drift: proven //p' | LC_ALL=C sort)
-  expected=$(printf '%s\n' '"quoted.txt' :colon.txt docs/au-bytes.txt docs/au-exec.txt docs/crlf-changed.txt docs/link-retarget \
-    docs/link-to-file docs/sw-bytes.txt docs/sw-dir.txt | LC_ALL=C sort)
-  assert_equals "$expected" "$reported" 'the hidden changes reported are not exactly the changed flagged paths'
+  reported=$(fm_drift_flagged_reported "$out")
+  assert_equals "$FM_DRIFT_FLAGGED_EXPECTED" "$reported" 'the hidden changes reported are not exactly the changed flagged paths'
   assert_equals "$(fm_drift_flagged_oracle "$W_SLOT")" "$reported" 'the report decided a flagged path differently from a per-path check'
   pass "drift: hidden flagged-path changes are listed exactly as a per-path check decides; unchanged and sparse paths are not"
+}
+
+# A batched `hash-object --stdin-paths` that fails, or that answers one line short, decides nothing: every path it was
+# given is hashed again on its own, so the changed paths are still listed and the unchanged ones are not.
+test_a_failed_or_short_batch_hash_still_lists_every_changed_flagged_path() {
+  local mode out reported shim log real
+  real=$(command -v git)
+  for mode in fail short; do
+    fm_drift_flagged_world "drift-flagged-batch-$mode"
+    shim="$W_DIR/shim" log="$W_DIR/batch-calls.log"
+    mkdir -p "$shim"
+    : >"$log"
+    cat >"$shim/git" <<SH
+#!/bin/sh
+for arg in "\$@"; do
+  if [ "\$arg" = --stdin-paths ]; then
+    printf x >>'$log'
+    case $mode in
+      fail) cat >/dev/null; exit 1 ;;
+      short) '$real' "\$@" | sed '\$d'; exit 0 ;;
+    esac
+  fi
+done
+exec '$real' "\$@"
+SH
+    chmod +x "$shim/git"
+    out=$(STATE='' PATH="$shim:$PATH" drift)
+    [ -s "$log" ] || fail "the fixture is vacuous: the $mode batch hash was never run"
+    reported=$(fm_drift_flagged_reported "$out")
+    assert_equals "$FM_DRIFT_FLAGGED_EXPECTED" "$reported" "a $mode batch hash changed which flagged paths are listed"
+  done
+  pass "drift: a failed or one-line-short batch hash still lists exactly the changed flagged paths"
 }
 
 # fm_drift_git_calls <flagged-count>: builds a world whose docs/many holds that many skip-worktree files, every third
@@ -803,6 +855,7 @@ test_firstmate_written_wiring_is_not_reported_as_drift
 test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift
 test_many_ignored_paths_print_a_sample_and_write_the_complete_report
 test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides
+test_a_failed_or_short_batch_hash_still_lists_every_changed_flagged_path
 test_the_flagged_path_check_starts_a_fixed_number_of_git_processes
 test_a_killed_runs_leftover_temp_is_removed_by_the_next_write
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
