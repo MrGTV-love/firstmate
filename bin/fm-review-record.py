@@ -724,7 +724,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
             reader = model(row["reader_model"], "reader_model")
             # An 'all' read is usable only when its typed evidence includes every
             # derived family; the old OpenAI-only declaration cannot hide Claude.
-            required = derived_families if "all" in row["author_groups"] else families
+            required = derived_families if "all" in row["author_groups"] or "all" in row.get("_superseded", ()) else families
             if (group in named or "all" in named) and required <= declared_families and reader != "unknown":
                 readers.add(reader)
         # Known authors retain different-family coverage. Unknown builders and

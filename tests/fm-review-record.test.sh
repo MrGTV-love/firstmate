@@ -934,6 +934,50 @@ test_correction_cannot_clear_derived_groups() {
   pass "C4 a correction cannot clear the derived ship or no-mistakes:anthropic group"
 }
 
+test_correction_superseding_all_adds_no_coverage() {
+  local case_dir out rc=0 label word
+  # A row's typed all entry holds it to every derived family; superseding that entry must not
+  # let the row's other entries cover their groups on a weaker bar.
+  case_dir=$(live_case supersede-all nobad nogood)
+  synth_row "$case_dir" 1700000090 "$HEAD1" PASS "$GOOD_READER" \
+    '{"ship":["claude-sonnet-5-5","openai-codex/gpt-6-luna"]}' '["ship"]' "$DIGEST_A"
+  synth_row "$case_dir" 1700000100 "$HEAD1" PASS "$GOOD_READER" \
+    '{"all":["openai-codex/gpt-6-x"],"no-mistakes:anthropic":["claude-opus-5-5"]}' '["no-mistakes:anthropic"]' "$DIGEST_B"
+  for label in before after; do
+    if [ "$label" = after ]; then
+      record_correction "$case_dir" "$HEAD1" supersede-author-group 1700000100 "$GOOD_READER" "$DIGEST_B" \
+        --group all >/dev/null || fail "C3 record the supersession of the all entry"
+    fi
+    rc=0
+    out=$(run_live_verify "$case_dir") || rc=$?
+    expect_code 1 "$rc" "C3 verify $label superseding all must leave no-mistakes:anthropic uncovered: $out"
+    expect_not_qualified "$out" "uncovered commit group no-mistakes:anthropic, family anthropic" "C3 verify $label superseding all"
+    out=$(NM_HOME="$LIVE_NM" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" --task task-x1 --base "$BASE")
+    "$JQ_BIN" -e '.ok == true and .uncovered == [{"group":"no-mistakes:anthropic","families":["anthropic"]}]' <<<"$out" >/dev/null \
+      || fail "C3 plan $label superseding all must still owe no-mistakes:anthropic: $out"
+  done
+  # The FAIL window: a captain-word, then a FAIL that read no-mistakes:anthropic, then the same row.
+  case_dir=$(live_case supersede-all-fail nobad nogood)
+  word='{"schema":"fm-review-record.v1","kind":"captain-word","pr":"'"$URL"'","at":1700000070,"head":"'"$HEAD1"'","words":"Merge this PR."}'
+  printf '%s\n' "$word" > "$(ledger_of "$case_dir")"
+  synth_row "$case_dir" 1700000080 "$HEAD1" FAIL "$GOOD_READER" \
+    '{"no-mistakes:anthropic":["claude-opus-5-5"]}' '["no-mistakes:anthropic"]' "$DIGEST_A"
+  synth_row "$case_dir" 1700000100 "$HEAD1" PASS "$GOOD_READER" \
+    '{"all":["openai-codex/gpt-6-x"],"no-mistakes:anthropic":["claude-opus-5-5"]}' '["no-mistakes:anthropic"]' "$DIGEST_B"
+  for label in before after; do
+    if [ "$label" = after ]; then
+      record_correction "$case_dir" "$HEAD1" supersede-author-group 1700000100 "$GOOD_READER" "$DIGEST_B" \
+        --group all >/dev/null || fail "C3 record the supersession of the all entry after a FAIL"
+    fi
+    rc=0
+    out=$(NM_HOME="$LIVE_NM" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" --head "$HEAD1" \
+      --task task-x1 --base "$BASE" --json) || rc=$?
+    expect_code 1 "$rc" "C3 the FAIL $label superseding all must still stand: $out"
+    expect_not_qualified "$out" "no later exact-head PASS covers group no-mistakes:anthropic, family anthropic" "C3 FAIL window $label superseding all"
+  done
+  pass "C3 superseding a row's all entry adds no coverage in verify, plan or the FAIL window"
+}
+
 test_correction_rejections_leave_the_ledger_untouched() {
   local case_dir out rc=0 headb before
   case_dir=$(make_case rejections gpt-5.1)
@@ -1187,6 +1231,7 @@ fm_test_run_cases \
   test_correction_exclusion_effects \
   test_correction_supersede_effects \
   test_correction_cannot_clear_derived_groups \
+  test_correction_superseding_all_adds_no_coverage \
   test_correction_rejections_leave_the_ledger_untouched \
   test_unusable_correction_rows_never_loosen_or_block \
   test_correction_is_never_merge_authority \
