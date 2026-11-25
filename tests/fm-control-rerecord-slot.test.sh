@@ -722,13 +722,40 @@ test_L13_check_names_a_pending_reconcile() {
   out=$(rr_run --check); rc=$?
   expect_code 0 "$rc" "L13"$'\n'"$out"
   assert_contains "$out" "pending_audit=$RR_L13_AUDIT result=pending state=untouched-staged" "L13"
-  assert_contains "$out" "write_would=reconcile-pending:${RR_L13_AUDIT##*/}" "L13"
+  printf '%s\n' "$out" | grep -qxF "write_would=reconcile-pending:${RR_L13_AUDIT##*/}" \
+    || fail "L13: expected write_would=reconcile-pending:${RR_L13_AUDIT##*/} with no refusal"$'\n'"$out"
+  assert_contains "$out" 'verdict_basis=pre-reconcile' "L13"
   assert_contains "$out" "manifest_sha256=$(rr_msha)" "L13"
   assert_contains "$out" "command: bin/fm-control.sh $RR_ID rerecord-slot --manifest-sha $(rr_msha) --note" "L13"
   assert_not_contains "$out" 'already recorded' "L13"
   [ "$before" = "$(rec_inventory)" ] || fail "L13: --check wrote something"
   rr_expect_write_rolls_back_the_crash L13
-  rr_ok L13 "pending untouched-staged audit, HEAD moved inside scope: --check prints write_would=reconcile-pending naming the audit record, the digest and the command, and writes nothing; the write then rolls the crash back and publishes"
+  rr_ok L13 "pending untouched-staged audit, HEAD moved inside scope: --check prints write_would=reconcile-pending naming the audit record, the verdict_basis line, the digest and the command, and writes nothing; the write then rolls the crash back and publishes"
+}
+
+# rr_expect_check_reconciles_then_refuses <id>: L14's --check on a live agent, then the write it reports on.
+rr_expect_check_reconciles_then_refuses() {
+  local id=$1 out rc before
+  before=$(rec_inventory)
+  out=$(rr_run --check); rc=$?
+  expect_code 0 "$rc" "$id"$'\n'"$out"
+  assert_contains "$out" 'stopped_proof=agent_not_proven_stopped' "$id"
+  assert_contains "$out" 'verdict_basis=pre-reconcile' "$id"
+  [ "$before" = "$(rec_inventory)" ] || fail "$id: --check wrote something"
+  RR_OUT=$out
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "$id: the write was expected to refuse"$'\n'"$out"
+  assert_contains "$out" 'error: slot rerecord refused: agent_not_proven_stopped' "$id write"
+  [ "$(rr_field "$RR_L13_AUDIT" result)" = rolled-back ] || fail "$id: the write did not reconcile first (audit '$(rr_field "$RR_L13_AUDIT" result)')"
+}
+
+test_L14_check_names_the_reconcile_and_the_refusal() {
+  rr_setup_L13 L14
+  rr_alive
+  rr_expect_check_reconciles_then_refuses L14
+  printf '%s\n' "$RR_OUT" | grep -qxF "write_would=reconcile-pending:${RR_L13_AUDIT##*/};refuse:agent_not_proven_stopped" \
+    || fail "L14: write_would must name the reconciliation and the refusal"$'\n'"$RR_OUT"
+  rr_ok L14 "pending untouched-staged audit, agent alive: --check prints write_would=reconcile-pending:<audit>;refuse:agent_not_proven_stopped and verdict_basis=pre-reconcile, writes nothing; the write then rolls the crash back and refuses agent_not_proven_stopped"
 }
 
 # --- end to end -----------------------------------------------------------------------------------
@@ -1848,6 +1875,17 @@ test_S23_check_pending_noop_claim() {
   rr_expect_write_rolls_back_the_crash S23-L13
   rr_ok S23 "L13 with the pending names dropped: --check claims write_would=already recorded with no digest or command, while the write rolls the crash back and publishes"
 }
+# L14's control: the reconcile-pending verdict replaces any refusal, as the first --check fix did.
+test_S24_check_pending_masks_the_refusal() {
+  rr_setup_L13 S24-L14
+  rr_alive
+  rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_pending_verdict() { printf "reconcile-pending:%s\n" "$2"; }'
+  rr_expect_check_reconciles_then_refuses S24-L14
+  printf '%s\n' "$RR_OUT" | grep -qxF "write_would=reconcile-pending:${RR_L13_AUDIT##*/}" \
+    || fail "S24/L14: the shimmed --check did not print the bare reconcile-pending verdict"$'\n'"$RR_OUT"
+  assert_not_contains "$RR_OUT" ';refuse:' "S24/L14"
+  rr_ok S24 "L14 with the refusal dropped from the pending verdict: --check prints a bare write_would=reconcile-pending while the write rolls the crash back and refuses agent_not_proven_stopped"
+}
 #__REGISTRY__
 control_relaunch_test_cases=(
 test_rec_inventory_oracle_rejects_both_mutants
@@ -1867,6 +1905,7 @@ test_L10_a_failed_launch_journal_with_the_agent_stopped
 test_L11_an_uncommitted_file_under_a_new_directory_is_counted
 test_L12_a_stale_spawn_lock_is_reclaimed
 test_L13_check_names_a_pending_reconcile
+test_L14_check_names_the_reconcile_and_the_refusal
 test_E1_relaunch_after_rerecord_adopts
 test_E2_relaunch_without_rerecord_refuses_base_mismatch
 test_H1_owner_mismatch
@@ -1970,5 +2009,6 @@ test_SF4c_post_publish_comparison
 test_SF4_owner_reread_alone_refuses
 test_SF4o_control_owner_reread
 test_S23_check_pending_noop_claim
+test_S24_check_pending_masks_the_refusal
 )
 control_relaunch_run "$@"

@@ -577,7 +577,7 @@ The verb takes, in order, the task's control lock, its spawn lock (`state/.spawn
 | --- | --- | --- |
 | 1. Actor | refuses `actor_not_main` (a worker or the supervision branch) or `session_lock_not_owned` | the same |
 | 2. Locks | a live holder of the spawn lock refuses `launch_in_progress` | reported as `launch_proof=` |
-| 3. Earlier interrupted runs | swept and resolved by the record's bytes (below) | reported as `pending_audit=` lines; any such line makes `write_would=reconcile-pending:<audit records>` unless a launch owner holds the spawn lock, and the run prints `manifest_sha256=` and the command even when the record already matches |
+| 3. Earlier interrupted runs | swept and resolved by the record's bytes (below) | reported as `pending_audit=` lines; any such line makes `write_would=reconcile-pending:<audit records>` unless a launch owner holds the spawn lock, followed by `;refuse:<reason>` when a step 7 proof would refuse after the reconciliation, and the run prints `manifest_sha256=`, the command, and a `verdict_basis=pre-reconcile` line saying the verdict and scope lines judge the record before reconciliation, so `--check` runs again after a write reconciles |
 | 4. Snapshot and fingerprints | taken | taken |
 | 5. Content and location proofs | refuse by name | refuse by name |
 | 6. No-op | `already recorded`, exit 0, nothing written | `already recorded`, and `write_would=already recorded` unless a launch owner holds the spawn lock or an audit record is pending, because a write stops at the no-op before the later proofs |
