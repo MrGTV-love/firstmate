@@ -339,12 +339,7 @@
 # on its very last tick, its own exit, is exempt; each tick first reaps an exited
 # root, so its exit is not sampled as misses), even if it later crosses the
 # cap: 96 comes before 98, so no memory retry follows, no success is recorded, and
-# the run fails, naming each root it did not start. Each watched root's measurement
-# record holds the time of its last successful sample; it has none until the first
-# sample, each sample is read back after it is written, and the first missed sample
-# or failed publication invalidates it at once, under the host admission lock; a
-# record that cannot be invalidated keeps that lock (no root is admitted anywhere)
-# until its root, which the watch ends, is reaped. Every gate on the host admits a
+# the run fails, naming each root it did not start. Every gate on the host admits a
 # new root when the charges fit the budget and no live ledger entry is unreadable;
 # it does not wait for a watched root's sample, because a held root is never
 # counted below its charge (Main 4065).
@@ -562,7 +557,7 @@ fm_lint_root_rss_samples() {  # <rss-file>...
     /^rss_reader_unavailable=/ { reasons = reasons ",reader-unavailable:" $2 }
     /^rss_escaped=/ { line = $0; sub(/^rss_escaped=/, "", line); gsub(/,/, ";", line); reasons = reasons ",escaped:" line }
     /^rss_unmeasured=1$/ { reasons = reasons ",unmeasured" }
-    /^rss_(cont|kill|invalidation)_failed=1$/ { line = $1; sub(/^rss_/, "", line); gsub(/_/, "-", line); reasons = reasons "," line }
+    /^rss_(cont|kill)_failed=1$/ { line = $1; sub(/^rss_/, "", line); gsub(/_/, "-", line); reasons = reasons "," line }
     /^rss_launch_unrecorded=1$/ { reasons = reasons ",launch-unrecorded" }
     END { if (found) printf "libproc:%d%s\n", count["libproc"], reasons; else print "none" }
   '
@@ -701,13 +696,7 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   elif [ -n "${FM_LINT_INTERNAL_RSS_KIB:-}" ]; then
     gate_cap=("FM_LINT_INTERNAL_ROOT_CAP_KIB=$FM_LINT_INTERNAL_RSS_KIB")
   fi
-  # A root under the resident watch publishes a measurement record
-  # (bin/fm-lint-cache.pl); its ledger entry says so.
-  local watched=0
-  if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" = none ] && [ -n "${FM_LINT_INTERNAL_RSS_KIB:-}" ] && [ "$(uname)" = Darwin ]; then
-    watched=1
-  fi
-  gate_command=(env "FM_LINT_INTERNAL_WATCHED=$watched" "FM_LINT_INTERNAL_ROOT_KEY=${FM_LINT_INTERNAL_MODE:-full}:${path#"$ROOT"/}" \
+  gate_command=(env "FM_LINT_INTERNAL_ROOT_KEY=${FM_LINT_INTERNAL_MODE:-full}:${path#"$ROOT"/}" \
     "FM_LINT_INTERNAL_ROOT_RSS_FILE=$rss_file" \
     "FM_LINT_INTERNAL_HOST_RSS_KIB=$ROOTS_RSS_KIB" "FM_LINT_INTERNAL_HOST_LOCK=$HOST_POOL_ROOT/admission.lock" \
     ${gate_cap[@]+"${gate_cap[@]}"} \

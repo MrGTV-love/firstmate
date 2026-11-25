@@ -5681,13 +5681,12 @@ test_an_empty_or_damaged_lane_record_holds_the_lane() {
 }
 
 # (Main 3985(b), Main 4065) Root starts do not wait on the watch: beside a live
-# ledger entry for a watched root, when its charge and the new root's charge fit
-# the budget, the new root starts and finishes while that root's measurement record
-# stays absent (not yet sampled), empty, invalidated ("failed ...") or names a
-# sample 60 s old; no fresh sample is ever written.
-test_a_charge_fit_root_starts_without_a_fresh_measurement_record() {
-  local tmp root pid waited state before rc
-  tmp=$(fm_test_tmproot fm-lint-stale-health)
+# ledger entry for a running root that its watch has not yet sampled (no peak),
+# when its charge and the new root's charge fit the budget, the new root starts
+# and finishes at once.
+test_a_charge_fit_root_starts_without_waiting_for_a_sample() {
+  local tmp root pid waited rc=0
+  tmp=$(fm_test_tmproot fm-lint-charge-fit)
   FM_LINT_RELEASE_FILES="$tmp/release"
   mkdir -p "$tmp/bin" "$tmp/host.lock.ledger"
   fm_lint_write_barrier_shellcheck "$tmp/bin" 8 "$tmp/barrier.log"
@@ -5697,37 +5696,26 @@ test_a_charge_fit_root_starts_without_a_fresh_measurement_record() {
     my ($dir, $peak, $release, $ready) = @ARGV;
     my $path = "$dir/entry.$$.1";
     open(my $fh, ">>", $path) or die; flock($fh, LOCK_EX) or die;
-    truncate($fh, 0); syswrite($fh, "$$\t65536\t$peak\t1\n");
+    truncate($fh, 0); syswrite($fh, "$$\t65536\t$peak\n");
     open(my $r, ">", $ready) or die; close $r;
     my $u = time() + 600; sleep 0.05 until -e $release || time() > $u; unlink $path;' \
     "$tmp/host.lock.ledger" "$tmp/peak" "$tmp/release" "$tmp/ready" &
   waited=0
   while [ ! -e "$tmp/ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
-  [ -e "$tmp/ready" ] || fm_lint_fail_settled "the watched ledger entry was not written"
-  for state in absent empty failed old; do
-    : > "$tmp/barrier.log"
-    rm -f "$tmp/peak.health"
-    case "$state" in
-      empty) : > "$tmp/peak.health" ;;
-      failed) printf 'failed a sample was missed\n' > "$tmp/peak.health" ;;
-      old) perl -MTime::HiRes=time -e 'printf "sample %.6f\n", time() - 60' > "$tmp/peak.health" ;;
-    esac
-    before=$(cat "$tmp/peak.health" 2>/dev/null || printf absent)
-    FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" "$state" "$root" -- \
-      "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/$state.out" 2>&1 &
-    pid=$!
-    waited=0
-    while [ ! -e "$tmp/pool.wait.$state" ] && [ "$waited" -lt 600 ]; do sleep 0.1; waited=$((waited + 1)); done
-    [ -e "$tmp/pool.wait.$state" ] || fm_lint_fail_settled "a root whose charge fits was not admitted within 60 s beside a watched root whose measurement record is $state"
-    rc=0
-    wait "$pid" || rc=$?
-    [ "$rc" -eq 0 ] || fm_lint_fail_settled "the root beside a watched root whose record is $state failed ($rc): $(cat "$tmp/$state.out")"
-    [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 1 ] || fm_lint_fail_settled "the root beside a watched root whose record is $state did not start once"
-    [ "$(cat "$tmp/peak.health" 2>/dev/null || printf absent)" = "$before" ] || fm_lint_fail_settled "the $state record changed while the root was admitted"
-  done
+  [ -e "$tmp/ready" ] || fm_lint_fail_settled "the running root's ledger entry was not written"
+  : > "$tmp/barrier.log"
+  FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" second "$root" -- \
+    "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/second.out" 2>&1 &
+  pid=$!
+  waited=0
+  while [ ! -e "$tmp/pool.wait.second" ] && [ "$waited" -lt 600 ]; do sleep 0.1; waited=$((waited + 1)); done
+  [ -e "$tmp/pool.wait.second" ] || fm_lint_fail_settled "a root whose charge fits was not admitted within 60 s beside a running root not yet sampled"
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] || fm_lint_fail_settled "the root beside a running root not yet sampled failed ($rc): $(cat "$tmp/second.out")"
+  [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 1 ] || fm_lint_fail_settled "the root beside a running root not yet sampled did not start once"
   : > "$tmp/release"
   wait 2>/dev/null || true
-  pass "a root whose charge fits starts and finishes beside a watched root whose record is absent, empty, invalidated or names an old sample, with no fresh sample written"
+  pass "a root whose charge fits starts and finishes beside a running root its watch has not yet sampled"
 }
 
 # (Main 1806 item 4, Main 1846 F3) Reader loss wins over an over-cap end. Every
@@ -5995,8 +5983,7 @@ fm_lint_source_sub() {
 
 # (Main 1846 F3, Main 1885) The watch's tick and exit rules on synthetic ticks: a
 # miss followed by any later tick is unmeasured, a miss on the last tick alone is
-# not; 96 (unmeasured, a survivor, a failed publication, a lost signal or record)
-# comes before 98.
+# not; 96 (unmeasured, a survivor, a lost signal) comes before 98.
 test_the_watch_tick_and_exit_rules_hold_on_synthetic_ticks() {
   local subs out
   subs="$(fm_lint_source_sub fm_watch_unmeasured)$(fm_lint_source_sub fm_watch_exit)"
@@ -6004,52 +5991,11 @@ test_the_watch_tick_and_exit_rules_hold_on_synthetic_ticks() {
   out=$(perl -e 'use strict; use warnings; '"$subs"'
 print join(",", map { fm_watch_unmeasured(split / /, $_) } ("m s", "s m s s", "m m", "s s m", "s s", "")), "\n";
 print join(",", fm_watch_exit(unmeasured => 1, status => 0), fm_watch_exit(unmeasured => 1, over => 1),
-  fm_watch_exit(warned => 1, over => 1), fm_watch_exit(escaped => 1, status => 0), fm_watch_exit(unpublished => 1),
+  fm_watch_exit(warned => 1, over => 1), fm_watch_exit(escaped => 1, status => 0),
   fm_watch_exit(lost => 1, over => 1), fm_watch_exit(over => 1), fm_watch_exit(signal => 15), fm_watch_exit(status => 256),
   fm_watch_exit(status => 0)), "\n";' 2>&1)
-  [ "$out" = "$(printf '1,1,1,0,0,0\n96,96,96,96,96,96,98,143,1,0')" ] || fail "the watch's tick or exit rule changed: $out"
-  pass "a miss followed by a later tick is unmeasured and a last-tick miss is not; 96 comes before 98 for every unmeasured, survivor, publication or lost-signal end"
-}
-
-# (Main 1846 F2, Main 1885 item 3) The measurement record: only a sample at most 5 s
-# old is proof; a published sample is read back; an invalidated record is not proof
-# at once; a publication into a directory that takes no file fails, and the record
-# is then invalidated in place; a record that cannot be invalidated at all (file and
-# directory unwritable) is reported, which the watch answers by keeping the host
-# admission lock (its header).
-test_the_measurement_record_rules_hold_on_synthetic_records() {
-  local subs tmp out
-  subs="$(fm_lint_source_sub fm_health_publish)$(fm_lint_source_sub fm_health_invalidate)$(fm_lint_source_sub fm_health_fresh)"
-  [ -n "$subs" ] || fail "a measurement record sub is missing"
-  tmp=$(fm_test_tmproot fm-lint-record-rules)
-  out=$(perl -e 'use strict; use warnings; '"$subs"'
-my ($dir) = @ARGV;
-my $path = "$dir/slot.1.peak.health";
-my $now = time;
-sub write_record { open(my $fh, ">", $path) or die; print {$fh} @_; close $fh; }
-my @r;
-push @r, fm_health_fresh($path, $now);
-write_record(""); push @r, fm_health_fresh($path, $now);
-write_record("failed a sample was missed\n"); push @r, fm_health_fresh($path, $now);
-write_record(sprintf("sample %.6f\n", $now - 6)); push @r, fm_health_fresh($path, $now);
-write_record(sprintf("sample %.6f\n", $now + 5)); push @r, fm_health_fresh($path, $now);
-write_record(sprintf("sample %.6f\n", $now - 1)); push @r, fm_health_fresh($path, $now);
-print join(",", @r), "\n";
-unlink $path;
-print join(",", fm_health_publish($path, $now), fm_health_fresh($path, $now), fm_health_invalidate($path, "a sample was missed"), fm_health_fresh($path, $now)), "\n";
-write_record(sprintf("sample %.6f\n", $now));
-chmod 0500, $dir;
-my @f = (fm_health_publish($path, $now), fm_health_invalidate($path, "the sample could not be published"), fm_health_fresh($path, $now));
-chmod 0700, $dir;
-write_record(sprintf("sample %.6f\n", $now));
-chmod 0400, $path; chmod 0500, $dir;
-push @f, fm_health_invalidate($path, "x"), fm_health_fresh($path, $now);
-chmod 0700, $dir; chmod 0600, $path;
-print join(",", @f), "\n";' "$tmp" 2>&1)
-  [ "$(printf '%s\n' "$out" | head -n 2)" = "$(printf '0,0,0,0,0,1\n1,1,1,0')" ] || fail "a measurement record rule changed: $out"
-  if [ "$(id -u)" -eq 0 ]; then pass "SKIP (a read-only directory still takes files as root): the record that cannot be invalidated"; return; fi
-  [ "$out" = "$(printf '0,0,0,0,0,1\n1,1,1,0\n0,1,0,0,1')" ] || fail "a measurement record rule changed: $out"
-  pass "only a fresh sample is proof; a published sample is read back and invalidated at once; a failed publication is invalidated in place; a record that cannot be invalidated is reported (and stays fresh, which the watch answers with the host lock)"
+  [ "$out" = "$(printf '1,1,1,0,0,0\n96,96,96,96,96,98,143,1,0')" ] || fail "the watch's tick or exit rule changed: $out"
+  pass "a miss followed by a later tick is unmeasured and a last-tick miss is not; 96 comes before 98 for every unmeasured, survivor or lost-signal end"
 }
 
 # (Main 1846 F1, Main 1885 item 2, Main 3904) The reply check, run in the reader on
@@ -6159,51 +6105,47 @@ test_a_live_malformed_ledger_entry_admits_no_root() {
   pass "a live ledger entry that cannot be read refuses every admission and is named; once freed, the root is admitted"
 }
 
-# (Main 1885 item 3) A measurement record that cannot be invalidated (its file and
-# directory made unwritable after the first samples, then a missed sample): the
-# watch keeps the host admission lock, so no gate anywhere can decide, ends its
-# root (recorded, not delivered) and fails it (96, rss_invalidation_failed=1), and
-# releases the lock only after the root is reaped.
-test_a_record_that_cannot_be_invalidated_keeps_the_host_lock_until_the_root_ends() {
-  if [ "$(uname)" != Darwin ]; then pass "SKIP (the resident watch runs on native macOS only): invalidation failure"; return; fi
-  if [ "$(id -u)" -eq 0 ]; then pass "SKIP (a read-only directory still takes files as root): invalidation failure"; return; fi
-  local tmp real_python rc=0 pid waited held_during held_after kill_number
-  tmp=$(fm_test_tmproot fm-lint-invalidation-failure)
+# (Main 3985(b)) A slot directory made unwritable after the root's first samples
+# neither fails the root nor holds the host admission lock: a second gate on the
+# same host lock admits and finishes while the root still runs, and the root ends
+# with its own status (0) and no unmeasured mark.
+test_an_unwritable_slot_directory_neither_fails_the_root_nor_blocks_admission() {
+  if [ "$(uname)" != Darwin ]; then pass "SKIP (the resident watch runs on native macOS only): unwritable slot directory"; return; fi
+  if [ "$(id -u)" -eq 0 ]; then pass "SKIP (a read-only directory still takes files as root): unwritable slot directory"; return; fi
+  local tmp real_python rc=0 gate_rc=0 pid waited running_after_gate=0
+  tmp=$(fm_test_tmproot fm-lint-unwritable-slot-dir)
   real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
   fm_lint_write_stub_python "$tmp/stub" "$real_python"
-  kill_number=$(kill -l KILL)
   mkdir -p "$tmp/rec"
   : > "$tmp/host.lock"
-  FM_TEST_SIGNAL_LOG="$tmp/signals.log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER=dieafter:2 FM_TEST_READER_MARK="$tmp/mark" \
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/b.sh"
+  FM_TEST_SIGNAL_LOG="$tmp/signals.log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER= FM_TEST_READER_MARK="$tmp/mark" \
     FM_LINT_INTERNAL_SLOT_PEAK_FILE="$tmp/rec/peak" FM_LINT_INTERNAL_HOST_LOCK="$tmp/host.lock" \
-    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss" -- sleep 9 > "$tmp/err" 2>&1 &
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss" -- sleep 30 > "$tmp/err" 2>&1 &
   pid=$!
   waited=0
-  while ! grep -q '^sample ' "$tmp/rec/peak.health" 2>/dev/null && [ "$waited" -lt 100 ]; do sleep 0.05; waited=$((waited + 1)); done
-  chmod 0400 "$tmp/rec/peak.health"; chmod 0500 "$tmp/rec"
-  waited=0
-  while ! grep -q 'keeps the host admission lock' "$tmp/err" && [ "$waited" -lt 150 ]; do sleep 0.1; waited=$((waited + 1)); done
-  held_during=0
-  perl -MFcntl=:flock -e 'open(my $f, ">>", $ARGV[0]) or exit 2; exit(flock($f, LOCK_EX | LOCK_NB) ? 0 : 1)' "$tmp/host.lock" || held_during=$?
-  chmod 0700 "$tmp/rec"; chmod 0600 "$tmp/rec/peak.health"
+  while [ ! -s "$tmp/rec/peak" ] && [ "$waited" -lt 200 ]; do sleep 0.05; waited=$((waited + 1)); done
+  [ -s "$tmp/rec/peak" ] || fm_lint_fail_settled "the watch wrote no peak before the directory was made unwritable: $(cat "$tmp/err")"
+  chmod 0400 "$tmp/rec"/*; chmod 0500 "$tmp/rec"
+  sleep 3
+  fm_lint_gate_root 100000000 "$tmp/pool" second "$tmp/b.sh" -- true > "$tmp/gate.out" 2>&1 || gate_rc=$?
+  kill -0 "$pid" 2>/dev/null && running_after_gate=1
   wait "$pid" || rc=$?
-  held_after=0
-  perl -MFcntl=:flock -e 'open(my $f, ">>", $ARGV[0]) or exit 2; exit(flock($f, LOCK_EX | LOCK_NB) ? 0 : 1)' "$tmp/host.lock" || held_after=$?
-  [ "$held_during" -eq 1 ] || fm_lint_fail_settled "the host admission lock was free while the record could not be invalidated ($held_during): $(cat "$tmp/err")"
-  { [ "$rc" -eq 96 ] && grep -q '^rss_invalidation_failed=1$' "$tmp/rss"; } || fm_lint_fail_settled "the root exited $rc, expected 96 with rss_invalidation_failed: $(cat "$tmp/err") $(cat "$tmp/rss")"
-  grep -q "^killpg [0-9]* $kill_number\$" "$tmp/signals.log" || fm_lint_fail_settled "the root was not ended: $(cat "$tmp/signals.log")"
-  [ "$held_after" -eq 0 ] || fm_lint_fail_settled "the host admission lock stayed held after the root was reaped"
-  pass "a record that cannot be invalidated keeps the host admission lock until its root is reaped; the root is ended and fails (96)"
+  chmod 0700 "$tmp/rec"; chmod 0600 "$tmp/rec"/*
+  [ "$gate_rc" -eq 0 ] || fm_lint_fail_settled "the second gate failed ($gate_rc): $(cat "$tmp/gate.out")"
+  [ "$running_after_gate" -eq 1 ] || fm_lint_fail_settled "the second gate finished only after the watched root had ended (root exit $rc): $(cat "$tmp/err")"
+  [ "$rc" -eq 0 ] || fm_lint_fail_settled "the watched root exited $rc, expected 0: $(cat "$tmp/err") $(cat "$tmp/rss")"
+  ! grep -q '^rss_unmeasured=1$' "$tmp/rss" || fm_lint_fail_settled "the watched root was marked unmeasured: $(cat "$tmp/rss")"
+  pass "an unwritable slot directory neither fails the watched root (exit 0) nor holds the host lock: a second gate admits and finishes while the root runs"
 }
 
 fm_lint_test_cases=(
 test_the_watch_tick_and_exit_rules_hold_on_synthetic_ticks
-test_the_measurement_record_rules_hold_on_synthetic_records
 test_the_reply_check_binds_members_and_refuses_a_zombie_root
 test_a_failed_resume_ends_the_held_root_and_fails_it
 test_a_root_whose_start_time_cannot_be_recorded_never_runs
 test_a_live_malformed_ledger_entry_admits_no_root
-test_a_record_that_cannot_be_invalidated_keeps_the_host_lock_until_the_root_ends
+test_an_unwritable_slot_directory_neither_fails_the_root_nor_blocks_admission
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
 test_oversubscribed_runs_share_the_cap_and_all_finish
@@ -6286,7 +6228,7 @@ test_a_launcher_switching_delegates_is_analysed_every_run
 test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root
 test_the_exact_member_reader_adopts_a_child_only_with_its_listed_identity
 test_an_empty_or_damaged_lane_record_holds_the_lane
-test_a_charge_fit_root_starts_without_a_fresh_measurement_record
+test_a_charge_fit_root_starts_without_waiting_for_a_sample
 test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured
 test_a_late_reply_is_retried_once_in_the_same_tick
 test_an_interrupted_reply_wait_with_a_reply_in_time_is_no_miss

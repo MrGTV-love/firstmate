@@ -96,49 +96,6 @@ sub fm_signal_root {
 # "unknown"; and ... state <pid> <sec> <usec>, which prints "alive" when that pid
 # still has exactly that start time, "ended" when the pid is no longer in the process
 # table or now holds another start time, and "unknown" for anything it cannot read.
-# A root's measurement record (<peak file>.health) holds only the time of the
-# watch's last successful sample, as one line "sample <epoch seconds>". The gate
-# never creates it: it removes any old record when it admits the root, so a root
-# has no record until its watch has taken a sample. The watch writes the record
-# after each successful sample and reads it back (fm_health_publish succeeds only
-# when the record now holds exactly that line). At its first miss or failed
-# publication it invalidates the record at once, under the host admission lock
-# (rewritten as "failed <why>" by a staged rename, else in place, else removed),
-# and never publishes for that root again; if even that fails it keeps the host
-# lock until its root has ended (the watch's header). fm_health_fresh counts a
-# record as a sample only when its line is a sample at most 5 s old; admission
-# does not read the record.
-sub fm_health_publish {
-    my ($path, $time) = @_;
-    my $line = sprintf "sample %.6f\n", $time;
-    my ($staged, $fh, $back) = ("$path.tmp.$$");
-    unless (open($fh, '>', $staged) && print({$fh} $line) && close($fh) && rename($staged, $path)) {
-        unlink $staged;
-        return 0;
-    }
-    return 0 unless open($fh, '<', $path);
-    { local $/; $back = <$fh> // ''; }
-    close $fh;
-    return $back eq $line ? 1 : 0;
-}
-sub fm_health_invalidate {
-    my ($path, $why) = @_;
-    my ($staged, $fh) = ("$path.tmp.$$");
-    return 1 if open($fh, '>', $staged) && print({$fh} "failed $why\n") && close($fh) && rename($staged, $path);
-    unlink $staged;
-    return 1 if -f $path && open($fh, '+<', $path) && truncate($fh, 0) && print({$fh} "failed $why\n") && close($fh);
-    return 1 if unlink($path) || !-e $path;
-    return 0;
-}
-sub fm_health_fresh {
-    my ($path, $now) = @_;
-    my ($fh, $line);
-    return 0 unless open($fh, '<', $path);
-    { local $/; $line = <$fh> // ''; }
-    close $fh;
-    return 0 unless $line =~ /\Asample ([0-9]+\.[0-9]+)\n\z/;
-    return $1 <= $now + 1 && $now - $1 <= 5 ? 1 : 0;
-}
 # A root's watch ticks once a second; each tick is "s" (a sample) or "m" (a miss
 # while the root still ran). The root ran unmeasured for an interval when any miss
 # is followed by a later tick; only a miss on the very last tick (the root's own
@@ -147,11 +104,11 @@ sub fm_watch_unmeasured {
     my @ticks = @_;
     return (grep { $ticks[$_] eq 'm' } 0 .. $#ticks - 1) ? 1 : 0;
 }
-# The watch's exit status: unmeasured, a survivor, a failed publication, or a lost
-# signal or record (96) comes before an over-cap end (98).
+# The watch's exit status: unmeasured, a survivor, or a lost signal (96) comes
+# before an over-cap end (98).
 sub fm_watch_exit {
     my (%end) = @_;
-    return 96 if $end{warned} || $end{unmeasured} || $end{escaped} || $end{unpublished} || $end{lost};
+    return 96 if $end{warned} || $end{unmeasured} || $end{escaped} || $end{lost};
     return 98 if $end{over};
     return 128 + $end{signal} if $end{signal};
     my $status = $end{status} // 0;
@@ -827,8 +784,7 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
             unless (open($record, '<', $path)) { next if $!{ENOENT}; $refuse->($path, $!); }
             my $line = <$record> // '';
             close $record;
-            if ($line =~ /\A([0-9]+)\t([0-9]+)\t([^\t\n]*)\t([01])\n\z/) { push @live, [$1 + 0, $2 + 0, $3, $4 + 0]; }
-            elsif ($line =~ /\A([0-9]+)\t([0-9]+)\t(.*)\n\z/) { push @live, [$1 + 0, $2 + 0, $3, undef]; }
+            if ($line =~ /\A([0-9]+)\t([0-9]+)\t(.*)\n\z/) { push @live, [$1 + 0, $2 + 0, $3]; }
             # A live entry this gate cannot read as an entry names no root, no charge
             # and no record: it is never charged at this request's worst case; it
             # refuses every admission until its holder ends (the admission below).
@@ -1019,16 +975,13 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                     ($slot, $slot_path) = @{shift @free};
                     $peak_file = "$slot_path.peak";
                     unlink $peak_file;
-                    # The root has no measurement record until its resident watch has
-                    # taken a sample: an old record left in this slot is removed.
-                    unlink("$peak_file.health") || !-e "$peak_file.health" or $refuse->("$peak_file.health", $!);
                     truncate($slot, 0) && syswrite($slot, "$run\t$ticket_number\t$$\t$charge_kib\n")
                         or $refuse->($slot_path, $!);
                     # The ledger entry is written while the host lock is still held,
                     # so the next admission, in any pool, reads this root.
                     $ledger_path = sprintf '%s/entry.%d.%d', $ledger_dir, $$, $ticket_number;
                     open($ledger_fh, '>>', $ledger_path) && flock($ledger_fh, LOCK_EX | LOCK_NB)
-                        && truncate($ledger_fh, 0) && syswrite($ledger_fh, "$$\t$charge_kib\t$peak_file\t" . ($ENV{FM_LINT_INTERNAL_WATCHED} ? 1 : 0) . "\n")
+                        && truncate($ledger_fh, 0) && syswrite($ledger_fh, "$$\t$charge_kib\t$peak_file\n")
                         or $refuse->($ledger_path, $!);
                 }
             } elsif (defined $next) {
@@ -1233,14 +1186,6 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # in a row also write FM_LINT_INTERNAL_ABORT_FILE so the run's gates admit no
 # further root. 96 comes before 98, so no unmeasured root is retried or recorded as
 # a success.
-# The measurement record (<peak file>.health): after each sample the watch writes
-# it and reads it back (fm_health_publish); a publication or read-back that fails
-# fails the root (96) and invalidates the record. The first miss invalidates it
-# too. Every invalidation is made under the host admission lock
-# (FM_LINT_INTERNAL_HOST_LOCK). If the record cannot be invalidated, the watch
-# keeps holding that lock, so no root is admitted anywhere, ends its root, and
-# releases the lock only after the root is reaped; if the lock cannot be taken either, it ends its root and marks
-# the run.
 # Signalling follows rule O (fm_signal_root): the watch records its root's exact
 # start time before the root executes anything (the root waits on a pipe until the
 # record exists; a root whose start time cannot be read never executes and the
@@ -1387,14 +1332,12 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         $start_reader->($root_pid) unless $reader_down;
         return undef;
     };
-    my ($child, $launch, $caught, $term_at, $over, $warned, $mark_failed, $unmeasured, @ticks, $unpublished, $held,
-        $escaped, $invalidated, $invalidation_failed, $cont_failures, $cont_failed, $kill_failed, $host_held, $hold_said);
-    my $health = length $peak_file ? "$peak_file.health" : '';
+    my ($child, $launch, $caught, $term_at, $over, $warned, $mark_failed, $unmeasured, @ticks, $held,
+        $escaped, $cont_failures, $cont_failed, $kill_failed, $hold_said);
     my $lock_path = $ENV{FM_LINT_INTERNAL_HOST_LOCK} // '';
-    # The host admission lock: the one the watch already keeps, or a new hold on it;
-    # undef when there is none or it cannot be taken.
+    # A hold on the host admission lock; undef when there is none or it cannot be
+    # taken.
     my $take_host = sub {
-        return $host_held if $host_held;
         my $lock;
         return length $lock_path && open($lock, '>>', $lock_path) && flock($lock, LOCK_EX) ? $lock : undef;
     };
@@ -1412,7 +1355,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
             $published = open($mark, '>>', $abort) && print({$mark} "$text\n") && close($mark);
         }
         my $why = $!;
-        close $lock if $lock && !$host_held;
+        close $lock if $lock;
         return if $published;
         warn "fm-lint: resident-memory watch could not mark the run at $abort ($why); the root fails and the worker stops the run\n";
         $mark_failed = 1;
@@ -1424,28 +1367,6 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         my $result = fm_signal_root('KILL', $launch);
         return if $result eq 'sent' || $result eq 'gone';
         warn "fm-lint: resident-memory watch could not end its root's group ($result); the root fails\n" unless $kill_failed++;
-    };
-    # Invalidate the measurement record, once, under the host lock. If it cannot be
-    # invalidated, keep the host lock (no gate anywhere admits) and end the root;
-    # the lock is released only after the root is reaped.
-    my $invalidate = sub {
-        my ($why) = @_;
-        return if $invalidated++ || !length $health;
-        my $lock = $take_host->();
-        if (fm_health_invalidate($health, $why)) {
-            close $lock if $lock && !$host_held;
-            return;
-        }
-        my $failure = $!;
-        $invalidation_failed = 1;
-        if ($lock) {
-            $host_held = $lock;
-            warn "fm-lint: resident-memory watch could not invalidate its measurement record $health ($failure); it keeps the host admission lock, so no root is admitted anywhere, and ends its root\n";
-        } else {
-            warn "fm-lint: resident-memory watch could not invalidate its measurement record $health ($failure) nor take the host admission lock; it ends its root and marks the run\n";
-        }
-        $end_tree->();
-        $mark_run->("the resident-memory watch could not invalidate a root's measurement record");
     };
     my ($peak, $misses) = (0, 0);
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
@@ -1511,10 +1432,8 @@ if (($ARGV[0] // '') eq 'rsswatch') {
                 $miss_branch, $tick_wait * 1000, $tick_interrupts);
             # A miss in the root's last tick can be its own exit (a zombie no reader
             # measures); a miss followed by any later tick is an unmeasured interval
-            # (fm_watch_unmeasured, judged once the root is reaped). The measurement
-            # record is invalidated at the first miss.
+            # (fm_watch_unmeasured, judged once the root is reaped).
             push @ticks, 'm';
-            $invalidate->('a sample was missed');
             return if ++$misses < 3 || $warned;
             $mark_run->("the resident-memory watch lost every reader of a running root's memory");
             warn "fm-lint: resident-memory watch cannot sample this root (no reader answers); the root fails (status 96), and the run admits no further root\n";
@@ -1523,12 +1442,6 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         }
         $misses = 0;
         push @ticks, 's';
-        # Publish this sample and read it back.
-        if (length $health && !$invalidated && !fm_health_publish($health, Time::HiRes::time())) {
-            warn "fm-lint: resident-memory watch could not publish its measurement at $health ($!); the root fails\n";
-            $unpublished = 1;
-            $invalidate->('the sample could not be published');
-        }
         if ($rss > $peak) {
             $peak = $rss;
             if (length $peak_file) {
@@ -1620,7 +1533,6 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         $escaped = 1;
         warn "fm-lint: resident-memory watch: counted process(es) " . join(',', @escaped)
             . " still run (or cannot be proven ended) after the root ended; they are never signalled, so the root fails and the run admits no further root\n";
-        $invalidate->('a counted process outlived the root');
         $mark_run->("a root's counted process outlived it");
     }
     if (open(my $fh, '>>', $rss_file)) {
@@ -1630,18 +1542,15 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         print {$fh} 'rss_escaped=' . join(',', @escaped) . "\n" if @escaped;
         print {$fh} "rss_cont_failed=1\n" if $cont_failed;
         print {$fh} "rss_kill_failed=1\n" if $kill_failed;
-        print {$fh} "rss_invalidation_failed=1\n" if $invalidation_failed;
-        print {$fh} "rss_unmeasured=1\n" if $warned || $unmeasured || $unpublished;
+        print {$fh} "rss_unmeasured=1\n" if $warned || $unmeasured;
         print {$fh} "rss_mark_failed=1\n" if $mark_failed;
         print {$fh} @miss_records;
         printf {$fh} "rss_ticks=%d\nrss_longest_tick_ms=%d\nrss_longest_reply_ms=%d\n",
             $tick_count, $longest_tick * 1000, $longest_reply * 1000;
         close $fh;
     }
-    # The host lock the watch kept is released only now, after its root is reaped.
-    close $host_held if $host_held;
-    exit fm_watch_exit(warned => $warned, unmeasured => $unmeasured, escaped => $escaped, unpublished => $unpublished,
-        lost => ($cont_failed || $kill_failed || $invalidation_failed) ? 1 : 0,
+    exit fm_watch_exit(warned => $warned, unmeasured => $unmeasured, escaped => $escaped,
+        lost => ($cont_failed || $kill_failed) ? 1 : 0,
         over => $over, signal => $caught ? $signal_number{$caught} : 0, status => $status);
 }
 
