@@ -113,6 +113,13 @@ cred=$(printf 'AKIA%s' ZZZZZZZZZZZZZZZZ)
 printf '%s\n' "$cred" > leak; git add leak
 GIT_TRACE="$obs/trace.cred" git commit -q -m leak 2>/dev/null
 emit cred_commit "$(landed leak)"; undo leak
+# G4: a credential the repository's own pre-commit hook stages is refused too:
+# the scan reads the final index Git commits.
+printf 'h\n' > h; git add h
+STAGE_FROM_HOOK=1 git commit -q -m hookstaged 2>/dev/null
+emit hook_staged_commit "$(landed hookstaged)"
+emit hook_staged_in_head "$(git ls-tree --name-only HEAD | grep -cx hook-staged)"
+undo hookstaged
 # G5: an AI trailer on an ordinary commit is removed; repo hooks run.
 printf 'w\n' > w; git add w
 : > "$REPO_HOOK_LOG"
@@ -187,6 +194,11 @@ if [ -n "${FM_GIT_HOOK_ROWS-}" ]; then
   printf '%s\n' "$cred" > c1; git add c1
   GIT_CONFIG_PARAMETERS=$(printf '%s' "$GIT_CONFIG_PARAMETERS" | sed "s/'hook.fm-scan-commit.event'='commit-msg'/'fixture.inert'='1'/") git commit -q -m ctl-commit 2>/dev/null
   emit ctl_commit "$(landed ctl-commit)"; undo ctl-commit
+  printf 'h2\n' > h2; git add h2
+  STAGE_FROM_HOOK=1 GIT_CONFIG_PARAMETERS=$(printf '%s' "$GIT_CONFIG_PARAMETERS" | sed "s/'hook.fm-scan-commit.event'='commit-msg'/'fixture.inert'='1'/") git commit -q -m ctl-hookstaged 2>/dev/null
+  emit ctl_hook_staged "$(landed ctl-hookstaged)"
+  emit ctl_hook_staged_in_head "$(git ls-tree --name-only HEAD | grep -cx hook-staged)"
+  undo ctl-hookstaged
   printf '%s\n' "$cred" > c2; git add c2; git commit -q --no-verify -m ctl-push-commit
   GIT_CONFIG_PARAMETERS=$(printf '%s' "$GIT_CONFIG_PARAMETERS" | sed "s/'hook.fm-scan-push.event'='pre-push'/'fixture.inert'='1'/") git push -q origin "HEAD:refs/heads/$run-ctlpush" 2>/dev/null
   emit ctl_push "$(remote_has ctlpush)"; undo ctl-push-commit
@@ -232,6 +244,8 @@ make_case() {
     {
       printf '#!/bin/sh\n'
       case "$hook" in
+        # A generator hook: when asked, it writes and stages a file itself.
+        pre-commit) printf 'if [ -n "${STAGE_FROM_HOOK-}" ]; then printf "AKIA%%s\\n" ZZZZZZZZZZZZZZZZ > hook-staged; git add hook-staged; fi\n' ;;
         pre-push) printf 'cat > "$(dirname "$REPO_HOOK_LOG")/prepush-stdin.$$"\n' ;;
         reference-transaction) printf 'cat >/dev/null\n' ;;
       esac
@@ -326,6 +340,7 @@ assert_full_protection() {  # <case-dir> <run> <carrier>
   assert_equals "$carrier" "$(cat /tmp/fm-"$(cat "$dir/id")"/git-hooks-admitted.* 2>/dev/null)" \
     "$run: the launch did not record that it admitted the worker on the $carrier carrier"
   assert_equals refused "$(obs "$dir" "$run" cred_commit)" "$run: credential commit landed"
+  assert_equals refused "$(obs "$dir" "$run" hook_staged_commit)" "$run: a credential staged by the repository's pre-commit hook landed"
   assert_equals landed "$(obs "$dir" "$run" clean_commit)" "$run: clean commit was refused"
   assert_equals 0 "$(obs "$dir" "$run" clean_trailer)" "$run: AI trailer reached the commit object"
   assert_equals yes "$(obs "$dir" "$run" clean_push)" "$run: clean push did not land"
@@ -363,6 +378,8 @@ assert_full_protection() {  # <case-dir> <run> <carrier>
       assert_equals refused "$(obs "$dir" "$run" event_without_command)" "$run: an event row without command let a commit land"
       # Sensitivity controls: each dropped row lets its harmful case through.
       assert_equals landed "$(obs "$dir" "$run" ctl_commit)" "$run: control without the scan-commit event was still refused"
+      assert_equals landed "$(obs "$dir" "$run" ctl_hook_staged)" "$run: control without the scan-commit event still refused the hook-staged credential"
+      assert_equals 1 "$(obs "$dir" "$run" ctl_hook_staged_in_head)" "$run: control commit landed without the hook-staged file, so the hook-staged case proves nothing"
       assert_equals yes "$(obs "$dir" "$run" ctl_push)" "$run: control without the scan-push event was still refused"
       assert_equals 1 "$(obs "$dir" "$run" ctl_merge_trailer)" "$run: control without the strip event still stripped"
       # S3 residuals, recorded so a change in them is noticed.
