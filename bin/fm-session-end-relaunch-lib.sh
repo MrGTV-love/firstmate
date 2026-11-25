@@ -268,10 +268,15 @@ fm_session_end_drift_kind() {  # <drift-summary>
   case "$1" in *': sampled: '*) printf printed ;; *) printf complete ;; esac
 }
 
+# The sentence that follows a quoted sample line: the file it names holds the task's latest report, not this one.
+fm_session_end_drift_file_note() {
+  printf '%s' "That file holds this task's most recent drift report, and each later report replaces it, so its list can differ from this count."
+}
+
 # Write the printed drift report from a control output to its stable durable path and print that path.
 fm_session_end_write_drift() {  # <state-dir> <id> <control-output>
   local file="$1/$2.relaunch-drift"
-  fm_session_end_first_drift_report "$3" > "$file" 2>/dev/null || true
+  fm_session_end_first_drift_report "$3" | awk -v note="$(fm_session_end_drift_file_note)" '{ print } /^  sampled: / { print "  " note }' > "$file" 2>/dev/null || true
   printf '%s' "$file"
 }
 
@@ -287,7 +292,7 @@ fm_session_end_drift_summary() {  # <control-output>
     limits=$(printf '%s\n' "$text" | sed -n 's/^  limitation: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
     # A sampled report's pointer to the file listing every path comes before the entries, so the wake's length cap can
     # only cut the entries after it.
-    printf '%s' "drift report: ${header#*: }: ${sampled:+sampled: $sampled | }$entries${limits:+ | limitation: $limits}"
+    printf '%s' "drift report: ${header#*: }: ${sampled:+sampled: $sampled | $(fm_session_end_drift_file_note) | }$entries${limits:+ | limitation: $limits}"
     return 0 ;;
   esac
   case "$header" in *'could not be produced'*) printf '%s' "drift report: ${header#*: }" ;; esac
