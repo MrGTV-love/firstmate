@@ -1744,7 +1744,9 @@ test_omp_adoption_proof_boundaries() {
 # recorded PID; it is killed by stop_stand_in or the suite's job reaping.
 start_stand_in() { # <name> -> STAND_IN_PID
   local tries=0
-  (exec -a "$1" /bin/sleep 60) &
+  # It outlives the slowest adoption under host load (a 60 s stand-in expired
+  # mid-adopt on a loaded host and the gone PID was then correctly repaired).
+  (exec -a "$1" /bin/sleep 3600) &
   STAND_IN_PID=$!
   until [ "$(ps -p "$STAND_IN_PID" -o args= 2>/dev/null | cut -d' ' -f1)" = "$1" ]; do
     tries=$((tries + 1))
