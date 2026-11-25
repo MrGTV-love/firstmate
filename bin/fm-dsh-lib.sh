@@ -113,7 +113,7 @@ fm_dsh_launch_alive() {  # <launch-patch>
     args=${line#"$stat"}
     case "$stat" in T* | Z* | '') continue ;; esac
     case "$args " in *" --patch $patch "*) ;; *) continue ;; esac
-    fm_dsh_args_are_dsh "$args" && return 0
+    fm_dsh_args_are_dsh "$args" fm_dsh_tui_script_path && return 0
   done <<EOF
 $(ps -eww -o stat=,args= 2>/dev/null)
 EOF

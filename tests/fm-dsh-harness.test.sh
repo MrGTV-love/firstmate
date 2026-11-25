@@ -388,7 +388,7 @@ for args in \
   'node /opt/homebrew/lib/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch x' \
   'node /state/t.dsh/g1/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch x' \
   'node /state/t.dsh/g1/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/lib/relaid/entry.js'; do
-  fm_dsh_args_are_dsh "$args" || { echo "a dsh-tui launcher or package script must match: $args" >&2; exit 1; }
+  fm_dsh_args_are_dsh "$args" fm_dsh_tui_script_path || { echo "a dsh-tui launcher or package script must match: $args" >&2; exit 1; }
 done
 for args in \
   'node /tmp/unrelated.js /opt/homebrew/bin/dsh-tui' \
@@ -396,7 +396,7 @@ for args in \
   'node /opt/homebrew/bin/dsh web --no-open' \
   'node /opt/homebrew/bin/dsh-tuix' \
   'node /opt/lib/node_modules/@deepseek-harness-tui/dsh-tui-extra/bin/x.js'; do
-  if fm_dsh_args_are_dsh "$args"; then
+  if fm_dsh_args_are_dsh "$args" fm_dsh_tui_script_path; then
     echo "only a dsh-tui launcher or package script in the interpreter slot may match: $args" >&2
     exit 1
   fi
