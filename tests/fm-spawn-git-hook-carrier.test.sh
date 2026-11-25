@@ -614,10 +614,12 @@ SH
     --mode no-mistakes --yolo off --harness omp --backend tmux)
   REAL_STATUS=$?
   # Observe only once the launch itself has finished: the harness started
-  # (admit), or the pane recorded its refusal (refuse, ctl).
+  # (admit), or the pane recorded its refusal (ctl). A refused spawn has
+  # already read that refusal and removed the task temp root holding it.
   # shellcheck disable=SC2016 # The child shell expands its own argument.
   case "$mode" in
     admit) fm_test_wait_until -- test -e "$dir/harness-started" || : ;;
+    refuse) ;;
     *) fm_test_wait_until -- sh -c 'ls "$1"/git-hooks-refused.* >/dev/null 2>&1' _ "/tmp/fm-$id" ||
       fail "$mode: the pane never recorded its refusal" ;;
   esac

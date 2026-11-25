@@ -147,8 +147,10 @@ run_case() {
       # A scratch CODEX_HOME whose only provider is the private loopback one,
       # with the task copy trusted so no dialog stands before the brief.
       mkdir -p "$dir/codex-home"
-      printf 'model = "carrier-probe"\nmodel_provider = "fmprobe"\n[model_providers.fmprobe]\nname = "fmprobe"\nbase_url = "%s/v1"\nwire_api = "responses"\n[projects."%s"]\ntrust_level = "trusted"\n[projects."%s"]\ntrust_level = "trusted"\n' \
-        "$BASE_URL" "$wt" "$(cd "$wt" && pwd -P)" > "$dir/codex-home/config.toml"
+      printf 'model = "carrier-probe"\nmodel_provider = "fmprobe"\n[model_providers.fmprobe]\nname = "fmprobe"\nbase_url = "%s/v1"\nwire_api = "responses"\n[projects."%s"]\ntrust_level = "trusted"\n' \
+        "$BASE_URL" "$wt" > "$dir/codex-home/config.toml"
+      [ "$(cd "$wt" && pwd -P)" = "$wt" ] ||
+        printf '[projects."%s"]\ntrust_level = "trusted"\n' "$(cd "$wt" && pwd -P)" >> "$dir/codex-home/config.toml"
       PANE_EXTRA=(CODEX_HOME="$dir/codex-home")
       ;;
   esac
@@ -208,9 +210,11 @@ for HARNESS in claude omp codex; do
   : > "$LAB/requests.jsonl"
 
   run_case "$HARNESS" carrier ''
-  if [ "$(uname -s)" = Darwin ]; then
-    assert_equals seatbelt-v1 "$(obs "$CASE_DIR" confinement)" "$VERSION: the probe did not run under the fleet's write confinement"
-  fi
+  # The fleet write-confines claude and omp workers on macOS, and no other.
+  case "$(uname -s):$HARNESS" in
+    Darwin:claude | Darwin:omp)
+      assert_equals seatbelt-v1 "$(obs "$CASE_DIR" confinement)" "$VERSION: the probe did not run under the fleet's write confinement" ;;
+  esac
   grep -q '"tool_result": true' "$LAB/requests.jsonl" || fail "$VERSION: the harness never returned a shell tool result to the provider"
   assert_equals refused "$(obs "$CASE_DIR" cred_commit)" "$VERSION $CARRIER: a credential commit landed through the harness's tool shell"
   assert_equals landed "$(obs "$CASE_DIR" clean_commit)" "$VERSION $CARRIER: a clean commit was refused"

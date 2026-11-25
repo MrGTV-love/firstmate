@@ -5,6 +5,7 @@
   "audited": 30,
   "beyond_audit_active": [
     "turnend-ask-gate",
+    "spawn-git-hook-carrier",
     "live-lab-processes-stopped-before-remove",
     "merge-local-ff-only",
     "merge-unproved-outcome",
