@@ -36,7 +36,8 @@ A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitH
      the forge reports it out of the queue and still open, the head is held for Main once with one wake and
      fm-pr-merge.sh is never called again for that head, and a merged PR still ends merged. A queued or
      merged event names a carried PASS only when fm-pr-merge.sh's own verify reported that carry; a merge
-     the lane only observes after a queue names the carry as the basis the lane queued the head on.
+     the lane only observes after a queue names the carry as the basis the lane queued the head on, and
+     a head the lane saw leave the queue still open names no carry when it is merged later.
 Counting rule: for one head and one reader model there is at most one request, whether it is
 outstanding, finished or failed, so a repeat pass, a restart or a second caller makes no duplicate.
 While a read is outstanding no further read is requested for that head. A model whose read failed

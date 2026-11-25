@@ -1234,6 +1234,7 @@ SH
 test_carry_over_refuses_when_the_state_directory_takes_no_scratch() {
   # An unwritable state directory is a typed refusal with its reason, never a traceback.
   local case_dir live out rc=0
+  [ "$(id -u)" != 0 ] || { printf 'skipped: running as root, a mode-500 directory is still writable\n'; return 0; }
   case_dir=$(make_carry_case carry-scratch-denied)
   carry_refs "$case_dir"
   record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
@@ -1250,18 +1251,24 @@ test_carry_over_refuses_after_a_rewrite_was_itself_read() {
   # A same-tree rewrite carries from R, but once the rewrite has its own read,
   # the head it replaced is a reviewed head off the newest reviewed head's
   # ancestry, so a later base update refuses and needs a fresh read.
-  local case_dir rewrite live out rc=0
-  case_dir=$(make_carry_case carry-rewrite-read)
-  carry_refs "$case_dir"
-  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
-  cgit "$case_dir" checkout -q pr
-  cgit "$case_dir" commit -q --amend -m 'ship change, reworded'
-  rewrite=$(cgit "$case_dir" rev-parse HEAD)
-  record_review "$case_dir" "$rewrite" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at the rewrite"
-  live=$(merge_trunk_into_pr "$case_dir")
-  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
-  expect_code 1 "$rc" "an update of a rewrite that was itself read must refuse: $out"
-  expect_not_qualified "$out" "which the reviewed head does not build on" "read rewrite"
+  # Both row orders: the rewrite read last, and a late read of R after it.
+  local order case_dir rewrite live out rc
+  for order in rewrite-last original-last; do
+    case_dir=$(make_carry_case "carry-rewrite-read-$order")
+    carry_refs "$case_dir"
+    record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+    cgit "$case_dir" checkout -q pr
+    cgit "$case_dir" commit -q --amend -m 'ship change, reworded'
+    rewrite=$(cgit "$case_dir" rev-parse HEAD)
+    record_review "$case_dir" "$rewrite" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at the rewrite"
+    [ "$order" = rewrite-last ] || record_review "$case_dir" "$REVIEWED" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null \
+      || fail "record a late PASS at R"
+    live=$(merge_trunk_into_pr "$case_dir")
+    rc=0
+    out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    expect_code 1 "$rc" "$order: an update of a rewrite that was itself read must refuse: $out"
+    expect_not_qualified "$out" "which the reviewed head does not build on" "$order read rewrite"
+  done
   pass "once a same-tree rewrite is itself read, a later base update needs a fresh read"
 }
 

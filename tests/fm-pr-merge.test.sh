@@ -3111,7 +3111,7 @@ test_auto_review_three_prs_through_the_housekeeping_pass() {
 
 test_auto_review_carries_a_pass_across_a_clean_base_update() {
   local scenario case_dir base2 merged h1 h2 AUTO_BIN=
-  for scenario in clean queued left word unread; do
+  for scenario in clean queued left word word-direct unread; do
     case_dir=$(auto_case "carry-$scenario")
     AUTO_BIN=
     case "$scenario" in queued | left | word) write_github_outcome "$case_dir" OPEN false true main ;; esac
@@ -3139,7 +3139,7 @@ test_auto_review_carries_a_pass_across_a_clean_base_update() {
       git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -q -m "Merge branch 'main' into fm/fixture"
     fi
     auto_publish_head "$case_dir" h2
-    if [ "$scenario" = word ]; then
+    if [ "$scenario" = word ] || [ "$scenario" = word-direct ]; then
       # A captain word at h2 is recorded after the lane's own verify and before
       # fm-pr-merge.sh's verify, so the merge call's basis is that word, not the carry.
       AUTO_BIN="$case_dir/word-bin"
@@ -3182,6 +3182,10 @@ SH
       auto_step "$case_dir"
       assert_grep "merged: $AUTO_URL at $h2" "$(auto_event_file "$case_dir")" "carry-word: the merge is recorded"
       assert_no_grep "carried from" "$(auto_event_file "$case_dir")" "carry-word: the merged event must not name a carry either"
+    elif [ "$scenario" = word-direct ]; then
+      expect_code "merged $AUTO_URL" "$(auto_state "$case_dir")" "carry-word-direct: the head merges directly"
+      assert_grep "merged: $AUTO_URL at $h2" "$(auto_event_file "$case_dir")" "carry-word-direct: the merge is recorded"
+      assert_no_grep "carried from" "$(auto_event_file "$case_dir")" "carry-word-direct: a direct merge on a captain word must not name a carry"
     elif [ "$scenario" = left ]; then
       assert_grep "queued: $AUTO_URL at $h2 is in the merge queue on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-left: the queued event names the carried head"
       write_github_outcome "$case_dir" OPEN false false main
