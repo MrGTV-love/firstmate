@@ -499,6 +499,74 @@ test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift() {
   pass "drift: a .fm-kept.<time>.<n> copy of recorded wiring is not listed; an unrecorded ignored file still is"
 }
 
+# fm_drift_flagged_oracle <copy>: the flagged (assume-unchanged or skip-worktree) paths whose existence, type, mode or
+# bytes differ, decided one path at a time with one ls-files and one hash-object each, one path per line, sorted.
+fm_drift_flagged_oracle() {
+  local copy=$1 tag path entry mode want have
+  git -C "$copy" ls-files -v -z | while IFS= read -r -d '' entry; do
+    tag=${entry:0:1} path=${entry:2}
+    case "$tag" in [[:lower:]]|S) ;; *) continue ;; esac
+    if [ ! -e "$copy/$path" ] && [ ! -L "$copy/$path" ]; then
+      case "$tag" in s) ;; [[:lower:]]) printf '%s\n' "$path" ;; esac
+      continue
+    fi
+    entry=$(git -C "$copy" ls-files -s -- ":(literal)$path")
+    mode=${entry%% *} want=${entry#* } want=${want%% *}
+    if [ -L "$copy/$path" ]; then
+      have=$(printf '%s' "$(readlink "$copy/$path")" | git -C "$copy" hash-object --stdin)
+      [ "$mode" = 120000 ] && [ "$have" = "$want" ] || printf '%s\n' "$path"
+    elif [ ! -f "$copy/$path" ]; then
+      printf '%s\n' "$path"
+    else
+      have=$(git -C "$copy" hash-object -- "$path")
+      if [ -x "$copy/$path" ]; then [ "$mode" = 100755 ] || have=; else [ "$mode" = 100644 ] || have=; fi
+      [ "$have" = "$want" ] || printf '%s\n' "$path"
+    fi
+  done | LC_ALL=C sort
+}
+
+# Tracked paths hidden from status by assume-unchanged or skip-worktree: changed bytes, an exec-bit flip, a file turned
+# into a directory, a symlink retarget and a symlink turned into a file are listed; unchanged bytes, a checkout's own
+# line-ending conversion and a sparse absence are not. The batched check decides exactly what a per-path check decides,
+# including for a path git reads specially on a line (a leading quote).
+test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides() {
+  local out f reported expected
+  make_world drift-flagged
+  for f in au-bytes au-same au-exec sw-bytes sw-same sw-dir crlf-same crlf-changed sw-gone; do
+    printf 'line one\nline two\n' >"$W_PROJ/docs/$f.txt"
+  done
+  printf 'quoted\n' >"$W_PROJ/\"quoted.txt"
+  ln -s target-one "$W_PROJ/docs/link-retarget"
+  ln -s target-two "$W_PROJ/docs/link-to-file"
+  printf 'docs/crlf-*.txt text eol=crlf\n' >"$W_PROJ/.gitattributes"
+  git -C "$W_PROJ" add -A
+  git -C "$W_PROJ" "${GITID[@]}" commit -qm 'flagged fixture'
+  git -C "$W_SLOT" "${GITID[@]}" merge -q --ff-only main
+  W_BASE=$(git -C "$W_SLOT" rev-parse HEAD)
+  git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
+  grep -q $'\r' "$W_SLOT/docs/crlf-same.txt" || fail 'the fixture is vacuous: checkout did not write CRLF line endings'
+  git -C "$W_SLOT" update-index --assume-unchanged docs/au-bytes.txt docs/au-same.txt docs/au-exec.txt docs/link-retarget
+  git -C "$W_SLOT" update-index --skip-worktree docs/sw-bytes.txt docs/sw-same.txt docs/sw-dir.txt docs/crlf-same.txt \
+    docs/crlf-changed.txt docs/sw-gone.txt docs/link-to-file '"quoted.txt'
+  printf 'line one\nline 2!!\n' >"$W_SLOT/docs/au-bytes.txt"
+  printf 'line one\nline 2!!\n' >"$W_SLOT/docs/sw-bytes.txt"
+  chmod +x "$W_SLOT/docs/au-exec.txt"
+  rm "$W_SLOT/docs/sw-dir.txt" && mkdir "$W_SLOT/docs/sw-dir.txt"
+  printf 'line one\r\nline 2!!\r\n' >"$W_SLOT/docs/crlf-changed.txt"
+  rm "$W_SLOT/docs/sw-gone.txt"
+  rm "$W_SLOT/docs/link-retarget" && ln -s target-new "$W_SLOT/docs/link-retarget"
+  rm "$W_SLOT/docs/link-to-file" && printf 'target-two' >"$W_SLOT/docs/link-to-file"
+  printf 'quoted, changed\n' >"$W_SLOT/\"quoted.txt"
+  [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail "the fixture is not hidden from status: $(git -C "$W_SLOT" status --porcelain)"
+  out=$(STATE='' drift)
+  reported=$(printf '%s\n' "$out" | sed -n 's/^  drift: proven //p' | LC_ALL=C sort)
+  expected=$(printf '%s\n' '"quoted.txt' docs/au-bytes.txt docs/au-exec.txt docs/crlf-changed.txt docs/link-retarget \
+    docs/link-to-file docs/sw-bytes.txt docs/sw-dir.txt | LC_ALL=C sort)
+  assert_equals "$expected" "$reported" 'the hidden changes reported are not exactly the changed flagged paths'
+  assert_equals "$(fm_drift_flagged_oracle "$W_SLOT")" "$reported" 'the report decided a flagged path differently from a per-path check'
+  pass "drift: hidden flagged-path changes are listed exactly as a per-path check decides; unchanged and sparse paths are not"
+}
+
 # B1 (exact-head read of 6acb4545): a governed task's own valid manifest is adopted. The record check must not overwrite
 # the manifest verdict, so the repository root the adoption judged is the manifest's own repo root, not the word ok.
 test_a_governed_tasks_own_manifest_is_adopted_with_the_manifest_repo_root() {
@@ -545,6 +613,7 @@ test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not
 test_a_path_that_arrives_only_through_a_merged_peer_branch_is_uncertain_not_proven
 test_firstmate_written_wiring_is_not_reported_as_drift
 test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift
+test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run

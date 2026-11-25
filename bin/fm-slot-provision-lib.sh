@@ -845,6 +845,7 @@ fm_slot_adopt_sibling_claim() { # <slot> <copy> <state-dir>
 }
 
 FM_SLOT_DRIFT_PY=$(cat <<'FMDRIFTPY'
+import hashlib
 import os
 import re
 import subprocess
@@ -1022,10 +1023,50 @@ while i < len(raw):
     else:
         add(path.rstrip(b"/") if code == b"??" and path.endswith(b"/") else path)
 # Tracked paths that status cannot report (assume-unchanged, skip-worktree) whose existence, type, mode or bytes differ.
-for flagged in names(git("ls-files", "-v", "-z").stdout):
-    tag, path = flagged[:1], flagged[2:]
-    if not (tag.islower() or tag == b"S"):
-        continue
+# The index is read once and the working bytes are hashed in one batch, so a copy with many flagged paths costs a fixed
+# number of git processes rather than two per path.
+flagged = []
+for row in names(git("ls-files", "-v", "-z").stdout):
+    tag, path = row[:1], row[2:]
+    if tag.islower() or tag == b"S":
+        flagged.append((tag, path))
+index = {}
+if flagged:
+    for row in names(git("ls-files", "-s", "-z").stdout):
+        fields, _, path = row.partition(b"\t")
+        index.setdefault(path, fields.split())
+algo = "sha1"
+if flagged:
+    algo = git("rev-parse", "--show-object-format", ok=(0, 128)).stdout.decode().strip() or "sha1"
+
+
+def blob_id(data):
+    # The id git gives these bytes as a blob with no path filters, which is what `hash-object --stdin` computes.
+    return hashlib.new(algo, b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def hash_files(paths):
+    # One `hash-object --stdin-paths` for every path it can name on a line (it reads a leading quote as C quoting and drops
+    # a carriage return before the newline), and one `hash-object -- <path>` for the rest and for every path of a batch
+    # git refused (it stops at the first path it cannot hash); a failure leaves an empty id, which differs.
+    ids = {}
+    batch = [p for p in paths if b"\n" not in p and not p.startswith(b'"') and not p.endswith(b"\r")]
+    if batch:
+        proc = subprocess.run(["git", "-C", copy, "hash-object", "--stdin-paths"], input=b"".join(p + b"\n" for p in batch),
+                              capture_output=True, env=env)
+        rows = proc.stdout.decode().split()
+        if proc.returncode == 0 and len(rows) == len(batch):
+            ids.update(zip(batch, rows))
+    for path in paths:
+        if path not in ids:
+            one = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True,
+                                 stdin=subprocess.DEVNULL, env=env)
+            ids[path] = one.stdout.decode().strip()
+    return ids
+
+
+regular = []
+for tag, path in flagged:
     full = os.path.join(os.fsencode(copy), path)
     if not os.path.lexists(full):
         # An assume-unchanged path that is gone was deleted by the task, which status cannot show; a skip-worktree path
@@ -1033,18 +1074,21 @@ for flagged in names(git("ls-files", "-v", "-z").stdout):
         if tag.islower() and tag != b"s":
             add(path)
         continue
-    entry = git("ls-files", "-s", "-z", "--", os.fsdecode(path)).stdout.split(b"\0")[0].split()
+    entry = index.get(path, [])
     if len(entry) < 2:
         continue
-    mode = entry[0].decode()
+    mode, want = entry[0].decode(), entry[1].decode()
     if os.path.islink(full):
-        blob = subprocess.run(["git", "-C", copy, "hash-object", "--stdin"], input=os.readlink(full), capture_output=True, env=env)
-        differs = mode != "120000" or blob.stdout.decode().strip() != entry[1].decode()
+        if mode != "120000" or blob_id(os.readlink(full)) != want:
+            add(path)
+    elif not os.path.isfile(full):
+        # A directory or other non-file where a tracked file was: git cannot hash it as a blob, so it differs.
+        add(path)
     else:
-        blob = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True, env=env)
-        want_mode = "100755" if os.stat(full).st_mode & 0o100 else "100644"
-        differs = blob.stdout.decode().strip() != entry[1].decode() or want_mode != mode
-    if differs:
+        regular.append((path, mode, want, "100755" if os.stat(full).st_mode & 0o100 else "100644"))
+hashed = hash_files([path for path, _mode, _want, _have in regular])
+for path, mode, want, have in regular:
+    if hashed[path] != want or have != mode:
         add(path)
 print("drift-count\t%d" % len(proven))
 for path in sorted(proven):
