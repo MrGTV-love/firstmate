@@ -146,8 +146,9 @@ Pipeline starts:
     the no-mistakes fork (backlog task nm-run-creation-admission).
   - The start lock serializes each decision with the publication of its
     admitted start's pending reservation (a locked pending-*.lock naming the
-    admitting pid, the admitted no-mistakes arguments, the running run IDs
-    of the decision and the start's binding), then is released. Every later decision counts each
+    admitting pid, the admitted no-mistakes arguments and whether they were
+    read from a shell's command string, the running run IDs of the decision
+    and the start's binding), then is released. Every later decision counts each
     admitted start at the full R, and as one run in the count fallback and the
     one-start minimum (live_pending), except while a run that decision counts
     as active is on the repository and branch the start was bound to when it
@@ -159,8 +160,9 @@ Pipeline starts:
     it is a proven reattach (proven_reattach): `axi run` with no --launch-nonce
     whose recorded HEAD is the run's head_sha or submitted_head_sha. Every other
     covered start (a rerun, a caller's own --launch-nonce, a HEAD that differs
-    or is not known, an argument read before a shell expanded it, which may
-    hide a nonce) may replace the run, whose own charge can be far below R
+    or is not known, a word read from a shell's command string that the shell
+    expands later, which may hide a nonce; a word of a real argument vector is
+    never refused for its characters) may replace the run, whose own charge can be far below R
     (a CI waiter is charged what it holds), so the branch carries the larger
     of the run's demand and R, once per branch however many such starts it
     has. The cost: while such a start's command runs, a run it only drives is
@@ -921,8 +923,9 @@ def fresh_pipeline_start(command: List[str]) -> bool:
     return start_route(command) is not None
 
 
-def start_route(command: List[str]) -> Optional[Tuple[List[str], bool]]:
-    """(no-mistakes arguments, whether another admission route sits in between) of the new run COMMAND begins, or None.
+def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool]]:
+    """(no-mistakes arguments, whether another admission route sits in between, whether the arguments were read from a
+    shell's command string before the shell expanded them) of the new run COMMAND begins, or None.
 
     Only the executable position counts: leading VAR=value words, the
     transparent wrappers env, nice, nohup, command, exec, time and stdbuf with
@@ -950,7 +953,7 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool]]:
             fresh = rest[:1] == ["rerun"] or rest[:2] == ["axi", "run"] and any(
                 option in INTENT_OPTIONS or option.startswith(tuple(intent + "=" for intent in INTENT_OPTIONS))
                 for option in rest[2:])
-            return (rest, routed) if fresh else None
+            return (rest, routed, False) if fresh else None
         if name in TRANSPARENT:
             operands = wrapper_operands(name, rest)
             if operands is None:
@@ -979,7 +982,7 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool]]:
                 words = rest[1:] if rest[:1] == ["--"] else rest
                 continue
             found = shell_string_start(string)
-            return None if found is None else (found[0], routed or found[1])
+            return None if found is None else (found[0], routed or found[1], True)
         if name in ROUTES:
             if name == "fm-mem-guard.sh" and rest[:2] == ["run", "--"]:
                 words, routed = rest[2:], True
@@ -1028,7 +1031,7 @@ def without_shell_comments(string: str) -> str:
     return "".join(kept)
 
 
-def shell_string_start(string: str) -> Optional[Tuple[List[str], bool]]:
+def shell_string_start(string: str) -> Optional[Tuple[List[str], bool, bool]]:
     """The first new run one of the simple commands of a shell command string begins, as start_route returns it.
 
     Comments and redirections (an operator with < or >, a file-descriptor number
@@ -2111,19 +2114,21 @@ def binding_key(binding) -> Optional[tuple]:
     return repo, branch
 
 
-def proven_reattach(args, binding, heads: frozenset) -> bool:
+def proven_reattach(args, shell, binding, heads: frozenset) -> bool:
     """Whether a covered start is proven to reattach to its covering run rather than replace it.
 
     Proof is `axi run` with no --launch-nonce (in either form) whose binding
-    records the HEAD the run records (its head_sha or submitted_head_sha). A
-    word the admission read before a shell expanded it ($X, a glob, ~) may hide
-    a nonce, so a start with such a word, a rerun, a start whose arguments or
-    HEAD are not known, and a HEAD that differs are no proof.
+    records the HEAD the run records (its head_sha or submitted_head_sha). When
+    SHELL is not False (the arguments were read from a shell's command string,
+    or the entry does not say), a word holding a character the shell expands
+    later ($X, a glob, ~) may hide a nonce and is no proof; a word of a real
+    argument vector is never refused for its characters. A rerun, a start whose
+    arguments or HEAD are not known, and a HEAD that differs are no proof.
     """
     if not isinstance(args, list) or args[:2] != ["axi", "run"]:
         return False
     if any(word == "--launch-nonce" or word.startswith("--launch-nonce=")
-           or any(char in word for char in SHELL_EXPANSION_CHARS) for word in args[2:]):
+           or (shell is not False and any(char in word for char in SHELL_EXPANSION_CHARS)) for word in args[2:]):
         return False
     head = binding.get("head") if isinstance(binding, dict) else None
     return isinstance(head, str) and head in heads
@@ -2216,7 +2221,7 @@ def pending_census(directory: str, running: set) -> List[dict]:
         claim = item["claim"]
         item["covered"] = cover.get(item["key"]) if item["key"] else None
         item["replacing"] = item["covered"] is not None and not proven_reattach(
-            item["entry"]["args"], item["binding"], places[item["covered"]][1])
+            item["entry"]["args"], item["entry"].get("shell"), item["binding"], places[item["covered"]][1])
         # K7 by the claim's bound client, the one client the reservation is for (Main 1876 C); a shell claim with no
         # client bound yet ends with the shell.
         item["ended"] = item["known"] and claim is not None and pid_dead(
@@ -2932,7 +2937,7 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         # counts it at the full R until its COMMAND returns or its client exits (K7), except while a counted run is
         # on its repository and branch (pending_census).
         pending_fd, pending_path = publish_locked(directory, "pending-", {
-            "holder": os.getpid(), "args": None if route is None else list(route[0]),
+            "holder": os.getpid(), "args": None if route is None else list(route[0]), "shell": route is None or route[2],
             "before": sorted(before), "created_ns": time.time_ns(), "binding": binding})
         fcntl.flock(admission_fd, fcntl.LOCK_UN)
         os.close(admission_fd)

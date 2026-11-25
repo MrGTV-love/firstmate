@@ -203,7 +203,8 @@ The short start lock covers each decision and the publication of its admitted st
 The one exception: a decision does not count a pending start while a run it counts as active (not CI-ready, not awaiting an agent) is on the repository and branch the start was bound to when it was admitted or claimed.
 That run is the one the start's client drives or replaces, because the no-mistakes daemon keeps one active run per repository and branch: it cancels the old run and waits for it to end before it writes the new row, and a client with no `--launch-nonce` reattaches to the branch's active run.
 A covered start adds nothing only when it is a proven reattach: `axi run` with no `--launch-nonce` whose recorded HEAD is the run's `head_sha` or `submitted_head_sha`.
-Every other covered start (a `rerun`, a caller's own `--launch-nonce`, a HEAD that differs or is not known, an argument read before a shell expanded it, which may hide a nonce) may replace the run, and that run's own charge can be far below `R`: a CI waiter is charged only what it holds.
+A word of a real argument vector is never refused for its characters (`$`, a backtick, `*`, `?`, `[`, `~`, `{`); the pending start records whether its arguments were read from a shell's command string.
+Every other covered start (a `rerun`, a caller's own `--launch-nonce`, a HEAD that differs or is not known, a word read from a shell's command string that the shell expands later, which may hide a nonce) may replace the run, and that run's own charge can be far below `R`: a CI waiter is charged only what it holds.
 So the branch then carries the larger of the covering run's demand and `R`, once per branch however many such starts it has.
 The cost: while such a start's command runs, a run it only drives is charged `R` instead of the larger of its size and `A`, an overcharge and never an undercount.
 The exact rule needs a launch identity in the no-mistakes fork.

@@ -1739,24 +1739,31 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                 os.killpg(child.pid, signal.SIGKILL); child.wait()
 
     def replacing_start_carries_r():
-        # R14-1 (R = 3 GiB, S = 8 GiB): run x on repo/main is a counted CI waiter with no agent and nothing visible,
-        # charged what it holds (0). A start admitted in the checkout on repo/main is covered by x. Only a proven
-        # reattach (axi run, no --launch-nonce, HEAD equal to x's head_sha or submitted_head_sha) adds nothing: a probe
-        # then projects 0 + 8. A rerun, an own nonce, a HEAD that differs or a word a shell expands later (it may hide
-        # a nonce) may replace x: the branch carries max(0, R), so the probe projects 3 + 8. Two replacing starts on the
-        # branch carry one R (3 + 8), never two (3 + 3 + 8).
-        rerun = ['no-mistakes', 'rerun']
-        nonce = ['no-mistakes', 'axi', 'run', '--intent', 'hold-a', '--launch-nonce', 'n1']
-        plain = ['no-mistakes', 'axi', 'run', '--intent', 'hold-a']
-        expanded = ['no-mistakes', 'axi', 'run', '--intent', '$X']
-        for label, starts, recorded, expected, ident in (
-                ('reattach-head', [plain], ('HEAD', None), 8, 'r14-proven-reattach-charged'),
-                ('reattach-submitted', [plain], ('0' * 40, 'HEAD'), 8, 'r14-proven-reattach-submitted-charged'),
-                ('rerun', [rerun], ('HEAD', None), 11, 'r14-rerun-covered-below-r'),
-                ('own-nonce', [nonce], ('HEAD', None), 11, 'r14-own-nonce-covered-below-r'),
-                ('head-differs', [plain], ('0' * 40, None), 11, 'r14-other-head-covered-below-r'),
-                ('expansion', [expanded], ('HEAD', None), 11, 'r14-unexpanded-word-proven'),
-                ('two-replacing', [rerun, nonce], ('HEAD', None), 11, 'r14-two-replacing-charged-twice')):
+        # R14-1 (R = 3 GiB, S = 8 GiB, A = 1 GiB): run x on repo/main is counted. A start admitted in the checkout on
+        # repo/main is covered by x. Only a proven reattach (axi run, no --launch-nonce, HEAD equal to x's head_sha or
+        # submitted_head_sha) adds nothing; any other covered start may replace x, so the branch carries max(D, R), with
+        # D x's own demand, once per branch. With x a CI waiter with no agent and nothing visible (D = 0): a proven
+        # reattach makes a probe project 0 + 8; a rerun, an own nonce, a HEAD that differs or a word of a shell's command
+        # string that the shell expands later (it may hide a nonce) projects 3 + 8, and two replacing starts 3 + 8, never
+        # 3 + 3 + 8. A real argument vector is never refused for its characters (R15-1): an intent holding ? and $ passed
+        # as argv is a proven reattach (0 + 8). With x visible at review (R15-2): D = max(0.5, A) = 1 projects
+        # 1 + 2 + 8 = 11, never the double charge 1 + 3 + 8; D = 4 projects 4 + 8 = 12, never 4 + 3 + 8.
+        rerun = (['no-mistakes', 'rerun'], True)
+        nonce = (['no-mistakes', 'axi', 'run', '--intent', 'hold-a', '--launch-nonce', 'n1'], True)
+        plain = (['no-mistakes', 'axi', 'run', '--intent', 'hold-a'], True)
+        hidden = (['no-mistakes', 'axi', 'run', '--intent', 'hold-a', '$NONCE'], True)
+        literal = (['no-mistakes', 'axi', 'run', '--intent', 'hold? $x'], False)
+        for label, starts, recorded, held, expected, ident in (
+                ('reattach-head', [plain], ('HEAD', None), None, 8, 'r14-proven-reattach-charged'),
+                ('reattach-submitted', [plain], ('0' * 40, 'HEAD'), None, 8, 'r14-proven-reattach-submitted-charged'),
+                ('rerun', [rerun], ('HEAD', None), None, 11, 'r14-rerun-covered-below-r'),
+                ('own-nonce', [nonce], ('HEAD', None), None, 11, 'r14-own-nonce-covered-below-r'),
+                ('head-differs', [plain], ('0' * 40, None), None, 11, 'r14-other-head-covered-below-r'),
+                ('shell-hidden-nonce', [hidden], ('HEAD', None), None, 11, 'r15-shell-expansion-proven'),
+                ('argv-characters', [literal], ('HEAD', None), None, 8, 'r15-argv-characters-refused'),
+                ('two-replacing', [rerun, nonce], ('HEAD', None), None, 11, 'r14-two-replacing-charged-twice'),
+                ('visible-below-r', [rerun], ('HEAD', None), GIB // 2, 11, 'r15-below-r-double-charged'),
+                ('visible-above-r', [rerun], ('HEAD', None), 4 * GIB, 12, 'r15-above-r-double-charged')):
             folder, db, env = case('r14-' + label, measured=True, available=12 * GIB)
             checkout = bound_repo(folder, db, env)
             subprocess.run(['git', '-C', str(checkout), '-c', 'user.name=t', '-c', 'user.email=t@example.invalid',
@@ -1766,13 +1773,15 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                                   text=True, stdin=subprocess.DEVNULL).stdout.strip()
             change(db, "INSERT INTO runs (id, status, repo_id, branch, head_sha, submitted_head_sha) VALUES"
                        " ('x', 'running', 'repo', 'main', ?, ?)", tuple(head if value == 'HEAD' else value for value in recorded))
-            steps(db, [('x', 'ci', 'running', None)])
+            steps(db, [('x', 'ci' if held is None else 'review', 'running', None)])
             prove(folder, db, 'x')
+            if held is not None:
+                facts(folder, available=12 * GIB, runs=[('repo', 'x', held)])
             admitted = []
-            for index, words in enumerate(starts):
+            for index, (words, shell) in enumerate(starts):
                 name = 'a%d' % index
-                admitted.append(launch_in(cli + ['pipeline-start', '--', 'bash', '-c', 'sleep 3600; ' + ' '.join(words)],
-                                          env, folder / name, checkout))
+                command = ['bash', '-c', 'sleep 3600; ' + ' '.join(words)] if shell else words
+                admitted.append(launch_in(cli + ['pipeline-start', '--'] + command, env, folder / name, checkout))
                 wait_for(lambda name=name: 'pipeline-start admitted' in (folder / (name + '.stderr')).read_text(),
                          label + ': ' + name + ' admitted')
             probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
@@ -1780,7 +1789,8 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             text = (folder / 'probe.stderr').read_text()
             projected = int(re.search(r'projected=(\d+)', text).group(1))
             harm(ident, projected == expected * GIB, label, projected, text)
-            assert 'x:ci-waiting:0:unseen' in text, (label, text)
+            covering = 'x:ci-waiting:0:unseen' if held is None else 'x:active:%d' % max(held, GIB)
+            assert covering in text, (label, text)
             for child in admitted + [probe]:
                 try:
                     os.killpg(child.pid, signal.SIGKILL)
