@@ -172,8 +172,10 @@ correction appends one record that makes ONE existing review row count for less;
 no row is ever edited or deleted. --effect exclude-review makes the named row count
 for no coverage and its typed author_groups add no constraint. --effect
 supersede-author-group with --group NAME removes only that typed author_groups
-entry from the named row: the entry adds no constraint and no coverage, while the
-row's other entries, covered_groups, verdict and report digest stay in force.
+entry from the named row: the entry adds no author constraint and no coverage,
+while the row's other entries, covered_groups, verdict and report digest stay in
+force. Superseding a row's typed "all" entry keeps the row's other entries held
+to the bar of every derived family, so a correction never adds coverage.
 A correction names its target exactly: the PR and head it is recorded for, the
 row's at, reader_model and, when the row has one, report_sha256 (a row without a
 digest is named without one). It is recorded only when exactly one review row

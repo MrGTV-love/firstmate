@@ -160,6 +160,7 @@ The `correction` record kind is owned by [`bin/fm-review-record.py`](../bin/fm-r
 
 A correction does not loosen a deny or allow-list.
 A correction widens what the guard permits in one bounded way: it can exclude one earlier PASS review row, or supersede one typed `author_groups` entry in such a row.
+Superseding a row's typed `all` entry keeps the row's other entries held to the bar of every derived family, so a correction never adds coverage.
 A correction never clears a derived group, a FAIL row or an escalation trigger.
 A correction does not touch customer data, billing or spend.
 Installed code from before correction rows existed fails closed on a correction row: it reports the review record history as invalid for every PR in that home.
