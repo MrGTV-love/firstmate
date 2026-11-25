@@ -393,7 +393,7 @@ def newest(fd, pr):
 
 def git(worktree, *args):
     result = subprocess.run(["git", "-C", str(worktree), *args], capture_output=True,
-                            text=True, check=False, env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"})
+                            text=True, check=False, env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull})
     if result.returncode:
         raise RecordError(f"cannot read author commit evidence: git {' '.join(args)} in {worktree}")
     return result.stdout.strip()
@@ -518,11 +518,13 @@ def carry_over_refusal(home, task, head, reviewed, base, others):
 
     for ref in (head, reviewed, base):
         if run("cat-file", "-e", f"{ref}^{{commit}}").returncode:
-            fetch = shlex.join(["git", "-C", str(worktree), "fetch", "origin", base, head, reviewed])
+            if ref == reviewed:
+                return f"reviewed head {ref} is not available in the task worktree; if the forge still serves it, fetch it with: {shlex.join(['git', '-C', str(worktree), 'fetch', 'origin', ref])}, otherwise the live head needs its own read"
+            fetch = shlex.join(["git", "-C", str(worktree), "fetch", "origin", base, head])
             return f"commit {ref} is not available in the task worktree; fetch it with: {fetch}, then retry"
     for other in sorted(others):
         if run("cat-file", "-e", f"{other}^{{commit}}").returncode:
-            return f"a review row names head {other}, which is not available to prove the reviewed head builds on it"
+            return f"a review row names head {other}, which is not available to prove the reviewed head builds on it; fetch it with: {shlex.join(['git', '-C', str(worktree), 'fetch', 'origin', other])}, or the live head needs its own read"
         if run("merge-base", "--is-ancestor", other, reviewed).returncode:
             return f"a review row names head {other}, which the reviewed head does not build on, so its reads may judge this change"
     point = run("merge-base", base, head)

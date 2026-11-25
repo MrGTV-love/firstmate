@@ -1009,8 +1009,47 @@ test_carry_over_refuses_a_base_older_than_the_update() {
   pass "a base older than the base content the live head merged refuses"
 }
 
+test_carry_over_ignores_a_graft_that_fakes_base_content() {
+  # DeepSeek round-2 finding 3: a graft on the base tip that makes an unread
+  # side commit look like base content. A copy without the proof's graft
+  # setting must accept it, so this case observes the harmful acceptance.
+  local case_dir side live out rc=0 copy
+  case_dir=$(make_carry_case carry-graft-base)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q -b side "$BASE"
+  printf 'unread side work\n' > "$case_dir/wt/side.txt"
+  cgit "$case_dir" add side.txt
+  cgit "$case_dir" commit -qm 'unread side work'
+  side=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit side
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  mkdir -p "$case_dir/wt/.git/info"
+  printf '%s %s %s\n' "$TRUNK" "$BASE" "$side" > "$case_dir/wt/.git/info/grafts"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a graft must not turn unread side work into base content: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "base graft"
+  copy="$TMP_ROOT/graft-honoring-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY2' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = '    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull}\n'
+assert text.count(needle) == 1, "proof env line not found exactly once"
+open(path, "w").write(text.replace(needle, '    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}\n'))
+PY2
+  rc=0
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
+    --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "control: with grafts honored the side work must carry, or this case observes nothing: $out"
+  pass "the proof ignores a graft that would pass unread side work off as base content"
+}
+
 fm_test_run_cases \
   test_carry_over_refuses_a_branch_that_is_not_on_the_base \
+  test_carry_over_ignores_a_graft_that_fakes_base_content \
   test_carry_over_refuses_a_base_older_than_the_update \
   test_carry_over_writes_nothing_to_the_task_object_store \
   test_carry_over_ignores_grafts \

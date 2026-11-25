@@ -437,12 +437,7 @@ def author_plan(home, task, url, sha, base):
     return plan, ""
 
 
-def ensure_objects(meta, sha, base, reviewed=None):
-    """Fetch the base, the live head and the newest reviewed head when they are missing.
-
-    The reviewed head is needed only for verify's carry-over proof after a rebase or other
-    rewrite; it is fetched separately so a forge that no longer serves it costs nothing else.
-    """
+def ensure_objects(meta, sha, base):
     worktree = meta.get("worktree", "")
     if not worktree or not os.path.isdir(worktree):
         return
@@ -450,8 +445,6 @@ def ensure_objects(meta, sha, base, reviewed=None):
                if run(["git", "-C", worktree, "cat-file", "-e", f"{ref}^{{commit}}"]).returncode]
     if missing:
         run(["git", "-C", worktree, "fetch", "--quiet", "origin", *missing])
-    if reviewed and reviewed != sha and run(["git", "-C", worktree, "cat-file", "-e", f"{reviewed}^{{commit}}"]).returncode:
-        run(["git", "-C", worktree, "fetch", "--quiet", "origin", reviewed])
 
 
 def verify(home, task, url, sha, base):
@@ -845,8 +838,7 @@ def advance(home, task, url, meta, side):
         emit(home, task, side, sha, "left-queue", f"held: {url} at {sha[:12]} left the merge queue and is still open; the merge is Main's",
              f"{url} left the merge queue at {sha[:12]} and is still open; not queued again, Main decides why and whether to merge it")
         return
-    newest = latest_review(home, url) or {}
-    ensure_objects(meta, sha, base, newest.get("head") if isinstance(newest.get("head"), str) else None)
+    ensure_objects(meta, sha, base)
     if collect(home, task, url, sha, base, side, meta) or head.get("outcome"):
         return
     reason = ready_reason(url, view)
