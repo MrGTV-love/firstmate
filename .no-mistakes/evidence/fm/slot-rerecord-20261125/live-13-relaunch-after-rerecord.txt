@@ -1,0 +1,60 @@
+# endpoint: a dead pane (shell, no agent) in the recorded window fmlab:fm-rrt; HOME/CLAUDE_CONFIG_DIR isolated inside the lab
+fmlab:fm-rrt cmd=zsh
+$ fm-control.sh rrt relaunch --note "resume after the slot renewal"   (AFTER rerecord)
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89W4CZM5PXRFWG112YQ3V2Q/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: /Users/charlesabrooker/tmp/fm-lab.8aS9t2/data/rrt/launch-brief.md records no ship branch; defaulting to legacy branch fm/rrt
+warning: /Users/charlesabrooker/tmp/fm-lab.8aS9t2/data/rrt/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for rrt: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+error: rrt was relaunched on claude but no running agent could be confirmed; its work is preserved at /Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/wt
+rc=124 (exit code of the test wrapper "timeout 240", which sent TERM to relaunch; not the product exit code)
+slot adoption refused? 0
+provisioner runs during relaunch: 0
+manifest unchanged
+$ cat state/rrt.control-relaunch
+v1
+task=rrt
+phase=failed:launching
+ts=2026-11-25T19:21:30Z
+backend=tmux
+endpoint=fmlab:fm-rrt
+worktree=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/wt
+kind=ship
+from_harness=claude
+from_model=default
+from_effort=default
+to_harness=claude
+$ tmux list-panes
+fmlab:fm-rrt cmd=zsh
+$ tail of state/rrt.control-relaunch
+to_model=default
+to_effort=default
+worktree_head=7d6460ac4db75b4d4edcc0dea5885df6eedd3a40
+worktree_dirty=no
+rollback=none-new-record-kept
+$ grep ^slot_ state/rrt.meta
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/manifests/manifest.json
+slot_base_sha=9e7b0aba933f74458e9afaf10dfa33ff439533d0
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+$ tmux capture-pane (last lines)
+       █████████      *
+.......█ █   █ █..........................................
+ Unable to connect to Anthropic services
+ Connection to api.anthropic.com timed out after 10 seconds
+ A proxy is configured via https_proxy. Check that it allows connections to the host above. See https://code.claude.com/docs/en/network-config
+ Check your internet connection and network settings.
+ Claude Code might not be available in your country. Check supported countries at https://anthropic.com/supported-countries
+charlesabrooker@Mac-Studio wt %

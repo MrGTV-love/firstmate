@@ -1,0 +1,18 @@
+$ fm-control.sh rrt rerecord-slot --check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8aS9t2
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+manifest_sha256=b3e8df8df7da2e57dd8d654b28db127346c74429242eba5b6bfd82fa4dc15900
+base=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2 -> 9e7b0aba933f74458e9afaf10dfa33ff439533d0
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=pass
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha b3e8df8df7da2e57dd8d654b28db127346c74429242eba5b6bfd82fa4dc15900 --note '<the ruling this carries out>'
+rc=0
+--- inventory diff (NOTE: the find -newer /dev/null filter matched no files on macOS, so only the record inode/mtime/ctime line was compared here; see live-02b for the full inventory) ---
+unchanged: --check wrote nothing

@@ -1,0 +1,51 @@
+$ fm-control.sh rrt rerecord-slot --manifest-sha b3e8df8df7da2e57dd8d654b28db127346c74429242eba5b6bfd82fa4dc15900 --note "Lab ruling: re-record after forward merge"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8aS9t2
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2 -> 9e7b0aba933f74458e9afaf10dfa33ff439533d0; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.8aS9t2/data/rrt/slot-rerecord/prior-meta.20261125T190742Z.a204d47ef657.0
+rc=0
+--- record diff (prior -> published) ---
+14c14
+< slot_base_sha=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2
+---
+> slot_base_sha=9e7b0aba933f74458e9afaf10dfa33ff439533d0
+15a16,17
+> slot_owned_path=lib
+> slot_owned_path=tools/x.sh
+--- audit dir ---
+total 16
+drwx------@ 4 charlesabrooker  staff   128 Nov 25 13:07 .
+drwxr-xr-x@ 4 charlesabrooker  staff   128 Nov 25 13:07 ..
+-rw-------@ 1 charlesabrooker  staff  1126 Nov 25 13:07 20261125T190742Z.a204d47ef657.0.record
+-rw-------@ 1 charlesabrooker  staff   443 Nov 25 13:02 prior-meta.20261125T190742Z.a204d47ef657.0
+--- audit record ---
+v1
+result=published
+archive=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/data/rrt/slot-rerecord/prior-meta.20261125T190742Z.a204d47ef657.0
+task=rrt
+prior_sha256=a204d47ef657c8d9b73e070ff37ce0377a1aab012e8592a7b6bef705879be212
+staged=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/state/.rrt.meta.rerecord.OyK7Qo
+staged_sha256=259018f13c3095f9df9041c32f2bf16e0e247d94477a81082f6f95b76069f7e0
+prior_block_sha256=b1b728eb6a4fab2b075a4505fde621b7a9341e1443b3c00dab72156dc5c400bf
+staged_block_sha256=2e73a6b89651b2e3b4e10c74a2f2b8833eb0c169c75c59b27f119a71de351bc4
+manifest=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/manifests/manifest.json
+manifest_sha256=b3e8df8df7da2e57dd8d654b28db127346c74429242eba5b6bfd82fa4dc15900
+old_base=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2
+new_base=9e7b0aba933f74458e9afaf10dfa33ff439533d0
+head=b2d72219b021d42601535448801819f638a95ebf
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+note="Lab ruling: re-record after forward merge"
+--- archive equals prior record? ---
+yes, byte-identical
+--- manifest and copy HEAD untouched? ---
+manifest unchanged
+HEAD unchanged
+--- leftovers in state/ ---
+none

@@ -1,0 +1,28 @@
+$ fm-control.sh rrt rerecord-slot --check
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+manifest_sha256=2f3a168d3ac6e7540c118d58a4070afffec38594a5f57a38ddc6108fcd304544
+base=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2 -> 9e7b0aba933f74458e9afaf10dfa33ff439533d0
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=pass
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha 2f3a168d3ac6e7540c118d58a4070afffec38594a5f57a38ddc6108fcd304544 --note '<the ruling this carries out>'
+$ fm-control.sh rrt rerecord-slot --manifest-sha 2f3a168d3ac6e7540c118d58a4070afffec38594a5f57a38ddc6108fcd304544 --note "Lab ruling: re-record after forward merge"
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2 -> 9e7b0aba933f74458e9afaf10dfa33ff439533d0; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.8aS9t2/data/rrt/slot-rerecord/prior-meta.20261125T191701Z.a204d47ef657.0
+rc=0
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/manifests/manifest.json
+slot_base_sha=9e7b0aba933f74458e9afaf10dfa33ff439533d0
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+audit results: published rolled-back 

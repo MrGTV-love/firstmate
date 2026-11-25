@@ -1,0 +1,38 @@
+# State: the audit record is left "pending" exactly as a SIGKILL between publish and commit leaves it (result=published -> result=pending); manifest and HEAD unchanged; a real claude agent is alive in the endpoint.
+$ head -2 20261125T190742Z.a204d47ef657.0.record
+v1
+result=pending
+$ tmux list-panes
+fmlab:fm-rrt cmd=2.1.332
+$ fm-control.sh rrt rerecord-slot --check
+pending_audit=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/data/rrt/slot-rerecord/20261125T190742Z.a204d47ef657.0.record result=pending state=untouched-staged
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+manifest_sha256=b3e8df8df7da2e57dd8d654b28db127346c74429242eba5b6bfd82fa4dc15900
+base=9e7b0aba933f74458e9afaf10dfa33ff439533d0 -> 9e7b0aba933f74458e9afaf10dfa33ff439533d0
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=agent_not_proven_stopped
+verdict_basis=pre-reconcile: the proof lines and the base and scope lines describe the current record before reconciliation; run --check again after a write run reconciles 20261125T190742Z.a204d47ef657.0.record to see the verdict it would then reach
+write_would=reconcile-pending:20261125T190742Z.a204d47ef657.0.record
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha b3e8df8df7da2e57dd8d654b28db127346c74429242eba5b6bfd82fa4dc15900 --note '<the ruling this carries out>'
+$ fm-control.sh rrt rerecord-slot --manifest-sha <sha> --note "..."   (the write reconciles first)
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+rerecord-slot rrt: already recorded
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=agent_not_proven_stopped
+rc=
+$ head -2 20261125T190742Z.a204d47ef657.0.record   (after the write)
+v1
+result=published-recovered
+record sha before: 259018f13c3095f9df9041c32f2bf16e0e247d94477a81082f6f95b76069f7e0  /Users/charlesabrooker/tmp/fm-lab.8aS9t2/state/rrt.meta
+record sha after:  259018f13c3095f9df9041c32f2bf16e0e247d94477a81082f6f95b76069f7e0  /Users/charlesabrooker/tmp/fm-lab.8aS9t2/state/rrt.meta
+# repeat of the pending-audit write, capturing its exit code
+rerecord-slot rrt: already recorded
+stopped_proof=agent_not_proven_stopped
+rc=0
+result=published-recovered

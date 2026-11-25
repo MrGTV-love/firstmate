@@ -1,0 +1,21 @@
+$ tmux list-panes (lab private socket)
+fmlab:fm-rrt cmd=2.1.332 path=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/wt
+$ fm-control.sh rrt rerecord-slot --check   (real claude alive in endpoint)
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=agent_not_proven_stopped
+write_would=refuse:agent_not_proven_stopped
+$ fm-control.sh rrt rerecord-slot --manifest-sha <correct> --note "ruling"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8aS9t2
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: agent_not_proven_stopped: the endpoint fmlab:fm-rrt reads 'alive'; stop it with fm-control.sh <id> exit, then re-record; no record, manifest, copy or journal was changed
+rc=1
+record sha before: a204d47ef657c8d9b73e070ff37ce0377a1aab012e8592a7b6bef705879be212  /Users/charlesabrooker/tmp/fm-lab.8aS9t2/state/rrt.meta
+record sha after:  a204d47ef657c8d9b73e070ff37ce0377a1aab012e8592a7b6bef705879be212  /Users/charlesabrooker/tmp/fm-lab.8aS9t2/state/rrt.meta
+audit dir: ls: /Users/charlesabrooker/tmp/fm-lab.8aS9t2/data/rrt/slot-rerecord: No such file or directory
+agent pane still: 2.1.332

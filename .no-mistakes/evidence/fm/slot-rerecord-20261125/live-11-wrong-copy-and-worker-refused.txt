@@ -1,0 +1,9 @@
+## manifest names a replacement copy, not the copy this task record names
+renewed: owner=rrt base=9e7b0aba933f74458e9afaf10dfa33ff439533d0 scope=src lib tools/x.sh
+error: slot rerecord refused: worktree_path_mismatch: manifest names '/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/wt2', the task copy is '/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/wt'; no record, manifest, copy or journal was changed
+rc=1
+## worker actor (FM_TASK_ID set) may not re-record
+renewed: owner=rrt base=9e7b0aba933f74458e9afaf10dfa33ff439533d0 scope=src lib tools/x.sh
+error: slot rerecord refused: actor_not_main: a worker (FM_TASK_ID is set) never re-records slot identity; no record, manifest, copy or journal was changed
+rc=1
+slot_base_sha=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2

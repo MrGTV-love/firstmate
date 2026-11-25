@@ -1,0 +1,11 @@
+# B: wrong --manifest-sha, no pending audit
+$ fm-control.sh rrt rerecord-slot --manifest-sha 0000000000000000000000000000000000000000000000000000000000000000 --note Lab ruling: re-record after the slot renewal
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: manifest_sha_mismatch: the manifest sha256 is 53100c476ef000c95929e5d6601d91b641e7653fe264a1e625833f91b78ed7c6, but --manifest-sha names 0000000000000000000000000000000000000000000000000000000000000000; review the manifest again and bind the digest fm-control.sh <id> rerecord-slot --check prints; no record, manifest, copy or journal was changed
+rc=1
+record unchanged
+ls: /Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/slot-rerecord: No such file or directory

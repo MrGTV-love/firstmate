@@ -1,0 +1,36 @@
+# G: relaunch after the re-record; endpoint is a shell pane (no agent) in fmlab:fm-rrt
+fmlab:fm-rrt cmd=bash
+$ grep ^slot_ state/rrt.meta
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.tRIjsw/projects/manifests/manifest.json
+slot_base_sha=c6c0c2dae040ddbb7868179483716dec326f1ead
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+$ fm-control.sh rrt relaunch --note "resume after the slot renewal"
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+warning: /Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/launch-brief.md records no ship branch; defaulting to legacy branch fm/rrt
+warning: /Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for rrt: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched rrt harness=claude from=claude model=default effort=default backend=tmux endpoint=fmlab:fm-rrt worktree=/Users/charlesabrooker/tmp/fm-lab.tRIjsw/projects/wt
+rc=
+slot adoption refusals in output: see above (none expected)
+manifest unchanged
+provisioner sentinel bytes:        0
+$ journal phase
+phase=complete
+fmlab:fm-rrt cmd=2.1.332
+$ capture-pane (last lines)
+ you trust?
+ Claude Code'll be able to read, edit, and execute files here. Its skills,
+ commands, and agents load and can run commands, and so can the git settings of
+ its repository. Your answer holds for this session.
+ Security guide
+ ❯ No, exit
+   Yes, add it
+ Enter to confirm · Esc to cancel
+note: rc= is empty because the wrapper ran in zsh (no PIPESTATUS); the product reported 'relaunched rrt ...' and the journal reads phase=complete

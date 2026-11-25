@@ -1,0 +1,33 @@
+# D: pending audit + HEAD moved + live claude agent -> rollback, then refuse
+# simulated crash: 20261125T202636Z.02d8ccd6b633.0.record result=pending
+# copy HEAD moved inside scope to 887eb77
+# lab tmux panes:
+fmlab:fm-rrt cmd=2.1.332 dead=0
+$ fm-control.sh rrt rerecord-slot --check
+pending_audit=/Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/slot-rerecord/20261125T202636Z.02d8ccd6b633.0.record result=pending state=untouched-staged
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+manifest_sha256=53100c476ef000c95929e5d6601d91b641e7653fe264a1e625833f91b78ed7c6
+base=c6c0c2dae040ddbb7868179483716dec326f1ead -> c6c0c2dae040ddbb7868179483716dec326f1ead
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=agent_not_proven_stopped
+verdict_basis=pre-reconcile: the proof lines and the base and scope lines describe the current record before reconciliation; run --check again after a write run reconciles 20261125T202636Z.02d8ccd6b633.0.record to see the verdict it would then reach
+write_would=reconcile-pending:20261125T202636Z.02d8ccd6b633.0.record
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha 53100c476ef000c95929e5d6601d91b641e7653fe264a1e625833f91b78ed7c6 --note '<the ruling this carries out>'
+rc=0
+$ fm-control.sh rrt rerecord-slot --manifest-sha 53100c476ef000c95929e5d6601d91b641e7653fe264a1e625833f91b78ed7c6 --note Lab ruling: re-record after the slot renewal
+note: the interrupted re-record of task rrt recorded in /Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/slot-rerecord/20261125T202636Z.02d8ccd6b633.0.record was rolled back (the copy HEAD moved (887eb77550b5e911c407dcaa68920873d919a879, expected 20957e091df8bc5b0bc79931b5016622bdae1875))
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: agent_not_proven_stopped: the endpoint fmlab:fm-rrt reads 'alive'; stop it with fm-control.sh <id> exit, then re-record; before refusing, this run reconciled earlier interrupted runs: audit /Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/slot-rerecord/20261125T202636Z.02d8ccd6b633.0.record rolled-back (the task record was restored to the prior record's bytes); no manifest, copy or journal was changed
+rc=1
+audit 20261125T202636Z.02d8ccd6b633.0.record: result=rolled-back
+task record is byte-identical to the archived prior record prior-meta.20261125T202636Z.02d8ccd6b633.0
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.tRIjsw/projects/manifests/manifest.json
+slot_base_sha=821edfa0dfa916bc8163d78910a8288942584b7d
+slot_owned_path=src

@@ -1,0 +1,6 @@
+ok - L14: pending untouched-staged audit, HEAD moved, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines, writes nothing; the write rolls the crash back, then refuses agent_not_proven_stopped and its tail names the rolled-back audit and the restored record
+test_L14_check_pending_rollback_with_a_live_agent exit=0
+ok - R6b: second run rolls the crashed write back (record P, first audit rolled-back), then refuses manifest_sha_mismatch and its tail names the rolled-back audit and the restored record
+test_R6b_recovery_rolls_back_against_a_changed_manifest exit=0
+ok - H14: refuses manifest_sha_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+test_H14_manifest_sha_mismatch exit=0

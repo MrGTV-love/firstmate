@@ -1,0 +1,19 @@
+# State: pending audit (SIGKILL between publish and commit), then the copy HEAD moved inside scope; real claude agent alive.
+$ head -2 20261125T190742Z.a204d47ef657.0.record
+result=pending
+$ fm-control.sh rrt rerecord-slot --check
+pending_audit=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/data/rrt/slot-rerecord/20261125T190742Z.a204d47ef657.0.record result=pending state=untouched-staged
+stopped_proof=agent_not_proven_stopped
+verdict_basis=pre-reconcile: the proof lines and the base and scope lines describe the current record before reconciliation; run --check again after a write run reconciles 20261125T190742Z.a204d47ef657.0.record to see the verdict it would then reach
+write_would=reconcile-pending:20261125T190742Z.a204d47ef657.0.record
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha b3e8df8df7da2e57dd8d654b28db127346c74429242eba5b6bfd82fa4dc15900 --note '<the ruling this carries out>'
+$ fm-control.sh rrt rerecord-slot --manifest-sha <sha> --note "..."
+error: slot rerecord refused: agent_not_proven_stopped: the endpoint fmlab:fm-rrt reads 'alive'; stop it with fm-control.sh <id> exit, then re-record; no record, manifest, copy or journal was changed
+rc=1
+$ head -2 20261125T190742Z.a204d47ef657.0.record   (after)
+result=rolled-back
+$ grep ^slot_base_sha state/rrt.meta   (rolled back to the prior record)
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/manifests/manifest.json
+slot_base_sha=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2
+slot_owned_path=src
+record is byte-identical to the archived prior record

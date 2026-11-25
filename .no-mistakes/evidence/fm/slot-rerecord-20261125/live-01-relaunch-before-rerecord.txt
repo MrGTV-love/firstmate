@@ -1,0 +1,13 @@
+$ grep ^slot_ state/rrt.meta
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/manifests/manifest.json
+slot_base_sha=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2
+slot_owned_path=src
+$ fm-control.sh rrt relaunch --note "resume after slot renewal"   (BEFORE rerecord)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8aS9t2
+error: slot adoption refused: base_mismatch: manifest base is '9e7b0aba933f74458e9afaf10dfa33ff439533d0', the recorded base is 'a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2'; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task rrt: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/wt; preserve and reconcile it first (a base_mismatch or scope_mismatch after the durable slot record was renewed is re-recorded with fm-control.sh rrt rerecord-slot --check, then without --check); the running agent was not stopped
+rc=1
+$ grep ^slot_ state/rrt.meta
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.8aS9t2/projects/manifests/manifest.json
+slot_base_sha=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2
+slot_owned_path=src

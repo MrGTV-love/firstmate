@@ -1,0 +1,15 @@
+$ tmux capture-pane (agent pane after the refused rerecord: nothing typed into it)
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel
+$ fm-control.sh rrt exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8aS9t2
+error: task rrt's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+rc=1
+$ tmux list-panes
+fmlab:fm-rrt cmd=2.1.332
+$ tmux send-keys -t fmlab:fm-rrt Enter   (choose "No, exit" on the trust prompt; the agent quits)
+$ tmux list-panes
+no server running on /private/tmp/fml.25gCWb/tmux-501/default
+no process in the lab copy

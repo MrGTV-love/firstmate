@@ -1,0 +1,26 @@
+# fresh lab (same fixture via lab-setup.sh + lab-renew.sh); full inventory of state/, data/, manifests, copy HEAD and status before/after
+files inventoried: 7
+$ fm-control.sh rrt rerecord-slot --check
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+manifest_sha256=6a09a1d5b03b269d54ac016e867ab6f8ed9573262dade545244b2ff71d363cb9
+base=a0bbcb00f1ff9da11a16433c5fa4c5a4ac1ef372 -> f841db56f1da4e05c931424992cc176c4443a00c
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=pass
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha 6a09a1d5b03b269d54ac016e867ab6f8ed9573262dade545244b2ff71d363cb9 --note '<the ruling this carries out>'
+rc=
+--- diff inventory-before inventory-after ---
+6a7
+> d9ba44aab75840c57ffc902b3cc220a8212a7449e982043f52f55b43c57b3936  state/guard-events.jsonl
+19a21
+> guard-events.jsonl
+# Note: the only new file is state/guard-events.jsonl. It is written by bin/fm-gate-refuse-lib.sh:167
+# (fm_gate_refuse_event, the "gate agent lifecycle permitted only against lab home" telemetry), which fires
+# only because this run is a no-mistakes gate agent. It is not touched by this change (git diff base..HEAD -- bin
+# has no guard-event call). Record, audit dir (still absent), temporaries, manifest, copy HEAD and status are identical.

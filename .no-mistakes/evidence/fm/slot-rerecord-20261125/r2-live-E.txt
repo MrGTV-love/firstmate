@@ -1,0 +1,27 @@
+# E: no agent; re-publish, crash, move HEAD, then write with a stale --manifest-sha
+# lab tmux server stopped
+no server running on /private/tmp/fml.pk0VoR/tmux-501/default
+$ fm-control.sh rrt rerecord-slot --manifest-sha 53100c476ef000c95929e5d6601d91b641e7653fe264a1e625833f91b78ed7c6 --note Lab ruling: re-record after the slot renewal
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base 821edfa0dfa916bc8163d78910a8288942584b7d -> c6c0c2dae040ddbb7868179483716dec326f1ead; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/slot-rerecord/prior-meta.20261125T202743Z.02d8ccd6b633.0
+rc=0
+# simulated crash: 20261125T202743Z.02d8ccd6b633.0.record result=pending
+# copy HEAD moved inside scope to 8d251f7
+$ fm-control.sh rrt rerecord-slot --manifest-sha 1111111111111111111111111111111111111111111111111111111111111111 --note Lab ruling: re-record after the slot renewal
+note: the interrupted re-record of task rrt recorded in /Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/slot-rerecord/20261125T202743Z.02d8ccd6b633.0.record was rolled back (the copy HEAD moved (8d251f75e3a24d043d71667f5a3eee4aa386cbef, expected 887eb77550b5e911c407dcaa68920873d919a879))
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: manifest_sha_mismatch: the manifest sha256 is 53100c476ef000c95929e5d6601d91b641e7653fe264a1e625833f91b78ed7c6, but --manifest-sha names 1111111111111111111111111111111111111111111111111111111111111111; review the manifest again and bind the digest fm-control.sh <id> rerecord-slot --check prints; before refusing, this run reconciled earlier interrupted runs: audit /Users/charlesabrooker/tmp/fm-lab.tRIjsw/data/rrt/slot-rerecord/20261125T202743Z.02d8ccd6b633.0.record rolled-back (the task record was restored to the prior record's bytes); no manifest, copy or journal was changed
+rc=1
+manifest bytes unchanged
+copy HEAD unchanged
+relaunch journals in state/: before=0 after=0
+audit 20261125T202743Z.02d8ccd6b633.0.record: result=rolled-back
+task record is byte-identical to the archived prior record prior-meta.20261125T202743Z.02d8ccd6b633.0

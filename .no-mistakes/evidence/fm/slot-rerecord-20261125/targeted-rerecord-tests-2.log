@@ -1,0 +1,4 @@
+ok - L3: second exit 0 already recorded; rec_inventory unchanged; one archive and one audit record
+ok - N6: refuses branch_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - R1a: input_changed_during_rerecord; record inventory unchanged; audit refused
+ok - R3: adopt_postcheck_failed; rolled back to P; archive kept; audit rolled-back

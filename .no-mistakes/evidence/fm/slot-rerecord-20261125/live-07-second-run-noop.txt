@@ -1,0 +1,21 @@
+$ fm-control.sh rrt rerecord-slot --check   (after the write)
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+rerecord-slot rrt: already recorded
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=already recorded
+rc=0
+$ fm-control.sh rrt rerecord-slot --manifest-sha <sha> --note "..."   (second write)
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+rerecord-slot rrt: already recorded
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+record inode/mtime/ctime before: 2250672451 1795633661 1795633662
+record inode/mtime/ctime after:  2250672451 1795633661 1795633662
+audit records: 1

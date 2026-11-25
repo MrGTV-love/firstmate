@@ -1,0 +1,25 @@
+## owner is another task
+renewed: owner=other-task base=9e7b0aba933f74458e9afaf10dfa33ff439533d0 scope=src lib tools/x.sh
+error: slot rerecord refused: owner_mismatch: manifest owner is 'other-task', the task is 'rrt'; no record, manifest, copy or journal was changed
+rc=1; record unchanged: yes
+## scope entry not own work (docs.txt changed only on main)
+renewed: owner=rrt base=9e7b0aba933f74458e9afaf10dfa33ff439533d0 scope=src lib tools/x.sh docs.txt
+error: slot rerecord refused: scope_entry_not_own_work: docs.txt is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added; no record, manifest, copy or journal was changed
+rc=1; record unchanged: yes
+## scope too broad (tools dir)
+renewed: owner=rrt base=9e7b0aba933f74458e9afaf10dfa33ff439533d0 scope=src lib tools
+error: slot rerecord refused: scope_entry_not_own_work: tools is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added; no record, manifest, copy or journal was changed
+rc=1; record unchanged: yes
+## changed path left uncovered (tools/x.sh missing)
+renewed: owner=rrt base=9e7b0aba933f74458e9afaf10dfa33ff439533d0 scope=src lib
+error: slot rerecord refused: scope_uncovered_change: tools/x.sh; no record, manifest, copy or journal was changed
+rc=1; record unchanged: yes
+## base is not merge-base (M0, not a forward move to merge-base)
+renewed: owner=rrt base=a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2 scope=src lib tools/x.sh
+error: slot rerecord refused: base_not_merge_base: the manifest base a273a5c0272bd2f8e2a3bb4faf0de27abeae0ac2 is not merge-base(origin/main, HEAD) = 9e7b0aba933f74458e9afaf10dfa33ff439533d0; renew the durable record against the current merge-base (this verb never fetches: if origin/main is stale, fetch it in the primary clone first); no record, manifest, copy or journal was changed
+rc=1; record unchanged: yes
+## base is HEAD (not on default)
+renewed: owner=rrt base=7d6460ac4db75b4d4edcc0dea5885df6eedd3a40 scope=src lib tools/x.sh
+error: slot rerecord refused: base_not_on_default: the manifest base 7d6460ac4db75b4d4edcc0dea5885df6eedd3a40 is not on origin/main (9e7b0aba933f74458e9afaf10dfa33ff439533d0); no record, manifest, copy or journal was changed
+rc=1; record unchanged: yes
+audit records now: 1
