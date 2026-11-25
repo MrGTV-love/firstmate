@@ -437,7 +437,8 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
   if ! out=$(fm_slot_check_copy "$project" "$copy" 2>&1); then
     printf '%s\n' "$out" >&2
     # An uncommitted own edit is the one own work this route refuses (Main 1795): nothing changes and every own
-    # path is printed, so the operator sees what the refusal left untouched.
+    # path is printed or, past the sampled `uncertain,ignored` lines, listed in the drift-report file the report names,
+    # so the operator sees what the refusal left untouched.
     case "$out" in
       *dirty_worktree*|*operation_in_progress*)
         fm_slot_drift_report "$copy" "$id" "$branch" \
@@ -845,6 +846,7 @@ fm_slot_adopt_sibling_claim() { # <slot> <copy> <state-dir>
 }
 
 FM_SLOT_DRIFT_PY=$(cat <<'FMDRIFTPY'
+import hashlib
 import os
 import re
 import subprocess
@@ -1022,10 +1024,53 @@ while i < len(raw):
     else:
         add(path.rstrip(b"/") if code == b"??" and path.endswith(b"/") else path)
 # Tracked paths that status cannot report (assume-unchanged, skip-worktree) whose existence, type, mode or bytes differ.
-for flagged in names(git("ls-files", "-v", "-z").stdout):
-    tag, path = flagged[:1], flagged[2:]
-    if not (tag.islower() or tag == b"S"):
-        continue
+# The index is read once and the working bytes are hashed in one batch, so a copy with many flagged paths costs a fixed
+# number of git processes rather than two per path. Each path is compared with its own index entry by exact name, so a
+# name git would read as a pathspec (one holding *, ?, [ or \, or starting with :, which git reads as magic and so as
+# the name without its colon) is judged by its own entry, never by another entry the pattern matches first and never
+# skipped because the pattern matches no entry.
+flagged = []
+for row in names(git("ls-files", "-v", "-z").stdout):
+    tag, path = row[:1], row[2:]
+    if tag.islower() or tag == b"S":
+        flagged.append((tag, path))
+index = {}
+if flagged:
+    for row in names(git("ls-files", "-s", "-z").stdout):
+        fields, _, path = row.partition(b"\t")
+        index.setdefault(path, fields.split())
+algo = "sha1"
+if flagged:
+    algo = git("rev-parse", "--show-object-format", ok=(0, 128)).stdout.decode().strip() or "sha1"
+
+
+def blob_id(data):
+    # The id git gives these bytes as a blob with no path filters, which is what `hash-object --stdin` computes.
+    return hashlib.new(algo, b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def hash_files(paths):
+    # One `hash-object --stdin-paths` for every path it can name on a line (it reads a leading quote as C quoting and drops
+    # a carriage return before the newline), and one `hash-object -- <path>` for the rest and for every path of a batch
+    # git refused (it stops at the first path it cannot hash); a failure leaves an empty id, which differs.
+    ids = {}
+    batch = [p for p in paths if b"\n" not in p and not p.startswith(b'"') and not p.endswith(b"\r")]
+    if batch:
+        proc = subprocess.run(["git", "-C", copy, "hash-object", "--stdin-paths"], input=b"".join(p + b"\n" for p in batch),
+                              capture_output=True, env=env)
+        rows = proc.stdout.decode().split()
+        if proc.returncode == 0 and len(rows) == len(batch):
+            ids.update(zip(batch, rows))
+    for path in paths:
+        if path not in ids:
+            one = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True,
+                                 stdin=subprocess.DEVNULL, env=env)
+            ids[path] = one.stdout.decode().strip()
+    return ids
+
+
+regular = []
+for tag, path in flagged:
     full = os.path.join(os.fsencode(copy), path)
     if not os.path.lexists(full):
         # An assume-unchanged path that is gone was deleted by the task, which status cannot show; a skip-worktree path
@@ -1033,18 +1078,21 @@ for flagged in names(git("ls-files", "-v", "-z").stdout):
         if tag.islower() and tag != b"s":
             add(path)
         continue
-    entry = git("ls-files", "-s", "-z", "--", os.fsdecode(path)).stdout.split(b"\0")[0].split()
+    entry = index.get(path, [])
     if len(entry) < 2:
         continue
-    mode = entry[0].decode()
+    mode, want = entry[0].decode(), entry[1].decode()
     if os.path.islink(full):
-        blob = subprocess.run(["git", "-C", copy, "hash-object", "--stdin"], input=os.readlink(full), capture_output=True, env=env)
-        differs = mode != "120000" or blob.stdout.decode().strip() != entry[1].decode()
+        if mode != "120000" or blob_id(os.readlink(full)) != want:
+            add(path)
+    elif not os.path.isfile(full):
+        # A directory or other non-file where a tracked file was: git cannot hash it as a blob, so it differs.
+        add(path)
     else:
-        blob = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True, env=env)
-        want_mode = "100755" if os.stat(full).st_mode & 0o100 else "100644"
-        differs = blob.stdout.decode().strip() != entry[1].decode() or want_mode != mode
-    if differs:
+        regular.append((path, mode, want, "100755" if os.stat(full).st_mode & 0o100 else "100644"))
+hashed = hash_files([path for path, _mode, _want, _have in regular])
+for path, mode, want, have in regular:
+    if hashed[path] != want or have != mode:
         add(path)
 print("drift-count\t%d" % len(proven))
 for path in sorted(proven):
@@ -1055,30 +1103,77 @@ for limit in dict.fromkeys(limits):
 FMDRIFTPY
 )
 
-# The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals.
-# Reads only; the recorded scope, manifest and record are never edited by what this reports.
+# The most `uncertain,ignored` drift lines the stderr report prints when the complete report is written to a file.
+FM_SLOT_DRIFT_SAMPLE=20
+
+# The complete report as text: the header, one labelled path per line, the limitations and the standing residual line.
+fm_slot_drift_text() { # <task-id> <report-output> <report-exit>
+  local id=$1 out=$2 rc=$3 count
+  if [ "$rc" -ne 0 ]; then
+    echo "relaunch drift report for $id: could not be produced ($(printf '%s' "$out" | tail -n 1)); this is a limitation of the report, not a statement that the task stayed in scope"
+    return 0
+  fi
+  count=$(printf '%s\n' "$out" | sed -n 's/^drift-count\t//p')
+  if [ "${count:-0}" -eq 0 ]; then
+    echo "relaunch drift report for $id: no out-of-scope path changed by this task's own work; the recorded scope is unchanged"
+  else
+    echo "relaunch drift report for $id: $count out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)"
+  fi
+  # One pass over every line; a path never holds a tab, because the report escapes it.
+  printf '%s\n' "$out" | awk -F '\t' '
+    $1 == "drift" { print "  drift: " $2 " " $3 }
+    $1 == "limitation" { sub(/^limitation\t/, ""); limits[++n] = "  limitation: " $0 }
+    END { for (i = 1; i <= n; i++) print limits[i] }'
+  echo "  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot"
+}
+
+# The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals, on stderr.
+# Reads only the copy; the recorded scope, manifest and record are never edited by what this reports.
+# With a STATE directory, the complete report is also written to STATE/<id>.drift-report.txt (mode 600, replaced on every
+# run), and stderr prints every line except the `uncertain,ignored` lines past the first FM_SLOT_DRIFT_SAMPLE, which a
+# `  sampled:` line counts and points to that file. With no STATE, or when that file cannot be written, stderr prints
+# the complete report. Every other line, each `proven` path included, is always printed in full.
 fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
-  local copy=$1 id=$2 branch=$3 base=$4 out count line
+  local copy=$1 id=$2 branch=$3 base=$4 out rc=0 report file='' tmp=''
   shift 4
   # state/<id>.wiring-sha names the launch artifacts Firstmate wrote, so they are not reported as the task's drift. Callers
   # (fm-control.sh and fm-spawn.sh) set STATE; with no STATE no record is read and nothing is filtered.
-  out=$(FM_SLOT_DRIFT_WIRING="${STATE:-}/$id.wiring-sha" python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || {
-    echo "relaunch drift report for $id: could not be produced ($(printf '%s' "$out" | tail -n 1)); this is a limitation of the report, not a statement that the task stayed in scope" >&2
-    return 0
-  }
-  count=$(printf '%s\n' "$out" | sed -n 's/^drift-count\t//p')
-  if [ "${count:-0}" -eq 0 ]; then
-    echo "relaunch drift report for $id: no out-of-scope path changed by this task's own work; the recorded scope is unchanged" >&2
-  else
-    echo "relaunch drift report for $id: $count out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)" >&2
-    printf '%s\n' "$out" | while IFS= read -r line; do
-      case "$line" in drift$'\t'*) printf '  drift: %s\n' "${line#drift$'\t'}" | tr '\t' ' ' >&2 ;; esac
-    done
+  out=$(FM_SLOT_DRIFT_WIRING="${STATE:-}/$id.wiring-sha" python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || rc=$?
+  report=$(fm_slot_drift_text "$id" "$out" "$rc")
+  if [ -n "${STATE:-}" ] && [ -d "$STATE" ]; then
+    file=$STATE/$id.drift-report.txt
+    # A run killed between mktemp and mv leaves its temp behind, so each write first removes this id's own leftovers,
+    # which match mktemp's exact name: the prefix and six ASCII letters or digits. A leftover that cannot be removed (a
+    # directory of that name, or a file this user cannot unlink) stays, and the write goes on: the callers run under
+    # set -e, so a failed removal must not end them. A concurrent same-id run whose temp this removes either rewrites it
+    # or fails its mv and prints its complete report instead, so no report is lost.
+    rm -f -- "$STATE/.$id.drift-report."[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9] 2>/dev/null || :
+    # mv into a directory (or a link to one) would move the file inside it, so that path counts as unwritable.
+    if [ -d "$file" ] || ! tmp=$(mktemp "$STATE/.$id.drift-report.XXXXXX" 2>/dev/null); then
+      file=''
+    elif ! { printf '%s\n' "$report" > "$tmp" && chmod 600 "$tmp" && mv -f -- "$tmp" "$file"; }; then
+      rm -f -- "$tmp"
+      file=''
+    fi
   fi
-  printf '%s\n' "$out" | while IFS= read -r line; do
-    case "$line" in limitation$'\t'*) printf '  limitation: %s\n' "${line#limitation$'\t'}" >&2 ;; esac
-  done
-  echo "  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot" >&2
+  if [ -z "$file" ]; then
+    printf '%s\n' "$report" >&2
+    return 0
+  fi
+  # The file path goes through the environment, because awk -v would read a backslash in it as an escape.
+  printf '%s\n' "$report" | FM_SLOT_DRIFT_FILE=$file awk -v keep="$FM_SLOT_DRIFT_SAMPLE" '
+    function summary() {
+      if (group > keep) print "  sampled: " group " uncertain,ignored path(s); the first " keep " are shown above, and every path of this report is listed in " ENVIRON["FM_SLOT_DRIFT_FILE"]
+      done = 1
+    }
+    /^  drift: / {
+      label = substr($0, 10); sub(/ .*/, "", label)
+      if (label ~ /^uncertain(,|$)/ && ("," label ",") ~ /,ignored,/ && ++group > keep) next
+      print; next
+    }
+    !done && NR > 1 { summary() }
+    { print }
+    END { if (!done) summary() }' >&2
 }
 
 # The launch contract for a worker started on an adopted slot: continue in place.
