@@ -226,8 +226,15 @@ _fm_status_read_span() {  # <status-file> <start-offset> <byte-length> [<max-lin
 # takes the byte limit alone, never the line limit, because a history reader keeps no
 # checkpoint and rereads from byte 0: a line limit would refuse a healthy log far below
 # the cap on every call, and the harm a runaway does is its size in bytes.
-fm_status_cat() {  # <status-file>
-  local f=$1 __fm_wc_size
+# --with-identity gets the whole endpoint, cap check and device:inode prefix
+# from the same opened handle, including empty files; default output stays raw.
+fm_status_cat() {  # <status-file> [--with-identity]
+  local f=$1 __fm_wc_size identity=${2:-}
+  case "$identity" in ''|--with-identity) ;; *) return 1 ;; esac
+  if [ "$identity" = --with-identity ]; then
+    fm_status_read_exact "$f" 0 0 0 --whole-with-identity
+    return $?
+  fi
   _fm_status_file_size "$f" __fm_wc_size || return 1
   __fm_wc_size=${__fm_wc_size//[[:space:]]/}
   case "$__fm_wc_size" in ''|*[!0-9]*) return 1 ;; esac

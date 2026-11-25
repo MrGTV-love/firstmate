@@ -3197,8 +3197,8 @@ relaunch_successor_refuse() {  # <successor> <message>
 
 do_relaunch() {
   local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0
-  local -a spawn_args
-  local owned_path
+  local -a spawn_args slot_scope
+  local owned_path slot_branch
 
   require_state_verified_backend relaunch
   if [ "$RECOVER_LAUNCH" = 1 ]; then
@@ -3308,8 +3308,31 @@ do_relaunch() {
   if [ "$slot_governed" = 1 ]; then
     [ "${#OWNED_PATHS[@]}" -gt 0 ] || grep -q '^slot_owned_path=' "$META" \
       || die "refused relaunch of governed task $ID: governed slot provisioning requires --owned-path <tracked-path> (repeatable); the running agent was not stopped"
-    fm_slot_check_copy "$slot_project" "$slot_copy" \
-      || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
+    if fm_slot_adopt_route "$META" "$RELOCATING"; then
+      # A relaunch is not a new scope declaration: the task's own recorded manifest is adopted, so the
+      # copy is judged by the record of what was admitted (lib header) and never by fresh-admission rules.
+      slot_branch=$(fm_meta_get "$META" branch)
+      [ -n "$slot_branch" ] || slot_branch=fm/$ID
+      slot_scope=()
+      while IFS= read -r owned_path; do slot_scope+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
+      fm_slot_adopt_check "$slot_project" "$slot_copy" "$ID" "$slot_branch" "$META" "$STATE" \
+        || die "refused relaunch of governed task $ID: its recorded slot manifest cannot be adopted for $slot_copy; preserve and reconcile it first; the running agent was not stopped"
+      fm_slot_drift_report "$slot_copy" "$ID" "$slot_branch" "$(fm_meta_get "$META" slot_base_sha)" "${slot_scope[@]}"
+    else
+      slot_branch=$(fm_meta_get "$META" branch)
+      [ -n "$slot_branch" ] || slot_branch=fm/$ID
+      slot_scope=(${OWNED_PATHS[@]+"${OWNED_PATHS[@]}"})
+      if [ "${#slot_scope[@]}" -eq 0 ]; then
+        while IFS= read -r owned_path; do slot_scope+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
+      fi
+      # Creating a manifest on a copy is a provisioning act: a clean copy another task holds is named before the stop
+      # (a relocation's destination is judged by its own route), and again by fm-spawn.sh before the provisioner runs and
+      # before the launch is delivered, with the adoption's custody owner.
+      [ "$RELOCATING" != 0 ] || fm_slot_provision_custody "$slot_project" "$slot_copy" "$ID" "$META" "$STATE" \
+        || die "refused relaunch of governed task $ID: its assigned copy $slot_copy is held by another record or claim; preserve and reconcile it first; the running agent was not stopped"
+      fm_slot_foresee_refusals "$slot_project" "$slot_copy" "$ID" "$slot_branch" "$META" "${slot_scope[@]}" \
+        || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
+    fi
   fi
   relaunch_successor_admission "$slot_project" "$slot_copy"
   relaunch_claimed_branch_admission "$slot_governed"
@@ -3402,6 +3425,10 @@ do_relaunch() {
 
   journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
+  # The task's own successful relaunch ends its earlier session-end refusal episode, so a later death is a new cause
+  # (D6(d)); only this task's memory file is named, in a subshell so the library's shell options stay out of this script.
+  # shellcheck source=bin/fm-session-end-relaunch-lib.sh
+  ( . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh" && fm_session_end_refusal_clear "$STATE" "$ID" ) >/dev/null 2>&1 || true
   if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
     fm_status_append_line "$STATE/$ID.status" "$(printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}")" \
       || echo "warning: could not record the model-matrix fallback note in $STATE/$ID.status (exit $?)" >&2

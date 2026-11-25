@@ -118,8 +118,21 @@ jobs:
       # New work cannot add debt: a refusal site on a changed line must map to a
       # guard, and the burn-down allowlist may not grow against the PR base.
       - name: Enforce the guard ratchet against the pull request base
+        id: touched-guard-lint
         if: github.event_name == 'pull_request'
+        env:
+          FM_HOME: ${{ runner.temp }}
+          FM_GUARD_EVENT_LOG: ${{ runner.temp }}/fm-guard-lint-touched.jsonl
+          FM_GUARD_LINT_EVENT_ACTOR: gate
         run: bin/fm-cpu-pass.sh run --label ci-guard-lint-new-or-touched -- bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+      - name: Retain the touched-registry guard decision
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.touched-guard-lint.outcome != 'skipped' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: fm-guard-lint-touched
+          path: ${{ runner.temp }}/fm-guard-lint-touched.jsonl
+          if-no-files-found: warn
 
   # The CPU pass pool's concurrency proofs (tests/fm-cpu-pass-concurrency.py), including the CI-only kill and
   # fault cases. They run up to three CPU-bound processes at once (FM_CONC_N=2 pooled workers plus
