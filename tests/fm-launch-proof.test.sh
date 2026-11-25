@@ -377,6 +377,9 @@ test_launch_proof_claude_verdict_and_refusal() (
     [ -f "$T/env-unreadable" ] && return 1
     [ ! -f "$T/env-bare" ] || { printf 'ONLY=1\n'; return; }
     printf 'PATH=/usr/bin\nHOME=%s\n%s' "$OPERATOR" "$(cat "$T/env-extra" 2>/dev/null)"; }
+  # No executable path is ever read: an unreadable member is never a platform helper here.
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
+  fm_launch_proof_pid_exe() { return 1; }
   # Any working-directory read is recorded: only the managed path reads it, as
   # a refusal check (Main 1709 ruling 1), never as proof.
   # shellcheck disable=SC2329 # the library's working-directory reader calls it
@@ -572,6 +575,14 @@ test_launch_proof_claude_refusal_checks() (
     [ -f "$T/w/env-$1" ] || return 1
     cat "$T/w/env-$1"
   }
+  # The executable path of a member, read without its environment: none unless
+  # staged; exe-fail prints the staged path and then fails.
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
+  fm_launch_proof_pid_exe() {
+    [ -f "$T/w/exe-$1" ] || return 1
+    cat "$T/w/exe-$1"
+    [ ! -f "$T/w/exe-fail" ] || return 1
+  }
   # shellcheck disable=SC2329 # the library's working-directory reader calls it
   lsof() {
     [ ! -f "$T/w/cwd-fail" ] || return 1
@@ -622,6 +633,33 @@ test_launch_proof_claude_refusal_checks() (
   judged unknown '(g) a matching token with a member whose environment shows neither PATH nor HOME' 'environment of live group process 56557 cannot be read'
   world; printf 'PATH=/usr/bin\nHOME=/Users/op\n' > "$T/w/env-56557"
   judged managed 'control: a readable descendant without the token is the agent'"'"'s own'
+
+  # Main decision on round 5: an unreadable member is the agent's own only when
+  # it is a proven descendant of the agent and its executable path, read without
+  # its environment, is a platform binary. Every other unreadable member refuses.
+  world; rm "$T/w/env-56557"; printf '/usr/bin/caffeinate' > "$T/w/exe-56557"
+  judged managed '(k) a busy managed claude whose unreadable descendant is /usr/bin/caffeinate keeps its base outcome'
+  world; printf '%s\n' '60001 53733 53539' >> "$T/w/table"; printf '/bin/zsh' > "$T/w/exe-60001"
+  judged managed '(k) a managed claude whose unreadable tool shell child is /bin/zsh keeps its base outcome'
+  world; rm "$T/w/env-56557"; printf '/Users/op/.local/bin/railway' > "$T/w/exe-56557"
+  judged unknown 'an unreadable descendant that is not a platform binary' 'environment of live group process 56557 cannot be read'
+  for path in /usr/binx/railway /usr/bin/../../tmp/railway /usr/local/bin/railway /bin /System /System/Volumes/Data/Users/op/railway; do
+    world; rm "$T/w/env-56557"; printf '%s' "$path" > "$T/w/exe-56557"
+    judged unknown "an unreadable descendant whose path $path is not under a platform directory" 'environment of live group process 56557 cannot be read'
+  done
+  world; rm "$T/w/env-56557"; printf '/usr/bin/caffeinate' > "$T/w/exe-56557"; : > "$T/w/exe-fail"
+  judged unknown 'an unreadable descendant whose path read prints a platform path and then fails' 'environment of live group process 56557 cannot be read'
+  world; rm "$T/w/env-56557"; printf '/usr/bin/caffeinate' > "$T/w/exe-56557"; printf '1' > "$T/w/live-ppid-56557"
+  judged unknown 'an unreadable platform descendant whose parent link changed between reads' 'environment of live group process 56557 cannot be read'
+  world; rm "$T/w/env-56557"; printf '/usr/bin/caffeinate' > "$T/w/exe-56557"
+  printf '%s\n' '60002 53733 53539' >> "$T/w/table"; printf '/Users/op/bin/tool' > "$T/w/exe-60002"
+  judged unknown 'a second unreadable descendant that is not a platform binary, after an exempt one' 'environment of live group process 60002 cannot be read'
+  world
+  printf '%s\n' '400 1 400' '53539 400 400' '53733 53539 400' '56557 53733 400' > "$T/w/table"
+  printf '400' > "$T/w/group"
+  printf '%s\n' '[{"pid":400,"name":"zsh","argv0":"-zsh"},{"pid":56557,"name":"railway","argv0":"railway"},{"pid":53733,"name":"2.1.316","argv0":"claude"},{"pid":53539,"name":"node","argv0":"node"}]' > "$T/w/fg"
+  printf '/bin/zsh' > "$T/w/exe-400"
+  judged unknown 'an unreadable platform binary that is the agent'"'"'s ancestor, not its descendant' 'environment of live group process 400 cannot be read'
 
   # The descendant rule, as a refusal only.
   world; printf '%s\n' '60000 500 53539' >> "$T/w/table"; printf 'PATH=/usr/bin\nHOME=/Users/op\nFM_SPAWN_GEN=%s\n' "$G" > "$T/w/env-60000"
@@ -801,6 +839,8 @@ test_launch_proof_token_checks_every_harness() (
   }
   # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_remote_herdr_process_env() { [ -f "$T/w/env-$1" ] || return 1; cat "$T/w/env-$1"; }
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
+  fm_launch_proof_pid_exe() { return 1; }
   # shellcheck disable=SC2329 # the library's working-directory reader calls it
   lsof() { printf 'p7101\0\nfcwd\0n%s\0\n' "$LANE"; }
   # shellcheck disable=SC2329 # the library under test calls this stand-in
@@ -1099,7 +1139,34 @@ test_launch_proof_omp_has_no_adoption_route() (
   pass 'omp has no adoption route: an unpinned omp refuses with its cause whatever its session record says, and a pinned omp keeps its session proof'
 )
 
+# The executable path reader reads a live process without its environment and
+# fails for a process that has exited; on a host other than macOS it fails.
+test_launch_proof_pid_exe_reads_the_live_path() {
+  local child path
+  if [ "$(uname -s)" != Darwin ]; then
+    fm_launch_proof_pid_exe "$$" >/dev/null && fail 'the path reader read a path on a host without proc_pidpath'
+    pass 'skip: proc_pidpath is macOS only; the reader fails closed here'
+    return 0
+  fi
+  /bin/sleep 30 &
+  child=$!
+  # The child is bash until its exec; wait, bounded, for the exec to land.
+  path=''
+  for _ in $(seq 1 200); do
+    path=$(fm_launch_proof_pid_exe "$child") || path=''
+    [ "$path" != /bin/sleep ] || break
+    sleep 0.05
+  done
+  kill "$child" 2>/dev/null || true
+  wait "$child" 2>/dev/null || true
+  assert_equals /bin/sleep "$path" 'the reader prints the live executable path'
+  fm_launch_proof_pid_exe "$child" >/dev/null && fail 'the reader read a path for a process that has exited'
+  fm_launch_proof_pid_exe '' >/dev/null && fail 'the reader read a path for an empty pid'
+  pass 'the executable path reader reads a live process and fails for one that is gone'
+}
+
 fm_test_only
+test_launch_proof_pid_exe_reads_the_live_path
 test_launch_proof_recorded_native_identity
 test_launch_proof_pinned_personal_switch
 test_launch_proof_claude_verdict_and_refusal

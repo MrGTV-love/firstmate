@@ -461,11 +461,46 @@ fm_launch_proof_claims() { # <meta> <cwd> <home> <root>
   return 0
 }
 
+# The executable path of <pid>, read by proc_pidpath without its environment.
+# Fails on a host other than macOS, for a pid that cannot be read, or for an
+# empty path. Prints the path.
+fm_launch_proof_pid_exe() { # <pid>
+  case "$1" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$(uname -s)" = Darwin ] || return 1
+  python3 -I -c '
+import ctypes, sys
+lib = ctypes.CDLL("/usr/lib/libproc.dylib")
+lib.proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+lib.proc_pidpath.restype = ctypes.c_int
+buf = ctypes.create_string_buffer(4096)
+n = lib.proc_pidpath(int(sys.argv[1]), buf, 4096)
+if n <= 0 or b"\0" in buf.raw[:n]:
+    sys.exit(1)
+sys.stdout.buffer.write(buf.raw[:n])
+' "$1" 2>/dev/null
+}
+
+# Whether <kid>, a live group member whose environment cannot be read, is the
+# agent's own platform helper (caffeinate, a tool shell): a proven descendant of
+# <pid> (fm_launch_proof_chain from <kid> to <pid>, every link re-read live),
+# whose executable path, read without its environment, is a platform binary
+# under /bin, /usr/bin, /usr/sbin or /System (not /System/Volumes, which holds
+# the writable data volume). Any failed read is no proof.
+fm_launch_proof_platform_descendant() { # <process-table> <pid> <kid>
+  local path
+  fm_launch_proof_chain "$1" "$3" "$2" || return 1
+  path=$(fm_launch_proof_pid_exe "$3") || return 1
+  case "$path" in *$'\n'*|*/./*|*/../*|*/.|*/..|/System/Volumes/*) return 1 ;; esac
+  case "$path" in /bin/?*|/usr/bin/?*|/usr/sbin/?*|/System/?*) return 0 ;; esac
+  return 1
+}
+
 # The refusal checks an agent whose token matches its versioned record must
 # pass before it is managed, for every harness (Main 1709 ruling 1, Main 1713
 # (1), Main 1716 (A) and (C), Main 1777 (1)). In this order: the process table, each other member of the agent's
-# process group (one environment read each: a pin for another generation or an
-# unreadable environment refuses, with no descendant exemption), the descendant
+# process group (one environment read each: a pin for another generation
+# refuses, and an unreadable environment refuses unless the member is the
+# agent's platform helper, fm_launch_proof_platform_descendant), the descendant
 # rule (every other member is an ancestor of the agent in its group or a proven
 # descendant of it), the agent's kernel working directory (the recorded home or
 # worktree), and the claim inventory. None is proof: each can only refuse. E3
@@ -507,7 +542,7 @@ fm_launch_proof_token_checks() { # <meta> <pid> <spawn-gen>
       && printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)='; then
       pinned=$(printf '%s\n' "$environment" | sed -n 's/^FM_SPAWN_GEN=//p')
       if [ -n "$pinned" ] && [ "$pinned" != "$gen" ] && [ -z "$foreign" ]; then foreign=$kid; fi
-    elif [ -z "$unread" ]; then
+    elif [ -z "$unread" ] && ! fm_launch_proof_platform_descendant "$table" "$pid" "$kid"; then
       unread=$kid
     fi
   done
