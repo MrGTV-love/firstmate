@@ -567,8 +567,10 @@
 #   after a pass-over, before launch, instead interrupts any `treehouse get` in the pane's foreground and proves from the
 #   process table that those processes are gone and that the pane rests in a copy this spawn passed over or leased in
 #   place; anything else (a get still alive, a pane resting in another copy, a foreground the backend cannot read, which
-#   is interrupted all the same) is an error. Either
-#   way the pane is recorded, read back, in $DATA/<task>/acquisition-pane.tsv. A recovered lease is freed by Treehouse itself
+#   is interrupted all the same) is an error. Only tmux reads the foreground. Every other backend, Herdr flat or projected
+#   included, always reports the abort as not clean: Herdr pass-over settlement and the Herdr projection branch
+#   (HERDR_PROJECTION_ABORT_CLEANUP, which a pass-over turns off) are untested, so no Herdr abort is ever called clean.
+#   Either way the pane is recorded, read back, in $DATA/<task>/acquisition-pane.tsv. A recovered lease is freed by Treehouse itself
 #   once the copy is idle, clean and landed. Each passed-over copy is a distinct copy the acquisition never accepts again,
 #   so the loop ends by the one absolute bound below or by the copies the pool has, with the refusal naming each copy.
 #   A pool state that cannot be read as exactly one consistent row for the copy (unreadable, a duplicate row by name or by
@@ -6261,19 +6263,11 @@ spawn_pane_pid() {
   printf '%s' "$pid"
 }
 # The pids of <target>'s foreground process group, one per line, from the process table: on tmux the processes of the
-# pane's tty in the tty's foreground group, on herdr `pane process-info`. Nothing when the backend cannot say.
+# pane's tty in the tty's foreground group. Nothing on every other backend. Herdr is deliberately absent: its pass-over
+# settlement and its projection branch are untested, so an empty read keeps every Herdr abort reported as not clean.
 spawn_foreground_pids() { # <target>
-  local out
   case "$BACKEND" in
     tmux) fm_backend_tmux_foreground_pids "$1" 2>/dev/null || true ;;
-    herdr)
-      # shellcheck disable=SC2016 # The single-quoted bash -c program expands its own positional arguments.
-      out=$(bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
-        _ "$SCRIPT_DIR" "${1%%:*}" "${1#*:}" 2>/dev/null </dev/null) || out=
-      printf '%s' "$out" | jq -r --arg pane "${1#*:}" '
-        select(.result.type == "pane_process_info" and .result.process_info.pane_id == $pane)
-        | .result.process_info.foreground_processes[]? | .pid | select(type == "number") | floor' 2>/dev/null || true
-      ;;
   esac
 }
 # Whether <pid> is a live process the kernel names `treehouse`: the launcher rule of bin/fm-slot-provision-lib.sh.
@@ -6286,8 +6280,10 @@ spawn_pid_is_treehouse() { # <pid>
 # Settle the acquisition pane on an abort after a pass-over, without closing it (the header owns why). A `treehouse get`
 # in the pane's foreground is interrupted through the backend and must then be gone from the process table, and the pane
 # must rest in a copy this spawn passed over or leased in place; a get still alive, a pane resting anywhere else, or a
-# foreground or path the backend cannot read (interrupted all the same) is an error. The outcome is recorded and read back in $DATA/<task>/acquisition-pane.tsv
-# (endpoint, outcome, detail, epoch). Returns 1 unless the pane was proved settled and recorded. Never exits.
+# foreground or path the backend cannot read (interrupted all the same) is an error. Only tmux can be proved settled: on
+# Herdr (flat or projected), which is untested here, and on every other backend the outcome is always unobservable. The
+# outcome is recorded and read back in $DATA/<task>/acquisition-pane.tsv (endpoint, outcome, detail, epoch). Returns 1
+# unless the pane was proved settled and recorded. Never exits.
 spawn_settle_passed_over_pane() {
   local target=$SPAWN_PASSED_OVER_PANE fg pid gets='' alive='' path='' outcome='' detail row i=0
   fg=$(spawn_foreground_pids "$target")
@@ -6644,7 +6640,8 @@ spawn_classify_copy() { # <path>
 # A copy the pool handed this spawn that already carries another holder's lease is passed over before anything is written to
 # it: no claim (the claim marker beside the copy is never created, replaced or removed), no lease command, no idle proof.
 # The pool state already holds the copy's lease, so this home adds no lease of its own. The pane is not closed for the rest
-# of this spawn, and an abort settles it instead (the header owns why). It is recorded in $DATA/<task>/skipped-copies.tsv
+# of this spawn, and an abort settles it instead (the header owns why); a Herdr pass-over, and the Herdr projection cleanup
+# this turns off, are untested, so a Herdr abort here is always reported as not clean. It is recorded in $DATA/<task>/skipped-copies.tsv
 # with the lease holder the pool state names in the holder column, never a holder this home could own, so
 # bin/fm-teardown.sh never returns it, and with the acquisition endpoint in the fifth column. The record is read back; a
 # record that cannot be written and read back refuses the whole spawn.
