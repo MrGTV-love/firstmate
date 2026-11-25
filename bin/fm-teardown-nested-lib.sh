@@ -576,8 +576,8 @@ teardown_removal_root_of() {  # <copy> <canonical-path>
   [ -z "${TASK_TMP:-}" ] || { roots+=("$TASK_TMP"); labels+=(scratch); }
   [ -z "${LAUNCH_HOME_TOKEN:-}" ] || { roots+=("/tmp/fm-$ID+$LAUNCH_HOME_TOKEN"); labels+=(scratch); }
   if [ -n "${STATE:-}" ]; then
-    roots+=("$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh")
-    labels+=(state state state state)
+    roots+=("$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/$ID.git-path" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh")
+    labels+=(state state state state state)
   fi
   for i in "${!roots[@]}"; do
     root=${roots[$i]%/}
