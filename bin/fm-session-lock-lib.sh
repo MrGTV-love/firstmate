@@ -405,23 +405,23 @@ EOF
 # contiguous harness ancestry that was not recorded by this same trusted Claude
 # session. Sets FM_SESSION_LOCK_FOREIGN_OWNER_PID for a diagnostic caller.
 # Malformed, missing, dead, and ancestry-uncertain locks are not foreign-owner
-# evidence; a holder that exists but cannot be read is.
+# evidence, and neither is a holder whose process read failed.
 # shellcheck disable=SC2034 # Output global, read by the sourcing guard caller.
 FM_SESSION_LOCK_FOREIGN_OWNER_PID=
 fm_session_lock_foreign_owner_live() {
-  local state=$1 lock_pid pids pid alive_rc
+  local state=$1 lock_pid pids pid
   FM_SESSION_LOCK_FOREIGN_OWNER_PID=
   [ -f "$state/.lock" ] && [ ! -L "$state/.lock" ] || return 1
   lock_pid=$(cat "$state/.lock" 2>/dev/null || true)
   case "$lock_pid" in
     ''|*[!0-9]*) return 1 ;;
   esac
-  # Status 2 (the holder exists but its process read failed) is foreign-owner
-  # evidence too: the holder is not proven dead, so the caller must stay
-  # read-only rather than arm or block as if the home had no live owner.
-  alive_rc=0
-  fm_harness_pid_alive "$lock_pid" || alive_rc=$?
-  [ "$alive_rc" -ne 1 ] || return 1
+  # Status 2 (the holder exists but its process read failed) is not proven to
+  # be a verified harness, so it is no foreign-owner evidence either: this
+  # answer lets the turn-end guard end a Stop unarmed, and that allowance stays
+  # exactly as narrow as before. The takeover protection for status 2 lives in
+  # bin/fm-lock.sh, which refuses.
+  fm_harness_pid_alive "$lock_pid" || return 1
   if fm_session_lock_requires_native_id "$state"; then
     fm_session_lock_owned_by_self "$state" && return 1
     FM_SESSION_LOCK_FOREIGN_OWNER_PID=$lock_pid

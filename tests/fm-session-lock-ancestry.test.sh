@@ -1229,6 +1229,51 @@ test_unreadable_live_holder_is_unknown_and_never_taken_over() {
   pass "session-lock: fm-lock.sh refuses an unreadable live holder, and still takes a gone or non-harness holder's lock"
 }
 
+# A live holder whose process read fails is not proven to be a verified harness,
+# so fm_session_lock_foreign_owner_live must not call it a foreign owner: that
+# answer lets bin/fm-turnend-guard.sh end a Stop unarmed. The caller chain here
+# is a real-shaped Claude session (700); the holder (810) is outside it.
+test_unreadable_holder_is_not_foreign_owner_evidence() {
+  local dir fakebin got
+  dir="$TMP_ROOT/foreign-unreadable"
+  fakebin=$(fm_fakebin "$dir")
+  mkdir -p "$dir/state"
+  cat > "$fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+set -u
+field= pid=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) field=$2; shift 2 ;;
+    -p) pid=$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+case "$pid:$field:${FM_TEST_HOLDER_MODE:-readable}" in
+  810:comm=:unreadable) echo 'ps: operation not permitted' >&2; exit 2 ;;
+  810:comm=:*) printf '%s\n' claude ;;
+  810:args=:*) printf '%s\n' 'claude --resume' ;;
+  810:ppid=:*) printf '%s\n' 1 ;;
+  700:comm=:*) printf '%s\n' claude ;;
+  700:args=:*) printf '%s\n' 'claude --resume' ;;
+  700:ppid=:*) printf '%s\n' 1 ;;
+  *:comm=:*) printf '%s\n' bash ;;
+  *:args=:*) printf '%s\n' 'bash /repo/bin/fm-turnend-guard.sh' ;;
+  *:ppid=:*) printf '%s\n' 700 ;;
+esac
+SH
+  chmod +x "$fakebin/ps"
+  printf '810\n' > "$dir/state/.lock"
+  # Non-vacuity: a readable live harness outside the chain is a foreign owner.
+  got=$(FM_TEST_HOLDER_MODE=readable foreign_owner "$fakebin" "$dir/state") || true
+  [ "$got" = 810 ] || fail "a readable live holder outside the chain was not a foreign owner (got '$got'), so this case proves nothing"
+  # The failed read must not widen that answer.
+  if got=$(FM_TEST_HOLDER_MODE=unreadable foreign_owner "$fakebin" "$dir/state"); then
+    fail "an unreadable live holder was called a foreign owner (pid $got), which would let the turn-end guard end a Stop unarmed"
+  fi
+  pass "session-lock: an unreadable live holder is not foreign-owner evidence, so the turn-end guard allows nothing more"
+}
+
 test_version_named_session_is_identified_on_both_platforms
 test_harness_at_namespace_pid1_is_examined
 test_ordinary_paths_are_never_harness_processes
@@ -1246,3 +1291,4 @@ test_failed_lock_write_restores_previous_sidecar
 test_failed_lock_write_removes_new_sidecar_when_none_existed
 test_verified_reclaim_keeps_new_sidecar
 test_unreadable_live_holder_is_unknown_and_never_taken_over
+test_unreadable_holder_is_not_foreign_owner_evidence
