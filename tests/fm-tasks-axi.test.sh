@@ -16,6 +16,8 @@ set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 WRAPPER="$ROOT/bin/fm-tasks-axi.sh"
 BOOTSTRAP="$ROOT/bin/fm-bootstrap.sh"
@@ -1241,6 +1243,539 @@ SH
   pass "ledger on: a proven done records one task.closed, a refusal or a Done row records none, and a failing ledger leaves the close alone"
 }
 
+# --duplicate-of: a never-dispatched row closes as a duplicate of a surviving item, with no
+# proof and no captain words, only when no work can exist for it. The fixture is a home, a
+# project repository, and rows built here; nothing outside the case directory is read or written.
+make_dup_case() {  # <name> [kind]: rows dup (the duplicate) and keep (the survivor) of project p
+  local dir
+  dir=$(make_split "$1")
+  mkdir -p "$dir/home/projects"
+  fm_git_init_commit "$dir/home/projects/p"
+  wrapper_from_code "$dir" add dup "the same work filed twice" --kind "${2:-ship}" --repo p >/dev/null \
+    || fail "could not add the duplicate row"
+  wrapper_from_code "$dir" add keep "the surviving item" --kind ship --repo p >/dev/null \
+    || fail "could not add the survivor row"
+  printf '%s\n' "$dir"
+}
+
+# Everything a refused close must leave exactly as it was: the backlog, the home's state and
+# data files, and the project's refs.
+dup_snapshot() {  # <case-dir>
+  cat "$1/home/data/backlog.md"
+  (cd "$1/home" && find state data -print | sort)
+  git -C "$1/home/projects/p" for-each-ref
+}
+
+dup_note_of() {  # <case-dir> <id>: the stored note of a row, or nothing
+  wrapper_from_code "$1" show "$2" 2>&1 | sed -n 's/^  body: *//p' | head -1
+}
+
+# One refused close: exit 2, a message naming the fact, and nothing changed.
+dup_refused() {  # <case-dir> <label> <message-fragment> <wrapper args...>
+  local dir=$1 label=$2 want=$3 before out rc=0
+  shift 3
+  before=$(dup_snapshot "$dir")
+  out=$(wrapper_from_code "$dir" "$@" 2>&1) || rc=$?
+  [ "$rc" -eq 2 ] || fail "$label: expected a refusal (exit 2), got $rc: $out"
+  assert_contains "$out" "$want" "$label: the refusal does not name the fact"
+  [ "$(dup_snapshot "$dir")" = "$before" ] || fail "$label: a refused close changed the home"
+}
+
+test_duplicate_close_of_a_never_dispatched_row() {
+  local dir kind id n spelling form out state ledger
+  local -a spellings=("done" "close" "task done" "task close") words
+  for kind in ship scout; do
+    dir=$(make_dup_case "dup-close-$kind" "$kind")
+    n=0
+    for spelling in "${spellings[@]}"; do
+      for form in split equals; do
+        id=dup
+        [ "$n" -eq 0 ] || id=dup-$n
+        if [ "$n" -ne 0 ]; then
+          wrapper_from_code "$dir" add "$id" "$kind filed twice" --kind "$kind" --repo p >/dev/null || fail "could not add $id"
+        fi
+        mkdir -p "$dir/home/data/$id"
+        printf '# brief\n' > "$dir/home/data/$id/brief.md"
+        printf '# done\n' > "$dir/home/data/$id/dod.md"
+        read -r -a words <<< "$spelling"
+        if [ "$form" = split ]; then
+          out=$(wrapper_from_code "$dir" "${words[@]}" "$id" --duplicate-of keep 2>&1) || fail "$kind $spelling $form: the close was refused: $out"
+        else
+          out=$(wrapper_from_code "$dir" "${words[@]}" "$id" --duplicate-of=keep 2>&1) || fail "$kind $spelling $form: the close was refused: $out"
+        fi
+        [ "$(row_state "$dir" "$id")" = x ] || fail "$kind $spelling $form: $id is not Done"
+        assert_equals "duplicate of keep" "$(dup_note_of "$dir" "$id")" "$kind $spelling $form: the fixed note"
+        state=$(wrapper_from_code "$dir" show "$id" 2>&1 | sed -n 's/^  state: *//p' | head -1)
+        assert_equals "done" "$state" "$kind $spelling $form: the row state"
+        assert_equals "brief.md
+dod.md" "$(ls -A "$dir/home/data/$id")" "$kind $spelling $form: the close wrote into the row's data directory"
+        n=$((n + 1))
+      done
+    done
+    assert_equals " " "$(row_state "$dir" keep)" "$kind: the survivor changed"
+    assert_equals "" "$(ls -A "$dir/home/state")" "$kind: a close left a state file"
+  done
+
+  # The survivor may already be Done by a report or the captain's drop (a merged pull request
+  # is the same Done state).
+  dir=$(make_dup_case dup-done-survivors)
+  mkdir -p "$dir/home/data/by-report" "$dir/home/data/by-drop"
+  printf '# findings\n' > "$dir/home/data/by-report/report.md"
+  printf 'Drop it.\n' > "$dir/words"
+  wrapper_from_code "$dir" add by-report "a scout that reported" --kind scout --repo p >/dev/null
+  wrapper_from_code "$dir" add by-drop "a ship the captain dropped" --kind ship --repo p >/dev/null
+  wrapper_from_code "$dir" task close by-report --report data/by-report/report.md >/dev/null || fail "could not close the report survivor"
+  wrapper_from_code "$dir" "done" by-drop --drop-file "$dir/words" >/dev/null || fail "could not close the dropped survivor"
+  for id in by-report by-drop; do
+    wrapper_from_code "$dir" add "twin-$id" "twin of $id" --kind ship --repo p >/dev/null
+    wrapper_from_code "$dir" "done" "twin-$id" --duplicate-of "$id" >/dev/null 2>&1 || fail "a Done survivor ($id) was refused"
+    assert_equals "duplicate of $id" "$(dup_note_of "$dir" "twin-$id")" "the note for the $id survivor"
+  done
+
+  # Near misses do not block: other ids, a longer branch name, another task's records.
+  dir=$(make_dup_case dup-near-misses)
+  git -C "$dir/home/projects/p" branch fm/dup2
+  git -C "$dir/home/projects/p" branch fm/xdup
+  git -C "$dir/home/projects/p" branch fm/dup-x
+  git -C "$dir/home/projects/p" worktree add --quiet --detach "$dir/copies/dup2"
+  printf 'kind=ship\n' > "$dir/home/state/dup2.meta"
+  : > "$dir/home/state/dup2.status"
+  mkdir -p "$dir/home/data/dup2"
+  : > "$dir/home/data/dup2/report.md"
+  out=$(wrapper_from_code "$dir" "done" dup --duplicate-of keep 2>&1) || fail "records of another id blocked the close: $out"
+  [ "$(row_state "$dir" dup)" = x ] || fail "the near-miss fixture did not close"
+
+  # The fleet ledger records the close with no deliverable evidence.
+  dir=$(make_dup_case dup-ledger)
+  : > "$dir/home/config/fleet-ledger"
+  rm -f "$dir/home/state/fleet-ledger.jsonl"
+  wrapper_from_code "$dir" "done" dup --duplicate-of keep >/dev/null 2>&1 || fail "the ledger-on close failed"
+  ledger=$(jq -c 'select(.event == "task.closed") | [.task, .evidence]' "$dir/home/state/fleet-ledger.jsonl")
+  assert_equals '["dup","none"]' "$ledger" "the task.closed record of a duplicate close"
+  pass "--duplicate-of closes a never-dispatched ship or scout row in every spelling and flag form, with the fixed note, and nothing else"
+}
+
+# The note-close shape of the original instance stays refused: a note alone is no proof.
+# This case passes at the base and at the head alike.
+test_duplicate_note_close_stays_refused() {
+  local dir out
+  for kind in ship scout; do
+    dir=$(make_dup_case "dup-note-shape-$kind" "$kind")
+    out=$(completion_refused "$dir" "the instance's note close" "done" dup --note "duplicate of keep")
+    assert_contains "$out" "completion needs proof of the deliverable" "the note close lost its proof refusal"
+    [ "$(row_state "$dir" dup)" = " " ] || fail "a refused note close closed the row"
+  done
+  pass "a note alone still does not close a never-dispatched ship or scout row"
+}
+
+test_duplicate_close_grammar_and_combinations() {
+  local dir flag value before
+  dir=$(make_dup_case dup-grammar)
+  dup_refused "$dir" "a repeated flag" "only once" "done" dup --duplicate-of keep --duplicate-of keep
+  dup_refused "$dir" "a repeated flag in = form" "only once" "done" dup --duplicate-of=keep --duplicate-of=keep
+  dup_refused "$dir" "mixed repeated forms" "only once" close dup --duplicate-of keep --duplicate-of=keep
+  dup_refused "$dir" "no value" "requires a value" "done" dup --duplicate-of
+  dup_refused "$dir" "an empty value" "requires a value" "done" dup --duplicate-of ""
+  dup_refused "$dir" "an empty = value" "requires a value" "done" dup --duplicate-of=
+  dup_refused "$dir" "an option-like value" "requires a value" "done" dup --duplicate-of --pr
+  dup_refused "$dir" "an option-like = value" "requires a value" "done" dup "--duplicate-of=--note"
+  dup_refused "$dir" "a value that is not an id" "plain task id" "done" dup --duplicate-of "a/b"
+  dup_refused "$dir" "no survivor and no proof" "completion needs proof" "done" dup
+  for flag in start reopen; do
+    dup_refused "$dir" "$flag takes no survivor" "unsupported $flag option" "$flag" dup --duplicate-of keep
+  done
+  # Help never mutates, with or without the new flag.
+  before=$(dup_snapshot "$dir")
+  wrapper_from_code "$dir" "done" dup --duplicate-of keep --help >/dev/null 2>&1 || fail "help with the flag failed"
+  [ "$(dup_snapshot "$dir")" = "$before" ] || fail "help with the flag changed the home"
+  # A row of another kind, a missing row, and a done row are not closed through this surface.
+  wrapper_from_code "$dir" add plain "a plain note" --kind docs --repo p >/dev/null
+  dup_refused "$dir" "a row that is not a ship or scout" "not a ship or scout row" "done" plain --duplicate-of keep
+  dup_refused "$dir" "a row that does not exist" "not in the backlog" "done" ghost --duplicate-of keep
+  wrapper_from_code "$dir" "done" dup --duplicate-of keep >/dev/null || fail "the clean close failed"
+  dup_refused "$dir" "a row that is already Done" "not a plain queued row" "done" dup --duplicate-of keep
+  # Combined with any other completion surface the flag refuses, in either order.
+  dir=$(make_dup_case dup-combinations)
+  printf 'Drop it.\n' > "$dir/words"
+  for value in "--drop-file $dir/words" "--pr https://github.com/o/r/pull/9" "--report data/dup/report.md" "--note x"; do
+    # shellcheck disable=SC2086
+    dup_refused "$dir" "combined with ${value%% *}" "do not combine --duplicate-of" "done" dup --duplicate-of keep $value
+    # shellcheck disable=SC2086
+    dup_refused "$dir" "combined with ${value%% *} first" "do not combine --duplicate-of" "done" dup $value --duplicate-of keep
+  done
+  pass "--duplicate-of refuses a repeated, empty, option-like or combined use and every other row, before any write"
+}
+
+# The flipped facts of R2: each is ONE change to the closing fixture, with the fragment the
+# refusal must name and the undo that must make the same row close again. FLIP_ARGS, FLIP_ENV,
+# FLIP_WANT and FLIP_UNDO are the case's outputs.
+dup_apply_flip() {  # <case-dir> <flip>
+  local dir=$1 flip=$2 home=$1/home p=$1/home/projects/p
+  FLIP_ARGS=("done" dup --duplicate-of keep)
+  FLIP_ENV=()
+  FLIP_WANT=
+  FLIP_UNDO=
+  case "$flip" in
+    a-task-record)
+      printf 'kind=ship\n' > "$home/state/dup.meta"
+      FLIP_WANT="has a task record"; FLIP_UNDO="rm -f '$home/state/dup.meta'" ;;
+    b-status)
+      : > "$home/state/dup.status"
+      FLIP_WANT="has a dispatch file"; FLIP_UNDO="rm -f '$home/state/dup.status'" ;;
+    b-inbox)
+      mkdir -p "$home/state/dup.inbox"
+      FLIP_WANT="has a dispatch file"; FLIP_UNDO="rmdir '$home/state/dup.inbox'" ;;
+    b-launch-models)
+      : > "$home/state/dup.launch-models"
+      FLIP_WANT="has a dispatch file"; FLIP_UNDO="rm -f '$home/state/dup.launch-models'" ;;
+    b-control-file)
+      : > "$home/state/.control-dup.pending"
+      FLIP_WANT="has a dispatch file"; FLIP_UNDO="rm -f '$home/state/.control-dup.pending'" ;;
+    c-default-prefix)
+      git -C "$p" branch fm/dup
+      FLIP_WANT="has a branch (refs/heads/fm/dup)"; FLIP_UNDO="git -C '$p' branch -q -D fm/dup" ;;
+    c-custom-prefix)
+      git -C "$p" branch crew/dup
+      FLIP_WANT="has a branch (refs/heads/crew/dup)"; FLIP_UNDO="git -C '$p' branch -q -D crew/dup" ;;
+    c-bare-branch)
+      git -C "$p" branch dup
+      FLIP_WANT="has a branch (refs/heads/dup)"; FLIP_UNDO="git -C '$p' branch -q -D dup" ;;
+    c-remote-ref)
+      git -C "$p" update-ref refs/remotes/origin/fm/dup HEAD
+      FLIP_WANT="has a branch (refs/remotes/origin/fm/dup)"; FLIP_UNDO="git -C '$p' update-ref -d refs/remotes/origin/fm/dup" ;;
+    d-worktree)
+      git -C "$p" worktree add --quiet --detach "$dir/copies/dup"
+      FLIP_WANT="has a copy"; FLIP_UNDO="git -C '$p' worktree remove --force '$dir/copies/dup'" ;;
+    d-recorded-copy)
+      mkdir -p "$home/data/dup"
+      printf '%s\tskipped\tfirstmate-skipped:dup\t1\n' "$dir/copies/dup" > "$home/data/dup/skipped-copies.tsv"
+      FLIP_WANT="has a recorded copy"; FLIP_UNDO="rm -rf '$home/data/dup'" ;;
+    e-extra-file)
+      mkdir -p "$home/data/dup"
+      : > "$home/data/dup/report.md"
+      FLIP_WANT="holds"; FLIP_UNDO="rm -rf '$home/data/dup'" ;;
+    e-hidden-file)
+      mkdir -p "$home/data/dup"
+      : > "$home/data/dup/.notes"
+      FLIP_WANT="holds"; FLIP_UNDO="rm -rf '$home/data/dup'" ;;
+    e-subdirectory)
+      mkdir -p "$home/data/dup/work"
+      FLIP_WANT="holds"; FLIP_UNDO="rm -rf '$home/data/dup'" ;;
+    e-brief-is-a-link)
+      mkdir -p "$home/data/dup"
+      ln -s /dev/null "$home/data/dup/brief.md"
+      FLIP_WANT="is not a plain file"; FLIP_UNDO="rm -rf '$home/data/dup'" ;;
+    f-survivor-missing)
+      FLIP_ARGS=("done" dup --duplicate-of nosuch)
+      FLIP_WANT="is not in the backlog"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of keep)" ;;
+    g-survivor-is-the-row)
+      FLIP_ARGS=("done" dup --duplicate-of dup)
+      FLIP_WANT="cannot be a duplicate of itself"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of keep)" ;;
+    h-survivor-is-a-duplicate)
+      wrapper_from_code "$dir" add other "a third item" --kind ship --repo p >/dev/null
+      wrapper_from_code "$dir" "done" keep --duplicate-of other >/dev/null || fail "could not close the survivor as a duplicate"
+      FLIP_WANT="is itself closed as a duplicate"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of other)" ;;
+    h-cycle)
+      wrapper_from_code "$dir" "done" keep --duplicate-of dup >/dev/null || fail "could not close the survivor as a duplicate of the row"
+      wrapper_from_code "$dir" add other "a third item" --kind ship --repo p >/dev/null
+      FLIP_WANT="is itself closed as a duplicate"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of other)" ;;
+    i-in-flight)
+      wrapper_from_code "$dir" start dup >/dev/null || fail "could not start the row"
+      FLIP_WANT="not a plain queued row"; FLIP_UNDO="wrapper_from_code '$dir' reopen dup >/dev/null" ;;
+    i-blocked-by-edge)
+      wrapper_from_code "$dir" add dupb "waits on the survivor" --kind ship --repo p --blocked-by keep >/dev/null
+      FLIP_ARGS=("done" dupb --duplicate-of keep)
+      FLIP_WANT="not a plain queued row"; FLIP_UNDO="wrapper_from_code '$dir' unblock dupb --by keep >/dev/null" ;;
+    i-captain-hold)
+      wrapper_from_code "$dir" hold dup --reason "captain decides" --kind captain >/dev/null || fail "could not hold the row"
+      FLIP_WANT="not a plain queued row"; FLIP_UNDO="wrapper_from_code '$dir' unhold dup >/dev/null" ;;
+    i-plain-hold)
+      wrapper_from_code "$dir" hold dup --reason "waiting" >/dev/null || fail "could not hold the row"
+      FLIP_WANT="not a plain queued row"; FLIP_UNDO="wrapper_from_code '$dir' unhold dup >/dev/null" ;;
+    j-drop-file)
+      printf 'Drop it.\n' > "$dir/words"
+      FLIP_ARGS=("done" dup --duplicate-of keep --drop-file "$dir/words")
+      FLIP_WANT="do not combine --duplicate-of"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of keep)" ;;
+    j-pr)
+      FLIP_ARGS=("done" dup --duplicate-of keep --pr https://github.com/o/r/pull/9)
+      FLIP_WANT="do not combine --duplicate-of"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of keep)" ;;
+    j-report)
+      FLIP_ARGS=("done" dup --duplicate-of keep --report data/dup/report.md)
+      FLIP_WANT="do not combine --duplicate-of"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of keep)" ;;
+    j-note)
+      FLIP_ARGS=("done" dup --duplicate-of keep --note "duplicate of keep")
+      FLIP_WANT="do not combine --duplicate-of"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of keep)" ;;
+    k-no-repo-field)
+      wrapper_from_code "$dir" add norepo "no repo field" --kind ship >/dev/null
+      FLIP_ARGS=("done" norepo --duplicate-of keep)
+      FLIP_WANT="has no usable repo field" ;;
+    k-project-missing)
+      wrapper_from_code "$dir" add lost "its project is gone" --kind ship --repo lost >/dev/null
+      FLIP_ARGS=("done" lost --duplicate-of keep)
+      FLIP_WANT="is not at"; FLIP_UNDO="fm_git_init_commit '$home/projects/lost'" ;;
+    k-project-not-a-repository)
+      mkdir -p "$home/projects/plain"
+      wrapper_from_code "$dir" add plain "its project is no repository" --kind ship --repo plain >/dev/null
+      FLIP_ARGS=("done" plain --duplicate-of keep)
+      FLIP_WANT="is not a git repository of its own"; FLIP_UNDO="fm_git_init_commit '$home/projects/plain'" ;;
+    k-project-inside-another-repository)
+      git -C "$home" init -q -b main
+      mkdir -p "$home/projects/nested"
+      wrapper_from_code "$dir" add nested "its project sits inside the home's own repository" --kind ship --repo nested >/dev/null
+      FLIP_ARGS=("done" nested --duplicate-of keep)
+      FLIP_WANT="is not a git repository of its own"; FLIP_UNDO="git -C '$home/projects/nested' init -q -b main" ;;
+    k-projects-path-unresolvable)
+      FLIP_ENV=("FM_PROJECTS_OVERRIDE=$dir/nowhere")
+      FLIP_WANT="is not at"; FLIP_UNDO="FLIP_ENV=()" ;;
+    l-another-row-waits)
+      wrapper_from_code "$dir" add blk "waits on the duplicate" --kind ship --repo p --blocked-by dup >/dev/null
+      FLIP_WANT="blk waits on dup"; FLIP_UNDO="wrapper_from_code '$dir' unblock blk --by dup >/dev/null" ;;
+    m-open-call-with-the-pr-close-flag)
+      wrapper_from_code "$dir" hold dup --reason "captain decides" --kind captain >/dev/null || fail "could not hold the row"
+      FLIP_ENV=("FM_TASKS_AXI_REFUSE_OPEN_CALL=1")
+      FLIP_WANT="is an open owner call"; FLIP_UNDO="wrapper_from_code '$dir' unhold dup >/dev/null; FLIP_ENV=()" ;;
+    *) fail "unknown flipped fact $flip" ;;
+  esac
+}
+
+dup_run_flip() {  # <case-dir>: runs FLIP_ARGS under FLIP_ENV; sets FLIP_OUT and FLIP_RC
+  local kv
+  FLIP_RC=0
+  FLIP_OUT=$(
+    for kv in ${FLIP_ENV[@]+"${FLIP_ENV[@]}"}; do export "${kv?}"; done
+    wrapper_from_code "$1" "${FLIP_ARGS[@]}" 2>&1
+  ) || FLIP_RC=$?
+}
+
+DUP_FLIPS="a-task-record b-status b-inbox b-launch-models b-control-file
+c-default-prefix c-custom-prefix c-bare-branch c-remote-ref d-worktree d-recorded-copy
+e-extra-file e-hidden-file e-subdirectory e-brief-is-a-link f-survivor-missing g-survivor-is-the-row
+h-survivor-is-a-duplicate h-cycle i-in-flight i-blocked-by-edge i-captain-hold i-plain-hold
+j-drop-file j-pr j-report j-note k-no-repo-field k-project-missing k-project-not-a-repository
+k-project-inside-another-repository k-projects-path-unresolvable l-another-row-waits
+m-open-call-with-the-pr-close-flag"
+
+test_duplicate_close_refuses_each_flipped_fact() {
+  local dir flip before id count=0
+  for flip in $DUP_FLIPS; do
+    dir=$(make_dup_case "flip-$flip")
+    dup_apply_flip "$dir" "$flip"
+    before=$(dup_snapshot "$dir")
+    dup_run_flip "$dir"
+    [ "$FLIP_RC" -eq 2 ] || fail "$flip: expected a refusal (exit 2), got $FLIP_RC: $FLIP_OUT"
+    assert_contains "$FLIP_OUT" "$FLIP_WANT" "$flip: the refusal does not name the fact"
+    [ "$(dup_snapshot "$dir")" = "$before" ] || fail "$flip: a refused close changed the home"
+    id=${FLIP_ARGS[1]}
+    [ "$(row_state "$dir" "$id")" = " " ] || fail "$flip: the refused row $id is not still open"
+    # The paired legitimate action: undo that one fact and the same row closes.
+    if [ -n "$FLIP_UNDO" ]; then
+      eval "$FLIP_UNDO"
+      dup_run_flip "$dir"
+      [ "$FLIP_RC" -eq 0 ] || fail "$flip: with the fact undone the close was still refused: $FLIP_OUT"
+      [ "$(row_state "$dir" "${FLIP_ARGS[1]}")" = x ] || fail "$flip: with the fact undone the row did not close"
+    fi
+    printf 'ok: %s refused (%s)\n' "$flip" "$FLIP_WANT"
+    count=$((count + 1))
+  done
+  pass "--duplicate-of refuses each of $count flipped facts naming the fact and changing nothing, and closes once the one fact is undone"
+}
+
+# A close that waits for the lifecycle lock re-reads every fact after the wait, and a fresh
+# spawn cannot start while the close holds the lock.
+dup_stand_in_tasks_axi() {  # <case-dir> <real-tasks-axi>
+  cat > "$1/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$1/tasks-log"
+if [ "\${1:-}" = show ] && [ "\${2:-}" = dup ] && [ -n "\${FAKE_HOLD_SHOW:-}" ] && [ ! -e "$1/show-released" ]; then
+  : > "$1/show-entered"
+  while [ ! -e "$1/show-released" ]; do sleep 0.05; done
+fi
+exec "$2" "\$@"
+SH
+  chmod +x "$1/fakebin/tasks-axi"
+}
+
+dup_hold_control_lock() {  # <case-dir>: a live holder of state/.control-dup.lock until <dir>/unlock exists
+  FM_HOME="$1/home" bash -c '
+    . "$1"
+    lock="$STATE/.control-dup.lock"
+    fm_lock_acquire_wait "$lock"
+    trap '\''fm_lock_release "$lock"'\'' EXIT
+    : > "$2/locked"
+    while [ ! -e "$2/unlock" ]; do sleep 0.05; done
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$1" &
+  DUP_HOLDER=$!
+  wait_mutation_fixture "$1/locked" "control lock holder" "$DUP_HOLDER"
+}
+
+test_duplicate_close_decides_inside_the_lock() (
+  local dir='' real child='' rc out spawn_fake
+  DUP_HOLDER=''
+  trap '[ -z "$dir" ] || touch "$dir/unlock" "$dir/show-released"; [ -z "$child" ] || kill "$child" 2>/dev/null || true; [ -z "$DUP_HOLDER" ] || kill "$DUP_HOLDER" 2>/dev/null || true' EXIT
+  real=$(command -v tasks-axi)
+
+  # A record that appears while the close waits for the lock refuses the close.
+  dir=$(make_dup_case dup-lock-record)
+  fm_fakebin "$dir" >/dev/null
+  make_mutation_wait_sleep "$dir/fakebin"
+  dup_stand_in_tasks_axi "$dir" "$real"
+  dup_hold_control_lock "$dir"
+  PATH="$dir/fakebin:$PATH" FAKE_LOCK_WAIT="$dir/lock-wait" \
+    wrapper_from_code "$dir" "done" dup --duplicate-of keep > "$dir/result" 2>&1 &
+  child=$!
+  wait_mutation_fixture "$dir/lock-wait" "the close waiting for the lock" "$child" "$dir/result"
+  [ ! -s "$dir/tasks-log" ] || fail "the close read or changed the backlog before it held the lock: $(cat "$dir/tasks-log")"
+  printf 'kind=ship\n' > "$dir/home/state/dup.meta"
+  : > "$dir/unlock"
+  wait "$DUP_HOLDER" || fail "the lock holder failed"
+  DUP_HOLDER=''
+  rc=0
+  wait "$child" || rc=$?
+  child=''
+  out=$(cat "$dir/result")
+  expect_code 2 "$rc" "a close that waited while a spawn recorded the task"
+  assert_contains "$out" "has a task record" "the close did not re-read the record that appeared while it waited"
+  [ "$(row_state "$dir" dup)" = " " ] || fail "a close proceeded after the task record appeared"
+  assert_absent "$dir/home/state/.control-dup.lock" "the refused close leaked control custody"
+
+  # While the close holds the lock, a fresh spawn of the same id is refused.
+  dir=$(make_dup_case dup-lock-spawn)
+  fm_fakebin "$dir" >/dev/null
+  dup_stand_in_tasks_axi "$dir" "$real"
+  spawn_fake=$(make_spawn_fakebin "$dir/spawn-fake" pi opencode claude codex gemini)
+  fm_test_spawn_home "$dir/home" claude
+  fm_git_worktree "$dir/spawn-project" "$dir/spawn-copy" wt-dup-lock
+  fm_test_spawn_brief "$dir/home" dup
+  PATH="$dir/fakebin:$PATH" FAKE_HOLD_SHOW=1 \
+    wrapper_from_code "$dir" "done" dup --duplicate-of keep > "$dir/result" 2>&1 &
+  child=$!
+  wait_mutation_fixture "$dir/show-entered" "the close inside its checks" "$child" "$dir/result"
+  rc=0
+  out=$(fm_test_run_spawn "$dir/home" "$dir/spawn-copy" "$spawn_fake" dup "$dir/spawn-project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 1 "$rc" "a fresh spawn while the close holds the lock"
+  assert_contains "$out" "another lifecycle action" "the spawn was not refused by the close's lock"
+  assert_absent "$dir/home/state/dup.meta" "the refused spawn recorded a task"
+  : > "$dir/show-released"
+  rc=0
+  wait "$child" || rc=$?
+  child=''
+  [ "$rc" -eq 0 ] || fail "the close failed after the spawn was refused: $(cat "$dir/result")"
+  [ "$(row_state "$dir" dup)" = x ] || fail "the close did not finish after the spawn was refused"
+  assert_absent "$dir/home/state/.control-dup.lock" "the close leaked control custody"
+  pass "a duplicate close re-checks after waiting for the lifecycle lock and holds it against a fresh spawn"
+)
+
+# The controlled faults of R4: an isolated copy of the wrapper with ONE check removed. The
+# copy shares every other script of bin/ by link, so only that check differs; the shipped
+# script is never touched. A fault counts only when the flipped fact then closes the row.
+dup_make_mutant() {  # <case-dir> <name>
+  local dir=$1 name=$2 bindir f where text
+  where=$(dup_mutant_where "$name")
+  text=$(dup_mutant_text "$name")
+  bindir="$dir/mutant-$name"
+  mkdir -p "$bindir"
+  for f in "$ROOT"/bin/*; do ln -s "$f" "$bindir/${f##*/}"; done
+  rm -f "$bindir/fm-tasks-axi.sh"
+  OVERRIDE=$text WHERE=$where awk '
+    BEGIN { where = ENVIRON["WHERE"]; text = ENVIRON["OVERRIDE"] }
+    where == "before-guard" && $0 == "guard_completion" { print text }
+    { print }
+    where == "after-wake-lib" && $0 == "  . \"$SCRIPT_DIR/fm-wake-lib.sh\"" { print text }
+  ' "$WRAPPER" > "$bindir/fm-tasks-axi.sh"
+  chmod +x "$bindir/fm-tasks-axi.sh"
+  if cmp -s "$WRAPPER" "$bindir/fm-tasks-axi.sh"; then
+    fail "the controlled fault $name did not change the copy"
+  fi
+  printf '%s\n' "$bindir/fm-tasks-axi.sh"
+}
+
+dup_mutant_where() {  # <name>: where the replacement definitions go in the copy
+  case "$1" in
+    lock) printf 'after-wake-lib\n' ;;
+    *) printf 'before-guard\n' ;;
+  esac
+}
+
+# shellcheck disable=SC2016 # The definitions are source text for the copy, not expanded here.
+dup_mutant_text() {  # <name>: the replacement definitions
+  case "$1" in
+    a-task-record) printf '%s\n' 'dup_refuse_task_record() { return 0; }' ;;
+    b-dispatch-files) printf '%s\n' 'dup_refuse_dispatch_files() { return 0; }' ;;
+    c-any-branch) printf '%s\n' 'dup_refuse_branch() { return 0; }' ;;
+    c-default-prefix-only) printf '%s\n' 'dup_refuse_branch() { ! dup_git "$2" show-ref --verify --quiet "refs/heads/fm/$1" || fail "$1 has a branch (refs/heads/fm/$1), so work may exist"; }' ;;
+    d-copies) printf '%s\n' 'dup_refuse_copy() { return 0; }' ;;
+    d-e-copies-and-work-dir) printf '%s\n' 'dup_refuse_copy() { return 0; }' 'dup_refuse_work_dir() { return 0; }' ;;
+    e-work-dir) printf '%s\n' 'dup_refuse_work_dir() { return 0; }' ;;
+    i-row-state) printf '%s\n' 'dup_refuse_row_state() { return 0; }' ;;
+    l-dependents) printf '%s\n' 'dup_refuse_dependents() { return 0; }' ;;
+    lock) printf '%s\n' 'fm_lock_acquire_wait() { return 0; }' 'fm_lock_release() { return 0; }' ;;
+    *) fail "unknown controlled fault $1" ;;
+  esac
+}
+
+test_duplicate_close_checks_are_each_load_bearing() (
+  local name flips other flip dir script expected
+  # name | flipped facts the fault must let through | a fact the faulty copy must still refuse
+  while IFS='|' read -r name flips other; do
+    [ -n "$name" ] || continue
+    for flip in $flips; do
+      dir=$(make_dup_case "mutant-$name-$flip")
+      dup_apply_flip "$dir" "$flip"
+      # The shipped script refuses this very fixture, naming the fact.
+      dup_run_flip "$dir"
+      [ "$FLIP_RC" -eq 2 ] || fail "$name/$flip: the shipped script did not refuse the fixture: $FLIP_OUT"
+      assert_contains "$FLIP_OUT" "$FLIP_WANT" "$name/$flip: the shipped refusal"
+      expected=$FLIP_OUT
+      script=$(dup_make_mutant "$dir" "$name")
+      WRAPPER=$script dup_run_flip "$dir"
+      [ "$FLIP_RC" -eq 0 ] || fail "$name/$flip: with the check removed the fixture was still refused (a setup problem, not the check?): $FLIP_OUT"
+      [ "$(row_state "$dir" "${FLIP_ARGS[1]}")" = x ] || fail "$name/$flip: with the check removed the row did not close"
+      printf 'fault %s: %s then closed the row; the shipped script refused it with: %s\n' "$name" "$flip" "$expected"
+    done
+    # The faulty copy still refuses a fact it has no fault for, so only that check is gone.
+    dir=$(make_dup_case "mutant-$name-control")
+    dup_apply_flip "$dir" "$other"
+    script=$(dup_make_mutant "$dir" "$name")
+    WRAPPER=$script dup_run_flip "$dir"
+    [ "$FLIP_RC" -eq 2 ] || fail "$name: the faulty copy no longer refuses $other: $FLIP_OUT"
+    assert_contains "$FLIP_OUT" "$FLIP_WANT" "$name: the faulty copy's refusal of $other"
+  done <<'TABLE'
+a-task-record|a-task-record|e-extra-file
+b-dispatch-files|b-status b-inbox b-launch-models b-control-file|a-task-record
+c-any-branch|c-default-prefix c-custom-prefix c-bare-branch c-remote-ref|a-task-record
+c-default-prefix-only|c-custom-prefix|c-default-prefix
+d-copies|d-worktree|a-task-record
+d-e-copies-and-work-dir|d-recorded-copy|a-task-record
+e-work-dir|e-extra-file e-hidden-file e-subdirectory e-brief-is-a-link|a-task-record
+i-row-state|i-in-flight i-blocked-by-edge i-captain-hold i-plain-hold|a-task-record
+l-dependents|l-another-row-waits|a-task-record
+TABLE
+  pass "removing any one check lets its flipped fact close the row, while the shipped script refuses it"
+)
+
+test_duplicate_close_lock_fault_lets_a_late_record_through() (
+  local dir='' child='' rc out script
+  DUP_HOLDER=''
+  trap '[ -z "$dir" ] || touch "$dir/unlock"; [ -z "$child" ] || kill "$child" 2>/dev/null || true; [ -z "$DUP_HOLDER" ] || kill "$DUP_HOLDER" 2>/dev/null || true' EXIT
+  dir=$(make_dup_case dup-lock-fault)
+  fm_fakebin "$dir" >/dev/null
+  make_mutation_wait_sleep "$dir/fakebin"
+  script=$(dup_make_mutant "$dir" lock)
+  dup_hold_control_lock "$dir"
+  rc=0
+  PATH="$dir/fakebin:$PATH" FAKE_LOCK_WAIT="$dir/lock-wait" WRAPPER=$script \
+    wrapper_from_code "$dir" "done" dup --duplicate-of keep > "$dir/result" 2>&1 || rc=$?
+  out=$(cat "$dir/result")
+  [ ! -e "$dir/lock-wait" ] || fail "the lockless copy still waited for the lock: $out"
+  [ "$rc" -eq 0 ] || fail "the lockless copy did not close while the holder held the lock: $out"
+  [ "$(row_state "$dir" dup)" = x ] || fail "the lockless copy did not close the row"
+  : > "$dir/unlock"
+  wait "$DUP_HOLDER" || fail "the lock holder failed"
+  DUP_HOLDER=''
+  printf 'fault lock: the close ran while another process held state/.control-dup.lock, so a record created then would not have been seen\n'
+  pass "without its lock the close does not wait for a holder, so the lock is what serializes it"
+)
+
 if [ "$#" -gt 0 ]; then
   fm_test_run_cases -- "$@"
   exit 0
@@ -1276,6 +1811,13 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_add_records_task_filed_once
   test_add_ledger_off_and_failing_ledger_leave_add_alone
   test_completion_records_task_closed_once_with_its_proof
+  test_duplicate_close_of_a_never_dispatched_row
+  test_duplicate_note_close_stays_refused
+  test_duplicate_close_grammar_and_combinations
+  test_duplicate_close_refuses_each_flipped_fact
+  test_duplicate_close_decides_inside_the_lock || exit "$?"
+  test_duplicate_close_checks_are_each_load_bearing || exit "$?"
+  test_duplicate_close_lock_fault_lets_a_late_record_through || exit "$?"
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi
