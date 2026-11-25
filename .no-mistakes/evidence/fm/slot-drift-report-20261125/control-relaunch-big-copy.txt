@@ -1,0 +1,20 @@
+== fm-control.sh bigcopy relaunch: exit=0 elapsed=9s
+== output lines: 56
+== drift-report lines in output:
+relaunch drift report for bigcopy: 32402 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored build/mod000/obj000.gen
+  drift: uncertain,ignored build/mod000/obj001.gen
+  drift: uncertain,ignored build/mod000/obj002.gen
+  drift: uncertain,ignored build/mod000/obj019.gen
+  drift: proven docs.txt
+  drift: proven notes-outside.txt
+  sampled: 32400 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in <case>/home/state/bigcopy.drift-report.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+relaunch drift report for bigcopy: 32402 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored build/mod000/obj019.gen
+  drift: proven docs.txt
+  drift: proven notes-outside.txt
+  sampled: 32400 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in <case>/home/state/bigcopy.drift-report.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+== report file: mode=600 lines=32404 ignored_lines=32400 proven_lines=2
+== leftover temps in state: 0

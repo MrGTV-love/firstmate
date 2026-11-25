@@ -1,0 +1,56 @@
+Copy: 32,400 git-ignored generated files + 2 proven edits + 13 changed skip-worktree files (32,415 drift paths).
+Same copy, same STATE-style call (fm_slot_drift_report sourced from each commit's bin/).
+
+OLD (base 6b775a16):
+real 66.91
+user 23.07
+sys 44.94
+old stderr lines: 32417
+
+NEW (target 9cb7d1b1):
+./run-report.sh $S/new/bin $S/world/copy $BASE $S/state-new 2>   0.45s user 0.24s system 85% cpu 0.812 total
+new stderr lines: 38
+report file: -rw-------@ 1653368 lines=32417
+
+Old complete stderr vs new STATE/t.drift-report.txt: BYTE-IDENTICAL
+New with no STATE vs new STATE file: BYTE-IDENTICAL
+
+NEW stderr (STATE set):
+relaunch drift report for t: 32415 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored build/mod000/obj000.gen
+  drift: uncertain,ignored build/mod000/obj001.gen
+  drift: uncertain,ignored build/mod000/obj002.gen
+  drift: uncertain,ignored build/mod000/obj003.gen
+  drift: uncertain,ignored build/mod000/obj004.gen
+  drift: uncertain,ignored build/mod000/obj005.gen
+  drift: uncertain,ignored build/mod000/obj006.gen
+  drift: uncertain,ignored build/mod000/obj007.gen
+  drift: uncertain,ignored build/mod000/obj008.gen
+  drift: uncertain,ignored build/mod000/obj009.gen
+  drift: uncertain,ignored build/mod000/obj010.gen
+  drift: uncertain,ignored build/mod000/obj011.gen
+  drift: uncertain,ignored build/mod000/obj012.gen
+  drift: uncertain,ignored build/mod000/obj013.gen
+  drift: uncertain,ignored build/mod000/obj014.gen
+  drift: uncertain,ignored build/mod000/obj015.gen
+  drift: uncertain,ignored build/mod000/obj016.gen
+  drift: uncertain,ignored build/mod000/obj017.gen
+  drift: uncertain,ignored build/mod000/obj018.gen
+  drift: uncertain,ignored build/mod000/obj019.gen
+  drift: proven docs/flag-12.txt
+  drift: proven docs/flag-15.txt
+  drift: proven docs/flag-18.txt
+  drift: proven docs/flag-21.txt
+  drift: proven docs/flag-24.txt
+  drift: proven docs/flag-27.txt
+  drift: proven docs/flag-3.txt
+  drift: proven docs/flag-30.txt
+  drift: proven docs/flag-33.txt
+  drift: proven docs/flag-36.txt
+  drift: proven docs/flag-39.txt
+  drift: proven docs/flag-6.txt
+  drift: proven docs/flag-9.txt
+  drift: proven docs/new-own.txt
+  drift: proven docs/y.txt
+  sampled: 32400 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in <scratch>/state-new/t.drift-report.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot

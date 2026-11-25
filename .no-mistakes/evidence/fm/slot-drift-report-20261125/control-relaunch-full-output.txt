@@ -1,0 +1,56 @@
+relaunch drift report for bigcopy: 32402 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored build/mod000/obj000.gen
+  drift: uncertain,ignored build/mod000/obj001.gen
+  drift: uncertain,ignored build/mod000/obj002.gen
+  drift: uncertain,ignored build/mod000/obj003.gen
+  drift: uncertain,ignored build/mod000/obj004.gen
+  drift: uncertain,ignored build/mod000/obj005.gen
+  drift: uncertain,ignored build/mod000/obj006.gen
+  drift: uncertain,ignored build/mod000/obj007.gen
+  drift: uncertain,ignored build/mod000/obj008.gen
+  drift: uncertain,ignored build/mod000/obj009.gen
+  drift: uncertain,ignored build/mod000/obj010.gen
+  drift: uncertain,ignored build/mod000/obj011.gen
+  drift: uncertain,ignored build/mod000/obj012.gen
+  drift: uncertain,ignored build/mod000/obj013.gen
+  drift: uncertain,ignored build/mod000/obj014.gen
+  drift: uncertain,ignored build/mod000/obj015.gen
+  drift: uncertain,ignored build/mod000/obj016.gen
+  drift: uncertain,ignored build/mod000/obj017.gen
+  drift: uncertain,ignored build/mod000/obj018.gen
+  drift: uncertain,ignored build/mod000/obj019.gen
+  drift: proven docs.txt
+  drift: proven notes-outside.txt
+  sampled: 32400 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in ~/tmp/fm-control-relaunch.zyRuk1/live-bigcopy-17909/home/state/bigcopy.drift-report.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+warning: ~/tmp/fm-control-relaunch.zyRuk1/live-bigcopy-17909/home/data/bigcopy/launch-brief.md records no ship branch; defaulting to legacy branch fm/bigcopy
+warning: ~/tmp/fm-control-relaunch.zyRuk1/live-bigcopy-17909/home/data/bigcopy/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunch drift report for bigcopy: 32402 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  drift: uncertain,ignored build/mod000/obj000.gen
+  drift: uncertain,ignored build/mod000/obj001.gen
+  drift: uncertain,ignored build/mod000/obj002.gen
+  drift: uncertain,ignored build/mod000/obj003.gen
+  drift: uncertain,ignored build/mod000/obj004.gen
+  drift: uncertain,ignored build/mod000/obj005.gen
+  drift: uncertain,ignored build/mod000/obj006.gen
+  drift: uncertain,ignored build/mod000/obj007.gen
+  drift: uncertain,ignored build/mod000/obj008.gen
+  drift: uncertain,ignored build/mod000/obj009.gen
+  drift: uncertain,ignored build/mod000/obj010.gen
+  drift: uncertain,ignored build/mod000/obj011.gen
+  drift: uncertain,ignored build/mod000/obj012.gen
+  drift: uncertain,ignored build/mod000/obj013.gen
+  drift: uncertain,ignored build/mod000/obj014.gen
+  drift: uncertain,ignored build/mod000/obj015.gen
+  drift: uncertain,ignored build/mod000/obj016.gen
+  drift: uncertain,ignored build/mod000/obj017.gen
+  drift: uncertain,ignored build/mod000/obj018.gen
+  drift: uncertain,ignored build/mod000/obj019.gen
+  drift: proven docs.txt
+  drift: proven notes-outside.txt
+  sampled: 32400 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in ~/tmp/fm-control-relaunch.zyRuk1/live-bigcopy-17909/home/state/bigcopy.drift-report.txt
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for bigcopy: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched bigcopy harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-bigcopy worktree=~/tmp/fm-control-relaunch.zyRuk1/live-bigcopy-17909/wt

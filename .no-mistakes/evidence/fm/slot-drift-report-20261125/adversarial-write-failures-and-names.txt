@@ -1,0 +1,17 @@
+A: STATE/t.drift-report.txt is a directory -> rc=0, 32417 lines, no sample, identical to the complete report, no temp left
+B: STATE dir read-only (chmod 500) -> rc=0, 32417 lines, no sample, identical to the complete report
+C: STATE names a missing dir -> rc=0, complete report printed, dir not created
+D: leftovers .t.drift-report.Ab3xY9 (removable) and .t.drift-report.dir123 (directory), caller under set -e:
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+caller continued after the report
+state dir after:
+.t.drift-report.Ab3xY9z
+.t.drift-report.dir123
+.u.drift-report.Ab3xY9
+t.drift-report.txt
+
+E: 150 new proven files + changed skip-worktree :colon.txt + 50 ignored; skip-worktree docs/g*x unchanged (docs/g!x differs):
+new: proven printed 151, ignored printed 20
+  drift: proven :colon.txt
+  sampled: 50 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in <scratch>/state-w2/t.drift-report.txt
+old:   drift: proven docs/g*x  (wrong: lists unchanged g*x, misses changed :colon.txt)
