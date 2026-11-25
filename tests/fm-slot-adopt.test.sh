@@ -549,6 +549,9 @@ test_many_ignored_paths_print_a_sample_and_write_the_complete_report() {
 
 # fm_drift_flagged_oracle <copy>: the flagged (assume-unchanged or skip-worktree) paths whose existence, type, mode or
 # bytes differ, decided one path at a time with one ls-files and one hash-object each, one path per line, sorted.
+# It reads each path's own index entry by exact name (:(literal)), as the report does, so a name git would read as a
+# pathspec (one holding *, ?, [ or \, or starting with :) is judged by its own entry; the per-path report before the
+# batch passed the name as a pathspec, so it could judge it by another entry the pattern matched or skip it entirely.
 fm_drift_flagged_oracle() {
   local copy=$1 tag path entry mode want have
   git -C "$copy" ls-files -v -z | while IFS= read -r -d '' entry; do
@@ -576,7 +579,10 @@ fm_drift_flagged_oracle() {
 # Tracked paths hidden from status by assume-unchanged or skip-worktree: changed bytes, an exec-bit flip, a file turned
 # into a directory, a symlink retarget and a symlink turned into a file are listed; unchanged bytes, a checkout's own
 # line-ending conversion and a sparse absence are not. The batched check decides exactly what a per-path check decides,
-# including for a path git reads specially on a line (a leading quote).
+# including for a path git reads specially on a line (a leading quote). A name git would read as a pathspec is judged
+# by its own index entry: an unchanged docs/g*x is not listed although docs/g!x, which its pattern also matches and
+# which sorts first, holds other bytes, and a changed :colon.txt is listed (git reads ":colon.txt" as the pathspec
+# colon.txt, which matches no entry here, so a lookup by pathspec skipped it).
 test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides() {
   local out f reported expected
   make_world drift-flagged
@@ -584,6 +590,9 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
     printf 'line one\nline two\n' >"$W_PROJ/docs/$f.txt"
   done
   printf 'quoted\n' >"$W_PROJ/\"quoted.txt"
+  printf 'star\n' >"$W_PROJ/docs/g*x"
+  printf 'bang, other bytes\n' >"$W_PROJ/docs/g!x"
+  printf 'colon\n' >"$W_PROJ/:colon.txt"
   ln -s target-one "$W_PROJ/docs/link-retarget"
   ln -s target-two "$W_PROJ/docs/link-to-file"
   printf 'docs/crlf-*.txt text eol=crlf\n' >"$W_PROJ/.gitattributes"
@@ -595,7 +604,9 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
   grep -q $'\r' "$W_SLOT/docs/crlf-same.txt" || fail 'the fixture is vacuous: checkout did not write CRLF line endings'
   git -C "$W_SLOT" update-index --assume-unchanged docs/au-bytes.txt docs/au-same.txt docs/au-exec.txt docs/link-retarget
   git -C "$W_SLOT" update-index --skip-worktree docs/sw-bytes.txt docs/sw-same.txt docs/sw-dir.txt docs/crlf-same.txt \
-    docs/crlf-changed.txt docs/sw-gone.txt docs/link-to-file '"quoted.txt'
+    docs/crlf-changed.txt docs/sw-gone.txt docs/link-to-file '"quoted.txt' 'docs/g*x' :colon.txt
+  [ "$(git -C "$W_SLOT" ls-files -s -- 'docs/g*x' | head -n 1 | cut -f 2)" = 'docs/g!x' ] \
+    || fail 'the fixture is vacuous: the docs/g*x pathspec does not match docs/g!x first'
   printf 'line one\nline 2!!\n' >"$W_SLOT/docs/au-bytes.txt"
   printf 'line one\nline 2!!\n' >"$W_SLOT/docs/sw-bytes.txt"
   chmod +x "$W_SLOT/docs/au-exec.txt"
@@ -605,14 +616,53 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
   rm "$W_SLOT/docs/link-retarget" && ln -s target-new "$W_SLOT/docs/link-retarget"
   rm "$W_SLOT/docs/link-to-file" && printf 'target-two' >"$W_SLOT/docs/link-to-file"
   printf 'quoted, changed\n' >"$W_SLOT/\"quoted.txt"
+  printf 'colon, changed\n' >"$W_SLOT/:colon.txt"
   [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail "the fixture is not hidden from status: $(git -C "$W_SLOT" status --porcelain)"
   out=$(STATE='' drift)
   reported=$(printf '%s\n' "$out" | sed -n 's/^  drift: proven //p' | LC_ALL=C sort)
-  expected=$(printf '%s\n' '"quoted.txt' docs/au-bytes.txt docs/au-exec.txt docs/crlf-changed.txt docs/link-retarget \
+  expected=$(printf '%s\n' '"quoted.txt' :colon.txt docs/au-bytes.txt docs/au-exec.txt docs/crlf-changed.txt docs/link-retarget \
     docs/link-to-file docs/sw-bytes.txt docs/sw-dir.txt | LC_ALL=C sort)
   assert_equals "$expected" "$reported" 'the hidden changes reported are not exactly the changed flagged paths'
   assert_equals "$(fm_drift_flagged_oracle "$W_SLOT")" "$reported" 'the report decided a flagged path differently from a per-path check'
   pass "drift: hidden flagged-path changes are listed exactly as a per-path check decides; unchanged and sparse paths are not"
+}
+
+# fm_drift_git_calls <flagged-count>: builds a world whose docs/many holds that many skip-worktree files, every third
+# one changed, and prints how many git processes one drift report starts there (a PATH shim counts them).
+fm_drift_git_calls() {
+  local n=$1 i shim real log
+  make_world "drift-calls-$n"
+  mkdir -p "$W_PROJ/docs/many"
+  for i in $(seq 1 "$n"); do printf '%s\n' "$i" >"$W_PROJ/docs/many/f$i.txt"; done
+  git -C "$W_PROJ" add -A
+  git -C "$W_PROJ" "${GITID[@]}" commit -qm many
+  git -C "$W_SLOT" "${GITID[@]}" merge -q --ff-only main
+  W_BASE=$(git -C "$W_SLOT" rev-parse HEAD)
+  git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
+  git -C "$W_SLOT" ls-files -z docs/many | xargs -0 git -C "$W_SLOT" update-index --skip-worktree
+  for i in $(seq 3 3 "$n"); do printf 'changed\n' >"$W_SLOT/docs/many/f$i.txt"; done
+  shim="$W_DIR/shim" log="$W_DIR/git-calls.log" real=$(command -v git)
+  mkdir -p "$shim"
+  printf '#!/bin/sh\nprintf x >>"%s"\nexec "%s" "$@"\n' "$log" "$real" >"$shim/git"
+  chmod +x "$shim/git"
+  : >"$log"
+  out=$(PATH="$shim:$PATH" drift)
+  [ "$(printf '%s\n' "$out" | grep -c '^  drift: proven docs/many/')" = "$((n / 3))" ] \
+    || fail "the report did not list the $((n / 3)) changed flagged paths: $out"
+  wc -c <"$log" | tr -d ' '
+}
+
+# The hidden flagged-path check reads the index once and hashes the working bytes in one batch, so the git processes
+# one report starts do not grow with the number of flagged paths (a per-path check starts two for each).
+test_the_flagged_path_check_starts_a_fixed_number_of_git_processes() {
+  local few many out
+  few=$(fm_drift_git_calls 6)
+  many=$(fm_drift_git_calls 60)
+  # a failure inside the counting helper reaches here as its message, not as a number
+  case "$few$many" in *[!0-9]*|'') fail "the git process count could not be taken: $few $many" ;; esac
+  [ "$few" -gt 0 ] || fail 'the fixture is vacuous: the git shim counted no process'
+  [ "$many" -le "$((few + 2))" ] || fail "60 flagged paths started $many git processes where 6 started $few"
+  pass "drift: the flagged-path check starts a fixed number of git processes ($few for 6 flagged paths, $many for 60)"
 }
 
 # B1 (exact-head read of 6acb4545): a governed task's own valid manifest is adopted. The record check must not overwrite
@@ -663,6 +713,7 @@ test_firstmate_written_wiring_is_not_reported_as_drift
 test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift
 test_many_ignored_paths_print_a_sample_and_write_the_complete_report
 test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides
+test_the_flagged_path_check_starts_a_fixed_number_of_git_processes
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run

@@ -1024,7 +1024,10 @@ while i < len(raw):
         add(path.rstrip(b"/") if code == b"??" and path.endswith(b"/") else path)
 # Tracked paths that status cannot report (assume-unchanged, skip-worktree) whose existence, type, mode or bytes differ.
 # The index is read once and the working bytes are hashed in one batch, so a copy with many flagged paths costs a fixed
-# number of git processes rather than two per path.
+# number of git processes rather than two per path. Each path is compared with its own index entry by exact name, so a
+# name git would read as a pathspec (one holding *, ?, [ or \, or starting with :, which git reads as magic and so as
+# the name without its colon) is judged by its own entry, never by another entry the pattern matches first and never
+# skipped because the pattern matches no entry.
 flagged = []
 for row in names(git("ls-files", "-v", "-z").stdout):
     tag, path = row[:1], row[2:]
