@@ -555,6 +555,25 @@ test_spawn_fails_when_the_pane_refuses() {
   pass "a real endpoint whose git honours neither carrier fails the spawn, names the reason and starts no harness; without the verdict wait it is falsely reported spawned"
 }
 
+# real_endpoint_await <command...>: poll for a launch outcome, up to five
+# minutes, so a loaded host only slows the case down.
+real_endpoint_await() {
+  local n
+  for n in $(seq 1 3000); do
+    "$@" && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+refusal_recorded() {  # <task-temp-root>
+  local f
+  for f in "$1"/git-hooks-refused.*; do
+    [ -s "$f" ] && return 0
+  done
+  return 1
+}
+
 # real_endpoint_spawn <refuse|admit|ctl> <verdict-polls>: one spawn into a
 # private tmux server whose pane git honours neither carrier (refuse, ctl) or
 # is the real git (admit). Sets REAL_DIR REAL_HOME REAL_ID REAL_OUT REAL_STATUS.
@@ -586,6 +605,11 @@ SH
   # configuration channel before running the real git.
   if [ "$mode" = admit ]; then
     ln -s "$REAL_GIT" "$dir/gitbin/git"
+  elif [ "$mode" = ctl ]; then
+    # The control's pane reaches its refusal slowly (the selector's final
+    # core.hooksPath check), so spawn's single immediate look without the wait
+    # cannot see it yet.
+    printf '#!/bin/sh\n[ "$*" != "config --get core.hooksPath" ] || sleep 3\nunset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\nexec %s "$@"\n' "$REAL_GIT" > "$dir/gitbin/git"
   else
     printf '#!/bin/sh\nunset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\nexec %s "$@"\n' "$REAL_GIT" > "$dir/gitbin/git"
   fi
@@ -616,12 +640,9 @@ SH
   # Observe only once the launch itself has finished: the harness started
   # (admit), or the pane recorded its refusal (ctl). A refused spawn has
   # already read that refusal and removed the task temp root holding it.
-  # shellcheck disable=SC2016 # The child shell expands its own argument.
   case "$mode" in
-    admit) fm_test_wait_until -- test -e "$dir/harness-started" || : ;;
-    refuse) ;;
-    *) fm_test_wait_until -- sh -c 'ls "$1"/git-hooks-refused.* >/dev/null 2>&1' _ "/tmp/fm-$id" ||
-      fail "$mode: the pane never recorded its refusal" ;;
+    admit) real_endpoint_await test -e "$dir/harness-started" || fail "admit: the harness never started" ;;
+    ctl) real_endpoint_await refusal_recorded "/tmp/fm-$id" || fail "ctl: the pane never recorded its refusal" ;;
   esac
   "$real_tmux" -S "$socket" kill-server 2>/dev/null || :
   rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
