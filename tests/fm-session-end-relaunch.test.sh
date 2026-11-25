@@ -70,6 +70,7 @@ if [ -n "${FM_SESSION_END_BEACON_REF:-}" ]; then
   fi
 fi
 [ -z "${FM_SESSION_END_CONTROL_SLEEP:-}" ] || sleep "$FM_SESSION_END_CONTROL_SLEEP"
+[ -z "${FM_SESSION_END_CONTROL_OUT:-}" ] || printf '%s\n' "$FM_SESSION_END_CONTROL_OUT"
 exit "${FM_SESSION_END_CONTROL_RC:-0}"
 SH
   chmod +x "$bin/fm-control.sh"
@@ -145,6 +146,7 @@ test_relaunch_hands_control_the_watcher_home() {
   (
     export -n FM_HOME
     unset FM_STATE_OVERRIDE FM_WAKE_QUEUE
+    # shellcheck disable=SC2030 # The unexported assignment is meant to stay local to this subshell.
     FM_HOME="$dir"
     export PATH="$fakebin:$PATH" FM_TEST_SEAM=1 FM_SESSION_END_CONTROL="$recorder" \
       FM_SESSION_END_CONTROL_LOG="$dir/control.log" \
@@ -434,7 +436,208 @@ SH
   pass "claude debug is off by default, on for a claude relaunch, and refused for another harness or a fresh spawn"
 }
 
+# A scan in a freshly started process, as the real watcher exits after a wake and a successor runs the next scan:
+# state kept only in the first process cannot make these cases pass.
+scan_lane_fresh() {  # <dir>
+  local dir=$1 fakebin recorder
+  fakebin=$(make_tmux "$dir")
+  recorder=$(make_recorder "$dir")
+  : > "$dir/control.log"
+  # shellcheck disable=SC2016 # The single-quoted program expands in the freshly started shell.
+  env FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_WAKE_QUEUE="$dir/state/.wake-queue" \
+    FM_TEST_SEAM=1 FM_SESSION_END_CONTROL="$recorder" FM_SESSION_END_CONTROL_LOG="$dir/control.log" \
+    FM_SESSION_END_CONTROL_RC="${FM_SESSION_END_CONTROL_RC:-0}" FM_SESSION_END_CONTROL_OUT="${FM_SESSION_END_CONTROL_OUT:-}" \
+    FM_FAKE_TMUX_LOG="$dir/tmux.log" \
+    bash -c 'export PATH="$3:$PATH"; . "$1/bin/fm-session-end-relaunch-lib.sh"; fm_session_end_relaunch_scan "$2/state"; printf "%s" "$FM_SESSION_END_WAKE" > "$2/wake"' _ "$ROOT" "$dir" "$fakebin"
+  FM_SESSION_END_WAKE=$(cat "$dir/wake")
+}
+
+# Age every ledger row past the 30-minute cap, as if the next scan came much later.
+age_ledger() {  # <dir>
+  local dir=$1 ledger
+  ledger="$dir/state/.session-end-relaunch-lane"
+  awk -F '\t' -v OFS='\t' '{ $1 = $1 - 4000; print }' "$ledger" > "$ledger.aged" && mv "$ledger.aged" "$ledger"
+}
+
+# Main 115: an unchanged refusal is reported once and not retried every 30 minutes; a changed cause permits one attempt.
+test_unchanged_refusal_is_reported_once_and_not_retried() {
+  local dir state refusal='error: slot adoption refused: manifest_exists: the manifest is not adoptable'
+  dir=$(make_lane refusal-memory)
+  state="$dir/state"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the first scan failed"
+  case "$FM_SESSION_END_WAKE" in
+    *'auto-relaunch failed after session-end'*'refused: manifest_exists'*'not retried by the scan'*) ;;
+    *) fail "the first refusal was not reported by name once: ${FM_SESSION_END_WAKE:-<empty>}" ;;
+  esac
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail 'the first scan did not attempt exactly once'
+  [ -f "$state/.session-end-refusal-lane" ] || fail 'the refusal left no durable record for a successor scanner'
+  local rows
+  rows=$(wc -l < "$state/.wake-queue" | tr -d ' ')
+  for _ in 1 2 3; do
+    age_ledger "$dir"
+    FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "a later scan failed"
+    [ ! -s "$dir/control.log" ] || fail "an unchanged refusal was retried: $(cat "$dir/control.log")"
+    [ -z "$FM_SESSION_END_WAKE" ] || fail "an unchanged refusal woke again: $FM_SESSION_END_WAKE"
+    [ "$(wc -l < "$state/.wake-queue" | tr -d ' ')" = "$rows" ] || fail 'an unchanged refusal wrote another wake row'
+  done
+  # the cause changes: the recorded manifest pointer changes, so one new attempt is permitted
+  printf 'slot_manifest=/elsewhere/manifest.json\n' >> "$state/lane.meta"
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the scan after a changed cause failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail "a changed cause did not permit exactly one attempt: $(cat "$dir/control.log")"
+  pass "an unchanged slot refusal is reported once and not retried by successor scanners; a changed cause permits one attempt"
+}
+
+# An outcome that is not a refusal keeps today's caps and retries.
+test_a_non_refusal_failure_keeps_its_retry() {
+  local dir
+  dir=$(make_lane non-refusal)
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT='error: the replacement agent could not be launched on claude' scan_lane_fresh "$dir" \
+    || fail "the first scan failed"
+  [ ! -e "$dir/state/.session-end-refusal-lane" ] || fail 'a launch failure was remembered as a refusal'
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT='error: the replacement agent could not be launched on claude' scan_lane_fresh "$dir" \
+    || fail "the later scan failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail 'a launch failure was not retried after the cap window'
+  pass "a failure that is not a refusal keeps today's retry"
+}
+
+# D9: a successful automatic relaunch that starts with out-of-scope work, and a refusal that names it, deliver the complete report.
+test_drift_report_reaches_the_observer() {
+  local dir report
+  report=$(printf '%s\n' 'relaunch drift report for lane: 2 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged' \
+    '  drift: proven docs/b.txt' '  drift: uncertain,ignored cache dir' '  a relaunch is not a new scope declaration')
+  dir=$(make_lane drift-success)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the scan failed"
+  case "$FM_SESSION_END_WAKE" in
+    *'auto-relaunched after session-end'*'docs/b.txt'*'uncertain,ignored cache dir'*) ;;
+    *) fail "the wake did not carry the complete drift report: ${FM_SESSION_END_WAKE:-<empty>}" ;;
+  esac
+  grep -F 'drift: proven docs/b.txt' "$dir/state/lane.relaunch-drift" >/dev/null || fail 'the durable report is missing'
+  dir=$(make_lane drift-refusal)
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$(printf '%s\n' "$report" 'error: slot provisioning refused: dirty_worktree; preserve and reconcile')" \
+    scan_lane_fresh "$dir" || fail "the refusal scan failed"
+  case "$FM_SESSION_END_WAKE" in
+    *'dirty_worktree'*'docs/b.txt'*) ;;
+    *) fail "the dirty refusal did not carry the complete drift report: ${FM_SESSION_END_WAKE:-<empty>}" ;;
+  esac
+  pass "the complete drift report reaches the observer on a relaunch and on a dirty refusal"
+}
+
+# The control print and the spawn print both reach the captured output: the wake and the durable file hold the first report once.
+test_two_printed_reports_are_listed_once() {
+  local dir report out file n
+  report=$(printf '%s\n' 'relaunch drift report for lane: 2 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged' \
+    '  drift: proven docs/b.txt' '  drift: uncertain,ignored cache dir' '  limitation: shallow history' '  a relaunch is not a new scope declaration')
+  out=$(printf '%s\n' "$report" 'spawn: launching the agent' "$report" 'spawn: the agent started')
+  dir=$(make_lane drift-twice)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$out" scan_lane_fresh "$dir" || fail "the scan failed"
+  case "$FM_SESSION_END_WAKE" in *'drift report: 2 out-of-scope path(s)'*) ;; *) fail "the wake has no count of 2: $FM_SESSION_END_WAKE" ;; esac
+  for n in 'docs/b.txt' 'uncertain,ignored cache dir' 'shallow history'; do
+    [ "$(printf '%s' "$FM_SESSION_END_WAKE" | grep -o -F "$n" | wc -l | tr -d ' ')" = 1 ] || fail "the wake does not list $n once: $FM_SESSION_END_WAKE"
+  done
+  file="$dir/state/lane.relaunch-drift"
+  [ "$(grep -c '^relaunch drift report for ' "$file")" = 1 ] || fail "the durable file holds more than one report: $(cat "$file")"
+  [ "$(grep -c '^  drift: ' "$file")" = 2 ] || fail "the durable file does not list the 2 counted paths: $(cat "$file")"
+  for n in '  drift: proven docs/b.txt' '  drift: uncertain,ignored cache dir' '  limitation: shallow history'; do
+    [ "$(grep -c -x -F "$n" "$file")" = 1 ] || fail "the durable file does not list '$n' once: $(cat "$file")"
+  done
+  ! grep -F 'spawn:' "$file" >/dev/null || fail "the durable file holds unrelated spawn output: $(cat "$file")"
+  pass "two printed reports are listed once, with a count that matches the paths, in the wake and in the durable file"
+}
+
+# The could-not-be-produced report is one line: the durable file holds that header and nothing after it.
+test_could_not_be_produced_report_is_one_line() {
+  local dir header out
+  header='relaunch drift report for lane: could not be produced (python3 failed); this is a limitation of the report, not a statement that the task stayed in scope'
+  out=$(printf '%s\n' "$header" 'control: stopping the agent' 'spawn: launching the agent' \
+    'relaunch drift report for lane: 1 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged' \
+    '  drift: proven docs/b.txt' '  a relaunch is not a new scope declaration')
+  dir=$(make_lane drift-could-not)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$out" scan_lane_fresh "$dir" || fail "the scan failed"
+  [ "$(cat "$dir/state/lane.relaunch-drift")" = "$header" ] || fail "the durable file holds more than the one header line: $(cat "$dir/state/lane.relaunch-drift")"
+  pass "a could-not-be-produced report is kept as its one header line in the durable file"
+}
+
+# A fresh session-end generation for the lane, as a later worker death produces.
+new_generation() {  # <dir>
+  local dir=$1 gen
+  "$ROOT/bin/fm-busy-event.sh" arm "$dir/state" lane --state idle --source claude-hook --event launch-brief >/dev/null
+  gen=$(cat "$dir/state/lane.busy-gen")
+  "$ROOT/bin/fm-busy-event.sh" apply "$dir/state" lane idle --gen "$gen" --source claude-hook --event session-end >/dev/null
+}
+
+# F5: the memory is keyed on the obstruction, not on the busy generation or the raw HEAD.
+test_unchanged_refusal_survives_a_new_generation_and_an_unrelated_commit() {
+  local dir state wt refusal='error: slot provisioning refused: scope_mismatch: docs/out.txt changed outside the recorded scope'
+  dir=$(make_lane refusal-effective-inputs)
+  state="$dir/state"
+  wt="$dir/wt-lane"
+  git init -q -b main "$wt"
+  mkdir -p "$wt/src" "$wt/docs"
+  printf 'a\n' > "$wt/src/a.txt"
+  printf 'd\n' > "$wt/docs/d.txt"
+  git -C "$wt" add -A
+  git -C "$wt" -c user.name=T -c user.email=t@example.invalid commit -qm base
+  git -C "$wt" update-ref refs/remotes/origin/main HEAD
+  printf 'slot_owned_path=src\nbranch=main\n' >> "$state/lane.meta"
+  printf 'out\n' > "$wt/docs/out.txt"
+  git -C "$wt" add -A
+  git -C "$wt" -c user.name=T -c user.email=t@example.invalid commit -qm 'own change outside the scope'
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the first scan failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail 'the first scan did not attempt once'
+  # only the busy generation advances: no attempt, no wake
+  new_generation "$dir"
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the scan after a new generation failed"
+  [ ! -s "$dir/control.log" ] || fail "a new busy generation retried an unchanged refusal: $(cat "$dir/control.log")"
+  [ -z "$FM_SESSION_END_WAKE" ] || fail "a new busy generation woke again: $FM_SESSION_END_WAKE"
+  # only an unrelated commit wholly inside the recorded scope: the same obstruction, so no attempt
+  printf 'b\n' > "$wt/src/b.txt"
+  git -C "$wt" add -A
+  git -C "$wt" -c user.name=T -c user.email=t@example.invalid commit -qm 'in-scope work'
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the scan after an in-scope commit failed"
+  [ ! -s "$dir/control.log" ] || fail "an unrelated in-scope commit retried an unchanged refusal: $(cat "$dir/control.log")"
+  # the obstruction really changes (a different out-of-scope path set): exactly one attempt
+  git -C "$wt" rm -q docs/out.txt
+  git -C "$wt" -c user.name=T -c user.email=t@example.invalid commit -qm 'revert the out-of-scope change'
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$refusal" scan_lane_fresh "$dir" || fail "the scan after the obstruction changed failed"
+  [ "$(wc -l < "$dir/control.log" | tr -d ' ')" = 1 ] || fail "a cleared obstruction did not permit one attempt: $(cat "$dir/control.log")"
+  pass "an unchanged slot refusal is not retried after a new generation or an unrelated commit; a real change to the obstruction permits one attempt"
+}
+
+# F6: a long drift report keeps its stable durable reference through the wake's 4096-character fallback cap.
+test_long_drift_report_keeps_its_durable_reference_at_the_fallback() {
+  local dir report i capped
+  # shellcheck source=bin/fm-push-transition-lib.sh
+  . "$ROOT/bin/fm-push-transition-lib.sh"
+  dir=$(make_lane long-drift)
+  report='relaunch drift report for lane: 100 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged'
+  for i in $(seq 1 100); do report=$report$'\n'"  drift: proven docs/generated/very/long/directory/name/for/path-number-$i.txt"; done
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the scan failed"
+  [ "${#FM_SESSION_END_WAKE}" -gt 4096 ] || fail 'the fixture reason is not over the fallback cap'
+  capped=$(watch_delivery_clean_reason "$FM_SESSION_END_WAKE")
+  [ "${#capped}" = 4096 ] || fail "the fallback did not cap the reason: ${#capped}"
+  case "$capped" in *"$dir/state/lane.relaunch-drift"*) ;; *) fail 'the durable report path was lost at the fallback cap' ;; esac
+  [ "$(grep -c 'drift: proven' "$dir/state/lane.relaunch-drift")" = 100 ] || fail 'the durable report is not complete'
+  grep -F 'path-number-100.txt' "$dir/state/lane.relaunch-drift" >/dev/null || fail 'the last path is missing from the durable report'
+  # a short report stays whole in the reason
+  dir=$(make_lane short-drift)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT=$'relaunch drift report for lane: 1 out-of-scope path(s) changed by this task\'s own work\n  drift: proven docs/b.txt' scan_lane_fresh "$dir" || fail "the short scan failed"
+  case "$FM_SESSION_END_WAKE" in *'docs/b.txt'*"$dir/state/lane.relaunch-drift"*|*"$dir/state/lane.relaunch-drift"*'docs/b.txt'*) ;; *) fail "the short report is not whole in the reason: $FM_SESSION_END_WAKE" ;; esac
+  pass "a long drift report keeps its durable reference through the fallback cap; a short one stays whole"
+}
+
 test_session_end_relaunches_a_dead_lane_once
+test_unchanged_refusal_is_reported_once_and_not_retried
+test_unchanged_refusal_survives_a_new_generation_and_an_unrelated_commit
+test_long_drift_report_keeps_its_durable_reference_at_the_fallback
+test_a_non_refusal_failure_keeps_its_retry
+test_drift_report_reaches_the_observer
+test_two_printed_reports_are_listed_once
+test_could_not_be_produced_report_is_one_line
 test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched
 test_relaunch_bound_stays_inside_the_watcher_grace
