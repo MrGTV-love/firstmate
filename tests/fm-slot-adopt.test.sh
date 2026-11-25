@@ -527,7 +527,8 @@ test_many_ignored_paths_print_a_sample_and_write_the_complete_report() {
   assert_contains "$out" "  sampled: 35 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in $file" 'the sample line did not count the group and name the file'
   assert_contains "$out" '  a relaunch is not a new scope declaration' 'the closing line was lost'
   [ -f "$file" ] || fail 'the complete report file was not written'
-  [ "$(stat -f '%Lp' "$file" 2>/dev/null || stat -c '%a' "$file")" = 600 ] || fail 'the report file is not mode 600'
+  # python3 reads the mode the same way on macOS and Linux (BSD and GNU stat disagree on -f)
+  [ "$(python3 -c 'import os, sys; print("%o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$file")" = 600 ] || fail 'the report file is not mode 600'
   [ "$(cat "$file")" = "$full" ] || fail "the report file is not the complete report: $(diff <(printf '%s\n' "$full") "$file")"
   # every printed line is a line of the complete report, apart from the sample line
   ! printf '%s\n' "$out" | grep -v '^  sampled: ' | grep -qvxF -f "$file" || fail "stderr printed a line the file does not hold: $out"
