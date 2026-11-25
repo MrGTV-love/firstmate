@@ -683,6 +683,44 @@ PL
   pass "a waiter's slow ps does not keep the next root out of admission"
 }
 
+# A table read slower than the growth guard's interval: the gate's command ends
+# while one guard read is in flight. The gate then reads no further table, and
+# exits with the command's own status. The fake ps records, at the start of each
+# table read, whether the command had already ended.
+test_a_gate_reads_no_table_after_its_command_ends() {
+  local tmp code rc reads
+  tmp=$(fm_test_tmproot fm-lint-guard-after-end)
+  mkdir -p "$tmp/bin" "$tmp/hide"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  : > "$tmp/root.sh"
+  cat > "$tmp/bin/ps" <<SH
+#!/bin/sh
+[ "\$*" = '-axww -o pid=,ppid=,rss=,lstart=,command=' ] || exec "$tmp/hide/ps" "\$@"
+if [ -e "$tmp/ended" ]; then echo after >> "$tmp/reads"; else echo before >> "$tmp/reads"; fi
+: > "$tmp/inflight"
+"$tmp/hide/ps" "\$@"; rc=\$?
+# Slower than the guard's 2 s interval, for at most two reads after the end.
+[ "\$(grep -c after "$tmp/reads")" -ge 2 ] || sleep 2.5
+rm -f "$tmp/inflight"
+exit \$rc
+SH
+  chmod +x "$tmp/bin/ps"
+  for code in 0 3; do
+    rm -f "$tmp/reads" "$tmp/ended" "$tmp/inflight"
+    rc=0
+    # The command ends inside a guard read: it waits for a read in flight, marks
+    # its end and exits.
+    PATH="$tmp/bin:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" fm_lint_gate_root 100000000 "$tmp/pool.$code/slots" "run$code" "$tmp/root.sh" -- \
+      perl -e 'for (1 .. 6000) { last if -e $ARGV[0]; select(undef, undef, undef, 0.01); } -e $ARGV[0] or exit 9; open(my $fh, ">", $ARGV[1]) or exit 8; close $fh; exit $ARGV[2];' \
+      "$tmp/inflight" "$tmp/ended" "$code" 2> "$tmp/err.$code" || rc=$?
+    [ "$rc" -eq "$code" ] || fail "the gate exited $rc for a command that exited $code: $(cat "$tmp/err.$code")"
+    [ -e "$tmp/ended" ] || fail "the command never saw a guard read in flight"
+    reads=$(grep -c . "$tmp/reads")
+    grep -q '^after$' "$tmp/reads" && fail "the gate read the process table after its command ended ($reads reads: $(tr '\n' ' ' < "$tmp/reads"))"
+  done
+  pass "a gate whose command ends during a slow guard read reads no further table and keeps the command's status"
+}
+
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets() {
   local tmp
   tmp=$(fm_test_tmproot fm-lint-slot-queue-scan)
@@ -4464,7 +4502,8 @@ test_a_worker_started_directly_takes_nothing_from_the_callers_environment() {
 # its real identity) and the member $FM_TEST_MEMBER ("<pid>:<sec>:<usec>"), bound
 # by the reader's own check (fm-proc-info.py bind_members) on the real process
 # table; FM_TEST_READER=late:<n>:<secs> makes the first reader (marked by
-# $FM_TEST_READER_MARK) answer its <n>th request <secs> late and the others at once,
+# $FM_TEST_READER_MARK) answer its <n>th request <secs> after reading it (census
+# time included) and the others at once,
 # and later readers run normally; FM_TEST_READER=slow:<secs> makes every reader
 # answer each request <secs> late; FM_TEST_READER=phantom:<ended|unreadable> makes
 # every reader the real one, with one extra child of the root (a free pid) in each
@@ -4568,12 +4607,16 @@ if len(args) >= 3 and args[1] == "rss-tree":
             root, known, asked = int(args[2]), {}, 0
             for request in iter(sys.stdin.readline, ""):
                 asked += 1
-                if asked == int(late):
-                    time.sleep(float(secs))
+                read_at = time.monotonic()
                 try:
                     answer = fp.rss_tree(root, known, request)
                 except Exception:
                     answer = "-"
+                # The late reply leaves <secs> after its request was read, however
+                # long the census took, so a slow census on a loaded host does not
+                # push a 6.5 s reply past the 7 s of its read and retry.
+                if asked == int(late):
+                    time.sleep(max(0.0, float(secs) - (time.monotonic() - read_at)))
                 print(answer, flush=True)
             sys.exit(0)
     if mode.startswith("slow:"):
@@ -6174,6 +6217,7 @@ test_unequal_runs_share_scarce_slots_per_run
 test_stopped_head_waiter_does_not_block_the_queue
 test_stopped_admission_coordinator_does_not_freeze_free_capacity
 test_slow_ps_does_not_hold_admission_against_the_next_root
+test_a_gate_reads_no_table_after_its_command_ends
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_runs_with_different_delegates_each_probe_their_own_shellcheck
 test_a_compiled_launcher_is_probed_every_run_and_its_delegates_version_decides

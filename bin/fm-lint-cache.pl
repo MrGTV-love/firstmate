@@ -556,11 +556,11 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     # the root's process group, to stop and resume that group: the gate writes
     # <peak file>.hold and removes it to resume. The gate itself sends no signal to
     # any process but its own unreaped child.
-    my ($child, $caught, $hold_path);
+    my ($child, $caught, $hold_path, $reaped_status);
     my $resume = sub { unlink $hold_path if defined $hold_path; };
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
     for my $name (keys %signal_number) {
-        $SIG{$name} = sub { $caught = $name; $resume->(); kill 'TERM', $child if $child; };
+        $SIG{$name} = sub { $caught = $name; $resume->(); kill 'TERM', $child if $child && !defined $reaped_status; };
     }
     my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
         : ($ncpu >> 1) > 2 ? ($ncpu >> 1) : 2;
@@ -1127,7 +1127,14 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     $hold_path = length($peak_file // '') ? "$peak_file.hold" : undef;
     my ($guard_busy, $poll) = (0, 0.5);
     my $guard = sub {
-        return if $caught || $guard_busy;
+        return if $caught || $guard_busy || defined $reaped_status;
+        # A table read slower than the guard's interval leaves the next tick
+        # pending, so ticks follow each other and the main flow's waitpid and exit
+        # wait behind them. As the watch's tick does, the guard first reaps an
+        # ended command, and it reads no table once its command has ended.
+        my $gone = waitpid($child, POSIX::WNOHANG());
+        $reaped_status = $? if $gone == $child;
+        return if $gone != 0;
         $guard_busy = 1;
         my $table = $process_table->();
         my $view = $table && $host_view->($table);
@@ -1149,8 +1156,8 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     $SIG{ALRM} = sub { local ($?, $!); $guard->() };
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), $poll, $poll);
     my $reaped;
-    while (($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
-    my $status = $reaped == $child ? $? : 127 << 8;
+    while (!defined $reaped_status && ($reaped = waitpid($child, 0)) == -1 && $!{EINTR}) { }
+    my $status = defined $reaped_status ? $reaped_status : $reaped == $child ? $? : 127 << 8;
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
     $resume->();
     # Raise the root's record to this complete analysis's measured peak (the
