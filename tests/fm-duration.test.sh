@@ -164,8 +164,9 @@ def override_run(key, command, **extra):
                           env=dict(env, **extra), cwd=workrepo, capture_output=True, text=True)
 
 
-# The only extreme that stops a silent command is a real stall: no output and
-# no process-tree CPU growth for the no-progress bound.
+# The only extreme that stops a silent command is a real stall: no output, no
+# runnable descendant and no process-tree CPU above the idle floor for the
+# no-progress bound.
 write_rows([sample('stall', 1) for _ in range(5)])
 stalled = override_run('stall', ['sleep', '30'], FM_DURATION_NO_PROGRESS_SECS='2')
 assert stalled.returncode == 124 and 'no_progress' in stalled.stderr, (stalled.returncode, stalled.stderr)
@@ -189,9 +190,10 @@ assert any(r.get('event') == 'timeout' and r['key'] == 'no-mistakes.capped' for 
 # CPU growth is progress even with no output, so a busy command outlives the stall
 # bound. The bound is several times the one-second CPU-time granularity of Linux
 # ps, so a loaded host that gives the loop under half a core still shows growth.
-busy = override_run('busy.cpu', [sys.executable, '-c', 'import time\nend = time.monotonic() + 10\nwhile time.monotonic() < end: pass'],
+busy_done = tmp / 'busy-cpu.done'
+busy = override_run('busy.cpu', [sys.executable, '-c', 'import pathlib, sys, time\nend = time.monotonic() + 10\nwhile time.monotonic() < end: pass\npathlib.Path(sys.argv[1]).touch()', str(busy_done)],
                     FM_DURATION_NO_PROGRESS_SECS='5', FM_DURATION_ABSOLUTE_SECS='60')
-assert busy.returncode == 0, busy.stderr
+assert busy.returncode == 0 and busy_done.exists(), busy.stderr
 assert not any(r.get('event') == 'timeout' and r['key'] == 'busy.cpu' for r in rows())
 
 # The absolute wall-clock limit is the other extreme, and it stops even a
@@ -199,6 +201,89 @@ assert not any(r.get('event') == 'timeout' and r['key'] == 'busy.cpu' for r in r
 absolute = override_run('absolute', ['bash', '-c', 'while true; do echo tick; done'], FM_DURATION_ABSOLUTE_SECS='2')
 assert absolute.returncode == 124 and 'absolute_limit' in absolute.stderr, (absolute.returncode, absolute.stderr)
 assert any(r.get('event') == 'timeout' and r['key'] == 'absolute' for r in rows())
+
+
+def trip_snapshot(stderr, rule):
+    """The snapshot file a trip line names, read from disk."""
+    match = re.search(rf'^{rule}: .*snapshot=([^"]+)"$', stderr, re.M)
+    assert match, (rule, stderr)
+    path = Path(match.group(1))
+    assert path.parent == ledger.parent / 'command-duration-trips' and path.is_file(), (path, stderr)
+    return path.read_text()
+
+
+assert 'rule: absolute_limit' in trip_snapshot(absolute.stderr, 'absolute_limit')
+
+# Idle CPU creep is not progress. A command blocked on a peer keeps accruing
+# housekeeping CPU in its sleeping processes; the stalled C5 corpus run crept
+# 0.03-0.08 s per minute and was stopped only by the 6 hour absolute limit.
+# This child creeps faster (about 0.36 s per minute, a tick every two seconds,
+# so any-growth would reset a 4 second clock forever) but stays under the
+# 0.5 s per minute floor. It records its own CPU, pid and an argv marker; the
+# environment carries another marker that the snapshot must not copy.
+creep = """import os, sys, time
+cpu_file, pid_file = sys.argv[1:3]
+open(pid_file, 'w').write(str(os.getpid()))
+while True:
+    mark = time.process_time()
+    while time.process_time() - mark < 0.003:
+        pass
+    open(cpu_file, 'w').write(repr(time.process_time()))
+    time.sleep(0.5)
+"""
+
+
+def creep_run(key, case, **extra):
+    cpu_file, pid_file = tmp / f'{case}.cpu', tmp / f'{case}.pid'
+    begun = time.monotonic()
+    # The child runs under an argv[0] marker as well as a later argv marker.
+    result = subprocess.run([sys.executable, str(helper), 'run', key, '--', 'bash', '-c', 'exec -a MARKER_ARGV0_c5creep "$0" "$@"',
+                             sys.executable, '-c', creep, str(cpu_file), str(pid_file), 'MARKER_ARGV_c5creep'],
+                            env=dict(env, FM_TEST_SNAPSHOT_SECRET='MARKER_ENV_c5creep', **extra), cwd=workrepo, capture_output=True, text=True)
+    elapsed = time.monotonic() - begun
+    child_cpu = float(cpu_file.read_text()) if cpu_file.exists() else 0.0
+    child_pid = int(pid_file.read_text())
+    with contextlib.suppress(ProcessLookupError):
+        os.kill(child_pid, 0)
+        raise AssertionError(f'{key}: creeping child {child_pid} outlived its run')
+    return result, elapsed, child_cpu, child_pid
+
+
+crept, crept_elapsed, crept_cpu, crept_pid = creep_run('creep.stall', 'creep', FM_DURATION_NO_PROGRESS_SECS='4', FM_DURATION_ABSOLUTE_SECS='60')
+assert crept.returncode == 124 and 'no_progress' in crept.stderr and 'absolute_limit' not in crept.stderr, (crept.returncode, crept.stderr)
+assert crept_elapsed < 30, f'idle CPU creep held off the no-progress stop: {crept_elapsed:.1f}s'
+# Precondition: the creep really grew the child's CPU, yet the run (shorter than
+# the 60 s window) gained less than the 0.5 s floor in total, startup included.
+assert 0.02 <= crept_cpu < 0.5, (crept_cpu, crept_elapsed)
+assert any(r.get('event') == 'timeout' and r['key'] == 'creep.stall' for r in rows())
+snapshot = trip_snapshot(crept.stderr, 'no_progress')
+assert 'rule: no_progress' in snapshot and 'columns: pid ppid stat cpu elapsed comm' in snapshot, snapshot
+assert any(line.split()[0] == str(crept_pid) for line in snapshot.splitlines() if line[:1].isdigit()), (crept_pid, snapshot)
+assert not any(marker in snapshot for marker in ('MARKER_ARGV0_c5creep', 'MARKER_ARGV_c5creep', 'MARKER_ENV_c5creep')), snapshot
+
+
+# A no-mistakes.<step> key keeps only the absolute stop, creep or not.
+nm_crept, nm_elapsed, _, _ = creep_run('no-mistakes.creep', 'nm-creep', FM_DURATION_NO_PROGRESS_SECS='2', FM_DURATION_ABSOLUTE_SECS='6')
+assert nm_crept.returncode == 124 and 'absolute_limit' in nm_crept.stderr and 'no_progress' not in nm_crept.stderr, (nm_crept.returncode, nm_crept.stderr)
+assert nm_elapsed >= 6, nm_elapsed
+
+# Missing telemetry is never a stall: with no complete CPU sample the creeping
+# child is stopped only by the absolute limit.
+blind_modules = tmp / 'blind-modules'
+blind_modules.mkdir()
+(blind_modules / 'ctypes.py').write_text('raise ImportError("fixture: ctypes unavailable")\n')
+(blind_modules / 'sitecustomize.py').write_text('import sys\nsys.platform = "darwin"\n')
+blind, blind_elapsed, _, _ = creep_run('creep.blind', 'blind-creep', FM_DURATION_NO_PROGRESS_SECS='2', FM_DURATION_ABSOLUTE_SECS='6',
+                                       PYTHONPATH=str(blind_modules), FM_PROC_ROOT_OVERRIDE=str(tmp / 'no-proc'))
+assert blind.returncode == 124 and 'absolute_limit' in blind.stderr and 'no_progress' not in blind.stderr, (blind.returncode, blind.stderr)
+assert 'cpu_telemetry_unavailable' in blind.stderr and blind_elapsed >= 6, (blind_elapsed, blind.stderr)
+
+# Output alone is progress: a slow child that prints each second and uses
+# almost no CPU outlives a 3 second no-progress bound.
+slow_done = tmp / 'slow-output.done'
+slow_output = override_run('slow.output', [sys.executable, '-c', 'import pathlib, sys, time\nfor i in range(8):\n    print(i, flush=True)\n    time.sleep(1)\npathlib.Path(sys.argv[1]).touch()', str(slow_done)],
+                           FM_DURATION_NO_PROGRESS_SECS='3', FM_DURATION_ABSOLUTE_SECS='60')
+assert slow_output.returncode == 0 and 'no_progress' not in slow_output.stderr and slow_done.exists(), (slow_output.returncode, slow_output.stderr)
 
 # A stop never starts a fixed kill clock. The cleanup a stop asks for runs for as
 # long as it keeps making progress, however long that is; it is killed only when
@@ -216,6 +301,280 @@ spec.loader.exec_module(module)
 sys.argv = sys.argv[1:]
 sys.exit(module.main())
 """)
+
+# The C5 shape: a real CPU burst, then creep. The burst is progress while it is
+# inside the trailing window; once the window slides past it the creep alone
+# is idle. Under a 10x clock the 60 s window is 6 real seconds, about six CPU
+# samples (one per real second), and the 30 s bound 3, so the stop lands about
+# nine real seconds after the 3 s burst ends; a window that never slid past the
+# burst would hold the clock until the 60 real second absolute limit.
+tenfold_clock = tmp / 'tenfold-clock-run.py'
+tenfold_clock.write_text(scaled_clock.read_text().replace('real() * 30', 'real() * 10'))
+burst = creep.replace('while True:', 'while time.process_time() < 3:\n    pass\nwhile True:', 1)
+burst_cpu, burst_pid = tmp / 'burst.cpu', tmp / 'burst.pid'
+begun = time.monotonic()
+bursted = subprocess.run([sys.executable, str(tenfold_clock), str(helper), 'run', 'creep.burst', '--', sys.executable, '-c', burst, str(burst_cpu), str(burst_pid)],
+                         env=dict(env, FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='600'), cwd=workrepo, capture_output=True, text=True)
+bursted_elapsed = time.monotonic() - begun
+assert bursted.returncode == 124 and 'no_progress' in bursted.stderr and 'absolute_limit' not in bursted.stderr, (bursted.returncode, bursted.stderr)
+assert bursted_elapsed < 40, f'a past CPU burst held off the no-progress stop: {bursted_elapsed:.1f}s'
+assert float(burst_cpu.read_text()) >= 3, burst_cpu.read_text()
+
+# The floor's value is decided at its edge: under the same 10x clock a silent
+# child at about 5% of a core (about 0.3 s per 6 real second window) is idle,
+# while one at about 20% (about 1.2 s per window) is working and finishes.
+duty = """import pathlib, sys, time
+share, seconds, done = float(sys.argv[1]), float(sys.argv[2]), pathlib.Path(sys.argv[3])
+end = time.monotonic() + seconds
+while time.monotonic() < end:
+    mark = time.process_time()
+    while time.process_time() - mark < share * 0.1:
+        pass
+    time.sleep(0.1 * (1 - share))
+done.touch()
+"""
+# A sampler wrapper for the telemetry cases: FM_TEST_CLOCK scales the clock,
+# FM_TEST_BLIND=FROM:TO blinds tree_cpu between those real seconds after
+# start, FM_TEST_BLIND_PERIOD=P:B blinds the first B real seconds of every P,
+# FM_TEST_BLIND_WHEN=PATH blinds it once PATH exists,
+# FM_TEST_NOT_RUNNABLE hides runnable state so CPU alone decides, and
+# FM_TEST_PLATFORM stands in for sys.platform after the module has loaded.
+sampler = tmp / 'sampler-run.py'
+sampler.write_text("""import importlib.util, os, sys, time
+real = time.monotonic
+start = real()
+factor = float(os.environ.get('FM_TEST_CLOCK', '1'))
+time.monotonic = lambda: real() * factor
+spec = importlib.util.spec_from_file_location('fm_duration', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules['fm_duration'] = module
+spec.loader.exec_module(module)
+blind_from, blind_to = map(float, os.environ.get('FM_TEST_BLIND', '-1:-1').split(':'))
+period, blind_part = map(float, os.environ.get('FM_TEST_BLIND_PERIOD', '0:0').split(':'))
+blind_when = os.environ.get('FM_TEST_BLIND_WHEN')
+if os.environ.get('FM_TEST_PLATFORM'):
+    sys.platform = os.environ['FM_TEST_PLATFORM']
+sampled = module.tree_cpu
+def tree_cpu(pid, observed):
+    cpu, runnable = sampled(pid, observed)
+    at = real() - start
+    if blind_from <= at < blind_to or (period and at % period < blind_part) or (blind_when and os.path.exists(blind_when)):
+        return None, False
+    return cpu, runnable and not os.environ.get('FM_TEST_NOT_RUNNABLE')
+module.tree_cpu = tree_cpu
+sys.argv = sys.argv[1:]
+sys.exit(module.main())
+""")
+
+
+def sampler_run(key, program, args, **extra):
+    begun = time.monotonic()
+    result = subprocess.run([sys.executable, str(sampler), str(helper), 'run', key, '--', sys.executable, '-c', program, *map(str, args)],
+                            env=dict(env, FM_TEST_NOT_RUNNABLE='1', **extra), cwd=workrepo, capture_output=True, text=True)
+    return result, time.monotonic() - begun
+
+
+# CPU alone keeps a bursty silent child alive: runnable state is hidden at
+# every sample, and a 40% duty cycle stays well above the floor.
+bursty_done = tmp / 'bursty.done'
+bursty, _ = sampler_run('busy.bursty', duty, ['0.4', '12', bursty_done], FM_DURATION_NO_PROGRESS_SECS='4', FM_DURATION_ABSOLUTE_SECS='60')
+assert bursty.returncode == 0 and 'no_progress' not in bursty.stderr and bursty_done.exists(), (bursty.returncode, bursty.stderr)
+
+for share, key, trips in (('0.05', 'duty.below-floor', True), ('0.2', 'duty.above-floor', False)):
+    done = tmp / f'{key}.done'
+    begun = time.monotonic()
+    duty_run = subprocess.run([sys.executable, str(tenfold_clock), str(helper), 'run', key, '--', sys.executable, '-c', duty, share, '15', str(done)],
+                              env=dict(env, FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='600'), cwd=workrepo, capture_output=True, text=True)
+    duty_elapsed = time.monotonic() - begun
+    if trips:
+        assert duty_run.returncode == 124 and 'no_progress' in duty_run.stderr and not done.exists(), (key, duty_run.returncode, duty_run.stderr)
+        assert duty_elapsed < 14, f'{key}: a child below the floor was not stopped: {duty_elapsed:.1f}s'
+    else:
+        assert duty_run.returncode == 0 and 'no_progress' not in duty_run.stderr and done.exists(), (key, duty_run.returncode, duty_run.stderr)
+
+# A blind stretch from the start is not idle time: blinded for 12 real
+# seconds (120 scaled, twice the bound) and then sighted, a silent 40% child
+# is not stopped and finishes.
+start_done = tmp / 'blind-start.done'
+from_start, _ = sampler_run('creep.blind-start', duty, ['0.4', '18', start_done], FM_TEST_CLOCK='10', FM_TEST_BLIND='0:12',
+                            FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert from_start.returncode == 0 and 'no_progress' not in from_start.stderr and start_done.exists(), (from_start.returncode, from_start.stderr)
+
+# A blind gap after a valid sample is not idle time either. A silent child at
+# about 40% of a core is blinded from 2 to 12 real seconds under a 10x clock, a
+# gap of 100 scaled seconds, longer than the 60 s window and the 60 s bound.
+# The gap pauses the clock and its CPU is not credited; once samples return the
+# child is sighted above the floor, so it is not stopped and finishes at 18
+# real seconds.
+blind_done, blind_cpu = tmp / 'blind-gap.done', tmp / 'blind-gap.cpu'
+gap_child = duty.replace('done.touch()', 'done.touch()\npathlib.Path(sys.argv[4]).write_text(repr(time.process_time()))')
+gap, gap_elapsed = sampler_run('creep.blind-gap', gap_child, ['0.4', '18', blind_done, blind_cpu], FM_TEST_CLOCK='10', FM_TEST_BLIND='2:12',
+                               FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert gap.returncode == 0 and 'no_progress' not in gap.stderr and blind_done.exists(), (gap.returncode, gap.stderr)
+assert 'cpu_telemetry_unavailable' in gap.stderr and float(blind_cpu.read_text()) >= 3, (gap.stderr, blind_cpu.read_text() if blind_cpu.exists() else None)
+
+# Nor is a gap progress: a silent 7% child (about 0.42 s per 6 real second
+# window, under the floor) is blinded for the first 12 s of every 15, so each
+# gap gains about 0.84 s. Counted over sighted time only, the 6 real second
+# bound is reached during the second sighted stretch; crediting the gaps would
+# hold it to the absolute limit.
+gaps_done = tmp / 'blind-gaps.done'
+gapped, gapped_elapsed = sampler_run('creep.blind-gaps', duty, ['0.07', '80', gaps_done], FM_TEST_CLOCK='10', FM_TEST_BLIND_PERIOD='15:12',
+                                     FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert gapped.returncode == 124 and 'no_progress' in gapped.stderr and 'absolute_limit' not in gapped.stderr, (gapped.returncode, gapped.stderr)
+assert 20 <= gapped_elapsed < 50 and not gaps_done.exists(), f'a gapped sub-floor tree was not stopped on sighted time: {gapped_elapsed:.1f}s'
+
+# A TERM cleanup is judged by the same floor: one that creeps below it is
+# killed after the no-progress interval, one that works above it finishes.
+cleanup = """import pathlib, signal, sys, time
+ready, done, share, seconds = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4])
+def work(signum, frame):
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        mark = time.process_time()
+        while time.process_time() - mark < share * 0.1:
+            pass
+        time.sleep(0.1 * (1 - share))
+    done.touch()
+    sys.exit(0)
+signal.signal(signal.SIGTERM, work)
+ready.touch()
+while True:
+    print('working', flush=True)
+    time.sleep(0.2)
+"""
+for share, seconds, key, killed in (('0.05', '3600', 'cleanup.creep-below', True), ('0.4', '8', 'cleanup.work-above', False)):
+    ready, done = tmp / f'{key}.ready', tmp / f'{key}.done'
+    job = subprocess.Popen([sys.executable, str(sampler), str(helper), 'run', key, '--', sys.executable, '-c', cleanup, str(ready), str(done), share, seconds],
+                           env=dict(env, FM_TEST_CLOCK='10', FM_TEST_NOT_RUNNABLE='1', FM_DURATION_NO_PROGRESS_SECS='30', FM_DURATION_ABSOLUTE_SECS='6000'),
+                           cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    ready_by = time.monotonic() + 60
+    while not ready.exists():
+        assert time.monotonic() < ready_by, f'{key}: the child never became ready'
+        time.sleep(0.05)
+    job.terminate()
+    signalled = time.monotonic()
+    try:
+        job.communicate(timeout=25)
+    except subprocess.TimeoutExpired:
+        os.killpg(job.pid, signal.SIGKILL)
+        job.communicate()
+        raise AssertionError(f'{key}: the TERM cleanup was neither killed nor finished within 25 s')
+    waited = time.monotonic() - signalled
+    assert job.returncode == 143, (key, job.returncode)
+    if killed:
+        assert 2.5 <= waited < 20 and not done.exists(), f'{key}: a cleanup creeping below the floor was not killed after the bound: {waited:.1f}s'
+    else:
+        assert done.exists() and waited >= 8, f'{key}: a cleanup working above the floor did not finish: {waited:.1f}s'
+
+# A blind sample pauses the no-progress clock only before a stop. Under a 10x
+# clock with a 2 real second bound, a silent leader that ignores TERM (it only
+# marks when TERM arrives) and is blind for the whole run is not tripped for
+# inactivity, reaches the 20 real second absolute stop, and its blind cleanup
+# is killed about one bound after TERM, not at the cleanup's own absolute
+# limit 20 real seconds later.
+term_ignorer = """import pathlib, signal, sys, time
+signal.signal(signal.SIGTERM, lambda *_: pathlib.Path(sys.argv[1]).touch())
+while True:
+    time.sleep(1)
+"""
+
+
+def blind_cleanup_run(key, termed, **extra):
+    result, _ = sampler_run(key, term_ignorer, [termed], FM_TEST_CLOCK='10', **extra)
+    assert result.returncode == 124 and termed.exists() and 'cpu_telemetry_unavailable' in result.stderr, (key, result.returncode, result.stderr)
+    return result, time.time() - termed.stat().st_mtime
+
+
+blind_run, blind_run_waited = blind_cleanup_run('cleanup.blind-run', tmp / 'blind-run.termed', FM_TEST_BLIND='0:100000',
+                                                FM_DURATION_NO_PROGRESS_SECS='20', FM_DURATION_ABSOLUTE_SECS='200')
+assert 'absolute_limit' in blind_run.stderr and 'no_progress' not in blind_run.stderr, blind_run.stderr
+assert 1.5 <= blind_run_waited < 12, f'a blind cleanup was not killed one bound after the absolute stop: {blind_run_waited:.1f}s'
+
+# A no-progress stop whose cleanup is blind from TERM on is killed one bound
+# (6 real seconds) after the stop, not held to the 60 real second absolute limit.
+after_stop, after_stop_waited = blind_cleanup_run('cleanup.blind-after-stop', tmp / 'blind-after-stop.termed',
+                                                  FM_TEST_BLIND_WHEN=str(tmp / 'blind-after-stop.termed'),
+                                                  FM_DURATION_NO_PROGRESS_SECS='60', FM_DURATION_ABSOLUTE_SECS='600')
+assert 'no_progress' in after_stop.stderr and 'absolute_limit' not in after_stop.stderr, after_stop.stderr
+assert 5 <= after_stop_waited < 30, f'a cleanup blind after a no-progress stop was not killed one bound after it: {after_stop_waited:.1f}s'
+
+# A refused table location is named as refused, not as recording turned off.
+refused_repo = make_repo('refused-table')
+refused = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.refused', '--', 'sleep', '30'],
+                         env=dict(env, FM_DURATION_FILE=str(refused_repo / 'durations.jsonl'), FM_DURATION_ABSOLUTE_SECS='2'),
+                         cwd=workrepo, capture_output=True, text=True)
+assert 'snapshot=unavailable (recording refused; rows on stderr)' in refused.stderr, refused.stderr
+
+# The snapshot's process table survives a ps that rejects ucomm (busybox), keeps
+# at most 200 rows, keeps the newest 100 snapshots, and goes to stderr when
+# recording is off.
+no_ucomm = tmp / 'no-ucomm-bin'
+no_ucomm.mkdir()
+real_ps = shutil.which('ps')
+(no_ucomm / 'ps').write_text(f'#!/usr/bin/env bash\ncase "$*" in *ucomm*) echo "ps: bad -o argument ucomm" >&2; exit 1 ;; esac\nexec {shlex.quote(real_ps)} "$@"\n')
+(no_ucomm / 'ps').chmod(0o755)
+sleeper = 'import os, sys, time\nopen(sys.argv[1], "w").write(str(os.getpid()))\ntime.sleep(60)'
+fallback_pid = tmp / 'no-ucomm.pid'
+fallback = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.no-ucomm', '--', sys.executable, '-c', sleeper, str(fallback_pid)],
+                          env=dict(env, PATH=f'{no_ucomm}:{env["PATH"]}', FM_DURATION_ABSOLUTE_SECS='3'), cwd=workrepo, capture_output=True, text=True)
+fallback_snapshot = trip_snapshot(fallback.stderr, 'absolute_limit')
+assert 'process table unavailable' not in fallback_snapshot, fallback_snapshot
+assert any(line.split()[0] == fallback_pid.read_text() for line in fallback_snapshot.splitlines() if line[:1].isdigit()), fallback_snapshot
+
+# Off Darwin the fallback is comm, the kernel name there: with sys.platform
+# standing in as linux and ucomm rejected, the row still carries a name.
+linux_pid = tmp / 'linux-comm.pid'
+linux = subprocess.run([sys.executable, str(sampler), str(helper), 'run', 'snapshot.linux-comm', '--', sys.executable, '-c', sleeper, str(linux_pid)],
+                       env=dict(env, PATH=f'{no_ucomm}:{env["PATH"]}', FM_TEST_PLATFORM='linux', FM_DURATION_ABSOLUTE_SECS='3'),
+                       cwd=workrepo, capture_output=True, text=True)
+linux_snapshot = trip_snapshot(linux.stderr, 'absolute_limit')
+linux_row = next(line.split() for line in linux_snapshot.splitlines() if line[:1].isdigit() and line.split()[0] == linux_pid.read_text())
+assert len(linux_row) >= 6 and linux_row[5] != '-', (linux_row, linux_snapshot)
+
+# A ps name column that is not valid UTF-8 (Darwin cuts p_comm at 16 bytes, which
+# can split a multibyte name) leaves the table unavailable and never skips the stop.
+undecodable_bin = tmp / 'undecodable-ps-bin'
+undecodable_bin.mkdir()
+(undecodable_bin / 'ps').write_text(f'#!/usr/bin/env bash\ncase "$*" in *ucomm*) {shlex.quote(real_ps)} "$@"; printf \'1 0 1 S 0:00.00 00:01 bad\\377name\\n\'; exit 0 ;; esac\n'
+                                    f'exec {shlex.quote(real_ps)} "$@"\n')
+(undecodable_bin / 'ps').chmod(0o755)
+termed = tmp / 'undecodable.termed'
+trapped_sleeper = 'import pathlib, signal, sys, time\ndef on_term(*_):\n    pathlib.Path(sys.argv[1]).touch()\n    sys.exit(0)\nsignal.signal(signal.SIGTERM, on_term)\ntime.sleep(60)'
+undecodable = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.undecodable', '--', sys.executable, '-c', trapped_sleeper, str(termed)],
+                             env=dict(env, PATH=f'{undecodable_bin}:{env["PATH"]}', FM_DURATION_NO_PROGRESS_SECS='2', FM_DURATION_ABSOLUTE_SECS='60'),
+                             cwd=workrepo, capture_output=True, text=True)
+assert undecodable.returncode == 124 and 'absolute_limit' not in undecodable.stderr, (undecodable.returncode, undecodable.stderr)
+assert termed.exists(), f'the stop skipped TERM before KILL: {undecodable.stderr}'
+assert 'process table unavailable' in trip_snapshot(undecodable.stderr, 'no_progress'), undecodable.stderr
+assert any(r.get('event') == 'timeout' and r['key'] == 'snapshot.undecodable' for r in rows())
+
+many = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.rows', '--', 'bash', '-c', 'for i in $(seq 1 210); do sleep 60 & done; wait'],
+                      env=dict(env, FM_DURATION_ABSOLUTE_SECS='6'), cwd=workrepo, capture_output=True, text=True)
+rows_snapshot = trip_snapshot(many.stderr, 'absolute_limit')
+process_rows = [line for line in rows_snapshot.splitlines() if line[:1].isdigit()]
+truncated = re.search(r'^truncated: (\d+) more rows$', rows_snapshot, re.M)
+assert len(process_rows) == 200 and truncated and int(truncated.group(1)) >= 10, (len(process_rows), rows_snapshot[-300:])
+
+keep_table = tmp / 'keep' / 'durations.jsonl'
+trips = keep_table.parent / 'command-duration-trips'
+trips.mkdir(parents=True)
+for index in range(105):
+    old = trips / f'old.{index:03d}.txt'
+    old.write_text('old\n')
+    os.utime(old, (1_000_000 + index, 1_000_000 + index))
+kept = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.keep', '--', 'sleep', '30'],
+                      env=dict(env, FM_DURATION_FILE=str(keep_table), FM_DURATION_ABSOLUTE_SECS='2'), cwd=workrepo, capture_output=True, text=True)
+newest = re.search(r'snapshot=([^"]+)"', kept.stderr).group(1)
+remaining = sorted(path.name for path in trips.glob('*.txt'))
+assert len(remaining) == 100 and Path(newest).name in remaining, (len(remaining), newest)
+assert not any(f'old.{index:03d}.txt' in remaining for index in range(6)) and 'old.006.txt' in remaining, remaining[:8]
+
+off = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.off', '--', sys.executable, '-c', sleeper, str(tmp / 'off.pid')],
+                     env=dict(env, FM_DURATION_FILE='off', FM_DURATION_ABSOLUTE_SECS='2'), cwd=workrepo, capture_output=True, text=True)
+assert 'snapshot=unavailable (recording is off; rows on stderr)' in off.stderr, off.stderr
+assert 'columns: pid ppid stat cpu elapsed comm' in off.stderr, off.stderr
+assert any(line.split()[0] == (tmp / 'off.pid').read_text() for line in off.stderr.splitlines() if line[:1].isdigit()), off.stderr
 
 
 def wait_for(path):
