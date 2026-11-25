@@ -1326,6 +1326,46 @@ test_successor_fm_control_relaunch_refuses_a_claimed_branch_before_stopping() {
   pass "successor: fm-control relaunch refuses a scout or ship branch another task records as its successor before it stops the running agent"
 }
 
+# R13-1: a slot-governed task's relaunch adopts its recorded slot manifest, which binds the
+# copy to the recorded branch= alone, so it can never apply a successor. For a task whose
+# record names slot_manifest=, the receipt's next step is the reassociation onto a copy on
+# the successor, and both relaunch owners refuse the task and name that step: fm-control
+# before it stops the running agent, fm-spawn before it writes a record or a profile.
+test_successor_slot_governed_task_is_reassociated_not_relaunched() {
+  local id=suc-slot dir out rc next
+  dir=$(new_successor_case slot "$id")
+  printf 'slot_manifest=%s\nslot_base_sha=%s\nslot_owned_path=scripts\n' \
+    "$dir/slot/manifest.json" "$(tip_of "$dir" "fm/$id")" >> "$dir/home/state/$id.meta"
+  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --tip "$(tip_of "$dir" "fm/$id")" --note "v2 for a governed task") || rc=$?
+  expect_code 0 "$rc" "recording for a slot-governed task should succeed"$'\n'"$out"
+  next=$(receipt_part "$out" next)
+  case "$next" in
+    "FM_HOME=$dir/home bash "*" $id reassociate --worktree "*) ;;
+    *) fail "a slot-governed task's next step must be the reassociation onto a copy on its successor: $next" ;;
+  esac
+  case "$next" in *" $id relaunch"*) fail "a slot-governed task's next step must not be a relaunch: $next" ;; esac
+  assert_contains "$next" "fm/$id-v2" "the next step must name the successor copy's branch"
+  printf 'claude' > "$dir/fake/command"
+  : > "$dir/fake/literal"
+  : > "$dir/fake/keys"
+  cp -p "$dir/home/state/$id.meta" "$dir/relaunch.before"
+  rc=0; out=$(NM_HOME="$dir/nm" run_control "$dir" "$id" relaunch --note "apply the recorded successor") || rc=$?
+  [ ! -s "$dir/fake/literal" ] && [ ! -s "$dir/fake/keys" ] || fail "the refused relaunch sent lifecycle input to the running agent: $(cat "$dir/fake/literal" "$dir/fake/keys")"
+  assert_equals claude "$(cat "$dir/fake/command")" "the running agent must still run"
+  cmp -s "$dir/relaunch.before" "$dir/home/state/$id.meta" || fail "the refused relaunch changed the task record"
+  [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "the refused relaunch opened a relaunch transaction"
+  expect_code 1 "$rc" "the relaunch of a slot-governed task that records a successor must refuse"$'\n'"$out"
+  assert_contains "$out" "the running agent was not stopped" "the refusal must come before the stop"
+  assert_contains "$out" "reassociate the task onto a copy on fm/$id-v2" "the refusal must name the reassociation as the next step"
+  assert_contains "$out" "$id reassociate --worktree" "the refusal must print the reassociation command"
+  printf 'zsh' > "$dir/fake/command"
+  rc=0; out=$(run_spawn "$dir" "$id" --relaunch --harness claude) || rc=$?
+  expect_code 1 "$rc" "the launch owner's relaunch of a slot-governed task that records a successor must refuse"$'\n'"$out"
+  cmp -s "$dir/relaunch.before" "$dir/home/state/$id.meta" || fail "the launch owner's refused relaunch changed the task record"
+  assert_contains "$out" "reassociate the task onto a copy on fm/$id-v2" "the launch owner's refusal must name the reassociation as the next step"
+  pass "successor: a slot-governed task's receipt names reassociation onto the successor copy, and both relaunch owners refuse it and name that step"
+}
+
 # F6 (d): the receipt says what the launch will do for a launch that no profile governs.
 test_successor_receipt_matches_what_the_launch_will_do() {
   local id=suc-receipt2 dir out rc
@@ -1370,6 +1410,7 @@ test_successor_reads_the_note_file_only_after_admission
 test_successor_keeps_the_composer_dialog_file
 test_successor_note_cannot_add_a_ship_branch_line
 test_successor_receipt_matches_what_the_launch_will_do
+test_successor_slot_governed_task_is_reassociated_not_relaunched
 test_successor_failure_at_each_write_step_changes_nothing
 test_successor_serializes_on_the_lifecycle_and_metadata_locks
 test_relaunch_profile_covers_exactly_the_recorded_successor

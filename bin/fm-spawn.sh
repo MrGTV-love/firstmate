@@ -6749,6 +6749,10 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   elif fm_slot_adopt_route "$RELAUNCH_META" "$RELAUNCH_RELOCATING"; then
     # The task's own recorded manifest is adopted, never re-provisioned (Main 115, rule S): nothing is
     # prepared, moved or declared here, and the decision is taken once below.
+    if [ -n "$SUCCESSOR_BRANCH" ]; then
+      echo "error: relaunch refused: task $ID records successor branch $SUCCESSOR_BRANCH, and its slot manifest $(fm_meta_get "$RELAUNCH_META" slot_manifest) is adopted only on its recorded branch $BRANCH, so a relaunch cannot apply the successor; this launch wrote no task record and no write profile. Next: reassociate the task onto a copy on $SUCCESSOR_BRANCH, which makes it the task's recorded branch: bash bin/fm-control.sh $ID reassociate --worktree <copy on refs/heads/$SUCCESSOR_BRANCH> --note <why>" >&2
+      exit 1
+    fi
     SLOT_ADOPT=1
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)

@@ -587,7 +587,11 @@ jobs:
           FM_REQUIRE_KERNEL_PROOF: "1"
         run: |
           set -eu
-          kernel_output=$(/bin/bash tests/fm-write-confinement-successor.test.sh)
+          kernel_output=$(/bin/bash tests/fm-write-confinement-successor.test.sh) || {
+            rc=$?
+            printf '%s\n' "$kernel_output"
+            exit "$rc"
+          }
           printf '%s\n' "$kernel_output"
           case "$kernel_output" in
             *SKIPPED-UNVERIFIED*) echo "::error::the kernel proof was skipped, not run"; exit 1 ;;
