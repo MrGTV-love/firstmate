@@ -11,7 +11,7 @@
 # from an effect independent of the hooks' own status: the commit HEAD names,
 # the bare remote's refs, the commit body, the repository hook log, the bytes
 # the repository's pre-push received, and git's own GIT_TRACE of which hook
-# commands it ran. FM_GIT_HOOK_MODE is never used as evidence.
+# commands it ran.
 #
 # Sensitivity controls change one decisive fact inside the fixture only: a row
 # dropped from the worker's own GIT_CONFIG_PARAMETERS, a fixture git on the pane
@@ -19,7 +19,7 @@
 # carrier's known gaps. No production bypass exists or is used.
 set -u
 
-unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS FM_GIT_HOOK_ROWS FM_GIT_HOOK_MODE
+unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS FM_GIT_HOOK_ROWS
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

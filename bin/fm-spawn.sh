@@ -8552,7 +8552,8 @@ fm_launch_git_hooks() {
       *"'hook.fm-strip.event'"*) printf '%s\n' "$fm_cm" | grep -qx fm-strip || fm_ok=0 ;;
     esac
     if [ "$fm_ok" = 1 ]; then
-      export GIT_CONFIG_PARAMETERS="$fm_new" FM_GIT_HOOK_ROWS="$fm_rows" FM_GIT_HOOK_MODE=config
+      export GIT_CONFIG_PARAMETERS="$fm_new" FM_GIT_HOOK_ROWS="$fm_rows"
+      fm_mode=config
       return 0
     fi
   fi
@@ -8564,7 +8565,7 @@ fm_launch_git_hooks() {
     fm_reason="fm-spawn: this pane's git honours neither task Git hook carrier; refusing to launch a worker without the task Git hooks"
     return 1
   fi
-  export FM_GIT_HOOK_MODE=legacy
+  fm_mode=legacy
   return 0
 }
 SH
@@ -8583,14 +8584,14 @@ esac
 GIT_HOOKS_VERDICT_REFUSED="$TASK_TMP/git-hooks-refused.$SPAWN_GEN"
 GIT_HOOKS_VERDICT_ADMITTED="$TASK_TMP/git-hooks-admitted.$SPAWN_GEN"
 git_hooks_guard() {
-  local unset_vars='unset fm_hooks fm_rows fm_carrier fm_gcp fm_old fm_count fm_i fm_out fm_key fm_value fm_new fm_cm fm_pp fm_ok fm_reason; unset -f fm_launch_git_hooks'
+  local unset_vars='unset fm_hooks fm_rows fm_carrier fm_gcp fm_old fm_count fm_i fm_out fm_key fm_value fm_new fm_cm fm_pp fm_ok fm_mode fm_reason; unset -f fm_launch_git_hooks'
   local admitted=:
   # shellcheck disable=SC2016 # The destination shell expands these references.
-  [ "$1" != inner ] || admitted='{ printf "%s\n" "$FM_GIT_HOOK_MODE" > '"$(shell_quote "$GIT_HOOKS_VERDICT_ADMITTED")"'; } 2>/dev/null || :'
+  [ "$1" != inner ] || admitted='{ printf "%s\n" "$fm_mode" > '"$(shell_quote "$GIT_HOOKS_VERDICT_ADMITTED")"'; } 2>/dev/null || :'
   # shellcheck disable=SC2016 # The destination shell expands these references.
   printf '%s\nfm_reason=\nif fm_launch_git_hooks %s %s %s; then\n%s\n%s\n%s\nelse\nprintf "%%s\\n" "$fm_reason" >&2\n{ printf "%%s\\n" "$fm_reason" > %s; } 2>/dev/null || :\n%s\nfalse\nfi\n' \
     "$GIT_HOOKS_LAUNCH_FUNCTION" "$(shell_quote "$GIT_HOOKS_DIR")" "$(shell_quote "$GIT_HOOKS_ROWS")" \
-    "$GIT_HOOKS_CARRIER" "$unset_vars" "$admitted" "$2" \
+    "$GIT_HOOKS_CARRIER" "$admitted" "$unset_vars" "$2" \
     "$(shell_quote "$GIT_HOOKS_VERDICT_REFUSED")" "$unset_vars"
 }
 # A launch the selector refused leaves a bare shell in the endpoint. Wait,

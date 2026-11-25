@@ -170,7 +170,7 @@ SH
   # records them in FM_GIT_HOOK_ROWS; the helper removes exactly those rows and
   # keeps every other parameter.
   rows="'hook.fm-fixture.event'='pre-commit' 'hook.fm-fixture.command'='$dir/failing-hooks/pre-commit'"
-  export FM_GIT_HOOK_ROWS="$rows" GIT_CONFIG_PARAMETERS="'fixture.input'='preserved' $rows" FM_GIT_HOOK_MODE=config
+  export FM_GIT_HOOK_ROWS="$rows" GIT_CONFIG_PARAMETERS="'fixture.input'='preserved' $rows"
   git init -q "$dir/rows-armed"
   if git -C "$dir/rows-armed" -c user.name=test -c user.email=test@example.invalid \
     commit -q --allow-empty -m armed > "$dir/rows-armed.log" 2>&1; then
@@ -183,7 +183,7 @@ fm_git_init_commit "$2"
 [ "$(git -C "$2" config --get fixture.input)" = preserved ] || fail "the launcher's other parameter was dropped"
 [ -z "${FM_GIT_HOOK_ROWS+x}" ] || fail "the helper left FM_GIT_HOOK_ROWS for a nested launch to trust"
 SH
-  unset FM_GIT_HOOK_ROWS GIT_CONFIG_PARAMETERS FM_GIT_HOOK_MODE
+  unset FM_GIT_HOOK_ROWS GIT_CONFIG_PARAMETERS
 
   # The system layer is the shared helper's other half: one entry point settles
   # it, and the caller still signing proves the layer was genuinely armed.

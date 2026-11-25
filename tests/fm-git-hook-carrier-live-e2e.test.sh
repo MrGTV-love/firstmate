@@ -37,7 +37,7 @@ set -u
 
 fm_live_gate opt-in FM_GIT_HOOK_CARRIER_LIVE tmux python3 jq curl
 
-unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS FM_GIT_HOOK_ROWS FM_GIT_HOOK_MODE CLAUDECODE TMUX
+unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS FM_GIT_HOOK_ROWS CLAUDECODE TMUX
 REAL_TMUX=$(command -v tmux)
 NODE_DIR=$(command -v node 2>/dev/null) && NODE_DIR=${NODE_DIR%/*}
 LAB=$(fm_test_tmproot fm-git-hook-carrier-live) || fail "no lab directory"

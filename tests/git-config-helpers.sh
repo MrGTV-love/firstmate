@@ -86,4 +86,4 @@ if [ -n "${FM_GIT_HOOK_ROWS-}" ] && [ -n "${GIT_CONFIG_PARAMETERS-}" ]; then
   fi
   unset __fm_git_env_p
 fi
-unset FM_GIT_HOOK_ROWS FM_GIT_HOOK_MODE
+unset FM_GIT_HOOK_ROWS
