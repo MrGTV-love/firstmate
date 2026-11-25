@@ -8607,7 +8607,7 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   esac
   # The profile refuses every packed-refs rewrite, and pruning a packed
   # remote-tracking ref needs one, so a host fetch.prune=true would fail every
-  # fetch after the remote deletes a branch. The profile also refuses every
+  # fetch after the remote deletes a branch. The profile also denies every
   # shared Git config write, and a branch started from a remote-tracking ref
   # would try to record its upstream there, so branch.autoSetupMerge=false keeps
   # that checkout from attempting the write. These entries outrank both settings.

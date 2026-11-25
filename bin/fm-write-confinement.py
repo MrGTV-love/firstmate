@@ -35,7 +35,7 @@ commondir, other tasks' branch refs and reflogs, replace refs, other
 worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
 link, or a folder above one is a symbolic link, naming the path and the link
 count or target, because a write through such an alias would be judged by the
-alias's path. It also refuses while one of those program files, or a file in
+alias's path. The build also stops while one of those program files, or a file in
 those folders outside an objects folder, has a second hard link. A HEAD
 symbolic link to a refs/heads name stays allowed. Other
 projects' and gate repositories' Git directories are not scanned. Task ids
@@ -205,7 +205,7 @@ def config_values(path, key):
     """Each value of the keys matching KEY in the one config file PATH.
 
     Git expands ~/ and %(prefix)/ in a path value; a relative path stays as
-    written. A file Git cannot parse refuses the build.
+    written. A file Git cannot parse stops the build.
     """
     listed = subprocess.run(["git", "config", "--file", str(path), "--no-includes", "--type=path", "-z", "--get-regexp", key],
                             capture_output=True, env=dict(os.environ, LC_ALL="C"))
@@ -243,7 +243,7 @@ def deniable(path):
 
     An absent path or a regular file is; an existing device, folder or other
     special file, such as the /dev/null GIT_CONFIG_GLOBAL often names, is not,
-    because a deny there would refuse the worker's ordinary writes to it.
+    because a deny there would block the worker's ordinary writes to it.
     """
     try:
         return stat.S_ISREG(os.stat(path).st_mode)
@@ -267,7 +267,7 @@ def git_program_paths(common, gitdir, home):
     link inside a listed folder, whose own entries are then walked in turn. A
     second hard link has no path this build can find, so each hard-linked
     regular file among them, outside a folder named objects, is returned as an
-    alias for the build to refuse. An unreadable folder refuses the build.
+    alias that stops the build. An unreadable folder stops the build.
     """
     files, folders, entries = [], [str(Path(common) / name) for name in GIT_PROGRAM_FOLDERS], []
     queue = [(Path(common) / name, 0) for name in GIT_PROGRAM_FILES] + [(Path(gitdir) / "config.worktree", 0)]
