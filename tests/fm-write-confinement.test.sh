@@ -11,4 +11,4 @@ fi
 TMP_ROOT=$(fm_test_tmproot fm-write-confinement)
 export OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp
 python3 "$ROOT/tests/fm-write-confinement.py" "$ROOT" "$TMP_ROOT"
-pass "T5 a-e, gate push, duration, procevent and fleet-ledger writes, and refused writes and renames per protected asset class under the omp and Claude profiles"
+pass "T5 a-e, gate push, ordinary Git work, duration, procevent and fleet-ledger writes, refused writes and renames per protected asset class, and each shared Git program-file deny with its mutant under the omp and Claude profiles"
