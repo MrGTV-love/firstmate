@@ -23,7 +23,8 @@ trap 'fm_test_cleanup' EXIT
 GITID=(-c user.name='Firstmate Tests' -c user.email='tests@example.invalid')
 
 # make_world <name>: a project clone on main with a bare origin and a pool slot (<pool>/1/repo) holding branch fm/t,
-# its manifest, its task record and an owner claim directory. Sets W_DIR W_PROJ W_SLOT W_STATE W_META W_MANIFEST W_BASE.
+# its manifest, its task record and an owner claim directory. Sets W_DIR W_PROJ W_SLOT W_STATE W_META W_MANIFEST W_BASE
+# and exports STATE=W_STATE.
 make_world() {
   local name=$1
   W_DIR="$TMP_ROOT/$name"
@@ -56,6 +57,8 @@ PY
     printf 'slot_manifest=%s\nslot_base_sha=%s\nslot_owned_path=src\n' "$W_MANIFEST" "$W_BASE"
   } >"$W_META"
   export FM_HOME="$W_DIR/home"
+  # The drift report writes STATE/<id>.drift-report.txt, so it must never fall back to the checkout's own state.
+  export STATE="$W_STATE"
 }
 
 adopt() { fm_slot_adopt_check "$W_PROJ" "$W_SLOT" t fm/t "$W_META" "$W_STATE" 2>&1; }
@@ -499,6 +502,204 @@ test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift() {
   pass "drift: a .fm-kept.<time>.<n> copy of recorded wiring is not listed; an unrecorded ignored file still is"
 }
 
+# The report on a copy with many git-ignored generated paths: every proven path is printed in full, the uncertain,ignored
+# group past the bounded sample is counted and named in a `sampled:` line, and the complete report is written to
+# STATE/<id>.drift-report.txt (mode 600, replaced on every run). With no STATE the complete report is printed, and it is
+# line for line what the file holds.
+test_many_ignored_paths_print_a_sample_and_write_the_complete_report() {
+  local out full file i exclude
+  make_world drift-many-ignored
+  exclude=$(git -C "$W_SLOT" rev-parse --path-format=absolute --git-path info/exclude)
+  mkdir -p "$(dirname "$exclude")" "$W_SLOT/build"
+  printf 'build/\n*.log\n' >>"$exclude"
+  for i in $(seq 1 30); do printf 'x\n' >"$W_SLOT/build/gen-$i.o"; done
+  for i in $(seq 1 5); do printf 'x\n' >"$W_SLOT/run-$i.log"; done
+  printf 'own\n' >"$W_SLOT/docs/own.txt"
+  file=$W_STATE/t.drift-report.txt
+  full=$(STATE='' drift)
+  assert_contains "$full" 'relaunch drift report for t: 36 out-of-scope path(s)' 'the report did not count every path'
+  [ "$(printf '%s\n' "$full" | grep -c '^  drift: uncertain,ignored ')" = 35 ] || fail "with no STATE the complete list was not printed: $full"
+  [ ! -e "$file" ] || fail 'a report file was written with no STATE'
+  assert_not_contains "$full" 'sampled:' 'a report with no STATE was sampled'
+  out=$(STATE=$W_STATE drift)
+  assert_contains "$out" 'drift: proven docs/own.txt' 'the proven path was not printed in full'
+  [ "$(printf '%s\n' "$out" | grep -c '^  drift: uncertain,ignored ')" = 20 ] || fail "the stderr sample is not bounded at 20: $out"
+  assert_contains "$out" "  sampled: 35 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in $file" 'the sample line did not count the group and name the file'
+  assert_contains "$out" '  a relaunch is not a new scope declaration' 'the closing line was lost'
+  [ -f "$file" ] || fail 'the complete report file was not written'
+  # python3 reads the mode the same way on macOS and Linux (BSD and GNU stat disagree on -f)
+  [ "$(python3 -c 'import os, sys; print("%o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$file")" = 600 ] || fail 'the report file is not mode 600'
+  [ "$(cat "$file")" = "$full" ] || fail "the report file is not the complete report: $(diff <(printf '%s\n' "$full") "$file")"
+  # every printed line is a line of the complete report, apart from the sample line
+  ! printf '%s\n' "$out" | grep -v '^  sampled: ' | grep -qvxF -f "$file" || fail "stderr printed a line the file does not hold: $out"
+  # the file is replaced on the next run, never left stale
+  rm -rf "$W_SLOT/build"
+  out=$(STATE=$W_STATE drift)
+  assert_not_contains "$out" 'sampled:' 'a short ignored group was sampled'
+  [ "$(cat "$file")" = "$out" ] || fail "the report file was not replaced by the next run: $(cat "$file")"
+  # a report path that cannot be written prints the complete report
+  rm -f "$file"
+  mkdir "$file"
+  for i in $(seq 1 30); do printf 'x\n' >"$W_SLOT/gen-$i.log"; done
+  out=$(STATE=$W_STATE drift)
+  assert_not_contains "$out" 'sampled:' 'a report whose file could not be written was sampled'
+  [ "$(printf '%s\n' "$out" | grep -c '^  drift: uncertain,ignored ')" = 35 ] || fail "an unwritable report file did not print the complete list: $out"
+  pass "drift: many ignored paths print every proven path, a bounded counted sample and the file holding the complete report"
+}
+
+# fm_drift_flagged_oracle <copy>: the flagged (assume-unchanged or skip-worktree) paths whose existence, type, mode or
+# bytes differ, decided one path at a time with one ls-files and one hash-object each, one path per line, sorted.
+# It reads each path's own index entry by exact name (:(literal)), as the report does, so a name git would read as a
+# pathspec (one holding *, ?, [ or \, or starting with :) is judged by its own entry; the per-path report before the
+# batch passed the name as a pathspec, so it could judge it by another entry the pattern matched or skip it entirely.
+fm_drift_flagged_oracle() {
+  local copy=$1 tag path entry mode want have
+  git -C "$copy" ls-files -v -z | while IFS= read -r -d '' entry; do
+    tag=${entry:0:1} path=${entry:2}
+    case "$tag" in [[:lower:]]|S) ;; *) continue ;; esac
+    if [ ! -e "$copy/$path" ] && [ ! -L "$copy/$path" ]; then
+      case "$tag" in s) ;; [[:lower:]]) printf '%s\n' "$path" ;; esac
+      continue
+    fi
+    entry=$(git -C "$copy" ls-files -s -- ":(literal)$path")
+    mode=${entry%% *} want=${entry#* } want=${want%% *}
+    if [ -L "$copy/$path" ]; then
+      have=$(printf '%s' "$(readlink "$copy/$path")" | git -C "$copy" hash-object --stdin)
+      [ "$mode" = 120000 ] && [ "$have" = "$want" ] || printf '%s\n' "$path"
+    elif [ ! -f "$copy/$path" ]; then
+      printf '%s\n' "$path"
+    else
+      have=$(git -C "$copy" hash-object -- "$path")
+      if [ -x "$copy/$path" ]; then [ "$mode" = 100755 ] || have=; else [ "$mode" = 100644 ] || have=; fi
+      [ "$have" = "$want" ] || printf '%s\n' "$path"
+    fi
+  done | LC_ALL=C sort
+}
+
+# Tracked paths hidden from status by assume-unchanged or skip-worktree: changed bytes, an exec-bit flip, a file turned
+# into a directory, a symlink retarget and a symlink turned into a file are listed; unchanged bytes, a checkout's own
+# line-ending conversion and a sparse absence are not. The batched check decides exactly what a per-path check decides,
+# including for a path git reads specially on a line (a leading quote). A name git would read as a pathspec is judged
+# by its own index entry: an unchanged docs/g*x is not listed although docs/g!x, which its pattern also matches and
+# which sorts first, holds other bytes, and a changed :colon.txt is listed (git reads ":colon.txt" as the pathspec
+# colon.txt, which matches no entry here, so a lookup by pathspec skipped it).
+test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides() {
+  local out f reported expected
+  make_world drift-flagged
+  for f in au-bytes au-same au-exec sw-bytes sw-same sw-dir crlf-same crlf-changed sw-gone; do
+    printf 'line one\nline two\n' >"$W_PROJ/docs/$f.txt"
+  done
+  printf 'quoted\n' >"$W_PROJ/\"quoted.txt"
+  printf 'star\n' >"$W_PROJ/docs/g*x"
+  printf 'bang, other bytes\n' >"$W_PROJ/docs/g!x"
+  printf 'colon\n' >"$W_PROJ/:colon.txt"
+  ln -s target-one "$W_PROJ/docs/link-retarget"
+  ln -s target-two "$W_PROJ/docs/link-to-file"
+  printf 'docs/crlf-*.txt text eol=crlf\n' >"$W_PROJ/.gitattributes"
+  git -C "$W_PROJ" add -A
+  git -C "$W_PROJ" "${GITID[@]}" commit -qm 'flagged fixture'
+  git -C "$W_SLOT" "${GITID[@]}" merge -q --ff-only main
+  W_BASE=$(git -C "$W_SLOT" rev-parse HEAD)
+  git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
+  grep -q $'\r' "$W_SLOT/docs/crlf-same.txt" || fail 'the fixture is vacuous: checkout did not write CRLF line endings'
+  git -C "$W_SLOT" update-index --assume-unchanged docs/au-bytes.txt docs/au-same.txt docs/au-exec.txt docs/link-retarget
+  git -C "$W_SLOT" update-index --skip-worktree docs/sw-bytes.txt docs/sw-same.txt docs/sw-dir.txt docs/crlf-same.txt \
+    docs/crlf-changed.txt docs/sw-gone.txt docs/link-to-file '"quoted.txt' 'docs/g*x' :colon.txt
+  [ "$(git -C "$W_SLOT" ls-files -s -- 'docs/g*x' | head -n 1 | cut -f 2)" = 'docs/g!x' ] \
+    || fail 'the fixture is vacuous: the docs/g*x pathspec does not match docs/g!x first'
+  printf 'line one\nline 2!!\n' >"$W_SLOT/docs/au-bytes.txt"
+  printf 'line one\nline 2!!\n' >"$W_SLOT/docs/sw-bytes.txt"
+  chmod +x "$W_SLOT/docs/au-exec.txt"
+  rm "$W_SLOT/docs/sw-dir.txt" && mkdir "$W_SLOT/docs/sw-dir.txt"
+  printf 'line one\r\nline 2!!\r\n' >"$W_SLOT/docs/crlf-changed.txt"
+  rm "$W_SLOT/docs/sw-gone.txt"
+  rm "$W_SLOT/docs/link-retarget" && ln -s target-new "$W_SLOT/docs/link-retarget"
+  rm "$W_SLOT/docs/link-to-file" && printf 'target-two' >"$W_SLOT/docs/link-to-file"
+  printf 'quoted, changed\n' >"$W_SLOT/\"quoted.txt"
+  printf 'colon, changed\n' >"$W_SLOT/:colon.txt"
+  [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail "the fixture is not hidden from status: $(git -C "$W_SLOT" status --porcelain)"
+  out=$(STATE='' drift)
+  reported=$(printf '%s\n' "$out" | sed -n 's/^  drift: proven //p' | LC_ALL=C sort)
+  expected=$(printf '%s\n' '"quoted.txt' :colon.txt docs/au-bytes.txt docs/au-exec.txt docs/crlf-changed.txt docs/link-retarget \
+    docs/link-to-file docs/sw-bytes.txt docs/sw-dir.txt | LC_ALL=C sort)
+  assert_equals "$expected" "$reported" 'the hidden changes reported are not exactly the changed flagged paths'
+  assert_equals "$(fm_drift_flagged_oracle "$W_SLOT")" "$reported" 'the report decided a flagged path differently from a per-path check'
+  pass "drift: hidden flagged-path changes are listed exactly as a per-path check decides; unchanged and sparse paths are not"
+}
+
+# fm_drift_git_calls <flagged-count>: builds a world whose docs/many holds that many skip-worktree files, every third
+# one changed, and prints how many git processes one drift report starts there (a PATH shim counts them).
+fm_drift_git_calls() {
+  local n=$1 i shim real log
+  make_world "drift-calls-$n"
+  mkdir -p "$W_PROJ/docs/many"
+  for i in $(seq 1 "$n"); do printf '%s\n' "$i" >"$W_PROJ/docs/many/f$i.txt"; done
+  git -C "$W_PROJ" add -A
+  git -C "$W_PROJ" "${GITID[@]}" commit -qm many
+  git -C "$W_SLOT" "${GITID[@]}" merge -q --ff-only main
+  W_BASE=$(git -C "$W_SLOT" rev-parse HEAD)
+  git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
+  git -C "$W_SLOT" ls-files -z docs/many | xargs -0 git -C "$W_SLOT" update-index --skip-worktree
+  for i in $(seq 3 3 "$n"); do printf 'changed\n' >"$W_SLOT/docs/many/f$i.txt"; done
+  shim="$W_DIR/shim" log="$W_DIR/git-calls.log" real=$(command -v git)
+  mkdir -p "$shim"
+  printf '#!/bin/sh\nprintf x >>"%s"\nexec "%s" "$@"\n' "$log" "$real" >"$shim/git"
+  chmod +x "$shim/git"
+  : >"$log"
+  out=$(PATH="$shim:$PATH" drift)
+  [ "$(printf '%s\n' "$out" | grep -c '^  drift: proven docs/many/')" = "$((n / 3))" ] \
+    || fail "the report did not list the $((n / 3)) changed flagged paths: $out"
+  wc -c <"$log" | tr -d ' '
+}
+
+# The hidden flagged-path check reads the index once and hashes the working bytes in one batch, so the git processes
+# one report starts do not grow with the number of flagged paths (a per-path check starts two for each).
+test_the_flagged_path_check_starts_a_fixed_number_of_git_processes() {
+  local few many out
+  few=$(fm_drift_git_calls 6)
+  many=$(fm_drift_git_calls 60)
+  # a failure inside the counting helper reaches here as its message, not as a number
+  case "$few$many" in *[!0-9]*|'') fail "the git process count could not be taken: $few $many" ;; esac
+  [ "$few" -gt 0 ] || fail 'the fixture is vacuous: the git shim counted no process'
+  [ "$many" -le "$((few + 2))" ] || fail "60 flagged paths started $many git processes where 6 started $few"
+  pass "drift: the flagged-path check starts a fixed number of git processes ($few for 6 flagged paths, $many for 60)"
+}
+
+# A run killed between mktemp and mv leaves STATE/.<id>.drift-report.XXXXXX behind; the next write removes this id's own
+# leftovers of that exact shape and nothing else.
+test_a_killed_runs_leftover_temp_is_removed_by_the_next_write() {
+  local out keep
+  make_world drift-leftover
+  printf 'own\n' >"$W_SLOT/docs/own.txt"
+  printf 'stale\n' >"$W_STATE/.t.drift-report.Ab3xY9"
+  printf 'stale\n' >"$W_STATE/.t.drift-report.zz00ZZ"
+  for keep in .t.drift-report.Ab3xY9z .t.drift-report.Ab3x .t.drift-report.Ab3-Y9 .u.drift-report.Ab3xY9 .tt.drift-report.Ab3xY9 \
+    t.drift-report.Ab3xY9; do
+    printf 'keep\n' >"$W_STATE/$keep"
+  done
+  out=$(drift)
+  assert_contains "$out" 'drift: proven docs/own.txt' 'the report did not run'
+  [ -f "$W_STATE/t.drift-report.txt" ] || fail 'the report file was not written'
+  [ ! -e "$W_STATE/.t.drift-report.Ab3xY9" ] || fail "a leftover temp of this id survived: $W_STATE/.t.drift-report.Ab3xY9"
+  [ ! -e "$W_STATE/.t.drift-report.zz00ZZ" ] || fail "a leftover temp of this id survived: $W_STATE/.t.drift-report.zz00ZZ"
+  for keep in .t.drift-report.Ab3xY9z .t.drift-report.Ab3x .t.drift-report.Ab3-Y9 .u.drift-report.Ab3xY9 .tt.drift-report.Ab3xY9 \
+    t.drift-report.Ab3xY9; do
+    [ -f "$W_STATE/$keep" ] || fail "a file that is not this id's leftover temp was removed: $keep"
+  done
+  assert_equals $'.t.drift-report.Ab3-Y9\n.t.drift-report.Ab3x\n.t.drift-report.Ab3xY9z' \
+    "$(cd "$W_STATE" && find . -maxdepth 1 -name '.t.drift-report.*' | sed 's|^\./||' | LC_ALL=C sort)" 'the write left its own temp behind'
+  # A leftover the cleanup cannot remove (here a directory of that shape) stays, and the write goes on: the callers run
+  # under set -e, so a failed removal must not end them before the report is printed.
+  mkdir "$W_STATE/.t.drift-report.dir123"
+  printf 'stale\n' >"$W_STATE/.t.drift-report.Qq1234"
+  out=$(set -e; drift); rc=$?
+  [ "$rc" -eq 0 ] || fail "an unremovable leftover ended the report under set -e (exit $rc): $out"
+  assert_contains "$out" 'drift: proven docs/own.txt' 'an unremovable leftover stopped the printed report'
+  [ -d "$W_STATE/.t.drift-report.dir123" ] || fail "the unremovable leftover was not left in place: $W_STATE/.t.drift-report.dir123"
+  [ ! -e "$W_STATE/.t.drift-report.Qq1234" ] || fail "a removable leftover beside it survived: $W_STATE/.t.drift-report.Qq1234"
+  pass "drift: a killed run's leftover temp is removed by the next write; other ids and other names are kept; one that cannot be removed stays and the report goes on"
+}
+
 # B1 (exact-head read of 6acb4545): a governed task's own valid manifest is adopted. The record check must not overwrite
 # the manifest verdict, so the repository root the adoption judged is the manifest's own repo root, not the word ok.
 test_a_governed_tasks_own_manifest_is_adopted_with_the_manifest_repo_root() {
@@ -545,6 +746,10 @@ test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not
 test_a_path_that_arrives_only_through_a_merged_peer_branch_is_uncertain_not_proven
 test_firstmate_written_wiring_is_not_reported_as_drift
 test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift
+test_many_ignored_paths_print_a_sample_and_write_the_complete_report
+test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides
+test_the_flagged_path_check_starts_a_fixed_number_of_git_processes
+test_a_killed_runs_leftover_temp_is_removed_by_the_next_write
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run
