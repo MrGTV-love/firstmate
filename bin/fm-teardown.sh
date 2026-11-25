@@ -1362,7 +1362,7 @@ teardown_marker_lease() {  # <slot> [lease|returned]
 # conditional return succeeded it also records that return (returned=, hex of the lease
 # returned), carried along the same way, so a retry knows the slot is no longer this task's.
 teardown_mark_return_pending() {  # <slot> [child-id]
-  local marker="$STATE/$ID.teardown-return-pending" tmp gen lease= returned=
+  local marker="$STATE/$ID.teardown-return-pending" tmp gen lease='' returned=''
   tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
   if [ -n "$TEARDOWN_UNCLAIMED_SLOT" ] && [ "$1" = "$TEARDOWN_UNCLAIMED_SLOT" ] \
       && [ -n "$TEARDOWN_UNCLAIMED_EARLY" ]; then
