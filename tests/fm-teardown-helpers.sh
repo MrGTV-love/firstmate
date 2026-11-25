@@ -174,7 +174,7 @@ add_gh_no_pr() {
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 case "${1:-} ${2:-}" in
-  "pr list") printf '%s\n' "count: 0 (showing first 0)" "pull_requests[]: []" ; exit 0 ;;
+  "pr list") printf '%s\n' "count: 0" "pull_requests: []" ; exit 0 ;;
   "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
 esac
 exit 0
@@ -388,14 +388,15 @@ land_on_origin_main() {
 }
 
 # Override GitHub lookups to report PR 7 as merged with the supplied head and,
-# optionally, the actual merge commit used by archive cleanup.
+# optionally, the actual merge commit used by archive cleanup and the merge commit
+# the landed proof reads (empty unless a case names one).
 add_gh_pr_merged_for_head() {
-  local case_dir=$1 head=$2 merge=${3:-}
+  local case_dir=$1 head=$2 merge=${3:-} landed_merge=${4:-}
   cat > "$case_dir/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 case "${1:-} ${2:-}" in
   "pr list")
-    printf '%s\n' "count: 1 (showing first 1)" "pull_requests[1]{number,state}:" "  7,merged" ; exit 0 ;;
+    printf '%s\n' "count: 1" "pull_requests[1]{number,state}:" "  7,merged" ; exit 0 ;;
   "pr view")
     printf '%s\n' "pull_request:" "  number: 7" "  state: merged" '  merged: "2026-06-26T00:00:00Z"' ; exit 0 ;;
 esac
@@ -407,6 +408,7 @@ case "\${1:-} \${2:-}" in
   "pr view")
     case " \$* " in
       *"state,headRefOid,mergeCommit"*) printf '%s\t%s\t%s\n' 'MERGED' '$head' '$merge' ; exit 0 ;;
+      *"state,headRefOid,url,mergeCommit"*) printf '%s\t%s\t%s\t%s\n' 'MERGED' '$head' 'https://github.com/example/repo/pull/7' '$landed_merge' ; exit 0 ;;
       *"state,headRefOid,url"*) printf '%s\t%s\t%s\n' 'MERGED' '$head' 'https://github.com/example/repo/pull/7' ; exit 0 ;;
       *"--json state "*) printf '%s\n' MERGED ; exit 0 ;;
       *"headRefOid"*) printf '%s\n' '$head' ; exit 0 ;;
@@ -421,9 +423,9 @@ SH
 
 # Squash-merged history whose pipeline rebased the branch onto a newer main that
 # edited the same shared file. A local copy left behind by that rebase holds
-# different content for the shared file, so its per-commit patch ids against the
-# PR head differ and merge-tree against main conflicts; teardown refuses it on
-# purpose rather than reading a shared path as proof the local content landed.
+# different content for the shared file, so merging it into main conflicts;
+# teardown refuses it on purpose rather than reading a shared path as proof the
+# local content landed.
 # local_mode: rebased | stale | rebased-plus-unlanded
 # Echoes: <pr_head>
 setup_squash_rebased_history() {
@@ -615,8 +617,64 @@ setup_pipeline_rewritten_history() {
   printf '%s\n' "$pr_head"
 }
 
-# Write one row of the no-mistakes state database teardown reads at
-# $case_dir/nm/state.sqlite (run_teardown points NM_HOME there). An empty
+# Fixture for the pipeline-input cases: PR 7 is merged, its head is the commit the
+# pipeline pushed, and the task copy is the (rewritten) input the pipeline started
+# from. The recorded run is each test's own. Echoes: <pr_head>
+pipeline_input_case() {
+  local name=$1 shape=${2:-rewritten-input} case_dir pr_head
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" no-mistakes ship
+  pr_head=$(setup_pipeline_rewritten_history "$case_dir" "$shape")
+  printf '%s\n' \
+    'pr=https://github.com/example/repo/pull/7' \
+    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  printf '%s\n' "$pr_head"
+}
+
+# Run teardown on the fixture, keep its output in the case dir, echo the exit code.
+run_teardown_status() {
+  local case_dir=$1 rc
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  printf '%s\n' "$rc"
+}
+
+# The copy must refuse, name every given pattern, and keep every recovery route.
+# Args: case_dir label local_head pattern...
+assert_pipeline_input_refusal() {
+  local case_dir=$1 label=$2 local_head=$3 rc pattern
+  shift 3
+  rc=$(run_teardown_status "$case_dir")
+  expect_code 1 "$rc" "$label: teardown should refuse"$'\n'"$(cat "$case_dir/stderr")"
+  grep -q REFUSED "$case_dir/stderr" || fail "$label: no REFUSED line in stderr"
+  for pattern in "$@"; do
+    grep -qF -- "$pattern" "$case_dir/stderr" \
+      || fail "$label: the refusal does not name '$pattern'"$'\n'"$(cat "$case_dir/stderr")"
+  done
+  assert_refusal_retained_task_state "$case_dir" "$label" "$local_head"
+}
+
+# The copy was the pipeline's input and the pipeline rewrote it before the PR
+# merged. Without the run record the copy still refuses, which is the stuck
+# cleanup; with a record whose run pushed the merged head and started from this
+# copy's HEAD, it is landed.
+assert_pipeline_input_copy_allowed_by_record() {
+  local case_dir=$1 label=$2 pr_head=$3 local_head rc
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  assert_pipeline_input_refusal "$case_dir" "$label-no-record" "$local_head" \
+    "no no-mistakes state database"
+
+  write_nm_run_record "$case_dir" 01RUNINPUT "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+  rc=$(run_teardown_status "$case_dir")
+  expect_code 0 "$rc" "$label: teardown should accept the copy the merged run started from"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "$label: teardown printed a REFUSED line"
+}
+
+# Write one row of the no-mistakes state database at $case_dir/nm/state.sqlite
+# (run_teardown points NM_HOME there). It is the pipeline-input landing proof
+# (fm_task_copy_pipeline_input): a copy that is exactly the recorded input of the
+# run that pushed the merged PR head is landed. An empty
 # submitted or pushed value is stored as NULL; omit-column leaves that column out
 # of the table entirely. Calling it again appends another run row.
 # Args: case_dir run_id pr_url submitted pushed [omit-column]
@@ -1034,8 +1092,8 @@ assert_archive_ref() {  # <case-dir> <branch> <expected-sha>
 
 # Override tea to answer one login for git.example.org and a pull request
 # read through "tea api" with the supplied merged flag and head.
-add_tea_pull_for_head() {
-  local case_dir=$1 merged=$2 head=$3
+add_tea_pull_for_head() {  # <case_dir> <merged> <head> [merge commit]
+  local case_dir=$1 merged=$2 head=$3 merge=${4:-}
   cat > "$case_dir/fakebin/tea" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$case_dir/tea.log"
@@ -1044,63 +1102,13 @@ if [ "\${1:-} \${2:-}" = "login list" ]; then
   exit 0
 fi
 [ "\${1:-}" = api ] || exit 1
-printf '{"state":"closed","merged":%s,"head":{"sha":"%s"}}\n' '$merged' '$head'
+if [ -n '$merge' ]; then
+  printf '{"state":"closed","merged":%s,"head":{"sha":"%s"},"merge_commit_sha":"%s"}\n' '$merged' '$head' '$merge'
+else
+  printf '{"state":"closed","merged":%s,"head":{"sha":"%s"},"merge_commit_sha":null}\n' '$merged' '$head'
+fi
 SH
   chmod +x "$case_dir/fakebin/tea"
-}
-
-# Fixture for the pipeline-input cases: PR 7 is merged, its head is the commit the
-# pipeline pushed, and the task copy is the (rewritten) input the pipeline started
-# from. The recorded run is each test's own. Echoes: <pr_head>
-pipeline_input_case() {
-  local name=$1 shape=${2:-rewritten-input} case_dir pr_head
-  case_dir=$(make_case "$name")
-  write_meta "$case_dir" no-mistakes ship
-  pr_head=$(setup_pipeline_rewritten_history "$case_dir" "$shape")
-  printf '%s\n' \
-    'pr=https://github.com/example/repo/pull/7' \
-    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
-  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
-  printf '%s\n' "$pr_head"
-}
-
-# Run teardown on the fixture, keep its output in the case dir, echo the exit code.
-run_teardown_status() {
-  local case_dir=$1 rc
-  rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  printf '%s\n' "$rc"
-}
-
-# The copy must refuse, name every given pattern, and keep every recovery route.
-# Args: case_dir label local_head pattern...
-assert_pipeline_input_refusal() {
-  local case_dir=$1 label=$2 local_head=$3 rc pattern
-  shift 3
-  rc=$(run_teardown_status "$case_dir")
-  expect_code 1 "$rc" "$label: teardown should refuse"$'\n'"$(cat "$case_dir/stderr")"
-  grep -q REFUSED "$case_dir/stderr" || fail "$label: no REFUSED line in stderr"
-  for pattern in "$@"; do
-    grep -qF -- "$pattern" "$case_dir/stderr" \
-      || fail "$label: the refusal does not name '$pattern'"$'\n'"$(cat "$case_dir/stderr")"
-  done
-  assert_refusal_retained_task_state "$case_dir" "$label" "$local_head"
-}
-
-# The copy was the pipeline's input and the pipeline rewrote it before the PR
-# merged. Without the run record the copy still refuses, which is the stuck
-# cleanup; with a record whose run pushed the merged head and started from this
-# copy's HEAD, it is landed.
-assert_pipeline_input_copy_allowed_by_record() {
-  local case_dir=$1 label=$2 pr_head=$3 local_head rc
-  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  assert_pipeline_input_refusal "$case_dir" "$label-no-record" "$local_head" \
-    "no no-mistakes state database"
-
-  write_nm_run_record "$case_dir" 01RUNINPUT "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
-  rc=$(run_teardown_status "$case_dir")
-  expect_code 0 "$rc" "$label: teardown should accept the copy the merged run started from"$'\n'"$(cat "$case_dir/stderr")"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "$label: teardown printed a REFUSED line"
 }
 
 assert_dirty_diagnostic() {

@@ -189,7 +189,7 @@ Its 338 cases now run exactly once across three independently runnable files:
 
 | File | Area |
 |---|---|
-| `tests/fm-teardown.test.sh` | the landed-work proof and refusal matrix: fork and local-only landing, squash-merge and PR-head proofs, content fallback, task archives, pipeline-input ties, PR-check head records, dirty-worktree diagnostics, legacy records, and index-lock recovery |
+| `tests/fm-teardown.test.sh` | the landed-work proof and refusal matrix: fork and local-only landing, landing by default-branch content (squash and true merges, reverted replays, pipeline-input copies), complete branch PR lookup, task archives, PR-check head records, dirty-worktree diagnostics, legacy records, and index-lock recovery |
 | `tests/fm-teardown-pool.test.sh` | pool slots, leases, custody, and returns: reservation before cleanup, proved landing after a wait, return-pending records across a refusal, reassigned and enclosing slots, reassociated and prior copies, nested slots, and subordinate cleanup custody |
 | `tests/fm-teardown-cleanup.test.sh` | post-close cleanup: the bounded process reap, foreign and held copies with the closeout driver, private no-mistakes launch agents, Docker stacks with their retained records, Herdr projection journals, and secondmate delivery and retirement |
 

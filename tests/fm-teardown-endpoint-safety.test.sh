@@ -1065,8 +1065,13 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=ship"
   # A ship retires from a reassigned slot only on its own delivery proof, never
-  # the claimant's copy: its own branch is landed on the default branch.
+  # the claimant's copy: its own branch is landed on origin's default branch,
+  # read live, as every landing proof is.
   git -C "$dir/project" branch "fm/$id"
+  git clone -q --bare "$dir/project" "$dir/origin.git"
+  git -C "$dir/project" remote add origin "$dir/origin.git"
+  git -C "$dir/project" fetch -q origin
+  git -C "$dir/project" remote set-head origin -a >/dev/null
   claim_pool_slot "$dir" "$other" "$dir/other-home"
   start_slot_worker "$dir"
   worker=$SLOT_WORKER

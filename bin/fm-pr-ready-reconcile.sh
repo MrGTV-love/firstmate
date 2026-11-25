@@ -4,14 +4,19 @@
 # Usage: fm-pr-ready-reconcile.sh
 # Every pass admits at most eight task records, rotating after the last admitted
 # record. Only kind=ship with mode=no-mistakes or direct-PR is eligible: one with no
-# pr= is registered, and one with a recorded pr= is handed to bin/fm-pr-auto-review.py,
-# whose header owns the request, record and merge sequence (the merge poll, a static
-# program that prints only `merged`, cannot request a read). That step is stopped only
-# when it goes silent for this pass's stall interval, like every other read here.
+# pr= is registered from its ready note below, and one with a recorded pr= is handed to
+# bin/fm-pr-auto-review.py, whose header owns the request, record and merge sequence (the
+# merge poll, a static program that prints only `merged`, cannot request a read). That step
+# is stopped only when it goes silent for this pass's stall interval, like every other read
+# here. A recorded pr= with no runnable merge poll (the registrar was interrupted between
+# committing pr= and publishing every poll file; pr_poll_lost owns the test) is then also
+# registered again for that recorded PR, unless a merge notification or armed prune for
+# that PR, a pending poll retirement or a pending slot return says the poll ended on purpose. That re-arm is the same registrar
+# call, so the merge poll then finds a merge nobody told this home about.
 # Read at most the final 64 KiB / 200 lines of each eligible status log. The
 # window comes from fm-status-event-lib.sh and the ready gate from fm-dod-lib.sh,
 # not a second status grammar, and the PR is the one the ready note declares as
-# `PR <url>`.
+# `PR <url>` or as its first word (the note's own URL, bin/fm-dod-lib.sh).
 # The newest ready declaration in that window wins, even when subsequent
 # resolution notes follow it. A no-mistakes ship with no ready declaration is
 # registered when fm-crew-state.sh reads its run as `checks green: PR ready for
@@ -95,9 +100,74 @@ crew_state_ready_url() {  # <id>
   printf '%s' "${component##*: }"
 }
 
+# 0 when <id>'s recorded pr= has no runnable merge poll and nothing says the poll
+# ended on purpose. A runnable poll is one the watcher itself admits
+# (fm_pr_poll_snapshot_capture, or a poll whose only fault is a moved volume device
+# number, which the watcher re-records) for that same PR; a sidecar or registration left
+# without its check by a registrar that died between its final renames is not
+# one. The poll ended on purpose when a pending retirement or a pending slot
+# return exists, when the merge-notified marker names this PR (a marker naming
+# another PR does not count), when a teardown's set-aside .retiring marker exists
+# at all (readable or not), or when an armed prune record names this PR or
+# cannot be read. A registration in progress holds the task's metadata lock from
+# writing pr= until it holds the poll publication lock, and that lock until its poll
+# is published (bin/fm-pr-check.sh); this pass tries both, in that order, and reads
+# pr= again under the first, so a registration in progress is left to it. A
+# check.sh that has a custom-check trust record, or that is not a merge poll by its
+# bytes or its generator mark, is another check and is never replaced; the pass
+# names that conflict instead.
+pr_poll_lost() {  # <id> <recorded pr>
+  local id=$1 pr=$2 suffix canonical lost=0 lock meta_lock current
+  for suffix in pr-poll-retirement teardown-return-pending; do
+    [ ! -e "$STATE/$id.$suffix" ] && [ ! -L "$STATE/$id.$suffix" ] || return 1
+  done
+  fm_pr_url_parse "$pr" || return 1
+  canonical=$FM_PR_URL
+  ! fm_pr_poll_merge_already_notified "$STATE" "$id" "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
+  # The marker a teardown moved aside before removing the record (bin/fm-teardown.sh
+  # merge_marker_retire_begin): its presence alone means a teardown of this task is
+  # under way, so it counts whatever it holds, unreadable or not (Main 1820 F8).
+  [ ! -e "$STATE/$id.pr-poll-merge-notified.retiring" ] && [ ! -L "$STATE/$id.pr-poll-merge-notified.retiring" ] || return 1
+  if [ -e "$STATE/$id.merge-prune" ] || [ -L "$STATE/$id.merge-prune" ]; then
+    [ -f "$STATE/$id.merge-prune" ] && [ ! -L "$STATE/$id.merge-prune" ] || return 1
+    ! grep -qxF -e "pr=$pr" -e "pr=$canonical" "$STATE/$id.merge-prune" 2>/dev/null || return 1
+    grep -q '^pr=' "$STATE/$id.merge-prune" 2>/dev/null || return 1
+  fi
+  meta_lock=$(fm_meta_lock_path "$STATE/$id.meta") || return 1
+  fm_lock_try_acquire "$meta_lock" || return 1
+  current=$(grep '^pr=' "$STATE/$id.meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)
+  if [ "$current" != "$pr" ]; then
+    fm_lock_release "$meta_lock" || true
+    return 1
+  fi
+  lock="$STATE/.pr-poll-publish-$id.lock"
+  if ! fm_lock_try_acquire "$lock"; then
+    fm_lock_release "$meta_lock" || true
+    return 1
+  fi
+  if fm_pr_poll_snapshot_capture "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" \
+    && [ "$FM_PR_POLL_SNAPSHOT_URL" = "$canonical" ]; then
+    lost=1
+  elif fm_pr_poll_registration_device_shifted "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" \
+    && [ "$FM_PR_DATA_URL" = "$canonical" ]; then
+    lost=1  # only the volume's device number moved: the watcher re-records it, so it is not lost
+  elif { [ -e "$STATE/$id.check.sh" ] || [ -L "$STATE/$id.check.sh" ]; } \
+    && ! fm_pr_poll_check_dest_replaceable "$STATE" "$id" "$SCRIPT_DIR/fm-pr-poll.sh"; then
+    # A registered custom check (bin/fm-check-register.sh), or any check.sh that the
+    # publisher cannot prove is a merge poll by its bytes or its generator mark
+    # (bin/fm-pr-lib.sh fm_pr_poll_check_bytes_ours), is another check: the
+    # registrar would not replace it.
+    printf 'pr-ready: %s: state/%s.check.sh is another check, not the merge poll for %s; the poll is not re-armed over it\n' "$id" "$id" "$pr"
+    lost=1
+  fi
+  fm_lock_release "$lock" || true
+  fm_lock_release "$meta_lock" || true
+  return "$lost"
+}
+
 # Metadata is read once, without sourcing worker-controlled bytes.
 reconcile_one() {  # <meta> <id>
-  local meta=$1 id=$2 line kind='' mode='' pr='' note url=''
+  local meta=$1 id=$2 line kind='' mode='' pr='' note url='' registered='registered'
   local ready='' refusal="$CACHE/$2.refused" refused_at output age previous='' rc=0
   if [ ! -f "$meta" ] || [ -L "$meta" ] || [ ! -r "$meta" ]; then
     printf 'pr-ready: %s: unreadable task record; skipped\n' "$id"
@@ -121,7 +191,8 @@ reconcile_one() {  # <meta> <id>
     fm_run_progress "$CREW_STATE_STALL_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
       "$AUTO_REVIEW_BIN" step "$id" || rc=$?
     ! fm_timed_out "$rc" || printf 'pr-ready: %s: the review step made no progress for %ss; stopped, read again next pass\n' "$id" "$CREW_STATE_STALL_SECS"
-    return 0
+    rc=0
+    pr_poll_lost "$id" "$pr" || return 0
   fi
   if [ -e "$refusal" ] || [ -L "$refusal" ]; then
     refused_at=$(_fm_status_file_mtime "$refusal") || refused_at=0
@@ -129,7 +200,11 @@ reconcile_one() {  # <meta> <id>
     [ "$age" -lt 0 ] || [ "$age" -ge "$REFUSAL_RETRY_SECS" ] || return 0
   fi
   output=
-  if [ -e "$STATE/$id.status" ] || [ -L "$STATE/$id.status" ]; then
+  if [ -n "$pr" ]; then
+    # The PR is already recorded: only its merge poll is missing.
+    url=$pr
+    registered='re-armed the merge poll for'
+  elif [ -e "$STATE/$id.status" ] || [ -L "$STATE/$id.status" ]; then
     if [ ! -f "$STATE/$id.status" ] || [ -L "$STATE/$id.status" ] || [ ! -r "$STATE/$id.status" ] \
       || ! tail -c 65536 "$STATE/$id.status" > "$SCRATCH" 2>/dev/null; then
       printf 'pr-ready: %s: unreadable status log; skipped\n' "$id"
@@ -144,7 +219,9 @@ reconcile_one() {  # <meta> <id>
     fm_dod_should_gate_ship_done ship "$mode" "$line" || continue
     ready=$line
   done <<< "$output"
-  if [ -n "$ready" ]; then
+  if [ -n "$pr" ]; then
+    :
+  elif [ -n "$ready" ]; then
     status_line_note "$ready" note
     url=$(fm_dod_pr_url_from_done_note "$note") || return 0
   else
@@ -156,11 +233,16 @@ reconcile_one() {  # <meta> <id>
   fm_pr_url_parse "$url" || return 0
   url=$FM_PR_URL
   [ ! -f "$refusal" ] || [ -L "$refusal" ] || previous=$(cat -- "$refusal" 2>/dev/null) || previous=
-  if output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" \
-    "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1); then
+  rc=0
+  output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" \
+    FM_PR_CHECK_EXPECT_PR="${pr:-none}" "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ]; then
     rm -f -- "$refusal"
-    printf 'pr-ready: %s: registered %s\n' "$id" "$url"
-  elif [ "$?" -eq 75 ]; then
+    printf 'pr-ready: %s: %s %s\n' "$id" "$registered" "$url"
+  elif [ "$rc" -eq 3 ]; then
+    # Another registration recorded a different PR during this pass: that one owns the record now.
+    printf 'pr-ready: %s: the recorded PR changed during this pass, so the registration of %s did nothing; read again next pass\n' "$id" "$url"
+  elif [ "$rc" -eq 75 ]; then
     # The run did not answer, so nothing was refused: no new wake, and the last
     # refusal memo stays as it is, so a repeat of that refusal is not woken twice;
     # its age is already past the back-off, so the next pass reads it again.

@@ -14,6 +14,9 @@
 #   - bin/fm-control.sh reassociate re-points a record at a replacement copy only
 #     when both hold for that copy and it shares the project's repository
 #     (fm_task_copy_same_repository).
+# The landed rule for a copy lives here once too (fm_task_copy_landed and
+# fm_task_copy_pipeline_input): bin/fm-teardown.sh acts on it and
+# bin/fm_open_loops.py reports it.
 # A record's prior_worktree= lines name copies the task worked in before a
 # reassociation that stay its preserved custody, so the record scan counts them
 # exactly like worktree= and home=. A pool slot the task left entirely is
@@ -118,35 +121,291 @@ fm_task_copy_default_branch() {
 }
 
 # A failed content check is no verdict on the work while FM_TASK_COPY_UNASKED
-# names why: it is cleared only once the check compared the two trees, and a
-# merge conflict is that comparison's answer. With no-fetch the same rule reads
-# the refs already here: merge-tree adds objects only, and no ref or worktree moves.
+# names why: it is cleared only once the check read and compared every blob, and a
+# blob that differs is that comparison's answer ("not landed"). Landing is proved
+# only against origin's default branch (Main 1871 P-A): a copy with no readable
+# origin, or a fetch that fails, leaves the answer unknown, and the caller refuses;
+# a local branch is never taken in its place. With no-fetch the same rule reads the
+# origin refs already here, for a report. The proof itself is
+# fm_task_copy_blobs_in_default: no merge machinery runs (Main 1871 P-B).
 FM_TASK_COPY_UNASKED=
 fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>] [no-fetch]
-  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref default_tree merged_tree
+  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} fetch=${5:-} ref
   FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -d "$worktree" ] || return 1
-  [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
-  if git -C "$worktree" remote get-url origin >/dev/null 2>&1; then
-    [ "$fetch" = no-fetch ] || git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
-      FM_TASK_COPY_UNASKED="origin/$name could not be fetched"
+  if [ "$fetch" = no-fetch ]; then
+    git -C "$worktree" remote get-url origin >/dev/null 2>&1 || {
+      FM_TASK_COPY_UNASKED="the copy has no readable origin, so its landing cannot be proved"
       return 1
     }
+    [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
     ref="refs/remotes/origin/$name"
-  elif git -C "$worktree" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
-    ref="refs/heads/$name"
+    git -C "$worktree" rev-parse --quiet --verify "$ref^{commit}" >/dev/null 2>&1 || return 1
   else
+    if [ -z "$name" ]; then
+      fm_task_copy_live_default "$worktree" "$project" || return 1
+      name=$FM_TASK_COPY_DEFAULT_NAME
+    fi
+    fm_task_copy_refresh_default "$worktree" "$name" || return 1
+    ref=$FM_TASK_COPY_DEFAULT_REF
+    FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
+  fi
+  fm_task_copy_blobs_in_default "$worktree" "$ref" "$head"
+}
+
+# 0 when the default branch at <default-ref> holds every change <head> made: for
+# each path that differs between <head> and the merge base of the two, the
+# default's tree entry (mode, type and object id) equals <head>'s, and a path
+# <head> deleted is absent there too (Main 1871 P-B). The paths come from
+# git diff-tree and the entries from git ls-tree, both plumbing, so no merge
+# driver, textconv or attribute can change the answer. A path the default branch
+# changed further is not equal, so it is unproved. Any read that fails leaves
+# FM_TASK_COPY_UNASKED set; an entry that differs clears it, as an answer.
+fm_task_copy_blobs_in_default() {  # <dir> <default-ref> <head>
+  local dir=$1 ref=$2 head=$3 base listed theirs ours path
+  local -a paths=()
+  FM_TASK_COPY_UNASKED='the content check could not read the trees it compares'
+  [ -n "$ref" ] && [ -n "$head" ] || return 1
+  base=$(git -C "$dir" merge-base "$ref" "$head" 2>/dev/null) || return 1
+  [ -n "$base" ] || return 1
+  listed=$(mktemp "${TMPDIR:-/tmp}/fm-task-copy-paths.XXXXXX") || return 1
+  if ! git -C "$dir" diff-tree -r -z --no-renames --name-only "$base" "$head" -- > "$listed" 2>/dev/null; then
+    rm -f -- "$listed"
     return 1
   fi
-  default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
-  [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || {
-    [ "$?" != 1 ] || FM_TASK_COPY_UNASKED=
+  while IFS= read -r -d '' path; do paths+=("$path"); done < "$listed"
+  rm -f -- "$listed"
+  if [ "${#paths[@]}" -eq 0 ]; then
+    FM_TASK_COPY_UNASKED=
+    return 0
+  fi
+  # The caller's git (a bounded wrapper in some callers) reads both trees.
+  theirs=$(git -C "$dir" --literal-pathspecs ls-tree -r --full-tree "$ref" -- "${paths[@]}" 2>/dev/null) || return 1
+  ours=$(git -C "$dir" --literal-pathspecs ls-tree -r --full-tree "$head" -- "${paths[@]}" 2>/dev/null) || return 1
+  FM_TASK_COPY_UNASKED=
+  [ "$(printf '%s\n' "$theirs" | LC_ALL=C sort)" = "$(printf '%s\n' "$ours" | LC_ALL=C sort)" ]
+}
+
+# The name of origin's default branch, read live: `git ls-remote --symref origin
+# HEAD` in <dir> answers, and when the project records origin/HEAD it must name
+# the same branch (Main 1871: a renamed remote default whose old name is still
+# fetchable is refused rather than read). FM_TASK_COPY_DEFAULT_NAME holds it on
+# success; on failure FM_TASK_COPY_UNASKED says why.
+FM_TASK_COPY_DEFAULT_NAME=
+fm_task_copy_live_default() {  # <dir> <project>
+  local dir=$1 project=$2 live recorded
+  FM_TASK_COPY_DEFAULT_NAME=
+  FM_TASK_COPY_UNASKED="the copy has no readable origin, so its landing cannot be proved"
+  git -C "$dir" remote get-url origin >/dev/null 2>&1 || return 1
+  live=$(git -C "$dir" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's|^ref: refs/heads/\([^[:space:]]*\)[[:space:]]*HEAD$|\1|p' | head -1)
+  [ -n "$live" ] || {
+    FM_TASK_COPY_UNASKED="origin's default branch could not be read"
+    return 1
+  }
+  recorded=$(git -C "$project" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [ -n "$recorded" ] && [ "${recorded#origin/}" != "$live" ]; then
+    FM_TASK_COPY_UNASKED="origin/HEAD names ${recorded#origin/} but origin's default branch is $live"
+    return 1
+  fi
+  FM_TASK_COPY_DEFAULT_NAME=$live
+  FM_TASK_COPY_UNASKED=
+}
+
+# The default branch's current tip in <dir>, read fresh: refs/remotes/origin/<branch>
+# is fetched first, and a failed fetch, or no readable origin, is no answer, so a
+# cached ref or a local branch is never taken as the default branch (Main 1820 F2,
+# Main 1871 P-A). FM_TASK_COPY_DEFAULT_REF names the ref on success, and on failure
+# FM_TASK_COPY_UNASKED says why.
+FM_TASK_COPY_DEFAULT_REF=
+fm_task_copy_refresh_default() {  # <dir> <default-branch>
+  local dir=$1 name=$2
+  FM_TASK_COPY_DEFAULT_REF=
+  FM_TASK_COPY_UNASKED="the default branch of $dir could not be refreshed"
+  [ -d "$dir" ] && [ -n "$name" ] || return 1
+  git -C "$dir" remote get-url origin >/dev/null 2>&1 || {
+    FM_TASK_COPY_UNASKED="the copy has no readable origin, so its landing cannot be proved"
+    return 1
+  }
+  git -C "$dir" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
+    FM_TASK_COPY_UNASKED="origin/$name could not be refreshed"
+    return 1
+  }
+  FM_TASK_COPY_DEFAULT_REF="refs/remotes/origin/$name"
+  git -C "$dir" rev-parse --quiet --verify "$FM_TASK_COPY_DEFAULT_REF^{commit}" >/dev/null 2>&1 || {
+    FM_TASK_COPY_DEFAULT_REF=
     return 1
   }
   FM_TASK_COPY_UNASKED=
-  merged_tree=${merged_tree%%$'\n'*}
-  [ "$merged_tree" = "$default_tree" ]
+}
+
+# Reads `gh-axi pr list` text that was asked for with --limit <bound+1>
+# (Main 1820 F4(a)). The list is complete only when its count line reads
+# "count: N" or "count: N of N total", N PR rows follow, and N is at most
+# <bound>; a full page of <bound+1> rows, a cut list, an unknown count line or a
+# row count that differs is incomplete, never "no PR". Returns 0 with
+# FM_TASK_COPY_PR_NUMBERS holding the listed numbers in order, one per line;
+# 1 for a complete list with no PR; 2 for an incomplete list, with
+# FM_TASK_COPY_UNASKED naming why.
+FM_TASK_COPY_PR_NUMBERS=
+fm_task_copy_pr_list_read() {  # <bound> <list-text>
+  local bound=$1 out=$2 first count total numbers rows
+  FM_TASK_COPY_PR_NUMBERS=
+  FM_TASK_COPY_UNASKED=
+  first=$(printf '%s\n' "$out" | sed -n '1p')
+  count=$(printf '%s\n' "$first" | sed -n 's/^count: \([0-9][0-9]*\)$/\1/p')
+  total=$count
+  if [ -z "$count" ]; then
+    count=$(printf '%s\n' "$first" | sed -n 's/^count: \([0-9][0-9]*\) of [0-9][0-9]* total$/\1/p')
+    total=$(printf '%s\n' "$first" | sed -n 's/^count: [0-9][0-9]* of \([0-9][0-9]*\) total$/\1/p')
+  fi
+  numbers=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p')
+  rows=$(printf '%s' "$numbers" | grep -c . || true)
+  if [ -z "$count" ] || [ -z "$total" ] || [ "$count" != "$total" ] || [ "$rows" != "$count" ] \
+    || [ "$count" -gt "$bound" ]; then
+    FM_TASK_COPY_UNASKED="the PR list is not shown complete (count line: $first; $rows rows; bound $bound)"
+    return 2
+  fi
+  [ "$count" -gt 0 ] || return 1
+  FM_TASK_COPY_PR_NUMBERS=$numbers
+}
+
+# 0 when the archive tip <tip> may be reaped: it is in the history of <default-ref>,
+# or the default branch holds every change it made by the blob proof
+# (fm_task_copy_blobs_in_default; Main 1820 F3, Main 1871 P-B). Anything else, an
+# error included, keeps it. The caller refreshes <default-ref> first
+# (fm_task_copy_refresh_default); a patch matched somewhere in history is never
+# enough, since a later commit can revert it.
+fm_task_copy_archive_carried() {  # <dir> <default-ref> <tip>
+  local dir=$1 ref=$2 tip=$3
+  [ -n "$ref" ] && [ -n "$tip" ] || return 1
+  git -C "$dir" merge-base --is-ancestor "$tip" "$ref" 2>/dev/null && return 0
+  fm_task_copy_blobs_in_default "$dir" "$ref" "$tip"
+}
+
+# The landed rule for a task copy, owned here so bin/fm-teardown.sh, which acts
+# on it, and bin/fm_open_loops.py, which reports it, read one rule (AGENTS.md hard
+# rule 3). <head> in <dir> is landed on <default-ref> when the default branch
+# holds every change it made (fm_task_copy_blobs_in_default), or, for a PR the
+# forge reports merged at <merged-pr-head>, when <head> is exactly that merged
+# head and the head is in the default branch's history (Main 1688 Q1), or when
+# <head> is an ancestor of the merged head and the forge's <merge-commit> for
+# the PR is in the default branch's history (Main 1907). The caller confirms the
+# merge and names <default-ref>; with no merged PR, pass no PR fields. The other
+# Main 1907 route, the no-mistakes run record, is fm_task_copy_pipeline_input.
+# FM_TASK_COPY_UNASKED keeps the content check's reason when nothing proved it.
+# This rule and fm_task_copy_pipeline_input need bin/fm-pr-lib.sh (fm_pr_head_valid)
+# sourced first.
+fm_task_copy_landed() {  # <dir> <default-ref> <head> [<merged-pr-head> <merge-commit>]
+  local dir=$1 ref=$2 head=$3 pr_head=${4:-} merge=${5:-} current
+  FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
+  [ -n "$ref" ] || return 1
+  current=$(git -C "$dir" rev-parse --verify --quiet "$head^{commit}" 2>/dev/null) || return 1
+  if fm_pr_head_valid "$pr_head" && [ "$current" = "$pr_head" ] \
+    && git -C "$dir" merge-base --is-ancestor "$pr_head" "$ref" 2>/dev/null; then
+    FM_TASK_COPY_UNASKED=
+    return 0
+  fi
+  fm_task_copy_blobs_in_default "$dir" "$ref" "$current" && return 0
+  if fm_pr_head_valid "$pr_head" && fm_pr_head_valid "$merge" \
+    && git -C "$dir" merge-base --is-ancestor "$current" "$pr_head" 2>/dev/null \
+    && git -C "$dir" merge-base --is-ancestor "$merge" "$ref" 2>/dev/null; then
+    FM_TASK_COPY_UNASKED=
+    return 0
+  fi
+  return 1
+}
+
+# The pipeline's own review and document steps rewrite and add commits on the
+# branch it pushes, so a copy that was the pipeline's INPUT is neither an
+# ancestor of the merged PR head nor content the default branch holds. Such a
+# copy is proven landed from the no-mistakes run record, never from commit
+# content: a recorded run for the merged PR pushed exactly the merged PR head,
+# that run started from a recorded input head (submitted_head_sha), and the
+# copy's HEAD <current> is exactly that input head. A copy at any other commit is
+# not landed, as is one whose run pushed some other head; each missing record is
+# named in FM_TASK_COPY_PIPELINE_REASON. Commit subjects and times never count.
+# <rows> is what FM_TASK_COPY_RUN_RECORD_PY printed for <db> and <pr-url>; the
+# caller bounds that read-only query. Returns 0 landed, 1 not landed, 2 unknown
+# (the database was locked past SQLite's busy wait).
+FM_TASK_COPY_PIPELINE_REASON=
+FM_TASK_COPY_RUN_RECORD_PY=
+read -r -d '' FM_TASK_COPY_RUN_RECORD_PY <<'PY' || :
+import re
+import sqlite3
+import sys
+from contextlib import closing
+from pathlib import Path
+
+database, pr_url = sys.argv[1:]
+needed = ("id", "pr_url", "submitted_head_sha", "last_pushed_sha")
+try:
+    with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
+        have = {row[1] for row in db.execute("PRAGMA table_info(runs)")}
+        missing = [name for name in needed if name not in have]
+        if missing:
+            print("missing-column|" + ",".join(missing))
+        else:
+            rows = db.execute(
+                "SELECT id, submitted_head_sha, last_pushed_sha FROM runs WHERE pr_url = ? "
+                "ORDER BY created_at, id", (pr_url,)
+            ).fetchall()
+            for row in rows:
+                values = ["" if value is None else str(value) for value in row]
+                if re.fullmatch(r"[A-Za-z0-9_-]+", values[0]):
+                    print("run|" + "|".join(values))
+except sqlite3.OperationalError as error:
+    print("busy|" if "locked" in str(error) else "unreadable|")
+except (OSError, ValueError, sqlite3.Error):
+    print("unreadable|")
+PY
+fm_task_copy_pipeline_input() {  # <current> <merged-pr-head> <pr-url> <db> <rows>
+  local current=$1 pr_head=$2 pr_url=$3 db=$4 rows=$5 kind id submitted pushed runs=0 tied=0 reasons=''
+  FM_TASK_COPY_PIPELINE_REASON=
+  while IFS='|' read -r kind id submitted pushed; do
+    case "$kind" in
+      missing-column)
+        FM_TASK_COPY_PIPELINE_REASON="the no-mistakes run table in $db is missing column(s) $id, so no run record ties this copy to $pr_url"
+        return 1
+        ;;
+      unreadable)
+        FM_TASK_COPY_PIPELINE_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+        return 1
+        ;;
+      busy)
+        FM_TASK_COPY_PIPELINE_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+        return 2
+        ;;
+      run) ;;
+      *) continue ;;
+    esac
+    runs=$((runs + 1))
+    if [ -z "$pushed" ]; then
+      reasons="${reasons}run $id records no pushed head (last_pushed_sha), so it cannot be tied to the merged PR head ${pr_head:0:12}"$'\n'
+      continue
+    fi
+    if [ "$pushed" != "$pr_head" ]; then
+      reasons="${reasons}run $id pushed ${pushed:0:12}, not the merged PR head ${pr_head:0:12}"$'\n'
+      continue
+    fi
+    tied=$((tied + 1))
+    if ! fm_pr_head_valid "$submitted"; then
+      reasons="${reasons}run $id records no input head (submitted_head_sha), so this copy's HEAD cannot be placed in what the run started from"$'\n'
+      continue
+    fi
+    if [ "$submitted" = "$current" ]; then
+      return 0
+    fi
+    reasons="${reasons}run $id started from ${submitted:0:12}; this copy's HEAD ${current:0:12} is not that head, so this copy is not the input the run started from"$'\n'
+  done <<EOF
+$rows
+EOF
+  if [ "$runs" -eq 0 ]; then
+    reasons="no no-mistakes run record names the merged PR $pr_url"$'\n'
+  elif [ "$tied" -eq 0 ]; then
+    reasons="${reasons}no recorded run pushed the merged PR head ${pr_head:0:12}"$'\n'
+  fi
+  FM_TASK_COPY_PIPELINE_REASON=${reasons%$'\n'}
+  return 1
 }
 
 # The porcelain status lines of <copy> that are its own uncommitted work:

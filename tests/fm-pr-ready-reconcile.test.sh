@@ -60,7 +60,7 @@ case "$*" in
     else printf '{"isDraft":false}\n'; fi ;;
   *'--json headRefOid'*)
     if [ -f "$FM_READY_CASE/forge-head" ]; then cat "$FM_READY_CASE/forge-head";
-    else git -C "$FM_READY_CASE/project" rev-parse HEAD; fi ;;
+    else git -C "$FM_READY_CASE/project" rev-parse refs/remotes/origin/main; fi ;;
   *) printf '[]\n' ;;
 esac
 SH
@@ -236,6 +236,8 @@ out=$(run_pass)
 [ "$(refusal_wakes ready)" -eq 1 ] || fail "a changed guard banner queued a second wake for the same refusal: $out"
 ! grep -q 'banner' "$CASE/home/state/.wake-queue" || fail 'guard banner leaked into the refusal wake'
 printf '%s\n' "$out" | grep -q 'registration refused: error: ' || fail "refusal line does not carry the registrar error: $out"
+printf '%s\n' "$out" | grep -qF "named head $(git -C "$CASE/project" rev-parse HEAD) is unreachable outside the worker copy" \
+  || fail "refusal line does not name the unpublished head: $out"
 pass 'a changing fm-guard.sh banner neither re-wakes the same refusal nor enters its reason'
 
 # The 2026-10-20 shape: the run is green and names its PR, but the worker never
@@ -490,10 +492,16 @@ for rejection in draft unreachable unreadable-forge; do
     git -C "$CASE/project" commit -q --allow-empty -m unpublished
     HEAD=$(git -C "$CASE/project" rev-parse HEAD)
   fi
-  [ "$rejection" != unreadable-forge ] || : > "$CASE/unreadable-forge"
+  if [ "$rejection" = unreadable-forge ]; then
+    # The no-mistakes pipeline pushed this head to the forge, which no local ref names.
+    printf '%s\n' "$HEAD" > "$CASE/forge-head"
+    : > "$CASE/unreadable-forge"
+  fi
   before=$(shasum -a 256 "$CASE/home/state/ready.meta")
   out=$(run_pass)
   [ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail "$rejection refusal not printed exactly once"
+  [ "$rejection" != unreachable ] || printf '%s\n' "$out" | grep -qF "named head $HEAD is unreachable outside the worker copy" \
+    || fail "unreachable refusal does not name the unpublished head: $out"
   assert_unregistered ready
   [ "$before" = "$(shasum -a 256 "$CASE/home/state/ready.meta")" ] || fail "$rejection refusal changed record"
   calls_before=$(wc -l < "$CASE/gh.calls")
@@ -600,6 +608,398 @@ done
 stop_watcher
 assert_registered ready
 pass 'hung forge call is killed at the pass limit and the next watcher tick registers the ready ship'
+
+# The 2026-10-18 shape: the worker's done note leads with the PR's URL instead of
+# `PR <url>`. It names the same PR, so the pass registers it exactly as for the
+# `PR ` form, and a note that does not start with a PR or MR URL registers nothing.
+make_case done-note-forms
+write_ship pr-form ship direct-PR
+write_ship bare-url ship direct-PR
+write_ship prose-url ship direct-PR
+write_ship issue-url ship direct-PR
+write_ship no-url ship direct-PR
+printf 'done [at=1792479210]: PR %s head %s\n' "$URL" "$HEAD" > "$CASE/home/state/pr-form.status"
+printf 'done [at=1792479210] [key=close-evidence]: %s merged by another lane\n' "$URL" > "$CASE/home/state/bare-url.status"
+printf 'done [at=1792479210]: closed, see %s\n' "$URL" > "$CASE/home/state/prose-url.status"
+printf 'done [at=1792479210]: https://github.com/example/project/issues/42 closed\n' > "$CASE/home/state/issue-url.status"
+printf 'done [at=1792479210]: closed with no link\n' > "$CASE/home/state/no-url.status"
+out=$(run_pass)
+assert_registered pr-form
+assert_registered bare-url
+assert_unregistered prose-url
+assert_unregistered issue-url
+assert_unregistered no-url
+pass 'a done note leading with the PR URL registers like the PR form; a URL later in the note, an issue URL and no URL do not'
+
+# A record whose pr= is already set but whose merge poll was never published (the
+# registrar was interrupted between the two) is handed to the registrar again for
+# that recorded PR. It registers once: the re-arm writes the one pr_ready event
+# the interrupted call never wrote, and later passes find the poll and call nothing.
+make_case lost-poll-rearm
+: > "$CASE/home/config/fleet-ledger"
+write_ship lost ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/lost.meta"
+pr_ready_events() {
+  { grep -h '"task":"lost"' "$CASE/home/state/fleet-ledger.jsonl" 2>/dev/null || true; } | grep -c '"event":"task.pr_ready"' || true
+}
+out=$(run_pass)
+printf '%s\n' "$out" | grep -qxF "pr-ready: lost: re-armed the merge poll for $URL" || fail "the lost poll was not re-armed: $out"
+assert_registered lost
+[ "$(pr_ready_events)" -eq 1 ] || fail "the re-arm did not write exactly one pr_ready event"
+poll_before=$(shasum -a 256 "$CASE/home/state/lost.check.sh" "$CASE/home/state/lost.pr-poll" "$CASE/home/state/lost.pr-poll-registration")
+calls_before=$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)
+for again in 1 2; do
+  out=$(run_pass)
+  [ -z "$out" ] || fail "pass $again after the re-arm reported again: $out"
+done
+# The review step may read the registered PR; only the registrar's own draft read proves a re-registration.
+[ "$calls_before" -eq "$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)" ] || fail 'a record with a published poll reached the registrar again'
+[ "$poll_before" = "$(shasum -a 256 "$CASE/home/state/lost.check.sh" "$CASE/home/state/lost.pr-poll" "$CASE/home/state/lost.pr-poll-registration")" ] \
+  || fail 'a later pass replaced the published poll'
+[ "$(pr_ready_events)" -eq 1 ] || fail 'a later pass wrote a second pr_ready event'
+[ "$(grep -c '^pr=' "$CASE/home/state/lost.meta")" -eq 1 ] || fail 'the record holds more than one pr='
+# A partly published poll whose registrar is still running is that registrar's
+# to finish: while it holds the task's poll publication lock nothing re-arms it.
+make_case partial-poll-live
+write_ship partial ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/partial.meta"
+printf 'fm-pr-poll-registration-v2\n' > "$CASE/home/state/partial.pr-poll-registration"
+bash -c '. "$1/bin/fm-wake-lib.sh"; fm_lock_acquire_wait "$2" && { echo held > "$3"; sleep 60; }' _ \
+  "$ROOT" "$CASE/home/state/.pr-poll-publish-partial.lock" "$CASE/lock-held" &
+holder=$!
+for ((i=0; i<200; i++)); do [ -e "$CASE/lock-held" ] && break; sleep 0.05; done
+[ -e "$CASE/lock-held" ] || fail 'the live registrar stand-in never took the publication lock'
+out=$(run_pass)
+kill "$holder" 2>/dev/null || true; wait "$holder" 2>/dev/null || true
+! grep -q -- '--json isDraft$' "$CASE/gh.calls" && [ -z "$out" ] || fail "a poll a live registrar is publishing was re-armed: $out"
+[ ! -e "$CASE/home/state/partial.check.sh" ] || fail 'a poll a live registrar is publishing gained a second check'
+pass 'a lost poll is re-armed once with one pr_ready event; a valid published poll, or one a live registrar is publishing, is never registered again'
+
+# A teardown's set-aside merge marker (state/<id>.pr-poll-merge-notified.retiring)
+# means a teardown of the task is under way, so a lost poll is not re-armed while
+# it exists, whatever it holds: unreadable, malformed or not a file (Main 1820 F8).
+# The re-arm above is the control: without it, the same record is re-armed.
+for shape in unreadable malformed directory; do
+  make_case "retiring-$shape"
+  write_ship lost ship direct-PR
+  printf 'pr=%s\n' "$URL" >> "$CASE/home/state/lost.meta"
+  marker="$CASE/home/state/lost.pr-poll-merge-notified.retiring"
+  case "$shape" in
+    unreadable) printf 'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\nacme/widget\n7\n' > "$marker"; chmod 000 "$marker" ;;
+    malformed) printf 'not a marker\n' > "$marker"; chmod 600 "$marker" ;;
+    directory) mkdir "$marker" ;;
+  esac
+  out=$(run_pass)
+  [ "$shape" != unreadable ] || chmod 600 "$marker"
+  ! printf '%s\n' "$out" | grep -q 're-armed the merge poll' || fail "$shape: a lost poll was re-armed while a teardown's set-aside marker exists: $out"
+  ! grep -q -- '--json isDraft$' "$CASE/gh.calls" 2>/dev/null || fail "$shape: the registrar was asked while a set-aside marker exists"
+  [ ! -e "$CASE/home/state/lost.check.sh" ] || fail "$shape: a merge poll was published while a set-aside marker exists"
+done
+pass "a teardown's set-aside merge marker stops a re-arm whatever it holds, unreadable, malformed or a directory"
+
+# A registrar that dies after committing pr= and after each final rename of its
+# poll leaves no runnable poll: the next pass re-arms it for the recorded PR. A
+# registrar that dies only after its last rename left a valid poll, which stays.
+install_killing_mv() {  # an mv that, after moving onto $FM_TEST_KILL_AT, kills the process that ran it
+  cat > "$FAKEBIN/mv" <<'SH'
+#!/usr/bin/env bash
+/bin/mv "$@"
+rc=$?
+dest=${*: -1}
+if [ "$rc" -eq 0 ] && [ -n "${FM_TEST_KILL_AT:-}" ] && [ "${dest##*/}" = "$FM_TEST_KILL_AT" ]; then
+  kill -KILL "$PPID"
+fi
+exit "$rc"
+SH
+  chmod +x "$FAKEBIN/mv"
+}
+crash_registrar() {  # <id> <final name to die after>
+  FM_TEST_KILL_AT=$2 FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" \
+    FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-pr-check.sh" "$1" "$URL" > "$CASE/crash.out" 2>&1 || true
+}
+for boundary in pr-poll pr-poll-registration; do
+  make_case "crash-after-$boundary"
+  install_killing_mv
+  write_ship crash ship direct-PR
+  crash_registrar crash "crash.$boundary"
+  grep -qxF "pr=$URL" "$CASE/home/state/crash.meta" || fail "$boundary: the crashed registrar did not commit pr= first: $(cat "$CASE/crash.out")"
+  [ -e "$CASE/home/state/crash.$boundary" ] && [ ! -e "$CASE/home/state/crash.check.sh" ] \
+    || fail "$boundary: the registrar did not die between its final renames"
+  out=$(run_pass)
+  printf '%s\n' "$out" | grep -qxF "pr-ready: crash: re-armed the merge poll for $URL" \
+    || fail "$boundary: a poll left without its check by a dead registrar was not re-armed: $out"
+  assert_registered crash
+done
+make_case crash-after-check
+install_killing_mv
+write_ship crash ship direct-PR
+crash_registrar crash crash.check.sh
+assert_registered crash
+calls_before=$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)
+out=$(run_pass)
+[ "$calls_before" -eq "$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)" ] || fail "a valid poll left by a registrar that died after publishing was registered again: $out"
+pass 'a registrar that dies after any final rename short of its check is re-armed on the next pass; one that published its check is left alone'
+
+# A valid poll whose registration names an old device number for its files (the
+# volume was remounted) is the watcher's to re-record, not a lost poll.
+make_case device-shifted
+write_ship shifted ship direct-PR
+run_pass > /dev/null
+assert_registered shifted
+( . "$ROOT/bin/fm-pr-lib.sh"
+  reg="$CASE/home/state/shifted.pr-poll-registration"
+  device=$(fm_pr_file_device "$CASE/home/state")
+  awk -v live="$device" -v shifted="$((device + 1))" '(NR == 10 || NR == 11) { sub("^" live ":", shifted ":") } { print }' "$reg" > "$reg.tmp"
+  chmod 0600 "$reg.tmp" && /bin/mv -f "$reg.tmp" "$reg"
+  ! fm_pr_poll_artifacts_valid "$CASE/home/state" shifted "$ROOT/bin/fm-pr-poll.sh" \
+    && fm_pr_poll_registration_device_shifted "$CASE/home/state" shifted "$ROOT/bin/fm-pr-poll.sh"
+) || fail 'the device-shifted fixture is not a device-only shift'
+shifted_reg=$(shasum -a 256 "$CASE/home/state/shifted.pr-poll-registration")
+calls_before=$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)
+out=$(run_pass)
+[ "$calls_before" -eq "$(grep -c -- '--json isDraft$' "$CASE/gh.calls" || true)" ] || fail "a device-shifted poll was re-armed: $out"
+[ "$shifted_reg" = "$(shasum -a 256 "$CASE/home/state/shifted.pr-poll-registration")" ] || fail 'the reconciler rewrote a device-shifted registration'
+pass 'a poll whose only fault is a moved device number is left for the watcher to re-record'
+
+B_URL=https://github.com/example/project/pull/44
+# A registered custom check in the task's check.sh is another check, not a lost
+# merge poll: the pass leaves it byte for byte and says the poll is not re-armed.
+make_case custom-check
+write_ship custom ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/custom.meta"
+printf '#!/usr/bin/env bash\necho custom check output\n' > "$CASE/home/state/custom.check.sh"
+chmod 700 "$CASE/home/state/custom.check.sh"
+FM_STATE_OVERRIDE="$CASE/home/state" bash "$ROOT/bin/fm-check-register.sh" custom > "$CASE/register.out" 2>&1 \
+  || fail "could not register the custom check: $(cat "$CASE/register.out")"
+custom_before=$(shasum -a 256 "$CASE/home/state/custom.check.sh" "$CASE/home/state/custom.check-trust")
+out=$(run_pass)
+[ "$custom_before" = "$(shasum -a 256 "$CASE/home/state/custom.check.sh" "$CASE/home/state/custom.check-trust")" ] \
+  || fail "the pass replaced a registered custom check: $out"
+! grep -q -- '--json isDraft$' "$CASE/gh.calls" || fail "the pass re-armed a merge poll over a custom check: $out"
+printf '%s\n' "$out" | grep -q 'custom: state/custom.check.sh is another check' || fail "the pass did not name the conflict: $out"
+pass 'a registered custom check is never overwritten by a merge-poll re-arm; the conflict is named'
+
+# The same holds for a first registration (no pr= yet), from a done note in either
+# form (Main 1686 F3): the registrar records nothing, the custom check and its trust
+# record stay byte for byte, and the refusal names the conflict. Control: a
+# check.sh that is the merge poll template itself, with no trust record, is an old
+# poll and is replaced by the new registration.
+for form in prefixed bare; do
+  make_case "custom-first-$form"
+  write_ship first ship direct-PR
+  [ "$form" = prefixed ] || printf 'done [at=1792479210]: %s checks green at %s\n' "$URL" "$HEAD" > "$CASE/home/state/first.status"
+  printf '#!/usr/bin/env bash\necho custom check output\n' > "$CASE/home/state/first.check.sh"
+  chmod 700 "$CASE/home/state/first.check.sh"
+  FM_STATE_OVERRIDE="$CASE/home/state" bash "$ROOT/bin/fm-check-register.sh" first > "$CASE/register.out" 2>&1 \
+    || fail "$form: could not register the custom check: $(cat "$CASE/register.out")"
+  custom_before=$(shasum -a 256 "$CASE/home/state/first.check.sh" "$CASE/home/state/first.check-trust")
+  out=$(run_pass)
+  [ "$custom_before" = "$(shasum -a 256 "$CASE/home/state/first.check.sh" "$CASE/home/state/first.check-trust")" ] \
+    || fail "$form: a first registration replaced a registered custom check: $out"
+  ! grep -q '^pr=' "$CASE/home/state/first.meta" || fail "$form: the refused first registration still recorded pr=: $out"
+  printf '%s\n' "$out" | grep -q 'state/first.check.sh is another check' || fail "$form: the refusal did not name the conflict: $out"
+done
+make_case template-first
+write_ship oldpoll ship direct-PR
+cp "$ROOT/bin/fm-pr-poll.sh" "$CASE/home/state/oldpoll.check.sh"
+chmod 600 "$CASE/home/state/oldpoll.check.sh"
+out=$(run_pass)
+assert_registered oldpoll
+# A poll from an older template version is judged by its generator mark, never as
+# another check (Main 1871): the first registration replaces it.
+make_case template-older
+write_ship olderpoll ship direct-PR
+printf '%s\n' '#!/usr/bin/env bash' '# Static watcher program for a validated PR poll sidecar.' 'set -u' 'exit 0' > "$CASE/home/state/olderpoll.check.sh"
+chmod 600 "$CASE/home/state/olderpoll.check.sh"
+out=$(run_pass)
+! printf '%s\n' "$out" | grep -q 'is another check' || fail "an older template's poll was named another check: $out"
+assert_registered olderpoll
+pass 'a first registration from either done-note form never replaces a registered custom check and names the conflict; an old template poll is replaced'
+
+# The stale-re-arm guard also holds at publication: when another registration
+# records a different PR after this re-arm committed but before it publishes, the
+# re-arm publishes nothing and reports no refusal.
+make_case stale-publish
+write_ship late ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/late.meta"
+# The re-arm's own commit writes pr_head=; when it then releases the metadata
+# lock, a competing registration records the newer PR before the re-arm publishes.
+cat > "$FAKEBIN/rm" <<SH
+#!/usr/bin/env bash
+/bin/rm "\$@"
+rc=\$?
+case " \$* " in
+  *"/.meta-late.lock "*)
+    if [ -e "$CASE/swap-after-commit" ] && grep -q '^pr_head=' "$CASE/home/state/late.meta"; then
+      /bin/rm -f "$CASE/swap-after-commit"
+      sed -i.bak 's#^pr=.*#pr=$B_URL#' "$CASE/home/state/late.meta" && /bin/rm -f "$CASE/home/state/late.meta.bak"
+    fi ;;
+esac
+exit "\$rc"
+SH
+chmod +x "$FAKEBIN/rm"
+: > "$CASE/swap-after-commit"
+out=$(run_pass)
+[ ! -e "$CASE/swap-after-commit" ] || fail 'the late registration was never simulated'
+grep -qxF "pr=$B_URL" "$CASE/home/state/late.meta" || fail "the newer recorded PR was replaced: $out"
+printf '%s\n' "$out" | grep -q 'late: the recorded PR changed during this pass' || fail "the late re-arm did not stand down: $out"
+[ "$(refusal_wakes late)" -eq 0 ] || fail "the late re-arm raised a refusal wake: $out"
+[ ! -e "$CASE/home/state/late.check.sh" ] || fail 'the late re-arm published a poll for the old PR'
+pass 'a re-arm whose recorded PR changes between its commit and its publication publishes nothing'
+
+# A first registration reads no pr= without the lock; when another registration
+# records a different PR before this one commits, this one is stale and changes
+# nothing: the newer PR stays recorded, no poll is armed for the older URL and no
+# refusal is raised (the review's empty-snapshot interleaving).
+make_case empty-snapshot
+write_ship snap ship direct-PR
+cat > "$FAKEBIN/rm" <<SH
+#!/usr/bin/env bash
+/bin/rm "\$@"
+rc=\$?
+case " \$* " in
+  *"/.meta-snap.lock "*)
+    if [ -e "$CASE/record-newer" ] && ! grep -q '^pr=' "$CASE/home/state/snap.meta"; then
+      /bin/rm -f "$CASE/record-newer"
+      printf 'pr=%s\n' "$B_URL" >> "$CASE/home/state/snap.meta"
+    fi ;;
+esac
+exit "\$rc"
+SH
+chmod +x "$FAKEBIN/rm"
+: > "$CASE/record-newer"
+out=$(run_pass)
+rm -f "$FAKEBIN/rm"
+[ ! -e "$CASE/record-newer" ] || fail 'the newer registration was never simulated'
+grep -qxF "pr=$B_URL" "$CASE/home/state/snap.meta" || fail "a first registration from an empty snapshot replaced the newer recorded PR: $out"
+! grep -qxF "pr=$URL" "$CASE/home/state/snap.meta" || fail "the stale first registration recorded its PR: $out"
+printf '%s\n' "$out" | grep -q 'snap: the recorded PR changed during this pass' || fail "the stale first registration did not stand down: $out"
+[ "$(refusal_wakes snap)" -eq 0 ] || fail "the stale first registration raised a refusal wake: $out"
+pass 'a first registration from an empty pr= snapshot never replaces a PR another registration recorded meanwhile'
+
+# A first registration is never re-armed by a pass that runs while it is between
+# committing pr= and publishing its poll: the registrar holds the poll publication
+# lock across that gap, so the pass leaves the poll to it and one pr_ready event
+# is written.
+make_case registrar-gap
+: > "$CASE/home/config/fleet-ledger"
+write_ship gap ship direct-PR
+cat > "$FAKEBIN/rm" <<SH
+#!/usr/bin/env bash
+/bin/rm "\$@"
+rc=\$?
+case " \$* " in
+  *"/.meta-gap.lock "*)
+    if [ -e "$CASE/run-pass-in-gap" ] && grep -q '^pr=' "$CASE/home/state/gap.meta"; then
+      /bin/rm -f "$CASE/run-pass-in-gap"
+      FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+        FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" PATH="$FAKEBIN:\$PATH" \
+        bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/gap-pass.out" 2>&1
+    fi ;;
+esac
+exit "\$rc"
+SH
+chmod +x "$FAKEBIN/rm"
+: > "$CASE/run-pass-in-gap"
+FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+  FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" \
+  bash "$ROOT/bin/fm-pr-check.sh" gap "$URL" > "$CASE/first.out" 2>&1 || fail "the first registration failed: $(cat "$CASE/first.out")"
+[ ! -e "$CASE/run-pass-in-gap" ] || fail 'the pass in the registration gap was never run'
+! grep -q 're-armed' "$CASE/gap-pass.out" || fail "a pass in the registration gap re-armed a live first registration: $(cat "$CASE/gap-pass.out")"
+assert_registered gap
+gap_events=$({ grep -h '"task":"gap"' "$CASE/home/state/fleet-ledger.jsonl" 2>/dev/null || true; } | grep -c '"event":"task.pr_ready"' || true)
+[ "$gap_events" -eq 1 ] || fail "the first registration wrote $gap_events pr_ready events, not one"
+rm -f "$FAKEBIN/rm"
+pass 'a pass that runs while a first registration is between pr= and its poll leaves the poll to it'
+
+# The same holds at the earliest point pr= can be read: right after the registrar
+# moves its new record into place, while it still holds the metadata lock. The
+# pass runs in the background there; a pass that tried to re-arm would wait on
+# that metadata lock, so the registrar goes on after a bounded wait either way,
+# and the pass's own output decides.
+make_case registrar-commit-gap
+: > "$CASE/home/config/fleet-ledger"
+write_ship cgap ship direct-PR
+cat > "$FAKEBIN/mv" <<SH
+#!/usr/bin/env bash
+/bin/mv "\$@"
+rc=\$?
+case " \$* " in
+  *"/cgap.meta "*)
+    if [ -e "$CASE/run-pass-at-commit" ] && grep -q '^pr=' "$CASE/home/state/cgap.meta"; then
+      /bin/rm -f "$CASE/run-pass-at-commit"
+      ( FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+          FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" PATH="$FAKEBIN:\$PATH" \
+          bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/commit-pass.out" 2>&1
+        : > "$CASE/commit-pass.done" ) </dev/null >/dev/null 2>&1 &
+      i=0
+      while [ ! -e "$CASE/commit-pass.done" ] && [ "\$i" -lt 200 ]; do sleep 0.1; i=\$((i + 1)); done
+    fi ;;
+esac
+exit "\$rc"
+SH
+chmod +x "$FAKEBIN/mv"
+: > "$CASE/run-pass-at-commit"
+FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+  FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" \
+  bash "$ROOT/bin/fm-pr-check.sh" cgap "$URL" > "$CASE/first.out" 2>&1 || fail "the first registration failed: $(cat "$CASE/first.out")"
+[ ! -e "$CASE/run-pass-at-commit" ] || fail 'the pass at the registration commit was never run'
+i=0
+while [ ! -e "$CASE/commit-pass.done" ] && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
+rm -f "$FAKEBIN/mv"
+[ -e "$CASE/commit-pass.done" ] || fail 'the pass at the registration commit never finished'
+! grep -q 're-armed' "$CASE/commit-pass.out" || fail "a pass at the registration commit re-armed a live first registration: $(cat "$CASE/commit-pass.out")"
+assert_registered cgap
+cgap_events=$({ grep -h '"task":"cgap"' "$CASE/home/state/fleet-ledger.jsonl" 2>/dev/null || true; } | grep -c '"event":"task.pr_ready"' || true)
+[ "$cgap_events" -eq 1 ] || fail "the first registration wrote $cgap_events pr_ready events, not one"
+pass 'a pass that runs right after a first registration makes pr= readable leaves the poll to it'
+
+# A merge-notified marker counts only for the PR it names: a record whose pr= is
+# a newer PR than the marker's is re-armed, a marker naming the recorded PR is not.
+B_URL=https://github.com/example/project/pull/44
+for marker_pr in "$URL" "$B_URL"; do
+  make_case "marker-${marker_pr##*/}"
+  write_ship marked ship direct-PR
+  printf 'pr=%s\n' "$B_URL" >> "$CASE/home/state/marked.meta"
+  ( . "$ROOT/bin/fm-pr-lib.sh"
+    fm_pr_url_parse "$marker_pr"
+    fm_pr_poll_merge_mark_notified "$CASE/home/state" marked "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER"
+  ) || fail 'could not write the merge-notified marker'
+  out=$(run_pass)
+  if [ "$marker_pr" = "$URL" ]; then
+    printf '%s\n' "$out" | grep -qxF "pr-ready: marked: re-armed the merge poll for $B_URL" \
+      || fail "a marker for an older PR stopped the re-arm of the recorded PR: $out"
+    assert_registered marked "$B_URL"
+  else
+    ! grep -q -- '--json isDraft$' "$CASE/gh.calls" || fail "a marker for the recorded PR did not stop the re-arm: $out"
+    [ ! -e "$CASE/home/state/marked.check.sh" ] || fail 'a merge already notified for the recorded PR was armed again'
+  fi
+done
+pass 'a merge-notified marker stops the re-arm only for the PR it names'
+
+# A re-arm reads pr= at the start of the pass; if another registration records a
+# different PR before the re-arm commits, the re-arm does nothing and the newer
+# PR stays recorded.
+make_case stale-rearm
+write_ship stale ship direct-PR
+printf 'pr=%s\n' "$URL" >> "$CASE/home/state/stale.meta"
+mv "$FAKEBIN/gh" "$FAKEBIN/gh.base"
+cat > "$FAKEBIN/gh" <<SH
+#!/usr/bin/env bash
+if [ -e "$CASE/swap-to-b" ] && [[ "\$*" = *'/pull/42 --json isDraft' ]]; then
+  rm -f "$CASE/swap-to-b"
+  sed -i.bak 's#^pr=.*#pr=$B_URL#' "$CASE/home/state/stale.meta" && rm -f "$CASE/home/state/stale.meta.bak"
+fi
+exec "$FAKEBIN/gh.base" "\$@"
+SH
+chmod +x "$FAKEBIN/gh"
+: > "$CASE/swap-to-b"
+out=$(run_pass)
+[ ! -e "$CASE/swap-to-b" ] || fail 'the concurrent registration was never simulated'
+grep -qxF "pr=$B_URL" "$CASE/home/state/stale.meta" || fail "a stale re-arm replaced the newer recorded PR: $(grep '^pr=' "$CASE/home/state/stale.meta") ($out)"
+[ "$(grep -c '^pr=' "$CASE/home/state/stale.meta")" -eq 1 ] || fail 'the record holds more than one pr='
+pass 'a re-arm whose recorded PR changed during the pass leaves the newer PR recorded'
 
 # A registered ship is stepped through the automatic review sequence by the same
 # bounded pass: one forge read per eligible registered PR, none for a local-only

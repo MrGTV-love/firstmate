@@ -4582,14 +4582,14 @@ test_landing_check_that_could_not_ask_the_forge_is_a_plain_error() {
 
 test_landing_check_that_could_not_compare_with_the_default_branch_is_a_plain_error() {
   local rc way subcommand cause
-  for way in fetch merge-tree; do
+  for way in fetch diff-tree; do
     make_foreign_copy_case "foreign-landing-no-compare-$way"
     printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
     git -C "$FOREIGN_COPY" add unlanded.txt
     git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
     case "$way" in
-      fetch) subcommand=fetch cause='origin/main could not be fetched' ;;
-      *) subcommand=merge-tree cause='the content check could not compare with the default branch' ;;
+      fetch) subcommand=fetch cause='origin/main could not be refreshed' ;;
+      *) subcommand=diff-tree cause='the content check could not read the trees it compares' ;;
     esac
     cat > "$FOREIGN_CASE/fakebin/git" <<SH
 #!/usr/bin/env bash
@@ -5359,7 +5359,10 @@ test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository() {
   git -C "$sub" -c user.email=t@t -c user.name=t commit -qm 'sub'
   git -C "$FOREIGN_COPY" -c protocol.file.allow=always submodule add -q "$sub" vendor/sub
   git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'add submodule'
+  # The merged PR's commit is on origin's default branch, as a real merge puts it
+  # (Main 1815): the content check reads origin, not the project's local main.
   git -C "$FOREIGN_CASE/project" update-ref refs/heads/main "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
+  git -C "$FOREIGN_CASE/project" push -q origin main
   add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
   second=$FOREIGN_SLOT/.claude/worktrees/fc-two
   git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main

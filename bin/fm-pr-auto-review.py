@@ -13,8 +13,11 @@ head and never waits: a read runs detached and a later pass collects it.
 
 A pass for a kind=ship task in mode no-mistakes or direct-PR that records a GitHub pr=:
   1. reads the PR once through `gh pr view`; a closed or merged PR ends the work, an unreadable forge
-     changes nothing, and a new head starts a new sequence, so a PASS recorded for an older head is
-     never counted (bin/fm-review-record.py binds every record to its exact head);
+     merges nothing and only records the step state `waiting: the forge did not answer the PR read`
+     (it replaces any state shown; a queued, held, failed or merged state is put back once the forge
+     answers, and with no prior state the waiting state is cleared), and a new head starts a new
+     sequence, so a PASS recorded for an older head is never counted (bin/fm-review-record.py binds
+     every record to its exact head);
   2. collects the reads it requested earlier for the live head: a finished report is recorded through
      `fm-review-record.py review`, an INCOMPLETE report is held, a FAIL that cannot be recorded still
      ends the head at fail, and a crashed, unusable or nonzero-exit read burns that model for the head
@@ -201,6 +204,35 @@ class Sidecar:
 
 def phase(side, sha, name, detail=""):
     side.data["phase"] = {"head": sha, "state": name, "detail": detail}
+
+
+UNANSWERED = "the forge did not answer the PR read"
+
+
+def unanswered(side):
+    """An unanswered `gh pr view` says so in the step state (Main 1849, Main 1871 F9), with no merge and no wake.
+
+    It replaces whatever state was shown. A queued, held, failed or merged phase is kept aside as `standing`
+    and put back when the forge answers again (answered), so the queue is still checked and no merge is asked
+    twice; held, failed and merged heads also keep their own records.
+    """
+    current = side.data.get("phase") or {}
+    if current.get("state") in ("queued", "held", "fail", "merged"):
+        side.data["standing"] = current
+    phase(side, current.get("head"), "waiting", UNANSWERED)
+    side.save()
+
+
+def answered(side):
+    """The forge answered: a phase kept aside by unanswered() is shown again, and with none the unanswered state
+    is cleared, so a pass that sets no phase of its own (a closed PR, a head with an outcome) does not keep it."""
+    standing = side.data.pop("standing", None)
+    current = side.data.get("phase") or {}
+    if current.get("state") == "waiting" and current.get("detail") == UNANSWERED:
+        if standing:
+            side.data["phase"] = standing
+        else:
+            side.data.pop("phase", None)
 
 
 def emit(home, task, side, sha, key, text, wake=None):
@@ -810,7 +842,9 @@ def advance(home, task, url, meta, side):
     side.data["next_at"] = int(time.time()) + INTERVAL
     view = gh_view(url)
     if view is None:
+        unanswered(side)
         return
+    answered(side)
     sha, base = view["headRefOid"], view["baseRefOid"]
     side.data["base"] = base
     head = side.head(sha)

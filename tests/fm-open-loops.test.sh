@@ -517,6 +517,7 @@ for name in ('a', 'b'):
     (home / f'state/{name}.meta').write_text(f'kind=scout\nspawn_gen={name}-generation\n')
 a_meta = home / 'state/a.meta'
 lost_meta, pr_meta = home / 'state/lost.meta', home / 'state/review-author.meta'
+pr_meta_text = pr_meta.read_text()
 for refresh in (False, True):
     if refresh:
         ledger('--heartbeat')
@@ -547,6 +548,7 @@ for refresh in (False, True):
     for path in (a_meta, lost_meta, pr_meta):
         path.unlink()
     a_meta.write_text('kind=scout\nspawn_gen=a-generation\n')
+    pr_meta.write_text(pr_meta_text)
 a_meta.chmod(0)
 degraded = ledger('--heartbeat')
 assert not degraded['complete'], degraded
@@ -754,8 +756,11 @@ double['single']['5']['head']['sha'] = present_head
 (world / 'gh.json').write_text(json.dumps(double))
 assert ledger()['complete'] is True
 
-# Failed deliverables actually landed in the current PR head, in default, or dropped are not owed.
+# Failed deliverables actually landed in the current PR head, in default, or dropped are not owed. The forge merged
+# PR 5 at the copy's HEAD into the default branch, so that head is in the default branch's history.
 double['single']['5']['head']['sha'] = git(merged, 'rev-parse', 'HEAD')
+git(merged, 'update-ref', 'refs/remotes/origin/main', git(merged, 'commit-tree', 'HEAD^{tree}', '-p', 'refs/remotes/origin/main',
+                                                           '-p', 'HEAD', '-m', 'merge PR 5'))
 (world / 'gh.json').write_text(json.dumps(double))
 default_failed = task_copy('default-failed')
 squashed = task_copy('squashed', commit_age=2)
@@ -834,6 +839,9 @@ try:
         (home / 'projects').chmod(projects_mode)
     double['pulls_by_repo']['/repos/delivery/project'] = [fork_pulls[0]]
     (world / 'gh.json').write_text(json.dumps(double))
+    # The forge merged PR 18 at fork-green's HEAD into the default branch.
+    git(fork_green, 'update-ref', 'refs/remotes/origin/main', git(fork_green, 'commit-tree', 'HEAD^{tree}', '-p',
+                                                                  'refs/remotes/origin/main', '-p', 'HEAD', '-m', 'merge PR 18'))
     fork_merged = ledger()
     assert set(rows(fork_merged, 'failed_task')) == {'fork-red'}, fork_merged
     assert not rows(fork_merged, 'unlanded_commit'), fork_merged
@@ -1866,7 +1874,7 @@ PY
 
 # Report silence through the real snapshot, ledger, inbox send and pending-reply store.
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
-import datetime as dt, json, os, shutil, subprocess, sys, time
+import datetime as dt, json, os, runpy, shutil, sqlite3, subprocess, sys, time
 from pathlib import Path
 root, world = map(Path, sys.argv[1:])
 code, home, fake = (world / name for name in ('silence-code', 'silence-home', 'silence-fake'))
@@ -1875,6 +1883,7 @@ for name in ('state', 'data', 'config', 'projects'):
     (home / name).mkdir(parents=True)
 fake.mkdir()
 now = int(time.time())
+iso = lambda t: dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 def script(path, text):
     path.write_text(text); path.chmod(0o755)
 script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\nprintf "state: %s · source: %s · %s\\n" "${FM_SILENCE_TEST_CREW_STATE:-working}" "${FM_SILENCE_TEST_CREW_SOURCE:-pane}" "${FM_SILENCE_TEST_CREW_DETAIL:-building}"\n')
@@ -2053,6 +2062,573 @@ scout_messages = list((home / 'state/scout.inbox').glob('*.msg')); assert len(sc
 assert 'report progress' in scout_messages[0].read_text()
 assert (home / 'state/scout.status').read_text() == scout_status_before
 print('PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run', flush=True)
+
+# ---- Finished and unaccepted work with an open record ------------------------------------------------
+# Every open record is either a finished task awaiting plain teardown (pending_cleanup) or a task whose
+# deliverable is not accepted or landed and whose only report was `done` (pending_acceptance); each row names
+# its owning home and a concrete next action and lives exactly as long as the record. Waits, holds, unfinished
+# work and an idle persistent secondmate are never turned into either row. Real records, the real snapshot.
+DEFAULT_AGES_FOR_TEST = runpy.run_path(str(code / 'bin/fm_open_loops.py'))['DEFAULT_AGES']
+v4 = world / 'v4-home'
+for name in ('state', 'data', 'config', 'projects'):
+    (v4 / name).mkdir(parents=True)
+(v4 / 'data/backlog.md').write_text(
+    '## In flight\n\n## Queued\n\n## Done\n'
+    '- [x] fin-moot - Ruled moot (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n'
+    '- [x] fin-moot-clean - Ruled moot with nothing left in its copy (repo: firstmate) (kind: ship) (done 2026-07-12)\n  dropped\n'
+    '- [x] src-backlog - Closed on the backlog, deliverable not on record (repo: firstmate) (kind: ship) (done 2026-07-12)\n'
+    '  Delivered, awaiting acceptance\n')
+v4_origin = world / 'v4-origin.git'
+git_ = lambda *a, **k: subprocess.run(['git', *map(str, a)], check=True, capture_output=True, text=True, **k).stdout.strip()
+git_('init', '-q', '--bare', v4_origin)
+git_('-C', v4_origin, 'symbolic-ref', 'HEAD', 'refs/heads/main')
+v4_seed = world / 'v4-seed'
+git_('init', '-q', '-b', 'main', v4_seed)
+(v4_seed / 'base').write_text('base\n')
+git_('-C', v4_seed, 'add', 'base'); git_('-C', v4_seed, 'commit', '-q', '-m', 'baseline')
+git_('-C', v4_seed, 'remote', 'add', 'origin', v4_origin)
+git_('-C', v4_seed, 'push', '-q', 'origin', 'main')
+git_('clone', '-q', v4_origin, v4 / 'projects/project')
+git_('-C', v4 / 'projects/project', 'remote', 'set-url', 'origin', 'https://github.com/test/project.git')
+def v4_copy(name, work=True, dirty=False):
+    path = world / ('v4-copy-' + name)
+    git_('clone', '-q', v4_origin, path)
+    if work:
+        (path / (name + '.txt')).write_text(name + '\n')
+        git_('-C', path, 'add', '.'); git_('-C', path, 'commit', '-q', '-m', 'work ' + name)
+    if dirty:
+        (path / 'scratch.txt').write_text('uncommitted\n')
+    return path
+V4_PR = 'https://github.com/test/project/pull/'
+v4_states, v4_details, v4_live, v4_prs = {}, {}, [], {}
+def v4_task(name, kind='ship', copy=None, verb='done', note='delivered', pr=None, state='done', live=False, age=2 * 3600, detail=None):
+    lines = [f'kind={kind}', 'backend=tmux', f'window=sess:fm-{name}', 'harness=claude', 'mode=direct-PR']
+    if copy is not None:
+        lines.append(f'worktree={copy}')
+    if pr:
+        lines.append(f'pr={V4_PR}{pr}')
+    (v4 / f'state/{name}.meta').write_text('\n'.join(lines) + '\n')
+    (v4 / f'state/{name}.status').write_text(f'{verb} [at={now - age}]: {note}\n')
+    os.utime(v4 / f'state/{name}.status', (now - age, now - age))
+    v4_states[name] = state
+    if detail:
+        v4_details[name] = detail
+    if live:
+        v4_live.append(name)
+def v4_merge_into_main(copy, label):
+    """Merge the copy's HEAD into origin's default branch, as the forge does when the PR merges."""
+    head = git_('-C', copy, 'rev-parse', 'HEAD').strip()
+    git_('-C', copy, 'push', '-q', 'origin', head + ':refs/heads/pr-' + label)
+    merger = world / ('v4-merge-' + label)
+    git_('clone', '-q', v4_origin, merger)
+    git_('-C', merger, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '-m', 'merge ' + label, 'origin/pr-' + label)
+    git_('-C', merger, 'push', '-q', 'origin', 'HEAD:main')
+    git_('-C', copy, 'fetch', '-q', 'origin')
+    return head
+def v4_merged_pr(number, copy):
+    # A merged PR's content is on the default branch: the copy's HEAD is merged there.
+    head = v4_merge_into_main(copy, str(number))
+    v4_prs[str(number)] = dict(number=number, html_url=V4_PR + str(number), state='closed', merged_at=iso(now - 3600),
+                               head=dict(sha=head))
+fin_merged = v4_copy('fin-merged'); v4_merged_pr(11, fin_merged)
+v4_task('fin-merged', copy=fin_merged, pr=11, note=f'{V4_PR}11 merged by another lane')
+fin_content = v4_copy('fin-content')
+land = world / 'v4-land'
+git_('clone', '-q', v4_origin, land)
+(land / 'fin-content.txt').write_text('fin-content\n')
+git_('-C', land, 'add', '.'); git_('-C', land, 'commit', '-q', '-m', 'squash fin-content'); git_('-C', land, 'push', '-q', 'origin', 'main')
+git_('-C', fin_content, 'fetch', '-q', 'origin')
+v4_task('fin-content', copy=fin_content, note='landed on main by squash')
+(v4 / 'data/fin-scout').mkdir()
+(v4 / 'data/fin-scout/report.md').write_text('Delivered investigation report.\n')
+v4_task('fin-scout', kind='scout', copy=None, note='report delivered')
+# Kind (d) of Main 1813's V4 amendment: a delivered scout report whose last report is
+# done while its pane still reads working has no completed_task row.
+(v4 / 'data/fin-scout-working').mkdir()
+(v4 / 'data/fin-scout-working/report.md').write_text('Delivered investigation report.\n')
+v4_task('fin-scout-working', kind='scout', copy=None, note='report delivered', state='working', live=True)
+(v4 / 'data/fin-scout-refused').mkdir()
+(v4 / 'data/fin-scout-refused/report.md').write_text('Delivered investigation report.\n')
+v4_task('fin-scout-refused', kind='scout', copy=None, note='report delivered')
+scout_refusal = 'REFUSED: fin-scout-refused has an unresolved captain decision in its report'
+fin_moot = v4_copy('fin-moot')
+v4_task('fin-moot', copy=fin_moot, note='ruled moot by Main')
+(v4 / 'data/fin-moot').mkdir()
+moot_words = v4 / 'data/fin-moot/captain-drop.md'
+moot_words.write_text('Drop fin-moot; the work is superseded.\n')
+fin_moot_clean = v4_copy('fin-moot-clean', work=False)
+v4_task('fin-moot-clean', copy=fin_moot_clean, note='ruled moot by Main')
+fin_refused = v4_copy('fin-refused'); v4_merged_pr(12, fin_refused)
+v4_task('fin-refused', copy=fin_refused, pr=12, note=f'{V4_PR}12 merged')
+refusal = 'REFUSED: worktree /pool/9 has uncommitted changes.'
+(v4 / 'state/fin-refused.merge-prune').write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}12\nattempts=3\nnext_at={now + 600}\nstate=retained\nreason={refusal}\n'
+    f'wake_sent=1\ncopy={fin_refused}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+fin_dirty = v4_copy('fin-dirty', dirty=True); v4_merged_pr(13, fin_dirty)
+v4_task('fin-dirty', copy=fin_dirty, pr=13, note=f'{V4_PR}13 merged by another lane')
+dirty_refusal = f'REFUSED: worktree {fin_dirty} has uncommitted changes.'
+(v4 / 'state/fin-dirty.merge-prune').write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}13\nattempts=3\nnext_at={now + 600}\nstate=retained\nreason={dirty_refusal}\n'
+    f'wake_sent=1\ncopy={fin_dirty}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+unl_refused = v4_copy('unl-refused'); v4_merged_pr(14, unl_refused)
+(unl_refused / 'later.txt').write_text('later\n')
+git_('-C', unl_refused, 'add', '.'); git_('-C', unl_refused, 'commit', '-q', '-m', 'work the merged PR never carried')
+v4_task('unl-refused', copy=unl_refused, pr=14, note=f'{V4_PR}14 merged by another lane')
+reap_refusal = 'REFUSED: t1 has commits the merged PR head does not contain; the ship deliverable is not landed'
+(v4 / 'state/.idle-reap').mkdir()
+(v4 / 'state/.idle-reap/unl-refused.refused').write_text(f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{reap_refusal}\n')
+return_refusal = 'REFUSED: fin-return slot return could not reach the pool lease'
+(v4 / 'state/.idle-reap/fin-return.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: merged\n{return_refusal}\n')
+(v4 / 'state/.idle-reap/fin-pending.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 7000}\ndone [at={now}]: merged\nREFUSED: an older idle-reaper refusal\n')
+(v4 / 'state/.idle-reap/fin-scout-refused.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 600}\ndone [at={now}]: report delivered\n{scout_refusal}\n')
+gate_refusal = 'named head 0123abc is unreachable outside the worker copy'
+v4_task('gate-refused', copy=v4_copy('gate-refused', work=False), note='delivered, branch pushed', state='blocked', live=True,
+        detail=gate_refusal)
+nm_down = 'the no-mistakes daemon is down and the run for this copy could not be read, so its verification-plan evidence is unavailable'
+v4_task('gate-nm-down', copy=v4_copy('gate-nm-down', work=False), note='delivered, pipeline passed', state='blocked', live=True,
+        detail=nm_down)
+nm_unreadable = 'the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable'
+v4_task('gate-nm-unreadable', copy=v4_copy('gate-nm-unreadable', work=False), note='delivered, pipeline passed', state='blocked',
+        live=True, detail=nm_unreadable)
+nm_norun = 'no no-mistakes run exists for this copy, so its verification-plan evidence is unavailable'
+v4_task('gate-nm-norun', copy=v4_copy('gate-nm-norun', work=False), note='delivered, pipeline passed', state='blocked', live=True,
+        detail=nm_norun)
+norun_merged = v4_copy('gate-nm-norun-merged', work=False); v4_merged_pr(15, norun_merged)
+v4_task('gate-nm-norun-merged', copy=norun_merged, pr=15, note=f'{V4_PR}15 merged by another lane', state='blocked', live=True,
+        detail=nm_norun)
+wait_paused = v4_copy('wait-paused', work=False)
+v4_task('wait-paused', copy=wait_paused, verb='paused', note='waiting on Main decision d1', state='paused', live=True, age=3000)
+wait_held = v4_copy('wait-held', work=False)
+v4_task('wait-held', copy=wait_held, verb='captain-held', note='awaiting captain approval', state='paused', live=True, age=3000)
+unfin = v4_copy('unfin-dirty', dirty=True)
+v4_task('unfin-dirty', copy=unfin, verb='working', note='building', state='working', live=True, age=2000)
+v4_task('pend-ship', copy=world / 'v4-nowhere', note='delivered, branch pushed')
+pend_run = v4_copy('pend-run', work=False)
+v4_task('pend-run', copy=pend_run, note='handoff: pipeline starting', state='working', live=True)
+v4_task('pend-scout', kind='scout', copy=None, note='delivered, report pending review')
+# One task per source of a pending_acceptance row, so each row's evidence can be checked against its real source.
+v4_task('src-report', copy=world / 'v4-nowhere', note='delivered, branch pushed', state='unknown')
+v4_task('src-state', copy=world / 'v4-nowhere', verb='working', note='building', state='done')
+v4_task('src-backlog', copy=world / 'v4-nowhere', verb='working', note='building', state='paused')
+# Round-2 review F4: a merged PR while the worker still reads working; a clean copy that never committed;
+# an interrupted slot return over a landed task with a recorded refusal; a refused done claim another row covers.
+fin_working = v4_copy('fin-working'); v4_merged_pr(16, fin_working)
+v4_task('fin-working', copy=fin_working, pr=16, note=f'{V4_PR}16 merged by another lane', state='working', live=True)
+v4_task('pend-clean', copy=v4_copy('pend-clean', work=False), note='delivered')
+fin_return = v4_copy('fin-return'); v4_merged_pr(17, fin_return)
+v4_task('fin-return', copy=fin_return, pr=17, note=f'{V4_PR}17 merged by another lane')
+(v4 / 'state/fin-return.teardown-return-pending').write_text('slot=/pool/fin-return/project\n')
+gate_covered_reason = 'named head 4567def is unreachable outside the worker copy'
+# Round-3 F3: a merged, covered task whose worker never sent a done update still owes its cleanup.
+fin_noupdate = v4_copy('fin-noupdate'); v4_merged_pr(19, fin_noupdate)
+v4_task('fin-noupdate', copy=fin_noupdate, pr=19, verb='working', note='building', state='working', live=True)
+# F3 controls: a merged PR does not make a still-working copy with more unlanded work, or a declared wait,
+# into a cleanup obligation.
+merged_more = v4_copy('merged-more'); v4_merged_pr(21, merged_more)
+(merged_more / 'more.txt').write_text('more\n')
+git_('-C', merged_more, 'add', '.'); git_('-C', merged_more, 'commit', '-q', '-m', 'more work after the merge')
+v4_task('merged-more', copy=merged_more, pr=21, verb='working', note='building more', state='working', live=True)
+merged_wait = v4_copy('merged-wait'); v4_merged_pr(22, merged_wait)
+v4_task('merged-wait', copy=merged_wait, pr=22, verb='paused', note='waiting on Main decision d2', state='paused', live=True, age=3000)
+# Round-3 F4: the newest recorded refusal is the one written last, whichever producer wrote it. The idle
+# reaper's memo carries the reaper's start time, not its write time, so a memo written after a prune record
+# can carry an older stamp.
+fin_order = v4_copy('fin-order'); v4_merged_pr(20, fin_order)
+v4_task('fin-order', copy=fin_order, pr=20, note=f'{V4_PR}20 merged by another lane')
+(v4 / 'state/fin-order.merge-prune').write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}20\nattempts=1\nnext_at={now + 600}\nstate=retained\n'
+    f'reason=REFUSED: the older prune refusal\nwake_sent=1\ncopy={fin_order}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+os.utime(v4 / 'state/fin-order.merge-prune', (now - 95, now - 95))
+time.sleep(0.05)
+# Published after the prune record, with an older stamp and an older write time.
+(v4 / 'state/.idle-reap/fin-order.refused').write_text(
+    f'fm-idle-reap-refused-v1\n{now - 100}\ndone [at={now}]: merged\nREFUSED: the newer reaper teardown refusal\n')
+os.utime(v4 / 'state/.idle-reap/fin-order.refused', (now - 100, now - 100))
+# Round-4 F5.3: both producers write a temporary file and rename it into place. The memo is written first, the
+# prune record is published next, and the memo is renamed into place last: the memo was recorded last and wins,
+# although its file's write time is the oldest.
+fin_publish = v4_copy('fin-publish'); v4_merged_pr(23, fin_publish)
+v4_task('fin-publish', copy=fin_publish, pr=23, note=f'{V4_PR}23 merged by another lane')
+memo_tmp = v4 / 'state/.idle-reap/.fin-publish.refused.tmp'
+memo_tmp.write_text(f'fm-idle-reap-refused-v1\n{now - 300}\ndone [at={now}]: merged\nREFUSED: the memo renamed into place last\n')
+os.utime(memo_tmp, (now - 300, now - 300))
+time.sleep(0.05)
+prune_tmp = v4 / 'state/.fin-publish.merge-prune.tmp'
+prune_tmp.write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}23\nattempts=1\nnext_at={now + 600}\nstate=retained\n'
+    f'reason=REFUSED: the prune record published before the memo\nwake_sent=1\ncopy={fin_publish}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+os.rename(prune_tmp, v4 / 'state/fin-publish.merge-prune')
+time.sleep(0.05)
+os.rename(memo_tmp, v4 / 'state/.idle-reap/fin-publish.refused')
+# F5 as ruled: the newest recorded refusal wins, a prune attempt it will retry (state=pending) included.
+fin_pending = v4_copy('fin-pending'); v4_merged_pr(18, fin_pending)
+v4_task('fin-pending', copy=fin_pending, pr=18, note=f'{V4_PR}18 merged by another lane')
+pending_refusal = 'REFUSED: fin-pending copy is busy: a process still runs inside it'
+(v4 / 'state/fin-pending.merge-prune').write_text(
+    f'version=fm-merge-prune-v1\npr={V4_PR}18\nattempts=1\nnext_at={now + 60}\nstate=pending\nreason={pending_refusal}\n'
+    f'wake_sent=0\ncopy={fin_pending}\narmed_at={now - 3600}\nproject=\nreturned=0\n')
+v4_task('gate-covered', copy=v4_copy('gate-covered'), note='delivered, branch pushed', state='blocked', live=True,
+        detail=gate_covered_reason)
+# Round-4 F5.1: a working task with no PR whose content already is on the default branch owes its cleanup,
+# done report or not. Control: a working task with no commits of its own is unfinished work, not landed work.
+work_landed = v4_copy('work-landed')
+land_wl = world / 'v4-land-work-landed'
+git_('clone', '-q', v4_origin, land_wl)
+(land_wl / 'work-landed.txt').write_text('work-landed\n')
+git_('-C', land_wl, 'add', '.'); git_('-C', land_wl, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'squash work-landed')
+git_('-C', land_wl, 'push', '-q', 'origin', 'main')
+git_('-C', work_landed, 'fetch', '-q', 'origin')
+v4_task('work-landed', copy=work_landed, verb='working', note='building', state='working', live=True)
+v4_task('work-empty', copy=v4_copy('work-empty', work=False), verb='working', note='starting', state='working', live=True)
+# Main 1968 (cov2-1): a pool copy that only synced to a newer origin/main has moved off its recorded slot base with
+# nothing of its own. While its worker reads working with no done report and no PR, it owes no cleanup; after a
+# done report the same shape is the done-reported delivery rule's, and it owes plain teardown.
+def v4_synced(name, verb):
+    copy = v4_copy(name, work=False)
+    slot_base = git_('-C', copy, 'rev-parse', 'HEAD')
+    mover = world / ('v4-move-' + name)
+    git_('clone', '-q', v4_origin, mover)
+    (mover / (name + '-main.txt')).write_text('main moved\n')
+    git_('-C', mover, 'add', '.'); git_('-C', mover, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'main moves under ' + name)
+    git_('-C', mover, 'push', '-q', 'origin', 'main')
+    git_('-C', copy, 'fetch', '-q', 'origin'); git_('-C', copy, 'reset', '-q', '--hard', 'origin/main')
+    v4_task(name, copy=copy, verb=verb, note='synced to main' if verb == 'working' else 'delivered', state='working', live=True)
+    with open(v4 / f'state/{name}.meta', 'a') as meta:
+        meta.write(f'slot_base_sha={slot_base}\n')
+v4_synced('work-synced', 'working')
+v4_synced('work-synced-done', 'done')
+# Round-4 F5.2: two PR-carried parents merged locally, with an extra change committed in the merge itself that
+# the merged PR never carried, is not landed. Control: the same local merge with no extra change is landed.
+def v4_local_merge(name, extra):
+    copy = v4_copy(name, work=False)
+    for side in ('a', 'b'):
+        git_('-C', copy, 'checkout', '-q', '-b', f'{name}-{side}', 'origin/main')
+        (copy / f'{name}-{side}.txt').write_text(side + '\n')
+        git_('-C', copy, 'add', '.'); git_('-C', copy, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', f'{name} {side}')
+    # The PR: a clean merge of both sides, merged into origin's default branch.
+    git_('-C', copy, 'checkout', '-q', '-b', f'{name}-pr', f'{name}-a')
+    git_('-C', copy, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '-m', f'{name} PR merge', f'{name}-b')
+    pr_head = v4_merge_into_main(copy, name)
+    # The copy: its own merge of the same two sides, with or without an extra committed change.
+    git_('-C', copy, 'checkout', '-q', '-b', f'{name}-local', f'{name}-a')
+    git_('-C', copy, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '--no-commit', f'{name}-b')
+    if extra:
+        (copy / f'{name}-resolution.txt').write_text('a change only this merge carries\n')
+        git_('-C', copy, 'add', '.')
+    git_('-C', copy, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', f'{name} local merge')
+    return copy, pr_head
+for name, extra, number in (('merge-extra', True, 24), ('merge-clean', False, 25)):
+    copy, pr_head = v4_local_merge(name, extra)
+    v4_prs[str(number)] = dict(number=number, html_url=V4_PR + str(number), state='closed', merged_at=iso(now - 3600),
+                               head=dict(sha=pr_head))
+    v4_task(name, copy=copy, pr=number, note=f'{V4_PR}{number} merged by another lane')
+# Main 1907 (R3): a ship whose branch merged a later main to resolve a conflict, under an open PR whose head is the
+# copy's HEAD. The open PR carries that merge, so it is the open_pr row's, never an unlanded_commit row.
+merge_open = v4_copy('merge-open')
+land_mo = world / 'v4-land-merge-open'
+git_('clone', '-q', v4_origin, land_mo)
+(land_mo / 'merge-open-main.txt').write_text('main moved\n')
+git_('-C', land_mo, 'add', '.'); git_('-C', land_mo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'main moves under merge-open')
+git_('-C', land_mo, 'push', '-q', 'origin', 'main')
+git_('-C', merge_open, 'fetch', '-q', 'origin')
+git_('-C', merge_open, '-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-ff', '-m', 'merge-open merges main', 'origin/main')
+v4_prs['27'] = dict(number=27, html_url=V4_PR + '27', state='open', merged_at=None,
+                    head=dict(sha=git_('-C', merge_open, 'rev-parse', 'HEAD')))
+v4_task('merge-open', copy=merge_open, pr=27, verb='working', note='PR open', state='working', live=True)
+# Main 1929 (N1): a merged PR alone put this task here (no done report, state idle, backlog open). The PR was
+# squash-merged and main then rewrote the same file, so the default branch's content no longer matches the copy;
+# the copy's HEAD is the merged PR head and the forge's merge commit is on main, so teardown's landed rule lands it.
+src_merged = v4_copy('src-merged')
+land_sm = world / 'v4-land-src-merged'
+git_('clone', '-q', v4_origin, land_sm)
+(land_sm / 'src-merged.txt').write_text('src-merged\n')
+git_('-C', land_sm, 'add', '.'); git_('-C', land_sm, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'squash src-merged (#26)')
+squash_sm = git_('-C', land_sm, 'rev-parse', 'HEAD')
+(land_sm / 'src-merged.txt').write_text('src-merged, reworded on main\n')
+git_('-C', land_sm, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-am', 'main rewords src-merged')
+git_('-C', land_sm, 'push', '-q', 'origin', 'main')
+git_('-C', src_merged, 'fetch', '-q', 'origin')
+v4_prs['26'] = dict(number=26, html_url=V4_PR + '26', state='closed', merged_at=iso(now - 3600),
+                    head=dict(sha=git_('-C', src_merged, 'rev-parse', 'HEAD')), merge_commit_sha=squash_sm)
+v4_task('src-merged', copy=src_merged, pr=26, verb='working', note='building', state='idle')
+# Main 1929 (N1): a GitHub no-mistakes copy that stayed the pipeline's input. The pipeline rewrote its file, pushed
+# that head, and the PR merged it; the run record names this copy's HEAD as that run's input, so it is landed.
+pipe_input = v4_copy('pipe-input')
+pipe_run = world / 'v4-pipeline-pipe-input'
+git_('clone', '-q', v4_origin, pipe_run)
+(pipe_run / 'pipe-input.txt').write_text('pipe-input, reviewed by the pipeline\n')
+git_('-C', pipe_run, 'add', '.'); git_('-C', pipe_run, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'work pipe-input')
+pipe_head = git_('-C', pipe_run, 'rev-parse', 'HEAD')
+git_('-C', pipe_run, 'push', '-q', 'origin', 'HEAD:main')
+git_('-C', pipe_input, 'fetch', '-q', 'origin')
+v4_prs['28'] = dict(number=28, html_url=V4_PR + '28', state='closed', merged_at=iso(now - 3600),
+                    head=dict(sha=pipe_head), merge_commit_sha=pipe_head)
+v4_task('pipe-input', copy=pipe_input, pr=28, note=f'{V4_PR}28 merged')
+v4_nm = world / 'v4-nm'
+v4_nm.mkdir()
+with sqlite3.connect(v4_nm / 'state.sqlite') as db:
+    db.execute('CREATE TABLE runs (id, branch, pr_url, submitted_head_sha, last_pushed_sha, created_at)')
+    db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?)',
+               ('01RUNPIPE', 'fm/pipe-input', V4_PR + '28', git_('-C', pipe_input, 'rev-parse', 'HEAD'), pipe_head, 1))
+# Main 1907 (R4): a merged PR alone put this task here, and no landing route proves its copy (the merged head is not
+# on main and the forge names no merge commit), so no other row covers it; its evidence names the merged PR.
+src_unproven = v4_copy('src-unproven')
+v4_prs['29'] = dict(number=29, html_url=V4_PR + '29', state='closed', merged_at=iso(now - 3600),
+                    head=dict(sha=git_('-C', src_unproven, 'rev-parse', 'HEAD')))
+v4_task('src-unproven', copy=src_unproven, pr=29, verb='working', note='building', state='idle')
+# The same unproven merged PR with a done report and a done state: the evidence names each source that holds.
+src_both = v4_copy('src-both')
+v4_prs['30'] = dict(number=30, html_url=V4_PR + '30', state='closed', merged_at=iso(now - 3600),
+                    head=dict(sha=git_('-C', src_both, 'rev-parse', 'HEAD')))
+v4_task('src-both', copy=src_both, pr=30, note=f'{V4_PR}30 merged')
+mate_home = world / 'v4-mate'
+for name in ('state', 'data', 'config', 'projects'):
+    (mate_home / name).mkdir(parents=True)
+(mate_home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+(v4 / 'state/v4-mate.meta').write_text(f'kind=secondmate\nbackend=tmux\nwindow=sess:fm-v4-mate\nharness=claude\nhome={mate_home}\n')
+(v4 / 'state/v4-mate.status').write_text(f'working [at={now - 90000}]: idle\n')
+os.utime(v4 / 'state/v4-mate.status', (now - 90000, now - 90000))
+v4_states['v4-mate'] = 'working'; v4_live.append('v4-mate')
+(world / 'v4-gh.json').write_text(json.dumps(dict(pulls=[], single=v4_prs)))
+script(fake / 'gh', r"""#!/usr/bin/env python3
+import hashlib, json, os, sys, time
+args = sys.argv[1:]
+assert args[:2] == ['api', '-i'], args
+double = json.load(open(os.environ['V4_GH']))
+path = '/' + args[-1].lstrip('/')
+value = double['pulls'] if '/pulls?' in path else double['single'][path.rsplit('/', 1)[1]]
+body = json.dumps(value)
+sys.stdout.write('HTTP/2.0 200 OK\r\nEtag: "%s"\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4000\r\n'
+                 'X-Ratelimit-Reset: %d\r\nX-Ratelimit-Resource: core\r\n\r\n%s' % (hashlib.sha1(body.encode()).hexdigest()[:8], int(time.time()) + 3600, body))
+""")
+(world / 'v4-live.txt').write_text(''.join(f'fm-{n}\n' for n in v4_live))
+script(fake / 'tmux', '#!/usr/bin/env bash\ncase "$1" in\n'
+       "  capture-pane) printf '╭────╮\\n│    │\\n╰────╯\\n' ;;\n"
+       '  list-windows) cat "$V4_LIVE" ;;\n'
+       "  display-message) printf 'fakepane\\n' ;;\n"
+       '  send-keys) printf \'%s\\n\' "$*" >> "$FM_SEND_LOG" ;;\nesac\n')
+script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\ns=$(sed -n "s/^$1=//p" "$V4_STATES" | head -1)\n'
+       'd=$(sed -n "s/^$1=//p" "$V4_DETAILS" | head -1)\n'
+       'printf "state: %s · source: pane · %s\\n" "${s:-working}" "${d:-recorded}"\n')
+(world / 'v4-states.txt').write_text(''.join(f'{n}={st}\n' for n, st in v4_states.items()))
+(world / 'v4-details.txt').write_text(''.join(f'{n}={d}\n' for n, d in v4_details.items()))
+env4 = dict(env, FM_HOME=str(v4), NM_HOME=str(v4_nm), V4_GH=str(world / 'v4-gh.json'), V4_LIVE=str(world / 'v4-live.txt'),
+            V4_STATES=str(world / 'v4-states.txt'), V4_DETAILS=str(world / 'v4-details.txt'), FM_SILENCE_TEST_LIVENESS='alive',
+            GIT_CONFIG_COUNT='1', GIT_CONFIG_KEY_0=f'url.{v4_origin}.insteadOf', GIT_CONFIG_VALUE_0='https://github.com/test/project.git')
+def ledger4(**extra):
+    done = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--json'], env=dict(env4, **extra), text=True, capture_output=True, timeout=180)
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    return json.loads(done.stdout)
+report4 = ledger4()
+by_cat = lambda c: {r['subject']: r for r in report4['rows'] if r['category'] == c}
+mine = lambda sub: [r for r in report4['rows'] if r['subject'] == sub]
+print('V4 ledger rows (category, subject, owner, overdue, next action):')
+for r in sorted(report4['rows'], key=lambda r: (r['category'], r['subject'])):
+    print('  ', r['category'], r['subject'], r['owner'], 'overdue' if r['overdue'] else '-', '|', r['next_action'][:110])
+cleanup = by_cat('pending_cleanup')
+assert {'fin-merged', 'fin-content', 'fin-moot', 'fin-moot-clean', 'fin-refused'} <= set(cleanup), ('finished classes need a row', sorted(cleanup))
+for name in ('fin-merged', 'fin-content', 'fin-moot-clean'):
+    row = cleanup[name]
+    assert row['owner'] == 'home:firstmate', row
+    assert f'bin/fm-teardown.sh {name}' in row['next_action'] and '--force' not in row['next_action'] and '--drop-file' not in row['next_action'], row
+    assert row['overdue'] and not row.get('informational'), ('done must not suppress a finished task past its age class', row)
+    assert row['limit_seconds'] == DEFAULT_AGES_FOR_TEST['interrupted_teardown'], ('cleanup must follow the existing teardown age class', row)
+assert 'pending_cleanup' not in DEFAULT_AGES_FOR_TEST and 'pending_acceptance' not in DEFAULT_AGES_FOR_TEST, 'a new age class was added'
+# A delivered scout report still awaits its owner handoff: the completed_task row owns it, once, until teardown.
+handoff = by_cat('completed_task')
+obligations = lambda sub: [r for r in mine(sub) if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')]
+scout_row = handoff.get('fin-scout')
+assert scout_row and scout_row['owner'] == 'firstmate' and scout_row['overdue'] and 'consume the report' in scout_row['next_action'], scout_row
+assert 'run plain bin/fm-teardown.sh fin-scout' in scout_row['next_action'] and '--force' not in scout_row['next_action'], \
+    ('the accepted report leads to plain teardown', scout_row)
+assert [r['category'] for r in obligations('fin-scout')] == ['completed_task'], ('one obligation, one row', mine('fin-scout'))
+# Kind (d): with no completed_task row, the delivered scout report is a home-owned pending_cleanup row.
+assert [r['category'] for r in obligations('fin-scout-working')] == ['pending_cleanup'], ('kind (d) needs its row', mine('fin-scout-working'))
+scout_working = cleanup['fin-scout-working']
+assert scout_working['owner'] == 'home:firstmate', scout_working
+assert scout_working['next_action'].startswith('accept the delivered report, then run plain bin/fm-teardown.sh fin-scout-working'), scout_working
+# A refused teardown keeps its exact refusal text on that one row.
+scout_refused = handoff.get('fin-scout-refused')
+assert [r['category'] for r in obligations('fin-scout-refused')] == ['completed_task'], mine('fin-scout-refused')
+assert scout_refusal in scout_refused['next_action'] and scout_refusal in scout_refused['evidence'], ('the refusal text must stay on the row', scout_refused)
+# A drop ruling over a copy that still holds unlanded work names the attended drop path with the recorded words.
+moot = cleanup['fin-moot']
+assert moot['owner'] == 'firstmate' and 'Main' in moot['next_action'], ('the drop path belongs to Main', moot)
+assert f'bin/fm-teardown.sh fin-moot --force --drop-file {moot_words}' in moot['next_action'], moot
+assert 'run plain' not in moot['next_action'], ('plain teardown refuses this copy, so it is not the next action', moot)
+refused = cleanup['fin-refused']
+assert refused['owner'] == 'home:firstmate' and refusal in refused['next_action'], ('the refusal text must stay on the row', refused)
+assert 'bin/fm-teardown.sh fin-refused' in refused['next_action'], refused
+# A merged PR over a dirty copy is not landed, and its cleanup is refused: it is an owned, overdue-eligible
+# pending_cleanup row carrying the kept teardown refusal, never informational (Main 1871 P-D).
+dirty = cleanup.get('fin-dirty')
+assert dirty and dirty['owner'] == 'home:firstmate' and not dirty.get('informational'), ('a refused dirty copy needs its cleanup row', mine('fin-dirty'))
+assert dirty_refusal in dirty['next_action'] and dirty_refusal in dirty['evidence'], ('the refusal text must stay on the row', dirty)
+assert 'fin-dirty' not in by_cat('pending_acceptance'), by_cat('pending_acceptance').get('fin-dirty')
+# When another row covers the task, the recorded refusal (here the idle reaper's memo) stays on that row.
+unl = by_cat('unlanded_commit').get('unl-refused')
+assert unl and reap_refusal in unl['next_action'] and reap_refusal in unl['evidence'], ('the covering row lost the refusal', mine('unl-refused'))
+# Its PR merged and its recorded refusal stands, so it also owes an owned cleanup row (Main 1871 P-D).
+unl_cleanup = cleanup.get('unl-refused')
+assert unl_cleanup and unl_cleanup['owner'] == 'home:firstmate' and reap_refusal in unl_cleanup['next_action'], ('a merged, refused task needs its cleanup row', mine('unl-refused'))
+assert 'unl-refused' not in by_cat('pending_acceptance'), mine('unl-refused')
+# A waiting task, a held task, unfinished work and an idle persistent secondmate are never stranded rows.
+for name in ('wait-paused', 'wait-held', 'unfin-dirty', 'v4-mate', 'pend-run'):
+    assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine(name)), (name, mine(name))
+for name in ('wait-paused', 'wait-held', 'v4-mate'):
+    assert not any(r['overdue'] for r in mine(name)), ('a waiting task or idle mate reported overdue because it is quiet', name, mine(name))
+assert 'unfin-dirty' in by_cat('unlanded_commit'), 'unfinished changes keep their existing row'
+assert not any(r['category'] in ('missing_worker', 'unlanded_commit') for r in mine('v4-mate'))
+# Round-2 F4 witnesses, each reported, then all required.
+clean_rows = [r for r in mine('pend-clean') if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')]
+ret = by_cat('interrupted_teardown').get('fin-return')
+covered = by_cat('unlanded_commit').get('gate-covered')
+PLAIN_CHECK_IN = 'check in: progress, blockers, cross-workstream dependencies'
+LANDED_CHECK_IN = (PLAIN_CHECK_IN + "; its copy's content is on the default branch: "
+                   'if its work is finished, report done so its cleanup can follow')
+f4 = [
+    # A merged PR whose worker still reads working is still owed cleanup.
+    ('merged-while-working', 'fin-working' in cleanup and 'bin/fm-teardown.sh fin-working' in cleanup['fin-working']['next_action'],
+     mine('fin-working')),
+    # A clean copy that never committed has delivered nothing on record: review and acceptance, never plain teardown.
+    ('never-committed', [r['category'] for r in clean_rows] == ['pending_acceptance']
+     and 'review and accept' in clean_rows[0]['next_action'] and 'plain bin/fm-teardown.sh' not in clean_rows[0]['next_action'],
+     mine('pend-clean')),
+    # An interrupted slot return already owns the landed task's cleanup: one row, and it carries the refusal.
+    ('interrupted-return', bool(ret) and 'fin-return' not in cleanup and return_refusal in ret['next_action']
+     and return_refusal in ret['evidence'], mine('fin-return')),
+    # A refused done claim another row covers still names the gate's reason on that row.
+    ('refused-claim-covered', bool(covered) and gate_covered_reason in covered['next_action'], mine('gate-covered')),
+    # The newest recorded refusal is on the row, a pending prune attempt's included.
+    ('newest-recorded-refusal', 'fin-pending' in cleanup and pending_refusal in cleanup['fin-pending']['next_action'],
+     mine('fin-pending')),
+    # Round-3 F3: no done update, merged and covered: the cleanup row is still there.
+    ('merged-without-done-update', 'fin-noupdate' in cleanup and 'bin/fm-teardown.sh fin-noupdate' in cleanup['fin-noupdate']['next_action'],
+     mine('fin-noupdate')),
+    # F3 controls: more unlanded work after the merge, or a declared wait, adds no cleanup row.
+    ('merged-with-more-work-no-cleanup', 'merged-more' not in cleanup and 'merged-more' not in by_cat('pending_acceptance'),
+     mine('merged-more')),
+    ('merged-with-declared-wait-no-cleanup', 'merged-wait' not in cleanup and 'merged-wait' not in by_cat('pending_acceptance'),
+     mine('merged-wait')),
+    # Round-3 F4: the refusal written last wins over an older-stamped memo order, and its producer is named.
+    ('latest-written-refusal', 'fin-order' in cleanup and 'the newer reaper teardown refusal' in cleanup['fin-order']['next_action']
+     and 'the older prune refusal' not in cleanup['fin-order']['next_action'] and 'idle-session-reap' in cleanup['fin-order']['next_action'],
+     mine('fin-order')),
+    # Round-3 F4: a prune record's reason is labeled as the prune's, not as a plain teardown's.
+    ('prune-reason-labeled', 'fin-pending' in cleanup and 'merge-prune' in cleanup['fin-pending']['next_action']
+     and 'plain bin/fm-teardown.sh fin-pending ended' not in cleanup['fin-pending']['next_action'], mine('fin-pending')),
+    # Round-4 F5.1: landed content with no PR and no done report, worker still working: the cleanup row exists.
+    # Main 1968: landed content alone owes no cleanup while the worker reads working with no done report or PR;
+    # its check-in row stays.
+    ('content-landed-working-no-pr-keeps-check-in', 'work-landed' not in cleanup and 'work-landed' not in by_cat('pending_acceptance')
+     and by_cat('silent_report').get('work-landed', {}).get('next_action') == LANDED_CHECK_IN, mine('work-landed')),
+    ('synced-working-no-cleanup', 'work-synced' not in cleanup and 'work-synced' not in by_cat('pending_acceptance')
+     and by_cat('silent_report').get('work-synced', {}).get('next_action') == LANDED_CHECK_IN, mine('work-synced')),
+    # Every other check-in row keeps its exact text, the content-landed ask included only where it applies.
+    ('plain-check-in-unchanged', by_cat('silent_report').get('work-empty', {}).get('next_action') == PLAIN_CHECK_IN,
+     mine('work-empty')),
+    ('synced-after-done-report-cleanup', 'work-synced-done' in cleanup
+     and cleanup['work-synced-done']['next_action'].startswith('run plain bin/fm-teardown.sh work-synced-done;'), mine('work-synced-done')),
+    ('working-with-no-commits-no-cleanup', 'work-empty' not in cleanup and 'work-empty' not in by_cat('pending_acceptance'),
+     mine('work-empty')),
+    # Round-4 F5.2: a local merge with an extra change is not landed and keeps an unlanded row naming that merge.
+    ('merge-with-extra-change-not-landed', 'merge-extra' not in cleanup and 'merge-extra' in by_cat('unlanded_commit')
+     and 'merge-extra local merge' in by_cat('unlanded_commit')['merge-extra']['evidence'], mine('merge-extra')),
+    ('clean-local-merge-landed', 'merge-clean' in cleanup, mine('merge-clean')),
+    # Main 1907 (R3): a merge commit the open PR head carries is that PR's, not an unlanded commit.
+    ('merge-under-open-pr-head-covered', 'merge-open' not in by_cat('unlanded_commit')
+     and 'merge-open' not in cleanup and 'merge-open' not in by_cat('pending_acceptance'), mine('merge-open')),
+    # Round-4 F5.3: the record published last wins, by publication, not by its file's write time.
+    ('published-last-refusal', 'fin-publish' in cleanup and 'the memo renamed into place last' in cleanup['fin-publish']['next_action']
+     and 'the prune record published before the memo' not in cleanup['fin-publish']['next_action'], mine('fin-publish')),
+]
+for name, ok, got in f4:
+    print('F4', name, 'ok' if ok else 'FAILED', '' if ok else [(r['category'], r['next_action'][:160]) for r in got], flush=True)
+assert all(ok for _, ok, _ in f4), 'an F4 witness failed'
+# Main 2009: the check-in a content-landed working ship receives also asks it to report done if its work is finished;
+# every other check-in is the plain text, byte for byte. Read from the message each worker's inbox received.
+V4_CHECK_IN = ('Check in: report progress, blockers, and cross-workstream dependencies that need resolution. '
+               'Reply through your supervised status/report channel before acknowledging this inbox message; '
+               'secondmates must preserve the request correlation in their parent-channel reply. '
+               'Handle this at your next safe checkpoint; do not interrupt a running step.')
+V4_REPORT_DONE = 'If your work is finished, report done so its cleanup can follow.'
+for name, expected in (('work-synced', V4_CHECK_IN + ' ' + V4_REPORT_DONE),
+                       ('work-landed', V4_CHECK_IN + ' ' + V4_REPORT_DONE),
+                       ('work-empty', V4_CHECK_IN)):
+    sent = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--check-in', name, '--json'], env=env4, text=True,
+                          capture_output=True, timeout=180)
+    assert sent.returncode == 0 and json.loads(sent.stdout)['check_in'] == 'sent', (name, sent.stdout, sent.stderr)
+    received = sorted((v4 / f'state/{name}.inbox').glob('*.msg'))
+    assert len(received) == 1, (name, received)
+    body = received[0].read_text().split('\n--\n', 1)[1].rstrip('\n')
+    assert body == expected, ('the check-in text sent to the worker is wrong', name, body)
+print('PASS: a content-landed working ship is asked to report done; other check-ins are unchanged', flush=True)
+# A record whose last report was done with no accepted deliverable and no live worker is never left with no row.
+# A done task, or a stopped one whose last report is done, with no PR and nothing landed is the completed_task
+# handoff's, so it gets that one row.
+acceptance = by_cat('pending_acceptance')
+for name in ('pend-ship', 'pend-scout', 'src-state', 'src-report'):
+    assert [r['category'] for r in mine(name) if r['category'] in ('completed_task', 'pending_acceptance', 'pending_cleanup')] \
+        == ['completed_task'], ('done with no accepted deliverable needs one owned row', name, mine(name))
+    row = handoff[name]
+    assert row['owner'] == 'firstmate' and row['next_action'] and row['overdue'], row
+# The evidence names the real source of the row: the last report, the task state, the closed backlog item, or each that holds.
+# It never claims a source that did not put the task there.
+sources = {'last report was done': 'the last report was done', 'task state is done': 'the task state is done',
+           'backlog item is closed': 'its backlog item is closed'}
+expected = {'src-backlog': {'backlog item is closed'},
+            'src-both': {'last report was done', 'task state is done'},
+            'src-unproven': set()}
+for name, held in expected.items():
+    row = acceptance.get(name)
+    assert row and row['owner'] == 'home:firstmate', ('each source needs its own owned row', name, mine(name))
+    named = {key for key, words in sources.items() if words in row['evidence']}
+    assert named == held, ('the evidence must name exactly the sources that hold', name, held, row['evidence'])
+    assert 'no accepted or landed deliverable is on record' in row['evidence'], row
+assert acceptance['src-unproven']['evidence'].startswith(f'its PR merged: {V4_PR}29, and no accepted'), acceptance['src-unproven']
+# Teardown's landed rule lands these merged PRs, so the ledger owes their cleanup, never acceptance or landing.
+for name in ('src-merged', 'pipe-input'):
+    assert [r['category'] for r in obligations(name)] == ['pending_cleanup'], (name, mine(name))
+    assert cleanup[name]['owner'] == 'home:firstmate', cleanup[name]
+    assert cleanup[name]['next_action'].startswith(f'run plain bin/fm-teardown.sh {name};'), cleanup[name]
+    assert name not in by_cat('unlanded_commit'), (name, mine(name))
+assert 'its PR merged' not in acceptance['src-backlog']['evidence'], acceptance['src-backlog']
+# A done claim the ship-done gate refused is firstmate's to resolve; one refused only because the no-mistakes daemon
+# is down is a wait and adds no row. A refusal because no run exists or the run is otherwise unreadable keeps its row,
+# also for a task whose PR another lane already merged.
+for name, why in (('gate-refused', gate_refusal), ('gate-nm-unreadable', nm_unreadable), ('gate-nm-norun', nm_norun),
+                  ('gate-nm-norun-merged', nm_norun)):
+    gate = acceptance.get(name)
+    assert gate and gate['owner'] == 'firstmate', ('a refused done claim needs an owned row', name, mine(name))
+    assert "resolve the ship-done gate's refusal of the done claim" in gate['next_action'] and why in gate['next_action'], gate
+assert not any(r['category'] in ('pending_cleanup', 'pending_acceptance') for r in mine('gate-nm-down')), mine('gate-nm-down')
+# The rows come from the records alone, so a fresh process (a restart) finds the same obligations.
+again = ledger4()
+key = lambda rep: sorted((r['category'], r['subject'], r['owner'], r['next_action']) for r in rep['rows']
+                         if r['category'] in ('pending_cleanup', 'pending_acceptance', 'completed_task'))
+assert key(report4) == key(again) and key(again), 'a restart changed or lost a pending row'
+# The row lives until the record is gone: removing a record removes only its own row.
+(v4 / 'state/fin-merged.meta').unlink()
+(v4 / 'state/fin-scout.meta').unlink()
+after = ledger4()
+assert not [r for r in after['rows'] if r['subject'] == 'fin-scout' and r['category'] in ('completed_task', 'pending_cleanup', 'pending_acceptance')]
+assert 'fin-scout-refused' in {r['subject'] for r in after['rows'] if r['category'] == 'completed_task'}, 'removing one record removed another row'
+assert not [r for r in after['rows'] if r['subject'] == 'fin-merged' and r['category'] in ('pending_cleanup', 'pending_acceptance')]
+assert 'fin-content' in {r['subject'] for r in after['rows'] if r['category'] == 'pending_cleanup'}
+# One task whose status log cannot be read degrades only its own row: every later task keeps its row.
+content_status = v4 / 'state/fin-content.status'
+kept = content_status.read_text()
+content_status.write_text(''.join(f'working [at={now - 9000 + i}]: step {i} of the padded history\n' for i in range(120)) + kept)
+past = ledger4(FM_STATUS_CAP_BYTES='2048', FM_STATUS_CAP_RESERVE_BYTES='2048')
+content_status.write_text(kept)
+cover = [r for r in past['rows'] if r['category'] == 'coverage']
+assert cover and 'completion fin-content' in cover[0]['evidence'], ('the unreadable task must be named degraded', cover)
+later = {r['subject'] for r in past['rows'] if r['category'] in ('pending_cleanup', 'pending_acceptance', 'completed_task')}
+assert {'fin-dirty', 'fin-moot', 'fin-moot-clean', 'fin-refused', 'gate-refused', 'pend-ship'} <= later, ('a later task lost its row', sorted(later))
+print('PASS: finished and unaccepted work with an open record keeps an owned ledger row; waits, unfinished work and an idle secondmate do not', flush=True)
 PY
 
 # The real snapshot's home-input contract: large inventories travel by file, direct secondmates
