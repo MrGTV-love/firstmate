@@ -1309,6 +1309,10 @@ LIFECYCLE_CASES = {
 # deny, common and project every deny naming that folder or a folder above
 # it, and own-git the two denies on the worker's own .git file and commondir.
 LIFECYCLE_MUTANTS = (("approvals",), ("drop",), ("lifecycle",), ("lifecycle", "approvals"), ("common",), ("project",), ("own-git",))
+# With only the lifecycle folder's deny removed, a lifecycle folder made under
+# another spelling holds record folders whose path the record denies may not
+# name; no measurement covers that cell, so it is reported, not judged.
+LIFECYCLE_UNJUDGED = {("absent-upper-lifecycle", ("lifecycle",)), ("absent-kelvin-lifecycle", ("lifecycle",))}
 # Names a worker could make, or an unconfined process could leave, as a
 # second name for a record, each stopping the build.
 LIFECYCLE_ALIASES = ("record-hard-link", "drop-record-hard-link", "approvals-symlink", "drop-symlink", "lifecycle-symlink",
@@ -1678,8 +1682,7 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
         if mode == "baseline":
             for case in LIFECYCLE_CASES:
                 judge(case, "unconfined", True, *run(case, None, "unconfined"))
-            assert not failures, f"{harness} {mode} lifecycle records:\n" + "\n".join(failures)
-            return report
+            return report, failures
         # The build creates the lifecycle folder only for a tree with Vernant's
         # module, keeps an existing one as it is, and writes nothing elsewhere.
         profiles = {}
@@ -1718,8 +1721,10 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
             profile = profiles.get(LIFECYCLE_CASES[case][0])
             if profile:
                 judge(case, "head", not LIFECYCLE_CASES[case][1], *run(case, profile[0], "head"))
-        # On the base builder every check above fails; name them all.
-        assert not failures, f"{harness} {mode} lifecycle records:\n" + "\n".join(failures)
+        # On the base builder the checks above fail; name them all, and run no
+        # mutant of a head that did not pass.
+        if failures:
+            return report, failures
         for removed in LIFECYCLE_MUTANTS:
             label = "without-" + "+".join(removed)
             for layout, (profile, built_with) in profiles.items():
@@ -1732,7 +1737,9 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
                     if case_layout != layout:
                         continue
                     needed = set().union(*(lifecycle_rule_lines(rule, lines, p, built_with) for rule in rules)) if rules else set()
-                    judge(case, label, not rules or needed <= gone, *run(case, mutant, label))
+                    result = run(case, mutant, label)
+                    if (case, removed) not in LIFECYCLE_UNJUDGED:
+                        judge(case, label, not rules or needed <= gone, *result)
         # Without the build-time creation, Vernant's own store writes fail.
         p = paths["vernant"]
         lay_out_lifecycle(p, "absent", lc["originals"])
@@ -1759,8 +1766,7 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
                 failures.append(f"alias {alias} without the alias check: {error}")
             if not profile.exists():
                 failures.append(f"alias {alias} without the alias check: no profile was built")
-        assert not failures, f"{harness} {mode} lifecycle mutants:\n" + "\n".join(failures)
-        return report
+        return report, failures
     finally:
         for name in paths:
             lay_out_lifecycle(paths[name], "absent", lc["originals"])
@@ -1777,7 +1783,7 @@ if sys.argv[1] == "--child":
 repo = Path(sys.argv[1])
 root = Path(sys.argv[2]).resolve()
 reader_startup(repo, root)
-lifecycle_failures = []
+deferred = []
 for harness in ("claude", "omp"):
     for mode in ("baseline", "confined"):
         base = root / f"{harness}-{mode}"
@@ -1830,22 +1836,25 @@ for harness in ("claude", "omp"):
         archive_file = archive_branch_file(repo, manifest, base, harness, mode, env)
         print(f"{harness} {mode} archive branch file: " + json.dumps(archive_file, sort_keys=True))
         assert archive_file == {"archive-branch-kept": True, "own-archive-created": mode == "baseline"}, (harness, mode, archive_file)
-        try:
-            lifecycle = lifecycle_records(repo, manifest, base, harness, mode, env)
-        except AssertionError as failure:
-            # Keep going, so a profile without the record folder rules shows
-            # every case under both harnesses before the run fails.
-            lifecycle_failures.append(str(failure))
-            lifecycle = {}
+        # Every verdict below is collected and the run fails only at the end,
+        # so a builder without these rules shows every case under both
+        # harnesses before it fails.
+        lifecycle, failed = lifecycle_records(repo, manifest, base, harness, mode, env)
         for name, results in lifecycle.items():
             print(f"{harness} {mode} lifecycle {name}: " + json.dumps(results, sort_keys=True))
+        for failure in failed:
+            print(f"FAIL {harness} {mode} lifecycle {failure}")
+            deferred.append(f"{harness} {mode} lifecycle {failure}")
         if mode == "baseline":
             for name in actual:
-                if name in CONTROL_KEYS or name.startswith("refused-"):
-                    assert actual[name] is False, (harness, mode, name, actual)
+                if (name in CONTROL_KEYS or name.startswith("refused-")) and actual[name] is not False:
+                    deferred.append(f"{harness} {mode}: control {name} was {actual[name]}, not False")
         else:
-            assert result.returncode == 0 and all(actual.values()), (harness, mode, result.stderr, actual)
+            if not (result.returncode == 0 and all(actual.values())):
+                wrong = sorted(name for name, value in actual.items() if not value)
+                print(f"FAIL {harness} {mode}: exit {result.returncode}, false keys {wrong}")
+                deferred.append(f"{harness} {mode}: exit {result.returncode}, false keys {wrong}, stderr {result.stderr[-400:]}")
             hardlink_alias(repo, manifest, base, harness, env)
             if harness == "claude":
                 reftable_source(repo, manifest, base, env)
-assert not lifecycle_failures, "\n".join(lifecycle_failures)
+assert not deferred, "\n".join(deferred)
