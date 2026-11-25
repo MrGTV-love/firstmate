@@ -29,8 +29,9 @@
 # fingerprint it recorded (state/.session-end-refusal-<id>, durable across scanner processes) must change
 # before one new attempt is allowed, and the operator's own `bin/fm-control.sh <task> relaunch` is the way to try
 # again. Any other failed outcome keeps the caps and wakes below. A relaunch that starts with, or refuses
-# because of, the task's own out-of-scope work carries the complete drift report in its wake line and in
-# state/<id>.relaunch-drift, so the observer sees every path (bin/fm-slot-provision-lib.sh owns the report).
+# because of, the task's own out-of-scope work carries the drift report in its wake line and in
+# state/<id>.relaunch-drift, so the observer sees every path or, for a long `uncertain,ignored` group, its count and the
+# file that lists every path (bin/fm-slot-provision-lib.sh owns the report).
 #
 # A completed fm-control exit retires the busy record, so its session-end
 # is never seen here. The control-exit marker covers the exit whose command
@@ -272,13 +273,14 @@ fm_session_end_write_drift() {  # <state-dir> <id> <control-output>
 # The complete drift report inside a control output, on one line: "header | entry | entry ...". Empty when the
 # output carries no report or the report found nothing out of scope.
 fm_session_end_drift_summary() {  # <control-output>
-  local text header entries limits
+  local text header entries sampled limits
   text=$(fm_session_end_first_drift_report "$1")
   header=$(printf '%s\n' "$text" | sed -n 's/^relaunch drift report for \(.*\)$/\1/p')
   case "$header" in ''|*'no out-of-scope path'*|*'could not be produced'*) ;; *)
     entries=$(printf '%s\n' "$text" | sed -n 's/^  drift: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
+    sampled=$(printf '%s\n' "$text" | sed -n 's/^  sampled: //p')
     limits=$(printf '%s\n' "$text" | sed -n 's/^  limitation: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
-    printf '%s' "drift report: ${header#*: }: $entries${limits:+ | limitation: $limits}"
+    printf '%s' "drift report: ${header#*: }: $entries${sampled:+ | sampled: $sampled}${limits:+ | limitation: $limits}"
     return 0 ;;
   esac
   case "$header" in *'could not be produced'*) printf '%s' "drift report: ${header#*: }" ;; esac

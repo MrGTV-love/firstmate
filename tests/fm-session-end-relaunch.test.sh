@@ -546,6 +546,21 @@ test_two_printed_reports_are_listed_once() {
   pass "two printed reports are listed once, with a count that matches the paths, in the wake and in the durable file"
 }
 
+# A report that sampled its long uncertain,ignored group carries the sample line, with the count and the file that lists
+# every path, in the wake and in the durable file.
+test_a_sampled_report_carries_its_count_and_full_list_file() {
+  local dir report line file
+  line='  sampled: 300 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in /home/state/lane.drift-report.txt'
+  report=$(printf '%s\n' 'relaunch drift report for lane: 301 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged' \
+    '  drift: proven docs/b.txt' '  drift: uncertain,ignored cache/1' "$line" '  limitation: shallow history' '  a relaunch is not a new scope declaration')
+  dir=$(make_lane drift-sampled)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the scan failed"
+  assert_contains "$FM_SESSION_END_WAKE" "| sampled: ${line#  sampled: } |" 'the wake did not carry the sample count and the full-list file'
+  file="$dir/state/lane.relaunch-drift"
+  grep -x -F "$line" "$file" >/dev/null || fail "the durable file lost the sample line: $(cat "$file")"
+  pass "a sampled drift report carries its count and the file listing every path in the wake and the durable file"
+}
+
 # The could-not-be-produced report is one line: the durable file holds that header and nothing after it.
 test_could_not_be_produced_report_is_one_line() {
   local dir header out
@@ -637,6 +652,7 @@ test_long_drift_report_keeps_its_durable_reference_at_the_fallback
 test_a_non_refusal_failure_keeps_its_retry
 test_drift_report_reaches_the_observer
 test_two_printed_reports_are_listed_once
+test_a_sampled_report_carries_its_count_and_full_list_file
 test_could_not_be_produced_report_is_one_line
 test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched

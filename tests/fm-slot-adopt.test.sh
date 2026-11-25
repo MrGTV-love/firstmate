@@ -23,7 +23,8 @@ trap 'fm_test_cleanup' EXIT
 GITID=(-c user.name='Firstmate Tests' -c user.email='tests@example.invalid')
 
 # make_world <name>: a project clone on main with a bare origin and a pool slot (<pool>/1/repo) holding branch fm/t,
-# its manifest, its task record and an owner claim directory. Sets W_DIR W_PROJ W_SLOT W_STATE W_META W_MANIFEST W_BASE.
+# its manifest, its task record and an owner claim directory. Sets W_DIR W_PROJ W_SLOT W_STATE W_META W_MANIFEST W_BASE
+# and exports STATE=W_STATE.
 make_world() {
   local name=$1
   W_DIR="$TMP_ROOT/$name"
@@ -56,6 +57,8 @@ PY
     printf 'slot_manifest=%s\nslot_base_sha=%s\nslot_owned_path=src\n' "$W_MANIFEST" "$W_BASE"
   } >"$W_META"
   export FM_HOME="$W_DIR/home"
+  # The drift report writes STATE/<id>.drift-report.txt, so it must never fall back to the checkout's own state.
+  export STATE="$W_STATE"
 }
 
 adopt() { fm_slot_adopt_check "$W_PROJ" "$W_SLOT" t fm/t "$W_META" "$W_STATE" 2>&1; }
@@ -499,6 +502,50 @@ test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift() {
   pass "drift: a .fm-kept.<time>.<n> copy of recorded wiring is not listed; an unrecorded ignored file still is"
 }
 
+# The report on a copy with many git-ignored generated paths: every proven path is printed in full, the uncertain,ignored
+# group past the bounded sample is counted and named in a `sampled:` line, and the complete report is written to
+# STATE/<id>.drift-report.txt (mode 600, replaced on every run). With no STATE the complete report is printed, and it is
+# line for line what the file holds.
+test_many_ignored_paths_print_a_sample_and_write_the_complete_report() {
+  local out full file i exclude
+  make_world drift-many-ignored
+  exclude=$(git -C "$W_SLOT" rev-parse --path-format=absolute --git-path info/exclude)
+  mkdir -p "$(dirname "$exclude")" "$W_SLOT/build"
+  printf 'build/\n*.log\n' >>"$exclude"
+  for i in $(seq 1 30); do printf 'x\n' >"$W_SLOT/build/gen-$i.o"; done
+  for i in $(seq 1 5); do printf 'x\n' >"$W_SLOT/run-$i.log"; done
+  printf 'own\n' >"$W_SLOT/docs/own.txt"
+  file=$W_STATE/t.drift-report.txt
+  full=$(STATE='' drift)
+  assert_contains "$full" 'relaunch drift report for t: 36 out-of-scope path(s)' 'the report did not count every path'
+  [ "$(printf '%s\n' "$full" | grep -c '^  drift: uncertain,ignored ')" = 35 ] || fail "with no STATE the complete list was not printed: $full"
+  [ ! -e "$file" ] || fail 'a report file was written with no STATE'
+  assert_not_contains "$full" 'sampled:' 'a report with no STATE was sampled'
+  out=$(STATE=$W_STATE drift)
+  assert_contains "$out" 'drift: proven docs/own.txt' 'the proven path was not printed in full'
+  [ "$(printf '%s\n' "$out" | grep -c '^  drift: uncertain,ignored ')" = 20 ] || fail "the stderr sample is not bounded at 20: $out"
+  assert_contains "$out" "  sampled: 35 uncertain,ignored path(s); the first 20 are shown above, and every path of this report is listed in $file" 'the sample line did not count the group and name the file'
+  assert_contains "$out" '  a relaunch is not a new scope declaration' 'the closing line was lost'
+  [ -f "$file" ] || fail 'the complete report file was not written'
+  [ "$(stat -f '%Lp' "$file" 2>/dev/null || stat -c '%a' "$file")" = 600 ] || fail 'the report file is not mode 600'
+  [ "$(cat "$file")" = "$full" ] || fail "the report file is not the complete report: $(diff <(printf '%s\n' "$full") "$file")"
+  # every printed line is a line of the complete report, apart from the sample line
+  ! printf '%s\n' "$out" | grep -v '^  sampled: ' | grep -qvxF -f "$file" || fail "stderr printed a line the file does not hold: $out"
+  # the file is replaced on the next run, never left stale
+  rm -rf "$W_SLOT/build"
+  out=$(STATE=$W_STATE drift)
+  assert_not_contains "$out" 'sampled:' 'a short ignored group was sampled'
+  [ "$(cat "$file")" = "$out" ] || fail "the report file was not replaced by the next run: $(cat "$file")"
+  # a report path that cannot be written prints the complete report
+  rm -f "$file"
+  mkdir "$file"
+  for i in $(seq 1 30); do printf 'x\n' >"$W_SLOT/gen-$i.log"; done
+  out=$(STATE=$W_STATE drift)
+  assert_not_contains "$out" 'sampled:' 'a report whose file could not be written was sampled'
+  [ "$(printf '%s\n' "$out" | grep -c '^  drift: uncertain,ignored ')" = 35 ] || fail "an unwritable report file did not print the complete list: $out"
+  pass "drift: many ignored paths print every proven path, a bounded counted sample and the file holding the complete report"
+}
+
 # fm_drift_flagged_oracle <copy>: the flagged (assume-unchanged or skip-worktree) paths whose existence, type, mode or
 # bytes differ, decided one path at a time with one ls-files and one hash-object each, one path per line, sorted.
 fm_drift_flagged_oracle() {
@@ -613,6 +660,7 @@ test_a_hidden_deletion_is_task_drift_and_a_sparse_absence_is_not
 test_a_path_that_arrives_only_through_a_merged_peer_branch_is_uncertain_not_proven
 test_firstmate_written_wiring_is_not_reported_as_drift
 test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift
+test_many_ignored_paths_print_a_sample_and_write_the_complete_report
 test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides
 test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift
 test_a_forged_cached_module_never_runs_and_a_substitution_is_detected

@@ -1099,30 +1099,71 @@ for limit in dict.fromkeys(limits):
 FMDRIFTPY
 )
 
-# The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals.
-# Reads only; the recorded scope, manifest and record are never edited by what this reports.
+# The most `uncertain,ignored` drift lines the stderr report prints when the complete report is written to a file.
+FM_SLOT_DRIFT_SAMPLE=20
+
+# The complete report as text: the header, one labelled path per line, the limitations and the standing residual line.
+fm_slot_drift_text() { # <task-id> <report-output> <report-exit>
+  local id=$1 out=$2 rc=$3 count
+  if [ "$rc" -ne 0 ]; then
+    echo "relaunch drift report for $id: could not be produced ($(printf '%s' "$out" | tail -n 1)); this is a limitation of the report, not a statement that the task stayed in scope"
+    return 0
+  fi
+  count=$(printf '%s\n' "$out" | sed -n 's/^drift-count\t//p')
+  if [ "${count:-0}" -eq 0 ]; then
+    echo "relaunch drift report for $id: no out-of-scope path changed by this task's own work; the recorded scope is unchanged"
+  else
+    echo "relaunch drift report for $id: $count out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)"
+  fi
+  # One pass over every line; a path never holds a tab, because the report escapes it.
+  printf '%s\n' "$out" | awk -F '\t' '
+    $1 == "drift" { print "  drift: " $2 " " $3 }
+    $1 == "limitation" { sub(/^limitation\t/, ""); limits[++n] = "  limitation: " $0 }
+    END { for (i = 1; i <= n; i++) print limits[i] }'
+  echo "  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot"
+}
+
+# The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals, on stderr.
+# Reads only the copy; the recorded scope, manifest and record are never edited by what this reports.
+# With a STATE directory, the complete report is also written to STATE/<id>.drift-report.txt (mode 600, replaced on every
+# run), and stderr prints every line except the `uncertain,ignored` lines past the first FM_SLOT_DRIFT_SAMPLE, which a
+# `  sampled:` line counts and points to that file. With no STATE, or when that file cannot be written, stderr prints
+# the complete report. Every other line, each `proven` path included, is always printed in full.
 fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
-  local copy=$1 id=$2 branch=$3 base=$4 out count line
+  local copy=$1 id=$2 branch=$3 base=$4 out rc=0 report file='' tmp=''
   shift 4
   # state/<id>.wiring-sha names the launch artifacts Firstmate wrote, so they are not reported as the task's drift. Callers
   # (fm-control.sh and fm-spawn.sh) set STATE; with no STATE no record is read and nothing is filtered.
-  out=$(FM_SLOT_DRIFT_WIRING="${STATE:-}/$id.wiring-sha" python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || {
-    echo "relaunch drift report for $id: could not be produced ($(printf '%s' "$out" | tail -n 1)); this is a limitation of the report, not a statement that the task stayed in scope" >&2
-    return 0
-  }
-  count=$(printf '%s\n' "$out" | sed -n 's/^drift-count\t//p')
-  if [ "${count:-0}" -eq 0 ]; then
-    echo "relaunch drift report for $id: no out-of-scope path changed by this task's own work; the recorded scope is unchanged" >&2
-  else
-    echo "relaunch drift report for $id: $count out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)" >&2
-    printf '%s\n' "$out" | while IFS= read -r line; do
-      case "$line" in drift$'\t'*) printf '  drift: %s\n' "${line#drift$'\t'}" | tr '\t' ' ' >&2 ;; esac
-    done
+  out=$(FM_SLOT_DRIFT_WIRING="${STATE:-}/$id.wiring-sha" python3 -c "$FM_SLOT_DRIFT_PY" "$copy" "$base" "$branch" "$@" 2>&1) || rc=$?
+  report=$(fm_slot_drift_text "$id" "$out" "$rc")
+  if [ -n "${STATE:-}" ] && [ -d "$STATE" ]; then
+    file=$STATE/$id.drift-report.txt
+    # mv into a directory (or a link to one) would move the file inside it, so that path counts as unwritable.
+    if [ -d "$file" ] || ! tmp=$(mktemp "$STATE/.$id.drift-report.XXXXXX" 2>/dev/null); then
+      file=''
+    elif ! { printf '%s\n' "$report" > "$tmp" && chmod 600 "$tmp" && mv -f -- "$tmp" "$file"; }; then
+      rm -f -- "$tmp"
+      file=''
+    fi
   fi
-  printf '%s\n' "$out" | while IFS= read -r line; do
-    case "$line" in limitation$'\t'*) printf '  limitation: %s\n' "${line#limitation$'\t'}" >&2 ;; esac
-  done
-  echo "  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot" >&2
+  if [ -z "$file" ]; then
+    printf '%s\n' "$report" >&2
+    return 0
+  fi
+  # The file path goes through the environment, because awk -v would read a backslash in it as an escape.
+  printf '%s\n' "$report" | FM_SLOT_DRIFT_FILE=$file awk -v keep="$FM_SLOT_DRIFT_SAMPLE" '
+    function summary() {
+      if (group > keep) print "  sampled: " group " uncertain,ignored path(s); the first " keep " are shown above, and every path of this report is listed in " ENVIRON["FM_SLOT_DRIFT_FILE"]
+      done = 1
+    }
+    /^  drift: / {
+      label = substr($0, 10); sub(/ .*/, "", label)
+      if (label ~ /^uncertain(,|$)/ && ("," label ",") ~ /,ignored,/ && ++group > keep) next
+      print; next
+    }
+    !done && NR > 1 { summary() }
+    { print }
+    END { if (!done) summary() }' >&2
 }
 
 # The launch contract for a worker started on an adopted slot: continue in place.
