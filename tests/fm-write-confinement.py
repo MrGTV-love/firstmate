@@ -966,6 +966,27 @@ def git_program_fixture(common, worktree, user_home, base):
     write(hook_script, "#!/bin/sh\n")
     (common / "hooks/pre-push").symlink_to(hook_script)
     write(common / "modules/sub/config", "[core]\n\tbare = false\n")
+    # A submodule's Git directory holds its HEAD beside its object store; a
+    # symbolic link inside that store is denied at its real path too.
+    write(common / "modules/sub/HEAD", "ref: refs/heads/main\n")
+    object_link_target = user_home / "object-link-target/target"
+    write(object_link_target, "fixture\n")
+    (common / "modules/sub/objects/info").mkdir(parents=True)
+    (common / "modules/sub/objects/info/fixture-link").symlink_to(object_link_target)
+    # A folder holding its own HEAD inside that store is a Git directory
+    # again, outside the store, so a second hard link to its config still
+    # stops the build (program_aliases).
+    write(common / "modules/sub/objects/nested/HEAD", "ref: refs/heads/main\n")
+    write(common / "modules/sub/objects/nested/config", "[core]\n\tbare = false\n")
+    # The Git directory of a submodule named objects is no object store: its
+    # hooks are walked like any other, so a hook link there is denied at its
+    # real path.
+    module_hook_script = user_home / "module-hook-scripts/pre-commit"
+    write(module_hook_script, "#!/bin/sh\n")
+    write(common / "modules/objects/HEAD", "ref: refs/heads/main\n")
+    write(common / "modules/objects/config", "[core]\n\tbare = false\n")
+    (common / "modules/objects/hooks").mkdir(parents=True)
+    (common / "modules/objects/hooks/pre-commit").symlink_to(module_hook_script)
     write(common / "remotes/probe", "URL: probe::fixture\n")
     # The user's own Git config, which every Git command of this user reads.
     user_config, user_xdg_config = user_home / ".gitconfig", user_home / ".config/git/config"
@@ -1020,6 +1041,8 @@ def git_program_fixture(common, worktree, user_home, base):
         ("git-hooks-path-new", "create", [hooks_path / "fixture-new"], subpath, hooks_path, [hooks_path / "fixture-new"]),
         ("git-module-config", "program", [common / "modules/sub/config"], subpath, common / "modules", []),
         ("git-module-new", "create", [common / "modules/new/config"], subpath, common / "modules", [common / "modules/new"]),
+        ("git-module-objects-hook-link-target", "program", [common / "modules/objects/hooks/pre-commit"], literal, module_hook_script, []),
+        ("git-object-store-link-target", "program", [common / "modules/sub/objects/info/fixture-link"], literal, object_link_target, []),
         ("git-remote-file", "program", [common / "remotes/probe"], subpath, common / "remotes", []),
         ("git-remote-new", "create", [common / "remotes/new"], subpath, common / "remotes", [common / "remotes/new"]),
         ("git-branches-rename-into-place", "rename-into-place", [common / "branches", worktree / "prepared-branches"],
@@ -1329,8 +1352,11 @@ def hardlink_alias(repo, manifest, base, harness, env):
 def program_aliases(repo, manifest, base, harness, env):
     # A second hard link to a Git program file has no path the profile can
     # deny, so the build must refuse while one exists, naming the file and its
-    # link count, and publish no profile. A hard-linked file inside an objects
-    # folder names no program and leaves the build working.
+    # link count, and publish no profile. A hard-linked file inside a Git
+    # object store, the objects folder beside a submodule Git directory's HEAD,
+    # names no program and leaves the build working; the Git directory of a
+    # submodule named objects, and a folder holding its own HEAD inside a
+    # store, are no object store, so their files still count.
     common = Path(manifest["git_common"])
     gitdir = Path(git("-C", manifest["worktree"], "rev-parse", "--absolute-git-dir").stdout.strip())
     user_home = Path(env["HOME"])
@@ -1340,6 +1366,10 @@ def program_aliases(repo, manifest, base, harness, env):
                "system-config": user_home / "system/private/etc/gitconfig",
                "hook": common / "hooks/post-checkout", "hook-link-target": user_home / "hook-scripts/pre-push",
                "hooks-path-hook": user_home / "task-hooks/post-checkout", "module-config": common / "modules/sub/config",
+               "module-named-objects-config": common / "modules/objects/config",
+               "module-named-objects-hook-link-target": user_home / "module-hook-scripts/pre-commit",
+               "object-store-link-target": user_home / "object-link-target/target",
+               "gitdir-in-object-store-config": common / "modules/sub/objects/nested/config",
                "remote-file": common / "remotes/probe"}
     for name, target in targets.items():
         profile, alias = base / f"program-alias-{name}-{harness}.sb", Path(manifest["user_tmp"]) / f"fm-task-program-alias-{name}"
@@ -1361,13 +1391,13 @@ def program_aliases(repo, manifest, base, harness, env):
     try:
         build_profile(repo, manifest, harness, base / f"program-alias-objects-{harness}.sb", env)
     finally:
-        shutil.rmtree(common / "modules/sub/objects")
+        shutil.rmtree(pack)
         source.unlink()
     clean = base / f"program-alias-clean-{harness}.sb"
     build_profile(repo, manifest, harness, clean, env)
     assert clean.exists(), "the build still refuses after every program-file alias was removed"
     print(f"{harness} program-file aliases: " + ", ".join(targets) + " refused naming path and link count;"
-          " a hard-linked objects file and clean builds still work")
+          " a hard-linked object-store file and clean builds still work")
 
 
 def mutants(repo, manifest, base, harness, env, launch_env):

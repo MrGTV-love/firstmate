@@ -36,7 +36,8 @@ worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
 link, or a folder above one is a symbolic link, naming the path and the link
 count or target, because a write through such an alias would be judged by the
 alias's path. The build also stops while one of those program files, or a file in
-those folders outside an objects folder, has a second hard link. A HEAD
+those folders outside a Git object store (the objects folder beside a HEAD),
+has a second hard link. A HEAD
 symbolic link to a refs/heads name stays allowed. Other
 projects' and gate repositories' Git directories are not scanned. Task ids
 come from the state/<id>.meta
@@ -264,10 +265,13 @@ def git_program_paths(common, gitdir, home):
     relative one resolves inside whichever checkout Git runs in. Each is listed
     both as the name Git opens and at its real path, which the kernel judges a
     write through a symbolic link by, and so is the real path of every symbolic
-    link inside a listed folder, whose own entries are then walked in turn. A
-    second hard link has no path this build can find, so each hard-linked
-    regular file among them, outside a folder named objects, is returned as an
-    alias that stops the build. An unreadable folder stops the build.
+    link inside a listed folder at any depth, object stores included, whose own
+    entries are then walked in turn. A second hard link has no path this build
+    can find, so each hard-linked regular file among them is returned as an
+    alias that stops the build, apart from a file inside a Git object store,
+    the objects folder beside a HEAD, whose files a local clone hard-links and
+    which names no program; a folder holding its own HEAD inside a store is a
+    Git directory again, outside it. An unreadable folder stops the build.
     """
     files, folders, entries = [], [str(Path(common) / name) for name in GIT_PROGRAM_FOLDERS], []
     queue = [(Path(common) / name, 0) for name in GIT_PROGRAM_FILES] + [(Path(gitdir) / "config.worktree", 0)]
@@ -289,20 +293,28 @@ def git_program_paths(common, gitdir, home):
     def unreadable(error):
         raise error
 
-    walked = []
+    walked, stores = [], set()
     for folder in folders:
         real = canonical(folder)
         if real in walked or not os.path.isdir(real):
             continue
         walked.append(real)
         for where, subfolders, names in os.walk(real, onerror=unreadable):
+            # A Git directory keeps its object store in the objects folder
+            # beside its HEAD, and a folder inside a store belongs to it, but
+            # a folder holding its own HEAD is a Git directory and never in a
+            # store. Any other folder named objects, such as the Git directory
+            # of a submodule named objects under modules, is not a store.
+            stored, gitdir_here = where in stores, os.path.lexists(os.path.join(where, "HEAD"))
             for name in subfolders + names:
-                entry = Path(where) / name
-                if entry.is_symlink():
-                    (folders if entry.is_dir() else files).append(canonical(entry))
-                elif name in names:
-                    entries.append(entry)
-            subfolders[:] = [name for name in subfolders if name != "objects"]
+                entry = os.path.join(where, name)
+                if (name in subfolders and (stored or (gitdir_here and name == "objects"))
+                        and not os.path.lexists(os.path.join(entry, "HEAD"))):
+                    stores.add(canonical(entry) if os.path.islink(entry) else entry)
+                if os.path.islink(entry):
+                    (folders if os.path.isdir(entry) else files).append(canonical(entry))
+                elif name in names and not stored:
+                    entries.append(Path(entry))
     # A symbolic link is denied by its own name, so it cannot be replaced, and
     # at its real path only when that is a file a deny can name.
     files = [path for path in files if os.path.islink(path) or deniable(path)]
