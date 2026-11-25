@@ -3164,8 +3164,10 @@ A link that an unconfined actor adds after the profile is built is also not refu
 A Git command can still repoint a packed ref outside `refs/heads`, such as `refs/stash`, a tag or a remote-tracking ref, by writing a loose ref, which takes precedence over the packed line.
 `packed-refs.lock` stays writable, because Git takes it to delete any ref, the task's own archives included, and holding it changes no ref.
 Creating or updating a ref, `git commit`, `git push`, `git stash push` and the task's own loose archives keep working, because Git writes those refs as loose files.
-Every write to the shared `config` is refused, so a confined Git command cannot record configuration there, such as an upstream from `git push -u`, a remote from `git remote add` or a value from `git config --local`.
-`core.hooksPath` and `fetch.prune` reach the worker as `GIT_CONFIG_COUNT` entries in its launch environment, so its own Git work needs no writable Git config file.
+Every write to the shared `config` is refused, so a confined Git command cannot record configuration there, and Git prints `error: could not write config file <common>/config: Operation not permitted`:
+`git push -u` exits 0 but records no upstream, `git branch -D` of a loose branch the task owns still deletes it and exits 0 and also prints `warning: update of config-file failed`, `git config --local` writes exit 4, and `git remote add` exits 128.
+`core.hooksPath`, `fetch.prune` and `branch.autoSetupMerge` reach the worker as `GIT_CONFIG_COUNT` entries in its launch environment, so its own Git work needs no writable Git config file.
+`fm-spawn.sh` adds `branch.autoSetupMerge=false` to those entries, so a branch the worker starts from a remote-tracking ref, as in `git checkout -B <branch> <remote>/<branch>`, records no upstream and tries no config write; under Git's default `true` that checkout still exits 0 but prints the error above.
 `fm-spawn.sh` adds `fetch.prune=false` to the confined launch's `GIT_CONFIG_COUNT` entries, which outrank a global or repository `fetch.prune=true`, so `git fetch` exits 0 under that setting and keeps the remote-tracking ref of a branch the remote deleted; a `remote.<name>.prune=true` setting or an explicit `--prune` still prunes and fails as listed below.
 These commands need a `packed-refs` rewrite and cannot complete in a confined worker; each prints `unable to create file <common>/packed-refs.new: Operation not permitted` and leaves `packed-refs` as it was:
 

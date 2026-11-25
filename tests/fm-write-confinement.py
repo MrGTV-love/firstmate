@@ -228,7 +228,17 @@ def link_replace_refused(link):
     return False
 
 
-CASES = {"program": program_refused, "create": program_create_refused, "rename-over": rename_over_refused,
+def tracking_checkout_clean(worktree):
+    """True only when starting the task's branch from a remote-tracking ref exits 0, records no upstream and tries no config write."""
+    tip = git("-C", worktree, "rev-parse", "HEAD").stdout.strip()
+    result = git("-C", worktree, "checkout", "-B", "fm/task", "no-mistakes/fm/task")
+    clean = (result.returncode == 0 and "could not write config file" not in result.stderr
+             and git("-C", worktree, "config", "--get", "branch.fm/task.remote").returncode == 1)
+    git("-C", worktree, "-c", "branch.autoSetupMerge=false", "checkout", "-B", "fm/task", tip)
+    return clean
+
+
+CASES = {"program": program_refused, "tracking-checkout": tracking_checkout_clean, "create": program_create_refused, "rename-over": rename_over_refused,
          "link-create": link_create_refused, "rename-into-place": rename_into_place_refused, "link-replace": link_replace_refused}
 
 
@@ -759,13 +769,25 @@ def ordinary_git(manifest, worktree, table):
                                 and on_task_branch() and git("-C", str(worktree), "rev-parse", "fm/task").stdout.strip() == tip)
     listed = run("branch --list", "branch", "--list", "fm/*")
     results["g2-branch-list"] = listed.returncode == 0 and "* fm/task" in listed.stdout.splitlines()
-    for label, extra in (("checkout -B own branch from remote-tracking ref", []),
-                         ("checkout -B own branch from remote-tracking ref, branch.autoSetupMerge=false", ["-c", "branch.autoSetupMerge=false"])):
+    # The launch environment carries branch.autoSetupMerge=false, so starting
+    # the task's branch from a remote-tracking ref records no upstream and
+    # tries no config write; Git's own default, true, is printed beside it.
+    tracking = "checkout -B own branch from remote-tracking ref"
+    for label, extra in ((tracking, []),
+                         ("checkout -B own branch from remote-tracking ref, Git's default branch.autoSetupMerge=true",
+                          ["-c", "branch.autoSetupMerge=true"])):
         run(label, *extra, "checkout", "-B", "fm/task", "no-mistakes/fm/task")
         table[label].update(on_task_branch=on_task_branch(),
                             at_remote=git("-C", str(worktree), "rev-parse", "fm/task").stdout.strip()
                             == git("-C", str(worktree), "rev-parse", "no-mistakes/fm/task").stdout.strip(),
                             upstream=git("-C", str(worktree), "config", "--get", "branch.fm/task.remote").stdout.strip())
+        if label == tracking:
+            row = table[label]
+            results["g2-tracking-checkout-clean"] = (row["exit"] == 0 and row["on_task_branch"] and row["at_remote"] and row["upstream"] == ""
+                                                     and not any("could not write config" in line for line in row["stderr"]))
+        if extra:
+            git("-C", str(worktree), "config", "--unset", "branch.fm/task.remote")  # the unconfined control records one
+            git("-C", str(worktree), "config", "--unset", "branch.fm/task.merge")
         git("-C", str(worktree), "-c", "branch.autoSetupMerge=false", "checkout", "-B", "fm/task", tip)
     results["g2-restored"] = on_task_branch() and git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip() == tip
     # Commands whose whole purpose is a shared config write, printed with
@@ -1147,11 +1169,18 @@ def fixture(repo, base, harness, user_home, other):
             "renamed": {name: str(path) for name, path in renamed.items()}}
 
 
-def launch_git_env(env, hooks):
-    """The child's environment with the GIT_CONFIG entries fm-spawn.sh sets for a confined launch."""
+def launch_git_env(env, hooks, auto_setup_merge=True):
+    """The child's environment with the GIT_CONFIG entries fm-spawn.sh sets for a confined launch.
+
+    AUTO_SETUP_MERGE=False leaves out the branch.autoSetupMerge=false entry,
+    for the mutant that shows the tracking-checkout case depends on it.
+    """
     count = int(env.get("GIT_CONFIG_COUNT") or 0)
-    return dict(env, GIT_CONFIG_COUNT=str(count + 2), **{f"GIT_CONFIG_KEY_{count}": "core.hooksPath", f"GIT_CONFIG_VALUE_{count}": str(hooks),
-                                                         f"GIT_CONFIG_KEY_{count + 1}": "fetch.prune", f"GIT_CONFIG_VALUE_{count + 1}": "false"})
+    entries = [("core.hooksPath", str(hooks)), ("fetch.prune", "false")] + ([("branch.autoSetupMerge", "false")] if auto_setup_merge else [])
+    numbered = {}
+    for index, (key, value) in enumerate(entries, count):
+        numbered.update({f"GIT_CONFIG_KEY_{index}": key, f"GIT_CONFIG_VALUE_{index}": value})
+    return dict(env, GIT_CONFIG_COUNT=str(count + len(entries)), **numbered)
 
 
 def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktree=None):
@@ -1331,6 +1360,20 @@ def mutants(repo, manifest, base, harness, env, launch_env):
             os.unlink(case["relink"][0])
             os.symlink(case["relink"][1], case["relink"][0])
         print(f"{harness} mutant {case['name']}: removed {rule}; " + ("the case's write landed" if landed else "SURVIVED: the case stayed refused"))
+    # The launch's branch.autoSetupMerge=false entry, under the unchanged
+    # profile: with it the tracking checkout is clean, and without it Git
+    # tries the refused config write.
+    case = {"kind": "tracking-checkout", "args": [manifest["worktree"]]}
+    for label, environment, expected in (("with the entry", launch_env, True),
+                                         ("mutant without the entry", launch_git_env(env, Path(manifest["home"]) / "state/task.git-hooks",
+                                                                                      auto_setup_merge=False), False)):
+        run = subprocess.run(["/usr/bin/sandbox-exec", "-f", str(profile), sys.executable, __file__, "--case", json.dumps(case)],
+                             capture_output=True, text=True, env=environment)
+        held = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": expected})
+        if not held:
+            survived.append(("tracking-checkout " + label, run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
+        print(f"{harness} tracking checkout {label}: " + ("clean" if expected else "tries the config write")
+              + (" as expected" if held else f" NOT as expected ({run.stdout.strip()})"))
     return survived
 
 

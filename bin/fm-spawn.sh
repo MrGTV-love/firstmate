@@ -8607,9 +8607,12 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   esac
   # The profile refuses every packed-refs rewrite, and pruning a packed
   # remote-tracking ref needs one, so a host fetch.prune=true would fail every
-  # fetch after the remote deletes a branch. This entry outranks that setting.
+  # fetch after the remote deletes a branch. The profile also refuses every
+  # shared Git config write, and a branch started from a remote-tracking ref
+  # would try to record its upstream there, so branch.autoSetupMerge=false keeps
+  # that checkout from attempting the write. These entries outrank both settings.
   # shellcheck disable=SC2016 # The launch shell expands these references.
-  LAUNCH='fm_n=${GIT_CONFIG_COUNT:-0}; export "GIT_CONFIG_KEY_$fm_n=fetch.prune" "GIT_CONFIG_VALUE_$fm_n=false" GIT_CONFIG_COUNT=$((fm_n + 1)); unset fm_n; '"$LAUNCH"
+  LAUNCH='fm_n=${GIT_CONFIG_COUNT:-0}; export "GIT_CONFIG_KEY_$fm_n=fetch.prune" "GIT_CONFIG_VALUE_$fm_n=false" "GIT_CONFIG_KEY_$((fm_n + 1))=branch.autoSetupMerge" "GIT_CONFIG_VALUE_$((fm_n + 1))=false" GIT_CONFIG_COUNT=$((fm_n + 2)); unset fm_n; '"$LAUNCH"
 fi
 LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH"
 # Every launch starts a new environment with /usr/bin/env -i. Generate only
