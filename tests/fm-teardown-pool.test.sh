@@ -6010,9 +6010,10 @@ unc6_marker_env() {  # <name>; prints the case dir
 }
 
 unc6_marker_functions() {
-  # The script initializes this global before any function runs (empty until the
-  # entry preflight makes the per-run directory); the marker writer reads it.
-  printf 'TEARDOWN_RUN_DIR=\n'
+  # The script initializes these globals before any function runs (empty until the
+  # entry preflight makes the per-run directory, or the route's return succeeds); the
+  # marker writer reads them.
+  printf 'TEARDOWN_RUN_DIR=\nTEARDOWN_UNCLAIMED_RETURNED=\n'
   unc6_functions teardown_hex_encode teardown_hex_decode teardown_marker_lease teardown_mark_return_pending \
     teardown_unclaimed_marker_refusal teardown_unclaimed_lease_matches teardown_return_pending_target_ok
   sed -n '/^fm_backlog_canonical_existing() {/,/^}/p' "$ROOT/bin/fm-backlog-transition-lib.sh"
@@ -6382,7 +6383,7 @@ unc7_kept_copy_case() {  # <name> <owner> <lease> <provider> <attempt> [<proc>]
     else
       LHOLDER=$ID TEARDOWN_SLOT_CUSTODY=lease
     fi
-    TEARDOWN_UNCLAIMED_SLOT=$SLOT TEARDOWN_UNCLAIMED_WHY=''
+    TEARDOWN_UNCLAIMED_SLOT=$SLOT TEARDOWN_UNCLAIMED_WHY='' TEARDOWN_UNCLAIMED_RETURNED=''
     TEARDOWN_UNCLAIMED_EARLY="$lease|$LHOLDER|id-1|1" TEARDOWN_UNCLAIMED_SEEN="$lease|$LHOLDER|id-1|1"
     TEARDOWN_UNCLAIMED_KIND='' TEARDOWN_UNCLAIMED_NAME='' TEARDOWN_UNCLAIMED_HOLDER='' TEARDOWN_UNCLAIMED_LEASE_ID=''
     TEARDOWN_RETURN_SLOT='' TEARDOWN_NESTED_COPIES=() TEARDOWN_PROOF_COPIES=() TEARDOWN_FOREIGN_COPIES=() TEARDOWN_HELD_SLOT=''
