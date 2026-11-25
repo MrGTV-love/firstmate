@@ -7657,6 +7657,11 @@
       "id": "home-state-write",
       "version": "1",
       "owner": "bin/fm-home-write.py",
+      "sites": [
+        {"file": "bin/fm-home-write.py", "match": "fm-home-write: refused:", "count": 2},
+        {"file": "bin/fm-home-write.sh", "match": "fm-home-write: refused: FM_HOME is unset"},
+        {"file": "bin/fm-home-write.sh", "match": "fm-guard-event.sh\" home-state-write"}
+      ],
       "emitters": ["bin/fm-home-write.sh"],
       "invariant": "a home-state write through fm-home-write lands only on an untracked gitignored regular file under the home's data/ reached without links or nested repositories",
       "layer": "runtime-block",
