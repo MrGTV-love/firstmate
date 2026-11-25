@@ -216,6 +216,15 @@ case "${1:-}" in
             : > "$D/foreign-wiring-created"
           fi
           ;;
+        "bash -- '"*"/.slot-provision."*"/run'")
+          # A case that lets provisioning run in the acquired pane (tests/fm-control-relaunch-adopt.test.sh):
+          # the typed attempt script is executed here, where a real pane's shell would execute it.
+          if [ -f "$D/run-slot-provision" ]; then
+            script=${payload#"bash -- '"}
+            script=${script%"'"}
+            bash -- "$script" </dev/null >/dev/null 2>&1
+          fi
+          ;;
         'export GOTMPDIR='*)
           if [ -n "${FM_FAKE_TRACE_PREPARE:-}" ]; then
             : > "$FM_FAKE_TRACE_PREPARE"
