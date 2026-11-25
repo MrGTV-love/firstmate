@@ -3163,7 +3163,7 @@ A link that an unconfined actor adds after the profile is built is also not refu
 A Git command can still repoint a packed ref outside `refs/heads`, such as `refs/stash`, a tag or a remote-tracking ref, by writing a loose ref, which takes precedence over the packed line.
 `packed-refs.lock` stays writable, because Git takes it to delete any ref, the task's own archives included, and holding it changes no ref.
 Creating or updating a ref, `git commit`, `git push`, `git stash push` and the task's own loose archives keep working, because Git writes those refs as loose files.
-Every write to the shared `config` is refused, so a confined Git command cannot record configuration there: an upstream from `git push -u`, `git branch --set-upstream-to` or a tracking `git checkout -b <name> <remote>/<branch>`, a remote from `git remote add` or `no-mistakes init`, submodule settings from `git submodule init`, and any `git config` write to the repository.
+Every write to the shared `config` is refused, so a confined Git command cannot record configuration there, such as an upstream from `git push -u`, a remote from `git remote add` or a value from `git config --local`.
 `core.hooksPath` and `fetch.prune` reach the worker as `GIT_CONFIG_COUNT` entries in its launch environment, so its own Git work needs no writable Git config file.
 `fm-spawn.sh` adds `fetch.prune=false` to the confined launch's `GIT_CONFIG_COUNT` entries, which outrank a global or repository `fetch.prune=true`, so `git fetch` exits 0 under that setting and keeps the remote-tracking ref of a branch the remote deleted; a `remote.<name>.prune=true` setting or an explicit `--prune` still prunes and fails as listed below.
 These commands need a `packed-refs` rewrite and cannot complete in a confined worker; each prints `unable to create file <common>/packed-refs.new: Operation not permitted` and leaves `packed-refs` as it was:
@@ -3183,7 +3183,7 @@ Main-owned records of this task include `state/<task>.meta`, `state/<task>.contr
 The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
 The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
 The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, the duration ledger, test slots, tool caches, `git fetch` without pruning, `git stash` and `git push` keep working.
-`no-mistakes init` adds its remote to the shared `config`, so it completes only outside the profile, as project add runs it.
+A project's remotes, its `no-mistakes` gate remote included, are therefore added outside the profile, as project add does when it runs `no-mistakes init`.
 Native temp selectors point at the task temporary root.
 A declared nested `.claude/worktrees/fm-*` worktree is treated as the task root, not rejected by its spelling.
 The measured harness contracts are omp and Claude.

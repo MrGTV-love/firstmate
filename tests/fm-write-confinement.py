@@ -766,6 +766,16 @@ def ordinary_git(manifest, worktree, table):
                             upstream=git("-C", str(worktree), "config", "--get", "branch.fm/task.remote").stdout.strip())
         git("-C", str(worktree), "-c", "branch.autoSetupMerge=false", "checkout", "-B", "fm/task", tip)
     results["g2-restored"] = on_task_branch() and git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip() == tip
+    # Commands whose whole purpose is a shared config write, printed with
+    # whether the value was recorded; the unconfined control removes it again.
+    for label, args, key, undo in (("remote add", ["remote", "add", "g2probe", manifest["own_gate"]], "remote.g2probe.url",
+                                    ["remote", "remove", "g2probe"]),
+                                   ("config --local write", ["config", "--local", "g2.probe", "1"], "g2.probe",
+                                    ["config", "--local", "--unset", "g2.probe"])):
+        run(label, *args)
+        table[label]["recorded"] = git("-C", str(worktree), "config", "--get", key).returncode == 0
+        if table[label]["recorded"]:
+            git("-C", str(worktree), *undo)
     return results
 
 
