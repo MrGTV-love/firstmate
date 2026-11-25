@@ -279,6 +279,10 @@ stable_profile() {
 
 test_installing_the_wrapper_changes_no_profile_byte() {
   local home="$TMP_ROOT/profile-home"
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: test_installing_the_wrapper_changes_no_profile_byte: the write profile is built only for macOS launches\n'
+    return 0
+  fi
   fixture_home "$home"
   build_profile "$home" "$TMP_ROOT/before.sb" || fail "the profile builder refused the fixture"
   "$WRAPPER" install "$home/state/$TASK.git-path" "$TASK" "$WT" || fail "install refused the fixture home"
@@ -333,7 +337,18 @@ test_real_sandbox_refusal_names_the_shapes_the_profile_accepts() {
   assert_contains "$(cat "$TMP_ROOT/sandbox-outside-plain.err")" 'Operation not permitted' "the profile did not refuse fm/$TASK-other"
   assert_same_run sandbox-outside-plain sandbox-outside-wrapped 0 "a confined refusal outside refs/heads/archive/"
   git -C "$WT" rev-parse -q --verify "refs/heads/$REFUSED" >/dev/null && fail "the refused archive name was created"
-  pass "inside the real profile a refused archive name gets the line, and both names it offers are accepted"
+  # The confined worker cannot change, add to or move the wrapper it runs.
+  cp "$wrap/git" "$TMP_ROOT/wrapper-before"
+  # shellcheck disable=SC2016 # The confined shell expands its own argument.
+  PATH="$wrap:$PATH" /usr/bin/sandbox-exec -f "$TMP_ROOT/sandbox.sb" /bin/bash -c '
+    { printf x >> "$1/git"; } 2>/dev/null && echo appended-git
+    { printf x >> "$1/config"; } 2>/dev/null && echo appended-config
+    { : > "$1/extra"; } 2>/dev/null && echo created-extra
+    mv "$1" "$1.moved" 2>/dev/null && echo moved-folder
+    true' tamper "$wrap" >"$TMP_ROOT/tamper.out" 2>&1
+  [ ! -s "$TMP_ROOT/tamper.out" ] || fail "a confined process changed the wrapper folder: $(cat "$TMP_ROOT/tamper.out")"
+  cmp -s "$TMP_ROOT/wrapper-before" "$wrap/git" || fail "a confined process changed the wrapper"
+  pass "inside the real profile a refused archive name gets the line, both names it offers are accepted, and the wrapper cannot be changed"
 }
 
 fm_test_run_cases \
