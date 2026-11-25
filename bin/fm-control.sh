@@ -3135,6 +3135,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     fi
     if [ "$noop" = 1 ]; then
       echo "rerecord-slot $ID: already recorded"
+      [ -z "$FM_RR_RECONCILED" ] || echo "rerecord-slot $ID: $(fm_slot_rerecord_changes 'finding it already recorded' '')"
     else
       echo "manifest_sha256=$manifest_sha"
       echo "base=$old_base -> $new_base"
@@ -3227,6 +3228,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
   released=$(grep -c '^released_scope=' "$snap/scope" || true)
   side=$(grep -c '^side_branch_' "$snap/scope" || true)
   echo "rerecord-slot $ID: base $old_base -> $new_base; scope $entries entries ($added added, $released released, $side side-branch); prior record archived at $FM_RR_ARCHIVE"
+  [ -z "$FM_RR_RECONCILED" ] || echo "rerecord-slot $ID: $(fm_slot_rerecord_changes publishing '')"
 }
 
 # --- verbs ------------------------------------------------------------------

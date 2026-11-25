@@ -857,6 +857,26 @@ test_L18_an_audit_that_cannot_be_rewritten_is_named_as_not_closed() {
   rr_ok L18 "the audit record cannot be rewritten: the record is restored, the audit stays pending, and the refusal tail says it could not be closed as rolled-back"
 }
 
+# An exit-0 no-op after step 3 recovered a crashed write says what happened to its audit record: closed as
+# published-recovered when the audit can be rewritten, and not closed, still pending, when it cannot.
+test_L19_an_already_recorded_run_names_the_audit_it_reconciled() {
+  local out rc
+  rr_setup_crashed L19
+  rr_fail_mktemp '*/.audit.XXXXXX'
+  out=$(rr_write); rc=$?
+  expect_code 0 "$rc" "L19"$'\n'"$out"
+  assert_contains "$out" "rerecord-slot $RR_ID: already recorded" "L19"
+  assert_contains "$out" "rerecord-slot $RR_ID: before finding it already recorded, this run reconciled earlier interrupted runs: audit $RR_L13_AUDIT could not be closed as published-recovered (the record was left as published; the audit stays pending); no manifest, copy or journal was changed" "L19"
+  [ "$(rr_field "$RR_L13_AUDIT" result)" = pending ] || fail "L19: the audit is '$(rr_field "$RR_L13_AUDIT" result)', not pending"
+  rr_setup_crashed L19-closed
+  out=$(rr_write); rc=$?
+  expect_code 0 "$rc" "L19 closed"$'\n'"$out"
+  assert_contains "$out" "rerecord-slot $RR_ID: already recorded" "L19 closed"
+  assert_contains "$out" "rerecord-slot $RR_ID: before finding it already recorded, this run reconciled earlier interrupted runs: audit $RR_L13_AUDIT published-recovered (the audit was closed with the record left as published); no manifest, copy or journal was changed" "L19 closed"
+  [ "$(rr_field "$RR_L13_AUDIT" result)" = published-recovered ] || fail "L19 closed: the audit is '$(rr_field "$RR_L13_AUDIT" result)'"
+  rr_ok L19 "an already-recorded run after a recovered crash names the audit: not closed and still pending when the audit cannot be rewritten, closed as published-recovered when it can"
+}
+
 # --- end to end -----------------------------------------------------------------------------------
 
 test_E1_relaunch_after_rerecord_adopts() {
@@ -2059,6 +2079,7 @@ test_L15_check_pending_recovery_with_a_live_agent
 test_L16_check_pending_superseded_new_with_a_live_agent
 test_L17_an_error_after_a_rollback_names_the_reconciliation
 test_L18_an_audit_that_cannot_be_rewritten_is_named_as_not_closed
+test_L19_an_already_recorded_run_names_the_audit_it_reconciled
 test_E1_relaunch_after_rerecord_adopts
 test_E2_relaunch_without_rerecord_refuses_base_mismatch
 test_H1_owner_mismatch
