@@ -1482,7 +1482,7 @@ def m1876_oversized_confirmation():
 
 def m1876_row_read_error():
     # Finding 6: the run-row read for pending releases fails (OperationalError): unknown, the decision waits, never an
-    # escaping error (which the entrypoint turns into 125). Control: the rows read: the entry is counted, 11 against 10.
+    # escaping error (which the entrypoint turns into 125). Control: the rows read: the entry is counted, 14 against 10.
     for label, broken in (('broken', True), ('readable', False)):
         w = World('m1876-row-error-' + label, available=10).run('own', step=('review', 'running', None), branch='main')
         w.proved('own')
