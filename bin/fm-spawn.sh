@@ -8598,8 +8598,17 @@ git_hooks_guard() {
 # bounded, for the launch's own verdict and fail the spawn on a refusal, before
 # any brief text is typed into that shell. A launch that records neither within
 # the bound (an endpoint that has not run it yet) proceeds as before.
+# The bound is 100 polls of 0.1 s.
+# FM_GIT_HOOKS_VERDICT_POLLS is a test-only seam: it replaces the bound only when FM_TEST_SEAM=1 and it is a non-negative decimal integer.
+# Any other value, or the seam unset, keeps the bound of 100.
 spawn_git_hooks_verdict() {
-  local i=0 max=${FM_GIT_HOOKS_VERDICT_POLLS:-100} reason
+  local i=0 max=100 reason
+  if [ "${FM_TEST_SEAM:-}" = 1 ]; then
+    case ${FM_GIT_HOOKS_VERDICT_POLLS:-} in
+      '' | *[!0-9]*) ;;
+      *) max=$FM_GIT_HOOKS_VERDICT_POLLS ;;
+    esac
+  fi
   while :; do
     if [ -s "$GIT_HOOKS_VERDICT_REFUSED" ]; then
       reason=$(head -n 1 "$GIT_HOOKS_VERDICT_REFUSED")

@@ -754,19 +754,21 @@ test_relaunch_refusal_keeps_the_task() {
   pass "a refused relaunch keeps the task's pane, hooks dir and record and writes the refusal to its status"
 }
 
-# The same fresh-refusal cleanup on the herdr backend, through the real herdr
-# adapter against a fake herdr CLI: the fake runs the staged launch as the pane
-# shell would, in a pane whose git honours neither carrier, and records every
-# call, so the close of this attempt's pane is observed without a live herdr.
-test_herdr_fresh_refusal_closes_its_pane() {
-  local dir home proj wt fakebin id out status
-  dir="$TMP_ROOT/herdr-refuse"
+# herdr_refusal_spawn <name> <seam> <verdict-polls> <delay>: one fresh spawn on
+# the herdr backend, through the real herdr adapter against a fake herdr CLI.
+# The fake runs the staged launch as the pane shell would, in a pane whose git
+# honours neither carrier and takes <delay> seconds over its final check, and
+# records every call. <seam> 1 arms FM_TEST_SEAM; anything else unsets it.
+# Sets HERDR_DIR HERDR_HOME HERDR_ID HERDR_OUT HERDR_STATUS.
+herdr_refusal_spawn() {
+  local name=$1 seam=$2 polls=$3 delay=$4 dir home proj wt fakebin id out status
+  dir="$TMP_ROOT/herdr-$name"
   mkdir -p "$dir/gitbin"
   dir=$(cd "$dir" && pwd -P)
   home="$dir/home"
   proj="$dir/project"
   wt="$dir/wt"
-  id="carrier-herdr-$$"
+  id="carrier-herdr$name-$$"
   fakebin=$(fm_test_make_spawn_fakebin "$dir/fake")
   fm_test_spawn_home "$home" codex
   fm_test_spawn_brief "$home" "$id"
@@ -774,7 +776,7 @@ test_herdr_fresh_refusal_closes_its_pane() {
   fm_git_worktree "$proj" "$wt" fixture-herdr
   wt=$(cd "$wt" && pwd -P)
   printf '%s\n' "$wt" > "$dir/cwd"
-  printf '#!/bin/sh\nunset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\nexec %s "$@"\n' "$REAL_GIT" > "$dir/gitbin/git"
+  printf '#!/bin/sh\n[ "$*" != "config --get core.hooksPath" ] || sleep %s\nunset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\nexec %s "$@"\n' "$delay" "$REAL_GIT" > "$dir/gitbin/git"
   printf '#!/bin/sh\n: > %s\n' "'$dir/harness-started'" > "$fakebin/codex"
   cat > "$fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
@@ -799,8 +801,10 @@ case "${1:-} ${2:-}" in
       ". '"*"'")
         # The pane shell sources the staged launch from the task copy.
         launch=${4#". '"}; launch=${launch%"'"}
-        (cd "$(cat "$D/cwd")" && env -i HOME="$D/home/user-home" PATH="$D/gitbin:$(dirname "$0"):/usr/bin:/bin:/usr/sbin:/sbin" \
-          TERM=xterm GIT_CONFIG_GLOBAL=/dev/null /bin/bash --noprofile --norc -c ". '$launch'" >/dev/null 2>&1) || : ;;
+        # A pane runs the launch beside fm-spawn, which reads its verdict.
+        { (cd "$(cat "$D/cwd")" && env -i HOME="$D/home/user-home" PATH="$D/gitbin:$(dirname "$0"):/usr/bin:/bin:/usr/sbin:/sbin" \
+          TERM=xterm GIT_CONFIG_GLOBAL=/dev/null /bin/bash --noprofile --norc -c ". '$launch'") || :
+          : > "$D/launch-done"; } </dev/null >/dev/null 2>&1 & ;;
     esac ;;
   *) : ;;
 esac
@@ -817,12 +821,25 @@ SH
   chmod +x "$fakebin/herdr" "$fakebin/ps" "$fakebin/codex" "$dir/gitbin/git"
   # shellcheck disable=SC2016 # The child shell expands its own arguments.
   out=$(FM_FAKE_DIR="$dir" FM_HERDR_PS_BIN="$fakebin/ps" HERDR_SESSION=fm-carrier-herdr-test \
-    FM_GIT_HOOKS_VERDICT_POLLS=3000 \
+    FM_GIT_HOOKS_VERDICT_POLLS=$polls CARRIER_SEAM=$seam \
     env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SOCKET_PATH -u HERDR_WORKSPACE_ID -u HERDR_TAB_ID \
-    bash -c '. "$1/tests/lib.sh"; . "$1/tests/fixtures.sh"; shift; fm_test_run_spawn "$@"' _ "$ROOT" \
+    bash -c '. "$1/tests/lib.sh"; . "$1/tests/fixtures.sh"; shift
+      if [ "$CARRIER_SEAM" = 1 ]; then export FM_TEST_SEAM=1; else unset FM_TEST_SEAM; fi
+      fm_test_run_spawn "$@"' _ "$ROOT" \
     "$home" "$wt" "$fakebin" "$id" "$proj" --mode no-mistakes --yolo off --backend herdr --harness codex)
   status=$?
+  # Observe only once the pane's launch has finished.
+  real_endpoint_await test -e "$dir/launch-done" || fail "herdr $name: the pane's launch never finished"
   rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
+  HERDR_DIR=$dir HERDR_HOME=$home HERDR_ID=$id HERDR_OUT=$out HERDR_STATUS=$status
+}
+
+# The same fresh-refusal cleanup on the herdr backend: the close of this
+# attempt's pane is observed without a live herdr.
+test_herdr_fresh_refusal_closes_its_pane() {
+  local dir home id out status
+  herdr_refusal_spawn refuse 1 3000 0
+  dir=$HERDR_DIR home=$HERDR_HOME id=$HERDR_ID out=$HERDR_OUT status=$HERDR_STATUS
   [ "$status" -ne 0 ] || fail "herdr: spawn reported success although the pane refused the launch: $out"
   assert_contains "$out" "honours neither task Git hook carrier" "herdr: spawn did not name the refusal"
   assert_absent "$dir/harness-started" "herdr: the harness started although the launch was refused"
@@ -832,6 +849,27 @@ SH
   assert_absent "$home/state/$id.status" "herdr: a refused fresh spawn left a status line"
   assert_absent "$home/state/$id.meta" "herdr: a refused fresh spawn kept a task record"
   pass "herdr: a refused fresh spawn closes its pane through the herdr adapter and leaves no hooks dir, status line or record"
+}
+
+# FM_GIT_HOOKS_VERDICT_POLLS is a test-only seam. Without FM_TEST_SEAM, or
+# with a value that is not a non-negative decimal integer, the wait keeps its
+# production bound, so a pane that refuses after a second is still reported.
+test_verdict_bound_is_a_test_only_seam() {
+  local polls
+  herdr_refusal_spawn seamctl 1 0 1
+  expect_code 0 "$HERDR_STATUS" "control: a seam-armed zero bound still waited for the slow refusal: $HERDR_OUT"
+  assert_absent "$HERDR_DIR/harness-started" "control: the harness started although the launch was refused"
+  herdr_refusal_spawn noseam '' 0 1
+  [ "$HERDR_STATUS" -ne 0 ] || fail "without FM_TEST_SEAM a zero bound hid the refusal: $HERDR_OUT"
+  assert_contains "$HERDR_OUT" "honours neither task Git hook carrier" "without FM_TEST_SEAM the refusal was not named"
+  assert_absent "$HERDR_HOME/state/$HERDR_ID.meta" "without FM_TEST_SEAM a refused launch published a task record"
+  for polls in abc -1; do
+    herdr_refusal_spawn "bad$polls" 1 "$polls" 1
+    [ "$HERDR_STATUS" -ne 0 ] || fail "the seam value '$polls' hid the refusal: $HERDR_OUT"
+    assert_contains "$HERDR_OUT" "honours neither task Git hook carrier" "the seam value '$polls' lost the refusal reason"
+    assert_not_contains "$HERDR_OUT" "integer expression expected" "the seam value '$polls' reached an integer test"
+  done
+  pass "the verdict bound is a test-only seam: unset FM_TEST_SEAM or a non-numeric value keeps the production bound, so a slow refusal is still reported"
 }
 
 tests=(
@@ -847,6 +885,7 @@ tests=(
   test_removed_hooks_dir_runs_no_hooks
   test_relaunch_refusal_keeps_the_task
   test_herdr_fresh_refusal_closes_its_pane
+  test_verdict_bound_is_a_test_only_seam
 )
 fm_test_run_cases "${tests[@]}" -- "$@"
 
