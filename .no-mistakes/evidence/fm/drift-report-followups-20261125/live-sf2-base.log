@@ -1,0 +1,9 @@
+
+===== S4 relaunch whose temp cannot be removed after a failed write (SF2) — relaunch survives, complete report printed =====
+exit=1
+printed uncertain,ignored lines: 0
+launched replacement (literal sent): no
+unremovable temps: 1
+file unchanged from the earlier report: NO
+  tail| shim: temp turned into a directory, mv fails
+  tail| rm: /Users/charlesabrooker/tmp/fm-control-relaunch.2oM3ji/live-23685/home/state/.lane.drift-report.91XGvw: is a directory

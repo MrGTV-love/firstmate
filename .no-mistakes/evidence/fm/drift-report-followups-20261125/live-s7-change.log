@@ -1,0 +1,12 @@
+
+===== S7 skip-worktree names with a space, a newline and a backslash, changed and unchanged (SF5) =====
+git status --porcelain (hidden): []
+skip-worktree entries: 6
+exit=0
+  |   drift: proven,reverted-to-base docs/back\\same.txt
+  |   drift: proven,reverted-to-base docs/back\\slash.txt
+  |   drift: proven,reverted-to-base docs/new\x0aline.txt
+  |   drift: proven,reverted-to-base docs/new\x0asame.txt
+  |   drift: proven,reverted-to-base docs/sp ace.txt
+  |   drift: proven,reverted-to-base docs/sp same.txt
+  | relaunch drift report for lane7: 6 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)

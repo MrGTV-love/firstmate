@@ -1,0 +1,27 @@
+ok - adoption: a same-task claim naming another home or no home is refused; the own claim (alias too) and no claim are admitted
+ok - adoption: an unreadable foreign custody record is refused by name, a readable one is named, the own copy is admitted
+ok - adoption: a governed task's own valid manifest is adopted and the judged root is the manifest's repo root
+ok - adoption: a pointer in a record store the relaunch does not compute is refused by name; the same pointer under the matching stores is adopted
+ok - adoption: a shadowed legacy pointer and a disagreeing legacy record are refused by name; the durable pointer, alone or with an agreeing legacy record, is admitted
+ok - drift: a hidden (assume-unchanged) tracked symlink retarget is listed, an unchanged one is not
+ok - drift: a deleted assume-unchanged tracked path is listed; an absent skip-worktree path is not
+ok - drift: a path that arrives only through a merged peer branch is uncertain; the task's own commit stays proven
+ok - drift: wiring recorded in state/<id>.wiring-sha is not listed; the task's own change still is
+ok - drift: a .fm-kept.<time>.<n> copy of recorded wiring is not listed; an unrecorded ignored file still is
+ok - drift: many ignored paths print every proven path, a bounded counted sample and the file holding the complete report
+warning: in the working copy of 'docs/crlf-changed.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/crlf-same.txt', LF will be replaced by CRLF the next time Git touches it
+ok - drift: hidden flagged-path changes are listed exactly as a per-path check decides; unchanged and sparse paths are not
+ok - drift: the flagged-path check starts a fixed number of git processes (16 for 6 flagged paths, 16 for 60)
+ok - drift: a killed run's leftover temp is removed by the next write; other ids and other names are kept; one that cannot be removed stays and the report goes on
+ok - drift: a temp that cannot be removed after a failed write leaves the report going under set -e, printed in full
+ok - drift: a task change that main absorbed and reverted is listed; an upstream-only path is not
+ok - primary provisioner: a forged cached module does not run, a substituted export file is detected, a locally changed module is refused
+ok - preflight: an old copy is judged by the primary provisioner's read-only check, collision refused, clean admitted
+ok - adopt check: a refusal after the wiring and record were written says so; the first-check refusal keeps its text
+ok - provision: a refused provision after the verified export leaves no export or bytecode directory
+ok - provision: a refused-first-provisioning recovery refuses the missing copy-local provisioner; an ordinary relaunch takes the primary one
+ok - preflight: a pinned provisioner without the check option has a durable or legacy collision named before the stop; a same-owner provisioner is not guessed
+ok - no-manifest route: a clean copy another task's record names is refused by name before provisioning; the own copy is admitted
+# all fm-slot-adopt tests passed
+bash tests/fm-slot-adopt.test.sh  11.86s user 19.48s system 14% cpu 3:31.79 total

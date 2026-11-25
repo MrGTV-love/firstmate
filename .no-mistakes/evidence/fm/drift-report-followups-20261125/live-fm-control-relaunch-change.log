@@ -1,0 +1,110 @@
+
+===== S1 relaunch with 25 ignored paths (sampled report) — fm-control.sh lane relaunch =====
+exit=0
+  | relaunch drift report for lane: 27 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven docs.txt
+  |   drift: uncertain,ignored gen-1.log
+  |   drift: uncertain,ignored gen-10.log
+  |   drift: uncertain,ignored gen-11.log
+  |   drift: uncertain,ignored gen-12.log
+  |   drift: uncertain,ignored gen-13.log
+  |   drift: uncertain,ignored gen-14.log
+  |   drift: uncertain,ignored gen-15.log
+  |   drift: uncertain,ignored gen-16.log
+  |   drift: uncertain,ignored gen-17.log
+  |   drift: uncertain,ignored gen-18.log
+  |   drift: uncertain,ignored gen-19.log
+  |   drift: uncertain,ignored gen-2.log
+  |   drift: uncertain,ignored gen-20.log
+  |   drift: uncertain,ignored gen-21.log
+  |   drift: uncertain,ignored gen-22.log
+  |   drift: uncertain,ignored gen-23.log
+  |   drift: uncertain,ignored gen-24.log
+  |   drift: uncertain,ignored gen-25.log
+  |   drift: uncertain,ignored gen-3.log
+  |   drift: uncertain,ignored gen-4.log
+  |   drift: proven notes: sampled: draft.txt
+  |   sampled: 25 uncertain,ignored path(s); the first 20 are shown in this report, and every path of this report is listed in /Users/charlesabrooker/tmp/fm-control-relaunch.DAIcG3/live-14801/home/state/lane.drift-report.txt
+  |   a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+  | relaunch drift report for lane: 27 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven docs.txt
+  |   drift: uncertain,ignored gen-1.log
+  |   drift: uncertain,ignored gen-10.log
+  |   drift: uncertain,ignored gen-11.log
+  |   drift: uncertain,ignored gen-12.log
+  |   drift: uncertain,ignored gen-13.log
+  |   drift: uncertain,ignored gen-14.log
+  |   drift: uncertain,ignored gen-15.log
+  |   drift: uncertain,ignored gen-16.log
+  |   drift: uncertain,ignored gen-17.log
+  |   drift: uncertain,ignored gen-18.log
+  |   drift: uncertain,ignored gen-19.log
+  |   drift: uncertain,ignored gen-2.log
+  |   drift: uncertain,ignored gen-20.log
+  |   drift: uncertain,ignored gen-21.log
+  |   drift: uncertain,ignored gen-22.log
+  |   drift: uncertain,ignored gen-23.log
+  |   drift: uncertain,ignored gen-24.log
+  |   drift: uncertain,ignored gen-25.log
+  |   drift: uncertain,ignored gen-3.log
+  |   drift: uncertain,ignored gen-4.log
+  |   drift: proven notes: sampled: draft.txt
+  |   sampled: 25 uncertain,ignored path(s); the first 20 are shown in this report, and every path of this report is listed in /Users/charlesabrooker/tmp/fm-control-relaunch.DAIcG3/live-14801/home/state/lane.drift-report.txt
+  |   a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+printed uncertain,ignored lines: 40
+file: /Users/charlesabrooker/tmp/fm-control-relaunch.DAIcG3/live-14801/home/state/lane.drift-report.txt mode=0o600 ignored-lines-in-file=25
+
+===== S2 second relaunch after removing 10 logs — a successful write replaces the file =====
+exit=0
+  | relaunch drift report for lane: 17 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven notes: sampled: draft.txt
+  | relaunch drift report for lane: 17 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven notes: sampled: draft.txt
+file header: relaunch drift report for lane: 17 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+ignored-lines-in-file=15
+
+===== S3 relaunch whose report write fails (mv onto the report refused) — earlier file kept, complete report printed =====
+exit=0
+  | relaunch drift report for lane: 27 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven notes: sampled: draft.txt
+  | relaunch drift report for lane: 27 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven notes: sampled: draft.txt
+printed uncertain,ignored lines: 50
+file unchanged from the earlier report: yes
+temps left: 0
+
+===== S4 relaunch whose temp cannot be removed after a failed write (SF2) — relaunch survives, complete report printed =====
+exit=0
+  | relaunch drift report for lane: 27 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven notes: sampled: draft.txt
+  |   a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+  | relaunch drift report for lane: 27 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven notes: sampled: draft.txt
+  |   a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+printed uncertain,ignored lines: 50
+launched replacement (literal sent): yes
+unremovable temps: 2
+file unchanged from the earlier report: yes
+  tail| calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+  tail| fallback: "330s existing caller limit"
+  tail| relaunched lane harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-lane worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.DAIcG3/live-14801/wt
+
+===== S5 relaunch whose report cannot be produced — the file is replaced with its one-line reason =====
+exit=0
+  | relaunch drift report for lane: could not be produced (error: simulated report failure); this is a limitation of the report, not a statement that the task stayed in scope
+  | relaunch drift report for lane: could not be produced (error: simulated report failure); this is a limitation of the report, not a statement that the task stayed in scope
+file lines: 1
+file: relaunch drift report for lane: could not be produced (error: simulated report failure); this is a limitation of the report, not a statement that the task stayed in scope
+
+===== S6 complete report whose path holds ': sampled: ' (no STATE sample) — produced by fm-control for session-end =====
+exit=0
+  | relaunch drift report for lane: 2 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven docs.txt
+  |   drift: proven notes: sampled: draft.txt
+  | relaunch drift report for lane: 2 out-of-scope path(s) changed by this task's own work; the recorded scope is unchanged (label = provenance[,status]; unusual bytes in a path are written as a doubled backslash or a backslash, x and two hex digits)
+  |   drift: proven docs.txt
+  |   drift: proven notes: sampled: draft.txt
+
+===== S7 skip-worktree names with a space, a newline and a backslash, changed and unchanged (SF5) =====
+git status --porcelain (hidden): []
+skip-worktree entries: 6
