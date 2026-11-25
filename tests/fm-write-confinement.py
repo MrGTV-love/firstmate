@@ -1441,8 +1441,9 @@ def mutants(repo, manifest, base, harness, env, launch_env):
     # only once a folder of the worker's own replaces the link. The literal
     # deny on the link, which every folder above a program file has, refuses
     # that first, so the opened-name deny is the second of two rules: under the
-    # head profile and with the link's deny alone removed the replacement stays
-    # refused, and with both removed it lands.
+    # head profile and with either deny alone removed the replacement stays
+    # refused, and with both removed it lands. A dead link deny would turn the
+    # opened-name-only run red, and a dead opened-name deny the link-only run.
     system = next(case for case in manifest["git_cases"] if case["name"] == "git-system-config")
     opened = Path(system["args"][0])
     link, target = opened.parent, os.readlink(opened.parent)
@@ -1451,8 +1452,9 @@ def mutants(repo, manifest, base, harness, env, launch_env):
     for rule in (link_rule, opened_rule):
         assert lines.count(rule) == 1, ("git-system-config folder link", rule, lines.count(rule))
     for label, removed, expected in (("head profile", (), True), ("link deny removed", (link_rule,), True),
+                                     ("opened-name deny removed", (opened_rule,), True),
                                      ("link and opened-name denies removed", (link_rule, opened_rule), False)):
-        mutant = base / f"mutant-git-system-config-folder-link-{len(removed)}-{harness}.sb"
+        mutant = base / f"mutant-git-system-config-folder-link-{label.replace(' ', '-')}-{harness}.sb"
         mutant.write_text("\n".join(line for line in lines if line not in removed) + "\n")
         run = subprocess.run(["/usr/bin/sandbox-exec", "-f", str(mutant), sys.executable, __file__, "--case", json.dumps(replace)],
                              capture_output=True, text=True, env=launch_env)
