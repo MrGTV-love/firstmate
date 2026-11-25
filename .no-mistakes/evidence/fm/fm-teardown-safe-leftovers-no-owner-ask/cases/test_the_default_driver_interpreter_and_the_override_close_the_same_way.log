@@ -1,0 +1,1 @@
+ok - the default interpreter and the explicit override close the kept-copy task the same way, and with a missing interpreter a dead launcher's lock is released directly with the unique ignored file and the .claude/channel-outbox files preserved

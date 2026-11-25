@@ -1,0 +1,1 @@
+ok - a live launcher that started before its lock keeps the copy whether ps answers at once or late; a pid started after the lock is recycled; an unreadable table keeps the copy

@@ -1,0 +1,64 @@
+=== foreign-claude-only
+exit=0 copy=gone released-line=yes owner-command-printed=no force-used=no unlock-calls=1 remove-calls=1
+lock-before=locked vernant-session-active owner=launcher:32475 launcher=32475
+lock-after=none
+args=none
+preserved 'one' (.claude/channel-outbox/a.jsonl): 59eed1d5e1d1ef91f5b14713217361fb7572bb5fa3983de07085e6144f6c8c31/files/.claude/channel-outbox/a.jsonl
+preserved 'one v2' (late a.jsonl change): 
+preserved 'closeout record' (.claude/bug-evidence): 59eed1d5e1d1ef91f5b14713217361fb7572bb5fa3983de07085e6144f6c8c31/files/.claude/bug-evidence/record.json
+preserved 'evidence' (.opencode/state/log.json): 59eed1d5e1d1ef91f5b14713217361fb7572bb5fa3983de07085e6144f6c8c31/files/.opencode/state/log.json
+preserved 'run v1' (.cache/run.bin): 
+preserved 'run v2' (late .cache change): 
+preserved 'late claude' (late .claude file): 
+preserved 'only here' (notes/unique.dat): 
+preserved 'late selected' (notes/late.dat): 
+release/refusal line: teardown: released creation lock 'vernant-session-active owner=launcher:32475 launcher=32475' on foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-claude-only/realroot/.treehouse/project-c7442f/1/project/.claude/worktrees/fc-one (launcher 32475 is gone; proof: the landed-
+first refusal text: none
+=== foreign-late-change
+exit=0 copy=gone released-line=yes owner-command-printed=no force-used=no unlock-calls=1 remove-calls=1
+lock-before=locked vernant-session-active owner=launcher:55848 launcher=55848
+lock-after=none
+args=none
+preserved 'one' (.claude/channel-outbox/a.jsonl): .aside-72f094e14c5b0763703d2c9f6ae815e8173c5f7d62dab21d2d5cc4f94d6a3da6.1795626887.68729/files/.claude/channel-outbox/a.jsonl
+preserved 'one v2' (late a.jsonl change): 72f094e14c5b0763703d2c9f6ae815e8173c5f7d62dab21d2d5cc4f94d6a3da6/files/.claude/channel-outbox/a.jsonl
+preserved 'closeout record' (.claude/bug-evidence): .aside-72f094e14c5b0763703d2c9f6ae815e8173c5f7d62dab21d2d5cc4f94d6a3da6.1795626887.68729/files/.claude/bug-evidence/record.json,72f094e14c5b0763703d2c9f6ae815e8173c5f7d62dab21d2d5cc4f94d6a3da6/files/.claude/bug-evidence/record.json
+preserved 'evidence' (.opencode/state/log.json): .aside-72f094e14c5b0763703d2c9f6ae815e8173c5f7d62dab21d2d5cc4f94d6a3da6.1795626887.68729/files/.opencode/state/log.json,72f094e14c5b0763703d2c9f6ae815e8173c5f7d62dab21d2d5cc4f94d6a3da6/files/.opencode/state/log.json
+preserved 'run v1' (.cache/run.bin): 
+preserved 'run v2' (late .cache change): 
+preserved 'late claude' (late .claude file): 72f094e14c5b0763703d2c9f6ae815e8173c5f7d62dab21d2d5cc4f94d6a3da6/files/.claude/channel-outbox/c.jsonl
+preserved 'only here' (notes/unique.dat): 
+preserved 'late selected' (notes/late.dat): 
+release/refusal line: teardown: released creation lock 'vernant-session-active owner=launcher:55848 launcher=55848' on foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project/.claude/worktrees/fc-one (launcher 55848 is gone; proof: the landed-
+first refusal text: none
+=== foreign-forced-cache
+exit=0 copy=gone released-line=yes owner-command-printed=no force-used=no unlock-calls=1 remove-calls=1
+lock-before=locked vernant-session-active owner=launcher:59805 launcher=59805
+lock-after=none
+args=--force --drop-file /Users/charlesabrooker/tmp/fm-test-owners/4200.wTteib/drop-words/captain-words.txt
+preserved 'one' (.claude/channel-outbox/a.jsonl): d618376d77972539196985276b0765434555b7f2aa43a0b7f2be4e7d48dd87f0/files/.claude/channel-outbox/a.jsonl
+preserved 'one v2' (late a.jsonl change): 
+preserved 'closeout record' (.claude/bug-evidence): d618376d77972539196985276b0765434555b7f2aa43a0b7f2be4e7d48dd87f0/files/.claude/bug-evidence/record.json
+preserved 'evidence' (.opencode/state/log.json): d618376d77972539196985276b0765434555b7f2aa43a0b7f2be4e7d48dd87f0/files/.opencode/state/log.json
+preserved 'run v1' (.cache/run.bin): d618376d77972539196985276b0765434555b7f2aa43a0b7f2be4e7d48dd87f0/files/.cache/run.bin
+preserved 'run v2' (late .cache change): 
+preserved 'late claude' (late .claude file): 
+preserved 'only here' (notes/unique.dat): d618376d77972539196985276b0765434555b7f2aa43a0b7f2be4e7d48dd87f0/files/notes/unique.dat
+preserved 'late selected' (notes/late.dat): 
+release/refusal line: teardown: released creation lock 'vernant-session-active owner=launcher:59805 launcher=59805' on foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-forced-cache/realroot/.treehouse/project-2ffb09/1/project/.claude/worktrees/fc-one (launcher 59805 is gone; proof: the landed
+first refusal text: none
+=== foreign-forced-late-cache
+exit=0 copy=gone released-line=yes owner-command-printed=no force-used=no unlock-calls=1 remove-calls=1
+lock-before=locked vernant-session-active owner=launcher:2686 launcher=2686
+lock-after=none
+args=--force --drop-file /Users/charlesabrooker/tmp/fm-test-owners/4200.wTteib/drop-words/captain-words.txt
+preserved 'one' (.claude/channel-outbox/a.jsonl): .aside-c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8.1795627051.14845/files/.claude/channel-outbox/a.jsonl,c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8/files/.claude/channel-outbox/a.jsonl
+preserved 'one v2' (late a.jsonl change): 
+preserved 'closeout record' (.claude/bug-evidence): .aside-c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8.1795627051.14845/files/.claude/bug-evidence/record.json,c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8/files/.claude/bug-evidence/record.json
+preserved 'evidence' (.opencode/state/log.json): .aside-c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8.1795627051.14845/files/.opencode/state/log.json,c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8/files/.opencode/state/log.json
+preserved 'run v1' (.cache/run.bin): .aside-c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8.1795627051.14845/files/.cache/run.bin
+preserved 'run v2' (late .cache change): c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8/files/.cache/run.bin
+preserved 'late claude' (late .claude file): 
+preserved 'only here' (notes/unique.dat): .aside-c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8.1795627051.14845/files/notes/unique.dat,c65532cb08942b0438b9046b70419c5c6213eaea9b6853b8ced6a6403a8f9db8/files/notes/unique.dat
+preserved 'late selected' (notes/late.dat): 
+release/refusal line: teardown: released creation lock 'vernant-session-active owner=launcher:2686 launcher=2686' on foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-forced-late-cache/realroot/.treehouse/project-f1e2b0/1/project/.claude/worktrees/fc-one (launcher 2686 is gone; proof: the land
+first refusal text: none

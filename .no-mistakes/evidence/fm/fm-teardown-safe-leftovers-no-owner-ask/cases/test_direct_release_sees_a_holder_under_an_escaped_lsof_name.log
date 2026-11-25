@@ -1,0 +1,1 @@
+ok - a process holding a file in a copy with a non-ASCII path keeps it, whatever locale lsof spells the name in; with no holder it closes

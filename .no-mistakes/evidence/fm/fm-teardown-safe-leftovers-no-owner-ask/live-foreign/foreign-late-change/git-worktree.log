@@ -1,0 +1,15 @@
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree unlock /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree remove /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot/.treehouse/project-871a4e/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/project worktree list --porcelain

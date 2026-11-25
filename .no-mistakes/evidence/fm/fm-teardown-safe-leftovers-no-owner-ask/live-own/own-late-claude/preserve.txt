@@ -1,0 +1,21 @@
+## every preserve under data/task-x1/nested-copy-preserved
+### 26a758325fd8049fa80b0b42a129c77a1c0c24a4323eee0ba4314a973a1e81ed
+./files/.cache/run.bin
+./files/.claude/bug-evidence/record.json
+./files/.claude/channel-outbox/a.jsonl
+./files/.opencode/state/log.json
+./files/notes/unique.dat
+./meta/SHA256SUMS
+./meta/copy-path
+--- meta/SHA256SUMS
+06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  notes/unique.dat
+7c1178925a445276a7339d81b231b4def148693e8562e926515873ba042ed540  .cache/run.bin
+aa301fa33765f678226a0378cef28649c9b588c68d566bd19fa195cc9959f684  .claude/bug-evidence/record.json
+2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806  .claude/channel-outbox/a.jsonl
+bdcf4c994585af6dd6cb1cfbff78bcc73ab27dc30a299db5bb83766ca05b5de4  .opencode/state/log.json
+--- independent check: shasum -a 256 -c over files/ against meta/SHA256SUMS
+notes/unique.dat: OK
+.cache/run.bin: OK
+.claude/bug-evidence/record.json: OK
+.claude/channel-outbox/a.jsonl: OK
+.opencode/state/log.json: OK

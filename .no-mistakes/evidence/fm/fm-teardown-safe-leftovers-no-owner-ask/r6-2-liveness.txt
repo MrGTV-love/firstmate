@@ -1,0 +1,23 @@
+### head 86fc59692
+fm_lock_path_mtime on a missing path: '' rc=1
+teardown_launcher_live_since <live pid> '' (unreadable lock time) -> rc=0
+teardown_lock_launcher_may_be_live <live pid> <missing lock> -> rc=0
+teardown_lock_launcher_may_be_live <live pid> <lock newer than pid> -> rc=0 (control: live)
+teardown_lock_launcher_may_be_live <exited pid> <missing lock> -> rc=1 (control: gone)
+
+### base 6b775a16a (before this change)
+fm_lock_path_mtime on a missing path: '' rc=1
+/Users/charlesabrooker/.no-mistakes/evidence/01M89SHBX5SR6TE8YAYXSMV1RN/scripts/r6-2-liveness.sh: line 17: teardown_launcher_live_since: command not found
+teardown_launcher_live_since <live pid> '' (unreadable lock time) -> rc=127
+teardown_lock_launcher_may_be_live <live pid> <missing lock> -> rc=0
+teardown_lock_launcher_may_be_live <live pid> <lock newer than pid> -> rc=0 (control: live)
+teardown_lock_launcher_may_be_live <exited pid> <missing lock> -> rc=1 (control: gone)
+
+### pre-fix f07f9c279^ (the branch before the R6-2 fix)
+fm_lock_path_mtime on a missing path: '' rc=1
+/Users/charlesabrooker/tmp/r6-2.SlV10o/pre/bin/fm-teardown-nested-lib.sh: line 318: [: : integer expression expected
+teardown_launcher_live_since <live pid> '' (unreadable lock time) -> rc=2
+/Users/charlesabrooker/tmp/r6-2.SlV10o/pre/bin/fm-teardown-nested-lib.sh: line 318: [: : integer expression expected
+teardown_lock_launcher_may_be_live <live pid> <missing lock> -> rc=2
+teardown_lock_launcher_may_be_live <live pid> <lock newer than pid> -> rc=0 (control: live)
+teardown_lock_launcher_may_be_live <exited pid> <missing lock> -> rc=1 (control: gone)

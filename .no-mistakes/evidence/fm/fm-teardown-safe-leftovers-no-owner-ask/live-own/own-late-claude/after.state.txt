@@ -1,0 +1,23 @@
+## git worktree list --porcelain (after)
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/project
+HEAD 5c71bee044af8716f8888a2de9643b3d290d4e43
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project
+HEAD 5c71bee044af8716f8888a2de9643b3d290d4e43
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project/.claude/worktrees/fc-one
+HEAD 5c71bee044af8716f8888a2de9643b3d290d4e43
+branch refs/heads/fm/task-x1-v2
+locked vernant-session-active owner=launcher:70721 launcher=70721
+
+## copy files (after)
+7c1178925a445276  ./.cache/run.bin
+aa301fa33765f678  ./.claude/bug-evidence/record.json
+2c8b08da5ce60398  ./.claude/channel-outbox/a.jsonl
+ad7ae5e5705d09d8  ./.claude/channel-outbox/c.jsonl
+bdcf4c994585af6d  ./.opencode/state/log.json
+06a249dc6db68999  ./notes/unique.dat
+## treehouse status --json (after)
+[{"name":"1","status":"leased","lease_holder":"task-x1"}]

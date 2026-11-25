@@ -1,0 +1,1 @@
+ok - a real process holding a file in the copy open keeps it unless ps names it the Spotlight worker, and is never signalled

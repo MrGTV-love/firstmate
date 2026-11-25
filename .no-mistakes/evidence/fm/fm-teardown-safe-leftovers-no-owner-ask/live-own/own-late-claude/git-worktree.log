@@ -1,0 +1,15 @@
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project worktree unlock /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project worktree lock --reason vernant-session-active owner=launcher:70721 launcher=70721 /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project/.claude/worktrees/fc-one

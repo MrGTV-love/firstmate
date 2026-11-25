@@ -1,0 +1,1 @@
+command: run_foreign_teardown rc TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/realroot  (=> /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/teardown-root/bin/fm-teardown.sh task-x1 (no flags), scratch FM_HOME /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-late-change/home)

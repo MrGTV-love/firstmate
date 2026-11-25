@@ -1,0 +1,68 @@
+=== own-retained
+exit=0 copy=gone released-line=yes owner-command-printed=no force-used=no unlock-calls=1 remove-calls=1
+lock-before=locked vernant-session-active owner=launcher:32287 launcher=32287
+lock-after=none
+args=none
+preserved 'one' (.claude/channel-outbox/a.jsonl): d94ae61ad04ec209d62ba712dfdc0cab9cb39a66badc261bee0e649837875a16/files/.claude/channel-outbox/a.jsonl
+preserved 'one v2' (late a.jsonl change): 
+preserved 'closeout record' (.claude/bug-evidence): d94ae61ad04ec209d62ba712dfdc0cab9cb39a66badc261bee0e649837875a16/files/.claude/bug-evidence/record.json
+preserved 'evidence' (.opencode/state/log.json): d94ae61ad04ec209d62ba712dfdc0cab9cb39a66badc261bee0e649837875a16/files/.opencode/state/log.json
+preserved 'run v1' (.cache/run.bin): d94ae61ad04ec209d62ba712dfdc0cab9cb39a66badc261bee0e649837875a16/files/.cache/run.bin
+preserved 'run v2' (late .cache change): 
+preserved 'late claude' (late .claude file): 
+preserved 'only here' (notes/unique.dat): d94ae61ad04ec209d62ba712dfdc0cab9cb39a66badc261bee0e649837875a16/files/notes/unique.dat
+preserved 'late selected' (notes/late.dat): 
+release/refusal line: teardown: released creation lock 'vernant-session-active owner=launcher:32287 launcher=32287' on own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project/.claude/worktrees/fc-one (launcher 32287 is gone; proof: the landed-work
+first refusal text: none
+=== own-late-claude
+exit=1 copy=kept released-line=no owner-command-printed=no force-used=no unlock-calls=1 remove-calls=0
+lock-before=locked vernant-session-active owner=launcher:70721 launcher=70721
+lock-after=locked vernant-session-active owner=launcher:70721 launcher=70721
+args=none
+preserved 'one' (.claude/channel-outbox/a.jsonl): 26a758325fd8049fa80b0b42a129c77a1c0c24a4323eee0ba4314a973a1e81ed/files/.claude/channel-outbox/a.jsonl
+preserved 'one v2' (late a.jsonl change): 
+preserved 'closeout record' (.claude/bug-evidence): 26a758325fd8049fa80b0b42a129c77a1c0c24a4323eee0ba4314a973a1e81ed/files/.claude/bug-evidence/record.json
+preserved 'evidence' (.opencode/state/log.json): 26a758325fd8049fa80b0b42a129c77a1c0c24a4323eee0ba4314a973a1e81ed/files/.opencode/state/log.json
+preserved 'run v1' (.cache/run.bin): 26a758325fd8049fa80b0b42a129c77a1c0c24a4323eee0ba4314a973a1e81ed/files/.cache/run.bin
+preserved 'run v2' (late .cache change): 
+preserved 'late claude' (late .claude file): 
+preserved 'only here' (notes/unique.dat): 26a758325fd8049fa80b0b42a129c77a1c0c24a4323eee0ba4314a973a1e81ed/files/notes/unique.dat
+preserved 'late selected' (notes/late.dat): 
+late files still in copy: .claude/channel-outbox/c.jsonl
+release/refusal line: 
+first refusal text: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/realroot/.treehouse/project-29fb63/1/project/.claude/worktrees/fc-one (exit 127): full output: /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-late-claude/data/task-x1/vernant-closeout.upyrD1
+=== own-new-late-selected
+exit=1 copy=kept released-line=no owner-command-printed=no force-used=no unlock-calls=1 remove-calls=0
+lock-before=locked vernant-session-active owner=launcher:66332 launcher=66332
+lock-after=locked vernant-session-active owner=launcher:66332 launcher=66332
+args=none
+preserved 'one' (.claude/channel-outbox/a.jsonl): febb60bf57593c98adb2f46b2c72668ec3b8497f5a98572e3dbbda9b145208ee/files/.claude/channel-outbox/a.jsonl
+preserved 'one v2' (late a.jsonl change): 
+preserved 'closeout record' (.claude/bug-evidence): febb60bf57593c98adb2f46b2c72668ec3b8497f5a98572e3dbbda9b145208ee/files/.claude/bug-evidence/record.json
+preserved 'evidence' (.opencode/state/log.json): febb60bf57593c98adb2f46b2c72668ec3b8497f5a98572e3dbbda9b145208ee/files/.opencode/state/log.json
+preserved 'run v1' (.cache/run.bin): 
+preserved 'run v2' (late .cache change): 
+preserved 'late claude' (late .claude file): 
+preserved 'only here' (notes/unique.dat): 
+preserved 'late selected' (notes/late.dat): 
+late files still in copy: notes/late.dat
+release/refusal line: 
+first refusal text: REFUSED: Vernant's closeout driver did not release own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-new-late-selected/realroot/.treehouse/project-4e9f76/1/project/.claude/worktrees/fc-one (exit 127): full output: /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-new-late-selected/data/task-x1/vernant-closeout.IIoeQ0
+=== own-live-launcher
+exit=1 copy=kept released-line=no owner-command-printed=no force-used=no unlock-calls=0 remove-calls=0
+lock-before=locked vernant-session-active owner=launcher:1761 launcher=1761
+lock-after=locked vernant-session-active owner=launcher:1761 launcher=1761
+args=none
+preserved 'one' (.claude/channel-outbox/a.jsonl): 
+preserved 'one v2' (late a.jsonl change): 
+preserved 'closeout record' (.claude/bug-evidence): 
+preserved 'evidence' (.opencode/state/log.json): 
+preserved 'run v1' (.cache/run.bin): 
+preserved 'run v2' (late .cache change): 
+preserved 'late claude' (late .claude file): 
+preserved 'only here' (notes/unique.dat): 
+preserved 'late selected' (notes/late.dat): 
+late files still in copy: 
+release/refusal line: 
+first refusal text: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-live-launcher/realroot/.treehouse/project-b9a95c/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-live-launcher/realroot/.treehouse/project-b9a95c/1/project: its creation-lock launcher
+live launcher 1761 still alive after teardown: yes

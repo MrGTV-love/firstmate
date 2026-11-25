@@ -1,0 +1,1 @@
+ok - copy content no default-branch commit holds, a tracked change, an untracked file, a staged-only change and an unrelated-history coincidence are all refused

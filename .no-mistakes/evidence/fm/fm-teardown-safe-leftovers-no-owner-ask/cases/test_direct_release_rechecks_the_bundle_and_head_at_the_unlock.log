@@ -1,0 +1,1 @@
+ok - a bundle truncated or a HEAD committed during the last holder scan keeps a dead launcher's copy locked; unchanged, it closes and restores

@@ -1,0 +1,1 @@
+ok - a process holding a file in the copy open, with its cwd outside, or a failed open-file listing keeps a dead launcher's lock on both direct-release routes; with no holder or only a search indexer they release

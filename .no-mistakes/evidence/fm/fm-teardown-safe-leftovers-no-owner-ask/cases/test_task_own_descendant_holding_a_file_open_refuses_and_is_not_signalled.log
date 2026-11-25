@@ -1,0 +1,1 @@
+ok - a task-own descendant that holds a file in the copy open from outside it refuses by pid and is never signalled

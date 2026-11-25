@@ -1,0 +1,13 @@
+## git worktree list --porcelain (after)
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-forced-late-cache/project
+HEAD c2ec64a0538a5a021127ed633b3bf2e18a779b95
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.OjSxXZ/live-foreign-forced-late-cache/realroot/.treehouse/project-f1e2b0/1/project
+HEAD c2ec64a0538a5a021127ed633b3bf2e18a779b95
+detached
+
+## copy files (after)
+(copy absent)
+## treehouse status --json (after)
+[{"name":"1","status":"available","lease_holder":""}]

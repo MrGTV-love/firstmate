@@ -1,0 +1,1 @@
+ok - a failed direct removal reports its lock restored only when it reads back, and says the copy is unlocked when the relock fails

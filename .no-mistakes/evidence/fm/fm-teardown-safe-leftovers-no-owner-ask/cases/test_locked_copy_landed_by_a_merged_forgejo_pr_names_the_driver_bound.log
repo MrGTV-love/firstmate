@@ -1,0 +1,1 @@
+ok - a merged Forgejo pull request is not passed as --pr to the GitHub-only driver, and the credit line names that bound

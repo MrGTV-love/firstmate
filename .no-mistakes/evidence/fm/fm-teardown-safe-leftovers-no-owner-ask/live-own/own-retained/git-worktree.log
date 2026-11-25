@@ -1,0 +1,20 @@
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project/.claude/worktrees/fc-one worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/project worktree list --porcelain
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree unlock /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree remove /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project/.claude/worktrees/fc-one
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/realroot/.treehouse/project-ef8312/1/project worktree list --porcelain -z
+-C /Users/charlesabrooker/tmp/fm-teardown-tests.M06UJi/live-own-retained/project worktree list --porcelain

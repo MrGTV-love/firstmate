@@ -1,0 +1,17 @@
+=== foreign-held-cache
+exit=0 copy=kept released-line=no owner-command-printed=no force-used=no unlock-calls=0 remove-calls=0
+lock-before=locked vernant-session-active owner=launcher:96759 launcher=96759
+lock-after=locked vernant-session-active owner=launcher:96759 launcher=96759
+args=none
+preserved 'one' (.claude/channel-outbox/a.jsonl): 
+preserved 'one v2' (late a.jsonl change): 
+preserved 'closeout record' (.claude/bug-evidence): 
+preserved 'evidence' (.opencode/state/log.json): 
+preserved 'run v1' (.cache/run.bin): 
+preserved 'run v2' (late .cache change): 
+preserved 'late claude' (late .claude file): 
+preserved 'only here' (notes/unique.dat): 
+preserved 'late selected' (notes/late.dat): 
+late files still in copy: 
+release/refusal line: 
+first refusal text: none
