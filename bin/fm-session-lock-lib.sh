@@ -394,6 +394,44 @@ EOF
   return 0
 }
 
+# Is <pid> proven absent? Returns 0 when it is, 1 when it is present, 2 when the
+# read cannot tell. The shared process read drops ps's stderr, so this reads it:
+# exit 1 proves absence only with empty stdout and either empty stderr or exactly
+# macOS's `ps: process id too large: <pid>` line, and any other diagnostic is a
+# failed read. A confined worker's sandbox refuses setuid ps (126); only a
+# complete, readable pid table from bin/fm-proc-info.py proves absence there.
+fm_session_lock_pid_absent() {  # <pid>
+  local pid=$1 observed diagnostic diagnostic_file rc=0 table row found=1
+  diagnostic_file=$(mktemp "${TMPDIR:-/tmp}/fm-lock-ps.XXXXXX") || return 2
+  observed=$(ps -o comm= -p "$pid" 2>"$diagnostic_file") || rc=$?
+  # Retain even a whitespace-only diagnostic; failed reads are not absence.
+  diagnostic=$(cat "$diagnostic_file" && printf '.') || {
+    rm -f -- "$diagnostic_file"
+    return 2
+  }
+  diagnostic=${diagnostic%.}
+  rm -f -- "$diagnostic_file"
+  case "$rc" in
+    0) return 1 ;;
+    1)
+      [ -z "$observed" ] || return 2
+      [ -z "$diagnostic" ] || [ "$diagnostic" = "ps: process id too large: $pid"$'\n' ] || return 2
+      return 0
+      ;;
+    126)
+      table=$(python3 "$_FM_SESSION_LOCK_PROC_INFO" table pid 2>/dev/null) || return 2
+      [ -n "$table" ] || return 2
+      while IFS= read -r row; do
+        case "$row" in ''|*[!0-9]*) return 2 ;; esac
+        [ "$row" != "$pid" ] || found=0
+      done <<< "$table"
+      [ "$found" -eq 0 ] && return 1
+      return 0
+      ;;
+    *) return 2 ;;
+  esac
+}
+
 # Read-only classification of state/.lock for machine-readable callers.
 # Never acquires the lock. A held lock is not proof the holder is consuming
 # wakes; that question belongs to the inbox readiness projection.
@@ -404,10 +442,12 @@ EOF
 #   FM_LOCK_INSPECT_LIVE_HARNESS  true|false|unknown
 #
 # held: the recorded pid is a live verified harness.
-# stale: the recorded pid is gone.
+# stale: the recorded pid is gone, proven by a process read that shows absence
+# (fm_session_lock_pid_absent). A failed read is not absence.
 # unknown: the file or pid cannot be classified without guessing, including a
-# live process that is not a verified harness. Existence of a lock file, a
-# session record, or a pane is never treated as liveness.
+# live process that is not a verified harness and any process read that fails
+# without proving absence. Existence of a lock file, a session record, or a pane
+# is never treated as liveness.
 # shellcheck disable=SC2034 # Output globals, read by lock status and inbox ready.
 FM_LOCK_INSPECT_STATE=unknown
 FM_LOCK_INSPECT_PID=
@@ -453,7 +493,7 @@ fm_session_lock_inspect() {  # <state>
     fi
     return 0
   fi
-  if fm_session_lock_proc comm "$pid" >/dev/null; then
+  if ! fm_session_lock_pid_absent "$pid"; then
     FM_LOCK_INSPECT_STATE=unknown
     return 0
   fi
