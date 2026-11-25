@@ -853,18 +853,18 @@ test_herdr_fresh_refusal_closes_its_pane() {
 
 # FM_GIT_HOOKS_VERDICT_POLLS is a test-only seam. Without FM_TEST_SEAM, or
 # with a value that is not a non-negative decimal integer, the wait keeps its
-# production bound, so a pane that refuses after a second is still reported.
+# production bound, so a pane that refuses after three seconds is still reported.
 test_verdict_bound_is_a_test_only_seam() {
   local polls
-  herdr_refusal_spawn seamctl 1 0 1
+  herdr_refusal_spawn seamctl 1 0 3
   expect_code 0 "$HERDR_STATUS" "control: a seam-armed zero bound still waited for the slow refusal: $HERDR_OUT"
   assert_absent "$HERDR_DIR/harness-started" "control: the harness started although the launch was refused"
-  herdr_refusal_spawn noseam '' 0 1
+  herdr_refusal_spawn noseam '' 0 3
   [ "$HERDR_STATUS" -ne 0 ] || fail "without FM_TEST_SEAM a zero bound hid the refusal: $HERDR_OUT"
   assert_contains "$HERDR_OUT" "honours neither task Git hook carrier" "without FM_TEST_SEAM the refusal was not named"
   assert_absent "$HERDR_HOME/state/$HERDR_ID.meta" "without FM_TEST_SEAM a refused launch published a task record"
   for polls in abc -1; do
-    herdr_refusal_spawn "bad$polls" 1 "$polls" 1
+    herdr_refusal_spawn "bad$polls" 1 "$polls" 3
     [ "$HERDR_STATUS" -ne 0 ] || fail "the seam value '$polls' hid the refusal: $HERDR_OUT"
     assert_contains "$HERDR_OUT" "honours neither task Git hook carrier" "the seam value '$polls' lost the refusal reason"
     assert_not_contains "$HERDR_OUT" "integer expression expected" "the seam value '$polls' reached an integer test"
