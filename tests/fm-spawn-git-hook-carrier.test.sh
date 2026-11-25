@@ -42,13 +42,16 @@ fm_git_identity 'Carrier Tests' 'carrier@example.invalid'
 REAL_GIT=$(command -v git) || fail "git is required"
 
 # Config-based hooks arrived in git 2.54. On an older git every config-carrier
-# case is skipped by name and only the fallback and refusal cases run.
+# case is skipped by name and only the fallback and refusal cases run; in CI,
+# whose runner images ship a newer git, that is a failure instead of a skip.
 CONFIG_GIT=1
 mkdir -p "$TMP_ROOT/probe"
 "$REAL_GIT" init -q "$TMP_ROOT/probe/r"
 if ! (cd "$TMP_ROOT/probe/r" && GIT_CONFIG_PARAMETERS="'hook.p.event'='commit-msg' 'hook.p.command'='true'" \
   "$REAL_GIT" hook list commit-msg 2>/dev/null | grep -qx p); then
   CONFIG_GIT=0
+  [ "${CI:-}" != true ] ||
+    fail "$("$REAL_GIT" --version) has no config-based hooks; CI must provide git 2.54 or newer so the config carrier cases run"
   printf 'skip: %s has no config-based hooks; config carrier cases not exercised\n' "$("$REAL_GIT" --version)"
 fi
 
