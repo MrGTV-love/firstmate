@@ -13,8 +13,8 @@
 # the commit body and git's GIT_TRACE of which hook commands ran.
 #
 # Cases, per installed harness this guard can drive offline (claude over the
-# Anthropic Messages API; omp over the OpenAI Responses API), each on the
-# carrier fm-spawn selects for it (config when listed, legacy otherwise):
+# Anthropic Messages API; omp and codex over the OpenAI Responses API), each on the
+# carrier fm-spawn must select for it (expected_carrier below):
 #   carrier  - the worker's tool shell refuses a credential commit and a
 #              --no-verify credential push, lands a clean commit and push, and
 #              strips an AI trailer; GIT_TRACE shows the carrier's hooks.
@@ -39,6 +39,7 @@ fm_live_gate opt-in FM_GIT_HOOK_CARRIER_LIVE tmux python3 jq curl
 
 unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS FM_GIT_HOOK_ROWS FM_GIT_HOOK_MODE CLAUDECODE TMUX
 REAL_TMUX=$(command -v tmux)
+NODE_DIR=$(command -v node 2>/dev/null) && NODE_DIR=${NODE_DIR%/*}
 LAB=$(fm_test_tmproot fm-git-hook-carrier-live) || fail "no lab directory"
 SOCKET="fm-carrier-live-$$"
 PROVIDER_PID=
@@ -91,15 +92,22 @@ emit done yes
 SH
 chmod +x "$LAB/probe.sh"
 
-# Listed harnesses run the config carrier; the list is fm-spawn's own.
-listed_harnesses() {
-  sed -n 's/^GIT_HOOKS_CONFIG_HARNESSES="\(.*\)"$/\1/p' "$ROOT/bin/fm-spawn.sh"
+# The carrier each harness must get, as recorded in
+# docs/verification/runtime-backends.md. Admitting a harness to the config
+# carrier changes both fm-spawn's list and this expectation, so the guard fails
+# whenever spawn selects anything else.
+expected_carrier() {
+  case "$1" in
+    claude) printf 'config\n' ;;
+    *) printf 'legacy\n' ;;
+  esac
 }
 
 # run_case <harness> <name> <extra-path-or-empty>: one real spawn's launch, replayed.
 run_case() {
   local harness=$1 name=$2 extra_path=$3 dir home proj wt fakebin id cfg out status branch n pane_path
   local -a spawn_args=()
+  PANE_EXTRA=()
   dir="$LAB/$harness-$name"
   home="$dir/home"
   proj="$dir/project"
@@ -135,6 +143,14 @@ run_case() {
       printf 'providers:\n  native:\n    baseUrl: %s/v1\n    apiKey: synthetic-local-only\n    api: openai-responses\n    models:\n      - id: carrier-probe\n        contextWindow: 200000\n        maxTokens: 4096\n' \
         "$BASE_URL" > "$home/user-home/.omp/agent/models.yml"
       ;;
+    codex)
+      # A scratch CODEX_HOME whose only provider is the private loopback one,
+      # with the task copy trusted so no dialog stands before the brief.
+      mkdir -p "$dir/codex-home"
+      printf 'model = "carrier-probe"\nmodel_provider = "fmprobe"\n[model_providers.fmprobe]\nname = "fmprobe"\nbase_url = "%s/v1"\nwire_api = "responses"\n[projects."%s"]\ntrust_level = "trusted"\n[projects."%s"]\ntrust_level = "trusted"\n' \
+        "$BASE_URL" "$wt" "$(cd "$wt" && pwd -P)" > "$dir/codex-home/config.toml"
+      PANE_EXTRA=(CODEX_HOME="$dir/codex-home")
+      ;;
   esac
   : > "$dir/launch.log"
   out=$(
@@ -151,11 +167,12 @@ run_case() {
   printf '%s' "sh '$LAB/probe.sh' '$dir/obs' '$wt' '$proj.origin.git' '$branch'" > "$LAB/command"
   printf '%s' "$home/state/$id.git-hooks" > "$dir/hooks-path"
   cp "$dir/launch.log" "$dir/launch.sh"
-  pane_path="${extra_path:+$extra_path:}${HARNESS_BIN%/*}:/usr/bin:/bin:/usr/sbin:/sbin"
+  # Node-based harnesses (codex) need node on the pane PATH, as on an operator's.
+  pane_path="${extra_path:+$extra_path:}${HARNESS_BIN%/*}${NODE_DIR:+:$NODE_DIR}:/usr/bin:/bin:/usr/sbin:/sbin"
   "$REAL_TMUX" -L "$SOCKET" -f /dev/null new-session -d -s "$harness-$name" -x 200 -y 50 -c "$wt" -- \
     env -i HOME="$dir/os-home" PATH="$pane_path" TERM=xterm-256color LANG=en_US.UTF-8 \
     ANTHROPIC_BASE_URL="$BASE_URL" ANTHROPIC_API_KEY="$KEY" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    DISABLE_AUTOUPDATER=1 /bin/bash --noprofile --norc -i || fail "$harness $name: cannot start the private tmux pane"
+    DISABLE_AUTOUPDATER=1 ${PANE_EXTRA[@]+"${PANE_EXTRA[@]}"} /bin/bash --noprofile --norc -i || fail "$harness $name: cannot start the private tmux pane"
   sleep 1
   "$REAL_TMUX" -L "$SOCKET" send-keys -t "$harness-$name" ". '$dir/launch.sh'" Enter
   for n in $(seq 1 240); do
@@ -176,13 +193,12 @@ obs() { sed -n "s/^$2=//p" "$1/obs/result" | tail -n 1; }
 trace_has() { grep -F "run_command:" "$1/obs/trace.$2" 2>/dev/null | grep -qF "$3"; }
 
 CHECKED=0
-for HARNESS in claude omp; do
+for HARNESS in claude omp codex; do
   HARNESS_BIN=$(command -v "$HARNESS" 2>/dev/null) || { printf 'skip: live: %s absent\n' "$HARNESS"; continue; }
   case "$HARNESS_BIN" in /*) ;; *) printf 'skip: live: %s is not an executable on PATH\n' "$HARNESS"; continue ;; esac
   VERSION="$HARNESS $("$HARNESS_BIN" --version 2>&1 | head -n 1)"
   printf '# live %s\n' "$VERSION"
-  CARRIER=legacy
-  case " $(listed_harnesses) " in *" $HARNESS "*) CARRIER=config ;; esac
+  CARRIER=$(expected_carrier "$HARNESS")
   # The sensitivity control's injected fault, never used outside this fixture:
   # a harness wrapper that drops the selected carrier's variables at the
   # harness boundary.

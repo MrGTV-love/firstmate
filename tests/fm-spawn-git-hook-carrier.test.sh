@@ -99,6 +99,7 @@ numbered_task_hooks() {
   echo "$n"
 }
 emit started yes
+printf '%s' "${GIT_CONFIG_PARAMETERS-}" > "$obs/gcp"
 emit hookspath "$(git config --show-scope --get core.hooksPath | tr '\t' ' ')"
 emit gcp_rows "$(rows_in_gcp)"
 emit numbered "$(numbered_task_hooks)"
@@ -320,6 +321,10 @@ chmod +x "$FOOLED_GIT_DIR/git"
 assert_full_protection() {  # <case-dir> <run> <carrier>
   local dir=$1 run=$2 carrier=$3 expected stdin
   assert_equals yes "$(obs "$dir" "$run" "done")" "$run: worker did not finish"
+  # The innermost selector, inside the filtered (and on macOS confined) shell,
+  # must record its verdict, or every real spawn waits out the verdict bound.
+  assert_equals "$carrier" "$(cat /tmp/fm-"$(cat "$dir/id")"/git-hooks-admitted.* 2>/dev/null)" \
+    "$run: the launch did not record that it admitted the worker on the $carrier carrier"
   assert_equals refused "$(obs "$dir" "$run" cred_commit)" "$run: credential commit landed"
   assert_equals landed "$(obs "$dir" "$run" clean_commit)" "$run: clean commit was refused"
   assert_equals 0 "$(obs "$dir" "$run" clean_trailer)" "$run: AI trailer reached the commit object"
@@ -542,6 +547,7 @@ test_spawn_fails_when_the_pane_refuses() {
   real_endpoint_spawn admit 100
   expect_code 0 "$REAL_STATUS" "spawn failed on a pane whose git honours the carrier: $REAL_OUT"
   assert_present "$REAL_DIR/harness-started" "the harness did not start on a healthy pane"
+  assert_not_contains "$REAL_OUT" "recorded no Git hook carrier verdict" "the healthy launch never recorded its verdict, so spawn waited out the bound"
   # Control: without the wait the same refusal is reported as a spawned worker.
   real_endpoint_spawn ctl 0
   expect_code 0 "$REAL_STATUS" "control: spawn without the verdict wait did not report success: $REAL_OUT"
@@ -607,11 +613,45 @@ SH
   REAL_OUT=$(TMUX='' FM_GIT_HOOKS_VERDICT_POLLS=$polls fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" \
     --mode no-mistakes --yolo off --harness omp --backend tmux)
   REAL_STATUS=$?
-  # Let a launch that is still running reach the harness before observing it.
-  sleep 2
+  # Observe only once the launch itself has finished: the harness started
+  # (admit), or the pane recorded its refusal (refuse, ctl).
+  # shellcheck disable=SC2016 # The child shell expands its own argument.
+  case "$mode" in
+    admit) fm_test_wait_until -- test -e "$dir/harness-started" || : ;;
+    *) fm_test_wait_until -- sh -c 'ls "$1"/git-hooks-refused.* >/dev/null 2>&1' _ "/tmp/fm-$id" ||
+      fail "$mode: the pane never recorded its refusal" ;;
+  esac
   "$real_tmux" -S "$socket" kill-server 2>/dev/null || :
   rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
   REAL_DIR=$dir REAL_HOME=$home REAL_ID=$id
+}
+
+# Teardown removes the task hooks directory while a process started from the
+# pane may still carry the carrier. The legacy carrier's dangling hooksPath then
+# runs no hooks; the config rows must do the same rather than fail every commit
+# of that process, while a directory that exists but lacks a script still fails
+# (G9).
+test_removed_hooks_dir_runs_no_hooks() {
+  local dir gcp hooks wt
+  [ "$CONFIG_GIT" = 1 ] || { printf 'skip: removed hooks dir case needs config-based hooks\n'; return; }
+  dir=$(make_case dangle claude) || exit 1
+  printf 'short' > "$dir/plan"
+  replay "$dir" dangle /bin/bash "$(pane_path "$dir")" >/dev/null
+  gcp=$(cat "$dir/obs/dangle/gcp")
+  [ -n "$gcp" ] || fail "the worker carried no rows to reuse"
+  hooks=$(cat "$dir/hooks-path")
+  wt=$(cat "$dir/wt-path")
+  git -C "$wt" checkout -q "$(cat "$dir/branch")"
+  cred_shape > "$wt/late"
+  git -C "$wt" add late
+  GIT_CONFIG_PARAMETERS=$gcp git -C "$wt" commit -q -m late-present 2>/dev/null
+  assert_not_equals late-present "$(git -C "$wt" log -1 --format=%s)" "the rows did not refuse while the hooks dir existed"
+  chmod -R u+w "$hooks"
+  rm -rf "$hooks"
+  GIT_CONFIG_PARAMETERS=$gcp git -C "$wt" commit -q -m late-removed 2>/dev/null
+  assert_equals late-removed "$(git -C "$wt" log -1 --format=%s)" "rows naming a removed hooks dir failed the commit instead of running no hooks"
+  git -C "$wt" reset -q --hard HEAD~1
+  pass "once teardown removes the hooks dir, a process still carrying the rows runs no fm hooks, as the legacy carrier's dangling hooksPath does"
 }
 
 tests=(
@@ -624,6 +664,7 @@ tests=(
   test_allowlisted_parameters_keep_one_row_set
   test_keep_ai_trailers_keeps_the_scan
   test_spawn_fails_when_the_pane_refuses
+  test_removed_hooks_dir_runs_no_hooks
 )
 fm_test_run_cases "${tests[@]}" -- "$@"
 

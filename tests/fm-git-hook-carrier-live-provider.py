@@ -6,7 +6,7 @@ Usage: fm-git-hook-carrier-live-provider.py <lab-dir>
 Serves the Anthropic Messages API (/v1/messages) and the OpenAI Responses API
 (/v1/responses). Writes the bound port to <lab-dir>/port and appends a summary
 of every request to <lab-dir>/requests.jsonl. A request that offers a shell
-tool (Bash, or bash) and carries no tool result yet is answered with one call
+tool (Bash; or bash, exec_command or shell) and carries no tool result yet is answered with one call
 of that tool running the command in <lab-dir>/command; a request carrying that
 tool's result, and any side request without a shell tool, is answered with a
 short end-of-turn text. No model is called and nothing leaves the loopback
@@ -46,14 +46,19 @@ class Handler(BaseHTTPRequestHandler):
     def openai_responses(self, body):
         items = body.get('input', [])
         done = any(isinstance(i, dict) and i.get('type') == 'function_call_output' for i in items)
-        tool = next((t for t in body.get('tools', []) if t.get('name') == 'bash'), None)
+        names = [t.get('name') for t in body.get('tools', [])]
+        tool = next((n for n in ('bash', 'exec_command', 'shell') if n in names), None)
         with (lab / 'requests.jsonl').open('a') as log:
             log.write(json.dumps({'path': self.path, 'tools': [t.get('name') for t in body.get('tools', [])],
                                   'tool_result': done}) + '\n')
         if tool is not None and not done:
-            args = json.dumps({'command': (lab / 'command').read_text().strip()})
+            command = (lab / 'command').read_text().strip()
+            # omp's bash takes a command string, Codex's exec_command a cmd
+            # string, and the older Codex shell an argv.
+            args = json.dumps({'bash': {'command': command}, 'exec_command': {'cmd': command},
+                               'shell': {'command': ['bash', '-lc', command]}}[tool])
             item = {'type': 'function_call', 'id': 'fc_fm_carrier', 'call_id': 'call_fm_carrier',
-                    'name': 'bash', 'arguments': args, 'status': 'completed'}
+                    'name': tool, 'arguments': args, 'status': 'completed'}
         else:
             item = {'type': 'message', 'id': 'm_fm_carrier', 'role': 'assistant', 'status': 'completed',
                     'content': [{'type': 'output_text', 'text': 'carrier probe finished', 'annotations': []}]}

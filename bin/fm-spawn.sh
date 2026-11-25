@@ -8426,7 +8426,11 @@ spawn_git_hooks_verdict() {
       return 1
     fi
     [ ! -e "$GIT_HOOKS_VERDICT_ADMITTED" ] || break
-    [ "$i" -lt "$max" ] || break
+    if [ "$i" -ge "$max" ]; then
+      [ "$max" -eq 0 ] ||
+        echo "warning: the launch in window $T recorded no Git hook carrier verdict within $max polls; proceeding" >&2
+      break
+    fi
     i=$((i + 1))
     sleep 0.1
   done

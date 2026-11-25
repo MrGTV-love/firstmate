@@ -42,7 +42,8 @@
 #       commit-msg and hook.fm-scan-push on pre-push, in that order. Each key
 #       and value is single-quoted in git's own GIT_CONFIG_PARAMETERS format,
 #       and each command quotes its script path for the shell git runs it in,
-#       so a path with spaces or quotes stays one argument. The output is one
+#       so a path with spaces or quotes stays one argument. A command runs no
+#       hook once <hooks-dir> itself is gone (row_command below). The output is one
 #       line with no trailing newline; fm-spawn records it as FM_GIT_HOOK_ROWS
 #       so the next launch can remove exactly these rows.
 #
@@ -342,6 +343,17 @@ git_config_row() {
   printf '%s=%s' "$(git_config_quote "$1")" "$(git_config_quote "$2")"
 }
 
+# row_command <hooks-dir> <script>: the shell command one row names. A process
+# started from a pane can outlive its task, and teardown removes the hooks
+# directory; the legacy carrier's dangling core.hooksPath then runs no hooks,
+# so a removed directory runs none here either, instead of failing every commit
+# and push of that process. A directory that exists but lacks the script still
+# fails, as git fails any missing hook command. Git appends the hook's own
+# arguments to the command.
+row_command() {
+  printf 'test ! -d %s || exec %s' "$(quote_for_hook "$1")" "$(quote_for_hook "$1/$2")"
+}
+
 print_rows() {
   local hooks_dir=$1 keep_trailers=${2:-0} name rows=
   case "$keep_trailers" in 0|1) ;; *) usage ;; esac
@@ -361,10 +373,10 @@ print_rows() {
       echo "error: $hooks_dir has no executable fm-strip; install it with keep-trailers=0" >&2
       return 1
     }
-    rows="$(git_config_row hook.fm-strip.event commit-msg) $(git_config_row hook.fm-strip.command "$(quote_for_hook "$hooks_dir/fm-strip")") "
+    rows="$(git_config_row hook.fm-strip.event commit-msg) $(git_config_row hook.fm-strip.command "$(row_command "$hooks_dir" fm-strip)") "
   fi
-  rows="$rows$(git_config_row hook.fm-scan-commit.event commit-msg) $(git_config_row hook.fm-scan-commit.command "$(quote_for_hook "$hooks_dir/fm-scan-commit")")"
-  rows="$rows $(git_config_row hook.fm-scan-push.event pre-push) $(git_config_row hook.fm-scan-push.command "$(quote_for_hook "$hooks_dir/fm-scan-push")")"
+  rows="$rows$(git_config_row hook.fm-scan-commit.event commit-msg) $(git_config_row hook.fm-scan-commit.command "$(row_command "$hooks_dir" fm-scan-commit)")"
+  rows="$rows $(git_config_row hook.fm-scan-push.event pre-push) $(git_config_row hook.fm-scan-push.command "$(row_command "$hooks_dir" fm-scan-push)")"
   printf '%s' "$rows"
 }
 
