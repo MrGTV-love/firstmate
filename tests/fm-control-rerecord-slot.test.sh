@@ -673,8 +673,10 @@ test_L11_an_uncommitted_file_under_a_new_directory_is_counted() {
 }
 
 test_L12_a_stale_spawn_lock_is_reclaimed() {
-  local out rc
+  local out rc jsum psum
   rr_setup_L10 L12
+  jsum=$(rr_sha "$RR_DIR/home/state/$RR_ID.control-relaunch")
+  psum=$(rr_sha "$RR_DIR/home/state/$RR_ID.control-relaunch.meta-prior")
   rr_start_spawn_lock_holder
   rr_stop_spawn_lock_holder
   [ -d "$RR_DIR/home/state/.spawn-$RR_ID.lock" ] || fail "L12: the stale lock was not left behind"
@@ -683,6 +685,8 @@ test_L12_a_stale_spawn_lock_is_reclaimed() {
   expect_code 0 "$rc" "L12"$'\n'"$out"
   rr_assert_l1 L12 "$out" "$RR_DIR/prior.meta"
   [ ! -e "$RR_DIR/home/state/.spawn-$RR_ID.lock" ] || fail "L12: the spawn lock remains after the run"
+  [ "$jsum" = "$(rr_sha "$RR_DIR/home/state/$RR_ID.control-relaunch")" ] || fail "L12: the journal changed"
+  [ "$psum" = "$(rr_sha "$RR_DIR/home/state/$RR_ID.control-relaunch.meta-prior")" ] || fail "L12: .meta-prior changed"
   rr_ok L12 "exit 0 as L10 over a dead holder's spawn lock; no spawn lock remains"
 }
 
@@ -694,6 +698,11 @@ test_E1_relaunch_after_rerecord_adopts() {
   out=$(rr_write); rc=$?
   expect_code 0 "$rc" "E1 rerecord"$'\n'"$out"
   sum=$(rr_sha "$RR_MANIFEST")
+  # The frozen F stops the agent as server-dead; a proven-gone tmux endpoint is replaced only on Herdr, so the relaunch
+  # step is staged on a dead pane in the same endpoint. The server-dead attempt is recorded as an observation.
+  out=$(rr_relaunch); rc=$?
+  rr_record E1-server-dead observation "relaunch on the frozen server-dead endpoint after rerecord: exit $rc; $(printf '%s\n' "$out" | grep -E '^error:' | head -n 2 | tr '\n' ' ')"
+  assert_not_contains "$out" 'slot adoption refused' "E1: adoption refused on the server-dead attempt"
   rr_dead_pane
   out=$(rr_relaunch); rc=$?
   expect_code 0 "$rc" "E1 relaunch"$'\n'"$out"
@@ -868,8 +877,11 @@ test_H19_agent_alive_after_a_failed_launch() {
   [ "$(cat "$RR_DIR/fake/command")" = claude ] || fail "H19: the agent is no longer alive"
 }
 test_H19b_agent_alive_after_a_confirmed_launch() {
+  local jsum
   rr_setup_H19b H19b
+  jsum=$(rr_sha "$RR_DIR/home/state/$RR_ID.control-relaunch")
   rr_expect_refusal H19b agent_not_proven_stopped
+  [ "$jsum" = "$(rr_sha "$RR_DIR/home/state/$RR_ID.control-relaunch")" ] || fail "H19b: the journal changed"
   [ "$(cat "$RR_DIR/fake/command")" = claude ] || fail "H19b: the agent is no longer alive"
 }
 test_H20_launch_in_progress() {
@@ -1190,7 +1202,6 @@ test_R6d_sigkill_after_the_restore_publish() {
   out=$(rr_write); rc=$?
   expect_code 0 "$rc" "R6d second run"$'\n'"$out"
   [ "$(rr_field "$a" result)" = rolled-back ] || fail "R6d: first audit is '$(rr_field "$a" result)'"
-  b=$(rr_audit_for "$p" ; true)
   [ "$(rr_count "$(rr_audits)")" = 2 ] || fail "R6d: expected two audit records"
   for b in $(rr_audits); do [ "$b" = "$a" ] || { [ "$(rr_field "$b" result)" = published ] && rr_agrees "$b"; } || fail "R6d: second audit"; done
   [ "$(rr_count "$(rr_archives)")" = 2 ] || fail "R6d: expected two archives"
@@ -1535,6 +1546,8 @@ test_S8_rollback() {
   rr_manifest_set created_at_iso '"2099-01-01T00:00:00+00:00"'
   rr_rollback_noop
   out=$(rr_run --manifest-sha "$(rr_field "$(rr_audit_for "$p")" manifest_sha256)" --note "$RR_NOTE"); rc=$?
+  [ "$rc" = 0 ] && case "$out" in *'was rolled back'*'already recorded'*) true ;; *) false ;; esac \
+    || fail "S8/R6b: the second run did not take the reconciliation's rollback branch and then the no-op"$'\n'"$out"
   [ "$(rr_sha "$RR_META")" != "$p" ] || fail "S8/R6b: the crashed write was rolled back"$'\n'"$out"
   rr_make_f S8-R9a; rr_signal_in_postcheck TERM; rr_rollback_noop; cp "$RR_META" "$RR_DIR/prior.meta"
   out=$(rr_write); rc=$?
@@ -1612,28 +1625,37 @@ test_S14b_own_line_is_nothing() {
 }
 rr_reconcile_noop() { rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_reconcile_pending() { return 0; }'; }
 test_S15_reconcile() {
-  local out p a
+  local out rc p a
   rr_make_f S15-R6b; p=$(rr_sha "$RR_META"); rr_crash_run "$RR_META" after 1; a=$(rr_audit_for "$p")
   rr_manifest_set created_at_iso '"2099-01-01T00:00:00+00:00"'
   rr_reconcile_noop
-  out=$(rr_run --manifest-sha "$(rr_field "$a" manifest_sha256)" --note "$RR_NOTE")
+  out=$(rr_run --manifest-sha "$(rr_field "$a" manifest_sha256)" --note "$RR_NOTE"); rc=$?
+  expect_code 0 "$rc" "S15/R6b: the shimmed run did not reach the no-op"$'\n'"$out"
+  assert_contains "$out" 'already recorded' "S15/R6b: the shimmed run did not reach the no-op"
   [ "$(rr_sha "$RR_META")" != "$p" ] || fail "S15/R6b: the crashed write was rolled back"$'\n'"$out"
   rr_setup_R6d S15-R6d; p=$(rr_sha "$RR_META"); rr_crash_run "$RR_META" after 2; a=$(rr_audit_for "$p")
   RR_CONTROL=; rr_reconcile_noop
-  out=$(rr_write)
+  out=$(rr_write); rc=$?
+  [ "$rc" = 0 ] && [ "$(rr_count "$(rr_audits)")" = 2 ] && printf '%s\n' "$(rr_results)" | grep -q published \
+    || fail "S15/R6d: the shimmed run did not publish its own write"$'\n'"$out"
   [ "$(rr_field "$a" result)" = rolling-back ] || fail "S15/R6d: the first audit record is '$(rr_field "$a" result)'"$'\n'"$out"
   rr_setup_R6d S15-R6e; p=$(rr_sha "$RR_META"); rr_crash_run "$RR_META" before 2; a=$(rr_audit_for "$p")
   RR_CONTROL=; rr_reconcile_noop
-  out=$(rr_write)
+  out=$(rr_write); rc=$?
+  expect_code 0 "$rc" "S15/R6e: the shimmed run did not reach the no-op"$'\n'"$out"
+  assert_contains "$out" 'already recorded' "S15/R6e: the shimmed run did not reach the no-op"
   [ "$(rr_field "$a" result)" = rolling-back ] || fail "S15/R6e: the first audit record is '$(rr_field "$a" result)'"$'\n'"$out"
   rr_make_f S15-R7; p=$(rr_sha "$RR_META"); rr_crash_run "$RR_META" before 1; a=$(rr_audit_for "$p")
   rr_reconcile_noop
-  out=$(rr_write)
+  out=$(rr_write); rc=$?
+  [ "$rc" = 0 ] && [ "$(rr_count "$(rr_audits)")" = 2 ] || fail "S15/R7: the shimmed run did not publish its own write"$'\n'"$out"
   [ "$(rr_field "$a" result)" = pending ] && rr_leftovers | grep -q "^\.$RR_ID\.meta\.rerecord\." \
     || fail "S15/R7: the audit record left pending with the staged file remaining was not observed"$'\n'"$out"
   rr_make_f S15-R9d; rr_term_runs_trap_with_child || true; p=$(rr_sha "$RR_META"); rr_signal_run; a=$(rr_audit_for "$p")
   rr_reconcile_noop
-  out=$(rr_write)
+  out=$(rr_write); rc=$?
+  expect_code 0 "$rc" "S15/R9d: the shimmed run did not reach the no-op"$'\n'"$out"
+  assert_contains "$out" 'already recorded' "S15/R9d: the shimmed run did not reach the no-op"
   [ "$(rr_field "$a" result)" = pending ] || fail "S15/R9d: the first audit record is '$(rr_field "$a" result)'"$'\n'"$out"
   rr_ok S15 "with a no-op reconciliation: R6b stays published against the changed manifest, R6d and R6e stay rolling-back, R7 stays pending with its staged file, R9d stays pending"
 }
