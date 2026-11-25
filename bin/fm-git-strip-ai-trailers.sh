@@ -7,7 +7,14 @@
 #       Commit-msg hook mode. Git passes the proposed message file as $1.
 #       Rewrites that file in place, then exits 0 so the commit proceeds.
 #   fm-git-strip-ai-trailers.sh install <hooks-dir> <worktree> [<keep-trailers:0|1>]
-#       Recreate <hooks-dir> as a core.hooksPath for this launch: pre-commit and
+#       Recreate <hooks-dir> for this launch. It carries both hook carriers
+#       (bin/fm-spawn.sh's header owns which one a launch selects):
+#       - Config carrier: fm-scan-commit (the scanner on the final index, run
+#         at commit-msg), fm-scan-push (the scanner at pre-push) and fm-strip
+#         (this strip), each named by a git config-based hook row from the
+#         rows command below. The repository's own core.hooksPath stays in
+#         force, so its hooks, reference-transaction included, run natively.
+#       - Legacy carrier: <hooks-dir> itself as a core.hooksPath: pre-commit and
 #       pre-push run the local fm-git-secrets.py scanner, which records guard
 #       events only for <worktree> itself, commit-msg runs this
 #       strip unless keep-trailers=1, plus wrappers per client-side hook name
@@ -28,6 +35,22 @@
 #       nonzero rather than skipping the repository's hook. Does not touch the
 #       project's git config; fm-spawn selects it through pane-scoped numbered
 #       GIT_CONFIG key/value entries (its header owns launch reconciliation).
+#   fm-git-strip-ai-trailers.sh rows <hooks-dir> [<keep-trailers:0|1>]
+#       Print the exact GIT_CONFIG_PARAMETERS rows that name the config
+#       carrier's scripts in an installed <hooks-dir>: hook.fm-strip on
+#       commit-msg (omitted when keep-trailers=1), hook.fm-scan-commit on
+#       commit-msg and hook.fm-scan-push on pre-push, in that order. Each key
+#       and value is single-quoted in git's own GIT_CONFIG_PARAMETERS format,
+#       and each command quotes its script path for the shell git runs it in,
+#       so a path with spaces or quotes stays one argument. A command runs no
+#       hook once <hooks-dir> itself is gone (row_command below). The output is one
+#       line with no trailing newline; fm-spawn records it as FM_GIT_HOOK_ROWS
+#       so the next launch can remove exactly these rows.
+#
+# The commit-time credential scan runs at commit-msg under the config carrier
+# (owner ruling 2026-11-24). commit-msg runs after the repository's pre-commit
+# hook on the index Git will commit, and on merge commits too, which pre-commit
+# skips; git commit --no-verify skips both alike.
 #
 # WHY THIS EXISTS. Claude launches already carry attribution-off in their
 # per-launch --settings JSON. Cursor and other non-Claude runtimes inject a
@@ -51,13 +74,23 @@
 # trailer found on a fleet commit therefore points at one of those two paths,
 # not at an unnoticed hole in the matcher.
 #
-# ACCEPTED RESIDUAL, ruled 2026-09-17. Inside a fleet pane git reports this
-# directory as the repository's hooks directory, so a hook manager run there
-# (lefthook's npm postinstall, pre-commit install) targets it and would
-# displace the strip. install leaves the directory and every hook in it
-# read-only, so such a manager fails loudly instead of silently winning. Hook
-# managers therefore cannot install from inside fleet panes until a registered
-# project genuinely needs it. Whoever removes the directory restores the owner
+# The same ruling covers each way of switching the config carrier off from the
+# command line, all of which a cooperative worker would have to type on purpose:
+# git -c hook.fm-scan-commit.enabled=false, -c hook.fm-scan-commit.command=true,
+# -c hook.fm-scan-commit.event= (and the same for the other two rows), and
+# env -u GIT_CONFIG_PARAMETERS. git -c core.hooksPath=/dev/null no longer
+# switches the fm hooks off under the config carrier, but it still skips the
+# repository's own hooks there, as it always did.
+#
+# ACCEPTED RESIDUAL, ruled 2026-09-17, legacy carrier only. Inside a fleet pane
+# on the legacy carrier git reports this directory as the repository's hooks
+# directory, so a hook manager run there (lefthook's npm postinstall,
+# pre-commit install) targets it and would displace the strip. install leaves
+# the directory and every hook in it read-only, so such a manager fails loudly
+# instead of silently winning. Under the config carrier git reports the
+# repository's own hooks directory, so a hook manager installs there as it
+# would outside a pane; the fm rows still run beside whatever it installs, so
+# no fm check is displaced. Whoever removes the directory restores the owner
 # write bit first.
 set -u
 unset CDPATH GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
@@ -69,6 +102,7 @@ usage() {
 usage:
   fm-git-strip-ai-trailers.sh <msgfile>
   fm-git-strip-ai-trailers.sh install <hooks-dir> <worktree> [<keep-trailers:0|1>]
+  fm-git-strip-ai-trailers.sh rows <hooks-dir> [<keep-trailers:0|1>]
 EOF
   exit 2
 }
@@ -270,7 +304,80 @@ EOF
       [ "$name" = pre-commit ] || runtime_chain_body "$hooks_dir"
     } | write_executable "$hooks_dir/$name" || return 1
   done
+
+  # Config carrier entry points. Git runs a config-based hook command through
+  # the shell with the hook's own arguments appended, so each script takes
+  # exactly what git passes: commit-msg's message file, which the scan does not
+  # need, and pre-push's remote name and location, with the ref-update records
+  # on stdin. Git gives every hook on an event its own copy of that stdin, so the
+  # repository's pre-push still reads the full stream after this scan.
+  # shellcheck disable=SC2016 # The generated hook expands its own arguments.
+  write_executable "$hooks_dir/fm-scan-commit" <<EOF || return 1
+#!/usr/bin/env bash
+exec python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") --task-worktree $(quote_for_hook "$wt") pre-commit
+EOF
+  # shellcheck disable=SC2016 # The generated hook expands its own arguments.
+  write_executable "$hooks_dir/fm-scan-push" <<EOF || return 1
+#!/usr/bin/env bash
+exec python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") --task-worktree $(quote_for_hook "$wt") pre-push "\$@"
+EOF
+  if [ "$keep_trailers" = 0 ]; then
+    # shellcheck disable=SC2016 # The generated hook expands its own arguments.
+    write_executable "$hooks_dir/fm-strip" <<EOF || return 1
+#!/usr/bin/env bash
+exec $(quote_for_hook "$SELF") "\$1"
+EOF
+  fi
   chmod 500 "$hooks_dir"
+}
+
+# git_config_quote <text>: one GIT_CONFIG_PARAMETERS token, quoted the way git
+# itself writes them (sq_quote): wrapped in single quotes, each embedded single
+# quote written as '\''.
+git_config_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+# git_config_row <key> <value>
+git_config_row() {
+  printf '%s=%s' "$(git_config_quote "$1")" "$(git_config_quote "$2")"
+}
+
+# row_command <hooks-dir> <script>: the shell command one row names. A process
+# started from a pane can outlive its task, and teardown removes the hooks
+# directory; the legacy carrier's dangling core.hooksPath then runs no hooks,
+# so a removed directory runs none here either, instead of failing every commit
+# and push of that process. A directory that exists but lacks the script still
+# fails, as git fails any missing hook command. Git appends the hook's own
+# arguments to the command.
+row_command() {
+  printf 'test ! -d %s || exec %s' "$(quote_for_hook "$1")" "$(quote_for_hook "$1/$2")"
+}
+
+print_rows() {
+  local hooks_dir=$1 keep_trailers=${2:-0} name rows=
+  case "$keep_trailers" in 0|1) ;; *) usage ;; esac
+  [ -n "$hooks_dir" ] || usage
+  hooks_dir=$(CDPATH='' cd -- "$hooks_dir" 2>/dev/null && pwd -P) || {
+    echo "error: hooks directory is not installed: $1" >&2
+    return 1
+  }
+  for name in fm-scan-commit fm-scan-push; do
+    [ -x "$hooks_dir/$name" ] || {
+      echo "error: $hooks_dir has no executable $name; run install first" >&2
+      return 1
+    }
+  done
+  if [ "$keep_trailers" = 0 ]; then
+    [ -x "$hooks_dir/fm-strip" ] || {
+      echo "error: $hooks_dir has no executable fm-strip; install it with keep-trailers=0" >&2
+      return 1
+    }
+    rows="$(git_config_row hook.fm-strip.event commit-msg) $(git_config_row hook.fm-strip.command "$(row_command "$hooks_dir" fm-strip)") "
+  fi
+  rows="$rows$(git_config_row hook.fm-scan-commit.event commit-msg) $(git_config_row hook.fm-scan-commit.command "$(row_command "$hooks_dir" fm-scan-commit)")"
+  rows="$rows $(git_config_row hook.fm-scan-push.event pre-push) $(git_config_row hook.fm-scan-push.command "$(row_command "$hooks_dir" fm-scan-push)")"
+  printf '%s' "$rows"
 }
 
 CMD=${1:-}
@@ -278,6 +385,10 @@ case "$CMD" in
 install)
   { [ "$#" -eq 3 ] || [ "$#" -eq 4 ]; } || usage
   install_hooks "$2" "$3" "${4:-0}"
+  ;;
+rows)
+  { [ "$#" -eq 2 ] || [ "$#" -eq 3 ]; } || usage
+  print_rows "$2" "${3:-0}"
   ;;
 -h | --help)
   usage

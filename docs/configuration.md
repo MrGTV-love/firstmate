@@ -2306,17 +2306,24 @@ Report raw counts and outcomes, not estimated savings from a single synthetic sm
 ### Commit attribution
 
 The optional local, gitignored `config/keep-ai-trailers` presence flag opts this home into keeping AI co-author trailers on its launched workers.
-With the flag absent, every Claude launch's inline `--settings` JSON carries `"attribution":{"commit":"","pr":"","sessionUrl":false}`, every Devin worker config sets `"attribution": false`, and every fleet launch receives a pane-scoped `GIT_CONFIG` `core.hooksPath` pointing at `state/<id>.git-hooks`, where git's `commit-msg` hook strips known AI trailers even when a runtime injects them after the typed message.
+With the flag absent, every Claude launch's inline `--settings` JSON carries `"attribution":{"commit":"","pr":"","sessionUrl":false}`, every Devin worker config sets `"attribution": false`, and every fleet launch carries the task Git hooks in `state/<id>.git-hooks`, whose `commit-msg` strip removes known AI trailers even when a runtime injects them after the typed message.
 When the flag is present, Claude launches omit those attribution-off settings, Devin worker configs keep the user config's `attribution` setting (Devin's default is on), and the task Git hooks omit only the commit-message strip.
 Fresh launches and supported same-task relaunches apply the current attribution choice without retaining that task's obsolete hook selection, including when `config/launch-env-allowlist` is enabled.
 Unrelated Git environment entries and explicit operator settings remain in the persistent pane; their inheritance by the worker is subject to the [launch environment filter](#worker-launch-environment-configlaunch-env-allowlist).
 Every fleet launch selects the task Git hooks for the [commit and push credential check](#jev-guard), independently of the attribution choice.
-`bin/fm-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs in either attribution posture.
-A repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
-The task hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the task hooks, which hold the credential checks and, unless trailers are kept, the strip; install a project's hooks from outside the pane, where the wrappers chain them.
+The launch carries them in one of two ways, chosen in the pane itself with the pane's own git:
+- The config carrier adds Git config-based hook rows (`hook.fm-strip` and `hook.fm-scan-commit` on `commit-msg`, `hook.fm-scan-push` on `pre-push`) to `GIT_CONFIG_PARAMETERS` and leaves the repository's own `core.hooksPath` in force, so every project hook, `reference-transaction` included, runs as it would outside the pane.
+  It needs Git 2.54 or later and is used only for harnesses proven to keep the rows in their tool shell; [runtime backend verification](verification/runtime-backends.md#task-git-hook-carrier-in-the-worker-tool-shell) records which.
+- The legacy carrier points a pane-scoped numbered `GIT_CONFIG` `core.hooksPath` at the task hooks directory, whose wrappers chain the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs; it does not chain `reference-transaction` or `post-index-change`.
+  Every other harness, and any pane whose git does not list the rows, uses it.
+A pane with no git on its PATH, a malformed `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS`, or a git that honours neither carrier refuses the launch, and the spawn fails naming the reason.
+Under the legacy carrier, a repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
+Under the legacy carrier the task hooks directory is git's hooks directory and is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the task hooks; install a project's hooks from outside the pane, where the wrappers chain them.
+Under the config carrier a hook manager installs into the repository's own hooks directory, and the task hook rows still run beside whatever it installs.
+`bin/fm-git-strip-ai-trailers.sh` owns the identities, the hook scripts and their rows.
 The flag is a home-wide attribution choice, independently owned by each home and not inherited into secondmate homes; the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract leaves each home's presence or absence unchanged.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Firstmate, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
-[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns launch-boundary reconciliation, with model-free real-tmux transition and preservation coverage in [`tests/fm-git-strip-ai-trailers.test.sh`](../tests/fm-git-strip-ai-trailers.test.sh).
+[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns carrier selection and launch-boundary reconciliation, with model-free real-tmux transition and preservation coverage in [`tests/fm-git-strip-ai-trailers.test.sh`](../tests/fm-git-strip-ai-trailers.test.sh) and staged-launch carrier coverage in [`tests/fm-spawn-git-hook-carrier.test.sh`](../tests/fm-spawn-git-hook-carrier.test.sh).
 
 ### Claude API key guard
 
@@ -3421,7 +3428,8 @@ No current guard handler builds a screening request: shell calls, tool results a
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
 The service refuses a larger request with `RequestTooLargeError` before anything is sent; it plans no overlapping pieces.
 Write/edit content has no model-screening size limit and no model coverage audit.
-Credential checks run locally in the per-task `pre-commit` and `pre-push` hooks installed by [`bin/fm-git-strip-ai-trailers.sh`](../bin/fm-git-strip-ai-trailers.sh), for every launched harness and project, independently of `config/keep-ai-trailers` and Jev scope.
+Credential checks run locally in the per-task Git hooks installed by [`bin/fm-git-strip-ai-trailers.sh`](../bin/fm-git-strip-ai-trailers.sh), for every launched harness and project, independently of `config/keep-ai-trailers` and Jev scope: at commit and at push.
+Under the [config carrier](#commit-attribution) the commit check runs at `commit-msg`, which also covers merge commits; under the legacy carrier it runs at `pre-commit`.
 [`bin/fm-git-secrets.py`](../bin/fm-git-secrets.py) scans only added content: the lines the staged index adds against `HEAD`, after the repository's pre-commit hook succeeds, including changes that hook stages, not their working-copy counterparts.
 Existing and moved lines are not scanned again; only new lines are: within one diff, each removed copy of a line cancels one added copy of the same text in any file, so renaming, moving or splitting a file adds nothing new.
 A merge commit is scanned only for lines new relative to every parent, so content brought in from either side is not rescanned.
@@ -3440,6 +3448,7 @@ It reports affected file names only, never matching values, and refuses when ins
 Writing a credential to an ignored `.env` is allowed and stages nothing; force-adding that file still subjects it to the commit check.
 Placeholders such as `replace-me` pass, but an added placeholder shaped like one of the listed credentials can fail; unfamiliar or encoded credentials can be missed.
 This is a client-side check, not a security boundary against hook bypass, alternate Git object writers, or pushes made outside the task launch environment.
+Hook bypass includes `git commit --no-verify` and, under the config carrier, `git -c hook.fm-scan-commit.enabled=false` (or `.command=true`, or an empty `.event`) and `env -u GIT_CONFIG_PARAMETERS`; `git -c core.hooksPath=/dev/null` no longer bypasses the task hooks there, though it still skips the repository's own hooks.
 [`tests/fm-git-secrets.test.sh`](../tests/fm-git-secrets.test.sh) exercises staged credentials, ignored files, placeholders, edits beside existing fixtures, renamed and split files, conflicted merges, repeated and abandoned refusals, outgoing history, URL and new-remote pushes, squash and cherry-pick replays of a commit already on a remote, and complete 396,924-byte report writes through both write adapters without provider calls.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
 
