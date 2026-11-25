@@ -565,8 +565,9 @@
 #   later get runs beneath that subshell, so the pane's process tree holds a shell inside the passed-over copy, and
 #   closing the pane ends that shell, which can let Treehouse release or reset a copy another holder may lease. An abort
 #   after a pass-over, before launch, instead interrupts any `treehouse get` in the pane's foreground and proves from the
-#   process table that those processes are gone and that the pane rests in a copy this spawn recorded; anything else
-#   (a get still alive, a pane resting in an unrecorded copy, a foreground the backend cannot read) is an error. Either
+#   process table that those processes are gone and that the pane rests in a copy this spawn passed over or leased in
+#   place; anything else (a get still alive, a pane resting in another copy, a foreground the backend cannot read, which
+#   is interrupted all the same) is an error. Either
 #   way the pane is recorded, read back, in $DATA/<task>/acquisition-pane.tsv. A recovered lease is freed by Treehouse itself
 #   once the copy is idle, clean and landed. Each passed-over copy is a distinct copy the acquisition never accepts again,
 #   so the loop ends by the one absolute bound below or by the copies the pool has, with the refusal naming each copy.
@@ -6284,8 +6285,8 @@ spawn_pid_is_treehouse() { # <pid>
 }
 # Settle the acquisition pane on an abort after a pass-over, without closing it (the header owns why). A `treehouse get`
 # in the pane's foreground is interrupted through the backend and must then be gone from the process table, and the pane
-# must rest in a copy this spawn recorded; a get still alive, a pane resting anywhere else, or a foreground or path the
-# backend cannot read is an error. The outcome is recorded and read back in $DATA/<task>/acquisition-pane.tsv
+# must rest in a copy this spawn passed over or leased in place; a get still alive, a pane resting anywhere else, or a
+# foreground or path the backend cannot read (interrupted all the same) is an error. The outcome is recorded and read back in $DATA/<task>/acquisition-pane.tsv
 # (endpoint, outcome, detail, epoch). Returns 1 unless the pane was proved settled and recorded. Never exits.
 spawn_settle_passed_over_pane() {
   local target=$SPAWN_PASSED_OVER_PANE fg pid gets='' alive='' path='' outcome='' detail row i=0
@@ -6293,8 +6294,12 @@ spawn_settle_passed_over_pane() {
   for pid in $fg; do
     ! spawn_pid_is_treehouse "$pid" || gets="${gets:+$gets }$pid"
   done
-  if [ -n "$gets" ]; then
+  # Before launch the foreground is a get or an interactive shell, which an interrupt leaves at its prompt, so a foreground
+  # that cannot be read is interrupted too; only the process table can say the get is gone, so that outcome stays unproved.
+  if [ -n "$gets" ] || [ -z "$fg" ]; then
     spawn_send_key "$target" C-c >/dev/null 2>&1 || true
+  fi
+  if [ -n "$gets" ]; then
     while :; do
       alive=''
       for pid in $gets; do
@@ -6307,7 +6312,7 @@ spawn_settle_passed_over_pane() {
   fi
   if [ -z "$fg" ]; then
     outcome=unobservable
-    detail="the $BACKEND backend did not report the pane's foreground processes, so no treehouse get in it is proved cancelled"
+    detail="the $BACKEND backend did not report the pane's foreground processes, so an interrupt was sent but no treehouse get in it is proved cancelled"
   elif [ -n "$alive" ]; then
     outcome=get-not-cancelled
     detail="treehouse get process(es) $alive in its foreground were interrupted but are still running and can still take a copy no record names"
@@ -6321,19 +6326,19 @@ spawn_settle_passed_over_pane() {
     path=$(spawn_current_path "$target" 2>/dev/null) || path=
     if [ -z "$fg" ] || [ -z "$path" ]; then
       outcome=unobservable
-      detail="the pane's foreground or current path could not be read after the interrupt, so it is not proved to rest in a copy this spawn recorded"
+      detail="the pane's foreground or current path could not be read after the interrupt, so it is not proved to rest in a copy this spawn passed over or leased in place"
     elif [ -n "$alive" ]; then
       outcome=get-not-cancelled
       detail="treehouse process(es) $alive are in its foreground after the interrupt and can still take a copy no record names"
     elif ! spawn_slot_skipped "$path"; then
       outcome=unrecorded-copy
-      detail="it rests in $path, which no record of this spawn names, so a shell there holds that copy"
+      detail="it rests in $path, which is not a copy this spawn passed over or leased in place, so a shell there holds that copy outside skipped-copies.tsv"
     elif [ -n "$gets" ]; then
       outcome=get-cancelled
-      detail="the treehouse get running in it (pid(s) $gets) was interrupted and is gone, and it rests in $path, a copy this spawn recorded"
+      detail="the treehouse get running in it (pid(s) $gets) was interrupted and is gone, and it rests in $path, a copy this spawn passed over or leased in place"
     else
       outcome=no-get
-      detail="no treehouse get was running in it, and it rests in $path, a copy this spawn recorded"
+      detail="no treehouse get was running in it, and it rests in $path, a copy this spawn passed over or leased in place"
     fi
   fi
   row=$(printf '%s\t%s\t%s\t%s' "$target" "$outcome" "$(printf '%s' "$detail" | tr '\t\r\n' '   ')" "$(date +%s)")

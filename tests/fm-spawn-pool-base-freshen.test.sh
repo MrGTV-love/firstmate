@@ -3460,7 +3460,8 @@ test_a_refused_copy_handed_out_twice_does_not_loop() {
 }
 
 # install_window_log <log>: the case's tmux answers new-window with a window id and logs each new-window and kill-window
-# call, so a case sees whether the spawn closed the pane it created. Every other call goes to the fixture's tmux stub.
+# call and each interrupt key sent, so a case sees whether the spawn closed or interrupted the pane it created. Every other
+# call goes to the fixture's tmux stub.
 install_window_log() {
   local log=$1 inner="$FAKEBIN_DIR/tmux.fixture"
   mv "$FAKEBIN_DIR/tmux" "$inner" || fail "the tmux stub could not be wrapped"
@@ -3469,6 +3470,7 @@ install_window_log() {
 case "\${1:-}" in
   new-window) printf '%s\\n' "\$*" >> '$log'; printf '@41\\n'; exit 0 ;;
   kill-window) printf '%s\\n' "\$*" >> '$log'; exit 0 ;;
+  send-keys) [ "\${!#}" != C-c ] || printf '%s\\n' "\$*" >> '$log' ;;
 esac
 exec '$inner' "\$@"
 SH
@@ -3494,6 +3496,15 @@ test_a_passed_over_pane_is_not_closed_on_abort() {
   assert_contains "$out" "aborting acquisition" "the all-refused spawn did not end with its acquisition refusal"
   grep -Fq 'new-window' "$log" || fail "the spawn created no pane, so its close could not be observed"
   ! grep -Fq 'kill-window' "$log" || fail "the all-refused spawn closed the pane in a passed-over copy: $(cat "$log")"
+  # This stub tmux reports no foreground processes, so the abort interrupts the pane but cannot prove the get gone: it
+  # must say so plainly and record the pane, never report a clean abort.
+  grep -Fq 'send-keys -t @41 C-c' "$log" || fail "the all-refused spawn did not interrupt the pane it kept open: $(cat "$log")"
+  assert_contains "$out" "acquisition pane @41" "the abort did not name the pane it kept open"
+  assert_contains "$out" "is not settled" "an abort that could not read the pane's foreground was not reported as unsettled"
+  assert_not_contains "$out" "notice: acquisition pane" "an abort that could not read the pane's foreground was reported as settled"
+  grep -q $'^@41\tunobservable\t' "$HOME_DIR/data/$id/acquisition-pane.tsv" \
+    || fail "the kept pane was not recorded as unobservable: $(cat "$HOME_DIR/data/$id/acquisition-pane.tsv" 2>&1)"
+  grep -q $'\t@41$' "$HOME_DIR/data/$id/skipped-copies.tsv" || fail "the passed-over rows do not name the acquisition pane: $(cat "$HOME_DIR/data/$id/skipped-copies.tsv")"
 
   id='pool-pane-kept-handed-twice'
   make_real_pool_case pane-kept-handed-twice "$id" 2

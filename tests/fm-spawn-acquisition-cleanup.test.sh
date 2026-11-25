@@ -119,6 +119,8 @@ if [ "\$MODE" = passover ] && [ ! -e "\$FIRSTPID" ]; then
 fi
 [ "\$MODE" != passover ] || MODE=slow
 trap 'rm -f "\$LEASE"; exit 0' HUP INT TERM
+# A get that ignores an interrupt stands in for one that no interrupt can prove cancelled.
+[ "\${IGNORE_INT:-0}" != 1 ] || trap '' INT
 trap 'rm -f "\$LEASE"' EXIT
 printf '%s\n' "\$\$" > "\$PIDFILE"
 touch "\$LEASE"
@@ -393,7 +395,9 @@ done
 # shows another holder's lease, so the spawn passes it over and keeps the pane open; the second get, for copy B, makes no
 # progress and the no-progress limit ends the spawn. That get must be interrupted and gone from the process table, B never
 # entered, A byte-identical with its lease, and the pane still open with A's shell and the get that opened it alive.
-# run_passover_inflight_case <label> <bash-env>: the spawn runs with <bash-env> as BASH_ENV, so the control can inject a fault.
+# run_passover_inflight_case <label> <bash-env> [stubborn]: the spawn runs with <bash-env> as BASH_ENV, so the control can
+# inject a fault. With stubborn the second get ignores the interrupt: the abort must then say plainly that the pane is not
+# settled, record that, and still leave the pane and copy A as they are; the case ends that get by its own pid.
 passover_copy_digest() { # <copy> <state-file>
   (
     set -o pipefail
@@ -404,7 +408,8 @@ passover_copy_digest() { # <copy> <state-file>
   )
 }
 run_passover_inflight_case() {
-  local label=$1 bash_env=$2 id case th_root a_copy b_copy state before after wid rc get2 row
+  local label=$1 bash_env=$2 kind=${3:-cancellable} id case th_root a_copy b_copy state before after wid rc get2 row ignore=0
+  [ "$kind" != stubborn ] || ignore=1
   id="get-cleanup-$label-$$"
   case="$TMP_ROOT/case-$label"
   th_root="$case/th-root"
@@ -419,8 +424,8 @@ run_passover_inflight_case() {
     || fail "$label: copy A does not carry the other holder's lease in the pool state"
   before=$(passover_copy_digest "$a_copy" "$state") || fail "$label: copy A could not be read before the spawn"
   : > "$case/ticks"
-  printf 'MODE=passover\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\nPASSED=%q\nFIRSTPID=%q\nASHELL=%q\n' \
-    "$case/lease" "$case/pid" "$case/allow" "$case/arrived" "$b_copy" "$case/ticks" "$a_copy" "$case/first-pid" "$case/a-shell" \
+  printf 'MODE=passover\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\nPASSED=%q\nFIRSTPID=%q\nASHELL=%q\nIGNORE_INT=%q\n' \
+    "$case/lease" "$case/pid" "$case/allow" "$case/arrived" "$b_copy" "$case/ticks" "$a_copy" "$case/first-pid" "$case/a-shell" "$ignore" \
     > "$TMP_ROOT/get-config"
   fm_test_spawn_brief "$FM_HOME" "$id" 'A get in flight after a pass-over must not outlive the refused spawn.'
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$case/claude" PATH="$FAKEBIN:$PATH" \
@@ -433,6 +438,27 @@ run_passover_inflight_case() {
   assert_contains "$out" 'no path or output progress for 600s' "$label: the second get was not ended by the no-progress limit"
   [ -s "$case/pid" ] || fail "$label: the second get never started: $out"
   get2=$(cat "$case/pid")
+  if [ "$kind" = stubborn ]; then
+    kill -0 "$get2" 2>/dev/null || fail "$label: the second get did not survive the interrupt, so the case is vacuous: $out"
+    assert_contains "$out" 'is not settled' "$label: an abort whose get survived was not reported as not settled"
+    assert_contains "$out" 'this abort is not clean' "$label: an abort whose get survived was not called unclean"
+    assert_not_contains "$out" 'notice: acquisition pane' "$label: an abort whose get survived was reported as settled"
+  fi
+  wid=$("$REAL_TMUX" list-windows -a -F '#{window_id} #{window_name}' | awk -v n="fm-$id" '$2 == n { print $1 }')
+  [ -n "$wid" ] || fail "$label: the spawn closed the acquisition pane while it still held copy A"
+  if [ "$kind" = stubborn ]; then
+    grep -q "^$wid"$'\t'"get-not-cancelled"$'\t' "$FM_HOME/data/$id/acquisition-pane.tsv" \
+      || fail "$label: the surviving get was not recorded against pane $wid: $(cat "$FM_HOME/data/$id/acquisition-pane.tsv" 2>&1)"
+    after=$(passover_copy_digest "$a_copy" "$state") || fail "$label: copy A could not be read after the spawn"
+    [ "$after" = "$before" ] || fail "$label: copy A or its pool state changed"
+    kill -0 "$(cat "$case/a-shell")" 2>/dev/null || fail "$label: copy A's subshell is gone"
+    # The case owns this get: end it by its own pid, then let nothing more reach copy B.
+    kill -TERM "$get2" 2>/dev/null || true
+    for _ in $(seq 1 250); do kill -0 "$get2" 2>/dev/null || break; /bin/sleep 0.02; done
+    ! kill -0 "$get2" 2>/dev/null || fail "$label: the case could not end its own surviving get $get2"
+    [ ! -e "$case/arrived" ] || fail "$label: the surviving get entered copy B"
+    return 0
+  fi
   # The process table, not the spawn's exit status, says whether the second get survived the refusal.
   ! kill -0 "$get2" 2>/dev/null || fail "$label: the spawn left the second treehouse get (pid $get2) running after it refused: $out"
   touch "$case/allow"
@@ -442,8 +468,6 @@ run_passover_inflight_case() {
   [ ! -f "$FM_HOME/state/$id.meta" ] || fail "$label: a refused spawn published task metadata"
   after=$(passover_copy_digest "$a_copy" "$state") || fail "$label: copy A could not be read after the spawn"
   [ "$after" = "$before" ] || fail "$label: copy A or its pool state changed"$'\n'"$(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") | head -20)"
-  wid=$("$REAL_TMUX" list-windows -a -F '#{window_id} #{window_name}' | awk -v n="fm-$id" '$2 == n { print $1 }')
-  [ -n "$wid" ] || fail "$label: the spawn closed the acquisition pane while it still held copy A"
   kill -0 "$(cat "$case/first-pid")" 2>/dev/null || fail "$label: the get that opened copy A's subshell is gone"
   kill -0 "$(cat "$case/a-shell")" 2>/dev/null || fail "$label: copy A's subshell is gone"
   [ "$(CDPATH='' cd -- "$("$REAL_TMUX" display-message -p -t "$wid" '#{pane_current_path}')" && pwd -P)" = "$a_copy" ] \
@@ -479,6 +503,8 @@ SH
     [ "$rc" -ne 0 ] || fail 'the pass-over in-flight case passed with a spawn that leaves the second get running'
     assert_contains "$out" 'the spawn left the second treehouse get' 'the control failed for another reason than the surviving get'
     pass 'tmux the pass-over in-flight case rejects an abort that leaves the second get running'
+    run_passover_inflight_case passover-stubborn "$TMP_ROOT/clock.sh" stubborn
+    pass 'tmux an abort after a pass-over whose get survives the interrupt says the pane is not settled and records it'
   fi
 fi
 [ "${FM_TEST_ACQUISITION_CASES:-all}" != passover ] || exit 0
