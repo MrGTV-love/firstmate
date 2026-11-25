@@ -1972,15 +1972,6 @@ fm_slot_rerecord_rollback() {
   RERECORD_STAGE='done'
 }
 
-# --check's write_would= while audit records are pending: a write reconciles them first (step 3) and then runs the later
-# proofs, so a refusal those proofs already named follows the reconciliation.
-fm_slot_rerecord_pending_verdict() { # <would> <pending-audit-names>
-  case "$1" in
-    refuse:*) printf 'reconcile-pending:%s;%s\n' "$2" "$1" ;;
-    *) printf 'reconcile-pending:%s\n' "$2" ;;
-  esac
-}
-
 # Classify the current record against a pending or rolling-back audit record: whole-record digests first, then the slot
 # block the verb owns.
 fm_slot_rerecord_pending_state() { # <audit> <record>

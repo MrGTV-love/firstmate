@@ -3150,8 +3150,8 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
         would="already recorded"
       fi
       if [ -n "$FM_RR_PENDING" ]; then
-        echo "verdict_basis=pre-reconcile: the verdict and scope lines judge the current record before a write reconciles $FM_RR_PENDING; run --check again after a write run reconciles them"
-        [ "$launch_proof" != ok ] || would=$(fm_slot_rerecord_pending_verdict "$would" "$FM_RR_PENDING")
+        echo "verdict_basis=pre-reconcile: the proof lines and the base and scope lines describe the current record before reconciliation; run --check again after a write run reconciles $FM_RR_PENDING to see the verdict it would then reach"
+        [ "$launch_proof" != ok ] || would="reconcile-pending:$FM_RR_PENDING"
       fi
       echo "write_would=$would"
       [ "$noop" = 1 ] || echo "command: bin/fm-control.sh $ID rerecord-slot --manifest-sha $manifest_sha --note '<the ruling this carries out>'"
