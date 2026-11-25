@@ -1,0 +1,73 @@
+
+===== S1 clean merge of base into reviewed PR carries the PASS (base moved again after) =====
+reviewed R=f3632e533d51 live H=38d343c2f6a8
+$ fm-review-record.py verify --head 38d343c2f6a8 --base 2da64474b1aa 
+review: PASS
+review: review carried from f3632e533d51de9334cece6c52191438f66e34f7: the live head is that reviewed change merged cleanly with its base
+[exit 0]
+$ fm-review-record.py verify --head 38d343c2f6a8 --base 2da64474b1aa --json
+{"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"38d343c2f6a868af262470dbc606798b2602b450","at":1795630572,"reader_model":"sonnet","reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"report":"<tmp>/s1/report-PASS-f3632e533d51de9334cece6c52191438f66e34f7.md","report_sha256":"f2f7957cb83ee36071c534fb9c9a762531d7518cea33e5b2abc5988c21ebc651","carried_from":"f3632e533d51de9334cece6c52191438f66e34f7","facts":["review carried from f3632e533d51de9334cece6c52191438f66e34f7: the live head is that reviewed change merged cleanly with its base"]}
+[exit 0]
+$ fm-review-record.py verify --head 38d343c2f6a8 --base 2da64474b1aa --review-only
+review: PASS
+review: review carried from f3632e533d51de9334cece6c52191438f66e34f7: the live head is that reviewed change merged cleanly with its base
+[exit 0]
+task object files before=14 after=14 (must be equal)
+$ fm-review-record.py plan --head 38d343c2f6a8 --base 2da64474b1aa   (plan answers for the exact head only)
+{"schema":"fm-review-plan.v1","ok":true,"pr":"https://github.com/example/repo/pull/9","head":"38d343c2f6a868af262470dbc606798b2602b450","groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"uncovered":[{"group":"ship","families":["openai"]}]}
+[exit 0]
+
+===== S2 clean rebase onto base carries the PASS =====
+$ fm-review-record.py verify --head 785335565bfa --base 4cd8d32c7192 
+review: PASS
+review: review carried from 9f4f0e7a39800e2c1add858a0a66ea697638d766: the live head is that reviewed change merged cleanly with its base
+[exit 0]
+
+===== S3 ADVERSARIAL: one unread line hidden inside the update merge is refused =====
+$ fm-review-record.py verify --head b4ed251ee84a --base 5bbc922eb5e3 --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 28b4d774c63ee9042a0da670393fd601d1727916, live head is b4ed251ee84ab25135b8a0b6d57a34227396a635; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read)"}}
+[exit 1]
+
+===== S4 ADVERSARIAL: conflicted update resolved to the reviewed side is refused =====
+$ fm-review-record.py verify --head c9a28e78dffe --base 7bfb3af0aad1 
+error: head mismatch: review names e28b42bb917679426a9e24a2f0769fba48f03c13, live head is c9a28e78dffe9b122b87a609fd26dba733f816f4; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains); inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+===== S5 ADVERSARIAL: same conflict, but task worktree config+attributes and GIT_CONFIG_* env select a take-the-PR-side merge driver =====
+control: plain git merge-tree in the task worktree with that driver:
+  driver tree=7dba106d8d12 live tree=7dba106d8d12 (equal means the driver would fool an unisolated proof)
+$ fm-review-record.py verify --head a94710a4ebbd --base 28ecab7422a0 
+error: head mismatch: review names 3563a7ef4d1013ba2af52c9f0e46bdbdd9b51985, live head is a94710a4ebbdc22da1389d98ba1789c93043f8be; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains); inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+-- and with GIT_CONFIG_COUNT env injecting the driver:
+$ fm-review-record.py verify --head a94710a4ebbd --base 28ecab7422a0 
+error: head mismatch: review names 3563a7ef4d1013ba2af52c9f0e46bdbdd9b51985, live head is a94710a4ebbdc22da1389d98ba1789c93043f8be; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains); inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+===== S6 ADVERSARIAL: a replace ref swaps the live head for a commit whose tree matches =====
+with replace refs honored, H^{tree}=7dba106d8d12; clean tree=7dba106d8d12
+$ fm-review-record.py verify --head 7dc96a2d0265 --base 9e2e0f14c00c 
+error: head mismatch: review names fcf666375f319b165aa92f3b323dca4398dea27d, live head is 7dc96a2d02655e1c74cef9723037015b276b68e3; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read); inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+===== S7 captain-word at the reviewed head never carries =====
+$ fm-review-record.py verify --head 51f0ed3dc84a --base f3ff1527fe7f 
+error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+===== S8 a standing FAIL at the reviewed head still stands =====
+$ fm-review-record.py verify --head dd93fae9e316 --base aedec53fdebc 
+error: head mismatch: review names 7dcefca68caf0141e2f00a123baa8a4bbcbd3804, live head is dd93fae9e31634443c6848db51786087a9bd301e; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reads at 7dcefca68caf0141e2f00a123baa8a4bbcbd3804 do not qualify: verdict is FAIL at 7dcefca68caf0141e2f00a123baa8a4bbcbd3804 (reader gemini-3-pro, report <tmp>/s8/report-FAIL-7dcefca68caf0141e2f00a123baa8a4bbcbd3804.md); no later exact-head PASS covers group ship, family openai, that this FAIL read; record later exact-head PASS reads of that group from readers outside each of its families with: FM_HOME=<tmp>/s8/home FM_STATE_OVERRIDE=<tmp>/s8/home/state <repo>/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head dd93fae9e31634443c6848db51786087a9bd301e --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1"]}' --covered-groups '["ship"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=<tmp>/s8/home FM_STATE_OVERRIDE=<tmp>/s8/home/state <repo>/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head dd93fae9e31634443c6848db51786087a9bd301e --words FRESH_CAPTAIN_WORDS); inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+===== S9 any read of the live head turns carry-over off =====
+$ fm-review-record.py verify --head 8efb3ac44190 --base 073e050c78cb 
+error: head mismatch: review names 23c58d269b74e0d02df814d43260986c4263e750, live head is 8efb3ac44190107faa93191ad9897d8908b5b70d; review the live head and record its PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+===== S10 ADVERSARIAL: an older-head PASS recorded after a FAIL at a later version is not carried =====
+H is R merged cleanly with trunk, so only the ancestry rule can refuse it
+R=c4d4b00966b8 (PASS, recorded last)  R2=848f56d96a28 (FAIL, later version)  H=500f8fc79755
+$ fm-review-record.py verify --head 500f8fc79755 --base c433a5630f1c 
+error: head mismatch: review names c4d4b00966b82ad79423da333bcc3319023395cf, live head is 500f8fc7975596955a19f304628d7b2d4be54637; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 848f56d96a28301d727ab006a6ec93ffb78d81d7, which the reviewed head does not build on, so its reads may judge this change); inspect review-records.jsonl in the PR task home before retrying
+[exit 1]

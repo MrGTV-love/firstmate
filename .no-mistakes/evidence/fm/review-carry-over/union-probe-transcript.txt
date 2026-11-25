@@ -1,0 +1,6 @@
+merge exit=0 (0 means union resolved it in the worktree)
+pr line
+base line
+H=eea23d335129 R=2bf95c63bba8
+error: head mismatch: review names 2bf95c63bba8d31d3c63eba7e040235ff0c1407d, live head is eea23d335129ad721ebfd700a4bf77135c8b8f0d; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains); inspect review-records.jsonl in the PR task home before retrying
+[exit 1]

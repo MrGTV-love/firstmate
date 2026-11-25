@@ -1,0 +1,22 @@
+  step -> state=[reading f9fb45f2373f by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
+  step -> state=[held: protected class yes - security-sensitive fixture] reads=1 reviews=1 merges=0
+  step -> state=[held: protected class yes - security-sensitive fixture] reads=1 reviews=1 merges=0
+tests/zz-tmp-carry-protected.test.sh: line 3133: NM_FIXTURE: unbound variable
+  live check: verify at h2 -> 
+  h1=f9fb45f2373f h2=e9987bd7f72d
+## carry-over protected-yes at R
+  fake runner argv:
+    argv: <tmp>/auto-carry-protected/state/.pr-auto-review/task-x1.d/f9fb45f2373f-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|f9fb45f2373f449e4b4dbe8ed2324cf7984a45b9|pr.diff|<tmp>/auto-carry-protected/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+  review-lane events (fm-pr-auto-review.py events task-x1):
+    1795630540 f9fb45f2373f reading f9fb45f2373f by claude-sonnet-5-5[1m] for openai
+    1795630541 f9fb45f2373f verdict recorded: PASS for f9fb45f2373f by claude-sonnet-5-5[1m], report <tmp>/auto-carry-protected/state/.pr-auto-review/task-x1.d/f9fb45f2373f-claude-sonnet-5-5_1m_/review.md
+    1795630543 e9987bd7f72d held: protected class yes - security-sensitive fixture at e9987bd7f72d; the merge is Main's
+  review records (state/review-records.jsonl):
+    {"verdict":"PASS","head":"f9fb45f2373f","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+  forge merge calls (fake gh log):
+  current state: held: protected class yes - security-sensitive fixture
+ok - a carried PASS is judged by the protected-class answers recorded at the reviewed head R, so a yes at R holds the live head
+exit=0
+
+Note: the "live check: verify at h2" line is an aside that failed to run (NM_FIXTURE is not defined in this test file). The hold with reads=1 and no new read request shows verify carried the PASS; the lane then read protected-class answers at R.
