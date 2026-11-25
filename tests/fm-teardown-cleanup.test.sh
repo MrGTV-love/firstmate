@@ -55,6 +55,8 @@ test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
   cat > "$child" <<'CHILD'
 #!/usr/bin/env bash
 set -u
+# This case tests the real refresh worker, so the child opts into it.
+export FM_TEST_REAL_SUMMARY_REFRESH=1
 # shellcheck source=tests/fm-teardown-helpers.sh
 . "$1/tests/fm-teardown-helpers.sh"
 case_dir=$(make_case leak-child)

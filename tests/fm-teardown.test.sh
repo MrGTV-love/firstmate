@@ -92,7 +92,7 @@ test_local_only_fork_remote_allows() {
   printf 'g1\t1\trelaunched\n' > "$case_dir/state/.session-end-handled-task-x1"
 
   rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_teardown_awaiting_refresh "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "fork-allow: teardown should succeed when HEAD is on a fork remote"
   ! grep -q REFUSED "$case_dir/stderr" || fail "fork-allow: teardown printed a REFUSED line"
@@ -143,16 +143,58 @@ test_teardown_does_not_wait_for_the_home_summary_refresh() {
   holder=$!
   fm_test_wait_until --while-alive "$holder" -- test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
   rc=0
-  FM_HOME_SUMMARY_TIMEOUT=20 run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  FM_HOME_SUMMARY_TIMEOUT=20 run_teardown_awaiting_refresh "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "teardown should succeed with a refresh in flight"
-  fm_test_wait_until --progress-file "$case_dir/state/.home-summary-refresh.pending" -- test -e "$case_dir/state/.home-summary-refresh.pending" \
+  [ -e "$case_dir/state/.home-summary-refresh.pending" ] \
     || { kill "$holder" 2>/dev/null; fail "the teardown trigger left no marker for the refresh in flight"; }
-  sleep 2
   kill "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
   [ ! -s "$case_dir/state/.home-summary-refresh.log" ] \
     || fail "teardown waited out a refresh and recorded a failure: $(cat "$case_dir/state/.home-summary-refresh.log")"
   pass "teardown does not wait for the home summary refresh"
+}
+
+# A fixture teardown must leave nothing running that can write into its home
+# once it returns: the detached home-summary refresh a completed close starts
+# would race the suite's EXIT cleanup, and its worker's `mkdir -p` can recreate
+# the home the cleanup just removed. Every process the teardown leaves behind
+# inherits fd 9, the write end of a pipe, and the fence stub holds a real refresh
+# worker at its fence until the home is gone, so a refresh that outlives the
+# teardown is seen whatever the timing. FM_TEST_REAL_SUMMARY_REFRESH=1 (the real
+# refresh by default) makes this case fail.
+test_fixture_teardown_leaves_no_detached_summary_refresh() {
+  local case_dir rc stub fifo reader worker=
+  case_dir=$(make_case summary-stub)
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "fix the thing"
+  add_fork_with_pushed_branch "$case_dir"
+  stub="$TMP_ROOT/summary-stub-fence"
+  fm_test_refresh_fence_stub "$stub" || fail "summary-stub: could not write the fence stub"
+  fifo="$TMP_ROOT/summary-stub-holders"
+  mkfifo "$fifo" || fail "summary-stub: could not make the holder pipe"
+  cat "$fifo" > /dev/null &
+  reader=$!
+  rc=0
+  (
+    export FM_TEST_FENCE_ACTION=await-removal FM_TEST_FENCE_HOME="$case_dir"
+    FM_TEARDOWN_TEST_PATH="$stub:$PATH" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  ) 9> "$fifo" || rc=$?
+  expect_code 0 "$rc" "summary-stub: teardown should complete the close: $(cat "$case_dir/stderr")"
+  # Either every process the teardown started has closed the pipe, so its reader
+  # ends, or a refresh worker waits at the fence for the home to go.
+  if fm_test_wait_until --while-alive "$reader" -- test -s "$case_dir/state/.test-fence-waiting"; then
+    worker=$(cat "$case_dir/state/.test-fence-waiting" 2>/dev/null) || worker=unknown
+  elif jobs -rp | grep -qx "$reader"; then
+    kill "$reader" 2>/dev/null || true
+    fail "summary-stub: a process the fixture teardown started is still running"
+  fi
+  # What the suite's EXIT cleanup does next: remove the home, then let anything
+  # still running finish.
+  fm_test_remove_tree "$case_dir"
+  wait "$reader" 2>/dev/null || true
+  [ -z "$worker" ] || fail "summary-stub: a fixture teardown left a detached home-summary refresh running (worker $worker)"
+  [ ! -e "$case_dir" ] || fail "summary-stub: a process the fixture teardown left behind recreated its removed home"
+  pass "a fixture teardown leaves no detached home-summary refresh that can write into its removed home"
 }
 
 test_teardown_closes_the_backlog_item_itself() {
@@ -4296,6 +4338,7 @@ test_recorded_slot_lost_lease_still_refuses
 test_recorded_slot_intact_lease_completes
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
+test_fixture_teardown_leaves_no_detached_summary_refresh
 test_teardown_closes_the_backlog_item_itself
 test_teardown_records_task_closed_once
 test_teardown_closed_record_names_each_evidence_kind

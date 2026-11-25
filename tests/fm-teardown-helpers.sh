@@ -29,7 +29,7 @@ fm_git_identity fmtest fmtest@example.invalid
 unset FM_HOME FM_FRICTION_EVENT_ID FM_FRICTION_ATTEMPT_ID FM_FRICTION_OPERATION_ID FM_FRICTION_EPISODE_ID
 export FM_FRICTION_EXECUTION_KIND=test
 
-TEARDOWN="$ROOT/bin/fm-teardown.sh"
+TEARDOWN_REAL_REFRESH="$ROOT/bin/fm-teardown.sh"
 PR_CHECK="$ROOT/bin/fm-pr-check.sh"
 TMP_ROOT=$(fm_test_tmproot fm-teardown-tests)
 REAL_GIT_FOR_TEST=$(command -v git)
@@ -124,6 +124,45 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
 trap 'exit 131' QUIT
+
+# teardown_link_bin <dest>: link every bin/ entry of this checkout into <dest>
+# (a subdirectory becomes a directory of links). Unless
+# FM_TEST_REAL_SUMMARY_REFRESH=1, fm-home-summary-refresh.sh there is a script
+# that does nothing (see TEARDOWN below).
+teardown_link_bin() {
+  local dest=$1 f base s
+  mkdir -p "$dest" || return 1
+  for f in "$ROOT"/bin/*; do
+    base=${f##*/}
+    if [ -d "$f" ]; then
+      mkdir -p "$dest/$base" || return 1
+      for s in "$f"/*; do
+        ln -s "$s" "$dest/$base/${s##*/}" || return 1
+      done
+    elif [ "$base" = fm-home-summary-refresh.sh ] && [ "${FM_TEST_REAL_SUMMARY_REFRESH:-0}" != 1 ]; then
+      { printf '#!/bin/sh\nexit 0\n' > "$dest/$base" && chmod +x "$dest/$base"; } || return 1
+    else
+      ln -s "$f" "$dest/$base" || return 1
+    fi
+  done
+}
+
+# A completed close starts a detached home-summary refresh (bin/fm-teardown.sh)
+# that outlives the teardown. Nothing on disk names it when the teardown returns,
+# and its worker runs `mkdir -p` on the home's state directory, so it can write
+# into, or recreate, a case home while the EXIT cleanup removes it, and no wait
+# can fence that. Fixture teardowns therefore run, by default, from linked bin/
+# scripts of this checkout whose fm-home-summary-refresh.sh does nothing (as
+# tests/fixtures.sh fm_test_spawn_script does for spawn). A case that tests the
+# refresh runs the real one through run_teardown_awaiting_refresh; a process
+# that sources this file with FM_TEST_REAL_SUMMARY_REFRESH=1 gets it everywhere.
+if [ "${FM_TEST_REAL_SUMMARY_REFRESH:-0}" = 1 ]; then
+  TEARDOWN=$TEARDOWN_REAL_REFRESH
+else
+  teardown_link_bin "$TMP_ROOT/teardown-root/bin" \
+    || { printf 'fm-teardown-helpers: could not link the teardown scripts\n' >&2; exit 1; }
+  TEARDOWN="$TMP_ROOT/teardown-root/bin/fm-teardown.sh"
+fi
 export -f teardown_fixture_birth teardown_fixture_live
 cat > "$FM_TEARDOWN_FIXTURE_HELPERS" <<'PERL'
 sub fixture_birth {
@@ -971,6 +1010,25 @@ run_teardown() {
   NM_HOME="$case_dir/nm" \
   PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
     "$TEARDOWN" task-x1 "$@"
+}
+
+# run_teardown_awaiting_refresh <case-dir> [args...]: run_teardown with the real
+# home-summary refresh, then wait until every process the teardown left behind
+# has exited, so the detached refresh cannot write into the case home after the
+# case. Each such process inherits fd 9, the write end of a pipe, and the
+# pipe's reader reaches end-of-file only when the last of them has closed it.
+# The refresh's own no-progress limit bounds the wait. Returns the teardown's
+# exit status.
+run_teardown_awaiting_refresh() {
+  local fifo reader rc=0 TEARDOWN=$TEARDOWN_REAL_REFRESH
+  fifo=$(mktemp -u "$TMP_ROOT/refresh-holders.XXXXXX") || return 2
+  mkfifo "$fifo" || return 2
+  cat "$fifo" > /dev/null &
+  reader=$!
+  run_teardown "$@" 9> "$fifo" || rc=$?
+  wait "$reader" 2>/dev/null || true
+  rm -f "$fifo"
+  return "$rc"
 }
 
 # Seed a real backlog carrying task-x1 as In flight, so a teardown in this case
@@ -2279,19 +2337,8 @@ EOF
 # Symlinks keep the copy cheap; an unreadable case replaces one link with a
 # real mode-000 file so the probe is of the file itself.
 prepare_teardown_source_copy() {  # <case-dir>
-  local case_dir=$1 f base dest="$1/test-root/bin" s
-  mkdir -p "$dest/backends"
-  for f in "$ROOT"/bin/*; do
-    base=$(basename "$f")
-    if [ -d "$f" ]; then
-      mkdir -p "$dest/$base"
-      for s in "$f"/*; do
-        ln -s "$s" "$dest/$base/$(basename "$s")"
-      done
-    else
-      ln -s "$f" "$dest/$base"
-    fi
-  done
+  local case_dir=$1
+  teardown_link_bin "$1/test-root/bin"
   printf 'manual\n' > "$case_dir/config/backlog-backend"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
