@@ -863,7 +863,7 @@ def snapshot_rows(pid):
         columns = 'pid=,ppid=,pgid=,stat=,time=,etime=' + (f',{name}=' if name else '')
         try:
             result, timed = proc_read(['ps', '-axo', columns], ['table', 'pid,ppid,pgid,stat'], env=dict(os.environ, LC_ALL='C'))
-        except OSError:
+        except (OSError, ValueError):
             return None
         if not result.returncode or not timed:
             break
@@ -1909,10 +1909,13 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
                     rule = 'absolute_limit' if now - started >= absolute else 'no_progress'
                     if inactivity is None:
                         # Capture the tree before the stop signals change it; keep-going is record-free and writes none.
-                        snapshot = write_trip_snapshot(key, rule, child.pid, (
-                            ('elapsed_secs', f'{now - started:.1f}'), ('idle_secs', f'{idle:.1f}'), ('output_bytes', output_bytes),
-                            ('tree_cpu_secs', f'{cpu:.2f}'), ('cpu_gain_in_window_secs', f'{window_gain:.2f}'),
-                            ('idle_cpu_floor', f'{IDLE_CPU_FLOOR_SECS}s per {IDLE_CPU_WINDOW_SECS}s'), ('telemetry', 'blind' if blind else 'sampled')))
+                        try:
+                            snapshot = write_trip_snapshot(key, rule, child.pid, (
+                                ('elapsed_secs', f'{now - started:.1f}'), ('idle_secs', f'{idle:.1f}'), ('output_bytes', output_bytes),
+                                ('tree_cpu_secs', f'{cpu:.2f}'), ('cpu_gain_in_window_secs', f'{window_gain:.2f}'),
+                                ('idle_cpu_floor', f'{IDLE_CPU_FLOOR_SECS}s per {IDLE_CPU_WINDOW_SECS}s'), ('telemetry', 'blind' if blind else 'sampled')))
+                        except Exception as error:
+                            snapshot = f'unavailable (snapshot failed: {type(error).__name__})'
                     if inactivity is not None:
                         scalar('no_progress', f'{key} made no output or CPU progress for {idle:.0f}s; stopping', sys.stderr)
                     elif rule == 'absolute_limit':

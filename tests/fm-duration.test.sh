@@ -496,6 +496,23 @@ linux_snapshot = trip_snapshot(linux.stderr, 'absolute_limit')
 linux_row = next(line.split() for line in linux_snapshot.splitlines() if line[:1].isdigit() and line.split()[0] == linux_pid.read_text())
 assert len(linux_row) >= 6 and linux_row[5] != '-', (linux_row, linux_snapshot)
 
+# A ps name column that is not valid UTF-8 (Darwin cuts p_comm at 16 bytes, which
+# can split a multibyte name) leaves the table unavailable and never skips the stop.
+undecodable_bin = tmp / 'undecodable-ps-bin'
+undecodable_bin.mkdir()
+(undecodable_bin / 'ps').write_text(f'#!/usr/bin/env bash\ncase "$*" in *ucomm*) {shlex.quote(real_ps)} "$@"; printf \'1 0 1 S 0:00.00 00:01 bad\\377name\\n\'; exit 0 ;; esac\n'
+                                    f'exec {shlex.quote(real_ps)} "$@"\n')
+(undecodable_bin / 'ps').chmod(0o755)
+termed = tmp / 'undecodable.termed'
+trapped_sleeper = 'import pathlib, signal, sys, time\ndef on_term(*_):\n    pathlib.Path(sys.argv[1]).touch()\n    sys.exit(0)\nsignal.signal(signal.SIGTERM, on_term)\ntime.sleep(60)'
+undecodable = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.undecodable', '--', sys.executable, '-c', trapped_sleeper, str(termed)],
+                             env=dict(env, PATH=f'{undecodable_bin}:{env["PATH"]}', FM_DURATION_NO_PROGRESS_SECS='2', FM_DURATION_ABSOLUTE_SECS='60'),
+                             cwd=workrepo, capture_output=True, text=True)
+assert undecodable.returncode == 124 and 'absolute_limit' not in undecodable.stderr, (undecodable.returncode, undecodable.stderr)
+assert termed.exists(), f'the stop skipped TERM before KILL: {undecodable.stderr}'
+assert 'process table unavailable' in trip_snapshot(undecodable.stderr, 'no_progress'), undecodable.stderr
+assert any(r.get('event') == 'timeout' and r['key'] == 'snapshot.undecodable' for r in rows())
+
 many = subprocess.run([sys.executable, str(helper), 'run', 'snapshot.rows', '--', 'bash', '-c', 'for i in $(seq 1 210); do sleep 60 & done; wait'],
                       env=dict(env, FM_DURATION_ABSOLUTE_SECS='6'), cwd=workrepo, capture_output=True, text=True)
 rows_snapshot = trip_snapshot(many.stderr, 'absolute_limit')
