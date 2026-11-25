@@ -121,7 +121,7 @@ class World:
         self.db = self.dir / 'state.sqlite'
         with sqlite3.connect(self.db) as c:
             c.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER,'
-                      ' repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER)')
+                      ' repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER, head_sha TEXT, submitted_head_sha TEXT)')
             c.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL,'
                       ' step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
             c.execute('CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT, started_at INTEGER,'
@@ -928,7 +928,7 @@ def m1812_incomplete_own_entry():
                          ('complete', dict(holder=os.getppid(), created_ns=1, before=[], args=['axi', 'run']))):
         w = pending_world('m1812-own-' + label)
         w.pending(entry)
-        count = engine.counted_pending(str(w.pool), set())
+        count = engine.counted_pending(str(w.pool), set())[0]
         w.close()
         if label == 'incomplete':
             harm('m1812-incomplete-own-entry-skipped', count == 1, count)
@@ -1256,7 +1256,7 @@ def m1876_claim_stat():
         os.path.lexists = lambda target: (False if denied and str(target) == path + '.claimed' else real_lexists(target))
         try:
             noted = noted_unknowns()
-            count = engine.counted_pending(str(w.pool), set())
+            count = engine.counted_pending(str(w.pool), set())[0]
             if denied:
                 harm('m1876-claim-stat-unclaimed', count == 1, count)
                 control(noted is not None and any('.claimed' in line for line in noted), 'the stat failure is noted', noted)
@@ -1490,7 +1490,7 @@ def m1876_row_read_error():
         real = engine.read_host_db
 
         def read(sql, parameters=(), real=real):
-            if broken and 'SELECT id, repo_id, branch FROM runs' in sql:
+            if broken and 'SELECT id, repo_id, branch, head_sha, submitted_head_sha FROM runs' in sql:
                 raise sqlite3.OperationalError('database is locked')
             return real(sql, parameters)
         engine.read_host_db = read

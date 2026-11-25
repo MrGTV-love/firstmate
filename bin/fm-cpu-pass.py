@@ -155,12 +155,20 @@ Pipeline starts:
     one active run per repository and branch (it cancels the old run and waits
     for it to end before it writes the new row), and a client with no launch
     nonce reattaches to that branch's active run, so that run is the one the
-    start's client drives or replaces, and its one charge covers the start.
-    This holds for every route: rerun, an intent from standard input or a file,
-    and a caller's own --launch-nonce alike. Coverage is read again at every
-    decision: in the gap between a replaced run's end and its replacement's
-    row, or once the run is CI-ready, parked or ended, the start counts at R
-    again. A start with no binding (a directory that is no registered
+    start's client drives or replaces. A covered start adds nothing only when
+    it is a proven reattach (proven_reattach): `axi run` with no --launch-nonce
+    whose recorded HEAD is the run's head_sha or submitted_head_sha. Every other
+    covered start (a rerun, a caller's own --launch-nonce, a HEAD that differs
+    or is not known, an argument read before a shell expanded it, which may
+    hide a nonce) may replace the run, whose own charge can be far below R
+    (a CI waiter is charged what it holds), so the branch carries the larger
+    of the run's demand and R, once per branch however many such starts it
+    has. The cost: while such a start's command runs, a run it only drives is
+    charged R rather than the larger of its size and A, an overcharge, never
+    an undercount; the exact rule needs a launch identity in the no-mistakes
+    fork. Coverage is read again at every decision: in the gap between a
+    replaced run's end and its replacement's row, or once the run is CI-ready,
+    parked or ended, the start counts at R again. A start with no binding (a directory that is no registered
     repository's, a detached HEAD) is covered by no run; its client starts no
     run there, so it is charged once, by its reservation. A pending start ends
     when its COMMAND returns, or when the client that claimed it through the
@@ -1270,7 +1278,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
             reservation: int, slack: int, term: int, self_run: Optional[str] = None,
             waiting: frozenset = frozenset(), now: Optional[float] = None, pending: int = 0,
             held_runs: frozenset = frozenset(), history: Optional[dict] = None,
-            queued_pids: Optional[dict] = None) -> dict:
+            queued_pids: Optional[dict] = None, replaced: frozenset = frozenset()) -> dict:
     """The one projection (Main 1759): every demand from one census's facts, each fact a proof or unknown.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map (keyed
@@ -1291,7 +1299,9 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         running) with no live agent (no pid or a dead one) and nothing visible, what it holds; otherwise
         the larger of what it holds and A once seen, R unseen; an uncounted run, what it holds;
       and R for each of its unproven launches, so a later attempt never masks an earlier one.
-    The new run reserves S; each pending admitted start that no counted run covers reserves R.
+    The new run reserves S; each pending admitted start that no counted run covers reserves R; and the
+    branch of each run in replaced (a covering run with a replacing start: counted_pending) carries the
+    larger of that run's demand and R, by one replacing entry of the shortfall per run, however many starts.
     Budget is available memory plus what the runs held. The one-start minimum admits only
     when nothing else is counted: every other counted run counts at least one, and the
     requesting run's own held attempts and unproven launches count (Main 1727).
@@ -1344,6 +1354,9 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         entries.append((run, kind, demand, visible))
         starts = len(attempts) + units
         others += starts if run == self_run else max(1 if run in counted else 0, starts)
+    demands = {run: demand for run, _, demand, _ in entries}
+    for run in sorted(replaced):
+        entries.append(("replace-" + run, "replacing", max(0, reservation - demands.get(run, 0)), False))
     for index in range(pending):
         entries.append(("start-%d" % (index + 1), "pending", reservation, False))
     projected = sum(demand for _, _, demand, _ in entries) + slack
@@ -1413,7 +1426,8 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
               launches: dict, cores: int, priority: str, self_run: Optional[str] = None,
               measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None,
               waiting: frozenset = frozenset(), pending: int = 0, held_runs: frozenset = frozenset(),
-              history: Optional[dict] = None, queued_pids: Optional[dict] = None) -> Tuple[bool, str]:
+              history: Optional[dict] = None, queued_pids: Optional[dict] = None,
+              replaced: frozenset = frozenset()) -> Tuple[bool, str]:
     """The complete admission rule over one census's facts: holds first, then the fit or the count fallback.
 
     measured, when given, supplies ((R, S, runs measured), (A, readings measured))
@@ -1439,7 +1453,8 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
             len([run for run in counted if run != self_run]), limit, launched, pending, others, priority)
     (reservation, slack, qualifying), (term, readings) = measured
     fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
-                  waiting, pending=pending, held_runs=held_runs, history=history, queued_pids=queued_pids)
+                  waiting, pending=pending, held_runs=held_runs, history=history, queued_pids=queued_pids,
+                  replaced=replaced)
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
@@ -1457,7 +1472,7 @@ def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool 
     seen = host_observation(fresh)
     states = judge_attempts(directory, set(running)) if directory else {}
     launches, held_runs = attempt_reservations(states, seen["memory"])
-    pending = counted_pending(directory, set(running)) if directory else 0
+    pending, replaced = counted_pending(directory, set(running)) if directory else (0, frozenset())
     steps = open_steps() if seen["memory"] is not None else None
     if seen["memory"] is not None and steps is None:
         note_unknown("step table unreadable")  # Main 1876 U: the decision waits
@@ -1473,7 +1488,8 @@ def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool 
         return False, "unknown: %s; counted=%d priority=%s (a decision waits until every fact reads)" % (
             "; ".join(sorted(set(_unknown)))[:1500], len(counted), priority)
     return admission(seen["reasons"], seen["memory"], running, counted, steps, launches, cores, priority, self_run,
-                     waiting=waiting, pending=pending, held_runs=held_runs, history=history, queued_pids=queued)
+                     waiting=waiting, pending=pending, held_runs=held_runs, history=history, queued_pids=queued,
+                     replaced=replaced)
 
 
 class CensusUnknown(Exception):
@@ -1994,12 +2010,14 @@ def history_units(directory: Optional[str], states: Dict[str, dict], runs: set) 
 
 
 def start_binding(cwd: str) -> Optional[dict]:
-    """The repository and branch a fresh client in CWD starts its run on: repo ID and branch, or None when not told.
+    """The repository, branch and HEAD a fresh client in CWD starts its run on, or None when repository or branch is not told.
 
     The repository follows the client's own rule (no-mistakes fork
     internal/cli/root.go findRepo, line 112): the git root, else the main
     worktree root, matched to repos.working_path. A start whose repository or
     branch cannot be told has no binding and is covered by no run (pending_census).
+    head is the commit HEAD names, or None when it cannot be read (an unborn
+    branch): such a start is never a proven reattach (proven_reattach).
     """
     def git(*words) -> Optional[str]:
         try:
@@ -2021,7 +2039,7 @@ def start_binding(cwd: str) -> Optional[dict]:
     for root in roots:
         for repo, path in repos:
             if isinstance(path, str) and os.path.realpath(path) == os.path.realpath(root):
-                return dict(repo=repo, branch=branch)
+                return dict(repo=repo, branch=branch, head=git("rev-parse", "--verify", "--quiet", "HEAD"))
     return None
 
 
@@ -2071,14 +2089,16 @@ def runs_since(running: set, since_ns: int) -> set:
         "SELECT id FROM runs WHERE status = 'running' OR created_at >= ?", (since_ns // 1000000000 - 1,))} | set(running)
 
 
-def counted_places(running: set) -> Dict[str, tuple]:
-    """run -> (repo ID, branch) for every run in RUNNING that a decision counts as active (running_runs' rule)."""
+def counted_places(running: set) -> Dict[str, Tuple[tuple, frozenset]]:
+    """run -> ((repo ID, branch), the heads it records) for every run in RUNNING that a decision counts as active
+    (running_runs' rule); the heads are its head_sha and submitted_head_sha, each when set."""
     if not running:
         return {}
     marks = ",".join("?" * len(running))
-    return {row[0]: (row[1], row[2]) for row in read_host_db(
-        "SELECT id, repo_id, branch FROM runs WHERE status = 'running' AND ci_ready_at IS NULL"
-        " AND awaiting_agent_since IS NULL AND id IN (%s)" % marks, tuple(sorted(running)))}
+    return {row[0]: ((row[1], row[2]), frozenset(head for head in row[3:] if isinstance(head, str) and head))
+            for row in read_host_db(
+                "SELECT id, repo_id, branch, head_sha, submitted_head_sha FROM runs WHERE status = 'running'"
+                " AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL AND id IN (%s)" % marks, tuple(sorted(running)))}
 
 
 def binding_key(binding) -> Optional[tuple]:
@@ -2091,13 +2111,32 @@ def binding_key(binding) -> Optional[tuple]:
     return repo, branch
 
 
+def proven_reattach(args, binding, heads: frozenset) -> bool:
+    """Whether a covered start is proven to reattach to its covering run rather than replace it.
+
+    Proof is `axi run` with no --launch-nonce (in either form) whose binding
+    records the HEAD the run records (its head_sha or submitted_head_sha). A
+    word the admission read before a shell expanded it ($X, a glob, ~) may hide
+    a nonce, so a start with such a word, a rerun, a start whose arguments or
+    HEAD are not known, and a HEAD that differs are no proof.
+    """
+    if not isinstance(args, list) or args[:2] != ["axi", "run"]:
+        return False
+    if any(word == "--launch-nonce" or word.startswith("--launch-nonce=")
+           or any(char in word for char in SHELL_EXPANSION_CHARS) for word in args[2:]):
+        return False
+    head = binding.get("head") if isinstance(binding, dict) else None
+    return isinstance(head, str) and head in heads
+
+
 def pending_census(directory: str, running: set) -> List[dict]:
     """One read of every pending admitted start, its claim and whether it counts, oldest first (Main 1759, 1812, 3852).
 
     Each item: path, entry (None when unreadable), claim (None when none or unreadable),
     known (its claimant's identity is read), claimed, key (the repository and branch the
     start is bound to, or None), ended, covered (the counted run on that repository and
-    branch, or None) and released (ended or covered: this decision does not count it).
+    branch, or None), released (ended or covered: this decision does not count it at R
+    on its own) and replacing (covered, and not a proven reattach: proven_reattach).
     The binding is the claimant's: a final claim's binding, or, with no claim, the binding
     the admission took from its own directory (start_binding). An entry or a claim that
     cannot be read or lacks a field of its type is unknown: noted (the decision waits),
@@ -2108,17 +2147,25 @@ def pending_census(directory: str, running: set) -> List[dict]:
     cancels every pending or running run there and waits for each to end (no-mistakes fork
     internal/daemon/manager.go cancelActiveRuns); and a client with no launch nonce on a
     branch with an active run reattaches to it (internal/cli/axi_drive.go). So that run is
-    the run the start's client drives or the run it is replacing, and the one charge it
-    carries covers the start. Coverage is read again at every decision, never kept: in the
-    gap between a replaced run's end and its replacement's row, and once the run leaves the
+    the run the start's client drives or the run it is replacing. A covered start adds
+    nothing only when it is a proven reattach (proven_reattach): it then drives that run,
+    and that run's own charge is its charge. Every other covered start may replace the run,
+    and the run's charge can be far below R (a CI waiter holds what it holds), so its branch
+    carries the larger of the covering run's demand and R, once per branch however many
+    such starts it has (counted_pending, project()). The cost: while such a start's command
+    runs, a run it only drives is charged R rather than the larger of its size and A, an
+    overcharge, never an undercount; the exact rule needs a launch identity in the
+    no-mistakes fork. Coverage is read again at every decision, never kept: in the gap
+    between a replaced run's end and its replacement's row, and once the run leaves the
     counted set (CI-ready, parked or ended), the start counts at R again. A start with no
     binding (a directory that is no registered repository's, a detached HEAD) is never
     covered; its client starts no run there (the client refuses), so it is charged once,
     by its reservation, until its COMMAND returns. A stale running row that an earlier
-    daemon left, which no cancel reaches, covers its branch's starts too; it is itself
-    counted at R. K7 ends a start whose known claimant's pid is dead. A locked file is a
-    live start; an unlocked one belongs to a start that no longer exists and is removed.
-    OSError when the pool cannot be listed.
+    daemon left, which no cancel reaches, covers its branch's starts too; it is charged
+    as any counted run is (a CI waiter at what it holds), and a replacing start on its
+    branch still makes the branch carry at least R. K7 ends a start whose known
+    claimant's pid is dead. A locked file is a live start; an unlocked one belongs to a
+    start that no longer exists and is removed. OSError when the pool cannot be listed.
     """
     found = []
     for path in list_pool(directory, "pending-*.lock"):
@@ -2156,18 +2203,20 @@ def pending_census(directory: str, running: set) -> List[dict]:
                 note_unknown("claim %s.claimed unreadable or malformed" % path)
         else:
             known = True
-        key = binding_key(claim.get("binding") if claimed else entry.get("binding")) if known else None
-        found.append(dict(path=path, entry=entry, claim=claim if known else None, known=known, claimed=claimed, key=key,
-                          order=(entry["created_ns"] if entry else 0, path)))
+        binding = (claim.get("binding") if claimed else entry.get("binding")) if known else None
+        found.append(dict(path=path, entry=entry, claim=claim if known else None, known=known, claimed=claimed,
+                          key=binding_key(binding), binding=binding, order=(entry["created_ns"] if entry else 0, path)))
     found.sort(key=lambda item: item["order"])
     all_known = all(item["known"] for item in found)
     places = counted_places(running) if all_known and any(item["key"] for item in found) else {}
     cover: Dict[tuple, str] = {}
-    for run, place in sorted(places.items()):
+    for run, (place, _) in sorted(places.items()):
         cover.setdefault(place, run)
     for item in found:
         claim = item["claim"]
         item["covered"] = cover.get(item["key"]) if item["key"] else None
+        item["replacing"] = item["covered"] is not None and not proven_reattach(
+            item["entry"]["args"], item["binding"], places[item["covered"]][1])
         # K7 by the claim's bound client, the one client the reservation is for (Main 1876 C); a shell claim with no
         # client bound yet ends with the shell.
         item["ended"] = item["known"] and claim is not None and pid_dead(
@@ -2182,10 +2231,12 @@ def live_pending(directory: str, running: set) -> List[Tuple[str, dict, bool, Op
             for item in pending_census(directory, running)]
 
 
-def counted_pending(directory: str, running: set) -> int:
-    """How many pending admitted starts this decision counts at the full R.
+def counted_pending(directory: str, running: set) -> Tuple[int, frozenset]:
+    """(how many pending admitted starts this decision counts at the full R, the covering runs whose branch carries R).
 
-    Every unreleased pending start counts, except, on positive proof only, this process's
+    Every unreleased pending start counts, and every replacing covered start
+    (pending_census) names its covering run, whose branch then carries at least R
+    (project()), except, on positive proof only, this process's
     own enclosing start: its entry and claimant are read, it has not been claimed, its
     holder is this process's ancestor, its admitted arguments are known, and no process in
     the holder's tree outside this process's own line runs the admitted client (so this
@@ -2196,11 +2247,12 @@ def counted_pending(directory: str, running: set) -> int:
         census = pending_census(directory, running)
     except (OSError, sqlite3.Error, ValueError) as exc:
         note_unknown("pending starts of %s unreadable: %s" % (directory, exc))  # a decision waits, never 125 (Main 1876 U)
-        return 0
+        return 0, frozenset()
     mine = None
     count = 0
+    replaced = set()
     for item in census:
-        if item["released"]:
+        if item["ended"] or (item["covered"] is not None and not item["replacing"]):
             continue
         entry = item["entry"]
         if entry is not None and item["known"] and item["claim"] is None and item["claimed"] is False \
@@ -2210,8 +2262,11 @@ def counted_pending(directory: str, running: set) -> int:
             if entry["holder"] in mine and not admitted_client_running(entry["holder"], entry["args"],
                                                                        exclude=frozenset(mine) | {os.getpid()}):
                 continue
-        count += 1
-    return count
+        if item["covered"] is not None:
+            replaced.add(item["covered"])
+        else:
+            count += 1
+    return count, frozenset(replaced)
 
 
 def process_table() -> Dict[int, int]:

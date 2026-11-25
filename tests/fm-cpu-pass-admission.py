@@ -1738,6 +1738,56 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             for child in (a, b):
                 os.killpg(child.pid, signal.SIGKILL); child.wait()
 
+    def replacing_start_carries_r():
+        # R14-1 (R = 3 GiB, S = 8 GiB): run x on repo/main is a counted CI waiter with no agent and nothing visible,
+        # charged what it holds (0). A start admitted in the checkout on repo/main is covered by x. Only a proven
+        # reattach (axi run, no --launch-nonce, HEAD equal to x's head_sha or submitted_head_sha) adds nothing: a probe
+        # then projects 0 + 8. A rerun, an own nonce, a HEAD that differs or a word a shell expands later (it may hide
+        # a nonce) may replace x: the branch carries max(0, R), so the probe projects 3 + 8. Two replacing starts on the
+        # branch carry one R (3 + 8), never two (3 + 3 + 8).
+        rerun = ['no-mistakes', 'rerun']
+        nonce = ['no-mistakes', 'axi', 'run', '--intent', 'hold-a', '--launch-nonce', 'n1']
+        plain = ['no-mistakes', 'axi', 'run', '--intent', 'hold-a']
+        expanded = ['no-mistakes', 'axi', 'run', '--intent', '$X']
+        for label, starts, recorded, expected, ident in (
+                ('reattach-head', [plain], ('HEAD', None), 8, 'r14-proven-reattach-charged'),
+                ('reattach-submitted', [plain], ('0' * 40, 'HEAD'), 8, 'r14-proven-reattach-submitted-charged'),
+                ('rerun', [rerun], ('HEAD', None), 11, 'r14-rerun-covered-below-r'),
+                ('own-nonce', [nonce], ('HEAD', None), 11, 'r14-own-nonce-covered-below-r'),
+                ('head-differs', [plain], ('0' * 40, None), 11, 'r14-other-head-covered-below-r'),
+                ('expansion', [expanded], ('HEAD', None), 11, 'r14-unexpanded-word-proven'),
+                ('two-replacing', [rerun, nonce], ('HEAD', None), 11, 'r14-two-replacing-charged-twice')):
+            folder, db, env = case('r14-' + label, measured=True, available=12 * GIB)
+            checkout = bound_repo(folder, db, env)
+            subprocess.run(['git', '-C', str(checkout), '-c', 'user.name=t', '-c', 'user.email=t@example.invalid',
+                            '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'base'],
+                           check=True, stdin=subprocess.DEVNULL)
+            head = subprocess.run(['git', '-C', str(checkout), 'rev-parse', 'HEAD'], check=True, capture_output=True,
+                                  text=True, stdin=subprocess.DEVNULL).stdout.strip()
+            change(db, "INSERT INTO runs (id, status, repo_id, branch, head_sha, submitted_head_sha) VALUES"
+                       " ('x', 'running', 'repo', 'main', ?, ?)", tuple(head if value == 'HEAD' else value for value in recorded))
+            steps(db, [('x', 'ci', 'running', None)])
+            prove(folder, db, 'x')
+            admitted = []
+            for index, words in enumerate(starts):
+                name = 'a%d' % index
+                admitted.append(launch_in(cli + ['pipeline-start', '--', 'bash', '-c', 'sleep 3600; ' + ' '.join(words)],
+                                          env, folder / name, checkout))
+                wait_for(lambda name=name: 'pipeline-start admitted' in (folder / (name + '.stderr')).read_text(),
+                         label + ': ' + name + ' admitted')
+            probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
+            wait_for(lambda: 'projected=' in (folder / 'probe.stderr').read_text(), label + ': the probe decides')
+            text = (folder / 'probe.stderr').read_text()
+            projected = int(re.search(r'projected=(\d+)', text).group(1))
+            harm(ident, projected == expected * GIB, label, projected, text)
+            assert 'x:ci-waiting:0:unseen' in text, (label, text)
+            for child in admitted + [probe]:
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                child.wait()
+
     def base_rule_from_line(text):
         """The base rule's decision recomputed from one admission or waiting line alone (P1, LIVE(a)).
 
@@ -1992,6 +2042,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                        ('Main 2422 a started run is charged once by its own run', started_run_charged_once),
                        ('Main 3852 every route is charged once', every_route_charged_once),
                        ('P5.lock the named collision under the branch rule', named_collision_branch),
+                       ('R14-1 only a proven reattach adds nothing to its covering run', replacing_start_carries_r),
                        ('P1 the line recomputes the base rule', p1_old_rule_recomputed),
                        ('P6(a) lines name the checkout, the pool and the start', lines_name_checkout_pool_and_start),
                        ('P6(a) the pool follows HOME and the override', pool_from_home),

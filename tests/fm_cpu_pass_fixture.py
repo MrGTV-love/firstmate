@@ -390,7 +390,7 @@ def case(name, cores=18, running=0, load=0, measured=False, available=40 * GIB, 
     db = folder / 'state.sqlite'
     with sqlite3.connect(db) as connection:
         # created_at defaults to the insert's second, as the daemon writes it (epoch seconds).
-        connection.execute("CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER)), launch_nonce TEXT)")
+        connection.execute("CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER)), launch_nonce TEXT, head_sha TEXT, submitted_head_sha TEXT)")
         # The daemon's step_results columns this owner reads (PRAGMA table_info of the host database).
         connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
         connection.execute('CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL)')
