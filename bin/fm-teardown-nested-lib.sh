@@ -1143,7 +1143,11 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 #     never rebuilt, moved or replaced (own; Main 3529 Ruling 2, Main 3556 F1);
 #     on that direct release it must also hold the .claude and .opencode
 #     trees whole, so a file that appeared or changed since refuses
-#     (own-retained; Main 3851);
+#     (own-retained; Main 3851); when no preserve existed before that
+#     direct release, nothing was selected at the dispose, so any selected
+#     ignored file now appeared since and refuses, as bd76b1ee7 refused it, even
+#     after the release made a preserve for the .claude and .opencode trees
+#     (own-retained-new; Main 4045 F1);
 #   - locked: the launcher <pid> is gone by pid and start time against the lock
 #     time read before the unlock; an empty or non-numeric pid or time refuses.
 # With <forced> (only the own nested copy's call before its driver, under
@@ -1155,8 +1159,8 @@ teardown_preserve_dest_outside() {  # <copy> <dest>
 # re-run cannot help; empty when a re-run for a fresh proof can).
 TEARDOWN_FINAL_WHY=
 TEARDOWN_FINAL_STABLE=
-teardown_removal_final_proof() {  # <copy> <preserve|with-claude|refuse|own|own-retained> <locked|unlocked> [<launcher-pid> <lock-mtime> [forced]]
-  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} forced=${6:-} head status unique canonical i latest found=0 rc=0 snap ref now work population held
+teardown_removal_final_proof() {  # <copy> <preserve|with-claude|refuse|own|own-retained|own-retained-new> <locked|unlocked> [<launcher-pid> <lock-mtime> [forced]]
+  local copy=$1 ignored=$2 locked=$3 pid=${4:-} mtime=${5:-} forced=${6:-} head status unique canonical i latest found=0 rc=0 snap ref now work population held late
   TEARDOWN_FINAL_WHY=
   TEARDOWN_FINAL_STABLE=
   head=$(git -C "$copy" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) \
@@ -1247,9 +1251,10 @@ teardown_removal_final_proof() {  # <copy> <preserve|with-claude|refuse|own|own-
         return 1
       fi
       ;;
-    own|own-retained)
+    own|own-retained|own-retained-new)
       work=$(mktemp -d "${TMPDIR:-/tmp}/fm-teardown-own-final.XXXXXX") || { TEARDOWN_FINAL_WHY='a scratch directory cannot be made at the removal'; return 1; }
       rc=0
+      late=
       TEARDOWN_PRESERVE_WHY=
       population=selected
       held='selected ignored files'
@@ -1269,7 +1274,23 @@ teardown_removal_final_proof() {  # <copy> <preserve|with-claude|refuse|own|own-
         # Nothing was selected when the copy was preserved: anything selected now appeared since.
         teardown_own_preserve_list "$copy" "$work/list" "$population" && [ ! -s "$work/list" ] || rc=1
       fi
+      # No preserve existed before the direct release (Main 4045 F1): nothing was selected at
+      # the dispose, so a selected ignored file now appeared since, even one the release's
+      # preserve for the .claude and .opencode trees took in.
+      if [ "$rc" = 0 ] && [ "$ignored" = own-retained-new ]; then
+        if ! teardown_own_preserve_list "$copy" "$work/selected" selected; then
+          rc=1
+        elif [ -s "$work/selected" ]; then
+          rc=1
+          late=$(teardown_nul_list_text "$work/selected")
+        fi
+      fi
       rm -rf "$work"
+      if [ -n "$late" ]; then
+        TEARDOWN_FINAL_STABLE=
+        TEARDOWN_FINAL_WHY="it holds ignored files that appeared after its ignored files were preserved, when none was selected: $late"
+        return 1
+      fi
       if [ "$rc" != 0 ]; then
         TEARDOWN_FINAL_STABLE=
         TEARDOWN_FINAL_WHY="its preserve ${TEARDOWN_PRESERVE_DIR:-(none was needed when it was preserved)} does not hold its $held as the copy holds them now, outside every removal root${TEARDOWN_PRESERVE_WHY:+ ($TEARDOWN_PRESERVE_WHY)}"
@@ -2484,7 +2505,7 @@ teardown_launcher_gone() {  # <pid> <lock-file>
 # Returns 1 with TEARDOWN_RELEASE_WHY naming the fact that kept the copy.
 TEARDOWN_RELEASE_WHY=
 teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
-  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap final_mode=with-claude
+  local slot=$1 copy=$2 head=$3 kind=$4 lock pid lock_file rc=0 now gone procs mtime landed_snap final_mode=with-claude own_late
   TEARDOWN_RELEASE_WHY=
   # Main 1843: an Orca-backed task keeps base behaviour, which has no direct release.
   if [ "${BACKEND:-}" = orca ] || [ "${TEARDOWN_CLEANUP_RECOVERY:-}" = orca ]; then
@@ -2556,6 +2577,21 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
     return 1
   fi
   if [ "$kind" = 'own nested' ]; then
+    # Main 4045 F1: with no preserve from #380's dispose, nothing was selected then, so a
+    # selected ignored file now appeared since. The release refuses, as bd76b1ee7 refused it:
+    # the copy stays and nothing is preserved. The widen then takes in the .claude and
+    # .opencode trees whole alone (R6-1), and the final proof refuses a selected file that
+    # appears after this check (own-retained-new).
+    if [ -z "${TEARDOWN_PRESERVE_DIR:-}" ]; then
+      final_mode='own-retained-new'
+      own_late=0
+      teardown_own_selected_none "$copy" || own_late=$?
+      case "$own_late" in
+        0) ;;
+        1) TEARDOWN_RELEASE_WHY="it holds ignored files that appeared after its ignored files were preserved, when none was selected: $TEARDOWN_OWN_SELECTED_TEXT"; return 1 ;;
+        *) TEARDOWN_RELEASE_WHY='its ignored files cannot be listed'; return 1 ;;
+      esac
+    fi
     if ! teardown_own_preserve_widen "$copy"; then
       TEARDOWN_RELEASE_WHY="its ignored files, the .claude and .opencode trees whole included, could not be preserved in ${TEARDOWN_PRESERVE_DIR:-$DATA/$ID/nested-copy-preserved} outside every removal root"
       return 1
@@ -2585,7 +2621,7 @@ teardown_dead_launcher_release() {  # <slot> <copy> <head> <foreign|own nested>
   # and leaves it in place (own-retained), never rebuilding,
   # moving or replacing it (Main 3529 Ruling 2, Main 3556 F1); a foreign copy's
   # are preserved again here (with-claude).
-  [ "$kind" != 'own nested' ] || final_mode='own-retained'
+  [ "$kind" != 'own nested' ] || [ "$final_mode" = own-retained-new ] || final_mode='own-retained'
   if ! teardown_removal_final_proof "$copy" "$final_mode" locked "$pid" "$mtime"; then
     git -C "$slot" worktree lock --reason "$lock" "$copy" >/dev/null 2>&1 || true
     if teardown_copy_lock_file "$copy" && [ "$TEARDOWN_FOREIGN_LOCK" = "$lock" ]; then
@@ -3069,12 +3105,30 @@ teardown_own_preserve_dir_new() {  # <copy>
   done
 }
 
+# Exit 0 when own nested <copy> has no selected ignored file now (teardown_own_preserve_list
+# selected), 1 when it has one, naming each in TEARDOWN_OWN_SELECTED_TEXT, 2 when they cannot
+# be listed.
+TEARDOWN_OWN_SELECTED_TEXT=
+teardown_own_selected_none() {  # <copy>
+  local list rc=0
+  TEARDOWN_OWN_SELECTED_TEXT=
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-own-selected.XXXXXX") || return 2
+  teardown_own_preserve_list "$1" "$list" selected || rc=2
+  if [ "$rc" = 0 ] && [ -s "$list" ]; then
+    TEARDOWN_OWN_SELECTED_TEXT=$(teardown_nul_list_text "$list")
+    rc=1
+  fi
+  rm -f "$list"
+  return "$rc"
+}
+
 # The kept route's part of (b), also run before the direct release of a dead launcher's lock
 # (teardown_dead_launcher_release): the preserve chosen before the driver was asked must still agree
 # with the copy byte for byte (teardown_own_preserve_current); then every ignored file of the
 # wide population and every <named> path is copied in where the preserve lacks it, never over a
 # byte it holds, and the preserve must then hold the whole of it. A copy with no selected file
-# gets its preserve here. Returns 1 when any of it fails.
+# gets its preserve here; before the direct release that copy has no selected file at all
+# (teardown_dead_launcher_release refuses one first). Returns 1 when any of it fails.
 teardown_own_preserve_widen() {  # <copy> [named entry...]
   local copy=$1 dir work rc=0
   shift

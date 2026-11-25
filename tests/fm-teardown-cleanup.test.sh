@@ -7319,8 +7319,10 @@ assert_late_copy_kept() {  # <label>
 }
 
 # F1: an ignored file outside the preserve allow-list that appears after the
-# ignored files were preserved is never lost: it is preserved again before the
-# removal, or the copy stays.
+# ignored files were preserved is never lost. This own copy had no selected
+# ignored file at the dispose, so no preserve was made then; a selected file that
+# appears later makes the direct release refuse, as bd76b1ee7 refused it (Main
+# 4045 F1): the copy stays, locked, with the file, and no preserve takes it in.
 test_late_unique_ignored_file_is_never_lost_at_the_removal() {
   local rc point label exclude found
   for point in none scan launcher unlock; do
@@ -7344,9 +7346,14 @@ test_late_unique_ignored_file_is_never_lost_at_the_removal() {
       found=preserved
     fi
     [ -n "$found" ] || fail "$label: the late unique ignored file was lost (rc=$rc): $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
-    [ "$found" != copy ] || assert_late_copy_kept "$label"
+    [ "$found" = copy ] || fail "$label: the release took the late unique ignored file into a preserve and removed the copy (found=$found, rc=$rc); with no preserve at the dispose it must refuse and keep the copy"
+    expect_code 1 "$rc" "$label: a late unique ignored file must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_late_copy_kept "$label"
+    if grep -rlqF 'late unique bytes' "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" 2>/dev/null; then
+      fail "$label: a preserve took in the late unique ignored file the refused release kept in the copy"
+    fi
   done
-  pass 'a unique ignored file that appears after preservation, at the scan, the launcher read or the unlock, is preserved again or keeps the copy'
+  pass 'a unique ignored file that appears after preservation, at the scan, the launcher read or the unlock, keeps the copy and is taken into no preserve'
 }
 
 # F2: a bundle truncated after the last recheck, at the launcher read or the
