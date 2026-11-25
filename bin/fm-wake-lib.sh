@@ -2167,6 +2167,17 @@ fm_treehouse_slot_owner_state() {  # <worktree> <task-id>
   fi
 }
 
+# True when the claim just read by fm_treehouse_slot_owner_state names a home that is this home, by physical path
+# (so a home reached through a symlink or alias still counts, and a claim naming no home or a different one does not).
+# The one owner of "is this my own claim": a same-task-ID claim from another home is not mine.
+fm_treehouse_slot_claim_home_is_this_home() {
+  local owner_home this_home
+  [ -n "$FM_TREEHOUSE_SLOT_OWNER_HOME" ] || return 1
+  owner_home=$(cd "$FM_TREEHOUSE_SLOT_OWNER_HOME" 2>/dev/null && pwd -P) || return 1
+  this_home=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || return 1
+  [ "$owner_home" = "$this_home" ]
+}
+
 # Teardown return-pending record: bin/fm-teardown.sh writes
 # <state>/<id>.teardown-return-pending, naming the task record's spawn_gen,
 # as soon as it reserves a pool task's slot and before any cleanup that can
