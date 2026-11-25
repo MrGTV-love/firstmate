@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -228,6 +229,26 @@ def link_replace_refused(link):
     return False
 
 
+def folder_link_replace_refused(link, opened):
+    """True only when replacing the folder link LINK by a folder of the worker's own, holding OPENED, was refused.
+
+    A refused create leaves the worker's folder in the link's place; the
+    caller puts the link back outside any profile.
+    """
+    link, opened = Path(link), Path(opened)
+    try:
+        link.unlink()
+    except PermissionError:
+        return link.is_symlink()
+    try:
+        link.mkdir()
+        with opened.open("x") as stream:
+            stream.write("# fixture write\n")
+    except PermissionError:
+        return not opened.exists()
+    return False
+
+
 def tracking_checkout_clean(worktree):
     """True only when starting the task's branch from a remote-tracking ref exits 0, records no upstream and tries no config write."""
     tip = git("-C", worktree, "rev-parse", "HEAD").stdout.strip()
@@ -239,7 +260,8 @@ def tracking_checkout_clean(worktree):
 
 
 CASES = {"program": program_refused, "tracking-checkout": tracking_checkout_clean, "create": program_create_refused, "rename-over": rename_over_refused,
-         "link-create": link_create_refused, "rename-into-place": rename_into_place_refused, "link-replace": link_replace_refused}
+         "link-create": link_create_refused, "rename-into-place": rename_into_place_refused, "link-replace": link_replace_refused,
+         "folder-link-replace": folder_link_replace_refused}
 
 
 def writable(path):
@@ -949,6 +971,22 @@ def git_program_fixture(common, worktree, user_home, base):
     user_config, user_xdg_config = user_home / ".gitconfig", user_home / ".config/git/config"
     write(user_config, "[fixture]\n\tuser = 1\n")
     write(user_xdg_config, "[fixture]\n\txdg = 1\n")
+    # Git's compiled-in system file, which the builder asks `git var
+    # GIT_CONFIG_SYSTEM` for, opened through a folder link as /etc/gitconfig
+    # is through /etc -> private/etc. The host's own system file is
+    # root-owned, so a stand-in git on the builder's PATH alone names this
+    # file there and hands every other command to Git (build_profile).
+    system_real, system_config = user_home / "system/private/etc/gitconfig", user_home / "system/etc/gitconfig"
+    write(system_real, "[fixture]\n\tsystem = 1\n")
+    system_config.parent.symlink_to("private/etc", target_is_directory=True)
+    stand_in = base / "git-var-stand-in/git"
+    write(stand_in, "#!/bin/sh\n"
+                    "if [ \"$#\" -eq 2 ] && [ \"$1\" = var ] && [ \"$2\" = GIT_CONFIG_SYSTEM ]; then\n"
+                    f"  printf '%s\\n' {shlex.quote(str(system_config))}\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    f"exec {shlex.quote(shutil.which('git'))} \"$@\"\n")
+    stand_in.chmod(0o755)
     for key, value in (("extensions.worktreeConfig", "true"), ("include.path", str(included)),
                        (f"includeIf.gitdir:{common}/.path", str(conditional))):
         assert git("-C", str(common.parent), "config", key, value).returncode == 0
@@ -969,6 +1007,9 @@ def git_program_fixture(common, worktree, user_home, base):
         ("git-include", "program", [included], literal, included, []),
         ("git-user-config", "program", [user_config], literal, user_config, []),
         ("git-user-xdg-config", "program", [user_xdg_config], literal, user_xdg_config, []),
+        # Written by the name Git opens, through the folder link; the kernel
+        # judges the write at the real path.
+        ("git-system-config", "program", [system_config], literal, system_real, []),
         # A write through the link name is judged at the link's real path.
         ("git-include-through-link", "program", [conditional], literal, conditional_real, []),
         ("git-include-link-replace", "link-replace", [conditional], literal, conditional, []),
@@ -1164,6 +1205,7 @@ def fixture(repo, base, harness, user_home, other):
             "late_tasks": [str(state / "task-late.meta"), str(state / "task-pipeline.meta")],
             "transcript_container": str(user_home / f".claude/projects/{slug}") if harness == "claude" else "",
             "git_common": str(project / ".git"), "git_cases": git_cases, "g2_hook_marker": str(g2_hook_marker),
+            "git_var_stand_in": str(base / "git-var-stand-in"),
             "protected": {name: str(path) for name, path in protected.items()},
             "writable": {name: str(path) for name, path in writable_paths.items()},
             "renamed": {name: str(path) for name, path in renamed.items()}}
@@ -1193,7 +1235,10 @@ def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktre
         command += ["--claude-session", OWN_SESSION]
     if agent_dir:
         command += ["--agent-dir", str(agent_dir)]
-    subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"]), check=True, capture_output=True, text=True)
+    # Only the builder runs with the git_program_fixture stand-in first on its
+    # PATH; the worker's own Git commands never see it.
+    path = manifest["git_var_stand_in"] + os.pathsep + env.get("PATH", os.defpath)
+    subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"], PATH=path), check=True, capture_output=True, text=True)
 
 
 def invalid_project_source(repo, manifest, base, env):
@@ -1292,6 +1337,7 @@ def program_aliases(repo, manifest, base, harness, env):
     targets = {"config": common / "config", "config-worktree": common / "config.worktree", "own-config-worktree": gitdir / "config.worktree",
                "include": user_home / "git-include/shared.gitconfig", "include-real-path": user_home / "git-real/conditional.gitconfig",
                "user-config": user_home / ".gitconfig", "user-xdg-config": user_home / ".config/git/config",
+               "system-config": user_home / "system/private/etc/gitconfig",
                "hook": common / "hooks/post-checkout", "hook-link-target": user_home / "hook-scripts/pre-push",
                "hooks-path-hook": user_home / "task-hooks/post-checkout", "module-config": common / "modules/sub/config",
                "remote-file": common / "remotes/probe"}
@@ -1360,6 +1406,36 @@ def mutants(repo, manifest, base, harness, env, launch_env):
             os.unlink(case["relink"][0])
             os.symlink(case["relink"][1], case["relink"][0])
         print(f"{harness} mutant {case['name']}: removed {rule}; " + ("the case's write landed" if landed else "SURVIVED: the case stayed refused"))
+    # The system file's opened name, as /etc/gitconfig, sits under a folder
+    # link, as /etc -> private/etc, so the kernel judges a write by that name
+    # only once a folder of the worker's own replaces the link. The literal
+    # deny on the link, which every folder above a program file has, refuses
+    # that first, so the opened-name deny is the second of two rules: under the
+    # head profile and with the link's deny alone removed the replacement stays
+    # refused, and with both removed it lands.
+    system = next(case for case in manifest["git_cases"] if case["name"] == "git-system-config")
+    opened = Path(system["args"][0])
+    link, target = opened.parent, os.readlink(opened.parent)
+    replace = {"kind": "folder-link-replace", "args": [str(link), str(opened)]}
+    link_rule, opened_rule = (f"(deny file-write* (literal {json.dumps(str(path), ensure_ascii=False)}))" for path in (link, opened))
+    for rule in (link_rule, opened_rule):
+        assert lines.count(rule) == 1, ("git-system-config folder link", rule, lines.count(rule))
+    for label, removed, expected in (("head profile", (), True), ("link deny removed", (link_rule,), True),
+                                     ("link and opened-name denies removed", (link_rule, opened_rule), False)):
+        mutant = base / f"mutant-git-system-config-folder-link-{len(removed)}-{harness}.sb"
+        mutant.write_text("\n".join(line for line in lines if line not in removed) + "\n")
+        run = subprocess.run(["/usr/bin/sandbox-exec", "-f", str(mutant), sys.executable, __file__, "--case", json.dumps(replace)],
+                             capture_output=True, text=True, env=launch_env)
+        # Put the link back for the next run, outside any profile.
+        if not link.is_symlink():
+            if link.exists():
+                shutil.rmtree(link)
+            link.symlink_to(target, target_is_directory=True)
+        held = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": expected})
+        if not held:
+            survived.append(("git-system-config folder link " + label, run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
+        print(f"{harness} system config folder link replaced, {label}: " + ("refused" if expected else "landed")
+              + (" as expected" if held else f" NOT as expected ({run.stdout.strip()})"))
     # The launch's branch.autoSetupMerge=false entry, under the unchanged
     # profile: with it the tracking checkout is clean, and without it Git
     # tries the refused config write.
