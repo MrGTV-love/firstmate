@@ -1,0 +1,9 @@
+ok - keep-ai-trailers keeps the trailer and still refuses a credential on the config carrier
+ok - a real endpoint whose git honours neither carrier fails the spawn, names the reason, starts no harness and leaves no endpoint, hooks dir or status line; without the verdict wait it is falsely reported spawned
+ok - once teardown removes the hooks dir, a process still carrying the rows runs no fm hooks, as the legacy carrier's dangling hooksPath does
+ok - a refused relaunch keeps the task's pane, hooks dir and record and writes the refusal to its status
+ok - herdr: a refused fresh spawn closes its pane through the herdr adapter and leaves no hooks dir, status line or record
+ok - the verdict bound is a test-only seam: unset FM_TEST_SEAM or a non-numeric value keeps the production bound, so a slow refusal is still reported
+# all fm-spawn-git-hook-carrier tests passed
+bash tests/fm-spawn-git-hook-carrier.test.sh        35.36s user 80.41s system 28% cpu 6:40.83 total
+exit=0

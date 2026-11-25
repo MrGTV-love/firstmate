@@ -1,0 +1,9 @@
+note: ps inside the worker: no (confinement seatbelt-v1)
+ok - a listed harness runs the config carrier from sh, bash, zsh and ksh panes with every frozen G3-G6, G9 case and control
+ok - a pane git that ignores the rows gets the verified legacy carrier with every protection
+ok - an unlisted harness stays on the legacy carrier even when the pane git honours the rows
+ok - control: a probe that passes on a git hiding the rows lets the credential and trailer land, so the probe is load-bearing
+ok - a pane with no git, malformed GIT_CONFIG_PARAMETERS or a malformed GIT_CONFIG_COUNT refuses the launch; a healthy pane runs it
+ok - relaunches in one pane switch carriers both ways and always leave exactly one, keeping operator parameters first
+ok - an allowlisted GIT_CONFIG_PARAMETERS keeps exactly one row set and the operator's own rows
+# run 1 stopped by the agent tool's 10-minute background limit after 7 of 13 cases; remaining cases rerun in carrier-suite-part2.log

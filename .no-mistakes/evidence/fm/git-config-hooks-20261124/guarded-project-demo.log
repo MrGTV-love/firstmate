@@ -1,0 +1,26 @@
+== LEGACY carrier (numbered GIT_CONFIG core.hooksPath)
+guard: DENY third-party hooks dir (core.hooksPath=/tmp/fm-guarded-demo.Yxrdmv/task.git-hooks)
+git hook list pre-commit: hook from hookdir 
+git hook list commit-msg: hook from hookdir 
+git hook list pre-push: hook from hookdir 
+git hook list reference-transaction: warning: no hooks found for event 'reference-transaction' 
+credential commit: refused
+credential commit with -c core.hooksPath=/dev/null: LANDED
+clean commit: landed
+AI trailers in commit body: 0
+clean push: landed
+repository's own hooks that ran: repo:pre-commit repo:pre-push 
+== CONFIG carrier (hook.<name> rows in GIT_CONFIG_PARAMETERS)
+guard: allow (core.hooksPath=.githooks)
+git hook list pre-commit: hook from hookdir 
+git hook list commit-msg: fm-strip fm-scan-commit 
+git hook list pre-push: fm-scan-push hook from hookdir 
+git hook list reference-transaction: hook from hookdir 
+credential commit: refused
+credential commit with -c core.hooksPath=/dev/null: refused
+clean commit: landed
+AI trailers in commit body: 0
+clean push: landed
+repository's own hooks that ran: repo:pre-commit repo:pre-push repo:reference-transaction 
+== teardown: task hooks dir removed, rows still in env
+commit with dangling rows: landed (rows run no hook, like a dangling legacy core.hooksPath)

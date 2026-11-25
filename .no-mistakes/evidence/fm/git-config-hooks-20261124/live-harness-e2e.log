@@ -1,0 +1,12 @@
+# live claude 2.1.332 (Claude Code)
+ok - claude 2.1.332 (Claude Code): the config carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control claude 2.1.332 (Claude Code): with the carrier removed at the harness boundary the credential commit and AI trailer land
+# live omp omp/19.2.0
+ok - omp omp/19.2.0: the legacy carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control omp omp/19.2.0: with the carrier removed at the harness boundary the credential commit and AI trailer land
+# live codex codex-cli 0.171.0
+ok - codex codex-cli 0.171.0: the legacy carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control codex codex-cli 0.171.0: with the carrier removed at the harness boundary the credential commit and AI trailer land
+# all fm-git-hook-carrier-live tests passed
+FM_GIT_HOOK_CARRIER_LIVE=1 bash tests/fm-git-hook-carrier-live-e2e.test.sh  14.73s user 24.38s system 30% cpu 2:07.76 total
+exit=0

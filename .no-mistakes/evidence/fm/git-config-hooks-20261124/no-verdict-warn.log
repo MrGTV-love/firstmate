@@ -1,0 +1,10 @@
+spawn exit status: 0
+seconds fm-spawn waited: 115
+verdict warning lines:
+  warning: task noverdict-19482: /Users/charlesabrooker/tmp/fm-noverdict.9qwy6u/home/data/noverdict-19482/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+  warning: /Users/charlesabrooker/tmp/fm-noverdict.9qwy6u/home/data/noverdict-19482/launch-brief.md records no ship branch; defaulting to legacy branch fm/noverdict-19482
+  warning: /Users/charlesabrooker/tmp/fm-noverdict.9qwy6u/home/data/noverdict-19482/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+  skill selection for noverdict-19482: unavailable - no TypeSafe or OpenRouter key
+  warning: the launch in window firstmate:fm-noverdict-19482 recorded no Git hook carrier verdict within 100 polls; proceeding
+  spawned noverdict-19482 harness=omp kind=ship mode=no-mistakes yolo=off window=firstmate:fm-noverdict-19482 worktree=/Users/charlesabrooker/tmp/fm-noverdict.9qwy6u/wt
+task record published: yes
