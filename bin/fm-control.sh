@@ -113,8 +113,10 @@
 # live pid, task_session_file, and current_session_file. Publication claims the
 # record by an atomic rename, confirms the claimed bytes are the compared ones,
 # and links the new record in only where nothing exists, so a writer that
-# published in the gap keeps its record. While the path is empty the omp
-# extension reads the claim, so such a writer keeps the task anchor. A failed
+# published in the gap keeps its record. While the path is empty an omp
+# extension started after this rule reads a claim of its own generation, so
+# such a writer keeps the task anchor; an older writer relies on the kept
+# claim, which adopt names. A failed
 # install restores the claim, and a claim that cannot be restored, or whose
 # task_session_file the record at the path does not keep, is kept and named,
 # never deleted.
@@ -418,12 +420,12 @@ control_cleanup() {
     reassociate_rollback || true
   fi
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
-  if [ -n "$CONTROL_RECORD_CLAIM" ]; then
+  if [ -n "$CONTROL_RECORD_CLAIM" ] && [ -e "$CONTROL_RECORD_CLAIM" ]; then
     # An interrupted or failed adopt gives the claimed record back unless a writer already
     # replaced it. The claim is the last copy of the old record and its task anchor, so it is
     # removed only once the record path holds it or a record keeping its task_session_file.
     local claimed_anchor
-    claimed_anchor=$(jq -r '.task_session_file // empty' "$CONTROL_RECORD_CLAIM" 2>/dev/null)
+    claimed_anchor=$(jq -r '.task_session_file // empty' "$CONTROL_RECORD_CLAIM" 2>/dev/null) || claimed_anchor=
     if ln -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" 2>/dev/null \
       || cmp -s -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" \
       || { [ -n "$claimed_anchor" ] \
@@ -1566,7 +1568,7 @@ if [ "$VERB" = adopt ]; then
   if [ "$adoption_recorded_pid" = "$adoption_pid" ] \
     && [ -n "$(printf '%s' "$adoption_prior" | jq -r '.start // empty' 2>/dev/null)" ] \
     && [ "$(printf '%s' "$adoption_prior" | jq -r '.start // empty')" != "$(printf '%s' "$adoption_record" | jq -r '.start // empty')" ]; then
-    echo "adopt note: the record's adopted process start identity differs from the live process, so the record is stale: another process now holds PID $adoption_pid; stop it or relaunch the task so a fresh launch writes a new record" >&2
+    echo "adopt note: the record's adopted process start identity differs from the live process, so the record is stale: another process now holds PID $adoption_pid; it is not this task's adopted agent and fm-control will not stop it, so stop that process first, and only then relaunch the task so a fresh launch writes a new record" >&2
   fi
   [ "$adoption_recorded_pid" != "$adoption_pid" ] \
     || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"

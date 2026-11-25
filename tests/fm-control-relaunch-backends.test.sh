@@ -2346,6 +2346,9 @@ test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install() {
     [ -f "${claims[0]}" ] || fail "the claimed record must exist between the claim and the install ($writer)"
     case "$writer" in
       extension)
+        # A claim an earlier adopt kept for an older generation can never supply this generation's anchor.
+        jq -c '.spawn_gen="older" | .task_session_file="/older/session.jsonl"' "$dir/record.original" > "$dir/home/state/.$id.omp-session.claim.older"
+        cp "$dir/home/state/.$id.omp-session.claim.older" "$dir/older-claim.expected"
         # The REAL extension, pinned to the task generation and not named by the record, activates another conversation.
         extension_event personal ;;
       anchorless)
@@ -2370,7 +2373,8 @@ test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install() {
         jq -e --arg task "$task" --arg personal "$personal" --argjson pid "$EXT_PROC_PID" \
           '.pid==$pid and .task_session_file==$task and .current_session_file==$personal' "$record" >/dev/null \
           || fail "a writer that published while the record was claimed lost the task anchor: $(cat "$record")"
-        assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a refused adoption whose writer kept the anchor leaves no staged or claimed record" ;;
+        cmp -s "$dir/older-claim.expected" "$dir/home/state/.$id.omp-session.claim.older" || fail "a kept claim of another generation must stay untouched"
+        assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' ! -name '*.claim.older' | wc -l | tr -d ' ')" "a refused adoption whose writer kept the anchor leaves no staged or claimed record" ;;
       anchorless)
         claims=("$dir"/home/state/.*omp-session.claim.*)
         [ -f "${claims[0]}" ] || fail "the claim holding the only copy of the task anchor was deleted"
@@ -2381,6 +2385,37 @@ test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install() {
     bun_stop_all
   done
   pass "omp bun adoption: a record published between the claim and the install is never overwritten, keeps the task anchor from the claim, and a claim holding the only anchor is kept"
+}
+
+test_omp_bun_adoption_finishes_cleanup_when_the_record_vanishes_before_the_claim() {
+  local dir id record line rc out adopt_job
+  prepare_bun_adoption vanished-before-claim
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  arm_adoption_barrier "$dir" "$id"
+  exec 6<> "$dir/fake/barrier-events"
+  (
+    rc=0
+    run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
+    printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
+  ) &
+  adopt_job=$!
+  read -r -t 120 line <&6 || fail "adoption never reached the claim"
+  [ "$line" = 'reached mv' ] || fail "adoption never reached the claim: $line"
+  # A writer's failure path removes the record after the last comparison, so the claim finds nothing.
+  rm -f "$record"
+  printf 'go\n' > "$dir/fake/barrier-resume"
+  read -r -t 120 line <&6 || fail "adoption never finished after the record vanished"
+  case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly: $line" ;; esac
+  wait "$adopt_job"
+  exec 6>&-
+  out=$(cat "$dir/adopt.out")
+  assert_equals 1 "$rc" "a claim that finds no record ends with its own refusal, not a cleanup failure: $out"
+  assert_contains "$out" 'adopt could not claim the session record' "the refusal names the failed claim"
+  assert_not_contains "$out" 'adopt kept the original session record' "no claim exists, so none is named"
+  [ ! -e "$record" ] || fail "cleanup must not invent a record"
+  assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" "a failed claim leaves no staged or claimed file"
+  bun_stop_all
+  pass "omp bun adoption: a record that vanishes before the claim ends in the claim refusal and a complete cleanup"
 }
 
 # ln shim: while <mode> is set, a link whose destination is the session record fails.
@@ -2600,6 +2635,7 @@ test_omp_adoption_bun_runtime() {
   test_omp_adoption_native_omp_first_on_path_keeps_a_live_bun_writer
   test_omp_bun_adoption_does_not_overwrite_a_late_writer
   test_omp_bun_adoption_does_not_overwrite_a_writer_between_claim_and_install
+  test_omp_bun_adoption_finishes_cleanup_when_the_record_vanishes_before_the_claim
   test_omp_bun_adoption_never_deletes_the_last_copy_of_the_old_record
   test_omp_bun_adoption_binds_the_adopted_incarnation
   test_omp_bun_adoption_needs_positive_live_session_evidence

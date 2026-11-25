@@ -55,9 +55,12 @@ export function createTaskSessionProof(state: string, id: string, registry: Regi
   function previous(): Proof | null {
     let text = readIfPresent(path);
     if (text === null) {
-      const claims = readdirSync(state).filter(name => name.startsWith(`.${id}.omp-session.claim.`));
+      const sameGeneration = (claim: string | null): claim is string => {
+        try { return claim !== null && JSON.parse(claim)?.spawn_gen === gen; } catch { return false; }
+      };
+      const claims = readdirSync(state).filter(name => name.startsWith(`.${id}.omp-session.claim.`)).map(name => readIfPresent(resolve(state, name))).filter(sameGeneration);
       if (claims.length > 1) throw new Error("ambiguous claimed session proof");
-      text = (claims.length === 1 ? readIfPresent(resolve(state, claims[0])) : null) ?? readIfPresent(path);
+      text = claims[0] ?? readIfPresent(path);
       if (text === null) return null;
     }
     const value = JSON.parse(text);
