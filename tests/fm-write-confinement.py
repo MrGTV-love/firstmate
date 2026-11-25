@@ -1,4 +1,5 @@
 """Synthetic cross-task operations through the production profile builder."""
+import errno
 import hashlib
 import importlib.util
 import json
@@ -7,8 +8,10 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 GIT_ENV = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
@@ -1145,6 +1148,308 @@ def reader_startup(repo, root):
     print("reader startup: Bash/Zsh login-interactive children cannot restore fake credential; PATH/TERM retained; admission event recorded")
 
 
+# Vernant's lifecycle record folders in the shared Git directory: a confined
+# task must not write its own owned-paths widening approval or captain-drop
+# record, while every other lifecycle write it makes stays allowed.
+LIFECYCLE = "vernant-worktree-lifecycle"
+RECORD_FOLDERS = {"approvals": "owned-paths-approvals", "drop": "captain-drop"}
+FORGED = "forged by the task\n"
+SIBLING_MANIFEST = "0123456789abcdef.json"
+# Cases on a record folder that exists, each on its own target.
+FILE_CASES = ("read", "create", "create-nested", "overwrite", "append", "rename-within", "rename-out", "rename-in",
+              "delete", "delete-folder", "hard-link-in", "hard-link-out", "symlink-in")
+RECORDED = ("read", "overwrite", "append", "rename-within", "rename-out", "delete", "hard-link-out")
+# Fixture states laid out before the build: both record folders holding
+# records, the lifecycle folder holding only a slot manifest, or no lifecycle
+# folder. Each inner list runs as one probe from a fresh fixture, so cases that
+# act on the same path never see each other's effects.
+LIFECYCLE_SCENARIOS = {
+    "present": [[f"{key}-{case}" for key in RECORD_FOLDERS for case in FILE_CASES] + ["drop-overwrite-words", "siblings"],
+                ["approvals-folder-rename"], ["drop-folder-rename"], ["lifecycle-folder-rename"]],
+    "absent-records": [["approvals-mkdir", "drop-mkdir", "siblings"], ["approvals-makedirs", "drop-makedirs"],
+                       ["approvals-symlink-folder", "drop-symlink-folder"],
+                       ["approvals-rename-folder-in", "drop-rename-folder-in"], ["lifecycle-folder-rename"]],
+    "absent-folder": [["lifecycle-folder-create"], ["lifecycle-folder-symlink"], ["lifecycle-folder-rename-in"],
+                      ["approvals-makedirs", "drop-makedirs"]],
+}
+# The head profile, then each rule removed from a copy of it: approvals and
+# drop are a record folder's own deny lines, parent is the lifecycle folder's.
+LIFECYCLE_VARIANTS = ((), ("approvals",), ("drop",), ("parent",), ("parent", "approvals"), ("parent", "drop"))
+REFUSAL = "EPERM Operation not permitted"
+
+
+def record_path(lifecycle, key, case):
+    folder = lifecycle / RECORD_FOLDERS[key]
+    if key == "approvals":
+        return folder / f"{case}.json"
+    # captain-drop keeps <task-id>/record.json and <task-id>/captain-words.txt.
+    return folder / case / ("captain-words.txt" if case == "overwrite-words" else "record.json")
+
+
+def record_text(key, case):
+    return f"{key} {case} record\n"
+
+
+def recorded(key):
+    return RECORDED + (("overwrite-words",) if key == "drop" else ())
+
+
+def subtree_operations(lifecycle, scratch, key):
+    """Each attempt on one record folder, with the effect it would leave."""
+    folder = lifecycle / RECORD_FOLDERS[key]
+    seen = {}
+
+    def target(case):
+        return record_path(lifecycle, key, case)
+
+    def changed(case):
+        path = target(case)
+        return not path.exists() or path.read_text() != record_text(key, case)
+
+    def forged(name):
+        path = scratch / f"{key}-{name}"
+        path.write_text(FORGED)
+        return path
+
+    def prepared(name):
+        # A record folder built where the worker may write.
+        path = scratch / f"{key}-{name}"
+        write(path / "task/record.json", FORGED)
+        return path
+
+    def read():
+        seen["read"] = target("read").read_text()
+
+    def append():
+        with target("append").open("a") as stream:
+            stream.write(FORGED)
+
+    alias = scratch / f"{key}-alias"
+    return {
+        f"{key}-read": (read, lambda: seen.get("read") == record_text(key, "read")),
+        f"{key}-create": (lambda: (folder / "created.json").write_text(FORGED), lambda: os.path.lexists(folder / "created.json")),
+        f"{key}-create-nested": (lambda: write(folder / "new-task/record.json", FORGED), lambda: os.path.lexists(folder / "new-task")),
+        f"{key}-overwrite": (lambda: target("overwrite").write_text(FORGED), lambda: changed("overwrite")),
+        f"{key}-overwrite-words": (lambda: target("overwrite-words").write_text(FORGED), lambda: changed("overwrite-words")),
+        f"{key}-append": (append, lambda: changed("append")),
+        f"{key}-rename-within": (lambda: target("rename-within").rename(target("rename-within").with_name("moved.json")),
+                                 lambda: changed("rename-within")),
+        f"{key}-rename-out": (lambda: target("rename-out").rename(scratch / f"{key}-renamed-out"), lambda: changed("rename-out")),
+        f"{key}-rename-in": (lambda: forged("rename-source").rename(folder / "renamed-in.json"),
+                             lambda: os.path.lexists(folder / "renamed-in.json")),
+        f"{key}-delete": (lambda: target("delete").unlink(), lambda: changed("delete")),
+        f"{key}-delete-folder": (lambda: (folder / "empty").rmdir(), lambda: not (folder / "empty").is_dir()),
+        f"{key}-hard-link-in": (lambda: os.link(forged("link-source"), folder / "linked-in.json"),
+                                lambda: os.path.lexists(folder / "linked-in.json")),
+        # A second name outside the folder would let a write reach the record.
+        f"{key}-hard-link-out": (lambda: os.link(target("hard-link-out"), alias), lambda: os.path.lexists(alias)),
+        f"{key}-symlink-in": (lambda: os.symlink(forged("symlink-target"), folder / "symlinked-in.json"),
+                              lambda: os.path.lexists(folder / "symlinked-in.json")),
+        f"{key}-folder-rename": (lambda: folder.rename(folder.with_name(folder.name + ".moved")), lambda: not folder.is_dir()),
+        # The record folder does not exist yet: creating it, or putting a
+        # symbolic link or a prepared folder at its name, must fail.
+        f"{key}-mkdir": (folder.mkdir, lambda: os.path.lexists(folder)),
+        f"{key}-makedirs": (lambda: write(folder / "task/record.json", FORGED), lambda: os.path.lexists(folder)),
+        f"{key}-symlink-folder": (lambda: os.symlink(prepared("symlinked-folder"), folder), lambda: os.path.lexists(folder)),
+        f"{key}-rename-folder-in": (lambda: prepared("renamed-folder").rename(folder), lambda: os.path.lexists(folder)),
+    }
+
+
+def lifecycle_probe(spec):
+    """Run the named lifecycle attempts in this process, confined or not."""
+    lifecycle, scratch = Path(spec["lifecycle"]), Path(spec["scratch"])
+    scratch.mkdir(parents=True)
+    done = {}
+
+    def prepared():
+        # A whole lifecycle folder, with both records, built where the worker may write.
+        path = scratch / "lifecycle-prepared"
+        write(path / RECORD_FOLDERS["approvals"] / "task.json", FORGED)
+        write(path / RECORD_FOLDERS["drop"] / "task/record.json", FORGED)
+        return path
+
+    def publish(folder, name, text):
+        # Vernant's create-only publication: a staging file, a hard link to the
+        # record name, then the staging file removed.
+        with tempfile.NamedTemporaryFile(mode="w", dir=folder, delete=False) as stream:
+            stream.write(text)
+        try:
+            os.link(stream.name, folder / name)
+        finally:
+            os.unlink(stream.name)
+
+    def siblings():
+        # The lifecycle writes M1 measured beside the record folders, in
+        # Vernant's own order: mkdir of the store, create-only publication,
+        # atomic replace, a retired/ receipt and its withdrawal, and unlink.
+        lifecycle.mkdir(parents=True, exist_ok=True)
+        manifest = lifecycle / "fedcba9876543210.json"
+        publish(lifecycle, manifest.name, "{}\n")
+        temporary = lifecycle / f"{manifest.name}.tmp-{os.getpid()}"
+        temporary.write_text('{"lifecycle_state": "worktree_active"}\n')
+        os.replace(temporary, manifest)
+        receipts = lifecycle / "retired" / manifest.stem
+        receipts.mkdir(parents=True, exist_ok=True)
+        publish(receipts, "0" * 64 + ".json", "{}\n")
+        done["receipt"] = (receipts / ("0" * 64 + ".json")).read_text() == "{}\n"
+        done["manifest"] = manifest.read_text() == '{"lifecycle_state": "worktree_active"}\n'
+        (receipts / ("0" * 64 + ".json")).unlink()
+        receipts.rmdir()
+        receipts.parent.rmdir()
+        manifest.unlink()
+        done["removed"] = not os.path.lexists(manifest) and not os.path.lexists(lifecycle / "retired")
+
+    operations = {
+        "lifecycle-folder-rename": (lambda: lifecycle.rename(lifecycle.with_name(lifecycle.name + ".moved")),
+                                    lambda: not lifecycle.is_dir()),
+        "lifecycle-folder-create": (lifecycle.mkdir, lambda: os.path.lexists(lifecycle)),
+        "lifecycle-folder-symlink": (lambda: os.symlink(prepared(), lifecycle), lambda: os.path.lexists(lifecycle)),
+        "lifecycle-folder-rename-in": (lambda: prepared().rename(lifecycle), lambda: os.path.lexists(lifecycle)),
+        "siblings": (siblings, lambda: len(done) == 3 and all(done.values())),
+    }
+    for key in RECORD_FOLDERS:
+        operations.update(subtree_operations(lifecycle, scratch, key))
+    results = {}
+    for name in spec["cases"]:
+        operation, effect = operations[name]
+        try:
+            operation()
+            error = None
+        except OSError as failure:
+            error = f"{errno.errorcode.get(failure.errno, failure.errno)} {failure.strerror}"
+        results[name] = {"error": error, "effect": effect()}
+    return results
+
+
+def case_rules(scenario, name):
+    """The profile rules that each deny this attempt on their own."""
+    if name == "siblings" or name.endswith("-read"):
+        return set()
+    if name.startswith("lifecycle-"):
+        return {"parent"}
+    key = name.split("-", 1)[0]
+    # With no lifecycle folder, the folder itself is created first.
+    return {"parent", key} if scenario == "absent-folder" else {key}
+
+
+def lay_out_lifecycle(common, scenario):
+    lifecycle = common / LIFECYCLE
+    for path in (lifecycle, common / (LIFECYCLE + ".moved")):
+        if path.is_symlink():
+            path.unlink()
+        else:
+            shutil.rmtree(path, ignore_errors=True)
+    if scenario == "absent-folder":
+        return
+    write(lifecycle / SIBLING_MANIFEST, '{"lifecycle_state": "worktree_active"}\n')
+    if scenario == "absent-records":
+        return
+    for key in RECORD_FOLDERS:
+        for case in recorded(key):
+            write(record_path(lifecycle, key, case), record_text(key, case))
+        (lifecycle / RECORD_FOLDERS[key] / "empty").mkdir()
+
+
+def tree_snapshot(root):
+    """The folder as an unconfined reader sees it: every entry's type, bytes, link target and link count."""
+    if not os.path.lexists(root):
+        return None
+    snapshot = {"": ("link", os.readlink(root)) if root.is_symlink() else ("dir", os.lstat(root).st_ino)}
+    for where, folders, files in os.walk(root):
+        for name in folders + files:
+            path = Path(where) / name
+            info = path.lstat()
+            snapshot[str(path.relative_to(root))] = (
+                ("link", os.readlink(path)) if stat.S_ISLNK(info.st_mode) else ("dir",) if stat.S_ISDIR(info.st_mode)
+                else ("file", path.read_text(), info.st_nlink))
+    return snapshot
+
+
+def mutant_profile(profile, lifecycle, removed, built_with, path):
+    """A copy of the built profile without the named rules' deny lines."""
+    targets, expected = set(), 0
+    for rule in removed:
+        folder = lifecycle if rule == "parent" else lifecycle / RECORD_FOLDERS[rule]
+        kinds = ("literal",) if rule == "parent" else ("subpath", "literal") if built_with[rule] else ("subpath",)
+        targets.update(f"(deny file-write* ({kind} {json.dumps(str(folder))}))" for kind in kinds)
+        expected += len(kinds)
+    lines = profile.read_text().splitlines()
+    kept = [line for line in lines if line not in targets]
+    # A mutant that removed nothing, or more than its rules, proves nothing.
+    assert len(lines) - len(kept) == expected, (removed, len(lines) - len(kept), expected)
+    path.write_text("\n".join(kept) + "\n")
+    return path
+
+
+def lifecycle_records(repo, manifest, base, harness, mode, env):
+    """Cases 1-5 of the lifecycle record folders, under the head profile and each mutant."""
+    common = Path(manifest["packed_refs"]).parent
+    lifecycle = common / LIFECYCLE
+    # The worker run above is case 7: its project has no lifecycle folder.
+    assert not os.path.lexists(lifecycle), lifecycle
+    scratch = base / "temp/lifecycle-scratch"
+    report, failures = {}, []
+
+    def run(scenario, label, profile, cases):
+        lay_out_lifecycle(common, scenario)
+        shutil.rmtree(scratch, ignore_errors=True)
+        before = tree_snapshot(lifecycle)
+        sandbox = [] if profile is None else ["/usr/bin/sandbox-exec", "-f", str(profile)]
+        spec = json.dumps({"lifecycle": str(lifecycle), "scratch": str(scratch), "cases": cases})
+        probe = subprocess.run(sandbox + [sys.executable, __file__, "--lifecycle", spec], capture_output=True, text=True, env=env)
+        assert probe.returncode == 0 and probe.stdout.strip(), (harness, scenario, label, cases, probe.stderr)
+        results = json.loads(probe.stdout)
+        report[f"{scenario} {label} {cases[0]}"] = results
+        return results, before, tree_snapshot(lifecycle)
+
+    def judge(scenario, label, removed, results):
+        for name, result in results.items():
+            allowed = removed is None or case_rules(scenario, name) <= set(removed)
+            took = result["error"] is None and result["effect"]
+            held = result["error"] == REFUSAL and not result["effect"]
+            if not (took if allowed else held):
+                failures.append(f"{scenario} {label} {name}: expected {'allowed' if allowed else 'refused'}, got {result}")
+
+    try:
+        profiles = {}
+        for scenario, groups in LIFECYCLE_SCENARIOS.items():
+            if mode == "baseline":
+                for cases in groups:
+                    results, _, _ = run(scenario, "unconfined", None, cases)
+                    judge(scenario, "unconfined", None, results)
+                continue
+            lay_out_lifecycle(common, scenario)
+            built_with = {key: (lifecycle / folder).is_dir() for key, folder in RECORD_FOLDERS.items()}
+            profile = base / f"lifecycle-{scenario}.sb"
+            build_profile(repo, manifest, harness, profile, env)
+            profiles[scenario] = (profile, built_with)
+            for cases in groups:
+                results, before, after = run(scenario, "head", profile, cases)
+                judge(scenario, "head", (), results)
+                # Independent of the probe: an unconfined read shows the
+                # lifecycle folder exactly as it was laid out.
+                if after != before:
+                    failures.append(f"{scenario} head {cases}: lifecycle folder changed from {before} to {after}")
+        # On the base profile every head case above is allowed; name them all.
+        assert not failures, f"{harness} {mode} lifecycle records:\n" + "\n".join(failures)
+        for scenario, (profile, built_with) in profiles.items():
+            for removed in LIFECYCLE_VARIANTS[1:]:
+                label = "without-" + "+".join(removed)
+                mutant = mutant_profile(profile, lifecycle, removed, built_with, base / f"lifecycle-{scenario}-{label}.sb")
+                for cases in LIFECYCLE_SCENARIOS[scenario]:
+                    results, _, _ = run(scenario, label, mutant, cases)
+                    judge(scenario, label, removed, results)
+        assert not failures, f"{harness} {mode} lifecycle mutants:\n" + "\n".join(failures)
+        return report
+    finally:
+        # Later builds in this run see the project as it was: no lifecycle folder.
+        lay_out_lifecycle(common, "absent-folder")
+
+
+if sys.argv[1] == "--lifecycle":
+    print(json.dumps(lifecycle_probe(json.loads(sys.argv[2])), sort_keys=True))
+    sys.exit(0)
+
 if sys.argv[1] == "--child":
     results = child(json.loads(sys.argv[2]))
     sys.exit(0 if all(results.values()) else 1)
@@ -1152,6 +1457,7 @@ if sys.argv[1] == "--child":
 repo = Path(sys.argv[1])
 root = Path(sys.argv[2]).resolve()
 reader_startup(repo, root)
+lifecycle_failures = []
 for harness in ("claude", "omp"):
     for mode in ("baseline", "confined"):
         base = root / f"{harness}-{mode}"
@@ -1202,6 +1508,15 @@ for harness in ("claude", "omp"):
         archive_file = archive_branch_file(repo, manifest, base, harness, mode, env)
         print(f"{harness} {mode} archive branch file: " + json.dumps(archive_file, sort_keys=True))
         assert archive_file == {"archive-branch-kept": True, "own-archive-created": mode == "baseline"}, (harness, mode, archive_file)
+        try:
+            lifecycle = lifecycle_records(repo, manifest, base, harness, mode, env)
+        except AssertionError as failure:
+            # Keep going, so a profile without the record folder rules shows
+            # every case under both harnesses before the run fails.
+            lifecycle_failures.append(str(failure))
+            lifecycle = {}
+        for name, results in lifecycle.items():
+            print(f"{harness} {mode} lifecycle {name}: " + json.dumps(results, sort_keys=True))
         if mode == "baseline":
             for name in actual:
                 if name in CONTROL_KEYS or name.startswith("refused-"):
@@ -1211,3 +1526,4 @@ for harness in ("claude", "omp"):
             hardlink_alias(repo, manifest, base, harness, env)
             if harness == "claude":
                 reftable_source(repo, manifest, base, env)
+assert not lifecycle_failures, "\n".join(lifecycle_failures)

@@ -17,7 +17,10 @@ assets: project primary checkouts, other task worktrees, other tasks' state
 records, every task's metadata and relaunch records, the home data root apart
 from this task's directory and the duration ledger, other tasks' branches, loose
 or packed (this task keeps its declared branch and its
-archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-owned
+archive/<task>-{submitted,pipeline}-<hex8> recovery branches), the Vernant
+lifecycle record folders vernant-worktree-lifecycle/owned-paths-approvals and
+vernant-worktree-lifecycle/captain-drop in this repository's shared Git
+directory, even before they exist (reads stay open), temp roots, Main-owned
 records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
@@ -66,6 +69,13 @@ WORKER_RECORDS = (
     r"live-model\.[0-9]+\.tmp",
     r"omp-session\.json\.[0-9]+\.[0-9]+\.tmp",
 )
+# Vernant's slot lifecycle widens a task's owned paths, and its captain-drop
+# closeout route releases a copy, only once the unconfined supervisor has
+# written a record in one of these folders of the shared Git directory, so a
+# confined task never writes its own. Every other entry of the lifecycle
+# folder, such as the slot manifests and their retired/ receipts, stays
+# writable, and reads stay open for the supervisor and the closeout driver.
+VERNANT_RECORDS = ("vernant-worktree-lifecycle/owned-paths-approvals", "vernant-worktree-lifecycle/captain-drop")
 
 
 def canonical(value):
@@ -291,6 +301,7 @@ def build(args):
     # No task operation writes a replace ref, and one changes what a commit
     # holds for every Git command in the primary checkout.
     git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]
+    git_shared += [str(Path(common) / name) for name in VERNANT_RECORDS]
     lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in git_shared]
     # The primary checkout's own HEAD and index live in the shared Git directory.
     for name in ("HEAD", "HEAD.lock", "index", "index.lock"):

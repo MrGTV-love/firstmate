@@ -3139,12 +3139,16 @@ Writes are allowed by default; the profile denies writes to these named protecte
 - the home `data/` root, including every `data/<other>/` directory and the Main-loaded `data/secondmates.md`, `data/captain.md` and `data/backlog.md`, apart from this task's own `data/<task>/` directory and the duration ledger `data/command-durations.jsonl` with its `.lock` and `.compact` siblings;
 - every other task's temp roots: `/tmp/fm-<other>` and its `/tmp/fm-<other>+<token>` launch sibling, every other session directory under `/private/tmp/claude-<uid>/`, and every `~/tmp` entry whose name carries another task's id, unless the name also carries this task's longer id;
 - other tasks' branches, loose or packed, the shared `refs/replace` folder, the shared `commondir` file, the shared `reftable` folder, and the primary checkout's own `HEAD` and index, in the shared Git directory;
+- the Vernant slot lifecycle's record folders `vernant-worktree-lifecycle/owned-paths-approvals/` and `vernant-worktree-lifecycle/captain-drop/` in the shared Git directory, even before either exists, so a task cannot write its own owned-paths widening approval or its own captain-drop record; reads stay open, because the unconfined supervisor and the captain-drop closeout driver read those records;
 - the harness config homes `~/.claude`, `~/.claude.json`, `~/.omp`, `~/.codex`, `~/.dsh`, `~/.pi`, `~/.grok`, `~/.kimi`, `~/.kimi-code`, `~/.cursor`, `~/.gemini`, `~/.rovo`, `~/.rovodev` and opencode's config and data directories, apart from the running harness's measured runtime state below;
 - every other local Firstmate home: the root home and each registered local secondmate home;
 - the no-mistakes gate repository of every other project under `$NM_HOME/repos` (default `~/.no-mistakes/repos`).
 
 Task ids come from the `state/<id>.meta` records of this home and of every other local home.
 Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
+Every other entry of `vernant-worktree-lifecycle/`, such as Vernant's slot manifests with their temporary siblings and the `retired/` receipts, stays writable.
+That folder itself, as the folder above both record folders, refuses rename and deletion, and when it does not exist yet a confined worker cannot create it either, so no symbolic link or prepared folder can take its place.
+The builder does not check the lifecycle folder or its record folders for a hard link or symbolic link that already exists when the profile is built, so such a link is not refused.
 In that shared Git directory the task keeps its own declared branch and the two recovery archives of the custody-return route in [`validation-supervision`](../.agents/skills/validation-supervision/SKILL.md), `archive/<task>-submitted-<8 lowercase hex>` and `archive/<task>-pipeline-<8 lowercase hex>`, each with its lock file and reflog.
 Both archive names are anchored at both ends on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
 That holds for a task created after the profile was built, because the profile names only these two exact shapes and never a prefix.
