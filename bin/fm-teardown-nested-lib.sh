@@ -2844,10 +2844,11 @@ teardown_retained_snapshot() {  # <copy>
 # The preserve of an own copy Vernant's creation lock holds (teardown_own_preserve), in
 # data/<task>/nested-copy-preserved/. Before the driver is asked, on every route, it holds what
 # teardown_preserve_ignored's own selection holds, copied the same way. Once the driver keeps
-# the copy, every other ignored entry of the payload fingerprint's population (all but the
-# regenerable class, the .claude and .opencode trees whole, symlinks included) and every path
-# the driver names are copied in too (teardown_own_preserve_widen), never over a byte the
-# preserve holds. teardown_own_preserve_list writes the selected or the wide population to
+# the copy, or before teardown releases a dead launcher's lock itself, every other ignored
+# entry of the payload fingerprint's population (all but the regenerable class, the .claude
+# and .opencode trees whole, symlinks included) and every path the driver names are copied in
+# too (teardown_own_preserve_widen), never over a byte the preserve holds.
+# teardown_own_preserve_list writes the selected or the wide population to
 # <out> as the sorted, unique, NUL-separated "./<path>" of every file, symlink and FIFO in it
 # (a socket and an empty directory hold no bytes). Fails when any cannot be listed.
 teardown_own_preserve_list() {  # <copy> <out> <selected|wide> [named entry...]
@@ -3068,7 +3069,8 @@ teardown_own_preserve_dir_new() {  # <copy>
   done
 }
 
-# The kept route's part of (b): the preserve chosen before the driver was asked must still agree
+# The kept route's part of (b), also run before the direct release of a dead launcher's lock
+# (teardown_dead_launcher_release): the preserve chosen before the driver was asked must still agree
 # with the copy byte for byte (teardown_own_preserve_current); then every ignored file of the
 # wide population and every <named> path is copied in where the preserve lacks it, never over a
 # byte it holds, and the preserve must then hold the whole of it. A copy with no selected file
