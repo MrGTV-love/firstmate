@@ -369,6 +369,9 @@ test_launch_proof_claude_verdict_and_refusal() (
       *) return 1 ;;
     esac
   }
+  # Every fixture process is live: kill -0 succeeds for it.
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
+  kill() { [ "${1:-}" = -0 ] || { builtin kill "$@"; return; }; }
   # Every environment read is counted per process.
   # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_remote_herdr_process_env() {
@@ -574,12 +577,21 @@ test_launch_proof_claude_refusal_checks() (
         [ ! -f "$T/w/gone-$p" ] && [ ! -f "$T/w/stat-fail-$p" ] || return 1
         if [ -f "$T/w/zombie-$p" ]; then printf 'Z '; else printf 'S '; fi
         if [ -f "$T/w/moved-$p" ]; then cat "$T/w/moved-$p"; else awk -v p="$p" '$1 == p {print $3}' "$T/w/table"; fi ;;
-      # A start time that reads 1 s later at each read once drift is staged.
+      # A start time that reads 1 s later at each read once drift is staged,
+      # in the one-process read and in the table; the table omits a gone process.
       '-p '*' -o lstart=')
         local p=$2
         printf x >> "$T/w/lstart-reads-$p"
         if [ -f "$T/w/lstart-drift-$p" ]; then printf 'Mon Oct 27 16:58:%02d 2026\n' "$(wc -c < "$T/w/lstart-reads-$p")"
         else printf 'Mon Oct 27 16:58:42 2026\n'; fi ;;
+      '-axo pid=,lstart=')
+        local p
+        while read -r p _; do
+          [ ! -f "$T/w/gone-$p" ] || continue
+          printf x >> "$T/w/lstart-reads-$p"
+          if [ -f "$T/w/lstart-drift-$p" ]; then printf '%s Mon Oct 27 16:58:%02d 2026\n' "$p" "$(wc -c < "$T/w/lstart-reads-$p")"
+          else printf '%s Mon Oct 27 16:58:42 2026\n' "$p"; fi
+        done < "$T/w/table" ;;
       *) return 1 ;;
     esac
   }
@@ -921,6 +933,9 @@ test_launch_proof_token_checks_every_harness() (
       *) return 1 ;;
     esac
   }
+  # Every fixture process is live: kill -0 succeeds for it.
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
+  kill() { [ "${1:-}" = -0 ] || { builtin kill "$@"; return; }; }
   # shellcheck disable=SC2329 # the library under test calls this stand-in
   fm_remote_herdr_process_env() { [ -f "$T/w/env-$1" ] || return 1; cat "$T/w/env-$1"; }
   # shellcheck disable=SC2329 # the library under test calls this stand-in
@@ -999,6 +1014,9 @@ test_launch_proof_round8_reads() (
       *) return 1 ;;
     esac
   }
+  # Every fixture process is live: kill -0 succeeds for it.
+  # shellcheck disable=SC2329 # the library under test calls this stand-in
+  kill() { [ "${1:-}" = -0 ] || { builtin kill "$@"; return; }; }
   # shellcheck disable=SC2329
   fm_remote_herdr_process_env() {
     case "$1" in
@@ -1233,6 +1251,7 @@ test_launch_proof_pid_exe_reads_the_live_path() {
     return 0
   fi
   /bin/sleep 30 &
+  # shellcheck disable=SC2031 # $! is set by the & on the line before
   child=$!
   # The child is bash until its exec; wait, bounded, for the exec to land.
   path=''
