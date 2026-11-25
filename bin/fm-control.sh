@@ -3206,7 +3206,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     RERECORD_STAGE=published
     FM_RR_STAGED=
     fm_slot_rerecord_rollback || exit 1
-    die "task $ID's record publish reported failure after it landed; the prior record was restored from $FM_RR_ARCHIVE"
+    die "task $ID's record publish reported failure after it landed; $(fm_slot_rerecord_restored)"
   else
     RERECORD_STAGE=staged
     die "${FM_BACKLOG_TRANSITION_ERROR:-the task record could not be published}; $(fm_slot_rerecord_changes stopping "the record of task $ID is unchanged")"
@@ -3215,12 +3215,12 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     "$project" "$ID" "$branch" "$STATE" "$snap/adopt-err"; then
     line=$FM_SLOT_RERECORD_DETAIL
     fm_slot_rerecord_rollback || exit 1
-    fm_slot_rerecord_refuse adopt_postcheck_failed "$line; the prior record was restored from $FM_RR_ARCHIVE"
+    fm_slot_rerecord_refuse adopt_postcheck_failed "$line" "$(fm_slot_rerecord_restored)"
     exit 1
   fi
   if ! fm_slot_rerecord_commit; then
     fm_slot_rerecord_rollback || exit 1
-    die "the audit record $FM_RR_AUDIT could not be closed as published, so task $ID's prior record was restored from $FM_RR_ARCHIVE"
+    die "the audit record $FM_RR_AUDIT could not be closed as published; $(fm_slot_rerecord_restored)"
   fi
 
   entries=${#scope[@]}

@@ -1294,8 +1294,16 @@ fm_slot_rerecord_changes() { # <refusing|stopping> <unchanged>
   fi
 }
 
-fm_slot_rerecord_refuse() { # <reason> <detail>
-  echo "error: slot rerecord refused: $1${2:+: $2}; $(fm_slot_rerecord_changes refusing 'no record, manifest, copy or journal was changed')" >&2
+# What a run that published its own staged record and then restored the prior record did, with every step 3 entry.
+fm_slot_rerecord_restored() {
+  local entries=
+  [ -z "$FM_RR_RECONCILED" ] || entries="; before publishing, this run reconciled earlier interrupted runs: $FM_RR_RECONCILED"
+  printf "this run published task %s's record and then restored the prior record from %s; the audit record %s is %s%s; no manifest, copy or journal was changed\n" \
+    "$FM_RR_ID" "$FM_RR_ARCHIVE" "$FM_RR_AUDIT" "$(fm_slot_rerecord_field "$FM_RR_AUDIT" result)" "$entries"
+}
+
+fm_slot_rerecord_refuse() { # <reason> <detail> [<tail>]
+  echo "error: slot rerecord refused: $1${2:+: $2}; ${3:-$(fm_slot_rerecord_changes refusing 'no record, manifest, copy or journal was changed')}" >&2
   return 1
 }
 

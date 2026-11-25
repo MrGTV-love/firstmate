@@ -1634,10 +1634,40 @@ rr_expect_postcheck_rollback() { # <id>
   [ "$(rr_results)" = rolled-back ] || fail "$id: audit is '$(rr_results)'"
   RR_OUT=$out
 }
+# rr_expect_restored_tail <id> <output>: the refusal of a run that published its own record and then restored the prior
+# record says so, names its rolled-back audit record, and never says that no record was changed.
+rr_expect_restored_tail() {
+  local a found=
+  for a in $(rr_audits); do [ "$(rr_field "$a" result)" != rolled-back ] || found=$a; done
+  [ -n "$found" ] || fail "$1: no rolled-back audit record"
+  a=$found
+  assert_contains "$2" "error: slot rerecord refused: adopt_postcheck_failed: " "$1"
+  assert_contains "$2" "this run published task $RR_ID's record and then restored the prior record from $(rr_field "$a" archive); the audit record $a is rolled-back" "$1"
+  assert_contains "$2" "; no manifest, copy or journal was changed" "$1"
+  assert_not_contains "$2" "no record, manifest, copy or journal was changed" "$1: the refusal must not say that no record was changed"
+}
 test_SF4_head_moved_after_the_rebind() {
   rr_setup_SF4head SF4-head
   rr_expect_postcheck_rollback SF4-head
-  rr_ok SF4-head "HEAD moved after the rebind returned: adopt_postcheck_failed, rolled back to P, audit rolled-back"
+  rr_expect_restored_tail SF4-head "$RR_OUT"
+  assert_not_contains "$RR_OUT" 'reconciled earlier interrupted runs' "SF4-head"
+  rr_ok SF4-head "HEAD moved after the rebind returned: adopt_postcheck_failed, rolled back to P, audit rolled-back; the refusal says the run published and then restored the prior record"
+}
+# SF4-head after an earlier write crashed before its publish: step 3 abandons that audit record, and the refusal names it.
+test_SF4_head_after_a_reconciled_crash() {
+  local out rc p a
+  rr_make_f SF4-head-reconciled
+  p=$(rr_sha "$RR_META")
+  rr_crash_run "$RR_META" before 1
+  a=$(rr_audit_for "$p") || fail "SF4-head-reconciled: no audit record after the crash"
+  rr_after_rebind "$(rr_hook sf4 "$RR_MERGE_M2_BODY")"
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "SF4-head-reconciled: expected a refusal"$'\n'"$out"
+  [ "$(rr_sha "$RR_META")" = "$p" ] || fail "SF4-head-reconciled: not rolled back"
+  [ "$(rr_results)" = 'abandoned rolled-back' ] || fail "SF4-head-reconciled: audits are '$(rr_results)'"
+  rr_expect_restored_tail SF4-head-reconciled "$out"
+  assert_contains "$out" "; before publishing, this run reconciled earlier interrupted runs: audit $a abandoned (the audit was closed with the task record left unchanged); no manifest, copy or journal was changed" "SF4-head-reconciled"
+  rr_ok SF4-head-reconciled "a crashed earlier write is abandoned in step 3, then HEAD moves after the rebind: the refusal says the run published and restored the prior record and names the abandoned audit"
 }
 test_SF4_owner_changed_after_the_rebind() {
   rr_setup_SF4owner SF4-owner
@@ -2154,6 +2184,7 @@ test_R9e_term_while_the_commit_rename_is_pending
 test_R10_an_unverified_archive_refuses
 test_R11_an_unreadable_audit_record_refuses_until_moved_aside
 test_SF4_head_moved_after_the_rebind
+test_SF4_head_after_a_reconciled_crash
 test_SF4_owner_changed_after_the_rebind
 test_SF5_term_to_relaunch_leaves_the_launcher_holding_the_spawn_lock
 test_S1a_identity_verdict
