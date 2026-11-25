@@ -687,6 +687,8 @@ console.log(JSON.stringify({ foreignDenied, filesystemOwner }));
         results["refused-" + name] = refused(path)
     for name, path in manifest["writable"].items():
         results[name] = writable(path)
+    # The shared config includes /dev/null; the profile must not deny it.
+    results["dev-null-writable"] = writable("/dev/null")
     # Every shared Git file that can name a program a Git command outside the
     # profile runs, one case per deny: a write by its name, by another
     # spelling the volume folds into it, through a symbolic link to its real
@@ -921,9 +923,15 @@ def git_program_fixture(common, worktree, user_home, base):
     (common / "hooks/pre-push").symlink_to(hook_script)
     write(common / "modules/sub/config", "[core]\n\tbare = false\n")
     write(common / "remotes/probe", "URL: probe::fixture\n")
+    # The user's own Git config, which every Git command of this user reads.
+    user_config, user_xdg_config = user_home / ".gitconfig", user_home / ".config/git/config"
+    write(user_config, "[fixture]\n\tuser = 1\n")
+    write(user_xdg_config, "[fixture]\n\txdg = 1\n")
     for key, value in (("extensions.worktreeConfig", "true"), ("include.path", str(included)),
                        (f"includeIf.gitdir:{common}/.path", str(conditional))):
         assert git("-C", str(common.parent), "config", key, value).returncode == 0
+    # An include of /dev/null names no file the profile may deny.
+    assert git("-C", str(common.parent), "config", "--add", "include.path", "/dev/null").returncode == 0
     probe = base / "CaseProbe"
     probe.mkdir()
     folds = (base / "caseprobe").is_dir()
@@ -937,6 +945,8 @@ def git_program_fixture(common, worktree, user_home, base):
         ("git-config-worktree", "program", [common / "config.worktree"], literal, common / "config.worktree", []),
         ("git-own-config-worktree", "program", [gitdir / "config.worktree"], literal, gitdir / "config.worktree", []),
         ("git-include", "program", [included], literal, included, []),
+        ("git-user-config", "program", [user_config], literal, user_config, []),
+        ("git-user-xdg-config", "program", [user_xdg_config], literal, user_xdg_config, []),
         # A write through the link name is judged at the link's real path.
         ("git-include-through-link", "program", [conditional], literal, conditional_real, []),
         ("git-include-link-replace", "link-replace", [conditional], literal, conditional, []),
@@ -1252,6 +1262,7 @@ def program_aliases(repo, manifest, base, harness, env):
     user_home = Path(env["HOME"])
     targets = {"config": common / "config", "config-worktree": common / "config.worktree", "own-config-worktree": gitdir / "config.worktree",
                "include": user_home / "git-include/shared.gitconfig", "include-real-path": user_home / "git-real/conditional.gitconfig",
+               "user-config": user_home / ".gitconfig", "user-xdg-config": user_home / ".config/git/config",
                "hook": common / "hooks/post-checkout", "hook-link-target": user_home / "hook-scripts/pre-push",
                "hooks-path-hook": user_home / "task-hooks/post-checkout", "module-config": common / "modules/sub/config",
                "remote-file": common / "remotes/probe"}

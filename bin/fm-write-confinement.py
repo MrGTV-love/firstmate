@@ -25,8 +25,9 @@ and other projects' no-mistakes gate repositories. In this repository's shared
 Git directory it also denies every file that can name a program an unconfined
 Git command runs: config and config.worktree, the hooks, modules, remotes and
 branches folders, every file a config file there includes and an absolute
-core.hooksPath folder it names, plus this worktree's own config.worktree, each
-on the path Git opens and on its real path. Each protected folder and
+core.hooksPath folder it names, plus this worktree's own config.worktree and
+the user and system Git config files, each on the path Git opens and on its
+real path when that is a regular file or absent. Each protected folder and
 every folder above it also refuses rename and deletion. --data is this task's
 directory below the home data root. The build refuses while a protected ref
 path in this repository's shared Git directory (packed-refs, HEAD, index,
@@ -215,12 +216,50 @@ def config_values(path, key):
     return [os.fsdecode(entry.split(b"\n", 1)[1]) for entry in listed.stdout.split(b"\0") if b"\n" in entry]
 
 
-def git_program_paths(common, gitdir):
+def user_git_configs(home):
+    """The user and system Git config files an unconfined Git command reads.
+
+    Git reads $XDG_CONFIG_HOME/git/config, or ~/.config/git/config, and
+    ~/.gitconfig for the user, unless GIT_CONFIG_GLOBAL names another file,
+    and its compiled-in system file unless GIT_CONFIG_SYSTEM does. A Git run
+    outside the profile need not share this launch's environment, so both
+    default user files are listed whatever the environment says, beside any
+    file the environment names.
+    """
+    paths = [Path(home) / ".gitconfig", Path(home) / ".config/git/config"]
+    if os.environ.get("XDG_CONFIG_HOME"):
+        paths.append(Path(os.environ["XDG_CONFIG_HOME"]) / "git/config")
+    paths += [Path(os.environ[name]) for name in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM") if os.environ.get(name)]
+    system = subprocess.run(["git", "var", "GIT_CONFIG_SYSTEM"], capture_output=True, text=True,
+                            env={name: value for name, value in os.environ.items() if name not in ("GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM")})
+    if system.returncode:
+        raise ValueError(f"git var GIT_CONFIG_SYSTEM failed (exit {system.returncode})")
+    paths += [Path(line) for line in system.stdout.splitlines() if line]
+    return [Path(os.path.abspath(path)) for path in paths]
+
+
+def deniable(path):
+    """A path Git would read as a config or hook file that a deny can safely name.
+
+    An absent path or a regular file is; an existing device, folder or other
+    special file, such as the /dev/null GIT_CONFIG_GLOBAL often names, is not,
+    because a deny there would refuse the worker's ordinary writes to it.
+    """
+    try:
+        return stat.S_ISREG(os.stat(path).st_mode)
+    except FileNotFoundError:
+        return True
+    except NotADirectoryError:
+        return True
+
+
+def git_program_paths(common, gitdir, home):
     """Files and folders that can name a program an unconfined Git command runs.
 
     Returns (files, folders, aliases). The files are the shared config and
-    config.worktree, this worktree's own config.worktree and every file any of
-    them includes, followed as deep as Git follows includes. The folders are
+    config.worktree, this worktree's own config.worktree, the user and system
+    config files (user_git_configs) and every file any of them includes,
+    followed as deep as Git follows includes. The folders are
     GIT_PROGRAM_FOLDERS and every absolute core.hooksPath those files name; a
     relative one resolves inside whichever checkout Git runs in. Each is listed
     both as the name Git opens and at its real path, which the kernel judges a
@@ -232,6 +271,7 @@ def git_program_paths(common, gitdir):
     """
     files, folders, entries = [], [str(Path(common) / name) for name in GIT_PROGRAM_FOLDERS], []
     queue = [(Path(common) / name, 0) for name in GIT_PROGRAM_FILES] + [(Path(gitdir) / "config.worktree", 0)]
+    queue += [(path, 0) for path in user_git_configs(home)]
     while queue:
         path, depth = queue.pop(0)
         if str(path) in files:
@@ -263,7 +303,10 @@ def git_program_paths(common, gitdir):
                 elif name in names:
                     entries.append(entry)
             subfolders[:] = [name for name in subfolders if name != "objects"]
-    files += [canonical(path) for path in files]
+    # A symbolic link is denied by its own name, so it cannot be replaced, and
+    # at its real path only when that is a file a deny can name.
+    files = [path for path in files if os.path.islink(path) or deniable(path)]
+    files += [canonical(path) for path in files if deniable(canonical(path))]
     aliases = []
     for path in dict.fromkeys([Path(canonical(path)) for path in files] + entries):
         try:
@@ -290,7 +333,7 @@ def build(args):
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
         raise ValueError("a repository with reftable ref storage cannot be confined")
-    program_files, program_folders, program_aliases = git_program_paths(common, gitdir)
+    program_files, program_folders, program_aliases = git_program_paths(common, gitdir, home)
     linked = extra_links(common, gitdir, args.branch) + program_aliases
     if linked:
         shown = ", ".join(f"{path} ({why})" for path, why in linked[:5])

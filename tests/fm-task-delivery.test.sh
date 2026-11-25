@@ -1715,6 +1715,9 @@ test_forge_gerrit_changes_what_no_mistakes_means() {
   # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
   assert_grep 'Run `no-mistakes doctor`' "$brief" \
     "the gerrit worker lost the pipeline initialization step no-mistakes still needs"
+  # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
+  assert_grep 'blocked [at=<epoch>]: no-mistakes is not initialized in this copy; firstmate runs init' "$brief" \
+    "a confined worker cannot add the no-mistakes remote, so it must hand initialization to firstmate"
 
   # The forge changes the contract's head and tail only: how the pipeline is
   # driven, what --intent may carry, and the two firstmate-specific rules are the
