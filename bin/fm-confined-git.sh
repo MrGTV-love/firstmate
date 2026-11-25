@@ -8,8 +8,12 @@
 #       bin/fm-spawn.sh runs it for a seatbelt-v1 launch only, with <dir> set to
 #       state/<task>.git-path, and puts <dir> first on PATH inside that launch's
 #       sandbox, never in the pane shell. The task's write profile denies the
-#       worker every write below state/<task>.git-path, so the worker cannot
-#       change the copy it runs. Teardown removes the folder.
+#       worker every write below state/<task>.git-path.
+#       tests/fm-confined-git.test.sh checks that a confined process cannot
+#       append to the folder's files, create a file in it or move it; that
+#       case runs only where sandbox-exec can apply a profile and skips by
+#       name elsewhere, so a run that skips it leaves this unverified.
+#       Teardown removes the folder.
 #   <dir>/git [<git argument>...]
 #       Wrapper mode, selected by the invoked name git.
 #
