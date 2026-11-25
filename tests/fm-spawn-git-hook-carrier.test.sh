@@ -754,6 +754,86 @@ test_relaunch_refusal_keeps_the_task() {
   pass "a refused relaunch keeps the task's pane, hooks dir and record and writes the refusal to its status"
 }
 
+# The same fresh-refusal cleanup on the herdr backend, through the real herdr
+# adapter against a fake herdr CLI: the fake runs the staged launch as the pane
+# shell would, in a pane whose git honours neither carrier, and records every
+# call, so the close of this attempt's pane is observed without a live herdr.
+test_herdr_fresh_refusal_closes_its_pane() {
+  local dir home proj wt fakebin id out status
+  dir="$TMP_ROOT/herdr-refuse"
+  mkdir -p "$dir/gitbin"
+  dir=$(cd "$dir" && pwd -P)
+  home="$dir/home"
+  proj="$dir/project"
+  wt="$dir/wt"
+  id="carrier-herdr-$$"
+  fakebin=$(fm_test_make_spawn_fakebin "$dir/fake")
+  fm_test_spawn_home "$home" codex
+  fm_test_spawn_brief "$home" "$id"
+  printf 'off\n' > "$home/config/herdr-presentation-spaces"
+  fm_git_worktree "$proj" "$wt" fixture-herdr
+  wt=$(cd "$wt" && pwd -P)
+  printf '%s\n' "$wt" > "$dir/cwd"
+  printf '#!/bin/sh\nunset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\nexec %s "$@"\n' "$REAL_GIT" > "$dir/gitbin/git"
+  printf '#!/bin/sh\n: > %s\n' "'$dir/harness-started'" > "$fakebin/codex"
+  cat > "$fakebin/herdr" <<'SH'
+#!/usr/bin/env bash
+set -eu
+D=$FM_FAKE_DIR
+printf '%s\n' "$*" >> "$D/herdr-calls"
+case "${1:-} ${2:-}" in
+  'status --json') printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":true}}\n' ;;
+  'session list') jq -nc --arg sock "$D/herdr.sock" '{sessions:[{name:"fm-carrier-herdr-test",running:true,default:false,socket_path:$sock}]}' ;;
+  'workspace list') printf '{"result":{"workspaces":[]}}\n' ;;
+  'workspace create') printf '{"result":{"workspace":{"workspace_id":"wsnew"},"tab":{"tab_id":"seedtab"}}}\n' ;;
+  'tab list') printf '{"result":{"tabs":[]}}\n' ;;
+  'tab create') printf '{"result":{"tab":{"tab_id":"tabnew"},"root_pane":{"pane_id":"%%9"}}}\n' ;;
+  'pane get')
+    if [ -e "$D/closed" ]; then printf '{"error":{"code":"pane_not_found"}}\n'; exit 1; fi
+    jq -nc --arg pane "${3:-}" --arg cwd "$(cat "$D/cwd")" '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}' ;;
+  'pane close') : > "$D/closed" ;;
+  'agent get') printf '{"error":{"code":"agent_not_found"}}\n' ;;
+  'pane process-info') printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%%9","shell_pid":4242,"foreground_processes":[]}}}\n' ;;
+  'pane send-text')
+    case "${4:-}" in
+      ". '"*"'")
+        # The pane shell sources the staged launch from the task copy.
+        launch=${4#". '"}; launch=${launch%"'"}
+        (cd "$(cat "$D/cwd")" && env -i HOME="$D/home/user-home" PATH="$D/gitbin:$(dirname "$0"):/usr/bin:/bin:/usr/sbin:/sbin" \
+          TERM=xterm GIT_CONFIG_GLOBAL=/dev/null /bin/bash --noprofile --norc -c ". '$launch'" >/dev/null 2>&1) || : ;;
+    esac ;;
+  *) : ;;
+esac
+SH
+  cat > "$fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  '-axo pid=,ppid=,comm=') printf '4242 1 bash\n' ;;
+  '-p 4242 -o args=') printf 'bash\n' ;;
+  '-p '*'-o lstart= -o command=') printf 'Mon Jan  1 00:00:00 2024 fixture-pid-%s\n' "$2" ;;
+  *) exec /bin/ps "$@" ;;
+esac
+SH
+  chmod +x "$fakebin/herdr" "$fakebin/ps" "$fakebin/codex" "$dir/gitbin/git"
+  # shellcheck disable=SC2016 # The child shell expands its own arguments.
+  out=$(FM_FAKE_DIR="$dir" FM_HERDR_PS_BIN="$fakebin/ps" HERDR_SESSION=fm-carrier-herdr-test \
+    FM_GIT_HOOKS_VERDICT_POLLS=3000 \
+    env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SOCKET_PATH -u HERDR_WORKSPACE_ID -u HERDR_TAB_ID \
+    bash -c '. "$1/tests/lib.sh"; . "$1/tests/fixtures.sh"; shift; fm_test_run_spawn "$@"' _ "$ROOT" \
+    "$home" "$wt" "$fakebin" "$id" "$proj" --mode no-mistakes --yolo off --backend herdr --harness codex)
+  status=$?
+  rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
+  [ "$status" -ne 0 ] || fail "herdr: spawn reported success although the pane refused the launch: $out"
+  assert_contains "$out" "honours neither task Git hook carrier" "herdr: spawn did not name the refusal"
+  assert_absent "$dir/harness-started" "herdr: the harness started although the launch was refused"
+  grep -q '^pane close %9 ' "$dir/herdr-calls" ||
+    fail "herdr: a refused fresh spawn did not close its pane: $(cat "$dir/herdr-calls")"
+  assert_absent "$home/state/$id.git-hooks" "herdr: a refused fresh spawn left its hooks dir"
+  assert_absent "$home/state/$id.status" "herdr: a refused fresh spawn left a status line"
+  assert_absent "$home/state/$id.meta" "herdr: a refused fresh spawn kept a task record"
+  pass "herdr: a refused fresh spawn closes its pane through the herdr adapter and leaves no hooks dir, status line or record"
+}
+
 tests=(
   test_listed_harness_runs_the_config_carrier
   test_git_without_config_hooks_falls_back_to_legacy
@@ -766,6 +846,7 @@ tests=(
   test_spawn_fails_when_the_pane_refuses
   test_removed_hooks_dir_runs_no_hooks
   test_relaunch_refusal_keeps_the_task
+  test_herdr_fresh_refusal_closes_its_pane
 )
 fm_test_run_cases "${tests[@]}" -- "$@"
 
