@@ -437,7 +437,8 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
   if ! out=$(fm_slot_check_copy "$project" "$copy" 2>&1); then
     printf '%s\n' "$out" >&2
     # An uncommitted own edit is the one own work this route refuses (Main 1795): nothing changes and every own
-    # path is printed, so the operator sees what the refusal left untouched.
+    # path is printed or, past the sampled `uncertain,ignored` lines, listed in the drift-report file the report names,
+    # so the operator sees what the refusal left untouched.
     case "$out" in
       *dirty_worktree*|*operation_in_progress*)
         fm_slot_drift_report "$copy" "$id" "$branch" \
