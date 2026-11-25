@@ -62,8 +62,6 @@ fm_lint_hide_outside_shellcheck() {
 SH
   chmod +x "$1/ps"
 }
-# Ordinary regressions must not read or populate the operator's shared cache.
-export FM_LINT_CACHE_DIR=off
 # A cold lint root takes a CPU pass: these regressions use a private pool and
 # never inherit an outer runner's pass count, which would cut their --jobs.
 unset FM_CPU_PASS_HELD

@@ -105,8 +105,9 @@ sub fm_signal_root {
 # publication it invalidates the record at once, under the host admission lock
 # (rewritten as "failed <why>" by a staged rename, else in place, else removed),
 # and never publishes for that root again; if even that fails it keeps the host
-# lock until its root has ended (the watch's header). A gate counts a record as
-# proof only when its line is a sample at most 5 s old.
+# lock until its root has ended (the watch's header). fm_health_fresh counts a
+# record as a sample only when its line is a sample at most 5 s old; admission
+# does not read the record.
 sub fm_health_publish {
     my ($path, $time) = @_;
     my $line = sprintf "sample %.6f\n", $time;
@@ -780,7 +781,7 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
         return $found;
     };
     my ($slot, $slot_path, $peak_file, $charge_kib, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
-    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued, $stale_roots, $malformed_said);
+    my ($blocked_at, $checked_at, $bypass, $census_from, $host, $queued, $malformed_said);
     my ($passed, $passed_at, %stopped);
     eval { make_path($slot_dir, {mode => 0700}); 1 } or $refuse->($slot_dir, $@);
     -d $slot_dir && -w _ or $refuse->($slot_dir, 'not a writable directory');
@@ -997,32 +998,18 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                         }
                     } else {
                         undef $census_from;
-                        # Positive proof, not a missing mark: a new root is admitted
-                        # only while every running root that has (or may have) a
-                        # resident watch holds a measurement record naming a sample
-                        # at most 5 s old (fm_health_fresh). A root not yet sampled
-                        # has no record; a root whose watch missed a sample or could
-                        # not publish has an invalidated one; nothing is admitted
-                        # anywhere until that root has ended. A root recorded as
-                        # unwatched (a host where no resident watch runs) needs no
-                        # record: the accepted no-cap limit applies to it, and the
-                        # lint run says so once before any root starts.
-                        my $stale = grep {
-                            my ($gate_pid, undef, $peak, $watched) = @$_;
-                            defined $gate_pid && $gate_pid != $$ && ($watched // 1)
-                                && !(defined $peak && length $peak && fm_health_fresh("$peak.health", Time::HiRes::time()))
-                        } values %by_gate;
-                        # A live ledger entry that cannot be read as an entry refuses
+                        # A new root is admitted when its charge, every held root's
+                        # charge (never below what that root holds now) and the memory
+                        # outside them fit the budget; no wait for a watch sample. A
+                        # live ledger entry that cannot be read as an entry refuses
                         # admission: its root, charge and record are unknown.
                         my @malformed = map { $_->[4] } grep { defined $_->[4] } @unnamed;
                         if (@malformed && !$malformed_said++) {
                             print STDERR "fm-lint: host ledger entry " . join(', ', @malformed) . " is held by a live process but cannot be read as an entry; "
                                 . "no root is admitted on this host until it is freed\n";
                         }
-                        $stale += @malformed;
-                        $stale_roots = $stale;
                         my $outside = $foreign->($table, @host_charges);
-                        $fits = !$stale && (!@host_charges && !$outside
+                        $fits = !@malformed && (!@host_charges && !$outside
                             || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib);
                     }
                 }
@@ -1250,11 +1237,9 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # it and reads it back (fm_health_publish); a publication or read-back that fails
 # fails the root (96) and invalidates the record. The first miss invalidates it
 # too. Every invalidation is made under the host admission lock
-# (FM_LINT_INTERNAL_HOST_LOCK), which every gate holds for its decision, so a gate
-# decides either before the invalidation, on a record that was then true, or after
-# it. If the record cannot be invalidated, the watch keeps holding that lock, so no
-# root is admitted anywhere, ends its root, and releases the lock only after the
-# root is reaped; if the lock cannot be taken either, it ends its root and marks
+# (FM_LINT_INTERNAL_HOST_LOCK). If the record cannot be invalidated, the watch
+# keeps holding that lock, so no root is admitted anywhere, ends its root, and
+# releases the lock only after the root is reaped; if the lock cannot be taken either, it ends its root and marks
 # the run.
 # Signalling follows rule O (fm_signal_root): the watch records its root's exact
 # start time before the root executes anything (the root waits on a pipe until the
@@ -1538,8 +1523,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         }
         $misses = 0;
         push @ticks, 's';
-        # Publish this sample and read it back: the gates admit a new root only while
-        # every watched root's record names a sample at most 5 s old.
+        # Publish this sample and read it back.
         if (length $health && !$invalidated && !fm_health_publish($health, Time::HiRes::time())) {
             warn "fm-lint: resident-memory watch could not publish its measurement at $health ($!); the root fails\n";
             $unpublished = 1;

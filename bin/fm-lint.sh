@@ -345,9 +345,9 @@
 # or failed publication invalidates it at once, under the host admission lock; a
 # record that cannot be invalidated keeps that lock (no root is admitted anywhere)
 # until its root, which the watch ends, is reaped. Every gate on the host admits a
-# new root only while each watched running root's record names a sample at most
-# 5 s old and no live ledger entry is unreadable: positive proof, not a missing
-# stop mark.
+# new root when the charges fit the budget and no live ledger entry is unreadable;
+# it does not wait for a watched root's sample, because a held root is never
+# counted below its charge (Main 4065).
 # Linux runs are never watched (the accepted no-cap limit; the run's warning says
 # admission counts them by charge only), and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
@@ -701,8 +701,8 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   elif [ -n "${FM_LINT_INTERNAL_RSS_KIB:-}" ]; then
     gate_cap=("FM_LINT_INTERNAL_ROOT_CAP_KIB=$FM_LINT_INTERNAL_RSS_KIB")
   fi
-  # A root under the resident watch publishes a measurement record the gates
-  # require to name a recent sample (bin/fm-lint-cache.pl); its ledger entry says so.
+  # A root under the resident watch publishes a measurement record
+  # (bin/fm-lint-cache.pl); its ledger entry says so.
   local watched=0
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" = none ] && [ -n "${FM_LINT_INTERNAL_RSS_KIB:-}" ] && [ "$(uname)" = Darwin ]; then
     watched=1

@@ -5680,14 +5680,13 @@ test_an_empty_or_damaged_lane_record_holds_the_lane() {
   pass "an empty or a damaged lane record holds the lane (the run reports blocked and starts no probe); once removed, the run probes and finishes"
 }
 
-# (Main 1806 item 3, Main 1846 F2) Positive proof: a new root is admitted only while
-# every watched running root's measurement record names a successful sample at most
-# 5 s old. A live ledger entry for a watched root keeps a new root out while its
-# record is absent (not yet sampled), empty, invalidated ("failed ...") or names a
-# sample 60 s old, whatever the file's own time; once it names a fresh sample the
-# root is admitted. The control: beside a fresh sample the root is admitted at once.
-test_a_stale_measurement_record_admits_no_new_root() {
-  local tmp root pid waited state
+# (Main 3985(b), Main 4065) Root starts do not wait on the watch: beside a live
+# ledger entry for a watched root, when its charge and the new root's charge fit
+# the budget, the new root starts and finishes while that root's measurement record
+# stays absent (not yet sampled), empty, invalidated ("failed ...") or names a
+# sample 60 s old; no fresh sample is ever written.
+test_a_charge_fit_root_starts_without_a_fresh_measurement_record() {
+  local tmp root pid waited state before rc
   tmp=$(fm_test_tmproot fm-lint-stale-health)
   FM_LINT_RELEASE_FILES="$tmp/release"
   mkdir -p "$tmp/bin" "$tmp/host.lock.ledger"
@@ -5700,38 +5699,35 @@ test_a_stale_measurement_record_admits_no_new_root() {
     open(my $fh, ">>", $path) or die; flock($fh, LOCK_EX) or die;
     truncate($fh, 0); syswrite($fh, "$$\t65536\t$peak\t1\n");
     open(my $r, ">", $ready) or die; close $r;
-    my $u = time() + 120; sleep 0.05 until -e $release || time() > $u; unlink $path;' \
+    my $u = time() + 600; sleep 0.05 until -e $release || time() > $u; unlink $path;' \
     "$tmp/host.lock.ledger" "$tmp/peak" "$tmp/release" "$tmp/ready" &
   waited=0
   while [ ! -e "$tmp/ready" ] && [ "$waited" -lt 50 ]; do sleep 0.1; waited=$((waited + 1)); done
-  sample_at() { perl -MTime::HiRes=time -e 'printf "sample %.6f\n", time() - $ARGV[0]' "$1"; }
+  [ -e "$tmp/ready" ] || fm_lint_fail_settled "the watched ledger entry was not written"
   for state in absent empty failed old; do
     : > "$tmp/barrier.log"
     rm -f "$tmp/peak.health"
     case "$state" in
       empty) : > "$tmp/peak.health" ;;
       failed) printf 'failed a sample was missed\n' > "$tmp/peak.health" ;;
-      old) sample_at 60 > "$tmp/peak.health" ;;
+      old) perl -MTime::HiRes=time -e 'printf "sample %.6f\n", time() - 60' > "$tmp/peak.health" ;;
     esac
+    before=$(cat "$tmp/peak.health" 2>/dev/null || printf absent)
     FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" "$state" "$root" -- \
       "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/$state.out" 2>&1 &
     pid=$!
-    sleep 3
-    [ ! -s "$tmp/barrier.log" ] || fm_lint_fail_settled "a root was admitted beside a watched root whose measurement record is $state"
-    sample_at 0 > "$tmp/peak.health"
-    wait "$pid" || fm_lint_fail_settled "the root failed once the record named a fresh sample ($state): $(cat "$tmp/$state.out")"
-    [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 1 ] || fm_lint_fail_settled "the root did not start once the record named a fresh sample ($state)"
-    [ "$(cat "$tmp/pool.wait.$state")" -ge 2500 ] || fm_lint_fail_settled "the recorded wait $(cat "$tmp/pool.wait.$state") ms is shorter than the record stayed $state"
+    waited=0
+    while [ ! -e "$tmp/pool.wait.$state" ] && [ "$waited" -lt 600 ]; do sleep 0.1; waited=$((waited + 1)); done
+    [ -e "$tmp/pool.wait.$state" ] || fm_lint_fail_settled "a root whose charge fits was not admitted within 60 s beside a watched root whose measurement record is $state"
+    rc=0
+    wait "$pid" || rc=$?
+    [ "$rc" -eq 0 ] || fm_lint_fail_settled "the root beside a watched root whose record is $state failed ($rc): $(cat "$tmp/$state.out")"
+    [ "$(grep -c '^start ' "$tmp/barrier.log")" -eq 1 ] || fm_lint_fail_settled "the root beside a watched root whose record is $state did not start once"
+    [ "$(cat "$tmp/peak.health" 2>/dev/null || printf absent)" = "$before" ] || fm_lint_fail_settled "the $state record changed while the root was admitted"
   done
-  # The control: a fresh sample admits at once.
-  : > "$tmp/barrier.log"
-  sample_at 0 > "$tmp/peak.health"
-  FM_TEST_MEM_HOLD=0.2 PATH="$tmp/bin:$PATH" fm_lint_gate_root 100000000 "$tmp/pool" fresh "$root" -- \
-    "$tmp/bin/shellcheck" --norc -- "$root" > "$tmp/fresh.out" 2>&1 || fm_lint_fail_settled "the root beside a fresh sample failed: $(cat "$tmp/fresh.out")"
-  [ "$(cat "$tmp/pool.wait.fresh")" -lt 1000 ] || fm_lint_fail_settled "a root beside a fresh sample waited $(cat "$tmp/pool.wait.fresh") ms"
   : > "$tmp/release"
   wait 2>/dev/null || true
-  pass "a watched running root whose record is absent, empty, invalidated or names an old sample keeps every new root out; once it names a fresh sample the root is admitted; beside a fresh sample it is admitted at once"
+  pass "a root whose charge fits starts and finishes beside a watched root whose record is absent, empty, invalidated or names an old sample, with no fresh sample written"
 }
 
 # (Main 1806 item 4, Main 1846 F3) Reader loss wins over an over-cap end. Every
@@ -6290,7 +6286,7 @@ test_a_launcher_switching_delegates_is_analysed_every_run
 test_a_stop_mark_that_cannot_be_written_still_admits_no_new_root
 test_the_exact_member_reader_adopts_a_child_only_with_its_listed_identity
 test_an_empty_or_damaged_lane_record_holds_the_lane
-test_a_stale_measurement_record_admits_no_new_root
+test_a_charge_fit_root_starts_without_a_fresh_measurement_record
 test_reader_loss_followed_by_an_over_cap_reading_still_fails_unmeasured
 test_a_late_reply_is_retried_once_in_the_same_tick
 test_an_interrupted_reply_wait_with_a_reply_in_time_is_no_miss
