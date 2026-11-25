@@ -184,7 +184,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-pr-close-items.sh`   | Close the backlog items a merged pull request names, run by `fm-pr-merge.sh` and by hand to retry; its header owns the reasons it reports |
 | `fm-pr-closes-lib.sh`    | Own the closes block, the one block of `Closes-backlog-item:` and `Train-member:` lines read from a pull request body |
 | `fm-tested-tree.py`      | The tested-landing-tree verifier behind `fm-pr-merge.sh`; its header owns the exit contract |
-| `fm-review-record.py`    | Record reviews and captain merge words, derive author evidence, verify named independent coverage and plan the reads still owed; its header and `--help` own the record and relay interface |
+| `fm-review-record.py`    | Record reviews, captain merge words and append-only corrections, derive author evidence, verify named independent coverage and plan the reads still owed; its header and `--help` own the record and relay interface |
 | `fm-pr-state.sh`         | Read-only: print one line per GitHub pull-request blocker it can see, reporting on checks that have reported rather than verdicting merge-readiness |
 | `fm-pr-reviewers.sh`     | Read-only: suggest reviewers from GitHub's own author mapping of recent commits on a pull request's changed files, never requesting one |
 | `fm-merge-outcome-lib.sh` | Publish a confirmed merge's durable, role-routed supervision outcome                 |
