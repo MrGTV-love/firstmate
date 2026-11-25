@@ -680,15 +680,24 @@ test_a_killed_runs_leftover_temp_is_removed_by_the_next_write() {
   out=$(drift)
   assert_contains "$out" 'drift: proven docs/own.txt' 'the report did not run'
   [ -f "$W_STATE/t.drift-report.txt" ] || fail 'the report file was not written'
-  [ ! -e "$W_STATE/.t.drift-report.Ab3xY9" ] && [ ! -e "$W_STATE/.t.drift-report.zz00ZZ" ] \
-    || fail "a leftover temp of this id survived: $(ls -A "$W_STATE")"
+  [ ! -e "$W_STATE/.t.drift-report.Ab3xY9" ] || fail "a leftover temp of this id survived: $W_STATE/.t.drift-report.Ab3xY9"
+  [ ! -e "$W_STATE/.t.drift-report.zz00ZZ" ] || fail "a leftover temp of this id survived: $W_STATE/.t.drift-report.zz00ZZ"
   for keep in .t.drift-report.Ab3xY9z .t.drift-report.Ab3x .t.drift-report.Ab3-Y9 .u.drift-report.Ab3xY9 .tt.drift-report.Ab3xY9 \
     t.drift-report.Ab3xY9; do
     [ -f "$W_STATE/$keep" ] || fail "a file that is not this id's leftover temp was removed: $keep"
   done
   assert_equals $'.t.drift-report.Ab3-Y9\n.t.drift-report.Ab3x\n.t.drift-report.Ab3xY9z' \
     "$(cd "$W_STATE" && find . -maxdepth 1 -name '.t.drift-report.*' | sed 's|^\./||' | LC_ALL=C sort)" 'the write left its own temp behind'
-  pass "drift: a killed run's leftover temp is removed by the next write; other ids and other names are kept"
+  # A leftover the cleanup cannot remove (here a directory of that shape) stays, and the write goes on: the callers run
+  # under set -e, so a failed removal must not end them before the report is printed.
+  mkdir "$W_STATE/.t.drift-report.dir123"
+  printf 'stale\n' >"$W_STATE/.t.drift-report.Qq1234"
+  out=$(set -e; drift); rc=$?
+  [ "$rc" -eq 0 ] || fail "an unremovable leftover ended the report under set -e (exit $rc): $out"
+  assert_contains "$out" 'drift: proven docs/own.txt' 'an unremovable leftover stopped the printed report'
+  [ -d "$W_STATE/.t.drift-report.dir123" ] || fail "the unremovable leftover was not left in place: $W_STATE/.t.drift-report.dir123"
+  [ ! -e "$W_STATE/.t.drift-report.Qq1234" ] || fail "a removable leftover beside it survived: $W_STATE/.t.drift-report.Qq1234"
+  pass "drift: a killed run's leftover temp is removed by the next write; other ids and other names are kept; one that cannot be removed stays and the report goes on"
 }
 
 # B1 (exact-head read of 6acb4545): a governed task's own valid manifest is adopted. The record check must not overwrite

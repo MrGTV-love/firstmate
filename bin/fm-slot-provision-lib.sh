@@ -1142,9 +1142,11 @@ fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   if [ -n "${STATE:-}" ] && [ -d "$STATE" ]; then
     file=$STATE/$id.drift-report.txt
     # A run killed between mktemp and mv leaves its temp behind, so each write first removes this id's own leftovers,
-    # which match mktemp's exact name: the prefix and six letters or digits. A concurrent same-id run whose temp this
-    # removes either rewrites it or fails its mv and prints its complete report instead, so no report is lost.
-    rm -f -- "$STATE/.$id.drift-report."[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]] 2>/dev/null
+    # which match mktemp's exact name: the prefix and six ASCII letters or digits. A leftover that cannot be removed (a
+    # directory of that name, or a file this user cannot unlink) stays, and the write goes on: the callers run under
+    # set -e, so a failed removal must not end them. A concurrent same-id run whose temp this removes either rewrites it
+    # or fails its mv and prints its complete report instead, so no report is lost.
+    rm -f -- "$STATE/.$id.drift-report."[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9] 2>/dev/null || :
     # mv into a directory (or a link to one) would move the file inside it, so that path counts as unwritable.
     if [ -d "$file" ] || ! tmp=$(mktemp "$STATE/.$id.drift-report.XXXXXX" 2>/dev/null); then
       file=''
