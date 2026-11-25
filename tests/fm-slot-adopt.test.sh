@@ -534,6 +534,51 @@ test_a_pointer_in_an_unknown_record_store_is_refused_and_a_known_one_adopted() {
   pass "adoption: a pointer in a record store the relaunch does not compute is refused by name; the same pointer under the matching stores is adopted"
 }
 
+# fm_slot_rerecord_verdict is the read-only replay of rerecord-slot's three content verdicts against a renewed manifest:
+# a forward-merged branch whose renewal adds the directory of a new file is admitted with its labels, and a renewal that
+# adds an untouched tracked file, or keeps a base that is no longer the merge-base, is refused by name. Nothing is written.
+test_the_rerecord_replay_verdict_judges_a_renewed_manifest() {
+  local m1 out
+  make_world rerecord-replay
+  mkdir -p "$W_PROJ/lib"
+  printf 'a\n' >"$W_PROJ/lib/a.txt"
+  printf 'doc2\n' >"$W_PROJ/docs/y.txt"
+  git -C "$W_PROJ" add -A
+  git -C "$W_PROJ" "${GITID[@]}" commit -qm 'main M1'
+  git -C "$W_PROJ" push --quiet origin main
+  git -C "$W_PROJ" fetch --quiet origin
+  m1=$(git -C "$W_PROJ" rev-parse HEAD)
+  printf 'owned2\n' >"$W_SLOT/src/a.txt"
+  git -C "$W_SLOT" "${GITID[@]}" commit -qam 'own change'
+  git -C "$W_SLOT" "${GITID[@]}" merge -q --no-edit origin/main
+  mkdir -p "$W_SLOT/lib"
+  printf 'new\n' >"$W_SLOT/lib/new.txt"
+  git -C "$W_SLOT" add -A
+  git -C "$W_SLOT" "${GITID[@]}" commit -qm 'new lib file'
+  renew() { # <base> <owned-path>...
+    python3 - "$W_MANIFEST" "$1" "${@:2}" <<'PY2'
+import json, sys
+path, base = sys.argv[1:3]
+record = json.load(open(path))
+record.update(base_sha=base, base_ref="origin/main", owned_paths=sys.argv[3:])
+json.dump(record, open(path, "w"))
+PY2
+  }
+  renew "$m1" src lib
+  out=$(fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$(printf '%s\n' "$out" | head -n 1)" = ok ] || fail "the forward-merged renewal was refused: $out"
+  assert_contains "$out" 'added_scope=lib rule=c' 'the new directory was not admitted by rule (c)'
+  assert_contains "$out" 'scope_split=prior:1 changed:0 ancestor:1' 'the scope split is wrong'
+  renew "$m1" src lib docs
+  out=$(fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  assert_contains "$out" 'scope_entry_not_own_work' 'an untouched tracked directory was admitted'
+  renew "$W_BASE" src lib
+  out=$(fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  assert_contains "$out" 'base_not_merge_base' 'a base that is no longer the merge-base was admitted'
+  [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail 'the replay changed the copy'
+  pass "rerecord replay: a forward-merged renewal is admitted with its labels; an untouched entry and a stale base are refused by name; the copy is unchanged"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
@@ -553,6 +598,7 @@ test_a_refused_provision_leaves_no_export_directory
 test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner
 test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named
 test_the_no_manifest_route_consults_copy_custody
+test_the_rerecord_replay_verdict_judges_a_renewed_manifest
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"
