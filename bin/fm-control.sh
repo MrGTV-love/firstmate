@@ -131,11 +131,12 @@
 # It never reads or writes a work tree, runs no command that changes a
 # ref or the index, signals no process, writes no profile and touches no run
 # record: a running worker keeps the profile it was launched with, and the
-# receipt's next line is the relaunch that applies the new one. For a task whose
-# record names its slot manifest (slot_manifest=), a relaunch adopts that manifest
-# only on the recorded branch=, so relaunch refuses the task while it records a
-# successor, before it stops the worker, and the receipt's next line is instead
-# the reassociation onto a copy on the successor. A failed write
+# receipt's next line is the relaunch that applies the new one. A slot-governed
+# task (its record names slot_manifest=, or its project or copy has
+# scripts/git-stability/provision_existing_slot.py) is refused before anything is
+# written, because a slot-governed launch adopts or provisions its copy on the
+# recorded branch= alone and could never apply a successor; relaunch and
+# fm-spawn.sh refuse a slot-governed task whose record names one anyway. A failed write
 # restores the record and the brief. docs/agent-control.md "Recording a
 # successor branch" owns the contract and what each reader of the record does.
 # adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
@@ -831,14 +832,6 @@ successor_note_check() {  # <note-text>
   fi
 }
 
-# A relaunch of a task whose record names its slot manifest adopts that manifest, which binds the copy to the
-# recorded branch= alone, so it can never apply a recorded successor; reassociation onto a copy on the successor is
-# the step that makes the successor the task's branch.
-successor_slot_next() {  # <successor>
-  printf 'FM_HOME=%q bash %q %q reassociate --worktree %q --note %q' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" \
-    "<copy on refs/heads/$1>" "make recorded successor branch $1 the task branch"
-}
-
 do_successor() {
   local project wt kind kind_count branch_count succ_count old_branch recorded_succ base_branch reason
   local proof su_route su_archive route_text proof_text next_cmd effect_text harness_now recorded_tip proved_tip rerun tip_text
@@ -882,6 +875,9 @@ do_successor() {
   wt=$(fm_backend_meta_exact_value "$META" worktree) \
     || die "task $ID has no unambiguous worktree; nothing was changed"
   [ -d "$project" ] || die "task $ID's recorded project $project is not a directory; nothing was changed"
+  if grep -q '^slot_manifest=' "$META" || fm_slot_required "$project" "$wt"; then
+    successor_refuse slot-governed "task $ID is slot-governed (its record names a slot manifest, or its project or copy has scripts/git-stability/provision_existing_slot.py), and a slot-governed launch adopts or provisions its copy on the recorded branch alone, so no launch could apply a successor; nothing was changed"
+  fi
   branch_count=$(grep -c '^branch=' "$META" 2>/dev/null || true)
   [ "${branch_count:-0}" -le 1 ] || die "task $ID records more than one branch; nothing was changed"
   succ_count=$(grep -c '^successor_branch=' "$META" 2>/dev/null || true)
@@ -974,7 +970,7 @@ do_successor() {
         "This task now records a successor branch in the same copy." \
         "Prior branch: $old_branch (still recorded; the Ship branch line above is unchanged)." \
         "Successor branch: $SUCC_BRANCH" \
-        "The write profile of this task's next launch allows writes to exactly its prior branch, the successor branch (each with its lock and reflog) and its archive recovery branches, and nothing more." \
+        "The write profile of this task's next launch allows writes to exactly its prior branch, the successor branch (each with its lock and reflog) and its archive recovery branches, and nothing more; a slot-governed launch never applies a successor." \
         "" "$NOTE"
     ) > "$SU_BRIEF_TMP" || die "could not stage task $ID's instructions"
     SU_META_TMP=$(mktemp "$STATE/.$ID.meta.successor.XXXXXX") \
@@ -1050,10 +1046,6 @@ do_successor() {
   printf 'tip: %s\n' "$tip_text"
   harness_now=$(fm_meta_get "$META" harness)
   next_cmd=$(printf 'FM_HOME=%q bash %q %q relaunch --note %q' "$FM_HOME" "$SCRIPT_DIR/fm-control.sh" "$ID" "$next_note")
-  if fm_slot_adopt_route "$META" 0; then
-    next_cmd=$(successor_slot_next "$SUCC_BRANCH")
-    effect_text="task $ID's record names its slot manifest $(fm_meta_get "$META" slot_manifest), which a relaunch adopts only on its recorded branch $old_branch, so fm-control $ID relaunch refuses this task while it records a successor, before it stops the running agent. Reassociation onto a copy on $SUCC_BRANCH makes $SUCC_BRANCH the task's recorded branch and drops its successor_branch= and successor_proved_tip= lines; it touches no work tree, ref, process or profile."
-  else
   case "$(uname -s):$harness_now" in
     Darwin:claude | Darwin:omp)
       effect_text="a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip $proved_tip, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch $old_branch and successor $SUCC_BRANCH (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites."
@@ -1062,7 +1054,6 @@ do_successor() {
       effect_text="this task's launches are not write-confined ($(uname -s) with harness '${harness_now:-unknown}'): a relaunch generates no write profile, so the recorded successor changes no write permission here; the record is kept for a launch a profile governs."
       ;;
   esac
-  fi
   printf 'next: %s\n' "$next_cmd"
   printf 'effect: %s\n' "$effect_text"
 }
@@ -3314,6 +3305,12 @@ do_relaunch() {
     { grep -q '^slot_manifest=' "$META" || fm_slot_required "$slot_project" "$slot_copy"; }; then
     slot_governed=1
   fi
+  relaunch_succ=$(fm_meta_get "$META" successor_branch)
+  if [ "$slot_governed" = 1 ] && [ "$RELOCATING" = 0 ] && [ -n "$relaunch_succ" ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule relaunch --task "$ID" \
+      --source-ok true --successor "$relaunch_succ" 2>/dev/null || true
+    die "relaunch refused: task $ID is slot-governed and records successor branch $relaunch_succ, and a slot-governed launch adopts or provisions its copy on its recorded branch alone, so it cannot apply the successor; the running agent was not stopped. Repair: preserve task $ID's worktree and record, then remove its successor_branch= and successor_proved_tip= lines from the record and run fm-control $ID relaunch again"
+  fi
   if [ "${#OWNED_PATHS[@]}" -gt 0 ]; then
     ! grep -q '^slot_owned_path=' "$META" \
       || die "task $ID already records slot scope; --owned-path cannot override it; the running agent was not stopped"
@@ -3330,9 +3327,6 @@ do_relaunch() {
       # copy is judged by the record of what was admitted (lib header) and never by fresh-admission rules.
       slot_branch=$(fm_meta_get "$META" branch)
       [ -n "$slot_branch" ] || slot_branch=fm/$ID
-      relaunch_succ=$(fm_meta_get "$META" successor_branch)
-      [ -z "$relaunch_succ" ] \
-        || die "relaunch refused: task $ID records successor branch $relaunch_succ, and its slot manifest $(fm_meta_get "$META" slot_manifest) is adopted only on its recorded branch $slot_branch, so a relaunch cannot apply the successor; the running agent was not stopped. Next: reassociate the task onto a copy on $relaunch_succ, which makes it the task's recorded branch: $(successor_slot_next "$relaunch_succ")"
       slot_scope=()
       while IFS= read -r owned_path; do slot_scope+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
       fm_slot_adopt_check "$slot_project" "$slot_copy" "$ID" "$slot_branch" "$META" "$STATE" \

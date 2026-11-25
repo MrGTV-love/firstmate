@@ -1326,44 +1326,83 @@ test_successor_fm_control_relaunch_refuses_a_claimed_branch_before_stopping() {
   pass "successor: fm-control relaunch refuses a scout or ship branch another task records as its successor before it stops the running agent"
 }
 
-# R13-1: a slot-governed task's relaunch adopts its recorded slot manifest, which binds the
-# copy to the recorded branch= alone, so it can never apply a successor. For a task whose
-# record names slot_manifest=, the receipt's next step is the reassociation onto a copy on
-# the successor, and both relaunch owners refuse the task and name that step: fm-control
-# before it stops the running agent, fm-spawn before it writes a record or a profile.
-test_successor_slot_governed_task_is_reassociated_not_relaunched() {
-  local id=suc-slot dir out rc next
-  dir=$(new_successor_case slot "$id")
-  printf 'slot_manifest=%s\nslot_base_sha=%s\nslot_owned_path=scripts\n' \
-    "$dir/slot/manifest.json" "$(tip_of "$dir" "fm/$id")" >> "$dir/home/state/$id.meta"
-  rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --tip "$(tip_of "$dir" "fm/$id")" --note "v2 for a governed task") || rc=$?
-  expect_code 0 "$rc" "recording for a slot-governed task should succeed"$'\n'"$out"
-  next=$(receipt_part "$out" next)
-  case "$next" in
-    "FM_HOME=$dir/home bash "*" $id reassociate --worktree "*) ;;
-    *) fail "a slot-governed task's next step must be the reassociation onto a copy on its successor: $next" ;;
-  esac
-  case "$next" in *" $id relaunch"*) fail "a slot-governed task's next step must not be a relaunch: $next" ;; esac
-  assert_contains "$next" "fm/$id-v2" "the next step must name the successor copy's branch"
-  printf 'claude' > "$dir/fake/command"
-  : > "$dir/fake/literal"
-  : > "$dir/fake/keys"
-  cp -p "$dir/home/state/$id.meta" "$dir/relaunch.before"
-  rc=0; out=$(NM_HOME="$dir/nm" run_control "$dir" "$id" relaunch --note "apply the recorded successor") || rc=$?
-  [ ! -s "$dir/fake/literal" ] && [ ! -s "$dir/fake/keys" ] || fail "the refused relaunch sent lifecycle input to the running agent: $(cat "$dir/fake/literal" "$dir/fake/keys")"
-  assert_equals claude "$(cat "$dir/fake/command")" "the running agent must still run"
-  cmp -s "$dir/relaunch.before" "$dir/home/state/$id.meta" || fail "the refused relaunch changed the task record"
-  [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "the refused relaunch opened a relaunch transaction"
-  expect_code 1 "$rc" "the relaunch of a slot-governed task that records a successor must refuse"$'\n'"$out"
-  assert_contains "$out" "the running agent was not stopped" "the refusal must come before the stop"
-  assert_contains "$out" "reassociate the task onto a copy on fm/$id-v2" "the refusal must name the reassociation as the next step"
-  assert_contains "$out" "$id reassociate --worktree" "the refusal must print the reassociation command"
-  printf 'zsh' > "$dir/fake/command"
-  rc=0; out=$(run_spawn "$dir" "$id" --relaunch --harness claude) || rc=$?
-  expect_code 1 "$rc" "the launch owner's relaunch of a slot-governed task that records a successor must refuse"$'\n'"$out"
-  cmp -s "$dir/relaunch.before" "$dir/home/state/$id.meta" || fail "the launch owner's refused relaunch changed the task record"
-  assert_contains "$out" "reassociate the task onto a copy on fm/$id-v2" "the launch owner's refusal must name the reassociation as the next step"
-  pass "successor: a slot-governed task's receipt names reassociation onto the successor copy, and both relaunch owners refuse it and name that step"
+# R14-1, R14-2: a slot-governed launch adopts its recorded slot manifest, which binds the
+# copy to the recorded branch= alone, or provisions the copy on that branch, so no launch
+# could ever apply a successor. successor refuses a slot-governed task before any proof or
+# write: one whose record names slot_manifest=, and one whose project has the slot
+# provisioner but whose record has no manifest yet.
+slot_govern() {  # <case-dir> <id> <manifest|project>
+  local dir=$1 id=$2
+  if [ "$3" = manifest ]; then
+    printf 'slot_manifest=%s\nslot_base_sha=%s\nslot_owned_path=scripts\n' \
+      "$dir/slot/manifest.json" "$(tip_of "$dir" "fm/$id")" >> "$dir/home/state/$id.meta"
+  else
+    mkdir -p "$dir/proj/scripts/git-stability"
+    printf 'import sys\nsys.exit(2)\n' > "$dir/proj/scripts/git-stability/provision_existing_slot.py"
+  fi
+}
+
+test_successor_refuses_a_slot_governed_task() {
+  local id=suc-slot dir out rc label
+  for label in manifest project; do
+    dir=$(new_successor_case "slot-$label" "$id")
+    slot_govern "$dir" "$id" "$label"
+    : > "$FM_GUARD_EVENT_LOG"
+    snap "$dir" pre
+    rc=0; out=$(sc "$dir" "$id" --branch "fm/$id-v2" --tip "$(tip_of "$dir" "fm/$id")" --note "v2 for a governed task") || rc=$?
+    snap "$dir" post
+    same "$dir" pre post "successor for a slot-governed task ($label)" state data wt wt-other proj-git nm fake sentinel
+    expect_code 1 "$rc" "successor for a slot-governed task ($label) must refuse"$'\n'"$out"
+    [ -n "$(admission_event slot-governed deny)" ] \
+      || fail "the slot-governed refusal ($label) wrote no successor-branch-admission deny event"
+    assert_contains "$out" "task $id is slot-governed" "the refusal ($label) must say the task is slot-governed"
+    case "$out" in *"next: "*) fail "the slot-governed refusal ($label) printed a next step: $out" ;; esac
+  done
+  pass "successor: a task whose record names a slot manifest, or whose project is slot-governed, is refused before anything is written"
+}
+
+# The belts for a record edited by hand to name a successor on a slot-governed task:
+# fm-control relaunch refuses before it stops the running agent, on the adopt route (a
+# recorded manifest) and on the provisioning route (a governed project, no manifest yet,
+# --owned-path), and fm-spawn --relaunch refuses before it writes a record or a profile.
+# Each writes a deny event and names the repair, never a reassociation.
+test_successor_relaunch_refuses_a_hand_recorded_successor_on_a_slot_governed_task() {
+  local id=suc-slotbelt dir out rc label
+  local -a scope
+  for label in manifest project; do
+    dir=$(new_successor_case "slotbelt-$label" "$id")
+    slot_govern "$dir" "$id" "$label"
+    scope=()
+    [ "$label" = manifest ] || scope=(--owned-path scripts)
+    printf 'successor_branch=fm/%s-v2\nsuccessor_proved_tip=%s\n' "$id" "$(tip_of "$dir" "fm/$id")" >> "$dir/home/state/$id.meta"
+    printf 'claude' > "$dir/fake/command"
+    : > "$dir/fake/literal"
+    : > "$dir/fake/keys"
+    cp -p "$dir/home/state/$id.meta" "$dir/relaunch.before"
+    : > "$FM_GUARD_EVENT_LOG"
+    rc=0; out=$(NM_HOME="$dir/nm" run_control "$dir" "$id" relaunch ${scope[@]+"${scope[@]}"} --note "apply the successor") || rc=$?
+    [ ! -s "$dir/fake/literal" ] && [ ! -s "$dir/fake/keys" ] || fail "the refused relaunch ($label) sent lifecycle input to the running agent: $(cat "$dir/fake/literal" "$dir/fake/keys")"
+    assert_equals claude "$(cat "$dir/fake/command")" "the running agent must still run ($label)"
+    cmp -s "$dir/relaunch.before" "$dir/home/state/$id.meta" || fail "the refused relaunch ($label) changed the task record"
+    [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "the refused relaunch ($label) opened a relaunch transaction"
+    expect_code 1 "$rc" "the relaunch of a slot-governed task that records a successor ($label) must refuse"$'\n'"$out"
+    [ -n "$(admission_event relaunch deny)" ] || fail "the refused relaunch ($label) wrote no successor-branch-admission deny event"
+    assert_contains "$out" "task $id is slot-governed and records successor branch fm/$id-v2" "the refusal ($label) must name the governed task and its successor"
+    assert_contains "$out" "the running agent was not stopped" "the refusal ($label) must come before the stop"
+    assert_contains "$out" "remove its successor_branch= and successor_proved_tip= lines" "the refusal ($label) must name the repair"
+    case "$out" in *reassociate*) fail "the refusal ($label) offered a reassociation, which cannot apply a successor to a governed task: $out" ;; esac
+    printf 'zsh' > "$dir/fake/command"
+    : > "$FM_GUARD_EVENT_LOG"
+    rc=0; out=$(run_spawn "$dir" "$id" --relaunch --harness claude ${scope[@]+"${scope[@]}"}) || rc=$?
+    cmp -s "$dir/relaunch.before" "$dir/home/state/$id.meta" || fail "the launch owner's refused relaunch ($label) changed the task record"
+    grep -q "sentinel profile" "$dir/home/state/$id.write-confinement.sb" || fail "the launch owner's refused relaunch ($label) wrote a profile"
+    expect_code 1 "$rc" "the launch owner's relaunch of a slot-governed task that records a successor ($label) must refuse"$'\n'"$out"
+    [ -n "$(admission_event relaunch deny)" ] || fail "the launch owner's refusal ($label) wrote no successor-branch-admission deny event"
+    assert_contains "$out" "task $id is slot-governed and records successor branch fm/$id-v2" "the launch owner's refusal ($label) must name the governed task and its successor"
+    assert_contains "$out" "remove its successor_branch= and successor_proved_tip= lines" "the launch owner's refusal ($label) must name the repair"
+    case "$out" in *reassociate*) fail "the launch owner's refusal ($label) offered a reassociation: $out" ;; esac
+  done
+  pass "successor: both relaunch owners refuse a slot-governed task whose record names a successor, before the stop and before any write, with a deny event"
 }
 
 # F6 (d): the receipt says what the launch will do for a launch that no profile governs.
@@ -1410,7 +1449,8 @@ test_successor_reads_the_note_file_only_after_admission
 test_successor_keeps_the_composer_dialog_file
 test_successor_note_cannot_add_a_ship_branch_line
 test_successor_receipt_matches_what_the_launch_will_do
-test_successor_slot_governed_task_is_reassociated_not_relaunched
+test_successor_refuses_a_slot_governed_task
+test_successor_relaunch_refuses_a_hand_recorded_successor_on_a_slot_governed_task
 test_successor_failure_at_each_write_step_changes_nothing
 test_successor_serializes_on_the_lifecycle_and_metadata_locks
 test_relaunch_profile_covers_exactly_the_recorded_successor

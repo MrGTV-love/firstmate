@@ -6738,6 +6738,12 @@ if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
 fi
 if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
   SLOT_GOVERNED=1
+  if [ "$RELAUNCH" -eq 1 ] && [ "$RELAUNCH_RELOCATING" = 0 ] && [ -n "$SUCCESSOR_BRANCH" ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule relaunch --task "$ID" \
+      --source-ok true --successor "$SUCCESSOR_BRANCH" 2>/dev/null || true
+    echo "error: relaunch refused: task $ID is slot-governed and records successor branch $SUCCESSOR_BRANCH, and a slot-governed launch adopts or provisions its copy on its recorded branch alone, so it cannot apply the successor; this launch wrote no task record and no write profile. Repair: preserve task $ID's worktree and record, then remove its successor_branch= and successor_proved_tip= lines from the record and run bash bin/fm-control.sh $ID relaunch --note <why>" >&2
+    exit 1
+  fi
   if [ "$RELAUNCH" -eq 1 ]; then
     while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$RELAUNCH_META")
   fi
@@ -6749,10 +6755,6 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   elif fm_slot_adopt_route "$RELAUNCH_META" "$RELAUNCH_RELOCATING"; then
     # The task's own recorded manifest is adopted, never re-provisioned (Main 115, rule S): nothing is
     # prepared, moved or declared here, and the decision is taken once below.
-    if [ -n "$SUCCESSOR_BRANCH" ]; then
-      echo "error: relaunch refused: task $ID records successor branch $SUCCESSOR_BRANCH, and its slot manifest $(fm_meta_get "$RELAUNCH_META" slot_manifest) is adopted only on its recorded branch $BRANCH, so a relaunch cannot apply the successor; this launch wrote no task record and no write profile. Next: reassociate the task onto a copy on $SUCCESSOR_BRANCH, which makes it the task's recorded branch: bash bin/fm-control.sh $ID reassociate --worktree <copy on refs/heads/$SUCCESSOR_BRANCH> --note <why>" >&2
-      exit 1
-    fi
     SLOT_ADOPT=1
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
