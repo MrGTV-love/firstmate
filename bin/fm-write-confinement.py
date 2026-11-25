@@ -25,7 +25,9 @@ records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
 and other projects' no-mistakes gate repositories. Each protected folder and
-every folder above it also refuses rename and deletion. --data is this task's
+every folder above it also refuses rename and deletion; a
+vernant-worktree-lifecycle folder absent at the build may still be created,
+only as that exact folder and never as a link or a file. --data is this task's
 directory below the home data root. The build refuses while a protected ref
 path in this repository's shared Git directory (packed-refs, HEAD, index,
 commondir, other tasks' branch refs and reflogs, replace refs, other
@@ -75,7 +77,8 @@ WORKER_RECORDS = (
 # confined task never writes its own. Every other entry of the lifecycle
 # folder, such as the slot manifests and their retired/ receipts, stays
 # writable, and reads stay open for the supervisor and the closeout driver.
-VERNANT_RECORDS = ("vernant-worktree-lifecycle/owned-paths-approvals", "vernant-worktree-lifecycle/captain-drop")
+VERNANT_LIFECYCLE = "vernant-worktree-lifecycle"
+VERNANT_RECORDS = tuple(VERNANT_LIFECYCLE + "/" + name for name in ("owned-paths-approvals", "captain-drop"))
 
 
 def canonical(value):
@@ -391,6 +394,14 @@ def build(args):
         path = Path(anchor)
         fixed += ([str(path)] if path.is_dir() else []) + [str(parent) for parent in path.parents if str(parent) != "/"]
     lines += [f"(deny file-write* (literal {quoted(path)}))" for path in dict.fromkeys(fixed)]
+    # Vernant's write_manifest creates its lifecycle folder when it is absent.
+    # A launch that finds none lets the worker create it only as that exact
+    # folder, never as a link or a file, and the literal deny above still
+    # covers renaming, deleting and replacing it. This rule follows that deny
+    # because the last matching rule decides.
+    lifecycle = Path(common) / VERNANT_LIFECYCLE
+    if not os.path.lexists(lifecycle):
+        lines.append(f"(allow file-write-create (require-all (literal {quoted(lifecycle)}) (vnode-type DIRECTORY)))")
     lines += startup_read_rules(home)
     Path(args.profile).write_text("\n".join(lines) + "\n")
 

@@ -1159,22 +1159,28 @@ SIBLING_MANIFEST = "0123456789abcdef.json"
 FILE_CASES = ("read", "create", "create-nested", "overwrite", "append", "rename-within", "rename-out", "rename-in",
               "delete", "delete-folder", "hard-link-in", "hard-link-out", "symlink-in")
 RECORDED = ("read", "overwrite", "append", "rename-within", "rename-out", "delete", "hard-link-out")
+# Folder cases: creating an absent record folder, or putting a symbolic link
+# or a prepared folder at its name, each creating the lifecycle folder first.
+FOLDER_CASES = ("mkdir", "makedirs", "symlink-folder", "rename-folder-in")
 # Fixture states laid out before the build: both record folders holding
-# records, the lifecycle folder holding only a slot manifest, or no lifecycle
-# folder. Each inner list runs as one probe from a fresh fixture, so cases that
-# act on the same path never see each other's effects.
+# records, both empty, the lifecycle folder holding only a slot manifest, or
+# no lifecycle folder. Each inner list runs as one probe from a fresh fixture,
+# so cases that act on the same path never see each other's effects.
 LIFECYCLE_SCENARIOS = {
     "present": [[f"{key}-{case}" for key in RECORD_FOLDERS for case in FILE_CASES] + ["drop-overwrite-words", "siblings"],
                 ["approvals-folder-rename"], ["drop-folder-rename"], ["lifecycle-folder-rename"]],
-    "absent-records": [["approvals-mkdir", "drop-mkdir", "siblings"], ["approvals-makedirs", "drop-makedirs"],
-                       ["approvals-symlink-folder", "drop-symlink-folder"],
-                       ["approvals-rename-folder-in", "drop-rename-folder-in"], ["lifecycle-folder-rename"]],
-    "absent-folder": [["lifecycle-folder-create"], ["lifecycle-folder-symlink"], ["lifecycle-folder-rename-in"],
-                      ["approvals-makedirs", "drop-makedirs"]],
+    "empty-records": [["approvals-replace-folder", "drop-replace-folder"], ["approvals-rmdir-folder", "drop-rmdir-folder"]],
+    "absent-records": [[f"{key}-{case}" for key in RECORD_FOLDERS] for case in FOLDER_CASES]
+                      + [["siblings"], ["lifecycle-folder-rename"], ["lifecycle-folder-remove"]],
+    "absent-folder": [["lifecycle-folder-create"], ["siblings"], ["lifecycle-folder-symlink"], ["lifecycle-folder-file"],
+                      ["lifecycle-folder-rename-in"], ["lifecycle-folder-create-rename"], ["lifecycle-folder-create-remove"]]
+                     + [[f"{key}-{case}" for key in RECORD_FOLDERS] for case in FOLDER_CASES],
 }
-# The head profile, then each rule removed from a copy of it: approvals and
-# drop are a record folder's own deny lines, parent is the lifecycle folder's.
-LIFECYCLE_VARIANTS = ((), ("approvals",), ("drop",), ("parent",), ("parent", "approvals"), ("parent", "drop"))
+# Each rule removed from a copy of the head profile: approvals and drop are a
+# record folder's own deny lines, parent is the lifecycle folder's literal
+# deny, and create is the grant to create an absent lifecycle folder, which
+# the builder writes only when the launch finds none.
+LIFECYCLE_RULES = ("approvals", "drop", "parent", "create")
 REFUSAL = "EPERM Operation not permitted"
 
 
@@ -1217,6 +1223,13 @@ def subtree_operations(lifecycle, scratch, key):
         write(path / "task/record.json", FORGED)
         return path
 
+    def in_store(attempt):
+        # Vernant's own mkdir of the lifecycle folder comes first.
+        def run():
+            lifecycle.mkdir(parents=True, exist_ok=True)
+            attempt()
+        return run
+
     def read():
         seen["read"] = target("read").read_text()
 
@@ -1248,10 +1261,13 @@ def subtree_operations(lifecycle, scratch, key):
         f"{key}-folder-rename": (lambda: folder.rename(folder.with_name(folder.name + ".moved")), lambda: not folder.is_dir()),
         # The record folder does not exist yet: creating it, or putting a
         # symbolic link or a prepared folder at its name, must fail.
-        f"{key}-mkdir": (folder.mkdir, lambda: os.path.lexists(folder)),
+        f"{key}-mkdir": (in_store(folder.mkdir), lambda: os.path.lexists(folder)),
         f"{key}-makedirs": (lambda: write(folder / "task/record.json", FORGED), lambda: os.path.lexists(folder)),
-        f"{key}-symlink-folder": (lambda: os.symlink(prepared("symlinked-folder"), folder), lambda: os.path.lexists(folder)),
-        f"{key}-rename-folder-in": (lambda: prepared("renamed-folder").rename(folder), lambda: os.path.lexists(folder)),
+        f"{key}-symlink-folder": (in_store(lambda: os.symlink(prepared("symlinked-folder"), folder)), lambda: os.path.lexists(folder)),
+        f"{key}-rename-folder-in": (in_store(lambda: prepared("renamed-folder").rename(folder)), lambda: os.path.lexists(folder)),
+        # The record folder exists and is empty, so a rename may replace it.
+        f"{key}-replace-folder": (lambda: prepared("replacing-folder").rename(folder), lambda: (folder / "task/record.json").exists()),
+        f"{key}-rmdir-folder": (folder.rmdir, lambda: not os.path.lexists(folder)),
     }
 
 
@@ -1259,7 +1275,7 @@ def lifecycle_probe(spec):
     """Run the named lifecycle attempts in this process, confined or not."""
     lifecycle, scratch = Path(spec["lifecycle"]), Path(spec["scratch"])
     scratch.mkdir(parents=True)
-    done = {}
+    done, made = {}, {}
 
     def prepared():
         # A whole lifecycle folder, with both records, built where the worker may write.
@@ -1299,12 +1315,27 @@ def lifecycle_probe(spec):
         manifest.unlink()
         done["removed"] = not os.path.lexists(manifest) and not os.path.lexists(lifecycle / "retired")
 
+    def moved():
+        return lifecycle.with_name(lifecycle.name + ".moved")
+
+    def created(attempt):
+        def run():
+            lifecycle.mkdir()
+            made["lifecycle"] = True
+            attempt()
+        return run
+
     operations = {
-        "lifecycle-folder-rename": (lambda: lifecycle.rename(lifecycle.with_name(lifecycle.name + ".moved")),
-                                    lambda: not lifecycle.is_dir()),
-        "lifecycle-folder-create": (lifecycle.mkdir, lambda: os.path.lexists(lifecycle)),
+        "lifecycle-folder-rename": (lambda: lifecycle.rename(moved()), lambda: not lifecycle.is_dir()),
+        "lifecycle-folder-remove": (lambda: shutil.rmtree(lifecycle), lambda: not lifecycle.is_dir()),
+        "lifecycle-folder-create": (lifecycle.mkdir, lambda: lifecycle.is_dir() and not lifecycle.is_symlink()),
         "lifecycle-folder-symlink": (lambda: os.symlink(prepared(), lifecycle), lambda: os.path.lexists(lifecycle)),
+        "lifecycle-folder-file": (lambda: open(lifecycle, "x").close(), lambda: os.path.lexists(lifecycle)),
         "lifecycle-folder-rename-in": (lambda: prepared().rename(lifecycle), lambda: os.path.lexists(lifecycle)),
+        # A folder the worker created itself is still the folder above both
+        # record folders, so it cannot be moved away or removed either.
+        "lifecycle-folder-create-rename": (created(lambda: lifecycle.rename(moved())), lambda: moved().is_dir()),
+        "lifecycle-folder-create-remove": (created(lifecycle.rmdir), lambda: bool(made) and not os.path.lexists(lifecycle)),
         "siblings": (siblings, lambda: len(done) == 3 and all(done.values())),
     }
     for key in RECORD_FOLDERS:
@@ -1321,21 +1352,26 @@ def lifecycle_probe(spec):
     return results
 
 
-def case_rules(scenario, name):
-    """The profile rules that each deny this attempt on their own."""
+def allowed(scenario, name, removed):
+    """Whether the attempt succeeds once the named rules are removed from the head profile."""
+    # Without the grant, the lifecycle folder's literal deny refuses its creation.
+    creatable = "create" not in removed or "parent" in removed
     if name == "siblings" or name.endswith("-read"):
-        return set()
+        return scenario != "absent-folder" or creatable
+    if name == "lifecycle-folder-create":
+        return creatable
+    if name.startswith("lifecycle-folder-create-"):
+        return creatable and "parent" in removed
     if name.startswith("lifecycle-"):
-        return {"parent"}
+        return "parent" in removed
     key = name.split("-", 1)[0]
-    # With no lifecycle folder, the folder itself is created first.
-    return {"parent", key} if scenario == "absent-folder" else {key}
+    return key in removed and (scenario != "absent-folder" or creatable)
 
 
 def lay_out_lifecycle(common, scenario):
     lifecycle = common / LIFECYCLE
     for path in (lifecycle, common / (LIFECYCLE + ".moved")):
-        if path.is_symlink():
+        if path.is_symlink() or path.is_file():
             path.unlink()
         else:
             shutil.rmtree(path, ignore_errors=True)
@@ -1343,6 +1379,10 @@ def lay_out_lifecycle(common, scenario):
         return
     write(lifecycle / SIBLING_MANIFEST, '{"lifecycle_state": "worktree_active"}\n')
     if scenario == "absent-records":
+        return
+    if scenario == "empty-records":
+        for folder in RECORD_FOLDERS.values():
+            (lifecycle / folder).mkdir()
         return
     for key in RECORD_FOLDERS:
         for case in recorded(key):
@@ -1365,14 +1405,34 @@ def tree_snapshot(root):
     return snapshot
 
 
+def observed(lifecycle):
+    """What an unconfined reader sees: the lifecycle folder's kind and each record folder's whole tree."""
+    if lifecycle.is_symlink():
+        kind = ("link", os.readlink(lifecycle))
+    elif lifecycle.is_dir():
+        kind = ("dir", os.lstat(lifecycle).st_ino)
+    else:
+        kind = ("file",) if os.path.lexists(lifecycle) else None
+    return kind, {key: tree_snapshot(lifecycle / folder) for key, folder in RECORD_FOLDERS.items()}
+
+
+def rule_lines(rule, lifecycle, built_with):
+    """The head profile lines that make up one rule."""
+    if rule == "create":
+        return [f"(allow file-write-create (require-all (literal {json.dumps(str(lifecycle))}) (vnode-type DIRECTORY)))"]
+    if rule == "parent":
+        return [f"(deny file-write* (literal {json.dumps(str(lifecycle))}))"]
+    folder = json.dumps(str(lifecycle / RECORD_FOLDERS[rule]))
+    return [f"(deny file-write* (subpath {folder}))"] + ([f"(deny file-write* (literal {folder}))"] if built_with[rule] else [])
+
+
 def mutant_profile(profile, lifecycle, removed, built_with, path):
-    """A copy of the built profile without the named rules' deny lines."""
+    """A copy of the built profile without the named rules' lines."""
     targets, expected = set(), 0
     for rule in removed:
-        folder = lifecycle if rule == "parent" else lifecycle / RECORD_FOLDERS[rule]
-        kinds = ("literal",) if rule == "parent" else ("subpath", "literal") if built_with[rule] else ("subpath",)
-        targets.update(f"(deny file-write* ({kind} {json.dumps(str(folder))}))" for kind in kinds)
-        expected += len(kinds)
+        lines = rule_lines(rule, lifecycle, built_with)
+        targets.update(lines)
+        expected += len(lines)
     lines = profile.read_text().splitlines()
     kept = [line for line in lines if line not in targets]
     # A mutant that removed nothing, or more than its rules, proves nothing.
@@ -1393,22 +1453,22 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
     def run(scenario, label, profile, cases):
         lay_out_lifecycle(common, scenario)
         shutil.rmtree(scratch, ignore_errors=True)
-        before = tree_snapshot(lifecycle)
+        before = observed(lifecycle)
         sandbox = [] if profile is None else ["/usr/bin/sandbox-exec", "-f", str(profile)]
         spec = json.dumps({"lifecycle": str(lifecycle), "scratch": str(scratch), "cases": cases})
         probe = subprocess.run(sandbox + [sys.executable, __file__, "--lifecycle", spec], capture_output=True, text=True, env=env)
         assert probe.returncode == 0 and probe.stdout.strip(), (harness, scenario, label, cases, probe.stderr)
         results = json.loads(probe.stdout)
         report[f"{scenario} {label} {cases[0]}"] = results
-        return results, before, tree_snapshot(lifecycle)
+        return results, before, observed(lifecycle)
 
     def judge(scenario, label, removed, results):
         for name, result in results.items():
-            allowed = removed is None or case_rules(scenario, name) <= set(removed)
+            expected = removed is None or allowed(scenario, name, removed)
             took = result["error"] is None and result["effect"]
             held = result["error"] == REFUSAL and not result["effect"]
-            if not (took if allowed else held):
-                failures.append(f"{scenario} {label} {name}: expected {'allowed' if allowed else 'refused'}, got {result}")
+            if not (took if expected else held):
+                failures.append(f"{scenario} {label} {name}: expected {'allowed' if expected else 'refused'}, got {result}")
 
     try:
         profiles = {}
@@ -1426,14 +1486,21 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
             for cases in groups:
                 results, before, after = run(scenario, "head", profile, cases)
                 judge(scenario, "head", (), results)
-                # Independent of the probe: an unconfined read shows the
-                # lifecycle folder exactly as it was laid out.
-                if after != before:
-                    failures.append(f"{scenario} head {cases}: lifecycle folder changed from {before} to {after}")
+                # Independent of the probe: an unconfined read shows both
+                # record folders as they were laid out, and the lifecycle
+                # folder unmoved, or, when it was absent, absent or created
+                # as a plain folder.
+                if before[0] is None:
+                    lifecycle_kept = after[0] is None or after[0][0] == "dir"
+                else:
+                    lifecycle_kept = after[0] == before[0]
+                if after[1] != before[1] or not lifecycle_kept:
+                    failures.append(f"{scenario} head {cases}: lifecycle folders changed from {before} to {after}")
         # On the base profile every head case above is allowed; name them all.
         assert not failures, f"{harness} {mode} lifecycle records:\n" + "\n".join(failures)
         for scenario, (profile, built_with) in profiles.items():
-            for removed in LIFECYCLE_VARIANTS[1:]:
+            # The grant exists only in a profile built with no lifecycle folder.
+            for removed in [(rule,) for rule in LIFECYCLE_RULES if rule != "create" or scenario == "absent-folder"]:
                 label = "without-" + "+".join(removed)
                 mutant = mutant_profile(profile, lifecycle, removed, built_with, base / f"lifecycle-{scenario}-{label}.sb")
                 for cases in LIFECYCLE_SCENARIOS[scenario]:
