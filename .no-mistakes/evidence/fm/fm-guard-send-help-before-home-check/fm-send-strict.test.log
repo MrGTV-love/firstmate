@@ -1,7 +1,7 @@
 ok - fm-send strict: exact task/lane ids resolve through home metadata
 ok - fm-send --key: exit status follows delivery, and an undelivered key never reports success
 ok - fm-send strict: unset FM_HOME fails before target resolution
-ok - fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME
+ok - fm-send help: a leading --help or -h prints usage and exits 0 without FM_HOME, with no transport call, no change anywhere in its fixture directory and no guard event but the gate-agent allow
 ok - fm-send help: a gate agent's --help and -h stay refused as on base
 ok - fm-send help: --help after a target is not help and keeps the FM_HOME refusal
 ok - fm-send strict: unresolvable selectors do not fall back to tmux
@@ -10,3 +10,4 @@ ok - fm-send strict: prefixless herdr pane ids are rejected before tmux fallback
 ok - fm-send strict: unmatched single-colon explicit targets must verify live before sending
 ok - fm-send strict: fm-prefixed Herdr sessions remain explicit backend targets
 ok - fm-send strict: healthy fm-<id> sends record the steer and ring once
+bash tests/fm-send-strict.test.sh  3.33s user 9.05s system 32% cpu 38.204 total

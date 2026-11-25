@@ -1,0 +1,26 @@
+[lab-home stderr] export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.95mkVu
+[lab-home stderr] export TMUX_TMPDIR=/tmp/fml.YqsehP
+[lab-home stderr] fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8A7R2CV70NQE8NHRSKWRCF6/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.95mkVu && rm -rf /Users/charlesabrooker/tmp/fm-lab.95mkVu
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.95mkVu
+## head --help inside gate worktree with marked lab home:
+exit=0
+stdout lines:       19; first: Steer a task by durable record: write the message into the task's steering
+stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.95mkVu
+## lab home file changes from --help (diff of path/size/mtime):
+6c6
+< ./state 96 1795640287
+---
+> ./state 128 1795640287
+7a8
+> ./state/guard-events.jsonl 304 1795640287
+## guard events in lab state log after --help:
+/Users/charlesabrooker/tmp/fm-lab.95mkVu/state/guard-events.jsonl:
+{"ts":"2026-11-25T20:58:07Z","guard":"gate-agent-containment","rule":"gate-context","task":"--help","version":"1","system":"firstmate","session":"--help","decision":"allow","source_ok":true,"elapsed_m
+## head send to unknown task in lab home (FM_HOME check passes, normal send path):
+exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.95mkVu
+error: target 'nosuchtask' is not resolvable (tried meta=/Users/charlesabrooker/tmp/fm-lab.95mkVu/state/nosuchtask.meta; metadata window/terminal lookup; backend=none). Use fm-nosuchtask for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+## teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8A7R2CV70NQE8NHRSKWRCF6/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.95mkVu && rm -rf /Users/charlesabrooker/tmp/fm-lab.95mkVu
+teardown exit=0
+lab removed

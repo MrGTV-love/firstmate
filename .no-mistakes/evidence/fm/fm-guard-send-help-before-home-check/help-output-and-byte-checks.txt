@@ -1,0 +1,45 @@
+## Full head --help stdout (FM_HOME unset, non-gate cwd):
+Steer a task by durable record: write the message into the task's steering
+inbox and ring its doorbell (bin/fm-task-inbox-lib.sh), best-effort.
+Usage: fm-send.sh <target> [--resolve-key <key> [--resolve-key <key>]... | --answers-none] [--fire-and-forget <delivery-id>] [--] <text...>
+  One key per --resolve-key flag: repeat the flag for each key the send
+  answers. A lone -- ends the options, so a message that starts with -- (even
+  --answers-none or --key) is sent as text.
+  <target> may be an exact task id, a legacy fm-<id> task label resolved
+  through this home's state/<id>.meta, or an explicit well-formed backend
+  target. fm-send refuses unresolved guesses rather than falling back to a
+  tmux window search, because a "successful" send to the wrong endpoint is
+  worse than a loud failure.
+The text must be nonempty: an empty or whitespace-only message is refused
+before anything is marked, recorded, or typed, because an empty marked
+secondmate request delivers only marker and correlation bytes and leaves the
+parent waiting on a reply to nothing.
+Special keys instead of text: fm-send.sh <target> --key Enter
+Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
+Orca currently supports Enter and C-c only, and rejects Escape.
+Help: a leading --help or -h prints usage and exits 0 without FM_HOME, after the existing gate-agent containment check; every other call keeps the existing behavior, including the FM_HOME check.
+exit=0
+
+## head --help vs head -h stdout identical?
+identical
+
+## Help text == header lines 2..19 of the head script with '# ' stripped?
+identical
+
+## FM_HOME refusal stderr byte-identical base vs head (send t1 hello)?
+identical
+
+## FM_HOME refusal stderr byte-identical base vs head (t1 hello --help)?
+identical
+
+## Gate worktree path backstop (cwd = run worktree, NO_MISTAKES_GATE unset), head --help:
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+
+## Gate worktree path backstop, head -h:
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
