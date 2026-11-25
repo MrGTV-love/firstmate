@@ -78,6 +78,31 @@ Entries for uninstrumented families explicitly distinguish their existing caller
 resolves to a file that exists, every retired guard has zero live references,
 and no removed guard is silently resurrected.
 
+## Guard procedure
+
+At scoping, Main, which fills the task brief before dispatch, declares each new, changed, or retired guard by decision point and exact stable ID in that brief.
+A decision point is the place in code, configuration, or policy that determines a guard's outcome, including whether work is allowed to proceed.
+The reviewer reconciles each changed decision point to its exact stable ID by the guard's invariant, owner, and decision behavior; a registry `site:` entry is evidence where one applies, not the definition of the guard.
+A decision point that no registered guard matches is a missing registration that the [review checklist](review-rubric.md#guard-changes) reports, and an allow-only event is neither a scanner site nor a standalone missing registration.
+The worker updates that declaration with the final diff.
+This procedure applies to any change that adds, changes, or retires an effective decision, including a behavior change with no registry edit or matching entry.
+It also applies to active ID additions or removals, changed proof obligations or relied-on coverage, a changed test oracle or coverage count, a changed allow predicate even with no mapped refusal, and a real owner transfer that changes enforcement or responsibility.
+A locator fix, or a rename of an owner or test file with unchanged behavior, routing, responsibility, and evidence coverage, does not by itself require replay, and neither does standalone retirement-decision bookkeeping; existing checks still apply.
+
+1. Name the harm and the closest legitimate action the guard could mistake for it.
+   For a repair, first reproduce the miss or false refusal at the real entry point in isolation.
+2. Register each new or retained guard with the existing [fields](#fields), preserving its ID across owner moves.
+   A retirement moves the same ID out of the active registry and into the ledger under the [cut procedure](#cut-procedure), with executed cut evidence in place of the active cases.
+3. Exercise the real enforcement entry point in isolation for the named harm and its nearest legitimate look-alike, recording the deny and allow and their actual downstream effects.
+   For a warning-only guard, prove the warning's intended effect instead of claiming a deny.
+   Use an isolated control or equally discriminating downstream evidence to attribute those effects to the named guard rather than an unrelated check; a diagnostic or event alone is not proof.
+   After a representative refusal, run the documented remedy and show the same work resumes or reaches a safe disposition, or explain why recovery cannot apply.
+4. The worker records the exact final comparison base and head commit IDs, the tree actually tested, check inputs and validator revision, and the observed results and limits in the delivery evidence.
+   If the tested tree differs from the final head tree, show how it was derived and why the checked inputs and behavior still cover the change.
+   Include passing results from the existing [registry and reference checks](#registry), counts and the base-specific [ratchet](#ratchet), either by running them or by reusing proven matching CI results of them, which supply these structural checks only.
+   Independently qualify a changed validator before relying on its result.
+   These structural checks do not prove the behavioral cases ran or replace the [independent landing review](review-rubric.md#guard-changes).
+
 ## Fields
 
 ```
