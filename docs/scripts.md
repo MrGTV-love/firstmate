@@ -42,7 +42,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe credential, transport, and never-send boundary ([operator contract](configuration.md#typed-dispatch-resolution-env-typesafe_api_key)) |
 | [`fm-typesafe-health.sh`](../bin/fm-typesafe-health.sh) | Probe and record the TypeSafe account's health and alert the captain once on credit or key failure ([operator contract](configuration.md#typesafe-account-health)) |
 | [`fm-jev-guard-hook.sh`](../bin/fm-jev-guard-hook.sh) | Run the ten-levels jev-guard as a Claude worker tool hook ([operator contract](configuration.md#jev-guard)) |
-| [`fm-model-index.sh`](../bin/fm-model-index.sh) | Validate the home model index and resolve dispatch model roles |
+| [`fm-model-index.sh`](../bin/fm-model-index.sh) | Validate the home model index, resolve dispatch model roles, and print a harness catalog ([intake contract](configuration.md#application-model-roles)) |
 | [`fm-model-freshness.sh`](../bin/fm-model-freshness.sh) | Report a dispatch or requested model that a newer model of its family has passed in its harness's catalog ([operator contract](configuration.md#model-freshness)) |
 | `fm-herdr-lab.sh`        | Provision and guardedly operate an isolated, never-default Herdr lab session         |
 | `fm-herdr-lab-viewer.py` | The pty engine behind `fm-herdr-lab.sh viewer`: one real foreground Herdr client on a non-zero window grid |

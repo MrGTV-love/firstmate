@@ -493,6 +493,28 @@ test_teamclaude_launcher_keeps_the_api_key_guard() {
   pass "config/claude-launcher=teamclaude keeps the API-key refusal and the --allow-api-key opt-in"
 }
 
+test_opt_in_local_attempt_metadata() {
+  local rec out launch status
+  rec=$(make_case local-attempts claude local-attempts-a1 local-attempts-a2)
+  read_case "$rec"
+  out=$(FM_CLAUDE_ATTEMPT_CAPTURE_PORT='8080;false' \
+    run_case_spawn local-attempts-a1 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] && [ ! -s "$LAUNCH_LOG" ] || fail 'invalid local collector input must not launch'
+  assert_contains "$out" 'must be a local collector port' 'the port refusal names the expected input'
+  out=$(FM_CLAUDE_ATTEMPT_CAPTURE_PORT=43210 \
+    run_case_spawn local-attempts-a2 "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "ordinary Claude launch did not receive the capture settings: $out"
+  launch=$(<"$LAUNCH_LOG")
+  assert_contains "$launch" 'OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:43210/v1/logs' 'logs stay local'
+  assert_contains "$launch" 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43210/v1/traces' 'traces stay local'
+  assert_contains "$launch" 'OTEL_LOG_RAW_API_BODIES=0' 'raw API payload export stays off'
+  assert_not_contains "$launch" 'ANTHROPIC_BASE_URL=' 'instrumentation does not redirect inference'
+  pass 'ordinary Claude launch accepts only a local attempt collector'
+}
+
+test_opt_in_local_attempt_metadata
 test_ambient_key_without_allowlist_is_dropped
 test_refuse_allowlisted_key
 test_succeed_unset

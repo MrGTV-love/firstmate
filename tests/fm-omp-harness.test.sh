@@ -159,6 +159,11 @@ case "$1" in
   usage)
     if [ -n "${OMP_USAGE_FIXTURE:-}" ]; then cat "$OMP_USAGE_FIXTURE"; else printf '{}\n'; fi
     ;;
+  *)
+    if [ "${FM_FAKE_OMP_REPORT_ATTEMPT_PATH:-0}" = 1 ]; then
+      printf 'attempt-journal=%s\n' "${FM_OMP_CODEX_ATTEMPT_JOURNAL-<unset>}"
+    fi
+    ;;
 esac
 exit 0
 SH
@@ -318,6 +323,39 @@ SH
   chmod +x "$bin/tmux"
   FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$home/state/$id.meta")" FM_FAKE_LAUNCH_LOG="$launchlog" \
     fm_test_run_spawn "$home" "$wt" "$bin:$fakebin" "$id" --relaunch "$@"
+}
+
+test_native_attempt_path_isolated_per_launch() {
+  local rec id="omp-attempt-$$" out meta gen prior_gen tmp stage capture expected actual
+  rec=$(make_spawn_case native-attempt omp "$id")
+  read_case_record "$rec"
+  meta="$HOME_DIR/state/$id.meta"
+  prior_gen=
+  for stage in initial replacement disabled; do
+    capture=1
+    [ "$stage" != disabled ] || capture=0
+    if [ "$stage" = initial ]; then
+      out=$(FM_OMP_CODEX_ATTEMPT_CAPTURE="$capture" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+        "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort low)
+    else
+      out=$(FM_OMP_CODEX_ATTEMPT_CAPTURE="$capture" run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+    fi
+    expect_code 0 $? "$stage synthetic preparation must succeed: $out"
+    gen=$(sed -n 's/^spawn_gen=//p' "$meta")
+    tmp=$(sed -n 's/^tasktmp=//p' "$meta")
+    [ -n "$gen" ] && [ "$gen" != "$prior_gen" ] && [ -n "$tmp" ] || fail "$stage did not record a fresh launch"
+    expected="$tmp/omp-codex-attempts.$gen.jsonl"
+    [ "$stage" != disabled ] || expected='<unset>'
+    # Replay the emitted launch verbatim as a fresh shell with a deliberately
+    # stale ambient path. Refuse to execute a launch that lost its fake tool.
+    assert_launch_contains "$(<"$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "$stage launch must name only the fake OMP binary"
+    actual=$(HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_REPORT_ATTEMPT_PATH=1 \
+      FM_OMP_CODEX_ATTEMPT_JOURNAL="$CASE_DIR/other-launch.jsonl" bash "$LAUNCH_LOG")
+    expect_code 0 $? "$stage captured launch shell must succeed: $actual"
+    assert_equals "attempt-journal=$expected" "$actual" "$stage native capture used the wrong path"
+    prior_gen=$gen
+  done
+  pass 'ordinary OMP launch: opt-in native journal is pinned to a fresh launch and opt-out ignores an ambient destination'
 }
 
 test_no_helpers_launch_contract() {
@@ -5171,6 +5209,7 @@ test_spawn_refuses_api_billed_routes
 test_spawn_raw_api_billing_admission
 test_spawn_api_billed_fallback_admission
 test_spawn_launch_line_and_worker_wiring
+test_native_attempt_path_isolated_per_launch
 test_no_helpers_rejects_nonworker_launches
 test_no_helpers_launch_contract
 test_no_helpers_refuses_ultra_effort
