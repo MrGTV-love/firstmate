@@ -1,0 +1,15 @@
+== BASE 535c962 script:
+$ fm-tasks-axi.sh done base-dup --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: unsupported done option '--duplicate-of'; run tasks-axi directly for that invocation
+exit=2
+$ fm-tasks-axi.sh done base-dup --note "duplicate of vernant-d3-m1-machine-check-map-v7"
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+exit=2
+== HEAD ec40789 script:
+$ fm-tasks-axi.sh done base-dup --duplicate-of vernant-d3-m1-machine-check-map-v7
+ok: done base-dup -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+exit=0
+  state: done
+  body: duplicate of vernant-d3-m1-machine-check-map-v7

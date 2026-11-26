@@ -1,0 +1,294 @@
+
+=== SETUP: lab home /Users/charlesabrooker/tmp/fm-lab.6qNQJm (marker: fm-lab-home v1)
+count: 2
+tasks[2]{id,state,kind,repo,title}:
+  vernant-d3-m1-machine-check-map-v7,queued,ship,vernant,machine check map v7
+  vernant-d3-m1-v7-follow-up,queued,ship,vernant,machine check map v7 follow-up (filed twice)
+help[2]:
+  - Run `tasks-axi show <id>` for full notes on a task
+  - Run `tasks-axi ready` to see unblocked queued work
+
+=== S1 instance note close stays refused
+$ fm-tasks-axi.sh done vernant-d3-m1-v7-follow-up --note duplicate of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+exit=2
+RESULT: PASS - S1 instance note close stays refused: refused (exit 2), names 'completion needs proof of the deliverable', home unchanged
+
+=== S2 instance closes as duplicate (split form, done)
+$ fm-tasks-axi.sh done vernant-d3-m1-v7-follow-up --duplicate-of vernant-d3-m1-machine-check-map-v7
+ok: done vernant-d3-m1-v7-follow-up -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+exit=0
+after: state=done body=duplicate of vernant-d3-m1-machine-check-map-v7
+RESULT: PASS - S2 instance closes as duplicate (split form, done): exit 0, Done, note 'duplicate of vernant-d3-m1-machine-check-map-v7'
+
+=== S2 ledger task.closed record
+{"v":1,"ts":1795714411,"at":"2026-11-26T17:33:31Z","event":"task.filed","task":"vernant-d3-m1-machine-check-map-v7","repo":"vernant","kind":"ship","priority":null}
+{"v":1,"ts":1795714412,"at":"2026-11-26T17:33:32Z","event":"task.filed","task":"vernant-d3-m1-v7-follow-up","repo":"vernant","kind":"ship","priority":null}
+{"v":1,"ts":1795714498,"at":"2026-11-26T17:34:58Z","event":"task.closed","task":"vernant-d3-m1-v7-follow-up","evidence":"none","pr":null}
+
+=== S2 backlog after close
+## In flight
+
+## Queued
+- [ ] vernant-d3-m1-machine-check-map-v7 - machine check map v7 (repo: vernant) (kind: ship) (since 2026-11-26)
+
+## Done
+- [x] vernant-d3-m1-v7-follow-up - machine check map v7 follow-up (filed twice) (repo: vernant) (kind: ship) (done 2026-11-26)
+  duplicate of vernant-d3-m1-machine-check-map-v7
+
+=== S3 scout row closes (task close, = form)
+$ fm-tasks-axi.sh task close sc-twin --duplicate-of=vernant-d3-m1-machine-check-map-v7
+ok: done sc-twin -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+exit=0
+after: state=done body=duplicate of vernant-d3-m1-machine-check-map-v7
+RESULT: PASS - S3 scout row closes (task close, = form): exit 0, Done, note 'duplicate of vernant-d3-m1-machine-check-map-v7'
+
+=== S4a task record exists
+$ fm-tasks-axi.sh done f-meta --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-meta has a task record (/Users/charlesabrooker/tmp/fm-lab.6qNQJm/state/f-meta.meta), so work may exist; complete it with bin/fm-teardown.sh f-meta, which owns the landing proof
+exit=2
+RESULT: PASS - S4a task record exists: refused (exit 2), names 'has a task record', home unchanged
+
+=== S4b status file exists
+$ fm-tasks-axi.sh done f-status --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-status has a dispatch file (/Users/charlesabrooker/tmp/fm-lab.6qNQJm/state/f-status.status), so it was started
+exit=2
+RESULT: PASS - S4b status file exists: refused (exit 2), names 'has a dispatch file', home unchanged
+
+=== S4b inbox dir exists
+$ fm-tasks-axi.sh done f-inbox --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-inbox has a dispatch file (/Users/charlesabrooker/tmp/fm-lab.6qNQJm/state/f-inbox.inbox), so it was started
+exit=2
+RESULT: PASS - S4b inbox dir exists: refused (exit 2), names 'has a dispatch file', home unchanged
+
+=== S4c branch fm/<id>
+$ fm-tasks-axi.sh done f-br --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-br has a branch (refs/heads/fm/f-br), so work may exist
+exit=2
+RESULT: PASS - S4c branch fm/<id>: refused (exit 2), names 'has a branch (refs/heads/fm/f-br)', home unchanged
+
+=== S4c branch cx-<id> (slash-less prefix)
+$ fm-tasks-axi.sh done f-cx --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-cx has a branch (refs/heads/cx-f-cx), so work may exist
+exit=2
+RESULT: PASS - S4c branch cx-<id> (slash-less prefix): refused (exit 2), names 'has a branch (refs/heads/cx-f-cx)', home unchanged
+
+=== S4d git worktree copy
+$ fm-tasks-axi.sh done f-wt --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-wt has a copy (/Users/charlesabrooker/tmp/fm-lab.6qNQJm/copies/f-wt), so work may exist
+exit=2
+RESULT: PASS - S4d git worktree copy: refused (exit 2), names 'has a copy', home unchanged
+
+=== S4d skipped-copies.tsv
+$ fm-tasks-axi.sh done f-sk --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-sk has a recorded copy (/Users/charlesabrooker/tmp/fm-lab.6qNQJm/data/f-sk/skipped-copies.tsv), so work may exist
+exit=2
+RESULT: PASS - S4d skipped-copies.tsv: refused (exit 2), names 'has a recorded copy', home unchanged
+
+=== S4e data/<id> holds more than brief/dod
+$ fm-tasks-axi.sh done f-data --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-data holds /Users/charlesabrooker/tmp/fm-lab.6qNQJm/data/f-data/notes.md; only brief.md and dod.md are allowed in /Users/charlesabrooker/tmp/fm-lab.6qNQJm/data/f-data
+exit=2
+RESULT: PASS - S4e data/<id> holds more than brief/dod: refused (exit 2), names 'only brief.md and dod.md are allowed', home unchanged
+
+=== S4e-control data/<id> with only brief.md+dod.md closes
+$ fm-tasks-axi.sh done f-ok-data --duplicate-of vernant-d3-m1-machine-check-map-v7
+ok: done f-ok-data -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+exit=0
+after: state=done body=duplicate of vernant-d3-m1-machine-check-map-v7
+RESULT: PASS - S4e-control data/<id> with only brief.md+dod.md closes: exit 0, Done, note 'duplicate of vernant-d3-m1-machine-check-map-v7'
+
+=== S4f survivor does not exist
+$ fm-tasks-axi.sh done f-x --duplicate-of ghost-item
+fm-tasks-axi: the surviving item ghost-item is not in the backlog, so f-x would be lost
+exit=2
+RESULT: PASS - S4f survivor does not exist: refused (exit 2), names 'is not in the backlog', home unchanged
+
+=== S4g survivor is itself
+$ fm-tasks-axi.sh done f-x --duplicate-of f-x
+fm-tasks-axi: f-x cannot be a duplicate of itself
+exit=2
+RESULT: PASS - S4g survivor is itself: refused (exit 2), names 'cannot be a duplicate of itself', home unchanged
+
+=== S4h survivor itself closed as duplicate
+$ fm-tasks-axi.sh done f-x --duplicate-of vernant-d3-m1-v7-follow-up
+fm-tasks-axi: the surviving item vernant-d3-m1-v7-follow-up is itself closed as a duplicate (duplicate of vernant-d3-m1-machine-check-map-v7); name the item that remains
+exit=2
+RESULT: PASS - S4h survivor itself closed as duplicate: refused (exit 2), names 'itself closed as a duplicate', home unchanged
+
+=== S4h-setup A closes as duplicate of B
+$ fm-tasks-axi.sh done f-x --duplicate-of f-cycle-b
+ok: done f-x -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+exit=0
+after: state=done body=duplicate of f-cycle-b
+RESULT: PASS - S4h-setup A closes as duplicate of B: exit 0, Done, note 'duplicate of f-cycle-b'
+
+=== S4h cycle: B as duplicate of A refused
+$ fm-tasks-axi.sh done f-cycle-b --duplicate-of f-x
+fm-tasks-axi: the surviving item f-x is itself closed as a duplicate (duplicate of f-cycle-b); name the item that remains
+exit=2
+RESULT: PASS - S4h cycle: B as duplicate of A refused: refused (exit 2), names 'itself closed as a duplicate', home unchanged
+
+=== S4i in-flight row
+$ fm-tasks-axi.sh done f-fly --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-fly is not a plain queued row (state 'in_flight no no', hold kind '-'); only a queued row with no hold and no blocked-by edge closes as a duplicate
+exit=2
+RESULT: PASS - S4i in-flight row: refused (exit 2), names 'is not a plain queued row', home unchanged
+
+=== S4i queued row with a blocked-by edge
+$ fm-tasks-axi.sh done f-blk --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-blk is not a plain queued row (state 'queued no yes', hold kind '-'); only a queued row with no hold and no blocked-by edge closes as a duplicate
+exit=2
+RESULT: PASS - S4i queued row with a blocked-by edge: refused (exit 2), names 'is not a plain queued row', home unchanged
+
+=== S4l another row waits on it
+$ fm-tasks-axi.sh done f-dep --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: waiter waits on f-dep (blocked-by), and closing f-dep would unblock it while the surviving item is not done
+exit=2
+RESULT: PASS - S4l another row waits on it: refused (exit 2), names 'waits on f-dep', home unchanged
+  held: yes
+  hold_kind: captain
+
+=== S4i held for the captain
+$ fm-tasks-axi.sh done f-hold --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-hold is not a plain queued row (state 'queued yes no', hold kind 'captain'); only a queued row with no hold and no blocked-by edge closes as a duplicate
+exit=2
+RESULT: PASS - S4i held for the captain: refused (exit 2), names 'not a plain queued row', home unchanged
+
+=== S4m FM_TASKS_AXI_REFUSE_OPEN_CALL=1 with captain hold
+
+=== S4m open call opt-in with captain hold
+$ fm-tasks-axi.sh done f-hold --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: f-hold is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it
+exit=2
+RESULT: PASS - S4m open call opt-in with captain hold: refused (exit 2), names 'open owner call', home unchanged
+
+=== S4j combined with --note
+$ fm-tasks-axi.sh done f-comb --duplicate-of vernant-d3-m1-machine-check-map-v7 --note x
+fm-tasks-axi: a duplicate close is its own completion; do not combine --duplicate-of with --drop-file, --pr, --report, or --note
+exit=2
+RESULT: PASS - S4j combined with --note: refused (exit 2), names 'do not combine --duplicate-of', home unchanged
+
+=== S4j combined with --drop-file
+$ fm-tasks-axi.sh done f-comb --duplicate-of vernant-d3-m1-machine-check-map-v7 --drop-file /Users/charlesabrooker/tmp/fm-lab.6qNQJm/words.txt
+fm-tasks-axi: a duplicate close is its own completion; do not combine --duplicate-of with --drop-file, --pr, --report, or --note
+exit=2
+RESULT: PASS - S4j combined with --drop-file: refused (exit 2), names 'do not combine --duplicate-of', home unchanged
+
+=== S4j combined with --pr
+$ fm-tasks-axi.sh done f-comb --pr https://github.com/o/r/pull/1 --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: a duplicate close is its own completion; do not combine --duplicate-of with --drop-file, --pr, --report, or --note
+exit=2
+RESULT: PASS - S4j combined with --pr: refused (exit 2), names 'do not combine --duplicate-of', home unchanged
+
+=== S4k project path cannot be resolved
+$ fm-tasks-axi.sh done f-norepo --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: the project ghostrepo of f-norepo is not at /Users/charlesabrooker/tmp/fm-lab.6qNQJm/projects/ghostrepo, so its branches and copies cannot be checked
+exit=2
+RESULT: PASS - S4k project path cannot be resolved: refused (exit 2), names 'is not at', home unchanged
+
+=== S4 repeated flag
+$ fm-tasks-axi.sh done f-comb --duplicate-of vernant-d3-m1-machine-check-map-v7 --duplicate-of vernant-d3-m1-machine-check-map-v7
+fm-tasks-axi: --duplicate-of may be given only once; run tasks-axi directly for other grammar
+exit=2
+RESULT: PASS - S4 repeated flag: refused (exit 2), names 'only once', home unchanged
+
+=== S4 empty value
+$ fm-tasks-axi.sh done f-comb --duplicate-of=
+fm-tasks-axi: --duplicate-of requires a value, not an option; run tasks-axi directly for other grammar
+exit=2
+RESULT: PASS - S4 empty value: refused (exit 2), names 'requires a value', home unchanged
+
+=== S5 survivor Done by merged PR is accepted
+$ fm-tasks-axi.sh done twin-pr --duplicate-of sv-pr
+ok: done twin-pr -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+exit=0
+after: state=done body=duplicate of sv-pr
+RESULT: PASS - S5 survivor Done by merged PR is accepted: exit 0, Done, note 'duplicate of sv-pr'
+
+=== S5 survivor closed by captain drop refused
+$ fm-tasks-axi.sh done twin-drop --duplicate-of sv-drop
+fm-tasks-axi: the surviving item sv-drop was closed by the captain's drop, so its work did not survive; ask the captain about twin-drop
+exit=2
+RESULT: PASS - S5 survivor closed by captain drop refused: refused (exit 2), names 'closed by the captain's drop', home unchanged
+
+=== S6 lock race
+close is waiting for the lock (pid 32152 alive)
+created state/race.meta while the close waited
+fm-tasks-axi: race has a task record (/Users/charlesabrooker/tmp/fm-lab.6qNQJm/state/race.meta), so work may exist; complete it with bin/fm-teardown.sh race, which owns the landing proof
+exit=2
+RESULT: PASS - S6 close waited on the lock and refused the record that appeared
+
+=== S7 plain close with no proof still refused
+$ fm-tasks-axi.sh done plain-ship
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+exit=2
+RESULT: PASS - S7 plain close with no proof still refused: refused (exit 2), names 'completion needs proof of the deliverable', home unchanged
+
+=== S7 --report on a ship still refused
+$ fm-tasks-axi.sh done plain-ship --report data/x.md
+fm-tasks-axi: a report is not a ship's deliverable; land its pull request or record the captain's drop
+exit=2
+RESULT: PASS - S7 --report on a ship still refused: refused (exit 2), names 'a report is not a ship's deliverable', home unchanged
+
+=== S7 --drop-file still closes with note dropped
+ok: done plain-ship -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+exit=0
+body=dropped
+RESULT: PASS - S7 drop close unchanged
+
+=== FINAL BACKLOG
+## In flight
+- [ ] f-fly - flip: in flight (repo: vernant) (kind: ship) (since 2026-11-26)
+
+## Queued
+- [ ] vernant-d3-m1-machine-check-map-v7 - machine check map v7 (repo: vernant) (kind: ship) (since 2026-11-26)
+
+- [ ] f-meta - flip: task record (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-status - flip: status (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-inbox - flip: inbox (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-br - flip: fm branch (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-cx - flip: slashless prefix (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-wt - flip: worktree copy (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-sk - flip: skipped copies (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-data - flip: data entry (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-cycle-b - cycle B (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-blk - flip: blocked-by blocked-by: vernant-d3-m1-machine-check-map-v7 (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-dep - flip: dependent (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] waiter - waits on f-dep blocked-by: f-dep (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-hold - flip: captain hold (repo: vernant) (kind: ship) (since 2026-11-26) (hold: captain call) (hold-kind: captain)
+- [ ] f-comb - flip: combined (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] f-norepo - flip: missing project (repo: ghostrepo) (kind: ship) (since 2026-11-26)
+- [ ] twin-drop - twin of sv-drop (repo: vernant) (kind: ship) (since 2026-11-26)
+- [ ] race - race row (repo: vernant) (kind: ship) (since 2026-11-26)
+## Done
+- [x] plain-ship - no proof (repo: vernant) (kind: ship) (done 2026-11-26)
+  dropped
+- [x] sv-drop - survivor the captain dropped (repo: vernant) (kind: ship) (done 2026-11-26)
+  dropped
+- [x] twin-pr - twin of sv-pr (repo: vernant) (kind: ship) (done 2026-11-26)
+  duplicate of sv-pr
+- [x] sv-pr - survivor landed by PR https://github.com/o/r/pull/9 (repo: vernant) (kind: ship) (merged 2026-11-26)
+- [x] f-x - flip: survivor (repo: vernant) (kind: ship) (done 2026-11-26)
+  duplicate of f-cycle-b
+- [x] f-ok-data - allow: brief+dod only (repo: vernant) (kind: ship) (done 2026-11-26)
+  duplicate of vernant-d3-m1-machine-check-map-v7
+- [x] sc-twin - scout filed twice (repo: vernant) (kind: scout) (done 2026-11-26)
+  duplicate of vernant-d3-m1-machine-check-map-v7
+- [x] vernant-d3-m1-v7-follow-up - machine check map v7 follow-up (filed twice) (repo: vernant) (kind: ship) (done 2026-11-26)
+  duplicate of vernant-d3-m1-machine-check-map-v7
+
+=== SUMMARY: 34 pass, 0 fail
+exit status: 0
