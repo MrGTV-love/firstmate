@@ -655,9 +655,19 @@ unread_merge_into_pr() {  # <case_dir>; prints a merge head that hides one unrea
 }
 
 verify_on() {  # <case_dir> <head> <base> [flags...]
-  local case_dir=$1 head=$2 base=$3
+  verify_with "$RECORD" -- "$@"
+}
+
+verify_with() {  # <record script> [env-args... --] <case_dir> <head> <base> [flags...]
+  # env-args go to env(1) for this call only, for example -u NAME or NAME=value.
+  local script=$1 case_dir head base
+  local -a envs=()
+  shift
+  while [ "$1" != -- ]; do envs+=("$1"); shift; done
+  shift
+  case_dir=$1 head=$2 base=$3
   shift 3
-  NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" --head "$head" \
+  env ${envs[@]+"${envs[@]}"} NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$script" verify --pr "$URL" --head "$head" \
     --task task-x1 --base "$base" "$@"
 }
 
@@ -1190,15 +1200,13 @@ test_carry_over_ignores_global_config_and_global_attributes() {
     live=$(cgit "$case_dir" rev-parse HEAD)
     [ "$(cat "$case_dir/wt/app.txt")" = "unread driver bytes" ] || fail "$layout fixture: the global driver wrote the merged file"
     rc=0
-    out=$(env -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" \
-      NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
-        --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
+    out=$(verify_with "$RECORD" -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" -- \
+      "$case_dir" "$live" "$TRUNK" --json) || rc=$?
     expect_code 1 "$rc" "$layout: a global merge driver must not hide a conflict resolution: $out"
     expect_not_qualified "$out" "does not merge cleanly" "$layout global merge driver"
     rc=0
-    out=$(env -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" \
-      NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
-        --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
+    out=$(verify_with "$copy/fm-review-record.py" -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" -- \
+      "$case_dir" "$live" "$TRUNK" --json) || rc=$?
     expect_code 0 "$rc" "$layout control: an unisolated proof must honor the global driver and carry: $out"
   done
   pass "the proof ignores merge drivers and attributes from the caller's global configuration in both locations"
@@ -1254,20 +1262,27 @@ test_carry_over_refuses_after_a_rewrite_was_itself_read() {
   # the head it replaced is a reviewed head off the newest reviewed head's
   # ancestry, so a later base update refuses and needs a fresh read.
   # Both row orders: the rewrite read last, and a late read of R after it.
+  # The unread order is the control: the same fixture with no read of the
+  # rewrite must carry, so the extra read is what makes the others refuse.
   local order case_dir rewrite live out rc
-  for order in rewrite-last original-last; do
+  for order in unread rewrite-last original-last; do
     case_dir=$(make_carry_case "carry-rewrite-read-$order")
     carry_refs "$case_dir"
     record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
     cgit "$case_dir" checkout -q pr
     cgit "$case_dir" commit -q --amend -m 'ship change, reworded'
     rewrite=$(cgit "$case_dir" rev-parse HEAD)
-    record_review "$case_dir" "$rewrite" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at the rewrite"
-    [ "$order" = rewrite-last ] || record_review "$case_dir" "$REVIEWED" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null \
+    [ "$order" = unread ] || record_review "$case_dir" "$rewrite" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null \
+      || fail "record PASS at the rewrite"
+    [ "$order" != original-last ] || record_review "$case_dir" "$REVIEWED" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null \
       || fail "record a late PASS at R"
     live=$(merge_trunk_into_pr "$case_dir")
     rc=0
     out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    if [ "$order" = unread ]; then
+      expect_code 0 "$rc" "control: an update of a rewrite nobody read must carry from R: $out"
+      continue
+    fi
     expect_code 1 "$rc" "$order: an update of a rewrite that was itself read must refuse: $out"
     expect_not_qualified "$out" "which the reviewed head does not build on" "$order read rewrite"
   done

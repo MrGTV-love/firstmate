@@ -119,9 +119,10 @@ auto-review lane asks verify first, so plan runs only when carry-over refused.
 A merge or rebase of the base into a reviewed PR therefore needs no new read,
 and neither does a rewrite of R that keeps its tree (an amended message, a
 squash, an empty commit): it carries from R. Once such a rewrite is itself
-read, a later update of it refuses carry-over: the rewrite and the head it
+read, an update of either one refuses carry-over: the rewrite and the head it
 replaced both have review rows and neither builds on the other, so whichever
-is the newest reviewed head, the other fails the ancestry rule. A merge
+of the two is the newest reviewed head, the other fails the ancestry rule. A
+later reviewed head that builds on both carries again. A merge
 of a branch that is not on the base is unread content and refuses. The proof
 trusts --base to be a commit on the PR's base branch (every caller passes the
 live forge's base SHA; GitLab's is its stored merge base) and trusts the task
