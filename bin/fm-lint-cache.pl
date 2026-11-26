@@ -1193,6 +1193,10 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
 # in a row also write FM_LINT_INTERNAL_ABORT_FILE so the run's gates admit no
 # further root. 96 comes before 98, so no unmeasured root is retried or recorded as
 # a success.
+# When that unmeasured interval is the root's only failure, the end also writes
+# rss_rerun_alone=1 (never for three misses in a row, a reader given up, a
+# reading over the cap, an owner's signal, a survivor or a lost signal); the watch still exits 96,
+# and fm-lint.sh decides whether the root runs once more alone.
 # Signalling follows rule O (fm_signal_root): the watch records its root's exact
 # start time before the root executes anything (the root waits on a pipe until the
 # record exists; a root whose start time cannot be read never executes and the
@@ -1550,6 +1554,14 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         print {$fh} "rss_cont_failed=1\n" if $cont_failed;
         print {$fh} "rss_kill_failed=1\n" if $kill_failed;
         print {$fh} "rss_unmeasured=1\n" if $warned || $unmeasured;
+        # A root whose only failure is an unmeasured interval (a missed tick that a
+        # later tick follows), with its readers still up, never seen over its cap
+        # (a reading over the cap is a real measurement, Main 4351), never signalled
+        # by its owner and with every counted process proven ended, may be run once
+        # more alone (fm-lint.sh). Every other failure of the root leaves this line
+        # out and stays final.
+        print {$fh} "rss_rerun_alone=1\n" if $unmeasured && !$warned && !@escaped && !$cont_failed
+            && !$kill_failed && !$over && !$caught && !$reader_down && !$mark_failed;
         print {$fh} "rss_mark_failed=1\n" if $mark_failed;
         print {$fh} @miss_records;
         printf {$fh} "rss_ticks=%d\nrss_longest_tick_ms=%d\nrss_longest_reply_ms=%d\n",

@@ -345,8 +345,22 @@
 # followed by a later tick fails that root (status 96, reason unmeasured; only a miss
 # on its very last tick, its own exit, is exempt; each tick first reaps an exited
 # root, so its exit is not sampled as misses), even if it later crosses the
-# cap: 96 comes before 98, so no memory retry follows, no success is recorded, and
-# the run fails, naming each root it did not start. Every gate on the host admits a
+# cap: 96 comes before 98, so no memory retry follows and no success is recorded.
+# THE ALONE RERUN (Main 4343, 4351). When that unmeasured interval is the root's
+# only failure (its readers stayed up, no reading was over its cap, its owner did
+# not signal it, and every process it counted was proven ended: the watch then
+# writes rss_rerun_alone=1), the root's result is not used, it does not stop the
+# run (the other roots keep being admitted), and it is queued (reason
+# rerun-queued). After every other root of the run has ended, each queued root runs
+# once more, one at a time with no other root of the run beside it, under the same
+# gate, watch, cap and memory retry. It passes only when that rerun is measured all
+# through and stays under its cap; a rerun unmeasured again fails (96), one
+# measured over its cap fails as over its cap (98, or its narrower retry's own
+# result), and no root runs a third time. Every other 96 (three misses in a row, a
+# reader given up, a reading over the cap, a survivor, a lost signal, a launch not
+# recorded, a queue that cannot be written) still fails its root at once and stops
+# the run: no further root starts, queued roots do not run again and fail (96), and
+# the run names each root it did not start. Every gate on the host admits a
 # new root when the charges fit the budget and no live ledger entry is unreadable;
 # it does not wait for a watched root's sample, because a held root is never
 # counted below its charge (Main 4065).
@@ -425,7 +439,9 @@
 # .tsv suffix); otherwise it lives only in the
 # run's scratch dir. Reason values are ok, findings, memory-fallback,
 # timeout, memory, signal:<sig>, limit-unavailable, not-started (the gate
-# refused a waiting root because the run was marked to stop), or error:<rc>.
+# refused a waiting root because the run was marked to stop), rerun-queued (its
+# first run was only unmeasured, so its result is not used and it runs once more
+# alone; the rerun has its own begin and end rows in the alone pass), or error:<rc>.
 # Memory requires process-level evidence (a GHC exhaustion status or runtime
 # error on stderr), not an echoed source excerpt or an OOM phrase in a
 # filename. In partition mode begin/end
@@ -499,6 +515,8 @@ fi
 
 FM_LINT_WORKER_RUN_PID=
 FM_LINT_WORKER_ARGS=()
+FM_LINT_LAST_QUEUED=0
+FM_LINT_LAST_INTERVAL_ONLY=0
 # shellcheck disable=SC2329 # Registered by the private worker's signal traps.
 fm_lint_worker_stop() {
   [ -n "$FM_LINT_WORKER_RUN_PID" ] || return 0
@@ -763,6 +781,15 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   done
 }
 
+# A root attempt the macOS watch failed (96) only because a missed tick was
+# followed by a later tick (the watch wrote rss_rerun_alone=1, which it writes
+# for no other failure) gets one rerun alone, in the run's first pass only: in
+# the alone pass (FM_LINT_INTERNAL_ALONE=1) the same end is final.
+fm_lint_rerun_alone_eligible() {  # <rc> <rss-file>
+  [ "$1" = 96 ] && [ "${FM_LINT_INTERNAL_ALONE:-0}" != 1 ] \
+    && grep -qx 'rss_rerun_alone=1' "$2" 2>/dev/null
+}
+
 # Run one selected root, retry memory failures without source following, record
 # its lifecycle in the roots log, and append the final diagnostics.
 fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
@@ -805,7 +832,17 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   # fresh one, so both attempts together still fit the budget CI sized its job
   # timeout around.
   fallback_secs=$(( (start_ms + queued_ms + root_seconds * 1000 - $(fm_lint_now_ms)) / 1000 ))
-  if [ "$reason" = memory ] \
+  FM_LINT_LAST_QUEUED=0
+  if fm_lint_rerun_alone_eligible "$invocation_rc" "$rss_file"; then
+    # Its only failure is an unmeasured interval: its result is not used (its
+    # output is dropped), and it is run once more alone after the run's other
+    # roots (fm_lint_worker queues it).
+    reason=rerun-queued
+    FM_LINT_LAST_QUEUED=1
+    rss_kib=$(fm_lint_root_rss "$rss_file")
+    printf 'fm-lint: %s ran unmeasured (watch record: %s); its result is not used, and it runs once more alone after the other roots finish\n' \
+      "$path" "$(fm_lint_root_rss_samples "$rss_file")" >> "$output_dir/shard.$shard_index.out"
+  elif [ "$reason" = memory ] \
     && [ "${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ] \
     && [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] \
     && [ "$fallback_secs" -lt 1 ]; then
@@ -830,7 +867,14 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$(fm_lint_root_rss "$rss_file")" "$(fm_lint_root_rss "$fallback_rss")")
     printf 'fm-lint: %s hit the memory ceiling with --external-sources (reason=%s rc=%s); retried without it' \
       "$path" "$initial_reason" "$initial_rc" >> "$output_dir/shard.$shard_index.out"
-    if [ "$reason" = ok ]; then
+    if fm_lint_rerun_alone_eligible "$invocation_rc" "$fallback_rss"; then
+      # The narrower retry's only failure is an unmeasured interval: the root's
+      # result is not used, and the whole root runs once more alone later.
+      reason=rerun-queued
+      FM_LINT_LAST_QUEUED=1
+      printf '; the retry ran unmeasured (watch record: %s); its result is not used, and the root runs once more alone after the other roots finish\n' \
+        "$(fm_lint_root_rss_samples "$fallback_rss")" >> "$output_dir/shard.$shard_index.out"
+    elif [ "$reason" = ok ]; then
       reason=memory-fallback
       invocation_rc=0
       printf '; fallback passed with cross-file codes excluded (%s)\n' "$LOCAL_NOX_EXCLUDE" \
@@ -839,7 +883,7 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       printf '; fallback reason=%s rc=%s\n' "$reason" "$invocation_rc" \
         >> "$output_dir/shard.$shard_index.out"
     fi
-    cat "$fallback_out" "$fallback_err" >> "$output_dir/shard.$shard_index.out"
+    [ "$FM_LINT_LAST_QUEUED" = 1 ] || cat "$fallback_out" "$fallback_err" >> "$output_dir/shard.$shard_index.out"
   else
     rss_kib=$(fm_lint_root_rss "$rss_file")
     cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
@@ -872,6 +916,17 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   FM_LINT_LAST_WATCH=
   if [ "$invocation_rc" = 96 ]; then
     FM_LINT_LAST_WATCH=$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")
+  fi
+  # Whether this 96 was only an unmeasured interval of its last attempt (the watch's
+  # rss_rerun_alone=1): in the alone pass such a final failure does not stop the
+  # run's other reruns, each of which runs alone anyway.
+  FM_LINT_LAST_INTERVAL_ONLY=0
+  if [ "$invocation_rc" = 96 ]; then
+    if [ "$final_follow_sources" = 0 ]; then
+      ! grep -qx 'rss_rerun_alone=1' "$fallback_rss" 2>/dev/null || FM_LINT_LAST_INTERVAL_ONLY=1
+    else
+      ! grep -qx 'rss_rerun_alone=1' "$rss_file" 2>/dev/null || FM_LINT_LAST_INTERVAL_ONLY=1
+    fi
   fi
   if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
     printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s%s\n' \
@@ -913,7 +968,20 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
       index=${entry%%"$tab"*}
       path=${entry#*"$tab"}
       invocation_rc=0
+      FM_LINT_LAST_QUEUED=0
+      FM_LINT_LAST_INTERVAL_ONLY=0
       fm_lint_run_root "$index" "$path" "$output_dir" "$shard_index" || invocation_rc=$?
+      # A root whose only failure was an unmeasured interval neither fails nor
+      # marks the run here: it is queued for its one rerun alone. A queue that
+      # cannot be written leaves it the failed root it was (status 96 below).
+      if [ "$FM_LINT_LAST_QUEUED" = 1 ]; then
+        if [ -n "${FM_LINT_INTERNAL_ALONE_QUEUE:-}" ] \
+          && printf '%s\t%s\n' "$index" "$path" >> "$FM_LINT_INTERNAL_ALONE_QUEUE" 2>/dev/null; then
+          continue
+        fi
+        printf 'fm-lint: %s could not be queued for its rerun alone (%s); it fails (status 96)\n' \
+          "$path" "${FM_LINT_INTERNAL_ALONE_QUEUE:-no queue}" >> "$output.out"
+      fi
       if [ "$rc" -eq 0 ] && [ "$invocation_rc" -ne 0 ]; then
         rc=$invocation_rc
       fi
@@ -921,7 +989,10 @@ fm_lint_worker() {  # <manifest> <output-dir> <shard-index>
       # starts another root, even if the watch could not write the mark itself;
       # if this mark cannot be written either, this worker starts no further root.
       # The mark names the root and the watch's recorded samples and reasons.
-      if [ "$invocation_rc" -eq 96 ] && [ -n "${FM_LINT_INTERNAL_ABORT_FILE:-}" ] && [ ! -e "$FM_LINT_INTERNAL_ABORT_FILE" ]; then
+      # In the alone pass a rerun that was again only unmeasured fails without the
+      # mark, so each other queued root still gets its one rerun alone.
+      if [ "$invocation_rc" -eq 96 ] && [ -n "${FM_LINT_INTERNAL_ABORT_FILE:-}" ] && [ ! -e "$FM_LINT_INTERNAL_ABORT_FILE" ] \
+        && { [ "${FM_LINT_INTERNAL_ALONE:-0}" != 1 ] || [ "$FM_LINT_LAST_INTERVAL_ONLY" != 1 ]; }; then
         if ! printf 'the resident-memory watch failed %s (status 96; watch record: %s)\n' "$path" "${FM_LINT_LAST_WATCH:-none}" >> "$FM_LINT_INTERNAL_ABORT_FILE" 2>/dev/null; then
           printf 'fm-lint: the run could not be marked to stop at %s; this worker starts no further root\n' "$FM_LINT_INTERNAL_ABORT_FILE" >> "$output.out"
           break
@@ -2745,6 +2816,9 @@ fm_lint_run_worker() {  # <worker-index>
   worker_env+=(FM_LINT_INTERNAL_HOST_LOCK="$HOST_POOL_ROOT/admission.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$ROOTS_RSS_KIB"
     FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" FM_LINT_INTERNAL_RUN_ENTRY="$RUN_ENTRY")
   worker_env+=(FM_LINT_INTERNAL_RUN_ID="$$")
+  # The first pass queues a root whose only failure was an unmeasured interval;
+  # the alone pass (fm_lint_run_alone_pass) reruns each once with this set to 1.
+  worker_env+=(FM_LINT_INTERNAL_ALONE_QUEUE="$TMP_ROOT/alone.queue" FM_LINT_INTERNAL_ALONE="$ALONE_PASS")
   # The most one root can hold: its address-space limit under the enforced
   # envelope, else the resident watch bound. The gate charges it for a root
   # without a record measured on its current input.
@@ -2792,6 +2866,8 @@ fm_lint_wait_workers() {
 if [ "$BOUND_MECH" = none ] && [ "$(uname)" = Darwin ]; then
   FM_LINT_WATCH_RUN=1
 fi
+ALONE_PASS=0
+rm -f "$TMP_ROOT/alone.queue"
 if [ "$JOBS" -eq 1 ]; then
   worker=0
   while [ "$worker" -lt "$SHARD_COUNT" ]; do
@@ -2808,11 +2884,47 @@ else
   fm_lint_wait_workers
 fi
 
-# Replay both stable shards in deterministic order and select the first nonzero
-# shard status. ShellCheck processes every root in a shard after earlier findings.
+# The alone pass (Main 4343). A root whose only failure in the first pass was an
+# unmeasured interval (fm_lint_rerun_alone_eligible) was queued instead of failing
+# or stopping the run. After every first-pass worker has ended, each queued root
+# runs once more, one at a time, with no other root of this run beside it, under
+# the same gate, watch, cap and memory retry. It passes only when that rerun is
+# measured all through and under its cap; a rerun that is unmeasured again fails
+# (96) and one measured over its cap fails as over its cap (98, or its narrower
+# retry's own result). No root runs a third time. If the run was marked to stop
+# (any other watch failure, or an unreadable host process table), no queued root
+# runs again, and each one fails (96), named; so does each one if the alone pass
+# manifest cannot be written whole.
+REPLAY_COUNT=$SHARD_COUNT
+if [ -s "$TMP_ROOT/alone.queue" ]; then
+  REPLAY_COUNT=$((SHARD_COUNT + 1))
+  alone_why=
+  if [ -e "$TMP_ROOT/census.abort" ]; then
+    alone_why=$(head -n 1 "$TMP_ROOT/census.abort" 2>/dev/null || true)
+    [ -n "$alone_why" ] || alone_why="the run was marked to stop"
+  elif ! cp "$TMP_ROOT/alone.queue" "$TMP_ROOT/manifest.$SHARD_COUNT" 2>/dev/null \
+    || ! cmp -s "$TMP_ROOT/alone.queue" "$TMP_ROOT/manifest.$SHARD_COUNT"; then
+    alone_why="its alone pass manifest could not be written"
+  fi
+  if [ -n "$alone_why" ]; then
+    while IFS=$'\t' read -r _ alone_path; do
+      printf 'fm-lint: %s not run again alone: %s\n' "$alone_path" "$alone_why"
+    done < "$TMP_ROOT/alone.queue" > "$OUTPUT_DIR/shard.$SHARD_COUNT.out"
+    printf '96\n' > "$OUTPUT_DIR/shard.$SHARD_COUNT.rc"
+  else
+    ALONE_PASS=1
+    fm_lint_start_worker "$SHARD_COUNT"
+    fm_lint_wait_workers
+    ALONE_PASS=0
+  fi
+fi
+
+# Replay both stable shards (and the alone pass, if any) in deterministic order and
+# select the first nonzero shard status. ShellCheck processes every root in a shard
+# after earlier findings.
 overall_rc=0
 worker=0
-while [ "$worker" -lt "$SHARD_COUNT" ]; do
+while [ "$worker" -lt "$REPLAY_COUNT" ]; do
   output="$OUTPUT_DIR/shard.$worker"
   [ ! -f "$output.out" ] || cat "$output.out"
   if [ -f "$output.rc" ]; then

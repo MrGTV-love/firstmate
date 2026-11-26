@@ -3476,7 +3476,8 @@ SH
 # A ShellCheck stand-in whose source-following run grows resident memory by
 # 8 MiB every 50 ms for FM_TEST_GROW_STEPS steps, then sleeps up to 20 s
 # (FM_TEST_GROW_HOLD=<seconds> holds the memory that long and exits 0 instead).
-# The run without --external-sources exits 0 at once.
+# The run without --external-sources exits 0 at once, unless FM_TEST_GROW_NARROW=1
+# makes it grow the same way. A root named quick.sh exits 0 at once, logging no flag.
 # FM_TEST_FLAGS_LOG gets one yes/no line per attempt and FM_TEST_PID_FILE the growing process id.
 fm_lint_write_growing_shellcheck() {  # <fakebin>
   cat > "$1/shellcheck" <<'SH'
@@ -3485,12 +3486,14 @@ if [ "${1:-}" = --version ]; then
   printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
   exit 0
 fi
+# (Main 4343) A root named quick.sh ends at once: it starts no reader and logs no flag.
+case "${!#}" in */quick.sh) exit 0 ;; esac
 follow=no
 for arg in "$@"; do
   [ "$arg" != --external-sources ] || follow=yes
 done
 printf '%s\n' "$follow" >> "$FM_TEST_FLAGS_LOG"
-[ "$follow" = yes ] || exit 0
+[ "$follow" = yes ] || [ "${FM_TEST_GROW_NARROW:-0}" = 1 ] || exit 0
 printf '%s\n' "$$" > "$FM_TEST_PID_FILE"
 exec perl -e '
   my $held = "";
@@ -3629,7 +3632,8 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 # marked bound, instead of reading memory; with FM_TEST_PY_PLAN=<file> too,
 # the Nth rss-tree reader started follows line N of <file>: stall answers its
 # first line 8 s late, slow answers its first line 1 s late, slow-later answers
-# its second line 8 s late (8 s is past a reply's 6 s and its 1 s retry), exit exits before any reply, and anything else (or
+# its second line 8 s late (8 s is past a reply's 6 s and its 1 s retry), exit exits before any reply, over answers
+# 204800 KiB on every line (over the tests' 102400 KiB bound), and anything else (or
 # no such line) answers at once. The python3 shim names itself as the
 # interpreter lint resolves for the watch's readers.
 fm_lint_write_rss_shims() {  # <dir>
@@ -3671,6 +3675,9 @@ print("%d,%d" % tuple(fp.process_identity(fp.kinfo(int(sys.argv[2])))))' "$1" "$
   plan=
   [ -z "${FM_TEST_PY_PLAN:-}" ] || plan=$(sed -n "$(grep -c rss-tree "$FM_TEST_PY_LOG")p" "$FM_TEST_PY_PLAN")
   [ "$plan" != exit ] || exit 1
+  kib=$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')
+  # (Main 4343) "over": this reader reports 204800 KiB, over the 102400 KiB bound.
+  [ "$plan" != over ] || kib=204800
   line=0
   while read -r _; do
     line=$((line + 1))
@@ -3679,7 +3686,7 @@ print("%d,%d" % tuple(fp.process_identity(fp.kinfo(int(sys.argv[2])))))' "$1" "$
       slow:1) sleep 1 ;;
       slow-later:2) sleep 8 ;;
     esac
-    printf '{"rss_kib":%s,"members":[[%s,%s]],"uncounted":[],"bound":true}\n' "$(printf '%s\n' "$FM_TEST_PY_MEMORY" | awk '{ print ($1 > $2 ? $1 : $2) }')" "$3" "$ident"
+    printf '{"rss_kib":%s,"members":[[%s,%s]],"uncounted":[],"bound":true}\n' "$kib" "$3" "$ident"
   done
   exit 0
 fi
@@ -3813,6 +3820,9 @@ print("%d:%d" % fp.process_identity(fp.kinfo(int(sys.argv[2]))))' "$ROOT/bin/fm-
 # <tmp>/pass.roots.tsv; on a host other than macOS it returns 1 untouched.
 fm_lint_footprint_lint() {  # <tmp> [<env>...]
   local tmp=$1 fakebin shims real_python rc=0
+  local -a extra_roots=()
+  # (Main 4343) A caller that wrote <tmp>/quick.sh lints it beside footprint.sh.
+  [ ! -e "$tmp/quick.sh" ] || extra_roots=("$tmp/quick.sh")
   shift
   [ "$(uname)" = Darwin ] || return 1
   fakebin=$(fm_fakebin "$tmp")
@@ -3832,7 +3842,7 @@ fm_lint_footprint_lint() {  # <tmp> [<env>...]
     FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" FM_TEST_PY_MEMORY="1024 204800" \
     FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_ROOT_RSS_KIB=102400 \
     FM_TEST_FLAGS_LOG="$tmp/flags.log" FM_TEST_PID_FILE="$tmp/footprint.pid" FM_TEST_GROW_STEPS=1 FM_TEST_GROW_HOLD=4 \
-    "$@" "$LINT" --telemetry "$tmp/pass.tsv" "$tmp/footprint.sh" > "$tmp/out" 2>&1 || rc=$?
+    "$@" "$LINT" --telemetry "$tmp/pass.tsv" "$tmp/footprint.sh" ${extra_roots[@]+"${extra_roots[@]}"} > "$tmp/out" 2>&1 || rc=$?
   printf '%s\n' "$rc" > "$tmp/rc"
 }
 
@@ -3909,30 +3919,87 @@ test_resident_watch_waits_for_a_slow_first_reply() {
   pass "a reader whose first reply is 1 s late keeps footprint in use"
 }
 
-# A later reply has the same 6 s and its one 1 s retry: one 8 s late is a miss
-# for that tick, a new reader answers every tick after it, and the miss followed by later ticks
-# fails the root unmeasured (96).
-test_resident_watch_fails_a_root_whose_later_reply_was_late() {
-  local tmp out samples
-  tmp=$(fm_test_tmproot fm-lint-rss-slow-later)
+# (Main 4343 case 1) A later reply has the same 6 s and its one 1 s retry: one 8 s
+# late is a miss for that tick, and a new reader answers every tick after it. That
+# unmeasured interval is the root's only failure, so its result is not used, the
+# run's other root (quick.sh) is still admitted and finishes, and the root runs once
+# more alone after it. That rerun is measured all through and under the cap, so the
+# root passes. Before Main 4343 the miss failed the root (96) and stopped the run.
+test_a_late_reply_reruns_the_root_alone_and_a_measured_rerun_under_the_cap_passes() {
+  local tmp out log
+  tmp=$(fm_test_tmproot fm-lint-rss-alone-pass)
   printf 'slow-later\n' > "$tmp/plan"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/quick.sh"
   if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_PY_MEMORY="1024 2048" FM_TEST_GROW_HOLD=22; then
-    pass "SKIP (the resident-memory watch runs only on macOS): slow later reply check"
+    pass "SKIP (the resident-memory watch runs only on macOS): alone rerun measured under the cap"
     return
   fi
   out=$(cat "$tmp/out")
-  [ "$(cat "$tmp/rc")" -ne 0 ] || fail "a root with a late later reply followed by later ticks passed"$'\n'"$out"
-  assert_contains "$out" "reason=unmeasured" "the late reply did not fail the root as unmeasured"
-  [ "$(cat "$tmp/flags.log")" = yes ] \
-    || fail "an unmeasured root took a narrower retry"$'\n'"$(cat "$tmp/flags.log")"
-  samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
-  case "$samples" in
-    libproc:[1-9]*,unmeasured) ;;
-    *) fail "the late later reply was not recorded as an unmeasured interval: $samples" ;;
-  esac
-  [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 2 ] \
-    || fail "the reader with a slow later reply was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
-  pass "a later reply 8 s late (past its 6 s and its 1 s retry) is a miss, and with later ticks it fails the root unmeasured"
+  log="$tmp/pass.roots.tsv"
+  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root whose alone rerun was measured under the cap did not pass (exit $(cat "$tmp/rc"))"$'\n'"$out"
+  assert_contains "$out" "runs once more alone after the other roots finish" "the unmeasured first run was not queued for its alone rerun"
+  ! grep -q 'not started' <<<"$out" || fail "a root was not started after an unmeasured interval"$'\n'"$out"
+  awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ && $9 == 96 && $10 == "rerun-queued" { q++ }
+    $1 == "end" && $3 ~ /footprint\.sh$/ && $9 == 0 && $10 == "ok" { k++ }
+    END { exit !(q == 1 && k == 1) }' "$log" \
+    || fail "the roots log does not hold one queued end and one passing rerun end for the root"$'\n'"$(cat "$log")"
+  awk -F '\t' '$1 == "end" && $3 ~ /quick\.sh$/ && $10 == "ok" { found = 1 } END { exit !found }' "$log" \
+    || fail "the run's other root was not admitted and finished"$'\n'"$(cat "$log")"
+  # The rerun begins after every other end of the run: no other root beside it.
+  awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ && $10 == "ok" { exit }
+    $1 == "end" { if ($7 > last) last = $7 }
+    $1 == "begin" && $3 ~ /footprint\.sh$/ { n++; if (n == 2) rerun = $6 }
+    END { exit !(rerun != "" && rerun >= last) }' "$log" \
+    || fail "the alone rerun began before the run's other roots had ended"$'\n'"$(cat "$log")"
+  [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nyes')" ] \
+    || fail "the root did not run exactly twice with source following"$'\n'"$(cat "$tmp/flags.log")"
+  [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 3 ] \
+    || fail "expected two readers for the first run and one for the rerun"$'\n'"$(cat "$tmp/py.log")"
+  pass "a late reply's unmeasured interval reruns the root once alone after the other roots, and a rerun measured under the cap passes"
+}
+
+# (Main 4343 case 2) The alone rerun is unmeasured again (its reader is late on its
+# second tick too): the root fails (96), and it never runs a third time.
+test_a_rerun_alone_that_is_unmeasured_again_fails_the_root() {
+  local tmp out
+  tmp=$(fm_test_tmproot fm-lint-rss-alone-unmeasured)
+  printf 'slow-later\n\nslow-later\n' > "$tmp/plan"
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_PY_MEMORY="1024 2048" FM_TEST_GROW_HOLD=22; then
+    pass "SKIP (the resident-memory watch runs only on macOS): alone rerun unmeasured again"
+    return
+  fi
+  out=$(cat "$tmp/out")
+  [ "$(cat "$tmp/rc")" -ne 0 ] || fail "a root whose alone rerun was unmeasured again passed"$'\n'"$out"
+  awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ && $10 == "rerun-queued" { q++ }
+    $1 == "end" && $3 ~ /footprint\.sh$/ && $9 == 96 && $10 == "unmeasured" { u++ }
+    END { exit !(q == 1 && u == 1) }' "$tmp/pass.roots.tsv" \
+    || fail "the roots log does not hold one queued end and one unmeasured (96) rerun end"$'\n'"$(cat "$tmp/pass.roots.tsv")"
+  assert_contains "$out" "reason=unmeasured rc=96" "the rerun's failure was not named unmeasured"
+  [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nyes')" ] \
+    || fail "the root did not run exactly twice (no narrower retry, no third run)"$'\n'"$(cat "$tmp/flags.log")"
+  pass "an alone rerun that is unmeasured again fails the root (96), with no third run"
+}
+
+# (Main 4343 case 3) The alone rerun is measured over its cap, and so is its
+# narrower retry: the root fails as over its cap, never as a pass.
+test_a_rerun_alone_measured_over_the_cap_fails_the_root() {
+  local tmp out
+  tmp=$(fm_test_tmproot fm-lint-rss-alone-over)
+  printf 'slow-later\n\nover\nover\n' > "$tmp/plan"
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_PY_MEMORY="1024 2048" FM_TEST_GROW_HOLD=22 FM_TEST_GROW_NARROW=1; then
+    pass "SKIP (the resident-memory watch runs only on macOS): alone rerun over the cap"
+    return
+  fi
+  out=$(cat "$tmp/out")
+  [ "$(cat "$tmp/rc")" -ne 0 ] || fail "a root whose alone rerun was measured over its cap passed"$'\n'"$out"
+  assert_contains "$out" "runs once more alone after the other roots finish" "the unmeasured first run was not queued for its alone rerun"
+  assert_contains "$out" "hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback reason=memory rc=98" \
+    "the rerun over its cap did not fail as over its cap"
+  awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ && $10 == "memory" { found = 1 } END { exit !found }' "$tmp/pass.roots.tsv" \
+    || fail "the roots log does not end the rerun as memory"$'\n'"$(cat "$tmp/pass.roots.tsv")"
+  [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nyes\nno')" ] \
+    || fail "expected the first run, the rerun and its one narrower retry"$'\n'"$(cat "$tmp/flags.log")"
+  pass "an alone rerun measured over its cap (and its narrower retry too) fails the root as over its cap"
 }
 
 # A replacement reader that exits before its first reply is one failed restart,
@@ -6511,7 +6578,9 @@ test_a_root_exit_under_slow_checks_keeps_its_own_status
 test_a_compiled_launcher_switching_delegates_is_analysed_every_run
 test_resident_watch_replaces_a_stalled_reader
 test_resident_watch_waits_for_a_slow_first_reply
-test_resident_watch_fails_a_root_whose_later_reply_was_late
+test_a_late_reply_reruns_the_root_alone_and_a_measured_rerun_under_the_cap_passes
+test_a_rerun_alone_that_is_unmeasured_again_fails_the_root
+test_a_rerun_alone_measured_over_the_cap_fails_the_root
 test_resident_watch_retries_a_replacement_that_exits
 test_resident_watch_gives_up_after_three_failed_restarts
 )
