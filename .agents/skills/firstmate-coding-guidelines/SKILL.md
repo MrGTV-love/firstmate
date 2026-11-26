@@ -96,6 +96,7 @@ Before writing or changing a hook, guard, or automated test, state three things 
 3. **Boundary:** Where can the result actually be observed or enforced?
 
 Derive expectations from the authority, never from the implementation under test.
+Source-analysis rows and examples apply to linters and guards whose checked input is source; automated tests still exercise behavior and never assert implementation-source bytes, as the [repo style rules](#repo-style-rules) require.
 Use `hook-design` for harness lifecycle proof, `guard-design` for protection proof, and `hook-audit` when assessing an existing control's operational value.
 This guide does not replace those proof requirements.
 
