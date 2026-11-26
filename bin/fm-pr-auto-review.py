@@ -58,11 +58,19 @@ non-comment line of config/review-runner. Unset, relative or not executable make
 Everything durable is under <state>/.pr-auto-review/: <task>.json is the sidecar (request, outstanding
 read, verdict, merge attempt, events, next due time) and <task>.d/ holds one directory per request with
 the review pack the runner reads, its lock and its report. The pack's diff is used only when the PR
-head fm-review-diff.sh fetched is the head being read. The reader runs detached under a flock the
-sidecar test can probe, so a restart neither loses a read nor repeats it. Outcomes are sidecar events
-(read requested, verdict recorded, queued, merged with the full PR URL, fail, held with its reason, no
-eligible reader, runner unavailable) and, for every lasting hold, one check wake per head and reason;
-the merge itself also writes the merge outcome and fleet-ledger record that bin/fm-pr-merge.sh owns.
+head fm-review-diff.sh fetched is the head being read. When a new head follows a recorded FAIL on an
+earlier head of the same PR without an intervening PASS or captain-word, the pack carries a scoped
+closure-check header and the prior FAIL report at the top of contract.md plus the incremental fix diff
+in closure-diff.patch (when the prior head is locally reachable), so re-reviews verify prior blockers
+and fix-introduced regressions rather than re-auditing unchanged code. Consecutive failed heads on one
+PR are bounded by FM_PR_AUTO_REVIEW_MAX_FAIL_ROUNDS (default 3; 0 disables the cap): once that many
+distinct prior heads failed in a row without an intervening PASS or captain-word, a newer head is held
+once for Main with a check wake instead of dispatching another automatic read. The reader runs detached
+under a flock the sidecar test can probe, so a restart neither loses a read nor repeats it. Outcomes are
+sidecar events (read requested, verdict recorded, queued, merged with the full PR URL, fail, held with
+its reason, no eligible reader, runner unavailable) and, for every lasting hold, one check wake per head
+and reason; the merge itself also writes the merge outcome and fleet-ledger record that bin/fm-pr-merge.sh
+owns.
 `state` prints reading, waiting: <reason>, queued, merged, fail, held: <reason> or idle, and `events` prints the history. Nothing is written to the task's status log,
 because a `note:` there would replace the worker's `done:` as the latest event.
 
@@ -116,6 +124,8 @@ FACTS = (("loosens_deny_allow_list", r"loosens\s+a\s+deny\s+or\s+allow[\s-]*list
 # A cadence, not a bound on any work: a head with nothing to do costs one forge read per interval.
 INTERVAL = int(os.environ.get("FM_PR_AUTO_REVIEW_INTERVAL", "120") or 0)
 MERGE_RETRY = int(os.environ.get("FM_PR_AUTO_REVIEW_MERGE_RETRY", "600") or 0)
+MAX_FAIL_ROUNDS = int(os.environ.get("FM_PR_AUTO_REVIEW_MAX_FAIL_ROUNDS", "3") or 0)
+PRIOR_REPORT_MAX_BYTES = 65536
 
 
 _RECORD_MODULE = []
@@ -722,7 +732,97 @@ def ci_text(sha, view):
     return "\n".join(rows) + "\n"
 
 
-def request_read(home, task, url, sha, base, side, meta, view, plan, model_id, covers):
+def prior_fail_streak(home, url, sha):
+    """(failed_heads, latest_fail) for consecutive distinct prior heads that ended in FAIL before sha.
+
+    Walks recorded review rows for this PR newest-first, skipping rows for sha itself.
+    Stops at the first captain-word or PASS row on another head, so any cleared round
+    resets the streak. Returns ([], None) when no prior FAIL streak exists or history
+    cannot be read.
+    """
+    record = load_record_module()
+    try:
+        with record.ledger(False, home.home) as fd:
+            _, rows = record.newest(fd, record.canonical_pr(url))
+    except (record.RecordError, OSError, ValueError):
+        return [], None
+    failed_heads, seen, latest_fail = [], set(), None
+    for row in reversed(rows):
+        if row.get("head") == sha:
+            continue
+        if row.get("kind") == "captain-word":
+            break
+        if row.get("kind") != "review":
+            continue
+        if row.get("verdict") == "PASS":
+            break
+        if row.get("verdict") == "FAIL":
+            prev_head = row["head"]
+            if latest_fail is None:
+                latest_fail = row
+            if prev_head not in seen:
+                seen.add(prev_head)
+                failed_heads.append(prev_head)
+    return failed_heads, latest_fail
+
+
+def read_prior_report(row):
+    """Return bounded text of a recorded FAIL report, verifying its recorded digest when present."""
+    path = row.get("report") or ""
+    if not path:
+        return "(no prior report path recorded)"
+    expected = row.get("report_sha256")
+    try:
+        raw = Path(path).read_bytes()
+    except OSError:
+        return f"(prior report at {path} could not be read)"
+    if expected and hashlib.sha256(raw).hexdigest() != expected:
+        return f"(prior report at {path} changed after recording; omitted)"
+    text = raw[:PRIOR_REPORT_MAX_BYTES].decode("utf-8", errors="replace").strip()
+    if len(raw) > PRIOR_REPORT_MAX_BYTES:
+        text += f"\n\n...(truncated at {PRIOR_REPORT_MAX_BYTES} bytes; full report at {path})"
+    return text
+
+
+def closure_pack_section(worktree, sha, review_dir, prior_fail):
+    """Build the closure-check header for contract.md and write closure-diff.patch when reachable."""
+    prev_head = prior_fail["head"]
+    if run(["git", "-C", worktree, "cat-file", "-e", f"{prev_head}^{{commit}}"]).returncode:
+        run(["git", "-C", worktree, "fetch", "--quiet", "origin", prev_head])
+    has_prev = run(["git", "-C", worktree, "cat-file", "-e", f"{prev_head}^{{commit}}"]).returncode == 0
+    stat_text = f"(prior head {prev_head} is not available locally for an incremental diff)"
+    if has_prev:
+        stat = run(["git", "-C", worktree, "diff", "--stat", f"{prev_head}..{sha}", "--"])
+        patch = run(["git", "-C", worktree, "diff", f"{prev_head}..{sha}", "--"])
+        if stat.returncode == 0 and patch.returncode == 0:
+            stat_text = stat.stdout.strip() or f"(no file changes between {prev_head[:12]} and {sha[:12]})"
+            (review_dir / "closure-diff.patch").write_text(
+                patch.stdout if patch.stdout else f"# no changes between {prev_head} and {sha}\n",
+                encoding="utf-8",
+            )
+    report_text = read_prior_report(prior_fail)
+    return "\n".join([
+        "<!-- closure-re-review -->",
+        f"# Closure re-review (prior FAIL at {prev_head})",
+        "",
+        f"This read is a scoped closure check for `{sha}` following a prior FAIL at `{prev_head}`.",
+        "Apply the `## Re-reviews (closure checks)` rules in `docs/review-rubric.md`:",
+        f"- Grade every prior blocking finding below as `MET` or `NOT MET` against `{sha}`.",
+        f"- Raise a new blocking finding only if it is material and introduced by the fix diff (`{prev_head[:12]}..{sha[:12]}`, written to `closure-diff.patch` when available).",
+        "- Do not re-audit unchanged code for fresh nits, wording, style, or PR-body prose.",
+        f"- Return `VERDICT: PASS head={sha}` when every prior blocking finding is `MET` and the fix diff introduces no new material defect.",
+        "",
+        f"## Fix diff summary ({prev_head[:12]}..{sha[:12]})",
+        "```",
+        stat_text,
+        "```",
+        "",
+        f"## Prior FAIL report ({prev_head})",
+        report_text,
+    ])
+
+
+def request_read(home, task, url, sha, base, side, meta, view, plan, model_id, covers, prior_fail=None):
     contract, absent = contract_text(home, task)
     if absent:
         return f"contract source missing: {', '.join(absent)}"
@@ -741,6 +841,8 @@ def request_read(home, task, url, sha, base, side, meta, view, plan, model_id, c
     fetched = run(["git", "-C", worktree, "rev-parse", "--verify", "--quiet", f"{pulled}^{{commit}}"]).stdout.strip()
     if fetched != sha:
         return f"diff unavailable: the PR head fm-review-diff.sh fetched is {fetched[:12] or 'none'}, not {sha[:12]}"
+    if prior_fail is not None:
+        contract = closure_pack_section(worktree, sha, review_dir, prior_fail) + "\n\n" + contract
     (review_dir / "pr.diff").write_text(diff.stdout, encoding="utf-8")
     (review_dir / "contract.md").write_text(contract, encoding="utf-8")
     (review_dir / "ci-evidence.md").write_text(ci_text(sha, view), encoding="utf-8")
@@ -750,7 +852,8 @@ def request_read(home, task, url, sha, base, side, meta, view, plan, model_id, c
     run_dir = review_dir.parent / (review_dir.name + ".run")
     run_dir.mkdir(mode=0o700, exist_ok=True)
     request = {"at": int(time.time()), "model": model_id, "dir": str(review_dir), "head": sha, "covers": covers,
-               "runner": runner, "pr": url, "root": meta.get("project", ""), "argv_model": model_id}
+               "runner": runner, "pr": url, "root": meta.get("project", ""), "argv_model": model_id,
+               "closure_of": prior_fail["head"] if prior_fail is not None else None}
     write_atomic(run_dir / "request.json", json.dumps(request, indent=1) + "\n")
     head = side.head(sha)
     head["attempts"][model_id] = {"state": "requested", "at": request["at"], "dir": str(review_dir), "covers": covers}
@@ -762,7 +865,8 @@ def request_read(home, task, url, sha, base, side, meta, view, plan, model_id, c
                      pass_fds=(lock.fileno(),), start_new_session=True, env=home.env())
     lock.close()
     phase(side, sha, "reading", f"{sha[:12]} by {model_id}")
-    emit(home, task, side, sha, f"requested:{model_id}", f"reading {sha[:12]} by {model_id} for {','.join(covers)}")
+    closure_note = f" (closure of {prior_fail['head'][:12]})" if prior_fail is not None else ""
+    emit(home, task, side, sha, f"requested:{model_id}", f"reading {sha[:12]} by {model_id} for {','.join(covers)}{closure_note}")
     return None
 
 
@@ -901,6 +1005,14 @@ def advance(home, task, url, meta, side):
         emit(home, task, side, sha, "nothing-to-read", f"held: {reason} at {sha[:12]}",
              f"{reason} at {sha[:12]}, yet verify does not accept it: {str(error.get('message', ''))[:160]}")
         return
+    failed_heads, prior_fail = prior_fail_streak(home, url, sha)
+    if MAX_FAIL_ROUNDS > 0 and len(failed_heads) >= MAX_FAIL_ROUNDS:
+        short_heads = ",".join(h[:12] for h in failed_heads)
+        reason = f"review loop cap reached ({len(failed_heads)} consecutive failed heads: {short_heads})"
+        phase(side, sha, "held", reason)
+        emit(home, task, side, sha, "review-loop-cap", f"held: {reason} at {sha[:12]}; Main decides next step",
+             f"{url} hit the review loop cap at {sha[:12]} ({len(failed_heads)} consecutive failed heads: {short_heads}); no further automatic review requested, Main decides next step")
+        return
     runner, why = runner_path(home)
     if not runner:
         phase(side, sha, "held", f"review runner unavailable: {why}")
@@ -917,7 +1029,7 @@ def advance(home, task, url, meta, side):
         phase(side, sha, "held", f"no eligible reader: {why}")
         emit(home, task, side, sha, f"no-eligible-reader:{why}", f"held: no eligible reader: {why}", f"no eligible reader at {sha[:12]}: {why}")
         return
-    problem = request_read(home, task, url, sha, base, side, meta, view, plan, pick[0], pick[1])
+    problem = request_read(home, task, url, sha, base, side, meta, view, plan, pick[0], pick[1], prior_fail=prior_fail)
     if problem:
         phase(side, sha, "held", f"review pack not built: {problem}")
         emit(home, task, side, sha, f"pack:{problem}", f"held: review pack not built for {sha[:12]}: {problem}",
