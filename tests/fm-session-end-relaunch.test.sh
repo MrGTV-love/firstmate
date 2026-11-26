@@ -502,6 +502,43 @@ test_a_non_refusal_failure_keeps_its_retry() {
   pass "a failure that is not a refusal keeps today's retry"
 }
 
+# The registered clone's provisioner check (fm_slot_origin_provisioner) refuses with its own texts before any provisioner
+# runs; each is a refusal, unclassified as the earlier primary-clone texts were, so the scan reports it once and holds it.
+test_clone_provisioner_refusals_are_remembered_as_refusals() {
+  local dir text reason state rows p=/p/scripts/git-stability
+  local -a texts=(
+    "error: slot provisioner is missing from project clone /p: $p/provision_existing_slot.py; provisioning refused; run fleet sync"
+    "error: cannot read fetched origin default branch for $p/provision_existing_slot.py; provisioning refused; run fleet sync"
+    "error: cannot read the import closure of project clone provisioner $p/provision_existing_slot.py; provisioning refused; run fleet sync"
+    "error: cannot read project clone provisioner $p/helper.py: it is not parseable Python, so its imports cannot be checked; provisioning refused; run fleet sync"
+    "error: cannot read fetched origin version refs/remotes/origin/main:scripts/git-stability/helper.py for $p/helper.py: origin path is not a regular provisioner file; provisioning refused; run fleet sync"
+    "error: slot provisioner $p/provision_existing_slot.py differs from fetched origin version refs/remotes/origin/main:scripts/git-stability/provision_existing_slot.py; provisioning refused; run fleet sync"
+    "error: slot provisioner $p/provision_existing_slot.py mode differs from fetched origin version refs/remotes/origin/main:scripts/git-stability/provision_existing_slot.py; provisioning refused; run fleet sync"
+    "error: the verified export of project clone provisioner $p/provision_existing_slot.py could not be recorded; provisioning refused"
+  )
+  for text in "${texts[@]}"; do
+    reason=$(fm_session_end_refusal_reason "$text")
+    [ "$reason" = unclassified ] || fail "a clone provisioner refusal was not classified as a refusal (${reason:-<empty>}): $text"
+  done
+  # The outcome, with the lines fm-spawn prints after such a refusal on a relaunch.
+  text=$(printf '%s\n' "${texts[5]}" 'error: assigned copy /c and endpoint firstmate:fm-lane retained; no worker admitted' \
+    'error: the replacement agent for lane could not be launched on codex')
+  dir=$(make_lane clone-provisioner-refusal)
+  state="$dir/state"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$text" scan_lane_fresh "$dir" || fail "the first scan failed"
+  case "$FM_SESSION_END_WAKE" in
+    *'auto-relaunch failed after session-end'*'refused: unclassified'*'differs from fetched origin version'*'not retried by the scan'*) ;;
+    *) fail "the clone provisioner refusal was not reported as a refusal: ${FM_SESSION_END_WAKE:-<empty>}" ;;
+  esac
+  [ -f "$state/.session-end-refusal-lane" ] || fail 'the clone provisioner refusal left no durable refusal record'
+  rows=$(wc -l < "$state/.wake-queue" | tr -d ' ')
+  age_ledger "$dir"
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$text" scan_lane_fresh "$dir" || fail "the later scan failed"
+  [ ! -s "$dir/control.log" ] || fail "an unchanged clone provisioner refusal was retried: $(cat "$dir/control.log")"
+  [ "$(wc -l < "$state/.wake-queue" | tr -d ' ')" = "$rows" ] || fail 'an unchanged clone provisioner refusal wrote another wake row'
+  pass "each clone provisioner refusal text is a refusal: reported once by its line and not retried while unchanged"
+}
+
 # D9: a successful automatic relaunch that starts with out-of-scope work, and a refusal that names it, deliver the complete report.
 test_drift_report_reaches_the_observer() {
   local dir report
@@ -719,6 +756,7 @@ test_unchanged_refusal_is_reported_once_and_not_retried
 test_unchanged_refusal_survives_a_new_generation_and_an_unrelated_commit
 test_long_drift_report_keeps_its_durable_reference_at_the_fallback
 test_a_non_refusal_failure_keeps_its_retry
+test_clone_provisioner_refusals_are_remembered_as_refusals
 test_drift_report_reaches_the_observer
 test_two_printed_reports_are_listed_once
 test_a_sampled_report_carries_its_count_and_full_list_file
