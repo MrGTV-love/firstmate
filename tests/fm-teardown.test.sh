@@ -5212,6 +5212,13 @@ test_by_path_exception_to_the_held_task_rule_judges_each_harm_row() {
           assert_present "$BP_COPY/.claude/inner" "by-path-exc-$shape: the inner worktree is gone" ;;
         h5-process-cwd | h5-open-file | h6-live-launcher)
           kill -0 "$pid" 2>/dev/null || fail "by-path-exc-$shape: the run signalled the process"
+          case "$shape" in
+            h5-open-file) assert_grep "human-only-exit: Which task or person owns process $pid, which holds $BP_COPY/.git open in $BP_COPY?" "$case_dir/stderr" "by-path-exc-$shape: the owner question does not name the holder and the file it holds open: $(cat "$case_dir/stderr")" ;;
+            h5-process-cwd) assert_grep "human-only-exit: Which task or person owns process $pid, which is running in $BP_COPY?" "$case_dir/stderr" "by-path-exc-$shape: the owner question does not name the process running in the copy: $(cat "$case_dir/stderr")" ;;
+            h6-live-launcher) assert_grep "human-only-exit: Is launcher $pid, named in the creation lock on $BP_COPY" "$case_dir/stderr" "by-path-exc-$shape: the owner question does not name the launcher: $(cat "$case_dir/stderr")" ;;
+          esac
+          assert_no_grep 'process unknown' "$case_dir/stderr" "by-path-exc-$shape: the owner question names no process"
+          assert_no_grep 'launcher unknown' "$case_dir/stderr" "by-path-exc-$shape: the owner question names no launcher"
           [ "$shape" != h6-live-launcher ] || assert_absent "$case_dir/closeout.log" "by-path-exc-$shape: the driver executed a release" ;;
       esac
     fi

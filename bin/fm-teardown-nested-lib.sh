@@ -123,6 +123,7 @@ TEARDOWN_CLOSEOUT_OUT=
 TEARDOWN_CLOSEOUT_STDOUT=
 TEARDOWN_FOREIGN_RULE=
 TEARDOWN_FOREIGN_PID=
+TEARDOWN_FOREIGN_HELD=
 TEARDOWN_REFUSED_COPIES=()
 TEARDOWN_FRICTION_GUARD=FM-TEARDOWN-PRESERVATION
 
@@ -142,7 +143,12 @@ teardown_copy_question() {  # <rule> <copy>
     copy-head-resolved) printf 'Which verified commit holds the work in %s (%s)? Keep the copy; no discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     copy-ignored-files) printf 'What owner-approved disposition covers the ignored files only %s holds (%s)? Keep the copy; no removal or discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     copy-anchor-commit) printf 'Which commit does the existing preservation anchor protect, and does it cover %s (%s)? Keep the copy and the anchor; no overwrite is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
-    process-cwd-owner) printf 'Which task or person owns process %s, which is running in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
+    process-cwd-owner)
+      if [ -n "$TEARDOWN_FOREIGN_HELD" ]; then
+        printf 'Which task or person owns process %s, which holds %s open in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$TEARDOWN_FOREIGN_HELD" "$2"
+      else
+        printf 'Which task or person owns process %s, which is running in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2"
+      fi ;;
     lock-launcher-owner) printf 'Is launcher %s, named in the creation lock on %s, still running, and who owns it?' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
     creation-lock-owner) printf 'Who owns the creation lock on %s, and may it be released?' "$2" ;;
     nonforced-removal) printf 'What retained disposition covers the contents Git still protects in %s? Preserve this copy; no forced removal is authorized.' "$2" ;;
@@ -1182,6 +1188,7 @@ teardown_foreign_copy_unowned() {  # <copy>
   local copy=$1 rc=0 pids pid
   TEARDOWN_OWN_SCANNED=0
   TEARDOWN_FOREIGN_PID=
+  TEARDOWN_FOREIGN_HELD=
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
   fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
   case "$rc" in
@@ -3064,7 +3071,7 @@ teardown_by_path_locate() {  # <canonical-copy>
 # One scan of every open file: a failed scan, or no lsof, refuses, because a copy
 # whose holders are unknown is not proved idle. Nothing is ever signalled.
 teardown_by_path_holders() {  # <copy>
-  local copy=$1 out line pid='' command='' fd='' name hits=''
+  local copy=$1 out line pid='' command='' fd='' name hits='' held=''
   if ! command -v lsof >/dev/null 2>&1; then
     teardown_by_path_unread "$(fm_refuse_text "$copy") cannot be proved idle: lsof is not installed to list the processes holding it"
     return 1
@@ -3085,7 +3092,10 @@ teardown_by_path_holders() {  # <copy>
             [ "$pid" = "$$" ] || case " $hits " in
               *" $pid "*) ;;
               *)
-                [ -n "$hits" ] || TEARDOWN_BY_PATH_HOLDER="process $pid ($(fm_refuse_text "$command")) holds $(fm_refuse_text "$name") through ${fd:-an open file}"
+                if [ -z "$hits" ]; then
+                  TEARDOWN_BY_PATH_HOLDER="process $pid ($(fm_refuse_text "$command")) holds $(fm_refuse_text "$name") through ${fd:-an open file}"
+                  [ "$fd" = cwd ] || held=$name
+                fi
                 hits+="${hits:+ }$pid"
                 ;;
             esac
@@ -3095,6 +3105,8 @@ teardown_by_path_holders() {  # <copy>
     esac
   done <<< "$out"
   [ -z "$hits" ] || {
+    TEARDOWN_FOREIGN_PID=${hits%% *}
+    TEARDOWN_FOREIGN_HELD=$held
     teardown_by_path_why "$(fm_refuse_text "$copy") is in use: $TEARDOWN_BY_PATH_HOLDER (processes holding it: $hits)"
     return 1
   }
@@ -3224,9 +3236,12 @@ teardown_by_path_audit() {  # <copy> <head> <proof>
 # are the route's mechanics, not the widened harm, and stay where they are. Any row
 # that holds, or cannot be read, refuses; the refusal names it (a row whose input
 # cannot be read as rule inspection-unavailable, never a policy row), and
-# TEARDOWN_BY_PATH_EXCEPTION_WHY and _RULE keep that reason for the final refusal.
+# TEARDOWN_BY_PATH_EXCEPTION_WHY, _RULE, _PID and _HELD keep that reason, and the
+# process it names, for the final refusal.
 TEARDOWN_BY_PATH_EXCEPTION_WHY=
 TEARDOWN_BY_PATH_EXCEPTION_RULE=
+TEARDOWN_BY_PATH_EXCEPTION_PID=
+TEARDOWN_BY_PATH_EXCEPTION_HELD=
 teardown_by_path_exception_clear() {  # <bundle> <required-tips, space separated>
   local copy=$TEARDOWN_BY_PATH_COPY rc=0 why='' why_rule='' unique reason_before=${TEARDOWN_BUNDLE_REASON:-}
   TEARDOWN_BY_PATH_EXCEPTION_WHY=
@@ -3277,6 +3292,8 @@ teardown_by_path_exception_clear() {  # <bundle> <required-tips, space separated
   [ -n "$why" ] || return 0
   TEARDOWN_BY_PATH_EXCEPTION_WHY=$why
   TEARDOWN_BY_PATH_EXCEPTION_RULE=$why_rule
+  TEARDOWN_BY_PATH_EXCEPTION_PID=$TEARDOWN_FOREIGN_PID
+  TEARDOWN_BY_PATH_EXCEPTION_HELD=$TEARDOWN_FOREIGN_HELD
   teardown_bundle_refuse "$1: the by-path exception to the held-task rule does not apply: $why"
 }
 
@@ -3390,6 +3407,8 @@ teardown_by_path_prove() {  # <copy>
   if [ -n "$TEARDOWN_BY_PATH_EXCEPTION_WHY" ]; then
     TEARDOWN_FOREIGN_RULE=$TEARDOWN_BY_PATH_EXCEPTION_RULE
     TEARDOWN_FOREIGN_WHY=$TEARDOWN_BY_PATH_EXCEPTION_WHY
+    TEARDOWN_FOREIGN_PID=$TEARDOWN_BY_PATH_EXCEPTION_PID
+    TEARDOWN_FOREIGN_HELD=$TEARDOWN_BY_PATH_EXCEPTION_HELD
   fi
   teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "copy $copy is not removed: $TEARDOWN_FOREIGN_WHY." "$copy"
   teardown_by_path_why "$(fm_refuse_text "$copy did not pass every proof (rule=$TEARDOWN_FOREIGN_RULE)${TEARDOWN_FOREIGN_WHY:+: $TEARDOWN_FOREIGN_WHY}")"
