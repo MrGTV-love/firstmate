@@ -100,11 +100,11 @@ Pipeline starts:
     run names a gated agent, and its rows and attempt records bind one to one by
     session key. A run created before activation (every run while no record
     exists) is instead charged the larger of its demand and R while it is
-    counted, queued or holds an attempt, so until activation and the drain of
-    those runs a CI waiter, a run the reading cannot see and a visible active
-    run (while A is at most R) are each charged no more beyond what they hold
-    than the base rule's R per run; a run with no open step row is charged R
-    beside what it holds, min(R, that memory) more than the base. S is the largest per-run peak of every recorded
+    counted, queued or holds an attempt. Until activation exists and every such
+    run has left the census, a start is also admitted when the base rule admits
+    it (base_rule: (counted + pending + 1) x R + S against available plus each
+    counted run's resident memory up to R), so the interim is never stricter
+    than the base rule; after that the projection stands alone. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
     rank) of those peaks leaving out runs that are status-running with
     ci_ready_at IS NULL, read from the root home's .memory-calibration.json
@@ -1335,6 +1335,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
     The new run reserves S; each pending admitted start that no counted run covers reserves R; and the
     branch of each run in replaced (a covering run with a replacing start: counted_pending) carries the
     larger of that run's demand and R, by one replacing entry of the shortfall per run, however many starts.
+    While before_activation names any run, the base rule (base_rule) also admits: the need is
+    the smaller of the two, each against its own budget (base, else None).
     Budget is available memory plus what the runs held. The one-start minimum admits only
     when nothing else is counted: every other counted run counts at least one, and the
     requesting run's own held attempts and unproven launches count (Main 1727).
@@ -1394,10 +1396,20 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         entries.append(("start-%d" % (index + 1), "pending", reservation, False))
     projected = sum(demand for _, _, demand, _ in entries) + slack
     budget = available + held
-    return dict(admit=projected <= budget or others == 0, projected=projected, budget=budget, held=held,
-                available=available, entries=entries, counted=len(counted), others=others,
-                counted_rss={run: (rss.get("no-mistakes:%s/%s" % (repo, run)) or {}).get("rss_bytes") or 0
-                             for run, repo in sorted(counted.items())})
+    counted_rss = {run: (rss.get("no-mistakes:%s/%s" % (repo, run)) or {}).get("rss_bytes") or 0
+                   for run, repo in sorted(counted.items())}
+    base = base_rule(available, counted_rss, reservation, slack, pending) if before_activation else None
+    return dict(admit=projected <= budget or others == 0 or base is not None and base[0] <= base[1],
+                projected=projected, budget=budget, held=held, available=available, entries=entries,
+                counted=len(counted), others=others, counted_rss=counted_rss, base=base)
+
+
+def base_rule(available: int, counted_rss: Dict[str, int], reservation: int, slack: int, pending: int = 0) -> Tuple[int, int]:
+    """(need, budget) of the base rule: (counted + 1) x R + S against available plus each counted run's resident memory
+    up to R. PENDING admitted starts are counted runs holding nothing, as the base rule counted each start once it
+    registered under the start lock it held until then."""
+    need = (len(counted_rss) + pending + 1) * reservation + slack
+    return need, available + sum(min(reservation, size) for size in counted_rss.values())
 
 
 def projection_text(fit: dict, reservation: int, slack: int, term: int, runs_measured: int, readings: int) -> str:
@@ -1406,13 +1418,16 @@ def projection_text(fit: dict, reservation: int, slack: int, term: int, runs_mea
                         for run, kind, demand, visible in fit["entries"] if selected(kind)) or "none"
     reserved = items(lambda kind: kind not in ("ci-waiting", "waiter"))
     unreserved = items(lambda kind: kind in ("ci-waiting", "waiter"))
-    # counted_runs names each counted run with its resident memory in this reading, so the base rule's decision,
-    # (counted + 1) x R + S against available + the sum of min(R, resident memory), is recomputable from the line.
+    # counted_runs names each counted run with its resident memory in this reading, so the base rule's decision
+    # (base_rule) is recomputable from the line; base_need and base_budget are that decision while it also admits.
     counted_runs = ",".join("%s:%d" % item for item in fit.get("counted_rss", {}).items()) or "none"
+    base = fit.get("base")
     return ("counted=%d projected=%d budget=%d available=%d held=%d reservation=%d active_term=%d slack=%d"
             " runs_measured=%d readings_measured=%d reserved=[%s] holding_only=[%s] counted_runs=[%s]"
+            " base_need=%s base_budget=%s"
             % (fit["counted"], fit["projected"], fit["budget"], fit["available"], fit["held"], reservation,
-               term, slack, runs_measured, readings, reserved, unreserved, counted_runs))
+               term, slack, runs_measured, readings, reserved, unreserved, counted_runs,
+               "none" if base is None else base[0], "none" if base is None else base[1]))
 
 
 _observed: dict = {}

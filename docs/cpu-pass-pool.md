@@ -125,8 +125,8 @@ The open step is the highest-ordered `step_results` row in `running` or `fixing`
 A run's launch history is shown complete only when the pool's activation record, `gate-activation.json` (`activated_at` in epoch seconds and `gate_sha256`, written once by [activation](#activation)), is dated before the run's `created_at`, every `agent_invocations` row of the run names a gated agent, and its rows and the gate's attempt records bind one to one by session key.
 Every other run created after activation is charged one `R` for its history beside its demand while it is counted, queued or holds an attempt.
 A run created before activation, every run while no activation record exists, is charged `max(demand, R)` instead, until it leaves the census.
-Against the base rule, `(counted + 1) x R + S` against `available_bytes` plus each counted run's resident memory up to `R`, that interim charge is never stricter for a CI waiter, a run the reading cannot see, or a visible active run while `A` is at most `R` (measured: 1.82 against 5.77 GiB): each is charged no more beyond what it holds than the base rule's `R`, and the new run carries `S` without the base rule's extra `R`.
-A counted run with no open step row is charged `R` beside what it holds, so for it the interim is stricter than the base by the smaller of `R` and its resident memory.
+Until an activation record exists and every run created before it has left the census, a start is also admitted when the base rule admits it: `(counted + pending + 1) x R + S` against `available_bytes` plus each counted run's resident memory up to `R`, each pending admitted start counted as a run holding nothing, so the interim is never stricter than the base rule; after that the projection stands alone.
+The lines then print the base rule's need and budget as `base_need` and `base_budget` (`none` once the projection stands alone).
 With no other counted run, one start is admitted even when the rule does not fit, a one-start minimum, so a large `S` or a low `available_bytes` never holds an idle host closed; the pause-only backstop below still pauses that start.
 The admission and waiting lines print every input: the counted runs, each run's reservation and why (`reserved=[run:kind:bytes]`, `holding_only=[...]`, `:unseen` for a run the reading cannot see), the projection, the budget, `R`, `A`, `S` and the class.
 The records belong to the host: they must name this host and its RAM size.
@@ -198,7 +198,7 @@ Deployment is one operator step.
 First apply the launcher line.
 Then, immediately after it, run `bin/fm-cpu-pass.sh activate --gate <the gate file the launcher line names>`.
 Then read the record with `cat ~/.cache/fm-cpu-pool/gate-activation.json` (or the pool directory `FM_CPU_POOL_DIR` names): it must be one JSON object with an integer `activated_at` at the time of the step and a 64-digit lowercase hexadecimal `gate_sha256` equal to `shasum -a 256` of that gate file.
-Residual: each run created before activation is charged `max(demand, R)` until it leaves the census, so the admission the corrected reservation allows is reached only after those runs drain; until then admission is held to about the base rule's level, never stricter except as stated for a run with no open step row.
+Residual: each run created before activation is charged `max(demand, R)` until it leaves the census, so the admission the corrected reservation allows is reached only after those runs drain; until then a start the base rule admits is also admitted, so admission is never stricter than the base rule.
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
 Admission never preempts an already granted start or stops running work.

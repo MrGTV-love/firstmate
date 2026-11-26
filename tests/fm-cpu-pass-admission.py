@@ -1837,7 +1837,8 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         # probe projects 3 + 8, never 0 + 8. A start through env -S is never a proven reattach, whatever its words hold:
         # env reads \_ as a word break, so an escape-only string hides a nonce in no expansion. A start through env -C or
         # --chdir is bound to the directory it names: repo2/main, which has no counted run, so 3 + 8. A wrapper added to
-        # the engine's list with no row here fails this case.
+        # the engine's list with no row here fails this case. R18-1: each wrapper row has a twin with no nonce, a proven
+        # reattach that projects 0 + 8, so a parser that does not follow the wrapper (no route, charged R) fails it.
         import importlib.util
         engine_spec = importlib.util.spec_from_file_location('fm_cpu_pass_wrappers', str(repo / 'bin/fm-cpu-pass.py'))
         engine = importlib.util.module_from_spec(engine_spec)
@@ -1846,14 +1847,17 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         rows = {'env': ['env', 'FM_WRAPPED=1'], 'nice': ['nice', '-n', '5'], 'nohup': ['nohup'], 'command': ['command'],
                 'exec': ['exec'], 'time': ['time', '-p'], 'stdbuf': ['stdbuf', '-oL']}
         assert set(rows) == set(engine.TRANSPARENT), ('a transparent wrapper has no row', sorted(set(engine.TRANSPARENT) ^ set(rows)))
-        cases = [(name, words + client + ['--launch-nonce=n1'], None) for name, words in sorted(rows.items())] + [
-            ('env-S-escape', ['env', '-S', ' '.join(client) + '\\_--launch-nonce=n1'], None),
-            ('env-S-variable', ['env', '-S', ' '.join(client) + ' ${NONCE}'], None),
-            ('env-C', ['env', '-C', '{other}'] + client, 'start_repo=repo2 start_branch=main'),
-            ('env-chdir', ['env', '--chdir={other}'] + client, 'start_repo=repo2 start_branch=main')]
-        for label, command, bound in cases:
+        cases = [(name, words + client + ['--launch-nonce=n1'], None, 11, 'r17-wrapper-%s-proven' % name)
+                 for name, words in sorted(rows.items())] + [
+            (name + '-twin', words + client, None, 8, 'r18-wrapper-%s-not-followed' % name) for name, words in sorted(rows.items())] + [
+            ('env-S-escape', ['env', '-S', ' '.join(client) + '\\_--launch-nonce=n1'], None, 11, 'r17-wrapper-env-S-escape-proven'),
+            ('env-S-variable', ['env', '-S', ' '.join(client) + ' ${NONCE}'], None, 11, 'r17-wrapper-env-S-variable-proven'),
+            ('env-C', ['env', '-C', '{other}'] + client, 'start_repo=repo2 start_branch=main', 11, 'r17-wrapper-env-C-proven'),
+            ('env-chdir', ['env', '--chdir={other}'] + client, 'start_repo=repo2 start_branch=main', 11,
+             'r17-wrapper-env-chdir-proven')]
+        for label, command, bound, expected, ident in cases:
             projected, text, first = covered_probe('wrap-' + label, [(command, False)], ('HEAD', None), None, wrappers=rows)
-            harm('r17-wrapper-%s-proven' % label, projected == 11 * GIB, label, projected, text)
+            harm(ident, projected == expected * GIB, label, projected, text)
             if bound is not None:
                 harm('r17-wrapper-%s-bound-to-admitting' % label, bound in first, label, first)
 
@@ -1906,6 +1910,55 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         assert old['admit'] and old['counted'] == 11, (old, line)
         finish(child)
         assert (folder / 'pre').exists() and 'admitted: counted=11 ' in text, text
+
+    def interim_base_cap():
+        # R17-2 (the captain, 2026-11-26; R = 3 GiB, S = 8 GiB, A = 1 GiB): until activation exists and every run
+        # created before it has left the census, a start the base rule admits is admitted too. Counted runs with no
+        # open step row hold SIZE each and are charged R + SIZE (max(R + SIZE, R) before activation).
+        # (a) two such runs at 4 GiB, before activation: the projection is 7 + 7 + 8 = 22 against AVAIL + 8, the base
+        #     rule 3 x 3 + 8 = 17 against AVAIL + 3 + 3; at 12 GiB the base rule admits and so does the start (the cap
+        #     binds), at 10 GiB both wait. The projection's 22 is asserted, so a changed per-run charge fails.
+        # (b) one such run at 3 GiB: both needs are 14 against AVAIL + 3: at 11 GiB both admit, one page below both wait.
+        # (c) two CI waiters at 0: the projection 3 + 3 + 8 = 14 is below the base rule's 17: at 14 GiB the start is
+        #     admitted on the projection, which the base rule alone would hold.
+        # (d) after activation, with no run created before it, (a)'s runs at 12 GiB wait: 22 against 20, the base rule
+        #     no longer admits, and the line names base_need=none.
+        def decide(name, available, sizes=(), ci=(), activated=False):
+            folder, db, env = case('r17-2-' + name, measured=True, available=available, activated=activated)
+            for run in [run for run, _ in sizes] + list(ci):
+                change(db, "INSERT INTO runs (id, status, repo_id) VALUES (?, 'running', 'repo')", (run,))
+            steps(db, [(run, 'ci', 'running', None) for run in ci])
+            facts(folder, available=available, runs=[('repo', run, size) for run, size in sizes])
+            child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'marker')], env, folder / 'start')
+            wait_for(lambda: 'projected=' in (folder / 'start.stderr').read_text(), name + ': the start decides')
+            if 'admitted:' in (folder / 'start.stderr').read_text():
+                finish(child)
+            else:
+                time.sleep(1)
+                os.killpg(child.pid, signal.SIGKILL); child.wait()
+            text = (folder / 'start.stderr').read_text()
+            line = [l for l in text.splitlines() if 'projected=' in l][0]
+            return dict(admitted='admitted:' in line and (folder / 'marker').exists(), line=line, text=text,
+                        projected=int(re.search(r'projected=(\d+)', line).group(1)),
+                        base=re.search(r'base_need=(\S+) base_budget=(\S+)', line).groups(), old=base_rule_from_line(text))
+
+        two = [('a', 4 * GIB), ('b', 4 * GIB)]
+        bound = decide('binds', 12 * GIB, two)
+        harm('r17-2-pre-activation-charge', bound['projected'] == 22 * GIB, bound['line'])
+        harm('r17-2-cap-binds', bound['admitted'] and bound['old']['admit'] and bound['base'] == (str(17 * GIB), str(18 * GIB)),
+             bound['line'])
+        held = decide('binds-short', 10 * GIB, two)
+        harm('r17-2-cap-admits-past-base', not held['admitted'] and not held['old']['admit'], held['line'])
+        edge = [('a', 3 * GIB)]
+        fits, short = decide('edge', 11 * GIB, edge), decide('edge-short', 11 * GIB - 16384, edge)
+        harm('r17-2-edge', fits['projected'] == 14 * GIB and fits['base'][0] == str(14 * GIB) and fits['admitted']
+             and fits['old']['admit'] and not short['admitted'] and not short['old']['admit'], fits['line'], short['line'])
+        below = decide('below', 14 * GIB, ci=['c1', 'c2'])
+        harm('r17-2-cap-raises-need', below['projected'] == 14 * GIB and below['admitted'] and not below['old']['admit'],
+             below['line'])
+        after = decide('ended', 12 * GIB, two, activated=True)
+        harm('r17-2-cap-outlives-activation', not after['admitted'] and after['old']['admit'] and after['base'] == ('none', 'none')
+             and after['projected'] == 22 * GIB, after['line'])
 
     def checkout_copy(folder):
         """A second checkout of this tree's bin/ (its own invoking checkout), as another home would run it."""
@@ -2138,6 +2191,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                        ('R17-1 no transparent wrapper hides a nonce from the charge', every_wrapper_hides_no_nonce),
                        ('P1 the line recomputes the base rule', p1_old_rule_recomputed),
                        ('R16-2 before activation a run is charged max(D, R)', pre_activation_not_stricter),
+                       ('R17-2 before activation the base rule caps the need', interim_base_cap),
                        ('P6(a) lines name the checkout, the pool and the start', lines_name_checkout_pool_and_start),
                        ('P6(a) the pool follows HOME and the override', pool_from_home),
                        ('P5.lock case (i): a nested first client uses the reservation', nested_first_uses_reservation),

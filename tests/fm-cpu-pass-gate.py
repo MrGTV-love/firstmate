@@ -163,8 +163,8 @@ try:
         assert not (folder / 'c.agent').exists()
         text_b = (folder / 'gate-b.stderr').read_text()
         assert 'a:launched:%d:unseen' % (3 * GIB) in text_b and 'projected=%d ' % (11 * GIB) in text_b, text_b
-        wait_for(lambda: 'launch-gate waiting: counted=3 projected=%d ' % (14 * GIB) in (folder / 'gate-c.stderr').read_text() or
-                 'held for capacity' in wakes(folder), 'third holds')
+        wait_for(lambda: 'launch-gate waiting: counted=3 projected=%d ' % (14 * GIB) in (folder / 'gate-c.stderr').read_text(),
+                 'third holds')
         assert 'run c (fm/c) held for capacity' in wakes(folder), wakes(folder)
         # A fix round waits in the one queue at class other.
         assert all('priority=other' in line for line in wakes(folder).splitlines() if 'held for capacity' in line), wakes(folder)

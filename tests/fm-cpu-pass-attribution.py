@@ -1445,6 +1445,7 @@ def m1903_census_read_error():
             failures.append(sql)
             raise sqlite3.OperationalError('database is locked')
         return real(sql, parameters)
+    w.observe()
     code, lines, ran = start_in_process(w, read_host_db=read)
     w.close()
     harm('m1903-census-read-refuses-125', code != 125, code, lines)
