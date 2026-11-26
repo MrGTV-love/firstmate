@@ -3463,7 +3463,7 @@ teardown_skipped_copies() {
     if [ "$holder" != "firstmate-skipped:$ID" ]; then
       # Only the exact holder this task's spawn leased under is this task's to return. A row naming anyone else (a copy the
       # spawn passed over because another holder's lease was already there) is never returned, whatever the pool says.
-      echo "notice: the record row for $copy names holder '$holder', not this task's firstmate-skipped:$ID; that lease is not this task's, so nothing is returned and the row is left as it is${pane:+ (acquisition pane $pane of the spawn may still stand in it)}" >&2
+      echo "notice: the record row for $copy names holder '$holder', not this task's firstmate-skipped:$ID; that lease is not this task's, so nothing is returned and the row is left as it is${pane:+ (acquisition pane $pane of the spawn stood in it; teardown closed that window, which does not release the lease of the other holder)}" >&2
       teardown_skipped_row "$copy" "$reason" "$holder" "$when" "$pane" >> "$keep"
       continue
     fi

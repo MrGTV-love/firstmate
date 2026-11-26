@@ -562,16 +562,20 @@
 #   skipped-copies.tsv with the holder the pool names and the acquisition endpoint, which bin/fm-teardown.sh never returns,
 #   and listed as passed over. From the first pass-over to the end of the spawn, even after a clean copy is reached, the
 #   acquisition pane is never closed: the get that entered the passed-over copy opened a subshell inside it and every
-#   later get runs beneath that subshell, so the pane's process tree holds a shell inside the passed-over copy, and
-#   closing the pane ends that shell, which can let Treehouse release or reset a copy another holder may lease. An abort
-#   after a pass-over, before launch, instead interrupts any `treehouse get` in the pane's foreground and proves from the
-#   process table that those processes are gone and that the pane rests in a copy this spawn passed over or leased in
+#   later get runs beneath that subshell, so an abort is settled and proved from the pane's own process table (closing
+#   the pane proves nothing about a get still running there), and nothing outside the record is left running. Closing
+#   the pane later (teardown closes the worker's window, which is this pane) does not release or reset a passed-over
+#   copy: Treehouse never hands a leased worktree, an ordinary or a recovered lease (`treehouse capabilities` reports
+#   persistent_recovered_leases), to a later get and never prunes it, even with no process inside, until
+#   `treehouse return <path>` releases it. An abort after a pass-over, before launch, instead interrupts any
+#   `treehouse get` in the pane's foreground and proves from the process table that those processes are gone and that the pane rests in a copy this spawn passed over or leased in
 #   place; anything else (a get still alive, a pane resting in another copy, a foreground the backend cannot read, which
 #   is interrupted all the same) is an error. Only tmux reads the foreground. Every other backend, Herdr flat or projected
 #   included, always reports the abort as not clean: Herdr pass-over settlement and the Herdr projection branch
 #   (HERDR_PROJECTION_ABORT_CLEANUP, which a pass-over turns off) are untested, so no Herdr abort is ever called clean.
-#   Either way the pane is recorded, read back, in $DATA/<task>/acquisition-pane.tsv. A recovered lease is freed by Treehouse itself
-#   once the copy is idle, clean and landed. Each passed-over copy is a distinct copy the acquisition never accepts again,
+#   Either way the pane is recorded, read back, in $DATA/<task>/acquisition-pane.tsv. Treehouse never frees a recovered lease by
+#   itself (`treehouse return --all` skips it): it stays until it is returned by name or acknowledged with
+#   `treehouse lease --recover`. Each passed-over copy is a distinct copy the acquisition never accepts again,
 #   so the loop ends by the one absolute bound below or by the copies the pool has, with the refusal naming each copy.
 #   A pool state that cannot be read as exactly one consistent row for the copy (unreadable, a duplicate row by name or by
 #   physical path, a conflicting entry, a lease that is this task's own) refuses the whole spawn at that point, before any
@@ -2144,8 +2148,8 @@ spawn_abort_cleanup() {
       fi
     fi
   fi
-  # After a pass-over the pane is never closed (it holds a shell inside the passed-over copy), so closing it cannot cancel a
-  # get still running there: the get is interrupted in place and proved gone instead. This never ends the cleanup early.
+  # After a pass-over the pane is never closed by an abort: closing it proves nothing about a get still running there, so
+  # the get is interrupted in place and proved gone from the pane's process table instead. This never ends the cleanup early.
   if [ -n "$SPAWN_PASSED_OVER_PANE" ] && [ "$KIND" != secondmate ] && [ "$SPAWN_LAUNCH_SENT" = 0 ]; then
     spawn_settle_passed_over_pane || status=1
   fi
@@ -6724,7 +6728,7 @@ spawn_classify_copy() { # <path>
 # record that cannot be written and read back refuses the whole spawn.
 spawn_pass_over_copy() {
   local passed=$WT real row reason
-  # From here the pane's process tree holds a shell inside this copy: never close the pane; settle it on abort instead.
+  # From here an abort never closes the pane: it settles it from the pane's process table instead (the header owns why).
   SPAWN_PASSED_OVER_PANE=$WT_TARGET
   SPAWN_TREEHOUSE_ABORT_TARGET=
   HERDR_PROJECTION_ABORT_CLEANUP=0
