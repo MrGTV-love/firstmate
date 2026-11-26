@@ -671,16 +671,35 @@ def own_git_results(manifest, worktree):
         results["policy-denies-" + name] = sandbox_query(path, 1)
     results["policy-allows-worktree-file"] = sandbox_query(worktree / "README", 0)
     common = str(Path(manifest["packed_refs"]).parent)
+    author = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "core.hooksPath=/dev/null"]
     status = git("-C", str(worktree), "status", "--porcelain")
+    (worktree / "after-denies").write_text("after the own .git denies\n")
+    added = git("-C", str(worktree), "add", "after-denies")
+    committed = git("-C", str(worktree), *author, "commit", "-q", "-m", "after the own .git denies")
+    switched = git("-C", str(worktree), "checkout", "-q", "-B", "fm/task")
     listed = git("-C", str(worktree), "branch", "--list", "fm/task")
     remote = git("-C", str(worktree), "config", "--get", "remote.no-mistakes.url")
     upstream = git("-C", str(worktree), "config", "--get", "branch.fm/task.remote")
     resolved = git("-C", str(worktree), "rev-parse", "--path-format=absolute", "--git-common-dir", "--absolute-git-dir")
-    committed = git("-C", str(worktree), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "core.hooksPath=/dev/null",
-                    "commit", "-q", "--allow-empty", "-m", "after the own .git denies")
-    results["own-git-work"] = (status.returncode == 0 and listed.stdout.split() == ["*", "fm/task"]
-                               and remote.stdout.strip() == manifest["own_gate"] and upstream.stdout.strip() == "no-mistakes"
-                               and resolved.stdout.split() == [common, str(gitdir)] and committed.returncode == 0)
+    fetched = git("-C", str(worktree), "fetch", "-q", "no-mistakes")
+    collected = git("-C", str(worktree), "gc", "-q", errors="replace")
+    after = git("-C", str(worktree), "status", "--porcelain")
+    work = {"status": status.returncode == 0, "add": added.returncode == 0, "commit": committed.returncode == 0,
+            "checkout-own-branch": switched.returncode == 0, "branch-list": listed.stdout.split() == ["*", "fm/task"],
+            "config": remote.stdout.strip() == manifest["own_gate"] and upstream.stdout.strip() == "no-mistakes",
+            "rev-parse": resolved.stdout.split() == [common, str(gitdir)], "fetch": fetched.returncode == 0, "gc": collected.returncode == 0,
+            "status-after": after.returncode == 0 and after.stdout == status.stdout}
+    results["own-git-work"] = all(work.values())
+    if not results["own-git-work"]:
+        print(f"own git work: {work} gc: {collected.stderr[-400:]} fetch: {fetched.stderr[-400:]}", file=sys.stderr)
+    # Adding a worktree at another path writes a new folder below the shared
+    # worktrees folder.
+    other_path = Path(os.environ["TMPDIR"]) / "other-worktree"
+    added_tree = git("-C", str(worktree), "worktree", "add", "-q", "--detach", str(other_path))
+    results["refused-other-worktree-add"] = (added_tree.returncode != 0 and f"{common}/worktrees/other-worktree" in added_tree.stderr
+                                             and "Operation not permitted" in added_tree.stderr)
+    if added_tree.returncode == 0:
+        git("-C", str(worktree), "worktree", "remove", "--force", str(other_path))
     return results
 
 
@@ -1233,7 +1252,7 @@ REFUSAL = "EPERM Operation not permitted"
 # the path a reader would follow once the tree took that folder's place.
 PREPARED = {"approvals": "task.json", "drop": "task/record.json", "lifecycle": "owned-paths-approvals/task.json",
             "common": LIFECYCLE + "/owned-paths-approvals/task.json",
-            "project": ".git/" + LIFECYCLE + "/owned-paths-approvals/task.json"}
+            "project": ".git/" + LIFECYCLE + "/owned-paths-approvals/task.json", "worktree": ".git", "gitdir": "commondir"}
 # Each case: the layout laid out before it, the profile rules that must all be
 # removed for it to go through (none for a write Vernant needs), and whether,
 # once it goes through, a record or the worker's own .git file or commondir
@@ -1278,6 +1297,10 @@ LIFECYCLE_CASES = {
     "own-commondir-write": ("empty", ("own-commondir",), True),
     "own-commondir-replace": ("empty", ("own-commondir",), True),
     "own-commondir-hard-link-out": ("empty", ("own-commondir",), True),
+    "swap-worktree": ("empty", ("worktree",), True),
+    "move-worktree-then-in": ("empty", ("worktree",), True),
+    "swap-gitdir": ("empty", ("gitdir",), True),
+    "move-gitdir-then-in": ("empty", ("gitdir",), True),
     "replace-empty-approvals": ("records-empty", ("approvals",), True),
     "replace-empty-drop": ("records-empty", ("drop",), True),
     "swap-approvals": ("records-empty", ("approvals",), True),
@@ -1309,10 +1332,11 @@ LIFECYCLE_CASES = {
 # A copy of the head profile without each rule's lines: approvals and drop
 # are a record folder's own denies, lifecycle the lifecycle folder's literal
 # deny, common and project every deny naming that folder or a folder above
-# it, and own-git-file and own-commondir the deny on the worker's own .git
-# file and on its commondir.
+# it, own-git-file and own-commondir the deny on the worker's own .git file
+# and on its commondir, and worktree and gitdir the literal deny on the
+# worker's own worktree folder and on its gitdir folder.
 LIFECYCLE_MUTANTS = (("approvals",), ("drop",), ("lifecycle",), ("lifecycle", "approvals"), ("common",), ("project",), ("own-git-file",),
-                     ("own-commondir",))
+                     ("own-commondir",), ("worktree",), ("gitdir",))
 # With only the lifecycle folder's deny removed, a lifecycle folder made under
 # another spelling holds record folders whose path the record denies may not
 # name; no measurement covers that cell, so it is reported, not judged.
@@ -1352,6 +1376,7 @@ def lifecycle_steps(case, p):
     upper_life, kelvin_life = c / LIFECYCLE.upper(), c / LIFECYCLE.replace("k", KELVIN)
     upper_a, long_s_a, upper_d = life / "OWNED-PATHS-APPROVALS", life / f"owned-path{LONG_S}-approvals", life / "CAPTAIN-DROP"
     own_git, commondir = p["worktree"] / ".git", p["gitdir"] / "commondir"
+    wt, gitdir = p["worktree"], p["gitdir"]
     manifest, receipts = life / "0123456789abcdef.json", life / "retired/0123456789abcdef"
     receipt = receipts / ("0" * 64 + ".json")
 
@@ -1429,6 +1454,12 @@ def lifecycle_steps(case, p):
         "own-commondir-write": [lambda: commondir.write_text(f"{s}\n")],
         "own-commondir-replace": [replace(commondir)],
         "own-commondir-hard-link-out": [lambda: os.link(commondir, s / "commondir-alias"), append(s / "commondir-alias")],
+        # A prepared folder holding a repointed .git file or commondir in
+        # place of the worker's own worktree or gitdir.
+        "swap-worktree": [lambda: swap(prep["worktree"], wt)],
+        "move-worktree-then-in": [lambda: os.rename(wt, s / "moved-worktree"), lambda: os.rename(prep["worktree"], wt)],
+        "swap-gitdir": [lambda: swap(prep["gitdir"], gitdir)],
+        "move-gitdir-then-in": [lambda: os.rename(gitdir, s / "moved-gitdir"), lambda: os.rename(prep["gitdir"], gitdir)],
         "replace-empty-approvals": [lambda: os.rename(prep["approvals"], a)],
         "replace-empty-drop": [lambda: os.rename(prep["drop"], d)],
         "swap-approvals": [lambda: swap(prep["approvals"], a)],
@@ -1482,8 +1513,8 @@ def remove(path):
 
 
 def restore_ancestors(p):
-    """Put back a project or shared Git directory that a case moved or swapped away."""
-    for key in ("project", "common"):
+    """Put back a project, shared Git directory, worktree or gitdir that a case moved or swapped away."""
+    for key in ("project", "common", "gitdir", "worktree"):
         target, moved, prepared = p[key], p["scratch"] / f"moved-{key}", p["scratch"] / f"prep-{key}"
         if os.path.lexists(moved):
             if os.path.lexists(target):
@@ -1514,7 +1545,7 @@ def lay_out_lifecycle(p, layout, originals):
         write(p["drop"] / "t1/captain-words.txt", WORDS)
     for key, relative in PREPARED.items():
         write(p["scratch"] / f"prep-{key}" / relative, FORGED)
-    for key in ("common", "project"):
+    for key in ("common", "project", "gitdir", "worktree"):
         write(p["scratch"] / f"prep-{key}" / "prepared-marker", "")
     write(p["scratch"] / "forged.json", FORGED)
 
@@ -1614,6 +1645,8 @@ def lifecycle_rule_lines(rule, lines, p, built_with):
         wanted = {f"(deny file-write* (literal {json.dumps(str(p['worktree'] / '.git'))}))"}
     elif rule == "own-commondir":
         wanted = {f"(deny file-write* (literal {json.dumps(str(p['gitdir'] / 'commondir'))}))"}
+    elif rule in ("worktree", "gitdir"):
+        wanted = {f"(deny file-write* (literal {json.dumps(str(p[rule]))}))"}
     else:
         named = {str(p[rule])} | {str(parent) for parent in p[rule].parents}
         wanted = set()
@@ -1668,6 +1701,7 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
         spec = json.dumps(dict(specs[worker], case=case))
         probe = subprocess.run(sandbox + [sys.executable, __file__, "--lifecycle", spec], capture_output=True, text=True, env=env)
         after = lifecycle_observed(p)
+        restore_ancestors(p)
         result = json.loads(probe.stdout) if probe.returncode == 0 and probe.stdout.strip() else {"exit": probe.returncode, "stderr": probe.stderr[-400:]}
         result["changed"] = after["watched"] != before["watched"]
         report[f"{label} {case}"] = result

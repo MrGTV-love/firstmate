@@ -26,7 +26,10 @@ harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
 and other projects' no-mistakes gate repositories. Each protected folder and
 every folder above it also refuses rename and deletion. The worker's own .git
-file and <gitdir>/commondir refuse every write. For a project whose
+file and <gitdir>/commondir refuse every write, and its worktree, its gitdir and
+every folder above them refuse every write to their own path, rename and
+deletion among them, so no prepared folder holding a repointed .git file or
+commondir can take their place. For a project whose
 checked-out tree holds scripts/git_management/worktree_lifecycle.py the build
 first creates an absent vernant-worktree-lifecycle folder. --data is this
 task's directory below the home data root. The build refuses while a protected ref
@@ -448,7 +451,7 @@ def build(args):
     lines += [f"(deny file-write* {item})" for item in harness_protected]
     # A protected folder, a folder holding protected entries, and every folder
     # above them refuse rename and deletion; creating children stays allowed.
-    anchors = deny + git_shared + claude_children + [state, common, str(gates), home + "/tmp", claude_tmp]
+    anchors = deny + git_shared + claude_children + [state, common, str(gates), home + "/tmp", claude_tmp, worktree, gitdir]
     fixed = []
     for anchor in anchors:
         path = Path(anchor)
