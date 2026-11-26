@@ -1266,8 +1266,15 @@ dup_snapshot() {  # <case-dir>
   git -C "$1/home/projects/p" for-each-ref
 }
 
-dup_note_of() {  # <case-dir> <id>: the stored note of a row, or nothing
-  wrapper_from_code "$1" show "$2" 2>&1 | sed -n 's/^  body: *//p' | head -1
+dup_note_of() {  # <case-dir> <id>: the last line of the row's whole body (its close note), or nothing
+  wrapper_from_code "$1" show "$2" --full 2>&1 | sed -n 's/^  body: *//p' | head -1 \
+    | perl -MJSON::PP -ne 'chomp; my $b = /^"/ ? JSON::PP->new->allow_nonref->decode($_) : $_; my @l = split /\n/, $b; print $l[-1] // "", "\n"'
+}
+
+dup_axi_direct() {  # <case-dir> <tasks-axi args...>: a close the wrapper does not make (teardown's own call, a PR link)
+  local dir=$1
+  shift
+  (cd "$dir/home" && TASKS_AXI_FILE="$dir/home/data/backlog.md" tasks-axi "$@")
 }
 
 # One refused close: exit 2, a message naming the fact, and nothing changed.
@@ -1316,21 +1323,40 @@ dod.md" "$(ls -A "$dir/home/data/$id")" "$kind $spelling $form: the close wrote 
     assert_equals "" "$(ls -A "$dir/home/state")" "$kind: a close left a state file"
   done
 
-  # The survivor may already be Done by a report or the captain's drop (a merged pull request
-  # is the same Done state).
+  # A Done survivor counts only when it finished by a merged PR or a report; one the captain
+  # dropped, or one whose work is only preserved in a bundle, did not survive.
   dir=$(make_dup_case dup-done-survivors)
-  mkdir -p "$dir/home/data/by-report" "$dir/home/data/by-drop"
+  mkdir -p "$dir/home/data/by-report"
   printf '# findings\n' > "$dir/home/data/by-report/report.md"
   printf 'Drop it.\n' > "$dir/words"
-  wrapper_from_code "$dir" add by-report "a scout that reported" --kind scout --repo p >/dev/null
-  wrapper_from_code "$dir" add by-drop "a ship the captain dropped" --kind ship --repo p >/dev/null
+  wrapper_from_code "$dir" add by-report "a scout that reported" --kind scout --repo p --body "plan line" >/dev/null
+  wrapper_from_code "$dir" add by-pr "a ship that merged" --kind ship --repo p --body "plan line" >/dev/null
+  wrapper_from_code "$dir" add by-drop "a ship the captain dropped" --kind ship --repo p --body "plan line" >/dev/null
+  wrapper_from_code "$dir" add by-bundle "a ship kept only in a bundle" --kind ship --repo p --body "plan line" >/dev/null
   wrapper_from_code "$dir" task close by-report --report data/by-report/report.md >/dev/null || fail "could not close the report survivor"
+  dup_axi_direct "$dir" "done" by-pr --pr https://github.com/o/r/pull/9 >/dev/null || fail "could not close the PR survivor"
   wrapper_from_code "$dir" "done" by-drop --drop-file "$dir/words" >/dev/null || fail "could not close the dropped survivor"
-  for id in by-report by-drop; do
+  dup_axi_direct "$dir" "done" by-bundle --note "preserved in bundle /bundles/by-bundle.bundle, not landed" >/dev/null \
+    || fail "could not close the bundled survivor"
+  for id in by-report by-pr; do
     wrapper_from_code "$dir" add "twin-$id" "twin of $id" --kind ship --repo p >/dev/null
     wrapper_from_code "$dir" "done" "twin-$id" --duplicate-of "$id" >/dev/null 2>&1 || fail "a Done survivor ($id) was refused"
     assert_equals "duplicate of $id" "$(dup_note_of "$dir" "twin-$id")" "the note for the $id survivor"
   done
+  wrapper_from_code "$dir" add twin-by-drop "twin of by-drop" --kind ship --repo p >/dev/null
+  dup_refused "$dir" "a survivor the captain dropped" "closed by the captain's drop" "done" twin-by-drop --duplicate-of by-drop
+  wrapper_from_code "$dir" add twin-by-bundle "twin of by-bundle" --kind ship --repo p >/dev/null
+  dup_refused "$dir" "a survivor preserved in a bundle" "preserved in a bundle, not landed" "done" twin-by-bundle --duplicate-of by-bundle
+
+  # A firstmate row's project is the home itself, as bin/fm-dispatch-project.py resolves it.
+  dir=$(make_dup_case dup-firstmate-repo)
+  fm_git_init_commit "$dir/home"
+  wrapper_from_code "$dir" add fm-dup "firstmate work filed twice" --kind ship --repo firstmate >/dev/null
+  wrapper_from_code "$dir" add fm-dup-b "firstmate work filed twice again" --kind ship --repo firstmate >/dev/null
+  out=$(wrapper_from_code "$dir" "done" fm-dup --duplicate-of keep 2>&1) || fail "a firstmate row was refused: $out"
+  [ "$(row_state "$dir" fm-dup)" = x ] || fail "the firstmate row did not close"
+  git -C "$dir/home" branch fm/fm-dup-b
+  dup_refused "$dir" "a firstmate row with a branch in the home" "has a branch (refs/heads/fm/fm-dup-b)" "done" fm-dup-b --duplicate-of keep
 
   # Near misses do not block: other ids, a longer branch name, another task's records.
   dir=$(make_dup_case dup-near-misses)
@@ -1440,6 +1466,9 @@ dup_apply_flip() {  # <case-dir> <flip>
     c-bare-branch)
       git -C "$p" branch dup
       FLIP_WANT="has a branch (refs/heads/dup)"; FLIP_UNDO="git -C '$p' branch -q -D dup" ;;
+    c-slashless-prefix)
+      git -C "$p" branch cx-dup
+      FLIP_WANT="has a branch (refs/heads/cx-dup)"; FLIP_UNDO="git -C '$p' branch -q -D cx-dup" ;;
     c-remote-ref)
       git -C "$p" update-ref refs/remotes/origin/fm/dup HEAD
       FLIP_WANT="has a branch (refs/remotes/origin/fm/dup)"; FLIP_UNDO="git -C '$p' update-ref -d refs/remotes/origin/fm/dup" ;;
@@ -1479,6 +1508,19 @@ dup_apply_flip() {  # <case-dir> <flip>
       wrapper_from_code "$dir" "done" keep --duplicate-of dup >/dev/null || fail "could not close the survivor as a duplicate of the row"
       wrapper_from_code "$dir" add other "a third item" --kind ship --repo p >/dev/null
       FLIP_WANT="is itself closed as a duplicate"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of other)" ;;
+    h-survivor-with-a-body-is-a-duplicate)
+      wrapper_from_code "$dir" add other "a third item" --kind ship --repo p >/dev/null
+      wrapper_from_code "$dir" add keepb "a survivor with a body" --kind ship --repo p --body "plan line" >/dev/null
+      wrapper_from_code "$dir" "done" keepb --duplicate-of other >/dev/null || fail "could not close the survivor as a duplicate"
+      FLIP_ARGS=("done" dup --duplicate-of keepb)
+      FLIP_WANT="is itself closed as a duplicate"; FLIP_UNDO="FLIP_ARGS=(done dup --duplicate-of other)" ;;
+    h-cycle-with-a-body)
+      wrapper_from_code "$dir" add twa "a twin with a body" --kind ship --repo p --body "plan line" >/dev/null
+      wrapper_from_code "$dir" add twb "its twin with a body" --kind ship --repo p --body "plan line" >/dev/null
+      wrapper_from_code "$dir" "done" twb --duplicate-of twa >/dev/null || fail "could not close the twin as a duplicate of the row"
+      wrapper_from_code "$dir" add other "a third item" --kind ship --repo p >/dev/null
+      FLIP_ARGS=("done" twa --duplicate-of twb)
+      FLIP_WANT="is itself closed as a duplicate"; FLIP_UNDO="FLIP_ARGS=(done twa --duplicate-of other)" ;;
     i-in-flight)
       wrapper_from_code "$dir" start dup >/dev/null || fail "could not start the row"
       FLIP_WANT="not a plain queued row"; FLIP_UNDO="wrapper_from_code '$dir' reopen dup >/dev/null" ;;
@@ -1548,9 +1590,9 @@ dup_run_flip() {  # <case-dir>: runs FLIP_ARGS under FLIP_ENV; sets FLIP_OUT and
 }
 
 DUP_FLIPS="a-task-record b-status b-inbox b-launch-models b-control-file
-c-default-prefix c-custom-prefix c-bare-branch c-remote-ref d-worktree d-recorded-copy
+c-default-prefix c-custom-prefix c-slashless-prefix c-bare-branch c-remote-ref d-worktree d-recorded-copy
 e-extra-file e-hidden-file e-subdirectory e-brief-is-a-link f-survivor-missing g-survivor-is-the-row
-h-survivor-is-a-duplicate h-cycle i-in-flight i-blocked-by-edge i-captain-hold i-plain-hold
+h-survivor-is-a-duplicate h-cycle h-survivor-with-a-body-is-a-duplicate h-cycle-with-a-body i-in-flight i-blocked-by-edge i-captain-hold i-plain-hold
 j-drop-file j-pr j-report j-note k-no-repo-field k-project-missing k-project-not-a-repository
 k-project-inside-another-repository k-projects-path-unresolvable l-another-row-waits
 m-open-call-with-the-pr-close-flag"
@@ -1742,8 +1784,8 @@ test_duplicate_close_checks_are_each_load_bearing() (
   done <<'TABLE'
 a-task-record|a-task-record|e-extra-file
 b-dispatch-files|b-status b-inbox b-launch-models b-control-file|a-task-record
-c-any-branch|c-default-prefix c-custom-prefix c-bare-branch c-remote-ref|a-task-record
-c-default-prefix-only|c-custom-prefix|c-default-prefix
+c-any-branch|c-default-prefix c-custom-prefix c-slashless-prefix c-bare-branch c-remote-ref|a-task-record
+c-default-prefix-only|c-custom-prefix c-slashless-prefix|c-default-prefix
 d-copies|d-worktree|a-task-record
 d-e-copies-and-work-dir|d-recorded-copy|a-task-record
 e-work-dir|e-extra-file e-hidden-file e-subdirectory e-brief-is-a-link|a-task-record

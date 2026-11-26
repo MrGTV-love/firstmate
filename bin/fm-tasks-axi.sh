@@ -79,18 +79,26 @@
 #     edge), no other row waits on it, and none of this exists: its task record, a
 #     state/<id>.status, .inbox, .launch-models, .backlog-close, .control-exit or
 #     .control-relaunch file or another state/.control-<id>* file, any ref in its
-#     project repository ($FM_PROJECTS_OVERRIDE or $FM_HOME/projects, named by the
-#     row's repo field) whose name ends in /<id> under any branch prefix, a
-#     `git worktree list` copy whose path holds an <id> component, data/<id>/skipped-copies.tsv,
-#     or any entry in data/<id>/ besides plain brief.md and dod.md. The survivor must be
-#     another row that exists and is not itself closed as a duplicate (one already Done
-#     by a merged PR or a report is fine). An unreadable repository, a missing repo
-#     field, or an unreadable row, backlog, or directory refuses. Combining it with
-#     --drop-file, --pr, --report, or --note refuses, as does any row that is not a
-#     queued ship or scout. Not covered (owner: Main): a treehouse lease no worktree
-#     list or skipped-copies.tsv shows, a branch that exists only on the remote, a direct
-#     tasks-axi call that skips this wrapper, and a survivor closed by another call
-#     between the check and the close (the survivor row is not locked).
+#     project repository whose last name part is <id> or ends in <id> after a /, -, _
+#     or . (so a branch under any branch prefix), a `git worktree list` copy whose path
+#     holds an <id> component, data/<id>/skipped-copies.tsv, or any entry in data/<id>/
+#     besides plain brief.md and dod.md. The project repository is the one the row's
+#     repo field names, resolved as bin/fm-dispatch-project.py resolves it: $FM_HOME
+#     itself for repo firstmate, else $FM_PROJECTS_OVERRIDE or $FM_HOME/projects. A copy
+#     is seen only when `git worktree list` shows a path with an <id> part or when the
+#     task branch is checked out in it (the branch check refuses that branch). The
+#     survivor must be another row that exists with no body line starting "duplicate of ";
+#     a Done survivor must have finished by a merged PR or a report (a pr: or report:
+#     link), so one closed by the captain's drop ("dropped") or by a "preserved in bundle
+#     ..., not landed" note refuses. An unreadable repository, a
+#     missing repo field, or an unreadable row, backlog, or directory refuses. Combining
+#     it with --drop-file, --pr, --report, or --note refuses, as does any row that is
+#     not a queued ship or scout. Not covered (owner: Main): a leased treehouse slot
+#     whose path holds no <id> part and which is on another branch or detached (git lists
+#     it, yet it passes the copy check; only the branch check, the task-record check, and
+#     the data/<id>/ allowlist protect it), a branch that exists only on the remote, a
+#     direct tasks-axi call that skips this wrapper, and a survivor closed by another
+#     call between the check and the close (the survivor row is not locked).
 # FM_TASKS_AXI_REFUSE_OPEN_CALL=1 (set only by bin/fm-pr-close-items.sh) makes that guard
 # also refuse an open captain hold on a row of any kind, inside the lock; without it a
 # row that is not a ship or scout closes as before.
@@ -317,13 +325,12 @@ dup_refuse_task_record() {  # <id>
 
 dup_refuse_dispatch_files() {  # <id>: status, inbox, launch models, an end-of-run marker, or another control file
   local id=$1 path own_owner
-  # The lock this command holds is a link to its owner directory; neither is a dispatch file.
+  # The lock this command holds is a link to its owner directory beside it; neither is a dispatch file.
   own_owner=$(readlink "$TASK_CONTROL_LOCK" 2>/dev/null) || own_owner=
-  case "$own_owner" in ''|/*) ;; *) own_owner="$task_state/$own_owner" ;; esac
   for path in "$task_state/$id.status" "$task_state/$id.inbox" "$task_state/$id.launch-models" \
     "$task_state/$id.backlog-close" "$task_state/$id.control-exit" "$task_state/$id.control-relaunch" \
     "$task_state"/.control-"$id"*; do
-    [ "$path" != "$TASK_CONTROL_LOCK" ] && [ "$path" != "$own_owner" ] || continue
+    [ "${path##*/}" != "${TASK_CONTROL_LOCK##*/}" ] && [ "${path##*/}" != "${own_owner##*/}" ] || continue
     ! dup_present "$path" || fail "$id has a dispatch file ($path), so it was started"
   done
 }
@@ -331,21 +338,25 @@ dup_refuse_dispatch_files() {  # <id>: status, inbox, launch models, an end-of-r
 dup_project_dir() {  # <id> <repo-from-the-row>: sets DUP_PROJECT to the repository's own directory
   local id=$1 repo=$2 projects dir prefix
   case "$repo" in ''|-|.|..|*[!A-Za-z0-9._-]*) fail "$id has no usable repo field ('$repo'), so its project cannot be checked for work" ;; esac
-  projects=${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}
-  case "$projects" in /*) ;; *) projects="$CALLER_DIR/$projects" ;; esac
-  dir="$projects/$repo"
+  if [ "$repo" = firstmate ]; then
+    dir=$FM_HOME
+  else
+    projects=${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}
+    case "$projects" in /*) ;; *) projects="$CALLER_DIR/$projects" ;; esac
+    dir="$projects/$repo"
+  fi
   [ -d "$dir" ] || fail "the project $repo of $id is not at $dir, so its branches and copies cannot be checked"
   prefix=$(dup_git "$dir" rev-parse --show-prefix 2>/dev/null) && [ -z "$prefix" ] \
     || fail "$dir is not a git repository of its own, so the branches and copies of $id cannot be checked"
   DUP_PROJECT=$dir
 }
 
-dup_refuse_branch() {  # <id> <project-dir>: any ref ending in /<id>, whatever the branch prefix
+dup_refuse_branch() {  # <id> <project-dir>: any ref whose last part is the id or ends in it after a separator
   local id=$1 refs ref
   refs=$(dup_git "$2" for-each-ref --format='%(refname)') \
     || fail "the refs of $2 cannot be read, so a branch of $id cannot be ruled out"
   while IFS= read -r ref; do
-    case "$ref" in */"$id") fail "$id has a branch ($ref), so work may exist" ;; esac
+    case "${ref##*/}" in "$id"|*[-_.]"$id") fail "$id has a branch ($ref), so work may exist" ;; esac
   done <<< "$refs"
 }
 
@@ -380,23 +391,39 @@ dup_refuse_work_dir() {  # <id>: data/<id>/ holds at most the brief and the defi
   done <<< "$entries"
 }
 
-dup_refuse_survivor() {  # <id> <survivor-id>: it exists, is another row, and is not itself a duplicate close
-  local id=$1 keep=$2 out rc=0 state body
-  [ "$keep" != "$id" ] || fail "$id cannot be a duplicate of itself"
-  out=$(fm_backlog_row_show "$DATA" "$keep") || rc=$?
+dup_show_field() {  # <show-output> <key>: the decoded value of one field of `show --full`
+  local raw
+  raw=$(printf '%s\n' "$1" | sed -n "s/^  $2: //p" | head -1)
+  case "$raw" in
+    '"'*) perl -MJSON::PP -e 'print JSON::PP->new->allow_nonref->decode($ARGV[0]), "\n"' -- "$raw" 2>/dev/null ;;
+    *) printf '%s\n' "$raw" ;;
+  esac
+}
+
+dup_refuse_survivor() {  # <id> <survivor-id>: a row that exists, is no duplicate close, and when Done finished by a PR or report
+  local id=$1 keep=$2 out rc=0 state body links line
+  out=$(fm_backlog_row_show "$DATA" "$keep" --full) || rc=$?
   if [ "$rc" -ne 0 ]; then
     if printf '%s\n' "$out" | grep -q '^code: NOT_FOUND$'; then
       fail "the surviving item $keep is not in the backlog, so $id would be lost"
     fi
     fail "the surviving item $keep cannot be read: $(printf '%s\n' "$out" | sed -n '1p')"
   fi
-  state=$(printf '%s\n' "$out" | sed -n 's/^  state: *//p' | head -1)
-  [ -n "$state" ] || fail "the surviving item $keep has no readable state"
-  body=$(printf '%s\n' "$out" | sed -n 's/^  body: *//p' | head -1)
-  body=${body#\"}
-  if [ "$state" = "done" ]; then
-    case "$body" in "duplicate of "*) fail "the surviving item $keep is itself closed as a duplicate ($body); name the item that remains" ;; esac
-  fi
+  state=$(dup_show_field "$out" state) && [ -n "$state" ] || fail "the surviving item $keep has no readable state"
+  body=$(dup_show_field "$out" body) || fail "the surviving item $keep has no readable body"
+  links=$(dup_show_field "$out" links) || fail "the surviving item $keep has no readable links"
+  while IFS= read -r line; do
+    case "$line" in "duplicate of "*) fail "the surviving item $keep is itself closed as a duplicate ($line); name the item that remains" ;; esac
+  done <<< "$body"
+  [ "$state" = "done" ] || return 0
+  while IFS= read -r line; do
+    case "$line" in
+      dropped|"Deliverable of the finished work: dropped") fail "the surviving item $keep was closed by the captain's drop, so its work did not survive; ask the captain about $id" ;;
+      "preserved in bundle /"*", not landed"|"Deliverable of the finished work: preserved in bundle /"*", not landed") fail "the surviving item $keep was closed with its work preserved in a bundle, not landed, so its work did not survive; ask the captain about $id" ;;
+    esac
+  done <<< "$body"
+  [[ ",$links" =~ ,(pr|report): ]] \
+    || fail "the surviving item $keep is Done without a merged PR or a report, so its work did not survive; ask the captain about $id"
 }
 
 dup_refuse_dependents() {  # <id>: closing the row would unblock any row that waits on it
@@ -438,17 +465,14 @@ guard_duplicate() {  # <id> <survivor-id> <other-proof> <note-flag>
   dup_refuse_dependents "$id"
   GUARD_ARGS=(--note "duplicate of $keep")
   # The ledger records no deliverable for a duplicate close; --duplicate-of reads as evidence none.
-  [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ] || LEDGER_CLOSE_ARGS=(--duplicate-of "$keep")
+  LEDGER_CLOSE_ARGS=(--duplicate-of "$keep")
 }
 
 guard_completion() {
   local id=$TASK_ID pr=$TASK_PR report=$TASK_REPORT drop note=$TASK_NOTE proof=()
   drop=$(absolute_from_caller "$TASK_DROP")
   case "$TASK_COMMAND" in done|close) ;; *) return 0 ;; esac
-  [ "$TASK_CONTROL_LOCK_HELD" = 1 ] || {
-    [ -z "$TASK_DUP" ] || [ "$TASK_HELP" = 1 ] || fail "--duplicate-of needs the lifecycle locks, which this call does not hold"
-    return 0
-  }
+  [ "$TASK_CONTROL_LOCK_HELD" = 1 ] || return 0
   fm_backlog_row_probe "$DATA" "$id" || {
     [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && { [ -z "$TASK_DUP" ] || fail "$id is not in the backlog, so there is no row to close as a duplicate"; return 0; }
     fail "cannot identify the task being completed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
