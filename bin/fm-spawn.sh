@@ -565,12 +565,12 @@
 #   later get runs beneath that subshell, so an abort is settled and proved from the pane's own process table (closing
 #   the pane proves nothing about a get still running there), and nothing outside the record is left running. Closing
 #   the pane later (teardown closes the worker's window, which is this pane) does not release or reset a passed-over
-#   copy: Treehouse never hands a leased worktree, an ordinary or a recovered lease (`treehouse capabilities` reports
-#   persistent_recovered_leases), to a later get and never prunes it, even with no process inside, until
-#   `treehouse return <path>` releases it. An abort after a pass-over, before launch, instead interrupts any
-#   `treehouse get` in the pane's foreground and proves from the process table that those processes are gone and that the pane rests in a copy this spawn passed over or leased in
-#   place; anything else (a get still alive, a pane resting in another copy, a foreground the backend cannot read, which
-#   is interrupted all the same) is an error. Only tmux reads the foreground. Every other backend, Herdr flat or projected
+#   copy: Treehouse never prunes or resets a leased worktree, an ordinary or a recovered lease (`treehouse capabilities`
+#   reports persistent_recovered_leases), even with no process inside, until `treehouse return <path>` releases it.
+#   An abort after a pass-over, before launch, instead interrupts any `treehouse get` in the pane's foreground and
+#   proves from the process table that those processes are gone and that the pane rests in a copy this spawn passed
+#   over or leased in place; anything else (a get still alive, a pane resting in another copy, a foreground the
+#   backend cannot read, which is interrupted all the same) is an error. Only tmux reads the foreground. Every other backend, Herdr flat or projected
 #   included, always reports the abort as not clean: Herdr pass-over settlement and the Herdr projection branch
 #   (HERDR_PROJECTION_ABORT_CLEANUP, which a pass-over turns off) are untested, so no Herdr abort is ever called clean.
 #   Either way the pane is recorded, read back, in $DATA/<task>/acquisition-pane.tsv. Treehouse never frees a recovered lease by
@@ -6425,7 +6425,7 @@ spawn_settle_passed_over_pane() {
   fi
   case "$outcome" in
     get-cancelled | no-get)
-      echo "notice: acquisition pane $target ($T) is left open because its process tree holds a shell inside a copy this spawn passed over; $detail (record: $DATA/$ID/acquisition-pane.tsv)" >&2
+      echo "notice: acquisition pane $target ($T) is left open so the abort is proved from its process table; $detail (record: $DATA/$ID/acquisition-pane.tsv)" >&2
       return 0
       ;;
   esac
@@ -6750,7 +6750,7 @@ spawn_pass_over_copy() {
 # A copy that is not plainly clean, idle and behind the target is never used and never touched
 # (bin/fm-slot-provision-lib.sh owns the rules). Treehouse resets a slot when its shell exits,
 # so the skipped copy is first leased durably, in place and without touching it: treehouse
-# then never hands it out again and never resets it, and its owner can still find it. Only
+# then never prunes or resets it, and its owner can still find it. Only
 # the claim this spawn just wrote is released. Then a second `treehouse get` in the same pane
 # hands another slot. A relaunch keeps the copy its task's work lives in, so it never skips.
 spawn_skip_copy() {

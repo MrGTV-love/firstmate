@@ -3503,7 +3503,7 @@ teardown_skipped_copies() {
     if [ "$procs" = '?' ]; then
       echo "warning: leaving $copy leased to $holder: its pool row has no list of the processes running in it, so nobody is not proved (skipped for: $reason)" >&2
     elif [ "${procs:-1}" != 0 ]; then
-      echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it${pane:+ (acquisition pane $pane of the spawn may still stand in it)} (skipped for: $reason)" >&2
+      echo "warning: leaving $copy leased to $holder: ${procs:-some} process(es) are running inside it${pane:+ (acquisition pane $pane of the spawn stood in it; teardown closed that window)} (skipped for: $reason)" >&2
     elif ! dirt=$(git -C "$canonical" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) || [ -n "$dirt" ]; then
       echo "warning: leaving $copy leased to $holder: it is not clean, or its status cannot be read (skipped for: $reason)" >&2
     elif ! hidden_work=$(fm_slot_hidden_work "$canonical") || [ -n "$hidden_work" ]; then

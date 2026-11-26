@@ -4600,7 +4600,7 @@ SH
     || fail "skipped-copies: the passed-over lease with a pane was returned"$'\n'"$(cat "$log")"
   ! grep -Fq "return $case_dir/passed-old-row" "$log" \
     || fail "skipped-copies: the four-column passed-over lease was returned"$'\n'"$(cat "$log")"
-  grep -Fq "process(es) are running inside it (acquisition pane @41 of the spawn may still stand in it)" "$case_dir/stderr" \
+  grep -Fq "process(es) are running inside it (acquisition pane @41 of the spawn stood in it; teardown closed that window)" "$case_dir/stderr" \
     || fail "skipped-copies: the refusal for the busy copy did not name its acquisition pane"$'\n'"$(cat "$case_dir/stderr")"
   grep -Fxq "$busy"$'\t'"dirty_tree"$'\t'"firstmate-skipped:task-x1"$'\t'"1"$'\t'"@41" "$rec" \
     || fail "skipped-copies: the busy copy's row lost its acquisition pane"$'\n'"$(cat "$rec")"
