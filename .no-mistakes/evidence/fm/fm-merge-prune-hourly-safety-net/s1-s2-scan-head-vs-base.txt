@@ -1,0 +1,9 @@
+head=88472dd2ee1b6896727fe3c4fa4fd68d31cf7e47
+== scan at HEAD ==
+fm-unbuilt-prune-claims: ok files=1115
+rc=0
+== scan at BASE fa99cccc02fc7b1bb14365dd38d2bc270ccd4a4a (git archive into scratch) ==
+bin/fm-merge-prune.sh:9: A merged task's pool copy used to stay until an hourly safety net or a human removed it.
+bin/fm-merge-prune.sh:138: The hourly `treehouse prune --all --yes` safety net is not duplicated.
+docs/configuration.md:898: The hourly `treehouse prune --all --yes` safety net is unchanged, and the prune does not alter what teardown itself preserves or refuses: the fallback
+rc=1

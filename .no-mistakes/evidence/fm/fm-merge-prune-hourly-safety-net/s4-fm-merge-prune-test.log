@@ -1,0 +1,6 @@
+head=88472dd2ee1b6896727fe3c4fa4fd68d31cf7e47
+bash -n rc=0
+ok - only a verified merge of the recorded PR arms the prune, and arming is idempotent
+ok - remote tasks, secondmates and a disabled setting are never armed
+ok - a record that is not due waits, and --now overrides
+Terminated: 15

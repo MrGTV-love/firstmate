@@ -1,0 +1,11 @@
+head=88472dd2ee1b6896727fe3c4fa4fd68d31cf7e47
+== A: inject a bare-'not' timed claim into a scratch copy of docs/configuration.md ==
+docs/configuration.md:5193: The nightly treehouse prune job is not changed by this script.
+rc=1
+== B: also inject a cron safety net claim split over two comment lines in a scratch bin script ==
+bin/fm-fake-net.sh:1: !/usr/bin/env bash The cron-driven treehouse safety net still runs every hour.
+docs/configuration.md:5193: The nightly treehouse prune job is not changed by this script.
+rc=1
+== C: replace both with the closed-phrase form ==
+fm-unbuilt-prune-claims: ok files=959
+rc=0
