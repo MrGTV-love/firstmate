@@ -93,13 +93,18 @@ Pipeline starts:
     whatever its recorded pid) or while its launch gate waits in
     this queue with no held attempt record; its resident memory or A,
     whichever is larger, when the reading sees it; R while the reading cannot see it.
-    Beside that, each run whose launch history is not shown complete is charged
-    one more R (history_units). A history is complete only when the pool's
+    Beside that, each run created after activation whose launch history is not
+    shown complete is charged one more R (history_units). A history is complete only when the pool's
     gate-activation.json (activated_at and gate_sha256, written once by
     `activate`) is dated before the run's creation, every invocation row of the
     run names a gated agent, and its rows and attempt records bind one to one by
-    session key. A run created before activation therefore keeps that R while it
-    is counted, queued or holds an attempt. S is the largest per-run peak of every recorded
+    session key. A run created before activation (every run while no record
+    exists) is instead charged the larger of its demand and R while it is
+    counted, queued or holds an attempt, so until activation and the drain of
+    those runs a CI waiter, a run the reading cannot see and a visible active
+    run (while A is at most R) are each charged no more beyond what they hold
+    than the base rule's R per run; a run with no open step row is charged R
+    beside what it holds, min(R, that memory) more than the base. S is the largest per-run peak of every recorded
     no-mistakes run with at least 2 readings, and R the 75th percentile (nearest
     rank) of those peaks leaving out runs that are status-running with
     ci_ready_at IS NULL, read from the root home's .memory-calibration.json
@@ -147,8 +152,10 @@ Pipeline starts:
   - The start lock serializes each decision with the publication of its
     admitted start's pending reservation (a locked pending-*.lock naming the
     admitting pid, the admitted no-mistakes arguments and whether they were
-    read from a shell's command string, the running run IDs of the decision
-    and the start's binding), then is released. Every later decision counts each
+    read from text that expands them later (a shell's command string or an
+    env -S string), the running run IDs of the decision and the start's
+    binding, read from the directory its client runs in: the admitting one, or
+    the one env -C/--chdir names), then is released. Every later decision counts each
     admitted start at the full R, and as one run in the count fallback and the
     one-start minimum (live_pending), except while a run that decision counts
     as active is on the repository and branch the start was bound to when it
@@ -160,9 +167,11 @@ Pipeline starts:
     it is a proven reattach (proven_reattach): `axi run` with no --launch-nonce
     whose recorded HEAD is the run's head_sha or submitted_head_sha. Every other
     covered start (a rerun, a caller's own --launch-nonce, a HEAD that differs
-    or is not known, a word read from a shell's command string that the shell
-    expands later, which may hide a nonce; a word of a real argument vector is
-    never refused for its characters) may replace the run, whose own charge can be far below R
+    or is not known, a word read from a shell's command string or an env -S
+    string that is expanded later, which may hide a nonce; a word of a real
+    argument vector is never refused for its characters, and every word of a
+    start through env -S is read as expandable, those after its string
+    included, an overcharge never an undercount) may replace the run, whose own charge can be far below R
     (a CI waiter is charged what it holds), so the branch carries the larger
     of the run's demand and R, once per branch however many such starts it
     has. The cost: while such a start's command runs, a run it only drives is
@@ -872,15 +881,17 @@ SHELL_OPERATOR_CHARS = "();<>|&\n"
 
 
 # Wrappers that run their operand as the program: (short options that take a value, long options that do).
-# env -S/--split-string's value is a command line whose words take its place.
+# env -S/--split-string's value is a command line whose words take its place; env -C/--chdir's value is the directory
+# the program runs in.
 TRANSPARENT = {"env": ("uCPS", ("--unset", "--chdir", "--split-string")), "nice": ("n", ("--adjustment",)),
                "nohup": ("", ()), "command": ("", ()), "exec": ("a", ()), "time": ("of", ("--output", "--format")),
                "stdbuf": ("ioe", ("--input", "--output", "--error"))}
 ROUTES = ("fm-mem-guard.sh", "fm-duration.py", "fm-cpu-pass.sh", "fm-cpu-pass.py")
 
 
-def wrapper_operands(name: str, rest: List[str]) -> Optional[Tuple[List[str], Optional[str]]]:
-    """(the words wrapper NAME runs as its program, an env split string to read first), or None when it runs none.
+def wrapper_operands(name: str, rest: List[str]) -> Optional[Tuple[List[str], Optional[str], Optional[str]]]:
+    """(the words wrapper NAME runs as its program, an env split string to read first, the env -C directory it runs
+    them in), or None when it runs none.
 
     Short options may be clustered and a valued one takes the rest of its word
     or the next word; a long option takes its =value or the next word. env also
@@ -888,22 +899,25 @@ def wrapper_operands(name: str, rest: List[str]) -> Optional[Tuple[List[str], Op
     program is, so they run nothing.
     """
     short, valued = TRANSPARENT[name]
+    chdir = None
     while rest:
         word = rest[0]
         if word == "--":
-            return rest[1:], None
+            return rest[1:], None, chdir
         if name == "env" and (word == "-" or not word.startswith("-") and "=" in word):
             rest = rest[1:]
             continue
         if not word.startswith("-") or word == "-":
-            return rest, None
+            return rest, None, chdir
         rest = rest[1:]
         if word.startswith("--"):
             option, equals, value = word.partition("=")
             if option in valued and not equals:
                 value, rest = (rest[0] if rest else ""), rest[1:]
             if option == "--split-string":
-                return rest, value
+                return rest, value, chdir
+            if name == "env" and option == "--chdir":
+                chdir = value
             continue
         for index, letter in enumerate(word[1:], 1):
             if name == "command" and letter in "vV":
@@ -913,9 +927,11 @@ def wrapper_operands(name: str, rest: List[str]) -> Optional[Tuple[List[str], Op
                 if not value:
                     value, rest = (rest[0] if rest else ""), rest[1:]
                 if name == "env" and letter == "S":
-                    return rest, value
+                    return rest, value, chdir
+                if name == "env" and letter == "C":
+                    chdir = value
                 break
-    return rest, None
+    return rest, None, chdir
 
 
 def fresh_pipeline_start(command: List[str]) -> bool:
@@ -923,14 +939,16 @@ def fresh_pipeline_start(command: List[str]) -> bool:
     return start_route(command) is not None
 
 
-def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool]]:
-    """(no-mistakes arguments, whether another admission route sits in between, whether the arguments were read from a
-    shell's command string before the shell expanded them) of the new run COMMAND begins, or None.
+def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool, Optional[str]]]:
+    """(no-mistakes arguments, whether another admission route sits in between, whether the arguments were read from
+    text that expands them later (a shell's command string, or an env -S string, which expands ${VAR}), the directory
+    the client runs in relative to this one (env -C/--chdir), or None for this one) of the new run COMMAND begins, or None.
 
     Only the executable position counts: leading VAR=value words, the
     transparent wrappers env, nice, nohup, command, exec, time and stdbuf with
     their options (wrapper_operands; env -S/--split-string's words read in its
-    place), a Python interpreter or a shell running a script, a shell's -c string
+    place, env -C/--chdir's directory joined onto the client's), a Python
+    interpreter or a shell running a script, a shell's -c string
     (read as a command line, see shell_string_start) and the admission routes
     fm-mem-guard.sh run --, fm-duration.py run KEY -- and fm-cpu-pass pipeline-start --
     are followed to the program they run. Any other program's arguments are data,
@@ -940,7 +958,8 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool]]:
     route flag is true when an admission route other than this admission's own
     measured runner (fm-duration.py run --pipeline-admitted) runs the start.
     """
-    routed = False
+    routed = expanded = False
+    chdir: Optional[str] = None
     words = list(command)
     while words:
         while words and "=" in words[0] and words[0].split("=", 1)[0].isidentifier():
@@ -953,18 +972,21 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool]]:
             fresh = rest[:1] == ["rerun"] or rest[:2] == ["axi", "run"] and any(
                 option in INTENT_OPTIONS or option.startswith(tuple(intent + "=" for intent in INTENT_OPTIONS))
                 for option in rest[2:])
-            return (rest, routed, False) if fresh else None
+            return (rest, routed, expanded, chdir) if fresh else None
         if name in TRANSPARENT:
             operands = wrapper_operands(name, rest)
             if operands is None:
                 return None
-            words, split = operands
+            words, split, into = operands
+            if into is not None:
+                chdir = os.path.join(chdir or "", into)
             if split is not None:
                 import shlex
                 try:
                     words = ["env"] + shlex.split(split) + words
                 except ValueError:
                     return None  # env refuses an unbalanced split string and runs nothing
+                expanded = True
             continue
         if name.rstrip("0123456789.").lower() == "python":
             while rest and rest[0].startswith("-"):
@@ -982,7 +1004,9 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool]]:
                 words = rest[1:] if rest[:1] == ["--"] else rest
                 continue
             found = shell_string_start(string)
-            return None if found is None else (found[0], routed or found[1], True)
+            if found is None:
+                return None
+            return found[0], routed or found[1], True, os.path.join(chdir or "", found[3] or "") or None
         if name in ROUTES:
             if name == "fm-mem-guard.sh" and rest[:2] == ["run", "--"]:
                 words, routed = rest[2:], True
@@ -1031,7 +1055,7 @@ def without_shell_comments(string: str) -> str:
     return "".join(kept)
 
 
-def shell_string_start(string: str) -> Optional[Tuple[List[str], bool, bool]]:
+def shell_string_start(string: str) -> Optional[Tuple[List[str], bool, bool, Optional[str]]]:
     """The first new run one of the simple commands of a shell command string begins, as start_route returns it.
 
     Comments and redirections (an operator with < or >, a file-descriptor number
@@ -1281,7 +1305,8 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
             reservation: int, slack: int, term: int, self_run: Optional[str] = None,
             waiting: frozenset = frozenset(), now: Optional[float] = None, pending: int = 0,
             held_runs: frozenset = frozenset(), history: Optional[dict] = None,
-            queued_pids: Optional[dict] = None, replaced: frozenset = frozenset()) -> dict:
+            queued_pids: Optional[dict] = None, replaced: frozenset = frozenset(),
+            before_activation: frozenset = frozenset()) -> dict:
     """The one projection (Main 1759): every demand from one census's facts, each fact a proof or unknown.
 
     counted maps each counted run ID to its repo ID; rss is the reading's run map (keyed
@@ -1301,7 +1326,9 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         own gate (no pid, a dead one, or its queued gate's), what it holds; waiting on CI (status
         running) with no live agent (no pid or a dead one) and nothing visible, what it holds; otherwise
         the larger of what it holds and A once seen, R unseen; an uncounted run, what it holds;
-      and R for each of its unproven launches, so a later attempt never masks an earlier one.
+      and R for each of its unproven launches, so a later attempt never masks an earlier one; a run in
+        before_activation (created before the gate's activation: history_units) is charged the larger
+        of that demand and R instead of R beside it.
     The new run reserves S; each pending admitted start that no counted run covers reserves R; and the
     branch of each run in replaced (a covering run with a replacing start: counted_pending) carries the
     larger of that run's demand and R, by one replacing entry of the shortfall per run, however many starts.
@@ -1353,7 +1380,7 @@ def project(available: int, rss: dict, counted: dict, steps: Optional[dict], lau
         if units:
             kind = ("ci-unproven" if step is not None and step[0] == CI_STEP and not attempts else kind) + (
                 "+%d" % units if units > 1 or attempts else "")
-            demand += reservation * units
+            demand = max(demand, reservation) if run in before_activation else demand + reservation * units
         entries.append((run, kind, demand, visible))
         starts = len(attempts) + units
         others += starts if run == self_run else max(1 if run in counted else 0, starts)
@@ -1430,7 +1457,7 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
               measured: Optional[Tuple[Tuple[int, int, int], Tuple[int, int]]] = None,
               waiting: frozenset = frozenset(), pending: int = 0, held_runs: frozenset = frozenset(),
               history: Optional[dict] = None, queued_pids: Optional[dict] = None,
-              replaced: frozenset = frozenset()) -> Tuple[bool, str]:
+              replaced: frozenset = frozenset(), before_activation: frozenset = frozenset()) -> Tuple[bool, str]:
     """The complete admission rule over one census's facts: holds first, then the fit or the count fallback.
 
     measured, when given, supplies ((R, S, runs measured), (A, readings measured))
@@ -1457,7 +1484,7 @@ def admission(reasons: List[str], report: Optional[dict], running: dict, counted
     (reservation, slack, qualifying), (term, readings) = measured
     fit = project(report["available_bytes"], report["runs"], counted, steps, launches, reservation, slack, term, self_run,
                   waiting, pending=pending, held_runs=held_runs, history=history, queued_pids=queued_pids,
-                  replaced=replaced)
+                  replaced=replaced, before_activation=before_activation)
     return fit["admit"], projection_text(fit, reservation, slack, term, qualifying, readings) + " priority=%s" % priority
 
 
@@ -1482,7 +1509,7 @@ def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool 
     # Every run the projection charges: counted, queued, requesting, and every run with a held attempt whatever its
     # status, a stopped one included (Main 1876 H).
     population = set(counted) | set(waiting) | ({self_run} if self_run else set()) | set(launches)
-    history = history_units(directory, states, population) if directory else {run: 1 for run in population}
+    history, before = history_units(directory, states, population) if directory else ({run: 1 for run in population}, frozenset())
     queued = waiting_pids(directory) if directory else {}
     for key, row in ((seen["memory"] or {}).get("runs") or {}).items():
         if not isinstance(row, dict) or type(row.get("rss_bytes")) is not int:
@@ -1492,7 +1519,7 @@ def decide(running: dict, counted: dict, cores: int, priority: str, fresh: bool 
             "; ".join(sorted(set(_unknown)))[:1500], len(counted), priority)
     return admission(seen["reasons"], seen["memory"], running, counted, steps, launches, cores, priority, self_run,
                      waiting=waiting, pending=pending, held_runs=held_runs, history=history, queued_pids=queued,
-                     replaced=replaced)
+                     replaced=replaced, before_activation=before)
 
 
 class CensusUnknown(Exception):
@@ -1967,8 +1994,9 @@ def cmd_activate(args: argparse.Namespace) -> int:
     return 0
 
 
-def history_units(directory: Optional[str], states: Dict[str, dict], runs: set) -> Dict[str, int]:
-    """run -> 1 when its launch history is not shown complete, else 0 (Main 1712, 1727, 1759, 1761, 1812).
+def history_units(directory: Optional[str], states: Dict[str, dict], runs: set) -> Tuple[Dict[str, int], frozenset]:
+    """(run -> 1 when its launch history is not shown complete, else 0 (Main 1712, 1727, 1759, 1761, 1812); the runs
+    of those created before the gate's activation, every one when there is no activation record).
 
     A run's history is proven complete only when the gate's activation record predates the
     run's creation, every invocation row of the run names a gated agent, each row binds one
@@ -1979,11 +2007,12 @@ def history_units(directory: Optional[str], states: Dict[str, dict], runs: set) 
     invocation returns, so a row marks a returned launch whose unrecorded remainder may
     linger, and R is the measured peak of a whole run. One charge per history, never one per
     row, keeps the projection from falling when a row is lost (the daemon gives no way to
-    detect a missing row; Main 1812 E). Any unreadable attempt record leaves no history
-    complete; rows or runs that cannot be read are unknown (note_unknown): the decision waits.
+    detect a missing row; Main 1812 E). A run created before activation is instead charged
+    the larger of its demand and R (project; the captain, 2026-11-26). Any unreadable attempt
+    record leaves no history complete; rows or runs that cannot be read are unknown (note_unknown): the decision waits.
     """
     if not runs:
-        return {}
+        return {}, frozenset()
     doubt = any(state["record"] is None for state in states.values())
     activated = read_activation(directory) if directory else None
     marks = ",".join("?" * len(runs))
@@ -1993,8 +2022,8 @@ def history_units(directory: Optional[str], states: Dict[str, dict], runs: set) 
         created = dict(read_host_db("SELECT id, created_at FROM runs WHERE id IN (%s)" % marks, tuple(sorted(runs))))
     except (OSError, sqlite3.Error, ValueError) as exc:
         note_unknown("invocation rows unreadable: %s" % exc)
-        return {run: 1 for run in runs}
-    units = {}
+        return {run: 1 for run in runs}, frozenset()
+    units, before = {}, set()
     for run in runs:
         keys = [key for owner, key, _ in rows if owner == run]
         agents = [agent for owner, _, agent in rows if owner == run]
@@ -2009,7 +2038,9 @@ def history_units(directory: Optional[str], states: Dict[str, dict], runs: set) 
                     and all(agent in GATED_AGENTS for agent in agents) and all(one_to_one(key) for key in keys)
                     and all(one_to_one(state["record"]["session_key"]) for state in records if state["state"] == "ended"))
         units[run] = 0 if complete else 1
-    return units
+        if not complete and (activated is None or type(created.get(run)) is int and created[run] <= activated):
+            before.add(run)
+    return units, frozenset(before)
 
 
 def start_binding(cwd: str) -> Optional[dict]:
@@ -2119,11 +2150,12 @@ def proven_reattach(args, shell, binding, heads: frozenset) -> bool:
 
     Proof is `axi run` with no --launch-nonce (in either form) whose binding
     records the HEAD the run records (its head_sha or submitted_head_sha). When
-    SHELL is not False (the arguments were read from a shell's command string,
-    or the entry does not say), a word holding a character the shell expands
-    later ($X, a glob, ~) may hide a nonce and is no proof; a word of a real
-    argument vector is never refused for its characters. A rerun, a start whose
-    arguments or HEAD are not known, and a HEAD that differs are no proof.
+    SHELL is not False (the arguments were read from text that expands them
+    later, a shell's command string or an env -S string, or the entry does not
+    say), a word holding a character that may expand later ($X, ${X}, a glob, ~)
+    may hide a nonce and is no proof; a word of a real argument vector is never
+    refused for its characters. A rerun, a start whose arguments or HEAD are not
+    known, and a HEAD that differs are no proof.
     """
     if not isinstance(args, list) or args[:2] != ["axi", "run"]:
         return False
@@ -2561,7 +2593,7 @@ def ancestors(pid: int) -> List[int]:
     return chain
 
 
-def claim_pending(directory: str, args: List[str], direct: bool = True) -> Optional[int]:
+def claim_pending(directory: str, args: List[str], direct: bool = True, cwd: Optional[str] = None) -> Optional[int]:
     """The pid of the enclosing admitted start whose pending reservation is this very start, or None.
 
     Under the pool's start lock (Main 1812 A), so no other decision or claim reads or
@@ -2571,14 +2603,15 @@ def claim_pending(directory: str, args: List[str], direct: bool = True) -> Optio
     its ancestors and claim_round finds the reservation unused or already its own. A record
     with the same arguments is claimed first; otherwise the first fresh client inside the
     admitted command claims its unclaimed record whatever its arguments (P5.lock). DIRECT:
-    this start's COMMAND is the client itself. Every other start is decided on its own, with
+    this start's COMMAND is the client itself; CWD: the directory its client runs in (this process's
+    when None), which a claim binds (start_binding). Every other start is decided on its own, with
     that pending start counted unless it is this start's own enclosing one (counted_pending).
     """
     with start_lock(directory):
         _last_claim.clear()
-        found = claim_round(directory, args, True, direct)
+        found = claim_round(directory, args, True, direct, cwd)
         if found is None:
-            found = claim_round(directory, args, False, direct)
+            found = claim_round(directory, args, False, direct, cwd)
         claimed = _last_claim[0] if _last_claim else None
         _last_claim.clear()
         if found is None or claimed is None:
@@ -2602,7 +2635,8 @@ def claim_pending(directory: str, args: List[str], direct: bool = True) -> Optio
 _last_claim: List[tuple] = []
 
 
-def claim_round(directory: str, args: List[str], same_args: bool, direct: bool = True) -> Optional[int]:
+def claim_round(directory: str, args: List[str], same_args: bool, direct: bool = True,
+                cwd: Optional[str] = None) -> Optional[int]:
     """One claim_pending pass: records with the same arguments, or any unclaimed one of an ancestor.
 
     Taken under the start lock. A claim already made by this process, or by an ancestor whose
@@ -2629,6 +2663,7 @@ def claim_round(directory: str, args: List[str], same_args: bool, direct: bool =
         if item["covered"] is not None:
             covering.setdefault(item["covered"], set()).add(item["path"])
     me = os.getpid()
+    cwd = os.getcwd() if cwd is None else cwd
     mine = None
     for item in census:
         entry, path = item["entry"], item["path"]
@@ -2650,7 +2685,7 @@ def claim_round(directory: str, args: List[str], same_args: bool, direct: bool =
             if claim["pid"] in mine and claim["client"] is None:
                 # The first client below a shell its claimant admitted: it binds the claim, the shell's one client.
                 try:
-                    publish_claim(path, dict(claim, client=me, binding=start_binding(os.getcwd())))  # client and binding together
+                    publish_claim(path, dict(claim, client=me, binding=start_binding(cwd)))  # client and binding together
                 except OSError:
                     return None
                 return holder
@@ -2666,7 +2701,7 @@ def claim_round(directory: str, args: List[str], same_args: bool, direct: bool =
         before = set(entry["before"])
         if any(run not in before and not covering.get(run, set()) - {path} for run in rows):
             continue  # a run that may be this reservation's own client's appeared: its admission may be used
-        claim = dict(pid=me, direct=direct, client=me if direct else None, binding=start_binding(os.getcwd()))
+        claim = dict(pid=me, direct=direct, client=me if direct else None, binding=start_binding(cwd))
         try:
             published = publish_claim(path, claim, new=True)
         except OSError:
@@ -2740,7 +2775,7 @@ def runs_client_directly(command: List[str]) -> bool:
             operands = wrapper_operands(name, rest)
             if operands is None:
                 return False
-            words, split = operands
+            words, split, _ = operands
             if split is not None:
                 import shlex
                 try:
@@ -2920,16 +2955,20 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
     try:
         directory = pool_dir()
         ensure_pool_dir(directory)
+        # The directory its client runs in: this one, or the one an env -C/--chdir names.
+        cwd = None if route is None else os.path.join(os.getcwd(), route[3]) if route[3] else os.getcwd()
         if route is not None:
-            holder = claim_pending(directory, route[0], direct=runs_client_directly(command))
+            holder = claim_pending(directory, route[0], direct=runs_client_directly(command), cwd=cwd)
             if holder is not None:
                 log(2, "pipeline-start: this start was admitted by its enclosing start (pid %d); not queued again" % holder)
                 _restore_exec_signals()
                 return exec_direct(command, child_environment, 2)
-        # The reservation is bound now to the repository and branch its client starts from in this directory; a client
-        # reached through the interception binds it again from its own directory when it claims (claim_pending). A
-        # COMMAND that changes directory first may give a binding no counted run is on: it then stays counted.
-        binding = start_binding(os.getcwd()) if route is not None else None
+        # The reservation is bound now to the repository and branch its client starts from: this directory, or the one
+        # an env -C/--chdir names. A client reached through the interception binds it again from its own directory when
+        # it claims (claim_pending). Until then, a COMMAND that changes directory another way (a shell's cd) is bound
+        # to this directory, and a counted run on this directory's branch may cover it although its client starts
+        # elsewhere.
+        binding = start_binding(cwd) if route is not None else None
         context = decision_context(directory, (binding or {}).get("repo"), (binding or {}).get("branch"))
         admission_fd, before, reason, _ = wait_for_admission(directory, args.priority, context=context)
         log(2, "pipeline-start admitted: %s %s" % (reason, context))

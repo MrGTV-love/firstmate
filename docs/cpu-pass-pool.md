@@ -101,7 +101,7 @@ Subject to the one-start minimum and pause-only backstop below, the first waiter
 
 ```text
 projected  <=  budget        where  budget = available_bytes + held
-projected  =   the reservations of the counted runs  +  R per incomplete history  +  S for the new run
+projected  =   the reservations of the counted runs  +  R per incomplete history (at least R per run created before activation)  +  S for the new run
 ```
 
 | A counted run that is | reserves | why |
@@ -110,7 +110,7 @@ projected  =   the reservations of the counted runs  +  R per incomplete history
 | waiting in its [launch gate](#launch-gate): a live launch-gate entry of it is queued in the pool and no launch-gate attempt of it is held, whatever its step or visibility | only the resident memory it holds, plus the history charge below while its history is not shown complete | its agent has not started, and it reserves capacity only when its gate is admitted |
 | visible in the reading at any other step, or with a held launch-gate attempt | its resident memory or `A`, whichever is larger | startup memory alone is not its demand; memory above `A` is counted as it is, never capped at `R`, `S` or a recorded peak |
 | not visible yet: just registered, between steps, with an unreadable step, or a launch-gate start the reading cannot see | `R` | the reading cannot show what it will use, so it is never read as idle |
-| any of the above whose launch history is not shown complete | one more `R` beside its row's reservation, once per run | an agent launch the gate did not record may still linger, and `R` is a whole run's measured peak |
+| any of the above whose launch history is not shown complete | one more `R` beside its row's reservation, once per run; for a run created before activation, the larger of its row's reservation and `R` instead | an agent launch the gate did not record may still linger, and `R` is a whole run's measured peak |
 
 | Symbol | Meaning | Source |
 |---|---|---|
@@ -123,7 +123,10 @@ projected  =   the reservations of the counted runs  +  R per incomplete history
 A counted run's resident memory appears in both `projected` and `budget`, so memory a run holds is never treated as free for new starts, and only the part of its reservation it does not hold yet must fit in `available_bytes`.
 The open step is the highest-ordered `step_results` row in `running` or `fixing`, read with the run rows.
 A run's launch history is shown complete only when the pool's activation record, `gate-activation.json` (`activated_at` in epoch seconds and `gate_sha256`, written once by [activation](#activation)), is dated before the run's `created_at`, every `agent_invocations` row of the run names a gated agent, and its rows and the gate's attempt records bind one to one by session key.
-Every other run, a run created before activation included, is charged one `R` for its history while it is counted, queued or holds an attempt, so runs created before activation keep that `R` until they leave the census.
+Every other run created after activation is charged one `R` for its history beside its demand while it is counted, queued or holds an attempt.
+A run created before activation, every run while no activation record exists, is charged `max(demand, R)` instead, until it leaves the census.
+Against the base rule, `(counted + 1) x R + S` against `available_bytes` plus each counted run's resident memory up to `R`, that interim charge is never stricter for a CI waiter, a run the reading cannot see, or a visible active run while `A` is at most `R` (measured: 1.82 against 5.77 GiB): each is charged no more beyond what it holds than the base rule's `R`, and the new run carries `S` without the base rule's extra `R`.
+A counted run with no open step row is charged `R` beside what it holds, so for it the interim is stricter than the base by the smaller of `R` and its resident memory.
 With no other counted run, one start is admitted even when the rule does not fit, a one-start minimum, so a large `S` or a low `available_bytes` never holds an idle host closed; the pause-only backstop below still pauses that start.
 The admission and waiting lines print every input: the counted runs, each run's reservation and why (`reserved=[run:kind:bytes]`, `holding_only=[...]`, `:unseen` for a run the reading cannot see), the projection, the budget, `R`, `A`, `S` and the class.
 The records belong to the host: they must name this host and its RAM size.
@@ -132,7 +135,7 @@ The owning home is `FM_HOME`, else the `FM_DURATION_HOME` that `bin/fm-spawn.sh`
 `R` and `S` are measurements, and taking the 75th percentile as `R` is a policy choice (Main 2473 ruling).
 `A` is a measurement with no chosen margin: because `S` covers one run at the largest recorded peak, `k x A + S` is at least the summed run memory of every recorded reading with `k` runs, so the projection never falls below what the record measured in use together.
 Measured on the root home's records of 2026-11-03 (373 readings, 347 of them with at least 2 runs): `A` is 1.82 GiB and `S` 13.39 GiB; the most run memory recorded at once was 20.1 GiB, with 10 and with 12 runs.
-At 12 visible runs whose histories are all shown complete the projection is at least 12 x 1.82 + 13.39 = 35.2 GiB, against 88 GiB under the previous rule, which reserved `R` for every counted run at once; each of them whose history is not shown complete adds one `R`.
+At 12 visible runs whose histories are all shown complete the projection is at least 12 x 1.82 + 13.39 = 35.2 GiB, against 88 GiB under the previous rule, which reserved `R` for every counted run at once; each of them whose history is not shown complete adds one `R`, or, created before activation, is charged at least `R`.
 The replay of every recorded reading against both rules, including the only pressure-2 episode (2026-11-02 21:11Z to 22:44Z), is in the task's private evidence; the pressure hold refuses every reading of that episode, and the rule alone never projects below the run memory a reading measured.
 The protection still has residuals: a run admitted just before pressure rises is not visible in the reading until it registers and grows, and an agent that raises its own memory after it starts is bounded by the next decision and the pressure hold, not by its reservation.
 A CI run is released only on positive proof that no agent of it lives, never by what its processes are named or who their parent is: the daemon records an agent's pid at the agent's start and clears it at its exit, so a visible tree, whatever its recorded pid (a reparented agent can outlive its launcher's dead pid), or a live pid keeps the active term `A`.
@@ -195,7 +198,7 @@ Deployment is one operator step.
 First apply the launcher line.
 Then, immediately after it, run `bin/fm-cpu-pass.sh activate --gate <the gate file the launcher line names>`.
 Then read the record with `cat ~/.cache/fm-cpu-pool/gate-activation.json` (or the pool directory `FM_CPU_POOL_DIR` names): it must be one JSON object with an integer `activated_at` at the time of the step and a 64-digit lowercase hexadecimal `gate_sha256` equal to `shasum -a 256` of that gate file.
-Residual: each run created before activation still carries one `R` for its history until it leaves the census, so the admission the corrected reservation allows is reached only after those runs drain.
+Residual: each run created before activation is charged `max(demand, R)` until it leaves the census, so the admission the corrected reservation allows is reached only after those runs drain; until then admission is held to about the base rule's level, never stricter except as stated for a run with no open step row.
 
 Queued classes are ordered `merge-train`, `machinery`, `vernant-build`, then `other`, with arrival order within each class.
 Admission never preempts an already granted start or stops running work.
@@ -203,8 +206,9 @@ The short start lock covers each decision and the publication of its admitted st
 The one exception: a decision does not count a pending start while a run it counts as active (not CI-ready, not awaiting an agent) is on the repository and branch the start was bound to when it was admitted or claimed.
 That run is the one the start's client drives or replaces, because the no-mistakes daemon keeps one active run per repository and branch: it cancels the old run and waits for it to end before it writes the new row, and a client with no `--launch-nonce` reattaches to the branch's active run.
 A covered start adds nothing only when it is a proven reattach: `axi run` with no `--launch-nonce` whose recorded HEAD is the run's `head_sha` or `submitted_head_sha`.
-A word of a real argument vector is never refused for its characters (`$`, a backtick, `*`, `?`, `[`, `~`, `{`); the pending start records whether its arguments were read from a shell's command string.
-Every other covered start (a `rerun`, a caller's own `--launch-nonce`, a HEAD that differs or is not known, a word read from a shell's command string that the shell expands later, which may hide a nonce) may replace the run, and that run's own charge can be far below `R`: a CI waiter is charged only what it holds.
+A word of a real argument vector is never refused for its characters (`$`, a backtick, `*`, `?`, `[`, `~`, `{`); the pending start records whether its arguments were read from text that expands them later: a shell's command string, or an `env -S` string, which expands `${VAR}`.
+Every word of a start through `env -S` is read as expandable, the real arguments after its string included, an overcharge and never an undercount.
+Every other covered start (a `rerun`, a caller's own `--launch-nonce`, a HEAD that differs or is not known, a word read from such text that may expand later, which may hide a nonce) may replace the run, and that run's own charge can be far below `R`: a CI waiter is charged only what it holds.
 So the branch then carries the larger of the covering run's demand and `R`, once per branch however many such starts it has.
 The cost: while such a start's command runs, a run it only drives is charged `R` instead of the larger of its size and `A`, an overcharge and never an undercount.
 The exact rule needs a launch identity in the no-mistakes fork.
@@ -219,8 +223,9 @@ Unusable run-database, CPU-count, memory or process observations do not imply an
 A route that begins a new run in a form the parser below recognizes, or through the exec interception after it, joins this one queue, judged by the facts the no-mistakes CLI itself uses: `no-mistakes rerun` always creates a run, and `no-mistakes axi run` creates one only with an intent input (`--intent TEXT`, `--intent -`, `--intent-file PATH` or their `=` forms); without one it reattaches an active run or exits 2.
 Only the executable position counts: leading `VAR=value` words, the wrappers `env`, `nice`, `nohup`, `command`, `exec`, `time` and `stdbuf` with their options (clustered short options, a valued option's attached or next word, `--option=value`), a Python interpreter or shell running a script, and the admission routes themselves are followed to the program they run, so `env A=1 /abs/path/no-mistakes axi run --intent ...` is a start and `printf no-mistakes axi run --intent ...` is not.
 `env -S STRING` and `--split-string` read STRING's words, split as a shell splits a quoted line, in its place; `command -v` and `-V` only print a path, so they begin nothing.
+A start through `env -C DIR` or `--chdir` is bound to the repository and branch of DIR, joined onto the admitting directory, not of the admitting directory.
 A command the parser finds no start in still meets the exec interception: `bin/fm-mem-guard.sh run`, and `bin/fm-duration.py run` under any key, put a private directory first on the command's `PATH` holding one symlink named `no-mistakes` to `bin/fm-cpu-pass.sh`.
-A `no-mistakes` the command reaches through `PATH`, however it is wrapped (`xargs`, `timeout`, an `env -S` string with escapes or `${VAR}`, a program name in a shell variable, a script), runs `fm-cpu-pass.py exec-intercept`, which judges the client's own arguments by the facts above, admits a new run once in the route's class, then runs the real client with that directory removed from `PATH`; reattachment and every other command pass straight through.
+A `no-mistakes` the command reaches through `PATH`, however it is wrapped (`xargs`, `timeout`, an `env -S` string whose escapes or `${VAR}` hide the program name, a program name in a shell variable, a script), runs `fm-cpu-pass.py exec-intercept`, which judges the client's own arguments by the facts above, admits a new run once in the route's class, then runs the real client with that directory removed from `PATH`; reattachment and every other command pass straight through.
 The directory is `fm-exec-intercept-<uid>-<checkout digest>` in the user's temporary directory, created 0700 and used only when this user owns it; when it cannot be made the route says why and holds the command as a fresh start in its class only when a word of the command names `no-mistakes` and the command is not the `no-mistakes` client itself judged no new run (a reattachment, response or status read); every other command runs at once.
 An admitted command keeps the directory unless it runs the client directly (through `VAR=value` words, the transparent wrappers and the admission routes only), so each further fresh client inside it, in a shell line, a script or a background job, is admitted on its own; the admitted client itself claims its own pending start, matched by its arguments (a word the shell still expands, such as `"$X"`, matches what it becomes) and by the admitting process among its ancestors, and is not admitted twice.
 Limit: a fresh start that no wrapper in this repository can see, the real client called by its absolute path past the interception, a wrapper that resets `PATH` (`sudo`, `env -i`), or a start made outside every route (a bare typed `no-mistakes axi run --intent ...`), is admitted only by admission at run creation inside the no-mistakes fork, backlog task `nm-run-creation-admission`.

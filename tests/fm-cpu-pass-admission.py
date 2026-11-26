@@ -270,8 +270,8 @@ try:
     text = (folder / 'p1a.stderr').read_text()
     assert 'admitted: counted=11 ' in text and 'start waiting' not in text and 'ci-361:ci-waiting:0:unseen' in text \
         and 'lint:active:%d' % int(2.22 * GIB) in text and 'review-b:active:%d' % diag_active in text, text
-    # The same world with no activation record: no history is shown complete, so each counted run carries one more R
-    # and the start waits: the deployment's activation step is what lets (a) admit.
+    # The same world with no activation record: no history is shown complete, so each counted run is charged at least R
+    # (R16-2: max(D, R)) and the start waits: the deployment's activation step is what lets (a) admit.
     folder, db, env = counted_case('p1-live-unactivated', 32.82 * GIB // 16384 * 16384, live,
                                    waiting_ci=['ci-361', 'ci-367', 'ci-369', 'ci-3609'], activated=False)
     child = launch(cli + ['pipeline-start', '--priority', 'machinery', '--', 'sh', '-c', 'exit 3'], env, folder / 'p1a-unactivated')
@@ -1747,12 +1747,16 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         # string that the shell expands later (it may hide a nonce) projects 3 + 8, and two replacing starts 3 + 8, never
         # 3 + 3 + 8. A real argument vector is never refused for its characters (R15-1): an intent holding ? and $ passed
         # as argv is a proven reattach (0 + 8). With x visible at review (R15-2): D = max(0.5, A) = 1 projects
-        # 1 + 2 + 8 = 11, never the double charge 1 + 3 + 8; D = 4 projects 4 + 8 = 12, never 4 + 3 + 8.
+        # 1 + 2 + 8 = 11, never the double charge 1 + 3 + 8; D = 4 projects 4 + 8 = 12, never 4 + 3 + 8. R16-1: an env -S
+        # string expands ${VAR} after the admission splits it, so ${NONCE} there may hide a nonce: 3 + 8. An env -C start
+        # is bound to the directory it names: in a second repository with no counted run it is covered by nothing, 3 + 8.
         rerun = (['no-mistakes', 'rerun'], True)
         nonce = (['no-mistakes', 'axi', 'run', '--intent', 'hold-a', '--launch-nonce', 'n1'], True)
         plain = (['no-mistakes', 'axi', 'run', '--intent', 'hold-a'], True)
         hidden = (['no-mistakes', 'axi', 'run', '--intent', 'hold-a', '$NONCE'], True)
         literal = (['no-mistakes', 'axi', 'run', '--intent', 'hold? $x'], False)
+        split = (['env', '-S', 'no-mistakes axi run --intent hold-a ${NONCE}'], False)
+        elsewhere = (['env', '-C', '{other}', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], False)
         for label, starts, recorded, held, expected, ident in (
                 ('reattach-head', [plain], ('HEAD', None), None, 8, 'r14-proven-reattach-charged'),
                 ('reattach-submitted', [plain], ('0' * 40, 'HEAD'), None, 8, 'r14-proven-reattach-submitted-charged'),
@@ -1761,11 +1765,17 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                 ('head-differs', [plain], ('0' * 40, None), None, 11, 'r14-other-head-covered-below-r'),
                 ('shell-hidden-nonce', [hidden], ('HEAD', None), None, 11, 'r15-shell-expansion-proven'),
                 ('argv-characters', [literal], ('HEAD', None), None, 8, 'r15-argv-characters-refused'),
+                ('env-split-nonce', [split], ('HEAD', None), None, 11, 'r16-env-split-proven'),
+                ('env-chdir-elsewhere', [elsewhere], ('HEAD', None), None, 11, 'r16-env-chdir-bound-to-admitting'),
                 ('two-replacing', [rerun, nonce], ('HEAD', None), None, 11, 'r14-two-replacing-charged-twice'),
                 ('visible-below-r', [rerun], ('HEAD', None), GIB // 2, 11, 'r15-below-r-double-charged'),
                 ('visible-above-r', [rerun], ('HEAD', None), 4 * GIB, 12, 'r15-above-r-double-charged')):
             folder, db, env = case('r14-' + label, measured=True, available=12 * GIB)
             checkout = bound_repo(folder, db, env)
+            other = folder / 'other-checkout'
+            subprocess.run(['git', 'init', '-q', '-b', 'main', str(other)], check=True, stdin=subprocess.DEVNULL)
+            change(db, "INSERT INTO repos (id, working_path) VALUES ('repo2', ?)", (str(other),))
+            env['NONCE'] = '--launch-nonce=n1'
             subprocess.run(['git', '-C', str(checkout), '-c', 'user.name=t', '-c', 'user.email=t@example.invalid',
                             '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'base'],
                            check=True, stdin=subprocess.DEVNULL)
@@ -1780,6 +1790,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             admitted = []
             for index, (words, shell) in enumerate(starts):
                 name = 'a%d' % index
+                words = [word.replace('{other}', str(other)) for word in words]
                 command = ['bash', '-c', 'sleep 3600; ' + ' '.join(words)] if shell else words
                 admitted.append(launch_in(cli + ['pipeline-start', '--'] + command, env, folder / name, checkout))
                 wait_for(lambda name=name: 'pipeline-start admitted' in (folder / (name + '.stderr')).read_text(),
@@ -1789,6 +1800,8 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             text = (folder / 'probe.stderr').read_text()
             projected = int(re.search(r'projected=(\d+)', text).group(1))
             harm(ident, projected == expected * GIB, label, projected, text)
+            if label == 'env-chdir-elsewhere':
+                assert 'start_repo=repo2 start_branch=main' in (folder / 'a0.stderr').read_text(), (folder / 'a0.stderr').read_text()
             covering = 'x:ci-waiting:0:unseen' if held is None else 'x:active:%d' % max(held, GIB)
             assert covering in text, (label, text)
             for child in admitted + [probe]:
@@ -1824,6 +1837,29 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         assert 'admitted: counted=11 ' in text and old['counted'] == 11 and not old['admit'], (old, text)
         named = re.search(r'counted_runs=\[([^\]]*)\]', text).group(1).split(',')
         assert 'ci-361:0' in named and 'lint:%d' % int(2.22 * GIB) in named and len(named) == 11, text
+
+    def pre_activation_not_stricter():
+        # R16-2 (the captain, 2026-11-26): before activation each counted run is charged max(D, R), not D + R. On the
+        # R16-2 live state (11 counted runs, 4 CI waiters at 0, 7 active runs holding 20 GiB together, R 5.77, S 13.39,
+        # A 1.82; the split of the 20 GiB over the 7 runs is this case's own, none above 2 x R) the projection is
+        # sum(max(D, R)) + S, not above the base rule's need (counted + 1) x R + S, and with 66 GiB available, where the
+        # base rule admits, it admits too. D + R would project sum(D) + 11 R + S, above the base need, and wait.
+        held = [7.0, 4.0, 3.0, 2.5, 1.5, 1.2, 0.8]
+        active = [('active-%d' % i, int(size * GIB)) for i, size in enumerate(held)]
+        folder, db, env = counted_case('r16-pre-activation', 66 * GIB, active, waiting_ci=['ci-1', 'ci-2', 'ci-3', 'ci-4'],
+                                       activated=False)
+        child = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'pre')], env, folder / 'pre')
+        wait_for(lambda: 'projected=' in (folder / 'pre.stderr').read_text(), 'the pre-activation start decides')
+        text = (folder / 'pre.stderr').read_text()
+        line = [l for l in text.splitlines() if 'projected=' in l][-1]
+        value = lambda key: int(re.search(r'\b%s=(\d+)' % key, line).group(1))  # noqa: E731
+        reservation, term, slack = value('reservation'), value('active_term'), value('slack')
+        expected = sum(max(size, term, reservation) for _, size in active) + 4 * reservation + slack
+        old = base_rule_from_line(text)
+        harm('r16-2-pre-activation-stricter', value('projected') == expected and expected <= old['need'], expected, old, line)
+        assert old['admit'] and old['counted'] == 11, (old, line)
+        finish(child)
+        assert (folder / 'pre').exists() and 'admitted: counted=11 ' in text, text
 
     def checkout_copy(folder):
         """A second checkout of this tree's bin/ (its own invoking checkout), as another home would run it."""
@@ -2054,6 +2090,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                        ('P5.lock the named collision under the branch rule', named_collision_branch),
                        ('R14-1 only a proven reattach adds nothing to its covering run', replacing_start_carries_r),
                        ('P1 the line recomputes the base rule', p1_old_rule_recomputed),
+                       ('R16-2 before activation a run is charged max(D, R)', pre_activation_not_stricter),
                        ('P6(a) lines name the checkout, the pool and the start', lines_name_checkout_pool_and_start),
                        ('P6(a) the pool follows HOME and the override', pool_from_home),
                        ('P5.lock case (i): a nested first client uses the reservation', nested_first_uses_reservation),
