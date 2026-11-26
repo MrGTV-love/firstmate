@@ -561,6 +561,8 @@ Standalone PR registration locks its task-copy snapshot before retirement recove
 
 A relaunch judges a governed task by the slot identity copied into its record at spawn (`slot_base_sha=` and the `slot_owned_path=` lines).
 When the project renews the task's durable slot record after an authorized forward merge and scope refresh, nothing renews the task record, so every relaunch refuses `base_mismatch` or `scope_mismatch`.
+`rerecord-slot` handles a renewed or grown scope of the same copy: it renews the record of the copy the task record already names, and it never writes `slot_manifest=`.
+A task moved to a replacement copy at a different path is relocated with `reassociate` or `relaunch --worktree`, which is outside this verb (see the residuals below).
 The actual lock-owning main Firstmate first runs `fm-control <task-id> rerecord-slot --check`, reviews what it prints, and then runs `fm-control <task-id> rerecord-slot --manifest-sha <sha256> --note <the ruling it carries out>`.
 The verb rewrites only those slot lines, from the renewed record, and judges the renewed record by the same proofs whether or not the write is asked for.
 It never writes the manifest, the copy, a ref, the brief, a pool claim, the endpoint, or the relaunch journal; it never fetches; and it never starts, stops, or sends input to an agent.
@@ -666,6 +668,8 @@ Residuals:
 
 - rerecord cannot tell whether the branch's changes were in the task's brief; the note's ruling carries that judgment and Vernant's push-time `owned_paths` gate stays the control on pushes;
 - a brand-new nested file leases its whole deepest tracked directory, and the `rule_c_entry=` lines show that breadth before the write;
+- an added file at the repository root, or an added file whose top-level directory is new, has no tracked proper ancestor, its own path is refused `scope_not_tracked` because every entry must be tracked at the manifest base, and `.` is refused `scope_invalid`, so renewal refuses `scope_uncovered_change`; the operator route is a hand edit, or landing the new path first so that it is tracked at the next base;
+- a task moved to a replacement copy at a different path keeps a `slot_manifest=` that still names the old copy's durable record, because `reassociate` and `relaunch --worktree` do not re-point it and this verb never writes it; renewing the replacement copy's own record then refuses `manifest_shadowed` or `worktree_path_mismatch`, and a hand edit of the task record is the only route today;
 - a hand edit of the task record or the durable store bypasses every proof here;
 - an already-equal record is a no-op that skips only the write preconditions and still runs the shape, record, identity, copy, base, scope and no-strand proofs against the synced record, so a hand-synced record is judged only by replaying `fm_slot_rerecord_verdict` read-only against the pre-sync record;
 - that replay runs the write path's own content-proof sequence (identity, base, the default-branch tip, the own-line and uncommitted sets, and scope, with the same read-failure refusals) and omits only the write-only shape, record, copy and no-strand proofs, which `rerecord-slot --check` also runs;
