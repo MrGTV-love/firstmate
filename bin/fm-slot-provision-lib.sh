@@ -1294,12 +1294,14 @@ fm_slot_rerecord_changes() { # <refusing|stopping> <unchanged>
   fi
 }
 
-# What a run that published its own staged record and then restored the prior record did, with every step 3 entry.
-fm_slot_rerecord_restored() {
-  local entries=
+# What a run that published its own staged record and then restored the prior record did, or with "unrestored" what it
+# did when that restore failed, with every step 3 entry.
+fm_slot_rerecord_restored() { # [unrestored]
+  local entries= outcome="then restored the prior record from $FM_RR_ARCHIVE"
+  [ "${1:-}" != unrestored ] || outcome="the prior record could not be restored; it is archived at $FM_RR_ARCHIVE"
   [ -z "$FM_RR_RECONCILED" ] || entries="; before publishing, this run reconciled earlier interrupted runs: $FM_RR_RECONCILED"
-  printf "this run published task %s's record and then restored the prior record from %s; the audit record %s is %s%s; no manifest, copy or journal was changed\n" \
-    "$FM_RR_ID" "$FM_RR_ARCHIVE" "$FM_RR_AUDIT" "$(fm_slot_rerecord_field "$FM_RR_AUDIT" result)" "$entries"
+  printf "this run published task %s's record and %s; the audit record %s is %s%s; no manifest, copy or journal was changed\n" \
+    "$FM_RR_ID" "$outcome" "$FM_RR_AUDIT" "$(fm_slot_rerecord_field "$FM_RR_AUDIT" result)" "$entries"
 }
 
 fm_slot_rerecord_refuse() { # <reason> <detail> [<tail>]

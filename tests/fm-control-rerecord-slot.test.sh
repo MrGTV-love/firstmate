@@ -1669,6 +1669,39 @@ test_SF4_head_after_a_reconciled_crash() {
   assert_contains "$out" "; before publishing, this run reconciled earlier interrupted runs: audit $a abandoned (the audit was closed with the task record left unchanged); no manifest, copy or journal was changed" "SF4-head-reconciled"
   rr_ok SF4-head-reconciled "a crashed earlier write is abandoned in step 3, then HEAD moves after the rebind: the refusal says the run published and restored the prior record and names the abandoned audit"
 }
+# SF4-head whose restore itself fails: the run says it published its record, that the prior record could not be
+# restored, and where the prior record is archived.
+test_SF4_head_with_a_failed_restore() {
+  local out rc a
+  rr_setup_SF4head SF4-head-unrestored
+  rr_fail_mktemp '*.meta.rerecord-restore.XXXXXX'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "SF4-head-unrestored: expected a failure"$'\n'"$out"
+  a=$(rr_audits)
+  [ "$(rr_count "$a")" = 1 ] || fail "SF4-head-unrestored: expected one audit record, got '$a'"
+  [ "$(rr_sha "$RR_META")" = "$(rr_field "$a" staged_sha256)" ] || fail "SF4-head-unrestored: the record does not hold the staged bytes"
+  assert_contains "$out" "error: this run published task $RR_ID's record and the prior record could not be restored; it is archived at $(rr_field "$a" archive); the audit record $a is rolling-back; no manifest, copy or journal was changed" "SF4-head-unrestored"
+  assert_not_contains "$out" "no record, manifest, copy or journal was changed" "SF4-head-unrestored"
+  assert_not_contains "$out" "and then restored the prior record" "SF4-head-unrestored"
+  rr_ok SF4-head-unrestored "the restore after a failed post-publish check cannot stage: the run says it published, that the prior record could not be restored, and names the archive; the record holds the staged bytes"
+}
+
+# Step 3 closes a first audit record, then the resumed restore of a second one fails: the stop names the first.
+test_L20_a_failed_step_3_restore_names_the_audit_closed_before_it() {
+  local out rc first
+  rr_setup_L13 L20
+  first="$(rr_audit_dir)/0-first.record"
+  printf 'result=pending\nprior_sha256=%064d\nstaged_sha256=%064d\nprior_block_sha256=x\nstaged_block_sha256=y\n' 0 1 > "$first"
+  chmod 600 "$first"
+  [ "$(rr_audits | head -n 1)" = "$first" ] || fail "L20: the fixture is vacuous: the first audit record is not read first"
+  rr_fail_mktemp '*.meta.rerecord-restore.XXXXXX'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "L20: expected a failure"$'\n'"$out"
+  assert_contains "$out" "error: could not stage the restore of task $RR_ID's record" "L20"
+  assert_contains "$out" "error: before stopping, this run reconciled earlier interrupted runs: audit $first superseded-other (the audit was closed with the task record left unchanged); no manifest, copy or journal was changed" "L20"
+  [ "$(rr_field "$first" result)" = superseded-other ] || fail "L20: the first audit is '$(rr_field "$first" result)'"
+  rr_ok L20 "step 3 closes a first audit as superseded-other, then the second's resumed restore fails: the stop names the first audit"
+}
 test_SF4_owner_changed_after_the_rebind() {
   rr_setup_SF4owner SF4-owner
   rr_expect_postcheck_rollback SF4-owner
@@ -2185,6 +2218,8 @@ test_R10_an_unverified_archive_refuses
 test_R11_an_unreadable_audit_record_refuses_until_moved_aside
 test_SF4_head_moved_after_the_rebind
 test_SF4_head_after_a_reconciled_crash
+test_SF4_head_with_a_failed_restore
+test_L20_a_failed_step_3_restore_names_the_audit_closed_before_it
 test_SF4_owner_changed_after_the_rebind
 test_SF5_term_to_relaunch_leaves_the_launcher_holding_the_spawn_lock
 test_S1a_identity_verdict

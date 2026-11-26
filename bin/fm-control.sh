@@ -439,7 +439,15 @@ control_cleanup() {
   if [ -n "$RERECORD_STAGE" ] && declare -F fm_slot_rerecord_trap_action >/dev/null 2>&1; then
     case "$(fm_slot_rerecord_trap_action "$RERECORD_STAGE")" in
       discard) fm_slot_rerecord_discard_staged || true ;;
-      rollback) fm_slot_rerecord_rollback || true ;;
+      rollback)
+        if [ -z "$RERECORD_SNAP" ]; then
+          fm_slot_rerecord_rollback || true
+        elif fm_slot_rerecord_rollback; then
+          echo "rerecord-slot $FM_RR_ID: $(fm_slot_rerecord_restored)" >&2
+        else
+          echo "error: $(fm_slot_rerecord_restored unrestored)" >&2
+        fi
+        ;;
     esac
   fi
   [ -z "$RERECORD_SNAP" ] || rm -rf -- "$RERECORD_SNAP"
@@ -3008,6 +3016,12 @@ rerecord_refuse() {
   exit 1
 }
 
+rerecord_rollback() {
+  fm_slot_rerecord_rollback && return 0
+  echo "error: $(fm_slot_rerecord_restored unrestored)" >&2
+  exit 1
+}
+
 do_rerecord_slot() {
   local project copy branch manifest snap prior_sha manifest_sha head old_base new_base noop=0 line
   local default tip jclass launch_proof=ok journal_proof stopped_proof=ok backlog_proof=ok would=pass
@@ -3062,7 +3076,10 @@ do_rerecord_slot() {
     fm_slot_rerecord_reconcile_pending write "$project" "$copy" "$branch" || rc=$?
     case $rc in
       0) ;;
-      2) exit 1 ;;
+      2)
+        [ -z "$FM_RR_RECONCILED" ] || echo "error: $(fm_slot_rerecord_changes stopping '')" >&2
+        exit 1
+        ;;
       *) rerecord_refuse ;;
     esac
   fi
@@ -3205,7 +3222,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     # The rename reported failure but landed (N1): judge it published and restore the prior record.
     RERECORD_STAGE=published
     FM_RR_STAGED=
-    fm_slot_rerecord_rollback || exit 1
+    rerecord_rollback
     die "task $ID's record publish reported failure after it landed; $(fm_slot_rerecord_restored)"
   else
     RERECORD_STAGE=staged
@@ -3214,12 +3231,12 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
   if ! fm_slot_rerecord_postcheck "$META" "$staged_sha" "$manifest" "$manifest_sha" "$copy" "$head" \
     "$project" "$ID" "$branch" "$STATE" "$snap/adopt-err"; then
     line=$FM_SLOT_RERECORD_DETAIL
-    fm_slot_rerecord_rollback || exit 1
+    rerecord_rollback
     fm_slot_rerecord_refuse adopt_postcheck_failed "$line" "$(fm_slot_rerecord_restored)"
     exit 1
   fi
   if ! fm_slot_rerecord_commit; then
-    fm_slot_rerecord_rollback || exit 1
+    rerecord_rollback
     die "the audit record $FM_RR_AUDIT could not be closed as published; $(fm_slot_rerecord_restored)"
   fi
 
