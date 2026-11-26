@@ -1180,10 +1180,12 @@ fm_slot_drift_text() { # <task-id> <report-output> <report-exit>
 
 # The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals, on stderr.
 # Reads only the copy; the recorded scope, manifest and record are never edited by what this reports.
-# With a STATE directory, the complete report is also written to STATE/<id>.drift-report.txt (mode 600, replaced on every
-# run), and stderr prints every line except the `uncertain,ignored` lines past the first FM_SLOT_DRIFT_SAMPLE, which a
-# `  sampled:` line counts and points to that file. With no STATE, or when that file cannot be written, stderr prints
-# the complete report. Every other line, each `proven` path included, is always printed in full.
+# With a STATE directory, the complete report is also written to STATE/<id>.drift-report.txt (mode 600), and stderr
+# prints every line except the `uncertain,ignored` lines past the first FM_SLOT_DRIFT_SAMPLE, which a `  sampled:` line
+# counts and points to that file. Each successful write replaces that file, so a report that could not be produced
+# replaces an earlier list with its one line, while a failed write leaves the earlier file in place. With no STATE, or
+# when that file cannot be written, stderr prints the complete report. Every other line, each `proven` path included,
+# is always printed in full.
 fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   local copy=$1 id=$2 branch=$3 base=$4 out rc=0 report file='' tmp=''
   shift 4
@@ -1203,7 +1205,9 @@ fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
     if [ -d "$file" ] || ! tmp=$(mktemp "$STATE/.$id.drift-report.XXXXXX" 2>/dev/null); then
       file=''
     elif ! { printf '%s\n' "$report" > "$tmp" && chmod 600 "$tmp" && mv -f -- "$tmp" "$file"; }; then
-      rm -f -- "$tmp"
+      # The temp can be unremovable too (a state directory turned read-only), and the complete report is printed below
+      # either way, so a failed removal must not end the set -e callers.
+      rm -f -- "$tmp" 2>/dev/null || :
       file=''
     fi
   fi
@@ -1214,7 +1218,7 @@ fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   # The file path goes through the environment, because awk -v would read a backslash in it as an escape.
   printf '%s\n' "$report" | FM_SLOT_DRIFT_FILE=$file awk -v keep="$FM_SLOT_DRIFT_SAMPLE" '
     function summary() {
-      if (group > keep) print "  sampled: " group " uncertain,ignored path(s); the first " keep " are shown above, and every path of this report is listed in " ENVIRON["FM_SLOT_DRIFT_FILE"]
+      if (group > keep) print "  sampled: " group " uncertain,ignored path(s); the first " keep " are shown in this report, and every path of this report is listed in " ENVIRON["FM_SLOT_DRIFT_FILE"]
       done = 1
     }
     /^  drift: / {

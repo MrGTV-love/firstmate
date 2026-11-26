@@ -137,6 +137,149 @@ EOF
   pass "report-only unresolved captain call is reproduced and completion refuses before loss"
 }
 
+# Run the same report/status -> supervisor -> teardown path portably and under
+# the production profiles. Only the confined legs assert a kernel denial.
+scout_report_handoff_case() {
+  local boundary=$1 choice=$2 home id=sample-handoff-scout meta report status error open epoch
+  local -a worker=(env) profile_args=()
+  home=$(make_home "report-handoff-$boundary-$choice")
+  meta="$home/state/$id.meta"
+  report="$home/data/$id/report.md"
+  status="$home/state/$id.status"
+  epoch=$(date +%s)
+  mkdir -p "$home/data/$id" "$home/user-home"
+  tasks_in "$home" add "$id" "Investigate a sample handoff" --kind scout --repo sample --start >/dev/null \
+    || fail "could not register the scout fixture"
+  write_origin_meta "$home" "$id"
+  cp "$meta" "$home/meta.before"
+
+  if [ "$boundary" != portable ]; then
+    local primary="$home/projects/sample" wt="$home/sample-worktree"
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$primary" \
+      -c core.hooksPath=/dev/null -c user.name=Fixture -c user.email=fixture@example.invalid \
+      commit -q --allow-empty -m fixture || fail "could not seed the fixture checkout"
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$primary" \
+      -c core.hooksPath=/dev/null worktree add -q --detach "$wt" || fail "could not make a linked fixture worktree"
+    if [ "$boundary" = claude ]; then
+      profile_args=(--claude-session 11111111-2222-4333-8444-555555555555)
+    fi
+    HOME="$home/user-home" OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp \
+      python3 "$ROOT/bin/fm-write-confinement.py" --worktree "$wt" --home "$home" \
+      --config "$home/config" --projects "$home/projects" --data "$home/data/$id" \
+      --state "$home/state" --task "$id" --harness "$boundary" \
+      --agent-dir "$home/user-home/agent" --profile "$home/worker.sb" \
+      ${profile_args[@]+"${profile_args[@]}"} || fail "$boundary: failed to derive the production profile"
+    worker=(/usr/bin/sandbox-exec -f "$home/worker.sb")
+  fi
+
+  if [ "$choice" = open ]; then
+    "$ROOT/bin/fm-status-append.sh" "$status" \
+      "needs-decision [key=route] [at=$epoch]: north or south?" \
+      "needs-decision [key=access] [at=$epoch]: public or restricted?" \
+      || fail "could not seed open status choices"
+  fi
+  # The child shell, not this shell, expands the quoted command's parameters.
+  # shellcheck disable=SC2016
+  PATH="$home/fakebin:$PATH" HOME="$home/user-home" FM_HOME="$home" FM_TASK_ID="$id" \
+    FM_DATA_OVERRIDE="$home/data" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+    "${worker[@]}" /bin/bash -eu -c '
+      root=$1 report=$2 status=$3 choice=$4 boundary=$5 epoch=$6
+      printf "# Sample findings\n" > "$report"
+      if [ "$choice" = open ]; then
+        printf "Choose route north or south, and access public or restricted.\n" >> "$report"
+        event="needs-decision [key=route] [at=$epoch]: Report ready for firstmate review - north or south?"
+      else
+        printf "The finding needs no decision.\n" >> "$report"
+        event="done [at=$epoch]: Report ready for firstmate review - no open calls"
+      fi
+      "$root/bin/fm-status-append.sh" "$status" "$event"
+      if [ "$boundary" != portable ] && [ "$choice" = none ]; then
+        # The original worker command must still be unable to write protected
+        # metadata. A remediation hint is not a successful attestation.
+        "$root/bin/fm-captain-hold.sh" complete "$FM_TASK_ID" --none
+      fi
+    ' _ "$ROOT" "$report" "$status" "$choice" "$boundary" "$epoch" \
+      >"$home/worker.out" 2>"$home/worker.err" && error=0 || error=$?
+  if [ "$boundary" != portable ] && [ "$choice" = none ]; then
+    [ "$error" -eq 1 ] || fail "$boundary: original worker complete did not fail as expected ($error)"
+    assert_grep 'Operation not permitted' "$home/worker.err" "$boundary: no kernel refusal"
+    assert_grep "have the originating home's supervisor run complete" "$home/worker.err" \
+      "$boundary: metadata denial did not name the supervisor handoff"
+  else
+    [ "$error" -eq 0 ] || fail "$boundary: worker report handoff failed: $(cat "$home/worker.err")"
+  fi
+  assert_grep 'Sample findings' "$report" "$boundary: worker did not write its report"
+  assert_grep 'Report ready for firstmate review' "$status" "$boundary: no handoff status"
+  cmp -s "$home/meta.before" "$meta" || fail "$boundary: the worker wrote completion metadata"
+  if run_teardown "$home" "$id" >"$home/refused.out" 2>"$home/refused.err"; then
+    fail "$boundary: report handoff alone passed the teardown gate"
+  fi
+  assert_grep 'has not passed the captain-call completion gate' "$home/refused.err" \
+    "$boundary: teardown did not refuse specifically at the completion gate"
+  assert_present "$meta" "$boundary: refused teardown removed protected metadata"
+
+  if [ "$choice" = open ]; then
+    open=$(bash -c '. "$1"; status_open_decisions "$2"' _ "$ROOT/bin/fm-classify-lib.sh" "$status") \
+      || fail "$boundary: could not fold the handoff status"
+    assert_contains "$open" $'route\tneeds-decision\t' "$boundary: handoff lost the updated decision"
+    assert_contains "$open" $'access\tneeds-decision\t' "$boundary: handoff lost an unrelated decision"
+    if run_captain "$home" complete "$id" --none >"$home/none.out" 2>"$home/none.err"; then
+      fail "$boundary: opted out of the worker's open decisions"
+    fi
+    cmp -s "$home/meta.before" "$meta" || fail "$boundary: refusal attested a false inventory"
+    run_captain "$home" hold sample-choice-call --title 'Choose route and access' \
+      --reason 'North or south, and public or restricted?' --repo sample --origin "$id" >/dev/null \
+      || fail "$boundary: supervisor could not register the call"
+    run_captain "$home" complete "$id" sample-choice-call >/dev/null \
+      || fail "$boundary: supervisor could not attest the open call"
+    assert_grep 'decision_keys=sample-choice-call' "$meta" "$boundary: wrong attested inventory"
+  else
+    run_captain "$home" complete "$id" --none >/dev/null \
+      || fail "$boundary: supervisor could not attest an empty inventory"
+  fi
+  run_captain "$home" verify "$id" >/dev/null || fail "$boundary: completion did not verify"
+  if [ "$boundary:$choice" = portable:open ]; then
+    "$ROOT/bin/fm-status-append.sh" "$status" 'needs-decision [key=later]: another sample call' \
+      || fail "could not append a later review question"
+    if run_captain "$home" complete "$id" --none >"$home/retry.out" 2>"$home/retry.err"; then
+      fail "--none transferred a new open decision to an earlier inventory without explicit review"
+    fi
+    assert_grep 'still has open captain decisions' "$home/retry.err" "repeat --none refused for the wrong reason"
+    if run_captain "$home" verify "$id" >"$home/retry-verify.out" 2>"$home/retry-verify.err"; then
+      fail "a prior attestation masked a later open choice"
+    fi
+    assert_grep "open captain decision $id/later" "$home/retry-verify.err" "repeat verify refused for the wrong reason"
+    "$ROOT/bin/fm-status-append.sh" "$status" 'resolved [key=later]: sample decision answered' \
+      || fail "could not resolve the later fixture question"
+    run_captain "$home" complete "$id" --none >/dev/null || fail "empty review with no new open calls did not replay"
+  fi
+  run_teardown "$home" "$id" >"$home/teardown.out" 2>"$home/teardown.err" \
+    || fail "$boundary: teardown refused after attestation: $(cat "$home/teardown.err")"
+  assert_absent "$meta" "$boundary: completed teardown retained live metadata"
+  assert_present "$report" "$boundary: completed teardown lost the report"
+  if [ "$choice" = open ]; then
+    run_captain "$home" open sample-choice-call || fail "$boundary: teardown closed the captain's call"
+  fi
+  pass "scout report handoff ($boundary, $choice): only supervisor attestation authorizes teardown"
+}
+
+test_scout_report_handoff() {
+  scout_report_handoff_case portable none
+  scout_report_handoff_case portable open
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: macOS Seatbelt scout handoff requires Darwin\n'
+    return
+  fi
+  scout_report_handoff_case claude none
+  scout_report_handoff_case claude open
+  if ! command -v bun >/dev/null 2>&1; then
+    printf 'skip: omp Seatbelt scout handoff requires bun\n'
+    return
+  fi
+  scout_report_handoff_case omp none
+  scout_report_handoff_case omp open
+}
+
 # The completion gate on the collapsed primitive: an origin with open keyed
 # status decisions refuses --none, refuses an inventory naming absent tasks,
 # attests a verified inventory of captain-held task ids, and transfers every
@@ -1868,6 +2011,7 @@ test_inventory_compares_backend_identities
 test_origin_is_never_its_own_inventory_entry
 test_complete_refuses_an_entry_held_for_another_origin
 test_uninventoried_report_decision_refuses_completion
+test_scout_report_handoff
 test_internal_retention_preserves_active_drop_provenance
 test_hold_decodes_a_bare_scalar_body_without_the_nonref_default
 test_retained_body_keeps_its_utf8_bytes
