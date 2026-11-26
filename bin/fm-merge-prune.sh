@@ -6,7 +6,8 @@
 #   fm-merge-prune.sh run <task-id> [--now]   Make one attempt for the task; without --now only when its record is due.
 #   fm-merge-prune.sh sweep                   Make one attempt for every due record (at most 3).
 #
-# A merged task's pool copy used to stay until an hourly safety net or a human
+# A merged task's pool copy used to stay until a human or the owner's manual
+# reaper (~/.local/bin/treehouse-reap-clean)
 # removed it. bin/fm-pr-merge.sh arms a record once it has verified a merge, and
 # bin/fm-watch.sh arms one for a merge that happened elsewhere (the merge poll).
 # A detached sweep then asks the same authority as every other cleanup,
@@ -135,8 +136,10 @@
 #
 # Anything else stays, is never forced or discarded, and raises exactly ONE wake
 # naming the copy and the reason (recorded as sent only once the queue took it). A retained copy is retried silently every six
-# hours in case the cause cleared. The hourly `treehouse prune --all --yes`
-# safety net is not duplicated.
+# hours in case the cause cleared. No hourly `treehouse prune --all --yes`
+# net is built in this repository: the owner's manual reaper,
+# ~/.local/bin/treehouse-reap-clean, run by hand on named paths, is the
+# only net until the task fm-arm-prune-and-copy-sweep lands.
 #
 # A teardown that succeeds and returns the slot to the pool leaves it reset in
 # place, so the copy is still on disk with the task's record gone. The prune
