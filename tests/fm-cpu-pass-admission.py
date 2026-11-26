@@ -792,14 +792,15 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
     def started(folder):
         return sorted(p.name for p in folder.glob('*.started'))
 
+    def held_by_count(log):
+        return re.search(r'pipeline-start waiting: counted=\d+ limit=\d+ basis=fallback ', log.read_text()) is not None
+
     def nested_expanded():
         # F1: an outer measured start whose shell string runs the memory route with an expanded intent.
         folder, db, env = case('fix-f1', cores=3)
         env.update(PATH=str(stay_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off')
         child = launch(measured_run + ['bash', '-c', 'X=goal; %s run -- no-mistakes axi run --intent "$X"' % guard_route], env, folder / 'outer')
-        wait_for_or = time.monotonic() + 15
-        while time.monotonic() < wait_for_or and not started(folder):
-            time.sleep(0.05)
+        wait_for(lambda: started(folder), 'the nested start to run', log=folder / 'outer', child=child)
         text = (folder / 'outer.stderr').read_text()
         assert started(folder), ('nested start never ran', text, live_entries(folder))
         assert text.count('pipeline-start admitted') == 1 and 'admitted by its enclosing start' in text, text
@@ -814,7 +815,8 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         first = launch(measured_run + ['env', 'A=1', guard_route, 'run', '--'] + fresh_shapes['intent'], env, folder / 'first')
         wait_for(lambda: len(started(folder)) == 1, 'first start')
         second = launch(measured_run + ['env', 'A=1', guard_route, 'run', '--'] + fresh_shapes['intent'], env, folder / 'second')
-        time.sleep(2.5)
+        wait_for(lambda: len(started(folder)) > 1 or held_by_count(folder / 'second.stderr'),
+                 'the second identical start to print its waiting line', log=folder / 'second', child=second)
         assert len(started(folder)) == 1 and second.poll() is None, ('second identical start was not held', started(folder))
         (folder / 'release').touch()
         finish(first); finish(second)
@@ -826,7 +828,8 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         both = 'no-mistakes axi run --intent goal & %s pipeline-start -- no-mistakes axi run --intent goal; wait' % (repo / 'bin/fm-cpu-pass.sh')
         outer = launch(cli + ['pipeline-start', '--', 'bash', '-c', both], env, folder / 'outer')
         wait_for(lambda: len(started(folder)) >= 1, 'first start')
-        time.sleep(2.5)
+        wait_for(lambda: len(started(folder)) > 1 or held_by_count(folder / 'outer.stderr'),
+                 'the second start inside one admission to print its waiting line', log=folder / 'outer', child=outer)
         assert len(started(folder)) == 1, ('a second start inside one admission was not held', started(folder))
         (folder / 'release').touch()
         finish(outer)
@@ -839,7 +842,8 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         two = '%s run -- no-mistakes axi run --intent goal & %s run -- no-mistakes axi run --intent goal; wait' % (guard_route, guard_route)
         outer = launch(measured_run + ['bash', '-c', two], env, folder / 'outer')
         wait_for(lambda: len(started(folder)) >= 1, 'first nested start')
-        time.sleep(2.5)
+        wait_for(lambda: len(started(folder)) > 1 or held_by_count(folder / 'outer.stderr'),
+                 'the second nested start to print its waiting line', log=folder / 'outer', child=outer)
         assert len(started(folder)) == 1, ('the second nested start did not queue', started(folder))
         (folder / 'release').touch()
         finish(outer)
@@ -866,15 +870,13 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 assert 'x:ci-waiting:' in (folder / 'f4.stderr').read_text(), (folder / 'f4.stderr').read_text()
             else:
                 line = 'waiting: counted=1 projected=%d ' % (9 * GIB)
-                until = time.monotonic() + 10
-                while time.monotonic() < until and child.poll() is None and line not in (folder / 'f4.stderr').read_text():
-                    time.sleep(0.05)
+                wait_for(lambda: line in (folder / 'f4.stderr').read_text(), 'the waiting line ' + line, log=folder / 'f4', child=child)
                 running = child.poll() is None
                 if running:
                     os.killpg(child.pid, signal.SIGTERM)
                 child.wait()
-                assert running and not (folder / 'm').exists(), ('a live agent at ci:running was read as idle',
-                                                                 (folder / 'f4.stderr').read_text())
+                assert running and line in (folder / 'f4.stderr').read_text() and not (folder / 'm').exists(), (
+                    'a live agent at ci:running was read as idle', (folder / 'f4.stderr').read_text())
 
     def handoff_kill():
         # F5: the gate dies at its pid handoff to the watcher; no agent may run on without it.
@@ -983,9 +985,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                     'holding_only=[x:ci-waiting:0:unseen]' in log.read_text(), (label, log.read_text())
             else:
                 line = 'waiting: counted=1 projected=%d ' % (9 * GIB)
-                until = time.monotonic() + 10
-                while time.monotonic() < until and child.poll() is None and line not in log.read_text():
-                    time.sleep(0.05)
+                wait_for(lambda: line in log.read_text(), label + ': the waiting line ' + line, log=folder / 'r1', child=child)
                 running = child.poll() is None
                 if running:
                     os.killpg(child.pid, signal.SIGTERM)
@@ -2027,7 +2027,8 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         line = "printf 'n\\n' | xargs -n1 -I{} no-mistakes axi run --intent reg-nested; no-mistakes axi run --intent reg-own"
         child = launch(cli + ['pipeline-start', '--', 'bash', '-c', line], env, folder / 'x', cwd=checkout)
         wait_for(lambda: any('reg-nested' in c for c in calls(folder)), 'the nested client ran')
-        time.sleep(2.5)
+        wait_for(lambda: any('reg-own' in c for c in calls(folder)) or held_by_count(folder / 'x.stderr'),
+                 'the own client to print its waiting line', log=folder / 'x', child=child)
         assert not any('reg-own' in c for c in calls(folder)), ('the own client did not wait', calls(folder), (folder / 'x.stderr').read_text())
         change(db, "UPDATE runs SET status = 'completed' WHERE intent = 'reg-nested'")
         code = ended(child, folder, 'lock-case-i')
@@ -2123,7 +2124,8 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         wait_for(lambda: (folder / 'pid-hold-b').exists(), 'the nested client claims and runs')
         row(db, 'run-a', 'another', 'other')
         probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
-        time.sleep(3)
+        wait_for(lambda: (folder / 'probe').exists() or held_by_count(folder / 'probe.stderr'),
+                 'the probe to print its waiting line', log=folder / 'probe', child=probe)
         harm('m1712-other-branch-covers-claimant', not (folder / 'probe').exists(), (folder / 'probe.stderr').read_text())
         change(db, "UPDATE runs SET status = 'completed' WHERE id = 'run-a'")
         finish(probe)
