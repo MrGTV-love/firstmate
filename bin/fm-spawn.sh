@@ -910,7 +910,8 @@
 #     entry, verified with `git config --get core.hooksPath` against the same
 #     git; every other launch.
 # Both carriers also add one numbered GIT_CONFIG maintenance.pack-refs.enabled=false
-# entry, so git's own automatic maintenance never packs the loose refs and deletes
+# entry (a dsh launch, which cannot use any numbered entry, carries it as a
+# GIT_CONFIG_PARAMETERS row instead; see GIT_HOOKS_DSH below), so git's own automatic maintenance never packs the loose refs and deletes
 # the empty refs/heads/<prefix> folder a confined worker's next commit cannot
 # create (bin/fm-fleet-sync.sh sets the same key in every clone's own config; a
 # carrier covers only processes that inherit it).

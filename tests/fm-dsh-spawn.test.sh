@@ -647,7 +647,7 @@ $foreign="*|"$foreign="*) fail "the launch must clear the inherited $foreign" ;;
 # dsh's own subprocess scrub removes every environment name that matches KEY, PASSWORD, SECRET or TOKEN
 # (@deepseek-ai/dsh-subprocess, SENSITIVE_ENV_PATTERN), so a numbered GIT_CONFIG_KEY_n never reaches a dsh tool
 # while GIT_CONFIG_COUNT and GIT_CONFIG_VALUE_n do, and every git call there fails ("missing config key").
-# The recorder applies that scrub to the launched environment; the shared check (tests/lib.sh,
+# The recorder applies that scrub to the launched environment; the shared check (tests/git-config-env-helpers.sh,
 # git_config_env_problems) must then find the environment consistent for a dsh worker and a dsh scout, on the
 # DeepSeek model the fleet runs, with and without a numbered entry already in the pane.
 test_dsh_launch_survives_the_dsh_credential_scrub() {

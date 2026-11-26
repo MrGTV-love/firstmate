@@ -880,7 +880,7 @@ test_verdict_bound_is_a_test_only_seam() {
 # refs/heads/fm folder, which a confined worker cannot create again. bin/fm-spawn.sh therefore adds one
 # maintenance.pack-refs.enabled=false entry to the launch carrier. Every route below replays the real launch text
 # bin/fm-spawn.sh staged, records the environment the worker was started with (env -0), and runs one shared
-# check on it (git_config_env_problems in tests/lib.sh): every n below GIT_CONFIG_COUNT has a KEY_n and a VALUE_n,
+# check on it (git_config_env_problems in tests/git-config-env-helpers.sh): every n below GIT_CONFIG_COUNT has a KEY_n and a VALUE_n,
 # nothing sits at or above it, and a plain `git status` in that environment exits 0.
 # On macOS a claude or omp launch runs under write confinement (sandbox-exec), whose profile also denies the
 # folder creation; the replays of those two routes drop the sandbox-exec wrapper from the staged text in the
