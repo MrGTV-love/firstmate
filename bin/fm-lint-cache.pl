@@ -605,8 +605,11 @@ sub scan_heredoc_parent_subs {
         if (substr($body, $position, 2) eq '$(') {
             $position += 2;
             my $program = balanced_text($body, \$position, '(', ')');
-            scan_program($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child)
-                unless $program =~ /^\(/;
+            if ($program =~ /^\(/) {
+                scan_heredoc_parent_subs($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child);
+            } else {
+                scan_program($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child);
+            }
             next;
         }
         if (substr($body, $position, 2) eq '${') {
@@ -757,19 +760,22 @@ if ($mode eq 'select') {
     while (<STDIN>) { chomp; s{^\./}{}; $changed{$_} = 1; }
     push @source_candidates, keys %changed;
     my $policy_changed = grep { $changed{$_} } qw(bin/fm-lint.sh bin/fm-lint-cache.pl);
-    my (%selected, %closures, %inputs);
+    my (%selected, %closures, %static_closures, %inputs);
     for my $path (@inventory) {
-        my %seen;
-        closure($path, \%seen, 1);
-        $closures{$path} = \%seen;
-        $inputs{$_} = 1 for keys %seen;
+        my (%static_seen, %all_seen);
+        closure($path, \%static_seen, 0);
+        closure($path, \%all_seen, 1);
+        $static_closures{$path} = \%static_seen;
+        $closures{$path} = \%all_seen;
+        $inputs{$_} = 1 for keys %all_seen;
     }
     my $source_changed = grep { $inputs{$_} || /\.sh\z/ } keys %changed;
     for my $path (@inventory) {
         my $seen = $closures{$path};
+        my $static_seen = $static_closures{$path};
         $selected{$path} = 1 if $policy_changed || $changed{$path}
             || (grep { $changed{$_} } keys %$seen)
-            || ($source_changed && (grep { $unknown{$_} } keys %$seen));
+            || ($source_changed && (grep { $unknown{$_} } keys %$static_seen));
     }
     print "$_\0" for grep { $selected{$_} } @inventory;
     exit 0;

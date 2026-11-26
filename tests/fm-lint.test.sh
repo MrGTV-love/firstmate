@@ -1129,18 +1129,46 @@ library_value
 )
 EOF
 SH
+  cat > "$repo/bin/unquoted-heredoc-arith.sh" <<'SH'
+#!/usr/bin/env bash
+bash <<EOF
+$(( $(
+# shellcheck source=bin/library.sh
+. bin/library.sh
+library_value
+printf '0\n'
+) + 1 ))
+EOF
+SH
+  cat > "$repo/bin/unknown-lib.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=/dev/null
+. "$1"
+SH
   cat > "$repo/bin/mixed-child.sh" <<'SH'
 #!/usr/bin/env bash
 message=${1:-hello}
 # shellcheck disable=SC2016
 bash -c ". bin/library.sh; echo $message"
 SH
-  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/child-only.sh bin/dynamic-child.sh bin/mixed-child.sh; do
+  cat > "$repo/bin/mixed-unknown-child.sh" <<'SH'
+#!/usr/bin/env bash
+message=${1:-hello}
+# shellcheck disable=SC2016
+bash -c ". bin/unknown-lib.sh; echo $message"
+SH
+  cat > "$repo/bin/parent-unknown-caller.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/unknown-lib.sh
+. bin/unknown-lib.sh /dev/null
+SH
+  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/unquoted-heredoc-arith.sh bin/child-only.sh bin/dynamic-child.sh bin/mixed-child.sh; do
     out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "baseline $root failed: $out"
     assert_not_contains "$out" "cache hit $root" "baseline $root must run cold"
   done
-  # Mixed dynamic/static -c string must still select on its literal target and stay off unrelated edits.
+  # Mixed dynamic/static -c string must still select on its literal target and stay off unrelated edits,
+  # even when the child-only target itself has an unknown runtime source (while a parent-shell caller still fans out).
   local diff_file="$tmp/mixed.diff" sel="$tmp/mixed.sel" listed
   fm_lint_write_diff_file "$diff_file" bin/library.sh
   perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$sel" || fail "mixed-child select failed"
@@ -1148,11 +1176,19 @@ SH
   while IFS= read -r -d '' root; do listed+="$root"$'\n'; done < "$sel"
   assert_contains "$listed" $'\n''bin/mixed-child.sh'$'\n' "mixed dynamic+static -c string omitted static caller selection"
   assert_contains "$listed" $'\n''bin/unquoted-heredoc-sub.sh'$'\n' "unquoted heredoc parent-shell sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-arith.sh'$'\n' "unquoted heredoc arithmetic-nested sub omitted caller selection"
+  fm_lint_write_diff_file "$diff_file" bin/unknown-lib.sh
+  perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$sel" || fail "unknown-lib direct select failed"
+  listed=$'\n'
+  while IFS= read -r -d '' root; do listed+="$root"$'\n'; done < "$sel"
+  assert_contains "$listed" $'\n''bin/mixed-unknown-child.sh'$'\n' "direct edit of child-only unknown lib omitted mixed-unknown-child"
   fm_lint_write_diff_file "$diff_file" bin/dynamic-child.sh
   perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$sel" || fail "unrelated mixed-child select failed"
   listed=$'\n'
   while IFS= read -r -d '' root; do listed+="$root"$'\n'; done < "$sel"
   assert_not_contains "$listed" $'\n''bin/mixed-child.sh'$'\n' "unrelated edit fanned out to mixed dynamic+static -c caller"
+  assert_not_contains "$listed" $'\n''bin/mixed-unknown-child.sh'$'\n' "child-only edge propagated %unknown fan-out on unrelated edit"
+  assert_contains "$listed" $'\n''bin/parent-unknown-caller.sh'$'\n' "control: parent-shell caller of unknown-lib must still fan out on unrelated edit"
   # Mutate bin/library.sh so library_value requires $1, triggering cross-file SC2119.
   cat > "$repo/bin/library.sh" <<'SH'
 #!/usr/bin/env bash
@@ -1160,9 +1196,9 @@ library_value() {
   printf '%s\n' "$1"
 }
 SH
-  # Sensitivity controls: top-level source AND parent-shell unquoted heredoc substitution
-  # MUST both invalidate cache and fail real ShellCheck with SC2119.
-  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh; do
+  # Sensitivity controls: top-level source AND parent-shell unquoted heredoc substitutions
+  # (direct and nested in arithmetic) MUST invalidate cache and fail real ShellCheck with SC2119.
+  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/unquoted-heredoc-arith.sh; do
     rc=0
     out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || rc=$?
