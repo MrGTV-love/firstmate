@@ -6397,37 +6397,75 @@ agy_spawn_fail() {  # <detail>
 }
 
 # dsh-tui submits the brief as its opening prompt, so its own durable session
-# log is the start proof: a turn opening (busy) or already finishing (idle)
-# both mean the brief reached the agent. A resumed launch already holds the
-# earlier conversation, so only a turn that started beyond DSH_START_POSITION,
-# the log position taken before launch, counts. No pane-scrape fallback exists
-# because the log is the same source the busy classifier trusts. Separately,
+# log is the start proof, judged by bin/fm-dsh.py start-state on the FIRST turn
+# that started beyond DSH_START_POSITION, the log position taken before launch
+# (a resumed launch already holds the earlier conversation, and a later turn
+# never stands in for the first). That turn starts the launch only once the
+# provider accepted it, shown by an assistant/message: busy with one, or ended
+# after one. A turn that ended with reason error refuses at once with the
+# provider's text; one that ended any other way without acceptance refuses as
+# not accepted; one still unaccepted when the window ends refuses as such. No
+# pane-scrape fallback exists because the log is the same source the busy
+# classifier trusts. A turn that errs after this proof returned is outside it;
+# supervision owns later turn failures.
+# The screen is then admitted only while this launch's own dsh-tui is alive:
+# a running, unstopped dsh-tui launcher whose argv carries this launch's
+# --patch path (fm_dsh_launch_alive), checked after the capture, so a frame a
+# dead launch left on screen above a shell cannot pass. Separately,
 # require the live composer shape the steering parser understands: a successful
 # version command is not proof that a changed frontend remains compatible.
 dsh_wait_for_start() {
-  local state pane parse_error i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local state pane parse_error identity unaccepted=0 i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local patch=$DSH_RUNTIME/launch.yml window
   # shellcheck source=bin/fm-composer-lib.sh
   . "$SCRIPT_DIR/fm-composer-lib.sh"
   DSH_START_ERROR=
+  window=$(awk -v n="$max" -v s="$interval" 'BEGIN { printf "%g", n * s }')
+  # The launch's recorded model, effort and cwd let the composer check prove
+  # dsh's pre-usage status row; with no readable binding that row stays unproven.
+  identity=$(python3 "$SCRIPT_DIR/fm-dsh.py" status-identity "$STATE_REAL" "$ID" 2>/dev/null) || identity=
   while [ "$i" -lt "$max" ]; do
-    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
+    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" start-state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state='unknown: bin/fm-dsh.py start-state failed'
+    unaccepted=0
     case "$state" in
+      failed:*)
+        DSH_START_ERROR="dsh: first turn failed: ${state#failed: }"
+        return 1
+        ;;
+      failed)
+        DSH_START_ERROR="dsh: first turn ended in error with no provider text"
+        return 1
+        ;;
+      ended-unaccepted:*)
+        DSH_START_ERROR="dsh: first turn not accepted by the provider: it ended (${state#ended-unaccepted: }) without a response"
+        return 1
+        ;;
+      unaccepted) unaccepted=1 ;;
       busy | idle)
         if fm_backend_visible_capture_supported "$BACKEND"; then
           pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null) || pane=
         else
           pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null) || pane=
         fi
-        if parse_error=$(fm_composer_dsh_screen_check "$pane" 2>&1); then
+        # Checked after the capture: a launch that has exited never comes
+        # back under the same patch within this loop, so alive now means the
+        # screen just read was not left by a dead launch.
+        if ! fm_dsh_launch_alive "$patch"; then
+          DSH_START_ERROR="dsh: the launched dsh-tui process for $patch is not running"
+        elif parse_error=$(fm_composer_dsh_screen_check "$pane" "$identity" 2>&1); then
           return 0
+        else
+          DSH_START_ERROR=${parse_error#error: }
         fi
-        DSH_START_ERROR=${parse_error#error: }
         ;;
       unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;;
     esac
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"
   done
+  if [ "$unaccepted" = 1 ]; then
+    DSH_START_ERROR="dsh: first turn not accepted by the provider within ${window}s"
+  fi
   return 1
 }
 
