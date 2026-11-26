@@ -1,0 +1,45 @@
+## Profile diff: launch 1 (no successor) -> launch 2 (successor recorded), both written by the real fm-spawn relaunch
+## Session-specific lines (Claude session id, launch temp folder) are normalised so only grant changes remain
+84a85,88
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707-v2"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707-v2.lock"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/logs/refs/heads/fm/labscott-dc3707-v2"))
+> (allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/logs/refs/heads/fm/labscott-dc3707-v2.lock"))
+186a191
+> (deny file-write* (literal "/private/tmp/claude-501/-Users-charlesabrooker--treehouse-fm-mini-home-27ba56-55-fm-mini-home"))
+
+## Raw diff line count (unnormalised): 15
+
+## Every allow line in launch 2 that names refs/heads or logs/refs/heads
+(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707"))
+(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707.lock"))
+(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/logs/refs/heads/fm/labscott-dc3707"))
+(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/logs/refs/heads/fm/labscott-dc3707.lock"))
+(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707-v2"))
+(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707-v2.lock"))
+(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/logs/refs/heads/fm/labscott-dc3707-v2"))
+(allow file-write* (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/logs/refs/heads/fm/labscott-dc3707-v2.lock"))
+(allow file-write* (regex #"^/Users/charlesabrooker/tmp/fm\-lab\-fx\.xCZQW8/project/\.git/refs/heads/archive/labscott\-dc3707-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+(allow file-write* (regex #"^/Users/charlesabrooker/tmp/fm\-lab\-fx\.xCZQW8/project/\.git/logs/refs/heads/archive/labscott\-dc3707-(submitted|pipeline)-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f](\.lock)?$"))
+(allow file-write-create (require-all (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/archive") (vnode-type DIRECTORY)))
+(allow file-write-create (require-all (literal "/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/logs/refs/heads/archive") (vnode-type DIRECTORY)))
+
+## Project refs before vs after relaunch 2
+refs identical
+
+## Gate repo (run-owned refs and objects) before vs after relaunch 2
+gate identical:       45 files
+
+## Project .git paths that changed in relaunch 2
+
+## Copy (work tree) paths that changed in relaunch 2
+.claude/settings.local.json
+
+## Record after relaunch 2 (branch lines)
+branch=fm/labscott-dc3707
+write_confinement=seatbelt-v1
+successor_branch=fm/labscott-dc3707-v2
+successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+
+## Copy HEAD
+refs/heads/fm/labscott-dc3707

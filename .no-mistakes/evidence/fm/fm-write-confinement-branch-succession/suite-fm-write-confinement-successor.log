@@ -1,4 +1,4 @@
-DIGEST no-successor-generator-profile=94aed424838e3945d5a6bda8610f6a15f87be4ebb71676a4334d33f0f9136b62
+DIGEST no-successor-generator-profile=744cb982cc85df99019494fbb7f41b9f79e963cefa1eb362d26419fee1f584ed
 ok - no-successor-allows-exactly-the-branch
 ok - successor-adds-exactly-four-literals
 ok - successor-only-in-literal-lines
@@ -6,31 +6,22 @@ ok - generator-refuses-inadmissible-successors
 ok - generator-holds-the-name-family-bound
 ok - alias-check-covers-the-successor-and-spares-the-own-branch
 ok - PROFILE-COVERS (profile text): the generated profile gains exactly the successor's literal allow lines and nothing else, holds the name family, and checks the successor's paths for links
-DIGEST no-successor-generator-profile=715e77bd43d9bf69f4235c66d4301278cb14172d45db8cb2d7c94296f2e66c94
+DIGEST no-successor-generator-profile=d709ab68d9ccba69c602e4b29e9d8042ca50aa5cc94c1bd2c952d53a0bdd7392
 ok - no-successor-allows-exactly-the-branch
 ok - successor-adds-exactly-four-literals
 ok - successor-only-in-literal-lines
 ok - generator-refuses-inadmissible-successors
 ok - the profile validator passes on the unchanged generator
-DIGEST no-successor-generator-profile=715e77bd43d9bf69f4235c66d4301278cb14172d45db8cb2d7c94296f2e66c94
+DIGEST no-successor-generator-profile=d709ab68d9ccba69c602e4b29e9d8042ca50aa5cc94c1bd2c952d53a0bdd7392
 ok - the profile validator fails when the successor build loses a protected-ref deny line: the successor profile dropped lines: ['(deny file-write* (subpath "/Users/charlesabrooker/tmp/fm-write-confinement-succe
 ok - kernel proof: the new profile allows the successor and refuses an unrelated name, another task's branch and prefix- or suffix-sharing names; the old profile refuses the successor
 ok - the kernel validator passes an ideal confinement and judges every refusal on a valid command
 ok - the kernel validator fails when a refusal is an unrelated git failure
 ok - the kernel validator fails when nothing is confined
+ok - kernel proof: the new profile allows the successor and refuses an unrelated name, another task's branch and prefix- or suffix-sharing names; the old profile refuses the successor
+ok - the kernel validator passes a refusal git reports only as a folder it could not create, when the profile refuses that folder
+ok - the kernel validator fails when git's folder error is not the confinement's (the folder can be made)
 ok - PROFILE-COVERS (validators): the profile comparison sees a removed deny line, and the kernel judgment tells a confinement refusal from an unrelated git failure
-Traceback (most recent call last):
-  File "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/tests/fm-write-confinement-successor.py", line 430, in <module>
-    sys.exit(main())
-             ~~~~^^
-  File "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/tests/fm-write-confinement-successor.py", line 425, in main
-    return kernel(REPO, base)
-  File "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/tests/fm-write-confinement-successor.py", line 399, in kernel
-    refused(new_profile, name, p_tip, "create", f"new profile: creating {name!r} ({label})")
-    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M7MYQZDENGWZ8TC0F3BXCXBA/tests/fm-write-confinement-successor.py", line 380, in refused
-    assert CONFINEMENT_REFUSAL.search(result.stderr or ""), \
-           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
-AssertionError: new profile: creating 'fm/pre-fm/fm-scott-fixture-task-v2' (successor-as-suffix): git failed for a reason other than the confinement refusing it: fatal: cannot lock ref 'refs/heads/fm/pre-fm/fm-scott-fixture-task-v2': unable to create directory for /Users/charlesabrooker/tmp/fm-write-confinement-successor.ZER37a/kernel/scott/project/.git/refs/heads/fm/pre-fm/fm-scott-fixture-task-v2
-not ok - the successor kernel proof failed (exit 1)
-exit=1 secs=102
+ok - kernel proof: the new profile allows the successor and refuses an unrelated name, another task's branch and prefix- or suffix-sharing names; the old profile refuses the successor
+ok - PROFILE-COVERS (kernel): with the new profile the successor is allowed and an unrelated name, another task's branch and prefix- or suffix-sharing names are refused; with the old profile the successor is refused
+exit=0

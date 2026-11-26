@@ -1,0 +1,10 @@
+stopping the lab worker at the Claude first-run theme screen: exact pid 85736 (claude), which this test's own relaunch started
+record branch lines now: branch=fm/labscott-dc3707 
+relaunched labscott-dc3707 harness=claude from=claude model=claude-sonnet-5-5[1m] effort=high backend=tmux endpoint=fmses:fm-labscott-dc3707 worktree=/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/slots/22/project
+exit=0
+
+## launch 3 profile vs launch 1 profile (normalised; other sessions' Claude temp-folder denies left out)
+identical grant set: the successor allow lines are gone
+
+## successor lines left in launch 3 profile: 0
+DONE

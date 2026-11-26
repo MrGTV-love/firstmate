@@ -1,0 +1,56 @@
+## First call (Main, lock owner)
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note 'Scott-shape v2 custody: the pipeline head P lives on the successor'
+successor-recorded labscott-dc3707 branch=fm/labscott-dc3707 successor_branch=fm/labscott-dc3707-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.rDLW52
+action: task=labscott-dc3707 prior_branch=fm/labscott-dc3707 successor_branch=fm/labscott-dc3707-v2; recorded; wrote /Users/charlesabrooker/tmp/fm-lab.rDLW52/state/labscott-dc3707.meta and /Users/charlesabrooker/tmp/fm-lab.rDLW52/data/labscott-dc3707/brief.md; proof: route=archive-tip archive=archive/labscott-dc3707-pipeline-6db21b5e: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 of the task's own archive branch archive/labscott-dc3707-pipeline-6db21b5e; no work tree, ref, index, process, run record or profile file was touched
+route: route=archive-tip archive=archive/labscott-dc3707-pipeline-6db21b5e successor=fm/labscott-dc3707-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.rDLW52 bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M8ANFT7017QY5MVCBFVGZS9B/bin/fm-control.sh labscott-dc3707 relaunch --note apply\ recorded\ successor\ branch\ fm/labscott-dc3707-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/labscott-dc3707 and successor fm/labscott-dc3707-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+exit=(not captured: the driver shell was zsh, where PIPESTATUS is empty; the receipt prints only on the success path, and the record diff below shows the write)
+
+## Record diff (before -> after)
+9a10,11
+> successor_branch=fm/labscott-dc3707-v2
+> successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+
+## Brief diff (before -> after)
+20a21,29
+> 
+> ## Successor branch (2026-11-26T01:29:09Z)
+> 
+> This task now records a successor branch in the same copy.
+> Prior branch: fm/labscott-dc3707 (still recorded; the Ship branch line above is unchanged).
+> Successor branch: fm/labscott-dc3707-v2
+> The write profile of this task's next launch allows writes to exactly its prior branch, the successor branch (each with its lock and reflog) and its archive recovery branches, and nothing more; a slot-governed launch never applies a successor.
+> 
+> Scott-shape v2 custody: the pipeline head P lives on the successor
+
+## Copy, project .git and gate trees (path, mode, size, sha256 of every file)
+identical:      120 files
+## Worker processes before/after
+52400 S+  
+52447 S+  
+52895 S+  
+52400 S+  
+52447 S+  
+52895 S+  
+
+## Second identical call (idempotence)
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --note 'same again'
+successor-already-recorded labscott-dc3707 branch=fm/labscott-dc3707 successor_branch=fm/labscott-dc3707-v2
+owner: the lock-owning main Firstmate of /Users/charlesabrooker/tmp/fm-lab.rDLW52
+action: task=labscott-dc3707 prior_branch=fm/labscott-dc3707 successor_branch=fm/labscott-dc3707-v2; none: task labscott-dc3707 already records successor_branch=fm/labscott-dc3707-v2; wrote nothing; proof: route=proved-tip: its tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 still contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved at its admission; no work tree, ref, index, process, run record or profile file was touched
+route: route=proved-tip successor=fm/labscott-dc3707-v2 successor_sha=6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+tip: none needed: re-admitted from the record's successor_proved_tip=6db21b5eb716310ad6356746ee9786e40eb9b4d6
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.rDLW52 bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M8ANFT7017QY5MVCBFVGZS9B/bin/fm-control.sh labscott-dc3707 relaunch --note apply\ recorded\ successor\ branch\ fm/labscott-dc3707-v2
+effect: a running worker keeps the profile it was launched with; that relaunch first re-admits the successor, which holds while its history contains the proved tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6, and only then exits the worker and starts a replacement in the same copy and endpoint, and the replacement's write profile is generated from the record to allow exactly branch fm/labscott-dc3707 and successor fm/labscott-dc3707-v2 (each with its lock and reflog) and the task's archive recovery branches. It touches no ref, no run record and no task file except the worker wiring files every relaunch rewrites.
+exit=0
+record, brief, state, data, copy, project, gate: byte-identical after the repeat
+
+## A different second successor (one per task)
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v9 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: task labscott-dc3707 already records successor branch fm/labscott-dc3707-v2; one successor per task, so nothing was changed
+exit=1
+bytes: unchanged
+DONE

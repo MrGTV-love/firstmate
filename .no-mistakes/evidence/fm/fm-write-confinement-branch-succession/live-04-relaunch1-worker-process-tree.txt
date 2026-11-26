@@ -1,0 +1,4 @@
+27491 /bin/bash --noprofile --norc
+  52400 /bin/bash -c export TMPDIR='/tmp/fm-labscott-dc3707' TMP='/tmp/fm-labscott-dc3707' TEMP='/tmp/fm-labscott-dc3707'; ( fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${
+    52447 /bin/bash -c fm_launch_git_hooks() {\012  fm_hooks=$1 fm_rows=$2 fm_carrier=$3\012  if ! command -v git >/dev/null 2>&1; then\012    fm_reason="fm-spawn: git does not resolve on this pane's PATH; refusing to launch
+      52895 claude --session-id d1c434df-b72a-4e02-b69d-1c747f74fafa --dangerously-skip-permissions --add-dir /Users/charlesabrooker/tmp/fm-lab.rDLW52/state/operational-inbox --add-dir /Users/charlesabrooker/tmp/fm-lab.rDLW52/

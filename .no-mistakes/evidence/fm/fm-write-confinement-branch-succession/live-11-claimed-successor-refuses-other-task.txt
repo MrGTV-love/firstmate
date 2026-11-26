@@ -1,0 +1,12 @@
+## Re-record the successor (Main)
+successor-recorded labscott-dc3707 branch=fm/labscott-dc3707 successor_branch=fm/labscott-dc3707-v2
+
+## Task labre tries to reassociate onto a copy on fm/labscott-dc3707-v2 (recorded as labscott-dc3707's successor)
+$ fm-control labre reassociate --worktree /Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/re-new --note x
+error: replacement copy /Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/re-new is on refs/heads/fm/labscott-dc3707-v2, which task labscott-dc3707 records as its successor branch, so task labre may not take it; nothing was changed
+exit=1
+one file changed: state/.treehouse-project-<hash>.lock.holds gained one line "start=... operation=reassociate labre"; this is the project lock hold-time log that bin/fm-project-lock-lib.sh:326 appends on every reassociate (not a task record, brief, copy, ref or process; that file is not in this change)
+
+{"decision":"allow","rule":"record","successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"reassociate","successor":"fm/labscott-dc3707-v2","task":"labre"}
+DONE

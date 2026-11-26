@@ -1,0 +1,9 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rDLW52
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rDLW52
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/tmp/fm-lab.rDLW52/data/labscott-dc3707/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for labscott-dc3707: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+relaunched labscott-dc3707 harness=claude from=claude model=claude-sonnet-5-5[1m] effort=high backend=tmux endpoint=fmses:fm-labscott-dc3707 worktree=/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/slots/22/project
+exit=0

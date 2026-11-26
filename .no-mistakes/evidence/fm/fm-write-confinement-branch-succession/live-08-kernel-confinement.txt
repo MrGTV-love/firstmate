@@ -1,0 +1,27 @@
+P=6db21b5eb716310ad6356746ee9786e40eb9b4d6 C=79361e4aeb73a20f80c34c569b7eda7d66f8293c (child of P)  S=8435a6f28f95b9cc3db51ec5b63009556fb4a4b7 C2=85a04c2823568f53cab5e6668eb7c9e77509c29d (child of S)
+
+## Launch 1 profile (no successor recorded)
+REFUSED   successor (must refuse)      refs/heads/fm/labscott-dc3707-v2                 rc=128 fatal: update_ref failed for ref 'refs/heads/fm/labscott-dc3707-v2': cannot lock ref 'refs/heads/fm/labscott-dc3707-v2': Unable to create '/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707-v2.lock': Operation not permitted
+ALLOWED   task branch (control)        refs/heads/fm/labscott-dc3707                    rc=0 
+
+## Launch 2 profile (successor recorded)
+ALLOWED   successor (must allow)       refs/heads/fm/labscott-dc3707-v2                 rc=0 
+ALLOWED   task branch (control)        refs/heads/fm/labscott-dc3707                    rc=0 
+REFUSED   unrelated name               refs/heads/lab-unrelated                         rc=128 fatal: update_ref failed for ref 'refs/heads/lab-unrelated': cannot lock ref 'refs/heads/lab-unrelated': Unable to create '/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/lab-unrelated.lock': Operation not permitted
+REFUSED   default branch               refs/heads/main                                  rc=128 fatal: update_ref failed for ref 'refs/heads/main': cannot lock ref 'refs/heads/main': Unable to create '/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/main.lock': Operation not permitted
+REFUSED   prefix-sharing (v2x)         refs/heads/fm/labscott-dc3707-v2x                rc=128 fatal: update_ref failed for ref 'refs/heads/fm/labscott-dc3707-v2x': cannot lock ref 'refs/heads/fm/labscott-dc3707-v2x': Unable to create '/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707-v2x.lock': Operation not permitted
+REFUSED   prefix of successor (-v)     refs/heads/fm/labscott-dc3707-v                  rc=128 fatal: update_ref failed for ref 'refs/heads/fm/labscott-dc3707-v': cannot lock ref 'refs/heads/fm/labscott-dc3707-v': Unable to create '/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707-v.lock': Operation not permitted
+REFUSED   suffix-sharing (x-...-v2)    refs/heads/x-fm/labscott-dc3707-v2               rc=128 fatal: update_ref failed for ref 'refs/heads/x-fm/labscott-dc3707-v2': cannot lock ref 'refs/heads/x-fm/labscott-dc3707-v2': unable to create directory for /Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/x-fm/labscott-dc3707-v2
+REFUSED   sibling in family (-v3)      refs/heads/fm/labscott-dc3707-v3                 rc=128 fatal: update_ref failed for ref 'refs/heads/fm/labscott-dc3707-v3': cannot lock ref 'refs/heads/fm/labscott-dc3707-v3': Unable to create '/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labscott-dc3707-v3.lock': Operation not permitted
+REFUSED   another task's branch        refs/heads/fm/labother                           rc=128 fatal: update_ref failed for ref 'refs/heads/fm/labother': cannot lock ref 'refs/heads/fm/labother': Unable to create '/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/fm/labother.lock': Operation not permitted
+REFUSED   archive (own, wrong hex len) refs/heads/archive/labscott-dc3707-pipeline-6db2 rc=128 fatal: update_ref failed for ref 'refs/heads/archive/labscott-dc3707-pipeline-6db2': cannot lock ref 'refs/heads/archive/labscott-dc3707-pipeline-6db2': Unable to create '/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project/.git/refs/heads/archive/labscott-dc3707-pipeline-6db2.lock': Operation not permitted
+
+## Refs after (successor moved to C by the allowed write; nothing else created)
+refs/heads/archive/labscott-dc3707-pipeline-6db21b5e 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+refs/heads/archive/labscott-dc3707-submitted-8435a6f2 8435a6f28f95b9cc3db51ec5b63009556fb4a4b7
+refs/heads/fm/labscott-dc3707 85a04c2823568f53cab5e6668eb7c9e77509c29d
+refs/heads/fm/labscott-dc3707-other 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+refs/heads/fm/labscott-dc3707-v2 79361e4aeb73a20f80c34c569b7eda7d66f8293c
+refs/heads/fm/labscott-dc3707v2 6db21b5eb716310ad6356746ee9786e40eb9b4d6
+refs/heads/main a2e45ca0cf7881cf24a599790e82a935d1a627b9
+DONE

@@ -1,0 +1,6 @@
+## A. non-owner session (home lock free) tries successor
+$ fm-control labscott-ffe483 successor --branch fm/labscott-ffe483-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note 'v2 custody'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rDLW52
+error: successor branch recording requires the actual lock-owning main Firstmate
+exit=1
+bytes: state, data, copy, project, gate unchanged

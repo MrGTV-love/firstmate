@@ -1,0 +1,37 @@
+live worker pid before: 85736 (claude)
+
+## A. successor reset to main's commit, so its history lacks the proved tip; relaunch
+$ bash bin/fm-control.sh labscott-dc3707 relaunch --note 'apply'
+error: task labscott-dc3707 records successor branch 'fm/labscott-dc3707-v2', which is no longer proved to be this task's: successor branch 'fm/labscott-dc3707-v2' at a2e45ca0cf7881cf24a599790e82a935d1a627b9 no longer contains the tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 proved at its admission; refused before stopping the running agent; repair: preserve task labscott-dc3707's worktree and record, then make the successor branch contain its recorded successor_proved_tip= again, or remove its successor_branch= and successor_proved_tip= lines from the record, and run fm-control labscott-dc3707 relaunch again
+exit=1
+worker pid after: 85736 (same: yes)
+record unchanged
+profile file unchanged
+
+## B. record hand-edited to add slot_manifest= while it records a successor; relaunch
+$ bash bin/fm-control.sh labscott-dc3707 relaunch --note 'apply'
+error: relaunch refused: task labscott-dc3707 is slot-governed and records successor branch fm/labscott-dc3707-v2, and a slot-governed launch adopts or provisions its copy on its recorded branch alone, so it cannot apply the successor; the running agent was not stopped. Repair: preserve task labscott-dc3707's worktree and record, then remove its successor_branch= and successor_proved_tip= lines from the record and run fm-control labscott-dc3707 relaunch again
+exit=1
+worker pid after: 85736 (same: yes)
+record unchanged
+profile file unchanged
+## successor-branch-admission guard events in the lab log
+{"decision":"deny","rule":"proof","route":null,"successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"name","route":null,"successor":"fm/labscott-dc3707-v*","task":"labscott-dc3707"}
+{"decision":"deny","rule":"name","route":null,"successor":"fm/labscott-dc3707-v 2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"name","route":null,"successor":"develop","task":"labscott-dc3707"}
+{"decision":"deny","rule":"name","route":null,"successor":"fm/labscott-dc3707v2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"name","route":null,"successor":"fm/labscott-dc3707","task":"labscott-dc3707"}
+{"decision":"deny","rule":"name","route":null,"successor":"fm/labscott-dc3707-other","task":"labscott-dc3707"}
+{"decision":"deny","rule":"name","route":null,"successor":"main","task":"labscott-dc3707"}
+{"decision":"deny","rule":"name","route":null,"successor":"archive/labscott-dc3707-pipeline-6db21b5e","task":"labscott-dc3707"}
+{"decision":"deny","rule":"proof","route":null,"successor":"fm/labscott-dc3707-v3","task":"labscott-dc3707"}
+{"decision":"deny","rule":"proof","route":null,"successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"slot-governed","route":null,"successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"slot-governed","route":null,"successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+{"decision":"allow","rule":"record","route":"archive-tip","successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"one-successor","route":null,"successor":"fm/labscott-dc3707-v9","task":"labscott-dc3707"}
+{"decision":"allow","rule":"launch","route":"proved-tip","successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"relaunch","route":null,"successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+{"decision":"deny","rule":"relaunch","route":null,"successor":"fm/labscott-dc3707-v2","task":"labscott-dc3707"}
+DONE

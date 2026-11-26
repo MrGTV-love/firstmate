@@ -1,0 +1,97 @@
+
+## R1 worker session (FM_TASK_ID set)
+$ FM_TASK_ID=labscott-dc3707 fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: workers cannot record a successor branch
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R2 first admission without --tip
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --note x
+error: successor branch 'fm/labscott-dc3707-v2' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy, containing the recorded branch's tip, which must be the --tip) fails because it is not checked out in the recorded copy /Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/slots/22/project; the archive-tip route (its history contains the --tip, which must be the tip of one of the task's own archive/labscott-dc3707-(submitted|pipeline)-<8 hex> branches) fails because no --tip was given; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.rDLW52 bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M8ANFT7017QY5MVCBFVGZS9B/bin/fm-control.sh labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project rev-parse refs/heads/fm/labscott-dc3707), a ref the worker can move, so that route proves only that you observed that tip
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R3 wildcard name
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v* --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'fm/labscott-dc3707-v*' is not admissible: it may use only letters, digits, '.', '_', '-' and '/', starting with a letter or digit (no wildcard, space or other character); nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R4 name with a space
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v 2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'fm/labscott-dc3707-v 2' is not admissible: it may use only letters, digits, '.', '_', '-' and '/', starting with a letter or digit (no wildcard, space or other character); nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R5 outside the name family: develop
+$ fm-control labscott-dc3707 successor --branch develop --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'develop' is not admissible: it is outside the task's own name family: the recorded branch name 'fm/labscott-dc3707', then '-', then one or more of letters, digits, '.', '_' and '-'; that bound keeps a branch of another lineage such as develop or release/* out of the task's write profile; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R6 outside the name family: prefix-sharing fm/labscott-dc3707v2 (no dash; ref exists)
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'fm/labscott-dc3707v2' is not admissible: it is outside the task's own name family: the recorded branch name 'fm/labscott-dc3707', then '-', then one or more of letters, digits, '.', '_' and '-'; that bound keeps a branch of another lineage such as develop or release/* out of the task's write profile; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R7 name equals the recorded branch
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'fm/labscott-dc3707' is not admissible: it equals the task's recorded branch; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R8 another task's recorded branch (task labother; ref exists)
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-other --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'fm/labscott-dc3707-other' is not admissible: task labother already records it as its branch; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R9 the default branch main
+$ fm-control labscott-dc3707 successor --branch main --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'main' is not admissible: it is the project's default branch; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R10 an archive name
+$ fm-control labscott-dc3707 successor --branch archive/labscott-dc3707-pipeline-6db21b5e --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'archive/labscott-dc3707-pipeline-6db21b5e' is not admissible: it is under archive/, which only a task's own recovery branches use; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R11 successor ref does not exist
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v3 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: successor branch 'fm/labscott-dc3707-v3' does not exist in the project's ref store (/Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project); create it first; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.rDLW52 bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M8ANFT7017QY5MVCBFVGZS9B/bin/fm-control.sh labscott-dc3707 successor --branch fm/labscott-dc3707-v3 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project rev-parse refs/heads/fm/labscott-dc3707), a ref the worker can move, so that route proves only that you observed that tip
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R12 --tip is shared history (main's commit)
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 --note x
+error: successor branch 'fm/labscott-dc3707-v2' is not proved to be this task's successor; the checked-out route (checked out in the recorded copy, containing the recorded branch's tip, which must be the --tip) fails because it is not checked out in the recorded copy /Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/slots/22/project; the archive-tip route (its history contains the --tip, which must be the tip of one of the task's own archive/labscott-dc3707-(submitted|pipeline)-<8 hex> branches) fails because no archive/labscott-dc3707-(submitted|pipeline)-<8 hex> branch of the task has the tip a2e45ca0cf7881cf24a599790e82a935d1a627b9 outside the project's default and base branches; nothing was changed. Rerun with a tip you read yourself: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.rDLW52 bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M8ANFT7017QY5MVCBFVGZS9B/bin/fm-control.sh labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --tip \<sha\> --note \<why\>, where <sha> is, for the archive-tip route, this task's submitted or pipeline head from its no-mistakes run record, which the worker cannot write (no-mistakes axi status --run <run-id>: branch_sync.pipeline.submitted_head, current_head, pushed_head or run.head_sha), or, for the checked-out route, the recorded branch's tip as you observe it (git -C /Users/charlesabrooker/tmp/fm-lab-fx.xCZQW8/project rev-parse refs/heads/fm/labscott-dc3707), a ref the worker can move, so that route proves only that you observed that tip
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R13 a scout task
+$ fm-control labscout successor --branch fm/labscout-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: a successor branch applies to a ship; task labscout is a scout; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R14 an unknown task
+$ fm-control nosuchtask successor --branch fm/nosuchtask-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: no task 'nosuchtask' in /Users/charlesabrooker/tmp/fm-lab.rDLW52/state (fm-control resolves an exact task id only)
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R15 slot-governed project (scripts/git-stability/provision_existing_slot.py present)
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: task labscott-dc3707 is slot-governed (its record names a slot manifest, or its project or copy has scripts/git-stability/provision_existing_slot.py), and a slot-governed launch adopts or provisions its copy on the recorded branch alone, so no launch could apply a successor; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+
+## R16 record names slot_manifest=
+$ fm-control labscott-dc3707 successor --branch fm/labscott-dc3707-v2 --tip 6db21b5eb716310ad6356746ee9786e40eb9b4d6 --note x
+error: task labscott-dc3707 is slot-governed (its record names a slot manifest, or its project or copy has scripts/git-stability/provision_existing_slot.py), and a slot-governed launch adopts or provisions its copy on the recorded branch alone, so no launch could apply a successor; nothing was changed
+exit=1
+bytes of state, data, copy, project git, gate: unchanged
+DONE
