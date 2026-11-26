@@ -1276,6 +1276,8 @@ FM_RR_S=
 FM_RR_PENDING=
 # What a write run's step 3 reconciliation did to each pending or rolling-back audit record, as comma-joined phrases.
 FM_RR_RECONCILED=
+# 1 once this run's exit output names what its step 3 reconciliation did, so the EXIT trap does not print it again.
+FM_RR_REPORTED=0
 
 fm_slot_rerecord_fail() { # <reason> <detail>
   FM_SLOT_RERECORD_REASON=$1
@@ -1305,6 +1307,7 @@ fm_slot_rerecord_restored() { # [unrestored]
 }
 
 fm_slot_rerecord_refuse() { # <reason> <detail> [<tail>]
+  FM_RR_REPORTED=1
   echo "error: slot rerecord refused: $1${2:+: $2}; ${3:-$(fm_slot_rerecord_changes refusing 'no record, manifest, copy or journal was changed')}" >&2
   return 1
 }

@@ -441,14 +441,22 @@ control_cleanup() {
       discard) fm_slot_rerecord_discard_staged || true ;;
       rollback)
         if [ -z "$RERECORD_SNAP" ]; then
-          fm_slot_rerecord_rollback || true
+          if fm_slot_rerecord_rollback; then
+            fm_slot_rerecord_closed "$FM_RR_AUDIT" rolled-back "the task record was restored to the prior record's bytes" \
+              "the task record was restored to the prior record's bytes"
+          fi
         elif fm_slot_rerecord_rollback; then
+          FM_RR_REPORTED=1
           echo "rerecord-slot $FM_RR_ID: $(fm_slot_rerecord_restored)" >&2
         else
+          FM_RR_REPORTED=1
           echo "error: $(fm_slot_rerecord_restored unrestored)" >&2
         fi
         ;;
     esac
+  fi
+  if [ -n "${FM_RR_RECONCILED:-}" ] && [ "${FM_RR_REPORTED:-0}" != 1 ] && declare -F fm_slot_rerecord_changes >/dev/null 2>&1; then
+    echo "error: $(fm_slot_rerecord_changes stopping '')" >&2
   fi
   [ -z "$RERECORD_SNAP" ] || rm -rf -- "$RERECORD_SNAP"
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
@@ -3018,8 +3026,14 @@ rerecord_refuse() {
 
 rerecord_rollback() {
   fm_slot_rerecord_rollback && return 0
+  FM_RR_REPORTED=1
   echo "error: $(fm_slot_rerecord_restored unrestored)" >&2
   exit 1
+}
+
+rerecord_die() { # <message naming the step 3 entries>
+  FM_RR_REPORTED=1
+  die "$1"
 }
 
 do_rerecord_slot() {
@@ -3078,6 +3092,7 @@ do_rerecord_slot() {
       0) ;;
       2)
         [ -z "$FM_RR_RECONCILED" ] || echo "error: $(fm_slot_rerecord_changes stopping '')" >&2
+        FM_RR_REPORTED=1
         exit 1
         ;;
       *) rerecord_refuse ;;
@@ -3086,11 +3101,11 @@ do_rerecord_slot() {
 
   # 4. Fingerprint P, M and H, and snapshot the record and manifest bytes.
   RERECORD_SNAP=$(mktemp -d "$STATE/.$ID.meta.rerecord-snap.XXXXXX") \
-    || die "could not create the private snapshot for task $ID; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+    || rerecord_die "could not create the private snapshot for task $ID; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   chmod 700 "$RERECORD_SNAP"
   snap=$RERECORD_SNAP
-  cp -p -- "$META" "$snap/record" || die "could not snapshot task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
-  prior_sha=$(fm_slot_rerecord_sha "$snap/record") || die "could not read task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+  cp -p -- "$META" "$snap/record" || rerecord_die "could not snapshot task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+  prior_sha=$(fm_slot_rerecord_sha "$snap/record") || rerecord_die "could not read task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   manifest=$(fm_meta_get "$snap/record" slot_manifest)
   manifest_sha=
   if [ -n "$manifest" ] && [ -f "$manifest" ] && [ ! -L "$manifest" ] && cp -- "$manifest" "$snap/manifest.json" 2>/dev/null; then
@@ -3153,6 +3168,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     if [ "$noop" = 1 ]; then
       echo "rerecord-slot $ID: already recorded"
       [ -z "$FM_RR_RECONCILED" ] || echo "rerecord-slot $ID: $(fm_slot_rerecord_changes 'finding it already recorded' '')"
+      FM_RR_REPORTED=1
     else
       echo "manifest_sha256=$manifest_sha"
       echo "base=$old_base -> $new_base"
@@ -3186,16 +3202,16 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
 
   # 9. Stage, verify, archive, rebind, publish, verify, commit.
   FM_RR_P=$prior_sha
-  FM_RR_STAGED=$(mktemp "$STATE/.$ID.meta.rerecord.XXXXXX") || die "could not stage task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+  FM_RR_STAGED=$(mktemp "$STATE/.$ID.meta.rerecord.XXXXXX") || rerecord_die "could not stage task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   RERECORD_STAGE=staged
   fm_slot_rerecord_stage "$snap/record" "$snap/manifest.json" "$FM_RR_STAGED" \
-    || die "could not stage task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+    || rerecord_die "could not stage task $ID's record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   fm_slot_rerecord_precheck "$FM_RR_STAGED" "$snap/record" "$snap/manifest.json" \
     "$(fm_task_copy_canonical_dir "$copy")" "$branch" || rerecord_refuse
-  staged_sha=$(fm_slot_rerecord_sha "$FM_RR_STAGED") || die "could not read task $ID's staged record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+  staged_sha=$(fm_slot_rerecord_sha "$FM_RR_STAGED") || rerecord_die "could not read task $ID's staged record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   FM_RR_S=$staged_sha
   note_json=$(python3 -I -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$NOTE") \
-    || die "could not encode the note; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+    || rerecord_die "could not encode the note; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   {
     echo "task=$ID"
     echo "prior_sha256=$prior_sha"
@@ -3210,7 +3226,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     echo "head=$head"
     sed -n '2,$p' "$snap/scope"
     echo "note=$note_json"
-  } > "$snap/audit-body" || die "could not prepare the audit record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+  } > "$snap/audit-body" || rerecord_die "could not prepare the audit record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   fm_slot_rerecord_archive "$FM_RR_DIR" "$snap/record" "$prior_sha" "$snap/audit-body" || rerecord_refuse
   fm_slot_rerecord_inputs_unchanged "$META" "$prior_sha" "$manifest" "$manifest_sha" "$copy" "$head" || rerecord_refuse
   fm_slot_rerecord_binding_ok "$manifest" "$RERECORD_MANIFEST_SHA" || rerecord_refuse
@@ -3223,10 +3239,10 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     RERECORD_STAGE=published
     FM_RR_STAGED=
     rerecord_rollback
-    die "task $ID's record publish reported failure after it landed; $(fm_slot_rerecord_restored)"
+    rerecord_die "task $ID's record publish reported failure after it landed; $(fm_slot_rerecord_restored)"
   else
     RERECORD_STAGE=staged
-    die "${FM_BACKLOG_TRANSITION_ERROR:-the task record could not be published}; $(fm_slot_rerecord_changes stopping "the record of task $ID is unchanged")"
+    rerecord_die "${FM_BACKLOG_TRANSITION_ERROR:-the task record could not be published}; $(fm_slot_rerecord_changes stopping "the record of task $ID is unchanged")"
   fi
   if ! fm_slot_rerecord_postcheck "$META" "$staged_sha" "$manifest" "$manifest_sha" "$copy" "$head" \
     "$project" "$ID" "$branch" "$STATE" "$snap/adopt-err"; then
@@ -3237,7 +3253,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
   fi
   if ! fm_slot_rerecord_commit; then
     rerecord_rollback
-    die "the audit record $FM_RR_AUDIT could not be closed as published; $(fm_slot_rerecord_restored)"
+    rerecord_die "the audit record $FM_RR_AUDIT could not be closed as published; $(fm_slot_rerecord_restored)"
   fi
 
   entries=${#scope[@]}
@@ -3246,6 +3262,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
   side=$(grep -c '^side_branch_' "$snap/scope" || true)
   echo "rerecord-slot $ID: base $old_base -> $new_base; scope $entries entries ($added added, $released released, $side side-branch); prior record archived at $FM_RR_ARCHIVE"
   [ -z "$FM_RR_RECONCILED" ] || echo "rerecord-slot $ID: $(fm_slot_rerecord_changes publishing '')"
+  FM_RR_REPORTED=1
 }
 
 # --- verbs ------------------------------------------------------------------

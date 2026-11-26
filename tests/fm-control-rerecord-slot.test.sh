@@ -829,6 +829,7 @@ test_L17_an_error_after_a_rollback_names_the_reconciliation() {
   [ "$rc" != 0 ] || fail "L17: the write was expected to stop on the snapshot error"$'\n'"$out"
   assert_contains "$out" "could not create the private snapshot for task $RR_ID; before stopping, this run reconciled earlier interrupted runs: audit $RR_L13_AUDIT rolled-back (the task record was restored to the prior record's bytes); no manifest, copy or journal was changed" "L17"
   assert_not_contains "$out" 'nothing was changed' "L17"
+  [ "$(printf '%s\n' "$out" | grep -c 'reconciled earlier interrupted runs')" = 1 ] || fail "L17: the step 3 entries were not named exactly once"$'\n'"$out"
   [ "$(rr_sha "$RR_META")" = "$p" ] || fail "L17: the record is not the prior record"
   [ "$(rr_field "$RR_L13_AUDIT" result)" = rolled-back ] || fail "L17: the crashed write's audit is '$(rr_field "$RR_L13_AUDIT" result)'"
   rr_make_f L17-no-pending
@@ -1513,7 +1514,33 @@ rr_expect_signal_rollback() { # <id> <SIG> <rc>
   [ "$(rr_sha "$(rr_archives)")" = "$(rr_sha "$RR_DIR/prior.meta")" ] || fail "$id: archive is not P"
   [ "$(rr_results)" = rolled-back ] || fail "$id: audit is '$(rr_results)'"
   rr_agrees "$(rr_audits)" || fail "$id: audit disagrees"
-  rr_ok "$id" "exit $3 under $2 in stage published; rolled back; archive P; audit rolled-back; audit_agrees (BASH_VERSION $(bash -c 'echo "$BASH_VERSION"'))"
+  assert_contains "$out" "rerecord-slot $RR_ID: this run published task $RR_ID's record and then restored the prior record from $(rr_field "$(rr_audits)" archive); the audit record $(rr_audits) is rolled-back; no manifest, copy or journal was changed" "$id: the trap must say what the run did"
+  assert_not_contains "$out" 'reconciled earlier interrupted runs' "$id: a run with no step 3 entries must name none"
+  rr_ok "$id" "exit $3 under $2 in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION $(bash -c 'echo "$BASH_VERSION"'))"
+}
+# A signal before this run's own publish leaves through the EXIT trap, which names what step 3 did exactly once; with no
+# step 3 entries it names none.
+rr_signal_in_shape() { # <SIG>
+  rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_prove_shape() { kill -$1 \$\$; }"
+}
+test_L21_a_signal_before_publish_names_the_step_3_entries() {
+  local out rc p a
+  rr_make_f L21
+  p=$(rr_sha "$RR_META")
+  rr_crash_run "$RR_META" before 1
+  a=$(rr_audit_for "$p") || fail "L21: no audit record after the crash"
+  rr_signal_in_shape TERM
+  out=$(rr_write); rc=$?
+  expect_code 143 "$rc" "L21"$'\n'"$out"
+  assert_contains "$out" "error: before stopping, this run reconciled earlier interrupted runs: audit $a abandoned (the audit was closed with the task record left unchanged); no manifest, copy or journal was changed" "L21"
+  [ "$(printf '%s\n' "$out" | grep -c 'reconciled earlier interrupted runs')" = 1 ] || fail "L21: the step 3 entries were not named exactly once"$'\n'"$out"
+  [ "$(rr_sha "$RR_META")" = "$p" ] || fail "L21: the record changed"
+  rr_make_f L21-no-entries
+  rr_signal_in_shape TERM
+  out=$(rr_write); rc=$?
+  expect_code 143 "$rc" "L21 no entries"$'\n'"$out"
+  assert_not_contains "$out" 'reconciled earlier interrupted runs' "L21 no entries"
+  rr_ok L21 "TERM in step 5 after step 3 abandoned a crashed write: the trap names that audit once; with no step 3 entries it names none"
 }
 test_R9a_term_in_published_rolls_back() { rr_expect_signal_rollback R9a TERM 143; }
 test_R9b_hup_in_published_rolls_back() { rr_expect_signal_rollback R9b HUP 129; }
@@ -2209,6 +2236,7 @@ test_R6d_sigkill_after_the_restore_publish
 test_R6e_sigkill_before_the_restore_publish
 test_R7_sigkill_before_publish_is_abandoned
 test_R8_a_failed_publish_leaves_the_record
+test_L21_a_signal_before_publish_names_the_step_3_entries
 test_R9a_term_in_published_rolls_back
 test_R9b_hup_in_published_rolls_back
 test_R9c_int_in_published_rolls_back
