@@ -263,14 +263,19 @@ fm_session_end_first_drift_report() {  # <control-output>
   printf '%s\n' "$1" | awk '/^relaunch drift report for /{ if (seen) exit; seen = 1 } seen { print } seen && /^  a relaunch is not a new scope declaration|^relaunch drift report for .*could not be produced/ { exit }'
 }
 
-# "complete" for a drift summary that lists every path, "printed" for one whose sample line names the file that does.
-fm_session_end_drift_kind() {  # <drift-summary>
-  case "$1" in *': sampled: '*) printf printed ;; *) printf complete ;; esac
+# "printed" when the first drift report in a control output has its own sample line, which names the file that lists
+# every path; "complete" otherwise. The sample line is a line of its own, and the report escapes a newline in a path,
+# so no path text on an entry line can stand for it.
+fm_session_end_drift_kind() {  # <control-output>
+  local sampled
+  sampled=$(fm_session_end_first_drift_report "$1" | sed -n '/^  sampled: /p')
+  if [ -n "$sampled" ]; then printf printed; else printf complete; fi
 }
 
-# The sentence that follows a quoted sample line: the file it names holds the task's latest report, not this one.
+# The sentence that follows a quoted sample line: the file it names holds the latest report written for the task, which
+# need not be this one.
 fm_session_end_drift_file_note() {
-  printf '%s' "That file holds this task's most recent drift report, and each later report replaces it, so its list can differ from this count."
+  printf '%s' "That file holds the most recent drift report written for this task, which a later report can replace, so its list can differ from this count."
 }
 
 # Write the printed drift report from a control output to its stable durable path and print that path.
@@ -463,7 +468,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     if [ -n "$drift" ]; then
       # The stable durable reference comes first, so the wake's length cap can only ever cut the repeated content after it.
       drift_file=$(fm_session_end_write_drift "$state" "$id" "$out")
-      reason="$reason (the $(fm_session_end_drift_kind "$drift") drift report is in $drift_file); $drift"
+      reason="$reason (the $(fm_session_end_drift_kind "$out") drift report is in $drift_file); $drift"
     fi
     fm_session_end_queue_wake "$key" "$reason" || return 1
     printf '%s\t%s\trelaunched\n' "$gen" "$seq" > "$handled" || return 1
@@ -476,7 +481,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   drift=$(fm_session_end_drift_summary "$out")
   if [ -n "$drift" ]; then
     drift_file=$(fm_session_end_write_drift "$state" "$id" "$out")
-    reason="$reason (the $(fm_session_end_drift_kind "$drift") drift report is in $drift_file)"
+    reason="$reason (the $(fm_session_end_drift_kind "$out") drift report is in $drift_file)"
   fi
   reason="$reason: $(fm_session_end_first_line "$out")"
   cause=$(fm_session_end_refusal_reason "$out")
