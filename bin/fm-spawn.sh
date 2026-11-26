@@ -542,6 +542,9 @@
 #   never a reset: it is `git merge --ff-only` (bin/fm-slot-provision-lib.sh,
 #   fm_slot_apply_move), which git itself refuses unless the copy's HEAD is an ancestor of
 #   the tip, so no commit is dropped and no tracked or untracked change is overwritten.
+#   A home whose treehouse base_branch is fm-pool-base also has that branch moved to the fetched origin default,
+#   under the project lock and before any copy is acquired, after the capacity and memory deferrals (exit 75) so a
+#   deferred spawn moves no ref; a case that cannot fast-forward refuses with no copy taken (bin/fm-pool-base-lib.sh).
 #   It is preceded by a read-only proof (fm_slot_prove_idle) that writes nothing to the
 #   copy, no ref and no file: one snapshot must show the tree clean, no process with its
 #   working directory in the copy (no age exemption; only the spawn's own pane or `treehouse`
@@ -1129,6 +1132,8 @@ fi
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # shellcheck source=bin/fm-slot-provision-lib.sh
 . "$SCRIPT_DIR/fm-slot-provision-lib.sh"
+# shellcheck source=bin/fm-pool-base-lib.sh
+. "$SCRIPT_DIR/fm-pool-base-lib.sh"
 fm_backlog_directory_present "$STATE" "state directory" || {
   echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
@@ -4562,6 +4567,41 @@ spawn_fetch_base_evidence() {
   fi
 }
 
+# The origin default tip the pool base branch follows (bin/fm-pool-base-lib.sh), resolved before the project lock so
+# no network call is made under it. A spawn that names no base branch fetched the origin default already. A spawn that
+# names one fetched that branch instead, so the default is read here, and only when the treehouse config names
+# fm-pool-base: a home that does not name it makes no extra network call. The objects are fetched with no ref written.
+SPAWN_POOL_DEFAULT_SHA=
+SPAWN_POOL_DEFAULT_ERROR=
+spawn_resolve_pool_default() {
+  local advertised default
+  SPAWN_POOL_DEFAULT_SHA=''
+  SPAWN_POOL_DEFAULT_ERROR=''
+  if [ -z "$BASE_BRANCH" ]; then
+    SPAWN_POOL_DEFAULT_SHA=$SPAWN_BASE_SHA
+    SPAWN_POOL_DEFAULT_ERROR=$SPAWN_BASE_ERROR
+    return 0
+  fi
+  fm_pool_base_config_names "$PROJ_ABS" || return 0
+  spawn_worktree_has_origin_config "$PROJ_ABS" || return 0
+  if ! advertised=$(GIT_TERMINAL_PROMPT=0 git -C "$PROJ_ABS" ls-remote --symref origin HEAD 'refs/heads/*' </dev/null 2>/dev/null); then
+    SPAWN_POOL_DEFAULT_ERROR="could not fetch origin"
+    return 0
+  fi
+  default=$(printf '%s\n' "$advertised" | sed -n 's|^ref: refs/heads/\(.*\)[[:space:]]HEAD$|\1|p' | head -n 1)
+  SPAWN_POOL_DEFAULT_SHA=$(printf '%s\n' "$advertised" | awk -F'\t' -v b="refs/heads/$default" '$2 == b { print $1; exit }')
+  if [ -z "$default" ] || [ -z "$SPAWN_POOL_DEFAULT_SHA" ]; then
+    SPAWN_POOL_DEFAULT_SHA=
+    SPAWN_POOL_DEFAULT_ERROR="could not resolve origin's current default branch"
+    return 0
+  fi
+  if ! GIT_TERMINAL_PROMPT=0 git -C "$PROJ_ABS" fetch --quiet --no-write-fetch-head --refmap= origin "refs/heads/$default" </dev/null >/dev/null 2>&1 ||
+    ! git -C "$PROJ_ABS" rev-parse --verify --quiet "$SPAWN_POOL_DEFAULT_SHA^{commit}" >/dev/null 2>&1; then
+    SPAWN_POOL_DEFAULT_SHA=
+    SPAWN_POOL_DEFAULT_ERROR="could not fetch 'origin/$default'"
+  fi
+}
+
 # The local-only plan pins the named default, never the primary's arbitrary HEAD
 # or working tree. Validate it under project custody before assigning a copy and
 # again before preparation; neither divergent history nor a changed plan is safe.
@@ -4643,6 +4683,7 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
     exit 1
   }
   [ "$BACKEND" = orca ] || spawn_fetch_base_evidence
+  [ "$BACKEND" = orca ] || spawn_resolve_pool_default
   if ! fm_project_lock_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK" "spawn $ID"; then
     if [ "$BACKEND" = orca ]; then
       echo "error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race its capacity admission" >&2
@@ -4680,6 +4721,13 @@ if [ "$RELAUNCH" -eq 0 ] && { [ "$KIND" != secondmate ] || [ ! -e "$STATE/$ID.me
     echo "deferred: host memory admission refused new task $ID (exit $memory_rc); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl" >&2
     exit 75
   fi
+fi
+# A home whose treehouse base_branch is fm-pool-base has that branch moved to the origin default, under the project
+# lock and before any copy is acquired, so the pool cuts the copy at the origin default whatever starting branch the
+# task names. It runs after the capacity and memory deferrals above, so a retryable exit 75 stays first and a deferred
+# spawn changes no ref; a refusal leaves every ref unchanged and acquires no copy (bin/fm-pool-base-lib.sh).
+if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+  fm_pool_base_advance "$PROJ_ABS" "$SPAWN_POOL_DEFAULT_SHA" "$SPAWN_POOL_DEFAULT_ERROR" || exit 1
 fi
 if [ "$RELAUNCH_RELOCATING" = 1 ]; then
   SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {

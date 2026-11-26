@@ -2313,6 +2313,697 @@ test_a_governed_refusal_after_preparation_keeps_its_branch_where_it_was() {
   pass "the branch the preparation detached from is where it was"
 }
 
+# --- fm-pool-base: the pool's base branch follows the origin default (bin/fm-pool-base-lib.sh) ---------------------
+# A scratch repository has `main` strictly ahead of the fetched `origin/main`, the state that made treehouse cut every
+# pool copy ahead of the origin default. Every repository, pool and home here lives under TMP_ROOT; no real repository,
+# pool or treehouse config is read or written.
+
+pb_git() {
+  GIT_AUTHOR_DATE='2026-01-01T00:00:00Z' GIT_COMMITTER_DATE='2026-01-01T00:00:00Z' \
+    git -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' "$@"
+}
+
+# pb_scenario <dir> [<treehouse.toml body> [no-local]]: <dir>/origin.git, and <dir>/repo with one pushed commit. Unless
+# "no-local" is given, local main also holds one commit that origin/main lacks. The commits carry fixed dates, so two
+# scenarios built alike hold identical commit ids.
+pb_scenario() {
+  local dir=$1 body=${2-} local_commit=${3-}
+  mkdir -p "$dir/home"
+  git init --quiet --bare -b main "$dir/origin.git"
+  git init --quiet -b main "$dir/repo"
+  printf 'base\n' > "$dir/repo/f"
+  pb_git -C "$dir/repo" add f
+  pb_git -C "$dir/repo" commit -qm c1
+  git -C "$dir/repo" remote add origin "file://$dir/origin.git"
+  git -C "$dir/repo" push --quiet origin main 2>/dev/null
+  git -C "$dir/repo" remote set-head origin main >/dev/null
+  if [ "$local_commit" != no-local ]; then
+    printf 'local only\n' > "$dir/repo/g"
+    pb_git -C "$dir/repo" add g
+    pb_git -C "$dir/repo" commit -qm local-ahead
+  fi
+  if [ -n "$body" ]; then
+    printf '%s\n' "$body" > "$dir/repo/treehouse.toml"
+    printf 'treehouse.toml\n' >> "$dir/repo/.git/info/exclude"
+  fi
+}
+
+# pb_advance_origin <dir>: one more commit on origin's main, pushed from another clone; <dir>/repo is not told.
+pb_advance_origin() {
+  local dir=$1
+  rm -rf "$dir/publisher"
+  git clone --quiet "file://$dir/origin.git" "$dir/publisher" 2>/dev/null
+  printf 'advanced\n' > "$dir/publisher/h"
+  pb_git -C "$dir/publisher" add h
+  pb_git -C "$dir/publisher" commit -qm c2
+  git -C "$dir/publisher" push --quiet origin main 2>/dev/null
+}
+
+# pb_origin_tip <dir>: the origin default as the scratch clone itself holds it after a fetch.
+pb_origin_tip() {
+  git -C "$1/repo" rev-parse refs/remotes/origin/main
+}
+
+# pb_snapshot <dir>: every ref and HEAD of <dir>/repo.
+pb_snapshot() {
+  git -C "$1/repo" for-each-ref --format='%(refname) %(objectname) %(symref)' | sed 's/[[:space:]]*$//'
+  printf 'HEAD %s\n' "$(git -C "$1/repo" rev-parse HEAD)"
+}
+
+# pb_git_shim <dir> <log>: a git on PATH that records every command it runs and, on request, fails one kind of it:
+# PB_FAIL_UPDATE_REF (another writer wins the compare-and-set), PB_FAIL_WORKTREE_LIST, PB_FAIL_MERGE_BASE.
+pb_git_shim() {
+  local real
+  real=$(command -v git)
+  mkdir -p "$1"
+  cat > "$1/git" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$2'
+case " \$* " in
+  *' update-ref '*) [ -z "\${PB_FAIL_UPDATE_REF:-}" ] || exit 1 ;;
+  *' worktree list '*) [ -z "\${PB_FAIL_WORKTREE_LIST:-}" ] || exit 1 ;;
+  *' merge-base '*) [ -z "\${PB_FAIL_MERGE_BASE:-}" ] || exit 128 ;;
+esac
+exec '$real' "\$@"
+SH
+  chmod +x "$1/git"
+}
+
+# pb_race_shim <dir> <log> <holder> <before|after>: a git that makes <holder>, a worktree, check out fm-pool-base just
+# before or just after the first update-ref the step runs, which is the one write a checkout cannot be stopped from.
+pb_race_shim() {
+  local real
+  real=$(command -v git)
+  mkdir -p "$1"
+  cat > "$1/git" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$2'
+case " \$* " in
+  *' update-ref '*)
+    if [ ! -e '$1/raced' ]; then
+      : > '$1/raced'
+      [ '$4' != before ] || '$real' -C '$3' checkout -q fm-pool-base
+      '$real' "\$@"; rc=\$?
+      [ '$4' != after ] || '$real' -C '$3' checkout -q fm-pool-base
+      exit \$rc
+    fi
+    ;;
+esac
+exec '$real' "\$@"
+SH
+  chmod +x "$1/git"
+}
+
+# pb_assert_only_guarded_git <log>: the step only read, except for update-ref with the old value as its last argument.
+pb_assert_only_guarded_git() {
+  local line sub
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    sub=${line#-C * }
+    case "$sub" in
+      rev-parse\ *|show-ref\ *|remote\ get-url\ *|merge-base\ *|worktree\ list\ *|diff-index\ --cached\ --quiet\ *) ;;
+      update-ref\ --no-deref\ -m\ *\ refs/heads/fm-pool-base\ *)
+        printf '%s\n' "$sub" | grep -Eq ' refs/heads/fm-pool-base [0-9a-f]{40} [0-9a-f]{40}$' \
+          || fail "update-ref ran without the old value as its compare-and-set check: $line"
+        ;;
+      *) fail "the step ran a git command that is not a read or a guarded update-ref: $line" ;;
+    esac
+  done < "$1"
+}
+
+# pb_step <dir> <origin-default-sha> [<why>]: the step the spawn runs, in PB_OUT and PB_RC, with every git command it
+# runs in PB_LOG, on PB_REPO when it is set and through the shim in PB_SHIM_DIR when that is set. HOME is the scratch
+# home, so the user config a real treehouse reads is never reached. Each run is checked to have used only reads and
+# compare-and-set updates.
+pb_step() {
+  PB_LOG="$TMP_ROOT/pb-step.git.log"
+  : > "$PB_LOG"
+  if [ -z "${PB_SHIM_DIR:-}" ]; then
+    pb_git_shim "$TMP_ROOT/pb-shim" "$PB_LOG"
+  fi
+  PB_RC=0
+  PB_OUT=$(PATH="${PB_SHIM_DIR:-$TMP_ROOT/pb-shim}:$PATH" HOME="$1/home" bash -c \
+    '. "$1/bin/fm-pool-base-lib.sh"; fm_pool_base_advance "$2" "$3" "$4"' _ \
+    "$ROOT" "${PB_REPO:-$1/repo}" "${2-}" "${3-}" 2>&1) || PB_RC=$?
+  pb_assert_only_guarded_git "$PB_LOG"
+}
+
+test_an_absent_pool_base_is_refused_and_never_created() {
+  local dir tip before body
+  dir="$TMP_ROOT/pb-create"
+  pb_scenario "$dir" 'base_branch = "fm-pool-base"'
+  tip=$(pb_origin_tip "$dir")
+  [ "$(git -C "$dir/repo" rev-parse main)" != "$tip" ] || fail "fixture: local main is not ahead of origin"
+  git -C "$dir/repo" show-ref --verify --quiet refs/heads/fm-pool-base && fail "fixture: fm-pool-base already exists"
+  before=$(pb_snapshot "$dir")
+  pb_step "$dir" "$tip"
+  [ "$PB_RC" -ne 0 ] || fail "an absent fm-pool-base named by the config was not refused"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "refused (absent)" "the absent refusal does not name its reason"
+  assert_contains "$PB_OUT" "[fm-pool-base: absent; origin default: $tip]" "the absent refusal does not carry the known values"
+  assert_contains "$PB_OUT" "every ref is as it was" "the absent refusal does not say every ref is unchanged"
+  git -C "$dir/repo" show-ref --verify --quiet refs/heads/fm-pool-base && fail "the step created fm-pool-base at the origin default"
+  [ "$(pb_snapshot "$dir")" = "$before" ] || fail "the absent refusal changed a ref"
+  [ "$(git -C "$dir/repo" rev-parse main)" != "$tip" ] || fail "the step moved the local main"
+  # Once the owner has created it at the origin default, a step leaves it alone and says nothing.
+  git -C "$dir/repo" branch fm-pool-base "$tip"
+  before=$(pb_snapshot "$dir")
+  pb_step "$dir" "$tip"
+  expect_code 0 "$PB_RC" "a current fm-pool-base is left alone"
+  [ -z "$PB_OUT" ] || fail "a current fm-pool-base was reported: $PB_OUT"
+  [ "$(pb_snapshot "$dir")" = "$before" ] || fail "a current fm-pool-base changed a ref"
+  # A config that does not name fm-pool-base: the step runs and every ref stays as it was.
+  for body in 'base_branch = "main"' 'base_branch = "fm-pool-base-2"' '# base_branch = "fm-pool-base"' 'max_trees = 4'; do
+    dir="$TMP_ROOT/pb-unnamed"
+    rm -rf "$dir"
+    pb_scenario "$dir" "$body"
+    before=$(pb_snapshot "$dir")
+    pb_step "$dir" "$(pb_origin_tip "$dir")"
+    expect_code 0 "$PB_RC" "a config without fm-pool-base is not the step's business (config: '$body')"
+    [ -z "$PB_OUT" ] || fail "a home that does not name fm-pool-base got output from the step (config: '$body'): $PB_OUT"
+    [ "$(pb_snapshot "$dir")" = "$before" ] || fail "a home that does not name fm-pool-base had a ref changed (config: '$body')"
+    git -C "$dir/repo" show-ref --verify --quiet refs/heads/fm-pool-base \
+      && fail "fm-pool-base was created in a home that does not name it (config: '$body')"
+  done
+  # No config file at all is a known answer too: nothing names fm-pool-base.
+  dir="$TMP_ROOT/pb-unnamed"
+  rm -rf "$dir"
+  pb_scenario "$dir"
+  before=$(pb_snapshot "$dir")
+  pb_step "$dir" "$(pb_origin_tip "$dir")"
+  expect_code 0 "$PB_RC" "a home with no treehouse config is not the step's business"
+  [ -z "$PB_OUT" ] || fail "a home with no treehouse config got output from the step: $PB_OUT"
+  [ "$(pb_snapshot "$dir")" = "$before" ] || fail "a home with no treehouse config had a ref changed"
+  pass "an absent fm-pool-base is refused as absent and never created, a current one is left alone, and an unnamed one is no business of the step"
+}
+
+test_pool_base_reads_the_config_of_the_main_checkout_and_the_user_config() {
+  local dir before tip old
+  dir="$TMP_ROOT/pb-config"
+  pb_scenario "$dir" 'base_branch = "fm-pool-base"'
+  old=$(pb_origin_tip "$dir")
+  git -C "$dir/repo" branch fm-pool-base "$old"
+  pb_advance_origin "$dir"
+  git -C "$dir/repo" fetch --quiet origin
+  tip=$(pb_origin_tip "$dir")
+  [ "$tip" != "$old" ] || fail "fixture: origin did not advance"
+  # The project a spawn is given can be a linked worktree of the repository: the config is the main checkout's.
+  git -C "$dir/repo" worktree add --quiet --detach "$dir/linked" main
+  PB_REPO="$dir/linked" pb_step "$dir" "$tip"
+  expect_code 0 "$PB_RC" "a linked worktree of the pool repository follows the main checkout's config"$'\n'"$PB_OUT"
+  [ "$(git -C "$dir/repo" rev-parse refs/heads/fm-pool-base)" = "$tip" ] \
+    || fail "fm-pool-base was not advanced through a linked worktree of the repository"
+  # With no treehouse.toml in the repository, the user's treehouse config is the one that names it.
+  rm -rf "$dir"
+  pb_scenario "$dir"
+  mkdir -p "$dir/home/.config/treehouse"
+  printf 'base_branch = "fm-pool-base"\n' > "$dir/home/.config/treehouse/config.toml"
+  old=$(pb_origin_tip "$dir")
+  git -C "$dir/repo" branch fm-pool-base "$old"
+  pb_advance_origin "$dir"
+  git -C "$dir/repo" fetch --quiet origin
+  tip=$(pb_origin_tip "$dir")
+  [ "$tip" != "$old" ] || fail "fixture: origin did not advance"
+  pb_step "$dir" "$tip"
+  expect_code 0 "$PB_RC" "the user's treehouse config names fm-pool-base"$'\n'"$PB_OUT"
+  [ "$(git -C "$dir/repo" rev-parse refs/heads/fm-pool-base)" = "$tip" ] || fail "fm-pool-base was not advanced from the user's treehouse config"
+  # A config that cannot be parsed: it is unknown whether the pool uses fm-pool-base, so the step refuses, moves
+  # nothing and names the missing values.
+  rm -rf "$dir"
+  pb_scenario "$dir" 'base_branch = '
+  before=$(pb_snapshot "$dir")
+  pb_step "$dir" "$tip"
+  [ "$PB_RC" -ne 0 ] || fail "an unparsable treehouse config did not refuse"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "refused (config_unreadable)" "an unparsable treehouse config did not name its reason"
+  assert_contains "$PB_OUT" "[fm-pool-base: absent; origin default: unavailable]" "the config refusal omits the known values"
+  [ "$(pb_snapshot "$dir")" = "$before" ] || fail "an unparsable treehouse config changed a ref"
+  pass "the treehouse config is read from the main checkout, else the user config, and an unreadable one refuses"
+}
+
+test_pool_base_advances_by_compare_and_set_and_a_second_step_changes_nothing() {
+  local dir old tip before reflog_before
+  dir="$TMP_ROOT/pb-advance"
+  pb_scenario "$dir" 'base_branch = "fm-pool-base"'
+  old=$(pb_origin_tip "$dir")
+  git -C "$dir/repo" branch fm-pool-base "$old"
+  pb_advance_origin "$dir"
+  git -C "$dir/repo" fetch --quiet origin
+  tip=$(pb_origin_tip "$dir")
+  [ "$tip" != "$old" ] || fail "fixture: origin did not advance"
+  before=$(git -C "$dir/repo" rev-parse main)
+  pb_step "$dir" "$tip"
+  expect_code 0 "$PB_RC" "fm-pool-base should advance to the new origin default"$'\n'"$PB_OUT"
+  [ "$(git -C "$dir/repo" rev-parse refs/heads/fm-pool-base)" = "$tip" ] \
+    || fail "fm-pool-base is not at the new origin default $tip"
+  git -C "$dir/repo" reflog show refs/heads/fm-pool-base | grep -q 'fm-pool-base: fast-forward to the origin default' \
+    || fail "the reflog of fm-pool-base does not record the fast-forward"$'\n'"$(git -C "$dir/repo" reflog show refs/heads/fm-pool-base)"
+  [ "$(git -C "$dir/repo" rev-parse main)" = "$before" ] || fail "the step moved the local main"
+  assert_grep "update-ref --no-deref -m fm-pool-base: fast-forward to the origin default refs/heads/fm-pool-base $tip $old" "$PB_LOG" \
+    "the update did not carry the old value as its compare-and-set check"
+  # A second step with nothing new: no output, no ref and no reflog entry changes.
+  before=$(pb_snapshot "$dir")
+  reflog_before=$(git -C "$dir/repo" reflog show refs/heads/fm-pool-base)
+  pb_step "$dir" "$tip"
+  expect_code 0 "$PB_RC" "a second step with nothing new exits as before"
+  [ -z "$PB_OUT" ] || fail "a second step with nothing new said something: $PB_OUT"
+  [ "$(pb_snapshot "$dir")" = "$before" ] || fail "a second step with nothing new changed a ref"
+  [ "$(git -C "$dir/repo" reflog show refs/heads/fm-pool-base)" = "$reflog_before" ] \
+    || fail "a second step with nothing new wrote a reflog entry"
+  pass "fm-pool-base advances to the new origin default by compare-and-set and a second step changes nothing"
+}
+
+# pb_check_refused <dir> <reason> <tip-argument> <expected fm-pool-base value> <expected origin default value> [<needle>...]:
+# the step refuses, names the reason, both values and the commits, and moves nothing.
+pb_check_refused() {
+  local d=$1 want=$2 t=$3 want_old=$4 want_tip=$5 needle before
+  shift 5
+  before=$(pb_snapshot "$d")
+  pb_step "$d" "$t" "${PB_WHY-}"
+  [ "$PB_RC" -ne 0 ] || fail "the step did not refuse the $want case"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "refused ($want)" "the refusal does not name the reason $want"
+  assert_contains "$PB_OUT" "[fm-pool-base: $want_old; origin default: $want_tip]" "the $want refusal does not carry the known values"
+  for needle in "$@"; do
+    assert_contains "$PB_OUT" "$needle" "the $want refusal does not name $needle"
+  done
+  [ "$(pb_snapshot "$d")" = "$before" ] || fail "the $want refusal changed a ref"
+}
+
+test_pool_base_refuses_every_unsafe_case_and_leaves_every_ref_unchanged() {
+  local dir old tip side ahead
+  dir="$TMP_ROOT/pb-refuse"
+  pb_scenario "$dir" 'base_branch = "fm-pool-base"'
+  old=$(pb_origin_tip "$dir")
+  # diverged: fm-pool-base holds a commit origin lacks, and origin holds one fm-pool-base lacks.
+  git -C "$dir/repo" checkout --quiet -b side "$old"
+  printf 'side\n' > "$dir/repo/s"
+  pb_git -C "$dir/repo" add s
+  pb_git -C "$dir/repo" commit -qm side
+  side=$(git -C "$dir/repo" rev-parse HEAD)
+  git -C "$dir/repo" checkout --quiet main
+  git -C "$dir/repo" branch fm-pool-base "$side"
+  pb_advance_origin "$dir"
+  git -C "$dir/repo" fetch --quiet origin
+  tip=$(pb_origin_tip "$dir")
+  pb_check_refused "$dir" diverged "$tip" "$side" "$tip" "$side" "$tip"
+
+  # ahead: fm-pool-base holds the origin default and one more commit.
+  git -C "$dir/repo" branch -D fm-pool-base >/dev/null
+  git -C "$dir/repo" checkout --quiet -b ahead "$tip"
+  printf 'ahead\n' > "$dir/repo/a"
+  pb_git -C "$dir/repo" add a
+  pb_git -C "$dir/repo" commit -qm ahead
+  ahead=$(git -C "$dir/repo" rev-parse HEAD)
+  git -C "$dir/repo" checkout --quiet main
+  git -C "$dir/repo" branch fm-pool-base "$ahead"
+  pb_check_refused "$dir" ahead "$tip" "$ahead" "$tip" "$ahead" "$tip"
+
+  # checked_out: fm-pool-base is behind origin but checked out in a worktree, which an update would leave inconsistent.
+  git -C "$dir/repo" branch -D fm-pool-base >/dev/null
+  git -C "$dir/repo" branch fm-pool-base "$old"
+  git -C "$dir/repo" worktree add --quiet "$dir/holder" fm-pool-base
+  pb_check_refused "$dir" checked_out "$tip" "$old" "$tip" "$old" "$tip"
+  git -C "$dir/repo" worktree remove "$dir/holder"
+
+  # changed: another writer wins the compare-and-set (the shim refuses update-ref).
+  PB_FAIL_UPDATE_REF=1 pb_check_refused "$dir" changed "$tip" "$old" "$tip" "$old" "$tip"
+
+  # ref_unreadable: the worktree list or the ancestry cannot be read (the shim fails that one command).
+  PB_FAIL_WORKTREE_LIST=1 pb_check_refused "$dir" ref_unreadable "$tip" "$old" "$tip"
+  PB_FAIL_MERGE_BASE=1 pb_check_refused "$dir" ref_unreadable "$tip" "$old" "$tip"
+
+  # origin_unreadable: no origin default could be read, or it is not a commit. The known fm-pool-base is still named.
+  PB_WHY='could not fetch origin'
+  pb_check_refused "$dir" origin_unreadable '' "$old" unavailable 'could not fetch origin'
+  PB_WHY=
+  pb_check_refused "$dir" origin_unreadable 0000000000000000000000000000000000000001 "$old" unavailable
+
+  # origin_missing: the repository has no origin remote at all.
+  git -C "$dir/repo" remote remove origin
+  pb_check_refused "$dir" origin_missing '' "$old" unavailable 'no origin remote'
+  pass "every unsafe fm-pool-base case is refused with its reason, both values and the commits, and no ref moves"
+}
+
+# A worktree can take fm-pool-base between the step's worktree list and its update, which the compare-and-set does not see.
+test_a_worktree_that_takes_pool_base_during_the_update_is_never_left_inconsistent() {
+  local dir old tip order holder before_hashes after_hashes shim
+  for order in before after; do
+    dir="$TMP_ROOT/pb-race-$order"
+    pb_scenario "$dir" 'base_branch = "fm-pool-base"'
+    old=$(pb_origin_tip "$dir")
+    git -C "$dir/repo" branch fm-pool-base "$old"
+    pb_advance_origin "$dir"
+    git -C "$dir/repo" fetch --quiet origin
+    tip=$(pb_origin_tip "$dir")
+    holder="$dir/holder"
+    git -C "$dir/repo" worktree add --quiet --detach "$holder" "$old"
+    before_hashes=$(cd "$holder" && find . -type f -not -name .git | sort | xargs shasum)
+    shim="$TMP_ROOT/pb-race-shim-$order"
+    pb_race_shim "$shim" "$TMP_ROOT/pb-step.git.log" "$holder" "$order"
+    PB_SHIM_DIR="$shim" pb_step "$dir" "$tip"
+    after_hashes=$(cd "$holder" && find . -type f -not -name .git | sort | xargs shasum)
+    if [ "$order" = before ]; then
+      # The holder took the old commit before the write: the branch is put back and the holder is whole.
+      [ "$PB_RC" -ne 0 ] || fail "a worktree took fm-pool-base before the update and the step did not refuse"$'\n'"$PB_OUT"
+      assert_contains "$PB_OUT" "refused (checked_out)" "the race refusal does not name its reason"
+      assert_contains "$PB_OUT" "[fm-pool-base: $old; origin default: $tip]" "the race refusal omits the values"
+      [ "$(git -C "$dir/repo" rev-parse refs/heads/fm-pool-base)" = "$old" ] || fail "fm-pool-base was not put back to $old"
+      [ "$(git -C "$holder" rev-parse HEAD)" = "$old" ] || fail "the holder's HEAD is not the old commit"
+      [ "$before_hashes" = "$after_hashes" ] || fail "the holder's files changed"
+    else
+      # The holder took the new commit after the write: it is whole at the new commit and the step stands.
+      expect_code 0 "$PB_RC" "a worktree that took fm-pool-base after the update is consistent"$'\n'"$PB_OUT"
+      [ "$(git -C "$dir/repo" rev-parse refs/heads/fm-pool-base)" = "$tip" ] || fail "fm-pool-base was put back although the holder is consistent"
+      [ "$(git -C "$holder" rev-parse HEAD)" = "$tip" ] || fail "the holder's HEAD is not the new commit"
+      [ -f "$holder/h" ] || fail "the holder lacks the new commit's file"
+    fi
+    [ -z "$(git -C "$holder" status --porcelain)" ] || fail "the holder shows changes against its HEAD ($order)"$'\n'"$(git -C "$holder" status --porcelain)"
+  done
+  pass "a worktree that takes fm-pool-base while it moves is never left with files out of step with its HEAD"
+}
+
+# A scratch tmux whose `treehouse get` is the REAL treehouse binary, in a scratch pool under TMP_ROOT, with the scratch
+# repository as the pool's repository. It records the copy's HEAD and fm-pool-base at the moment the get returns,
+# before the spawn's own freshness step can move the copy.
+pb_real_treehouse() {
+  local bin
+  bin=$(command -v treehouse 2>/dev/null) || return 1
+  treehouse get --help 2>&1 | grep -q -- '--lease' || return 1
+  treehouse lease --help 2>&1 | grep -Eq '(^|[^[:alnum:]_-])--path([^[:alnum:]_-]|$)' || return 1
+  printf '%s\n' "$bin"
+}
+
+# make_real_pool_case <name> <id> <treehouse.toml body>: "<case-dir>|<home>|<project>|<fakebin>". The project's local main
+# is a strict descendant of its fetched origin/main, and fm-pool-base and pool-other sit at the older commit (case-dir/stale-base).
+make_real_pool_case() {
+  local name=$1 id=$2 body=$3 case_dir home project fakebin real stale
+  real=$(pb_real_treehouse) || return 1
+  case_dir="$TMP_ROOT/$name"
+  home="$case_dir/home"
+  mkdir -p "$home/data/$id" "$home/projects" "$home/state" "$home/config" "$case_dir/pool-root"
+  printf 'codex\n' > "$home/config/crew-harness"
+  fm_test_spawn_brief "$home" "$id"
+  touch "$home/state/.last-watcher-beat"
+  pb_scenario "$case_dir/scn" "$body" no-local >/dev/null 2>&1
+  project="$case_dir/scn/repo"
+  stale=$(git -C "$project" rev-parse main)
+  printf '%s\n' "$stale" > "$case_dir/stale-base"
+  git -C "$project" branch --no-track fm-pool-base "$stale" >/dev/null 2>&1
+  git -C "$project" branch --no-track pool-other "$stale" >/dev/null 2>&1
+  pb_advance_origin "$case_dir/scn" >/dev/null 2>&1
+  git -C "$project" fetch --quiet origin >/dev/null 2>&1
+  git -C "$project" merge --ff-only --quiet origin/main >/dev/null 2>&1
+  printf 'local only\n' > "$project/g"
+  pb_git -C "$project" add g
+  pb_git -C "$project" commit -qm local-ahead
+  fakebin=$(make_spawn_fakebin "$case_dir/fake")
+  mv "$fakebin/tmux" "$fakebin/tmux.stock"
+  cat > "$fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"#{pane_current_path}"*)
+    if [ -s '$case_dir/pane-path' ]; then cat '$case_dir/pane-path'; else printf '%s\n' '$project'; fi
+    exit 0
+    ;;
+esac
+for a in "\$@"; do
+  if [ "\$a" = 'treehouse get' ]; then
+    for v in \$(env | sed -n 's/^\\(TREEHOUSE_[A-Z_]*\\)=.*/\\1/p'); do unset "\$v"; done
+    export TREEHOUSE_ROOT='$case_dir/pool-root'
+    slot=\$(cd '$project' && '$real' get --lease --lease-holder 'pb-test-$id' 2>/dev/null) || exit 1
+    printf '%s\n' "\$slot" > '$case_dir/pane-path'
+    {
+      printf 'slot=%s\n' "\$slot"
+      printf 'head_at_get=%s\n' "\$(git -C "\$slot" rev-parse HEAD)"
+      printf 'pool_base_at_get=%s\n' "\$(git -C '$project' rev-parse refs/heads/fm-pool-base)"
+    } >> '$case_dir/at-get.txt'
+    exit 0
+  fi
+done
+exec '$fakebin/tmux.stock' "\$@"
+SH
+  chmod +x "$fakebin/tmux"
+  printf '%s\n' "$case_dir|$home|$project|$fakebin"
+}
+
+# pb_real_spawn <case-record> <id> [<spawn argument>...]: runs the spawn; sets PB_OUT, PB_RC, PB_CASE, PB_PROJECT, PB_HOME.
+pb_real_spawn() {
+  local rec=$1 id=$2 fakebin
+  shift 2
+  IFS='|' read -r PB_CASE PB_HOME PB_PROJECT fakebin <<EOF
+$rec
+EOF
+  case "$PB_CASE" in "$TMP_ROOT"/*) ;; *) fail "the real-treehouse case is outside the scratch root: $PB_CASE" ;; esac
+  PB_RC=0
+  if [ "$#" -eq 0 ]; then set -- --mode no-mistakes --yolo off; fi
+  PB_OUT=$(fm_test_run_spawn "$PB_HOME" "$PB_PROJECT" "$fakebin" "$id" "$PB_PROJECT" "$@") || PB_RC=$?
+}
+
+# pb_assert_strictly_ahead <case-dir>: the fixture's local main is a strict descendant of the fetched origin/main, and
+# fm-pool-base is strictly behind it.
+pb_assert_strictly_ahead() {
+  local repo="$1/scn/repo" tip stale
+  tip=$(git -C "$repo" rev-parse origin/main)
+  stale=$(cat "$1/stale-base")
+  git -C "$repo" merge-base --is-ancestor origin/main main || fail "fixture: local main is not a descendant of the fetched origin/main"
+  [ "$(git -C "$repo" rev-parse main)" != "$tip" ] || fail "fixture: local main equals origin/main, so it is not ahead"
+  git -C "$repo" merge-base --is-ancestor "$stale" "$tip" || fail "fixture: the old pool base is not an ancestor of origin/main"
+  [ "$stale" != "$tip" ] || fail "fixture: the pool base is not behind origin/main"
+  [ "$(git --git-dir="$1/scn/origin.git" rev-parse refs/heads/main)" = "$tip" ] || fail "fixture: the scratch clone's origin/main is not the bare origin's tip"
+}
+
+test_a_real_treehouse_copy_is_cut_at_the_advanced_origin_default() {
+  local rec id tip main_before slot
+  if ! pb_real_treehouse >/dev/null; then
+    echo "skip - no treehouse with get --lease and lease --path is installed; the real-binary case did not run"
+    return 0
+  fi
+  id='pool-base-real-pb1'
+  rec=$(make_real_pool_case pb-real "$id" 'base_branch = "fm-pool-base"') || fail "the real-treehouse case could not be built"
+  pb_assert_strictly_ahead "$TMP_ROOT/pb-real"
+  tip=$(git -C "$TMP_ROOT/pb-real/scn/repo" rev-parse origin/main)
+  main_before=$(git -C "$TMP_ROOT/pb-real/scn/repo" rev-parse main)
+  pb_real_spawn "$rec" "$id"
+  expect_code 0 "$PB_RC" "spawn should launch from a real treehouse copy"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "spawned $id" "the real-treehouse spawn did not report success"
+  [ -s "$PB_CASE/at-get.txt" ] || fail "the real treehouse get never ran"$'\n'"$PB_OUT"
+  assert_grep "head_at_get=$tip" "$PB_CASE/at-get.txt" \
+    "the copy treehouse handed out was not at the origin default $tip"$'\n'"$(cat "$PB_CASE/at-get.txt")"
+  assert_grep "pool_base_at_get=$tip" "$PB_CASE/at-get.txt" \
+    "fm-pool-base was not at the origin default when the copy was cut"$'\n'"$(cat "$PB_CASE/at-get.txt")"
+  [ "$(git -C "$PB_PROJECT" rev-parse refs/heads/fm-pool-base)" = "$tip" ] || fail "fm-pool-base is not at the origin default afterwards"
+  [ "$(git -C "$PB_PROJECT" rev-parse main)" = "$main_before" ] || fail "the spawn moved the local main"
+  slot=$(sed -n 's/^slot=//p' "$PB_CASE/at-get.txt" | head -n 1)
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$tip" ] || fail "the launched copy is not at the origin default"
+  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    printf '# real treehouse, local main strictly ahead: origin/main=%s local main=%s\n' "$tip" "$main_before"
+    cat "$PB_CASE/at-get.txt"
+  fi
+  pass "a copy cut by the real treehouse is at the advanced origin default while local main is strictly ahead"
+}
+
+# A task that names its starting branch still has the pool base followed to the origin DEFAULT, and still starts there.
+test_a_spawn_that_names_a_base_branch_still_advances_the_pool_base() {
+  local rec id tip feature slot
+  if ! pb_real_treehouse >/dev/null; then
+    echo "skip - no treehouse with get --lease and lease --path is installed; the real-binary case did not run"
+    return 0
+  fi
+  id='pool-base-real-named'
+  rec=$(make_real_pool_case pb-real-named-base "$id" 'base_branch = "fm-pool-base"') || fail "the named-base case could not be built"
+  pb_assert_strictly_ahead "$TMP_ROOT/pb-real-named-base"
+  tip=$(git -C "$TMP_ROOT/pb-real-named-base/scn/repo" rev-parse origin/main)
+  git clone --quiet "file://$TMP_ROOT/pb-real-named-base/scn/origin.git" "$TMP_ROOT/pb-real-named-base/feature" 2>/dev/null
+  git -C "$TMP_ROOT/pb-real-named-base/feature" checkout --quiet -b feature/hub origin/main
+  printf 'only on feature/hub\n' > "$TMP_ROOT/pb-real-named-base/feature/feature-only.txt"
+  pb_git -C "$TMP_ROOT/pb-real-named-base/feature" add feature-only.txt
+  pb_git -C "$TMP_ROOT/pb-real-named-base/feature" commit -qm feature
+  git -C "$TMP_ROOT/pb-real-named-base/feature" push --quiet origin feature/hub 2>/dev/null
+  feature=$(git -C "$TMP_ROOT/pb-real-named-base/feature" rev-parse HEAD)
+  [ "$feature" != "$tip" ] || fail "fixture: the named base is the origin default"
+  printf '\n# Setup\nYou are in a disposable git worktree of project, at a detached HEAD on a clean copy of its base branch.\nBase branch: feature/hub\n' \
+    >> "$TMP_ROOT/pb-real-named-base/home/data/$id/brief.md"
+  pb_real_spawn "$rec" "$id" --mode direct-PR --yolo off --base-branch feature/hub
+  expect_code 0 "$PB_RC" "a spawn that names a base branch should launch"$'\n'"$PB_OUT"
+  [ -s "$PB_CASE/at-get.txt" ] || fail "the real treehouse get never ran"$'\n'"$PB_OUT"
+  assert_grep "head_at_get=$tip" "$PB_CASE/at-get.txt" \
+    "the copy was not cut at the origin default $tip although the task names another base"$'\n'"$(cat "$PB_CASE/at-get.txt")"
+  assert_grep "pool_base_at_get=$tip" "$PB_CASE/at-get.txt" "fm-pool-base was not at the origin default when the copy was cut"
+  slot=$(sed -n 's/^slot=//p' "$PB_CASE/at-get.txt" | head -n 1)
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$feature" ] || fail "the task's copy does not start from the base branch it named"
+  assert_grep 'base_branch=feature/hub' "$PB_HOME/state/$id.meta" "the spawn did not record the base branch it was given"
+  pass "a task that names a base branch still has fm-pool-base moved to the origin default, and still starts from that branch"
+}
+
+# The config reader fails while the config names fm-pool-base: the spawn refuses and takes no copy.
+test_a_spawn_whose_treehouse_config_cannot_be_read_is_refused_before_any_copy_is_taken() {
+  local rec id before real_python
+  if ! pb_real_treehouse >/dev/null; then
+    echo "skip - no treehouse with get --lease and lease --path is installed; the real-binary case did not run"
+    return 0
+  fi
+  id='pool-base-real-config'
+  rec=$(make_real_pool_case pb-real-config "$id" 'base_branch = "fm-pool-base"') || fail "the config case could not be built"
+  pb_assert_strictly_ahead "$TMP_ROOT/pb-real-config"
+  real_python=$(command -v python3)
+  cat > "$TMP_ROOT/pb-real-config/fake/fakebin/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'tomllib.load(open'*) exit 1 ;; esac
+exec '$real_python' "\$@"
+SH
+  chmod +x "$TMP_ROOT/pb-real-config/fake/fakebin/python3"
+  before=$(pb_snapshot "$TMP_ROOT/pb-real-config/scn")
+  pb_real_spawn "$rec" "$id"
+  [ "$PB_RC" -ne 0 ] || fail "a spawn whose treehouse config could not be read was not refused"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "refused (config_unreadable)" "the refusal does not name the reason"
+  [ ! -e "$PB_CASE/at-get.txt" ] || fail "a copy was acquired although the treehouse config could not be read"
+  [ "$(pb_snapshot "$TMP_ROOT/pb-real-config/scn")" = "$before" ] || fail "the refused spawn changed a ref"
+  [ ! -e "$PB_HOME/state/$id.meta" ] || fail "the refused spawn published a task record"
+  pass "a spawn whose treehouse config cannot be read is refused before any copy is taken and no ref moves"
+}
+
+test_a_spawn_changes_no_ref_but_fm_pool_base_and_none_when_the_home_does_not_name_it() {
+  local id named plain tip old diff_out
+  if ! pb_real_treehouse >/dev/null; then
+    echo "skip - no treehouse with get --lease and lease --path is installed; the real-binary case did not run"
+    return 0
+  fi
+  id='pool-base-real-pb4'
+  named=$(make_real_pool_case pb-real-named "$id" 'base_branch = "fm-pool-base"') || fail "the named case could not be built"
+  plain=$(make_real_pool_case pb-real-plain "$id" 'base_branch = "pool-other"') || fail "the plain case could not be built"
+  tip=$(git -C "$TMP_ROOT/pb-real-named/scn/repo" rev-parse origin/main)
+  old=$(git -C "$TMP_ROOT/pb-real-named/scn/repo" rev-parse refs/heads/fm-pool-base)
+  [ "$tip" = "$(git -C "$TMP_ROOT/pb-real-plain/scn/repo" rev-parse origin/main)" ] || fail "fixture: the two scenarios are not identical"
+  pb_real_spawn "$plain" "$id"
+  expect_code 0 "$PB_RC" "a home that names another base branch should still launch"$'\n'"$PB_OUT"
+  [ "$(git -C "$TMP_ROOT/pb-real-plain/scn/repo" rev-parse refs/heads/fm-pool-base)" = "$old" ] \
+    || fail "a home that does not name fm-pool-base had fm-pool-base moved"
+  assert_not_contains "$PB_OUT" "fm-pool-base: " "a home that does not name fm-pool-base heard about it"
+  assert_not_contains "$PB_OUT" "fm-pool-base refused" "a home that does not name fm-pool-base was refused"
+  pb_real_spawn "$named" "$id"
+  expect_code 0 "$PB_RC" "a home that names fm-pool-base should launch"$'\n'"$PB_OUT"
+  diff_out=$(diff <(pb_snapshot "$TMP_ROOT/pb-real-plain/scn") <(pb_snapshot "$TMP_ROOT/pb-real-named/scn") || true)
+  [ "$diff_out" = "1c1"$'\n'"< refs/heads/fm-pool-base $old"$'\n'"---"$'\n'"> refs/heads/fm-pool-base $tip" ] \
+    || fail "naming fm-pool-base changed more than fm-pool-base itself"$'\n'"$diff_out"
+  pass "a spawn moves only fm-pool-base, and moves nothing when the home does not name it"
+}
+
+test_a_spawn_with_a_diverged_pool_base_is_refused_before_any_copy_is_taken() {
+  local rec id repo stale side before tip
+  if ! pb_real_treehouse >/dev/null; then
+    echo "skip - no treehouse with get --lease and lease --path is installed; the real-binary case did not run"
+    return 0
+  fi
+  id='pool-base-real-pb3'
+  rec=$(make_real_pool_case pb-real-diverged "$id" 'base_branch = "fm-pool-base"') || fail "the diverged case could not be built"
+  repo="$TMP_ROOT/pb-real-diverged/scn/repo"
+  stale=$(cat "$TMP_ROOT/pb-real-diverged/stale-base")
+  git -C "$repo" checkout --quiet -b side "$stale"
+  printf 'side\n' > "$repo/s"
+  pb_git -C "$repo" add s
+  pb_git -C "$repo" commit -qm side
+  side=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" checkout --quiet main
+  git -C "$repo" branch -D fm-pool-base >/dev/null
+  git -C "$repo" branch fm-pool-base "$side"
+  tip=$(git -C "$repo" rev-parse origin/main)
+  before=$(pb_snapshot "$TMP_ROOT/pb-real-diverged/scn")
+  pb_real_spawn "$rec" "$id"
+  [ "$PB_RC" -ne 0 ] || fail "a spawn over a diverged fm-pool-base was not refused"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "refused (diverged)" "the spawn refusal does not name the reason"
+  assert_contains "$PB_OUT" "[fm-pool-base: $side; origin default: $tip]" "the spawn refusal does not name both commits"
+  [ ! -e "$PB_CASE/at-get.txt" ] || fail "a copy was acquired although fm-pool-base was refused"
+  [ -z "$(find "$PB_CASE/pool-root" -mindepth 2 -maxdepth 3 -type d 2>/dev/null | head -n 1)" ] \
+    || fail "the refused spawn left a pool copy behind"
+  [ "$(pb_snapshot "$TMP_ROOT/pb-real-diverged/scn")" = "$before" ] || fail "the refused spawn changed a ref"
+  [ ! -e "$PB_CASE/home/state/$id.meta" ] || fail "the refused spawn published a task record"
+  pass "a spawn over a diverged fm-pool-base is refused before any copy is taken and no ref moves"
+}
+
+test_a_spawn_over_an_absent_pool_base_is_refused_before_any_copy_is_taken() {
+  local rec id repo tip before
+  if ! pb_real_treehouse >/dev/null; then
+    echo "skip - no treehouse with get --lease and lease --path is installed; the real-binary case did not run"
+    return 0
+  fi
+  id='pool-base-real-absent'
+  rec=$(make_real_pool_case pb-real-absent "$id" 'base_branch = "fm-pool-base"') || fail "the absent case could not be built"
+  repo="$TMP_ROOT/pb-real-absent/scn/repo"
+  git -C "$repo" branch -D fm-pool-base >/dev/null
+  tip=$(git -C "$repo" rev-parse origin/main)
+  before=$(pb_snapshot "$TMP_ROOT/pb-real-absent/scn")
+  pb_real_spawn "$rec" "$id"
+  [ "$PB_RC" -ne 0 ] || fail "a spawn over an absent fm-pool-base was not refused"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "refused (absent)" "the spawn refusal does not name the reason"
+  assert_contains "$PB_OUT" "[fm-pool-base: absent; origin default: $tip]" "the spawn refusal does not name the origin default"
+  [ ! -e "$PB_CASE/at-get.txt" ] || fail "a copy was acquired although fm-pool-base was absent"
+  [ -z "$(find "$PB_CASE/pool-root" -mindepth 2 -maxdepth 3 -type d 2>/dev/null | head -n 1)" ] \
+    || fail "the refused spawn left a pool copy behind"
+  git -C "$repo" show-ref --verify --quiet refs/heads/fm-pool-base && fail "the spawn created fm-pool-base"
+  [ "$(pb_snapshot "$TMP_ROOT/pb-real-absent/scn")" = "$before" ] || fail "the refused spawn changed a ref"
+  [ ! -e "$PB_CASE/home/state/$id.meta" ] || fail "the refused spawn published a task record"
+  pass "a spawn over an absent fm-pool-base is refused before any copy is taken and creates nothing"
+}
+
+# pb_offline_origin_case <name> <id> <capacity|memory>: a real-pool case whose origin cannot be read, so the pool-base
+# step would refuse with origin_unreadable (exit 1), and which is also deferred: its project is at its declared capacity,
+# or the host memory admission refuses.
+pb_offline_origin_case() {
+  local name=$1 id=$2 kind=$3 rec project home
+  rec=$(make_real_pool_case "$name" "$id" 'base_branch = "fm-pool-base"') || fail "the $kind case could not be built"
+  project="$TMP_ROOT/$name/scn/repo"
+  home="$TMP_ROOT/$name/home"
+  git -C "$project" remote set-url origin "file://$TMP_ROOT/$name/missing-origin.git"
+  if [ "$kind" = capacity ]; then
+    printf 'repo 1\n' > "$home/config/project-capacity"
+    fm_write_meta "$home/state/live-holder.meta" \
+      "window=firstmate:fm-live-holder" "endpoint_task_id=live-holder" "worktree=$home/absent-worktree-live-holder" \
+      "project=$project" "harness=codex" "kind=ship" "mode=no-mistakes" "yolo=off" "spawn_gen=s-live-holder"
+  else
+    cat > "$TMP_ROOT/$name/mem-guard-refuse.sh" <<'SH'
+#!/usr/bin/env bash
+exit 75
+SH
+    chmod +x "$TMP_ROOT/$name/mem-guard-refuse.sh"
+  fi
+  printf '%s\n' "$rec"
+}
+
+test_exit_75_stays_first_when_origin_is_offline_and_the_project_is_at_capacity() {
+  local rec id before
+  if ! pb_real_treehouse >/dev/null; then
+    echo "skip - no treehouse with get --lease and lease --path is installed; the real-binary case did not run"
+    return 0
+  fi
+  id='pool-base-real-capacity'
+  rec=$(pb_offline_origin_case pb-real-capacity "$id" capacity)
+  before=$(pb_snapshot "$TMP_ROOT/pb-real-capacity/scn")
+  pb_real_spawn "$rec" "$id"
+  expect_code 75 "$PB_RC" "an offline origin with the project at capacity must defer with exit 75, not refuse with exit 1"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "deferred: project repo admits 1 worker(s) at once" "the capacity deferral was not reported"
+  assert_not_contains "$PB_OUT" "fm-pool-base refused" "the pool-base refusal came before the capacity deferral"
+  [ ! -e "$PB_CASE/at-get.txt" ] || fail "a copy was acquired by a deferred spawn"
+  [ "$(pb_snapshot "$TMP_ROOT/pb-real-capacity/scn")" = "$before" ] || fail "a deferred spawn changed a ref"
+  [ ! -e "$PB_CASE/home/state/$id.meta" ] || fail "a deferred spawn published a task record"
+  pass "an offline origin with the project at capacity defers with exit 75 before the pool-base refusal, and moves no ref"
+}
+
+test_exit_75_stays_first_when_origin_is_offline_and_host_memory_refuses() {
+  local rec id before
+  if ! pb_real_treehouse >/dev/null; then
+    echo "skip - no treehouse with get --lease and lease --path is installed; the real-binary case did not run"
+    return 0
+  fi
+  id='pool-base-real-memory'
+  rec=$(pb_offline_origin_case pb-real-memory "$id" memory)
+  before=$(pb_snapshot "$TMP_ROOT/pb-real-memory/scn")
+  FM_MEMORY_GUARD_BIN="$TMP_ROOT/pb-real-memory/mem-guard-refuse.sh" pb_real_spawn "$rec" "$id"
+  expect_code 75 "$PB_RC" "an offline origin with host memory refusing must defer with exit 75, not refuse with exit 1"$'\n'"$PB_OUT"
+  assert_contains "$PB_OUT" "deferred: host memory admission refused new task $id" "the memory deferral was not reported"
+  assert_not_contains "$PB_OUT" "fm-pool-base refused" "the pool-base refusal came before the memory deferral"
+  [ ! -e "$PB_CASE/at-get.txt" ] || fail "a copy was acquired by a deferred spawn"
+  [ "$(pb_snapshot "$TMP_ROOT/pb-real-memory/scn")" = "$before" ] || fail "a deferred spawn changed a ref"
+  pass "an offline origin with host memory refusing defers with exit 75 before the pool-base refusal, and moves no ref"
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
@@ -2325,6 +3016,19 @@ if [ "$#" -gt 0 ]; then
   exit 0
 fi
 
+test_an_absent_pool_base_is_refused_and_never_created
+test_pool_base_reads_the_config_of_the_main_checkout_and_the_user_config
+test_pool_base_advances_by_compare_and_set_and_a_second_step_changes_nothing
+test_pool_base_refuses_every_unsafe_case_and_leaves_every_ref_unchanged
+test_a_worktree_that_takes_pool_base_during_the_update_is_never_left_inconsistent
+test_a_real_treehouse_copy_is_cut_at_the_advanced_origin_default
+test_a_spawn_that_names_a_base_branch_still_advances_the_pool_base
+test_a_spawn_whose_treehouse_config_cannot_be_read_is_refused_before_any_copy_is_taken
+test_a_spawn_changes_no_ref_but_fm_pool_base_and_none_when_the_home_does_not_name_it
+test_a_spawn_with_a_diverged_pool_base_is_refused_before_any_copy_is_taken
+test_a_spawn_over_an_absent_pool_base_is_refused_before_any_copy_is_taken
+test_exit_75_stays_first_when_origin_is_offline_and_the_project_is_at_capacity
+test_exit_75_stays_first_when_origin_is_offline_and_host_memory_refuses
 test_local_only_source_selection
 test_local_only_source_binding
 test_local_only_unprepared_retry

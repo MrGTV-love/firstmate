@@ -14,6 +14,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [status log size bounds](#status-log-size-bounds-fm_status_cap_bytes), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
+| Pool copies cut ahead of the origin default | [Pool base branch](#pool-base-branch) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Automatic review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
@@ -667,6 +668,18 @@ When the installed Treehouse has no `pool-dir`, or its output is not one absolut
 A held close, and a shared slot's claimant record retiring with one remaining record, leave copies in the slot, so they lease a superseded-folder slot by its exact path with `treehouse lease --path` once every refusal check has passed, so a close that refuses leaves no new lease, and Treehouse then never hands it out, whichever folder is current; without `lease --path` (treehouse v3.1.7-fm or later) they refuse and the copies stay held.
 A dirty copy in an old folder is therefore still refused, before any return or lease release, and so is an unlanded one that the attended recorded-bundle exception in [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header does not cover.
 A lease an earlier teardown took by name on a same-named slot of the current pool is released with `treehouse return <path> --if-lease-holder <task>`, after the reservation and the held-copy record checks, and only for the current-pool slot that bears the recorded slot's name in its old folder, only when its holder is that task, no other task claims the slot, no process runs inside it, no copy is registered inside it, and no local task record names a copy in it; a lease left in place, or a listing that cannot be read, is reported with the command that releases it.
+
+### Pool base branch
+
+Treehouse cuts every new pool copy, and recycles every returned one, at its base branch, and it prefers a local branch that is strictly ahead of origin.
+A repository whose local default branch holds commits origin lacks therefore cuts every copy ahead of the origin default that `bin/fm-spawn.sh` targets, and the spawn precheck skips each one as `head_not_target` until the pool is full of unusable copies.
+Set `base_branch = "fm-pool-base"` in that repository's `treehouse.toml` to cut the pool at a branch that Firstmate keeps at the origin default instead.
+A fresh Treehouse-backed spawn (every backend except `orca`, which does not call Treehouse) then moves `fm-pool-base` to the origin default it fetched, under the project's Treehouse lock and before it takes a copy, whatever starting branch the task names: an existing branch is only fast-forwarded, by a compare-and-set update, and Firstmate never creates it.
+A home whose treehouse config is readable and does not name `fm-pool-base`, or has no treehouse config at all, moves nothing.
+Every other case refuses the spawn before any copy is taken, names its reason, the `fm-pool-base` commit and the origin default commit, and leaves every ref unchanged: `absent` (the branch does not exist, so the repository's owner creates it at the origin default), `config_unreadable` (the treehouse config cannot be read or parsed), `origin_missing` (no origin remote), `origin_unreadable` (the origin default cannot be read), `ahead` (the branch holds commits the origin default lacks), `diverged` (each holds commits the other lacks), `checked_out` (a worktree has the branch checked out, or took it while it moved, in which case the branch is put back), `ref_unreadable` (the branch or its ancestry cannot be read), and `changed` (the branch moved during the update).
+The step runs after the project's capacity and host-memory deferrals, so a retryable exit 75 comes before any of these refusals and a deferred spawn moves no ref.
+Firstmate never forces, resets, creates or deletes the branch, so the repository's owner corrects a refused branch.
+[`bin/fm-pool-base-lib.sh`](../bin/fm-pool-base-lib.sh)'s header owns the mechanics.
 
 ### Herdr homes and presentation
 
