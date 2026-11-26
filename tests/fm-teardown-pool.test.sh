@@ -4592,6 +4592,14 @@ SH
     || fail "skipped-copies: the notice for a passed-over row did not name its acquisition pane"$'\n'"$(cat "$case_dir/stderr")"
   grep -Fxq "notice: the record row for $case_dir/passed-old-row names holder 'holder-old-row', not this task's firstmate-skipped:task-x1; that lease is not this task's, so nothing is returned and the row is left as it is" "$case_dir/stderr" \
     || fail "skipped-copies: the notice for a passed-over row without a pane changed"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fxq "$case_dir/passed-with-pane"$'\t'"passed over"$'\t'"holder-with-pane"$'\t'"1"$'\t'"@42" "$rec" \
+    || fail "skipped-copies: the passed-over row with a pane was not kept as it was"$'\n'"$(cat "$rec")"
+  grep -Fxq "$case_dir/passed-old-row"$'\t'"passed over"$'\t'"holder-old-row"$'\t'"1" "$rec" \
+    || fail "skipped-copies: the four-column passed-over row was not kept as it was"$'\n'"$(cat "$rec")"
+  ! grep -Fq "return $case_dir/passed-with-pane" "$log" \
+    || fail "skipped-copies: the passed-over lease with a pane was returned"$'\n'"$(cat "$log")"
+  ! grep -Fq "return $case_dir/passed-old-row" "$log" \
+    || fail "skipped-copies: the four-column passed-over lease was returned"$'\n'"$(cat "$log")"
   grep -Fq "process(es) are running inside it (acquisition pane @41 of the spawn may still stand in it)" "$case_dir/stderr" \
     || fail "skipped-copies: the refusal for the busy copy did not name its acquisition pane"$'\n'"$(cat "$case_dir/stderr")"
   grep -Fxq "$busy"$'\t'"dirty_tree"$'\t'"firstmate-skipped:task-x1"$'\t'"1"$'\t'"@41" "$rec" \
