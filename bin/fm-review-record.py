@@ -129,9 +129,11 @@ see docs/configuration.md 'Review carry-over across a
 base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta, zhipu (aliases claude, gpt, chatgpt, codex, oN, gemini,
-gemma, grok, kimi, llama, glm, zai, and the exact native Claude names opus,
+gemma, grok, kimi, llama, glm, and the exact native Claude names opus,
 sonnet, haiku, which are deliberately anthropic because Claude records bare
-model names); route prefixes ending in / are dropped. Stored typed family fields
+model names); route prefixes ending in / are dropped, and zai/z-ai are
+recognized only as Zhipu pipeline provider names, never as bare model ids.
+Stored typed family fields
 never decide independence. Uncovered-group refusals name each uncovered family,
 reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
@@ -221,7 +223,11 @@ FAMILIES = {"anthropic": "anthropic", "claude": "anthropic",
             "google": "google", "gemini": "google", "gemma": "google",
             "deepseek": "deepseek", "xai": "xai", "grok": "xai",
             "moonshot": "moonshot", "kimi": "moonshot", "meta": "meta", "llama": "meta",
-            "zhipu": "zhipu", "glm": "zhipu", "zai": "zhipu"}
+            "zhipu": "zhipu", "glm": "zhipu"}
+# Only canonical provider names plus explicit Zhipu provider route spellings
+# map from agent_invocations.model_provider; model aliases (e.g. gpt, sonnet)
+# are never trusted as provider names.
+PROVIDER_FAMILIES = {family: family for family in set(FAMILIES.values())} | {"zai": "zhipu", "z-ai": "zhipu"}
 RECORDED_FAMILIES = set(FAMILIES.values()) | {"unknown"}
 
 
@@ -246,10 +252,14 @@ def nonempty(value, field):
 def model(value, field):
     if not isinstance(value, str) or not re.fullmatch(r"[^\s\x00]+", value):
         raise RecordError(f"{field} must be an exact model id")
-    name = re.match(r"([a-z]*)(\d*)", value.casefold().rsplit("/", 1)[-1])
+    tail = value.casefold().rsplit("/", 1)[-1]
+    name = re.match(r"([a-z]*)(\d*)", tail)
     if name.group(1) == "o" and name.group(2):
         return "openai"
-    return FAMILIES.get(name.group(1), "unknown")
+    family = FAMILIES.get(name.group(1), "unknown")
+    if family == "zhipu" and not re.fullmatch(r"[a-z0-9][a-z0-9._:-]*", tail):
+        return "unknown"
+    return family
 
 
 def modelled(value, field):
@@ -484,8 +494,8 @@ def derived_authors(home, pr, head, task, base):
                         item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
-                        provider_family = FAMILIES.get(provider.casefold()) if isinstance(provider, str) else None
-                        if provider_family in RECORDED_FAMILIES - {"unknown"}:
+                        provider_family = PROVIDER_FAMILIES.get(provider.casefold()) if isinstance(provider, str) else None
+                        if provider_family:
                             if item["family"] == "unknown":
                                 item["family"] = provider_family
                             elif item["family"] != provider_family:
