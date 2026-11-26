@@ -1033,7 +1033,7 @@ classify() {  # <copy> <clone> <pool> <container>
       # The sweep never releases a lock naming a running pid, even when its
       # start is newer than the lock. Teardown's recycled-pid policy is broader.
       rc=0
-      fm_task_copy_launcher_state "$pid" || rc=$?
+      fm_task_copy_launcher_state "$pid" strict || rc=$?
       case "$rc" in
         0)
           REASON="$REASON (launcher $pid is alive; start age=$(teardown_pid_age_secs "$pid" || printf unknown)s; lock mtime=$(file_mtime "$TEARDOWN_FOREIGN_LOCK_FILE" || printf unknown))"

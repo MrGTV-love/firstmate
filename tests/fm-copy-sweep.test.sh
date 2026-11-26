@@ -2499,6 +2499,92 @@ test_live_foreign_or_unreleasable_locks_are_kept() {
   pass "a live launcher, a lock that is not Vernant's, and a missing driver all keep their copy untouched"
 }
 
+# A ps in this world that answers for <pid> the way <shape> says (refused: the
+# sandbox refuses it with 126; absent: no such process) and passes every other
+# call to the real ps.
+sweep_fake_launcher_ps() {  # <pid> <refused|absent>
+  local real_ps
+  real_ps=$(command -v ps)
+  cat > "$FAKEBIN/ps" <<SH
+#!/usr/bin/env bash
+if [ "\$*" = "-p $1 -o pid=" ]; then
+  case "$2" in
+    refused) echo 'ps: Operation not permitted' >&2; exit 126 ;;
+    absent) exit 1 ;;
+  esac
+fi
+exec "$real_ps" "\$@"
+SH
+  chmod +x "$FAKEBIN/ps"
+}
+
+# A python3 in this world whose `fm-proc-info.py table pid` answer leaves <pid>
+# out and passes every other call to the real one: the partial process table a
+# confined reader sees when the sandbox that refused ps also hides processes.
+sweep_hide_launcher_from_table() {  # <pid>
+  local real_python
+  real_python=$(command -v python3)
+  cat > "$FAKEBIN/python3" <<SH
+#!/usr/bin/env bash
+for last; do :; done
+if [ "\$#" -ge 3 ] && [ "\${@: -2:1}" = table ] && [ "\$last" = pid ]; then
+  "$real_python" "\$@" | grep -vx -- "$1"
+  exit 0
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$FAKEBIN/python3"
+}
+
+# A refused ps is no proof that a Vernant launcher is gone, even when the
+# confined table read made under the same restriction leaves it out: the copy is
+# held and the driver is never asked. A readable ps that shows the launcher gone
+# still sends the same kind of copy to the driver.
+test_a_refused_ps_holds_a_locked_copy_the_confined_table_cannot_see() {
+  local admin before table rc pid
+  make_locked_copy_case refused-ps-hidden live
+  install_driver "$SLOT" "$W"
+  pid=$LIVE_PID
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  sweep_fake_launcher_ps "$pid" refused
+  sweep_hide_launcher_from_table "$pid"
+  rc=0
+  PATH="$FAKEBIN:$ORIGINAL_PATH" ps -p "$pid" -o pid= >/dev/null 2>&1 || rc=$?
+  assert_equals 126 "$rc" "the fake ps does not refuse the launcher"
+  table=$(python3 "$ROOT/bin/fm-proc-info.py" table pid)
+  printf '%s\n' "$table" | grep -qx -- "$pid" || fail "the real process table does not list the live launcher"
+  table=$(PATH="$FAKEBIN:$ORIGINAL_PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid)
+  if printf '%s\n' "$table" | grep -qx -- "$pid"; then fail "the launcher is not hidden from the confined reader"; fi
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  kill -0 "$pid" 2>/dev/null || fail "the live launcher ended before the verdict"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  LIVE_PID=
+  [ "$RC" = 0 ] || fail "refused ps: apply failed ($RC): $OUT"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "launcher $pid cannot be observed; absence is not proved" \
+    "a refused ps was not reported as unobservable"
+  assert_absent "$W/closeout.log" "the closeout driver ran for a launcher ps could not observe"
+  [ -e "$(copy_path locked)" ] || fail "the copy of an unobservable launcher was removed"
+  registered locked || fail "the copy of an unobservable launcher was unregistered"
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "the unobservable launcher's lock changed"
+
+  make_locked_copy_case refused-ps-control dead
+  install_driver "$SLOT" "$W"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  pid=$(sed -n 's/.*launcher=\([0-9][0-9]*\).*/\1/p' "$admin/locked")
+  [ -n "$pid" ] || fail "the control lock names no launcher pid"
+  sweep_fake_launcher_ps "$pid" absent
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "readable ps: apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "a launcher ps showed gone did not reach the driver"
+  assert_contains "$(cat "$W/closeout.log" 2>/dev/null)" "--cleanup-worktree $(copy_path locked) --execute-cleanup" \
+    "the driver was not asked to release the copy"
+  [ ! -e "$(copy_path locked)" ] || fail "the driver did not remove the copy"
+  pass "a refused ps holds a Vernant-locked copy even when the confined table cannot see its launcher, and a readable ps that shows the launcher gone still reaches the driver"
+}
+
 test_copy_with_one_untracked_file_and_unpushed_tip_are_kept() {
   local bundle digest tips
   make_world edges
@@ -3402,6 +3488,7 @@ test_two_sweeps_of_one_path_keep_both_preserved_directories
 test_a_removal_with_no_measured_size_says_so
 test_locked_copy_with_an_unpushed_equivalence_is_still_held
 test_live_foreign_or_unreleasable_locks_are_kept
+test_a_refused_ps_holds_a_locked_copy_the_confined_table_cannot_see
 test_copy_with_one_untracked_file_and_unpushed_tip_are_kept
 test_landed_content_without_a_pushed_tip_is_reaped_by_apply
 test_lane_home_project_clone_is_swept
