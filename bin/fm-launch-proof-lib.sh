@@ -759,9 +759,10 @@ fm_launch_proof_refusal_cause() { # <unmanaged|pinned-elsewhere|contested|unknow
   esac
 }
 
-# The next action follows the judged <cause> when one is present, otherwise the
-# verdict. Nothing can authorize an unpinned native restore, so its next action
-# is the guarded relaunch of a positively stopped agent, or a decision by hand.
+# The next action follows the verdict, except that the omp session cause and any
+# judged <cause> on an unknown verdict get their own. Nothing can authorize an
+# unpinned native restore, so its next action is the guarded relaunch of a
+# positively stopped agent, or a decision by hand.
 fm_launch_proof_refusal_next() { # <unmanaged|pinned-elsewhere|contested|unknown> <meta> [<cause>]
   local id=${2##*/}
   if [ "${3:-}" = "$FM_LAUNCH_PROOF_OMP_SESSION_CAUSE" ]; then

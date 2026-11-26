@@ -2751,7 +2751,7 @@ do_relaunch() {
         # nonzero exit an unproven versioned launch always had.
         [ "$report_harness" != claude ] \
           || die "launch recovery for $ID found $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META")"
-        # An unpinned omp names its cause and next action as claude does (Main
+        # An unmanaged omp names its cause and that cause's next action (Main
         # 1901 (b), Main 1928 F3); it keeps the skip and zero exit omp always had.
         echo "recovery-skipped $ID launch=unmanaged: $(fm_launch_proof_refusal_cause unmanaged "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META" "$detail")"
         return 0
