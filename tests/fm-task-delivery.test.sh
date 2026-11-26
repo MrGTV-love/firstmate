@@ -275,6 +275,89 @@ EOF
   pass "fm-spawn: a DoD file line inside the task section naming a finished criteria file is the only Definition of Done escape"
 }
 
+# A brief that carries a Reviewed task record line is a review assignment. A
+# fresh spawn refuses it while the line names a file that cannot be opened, is
+# not an absolute path, or disagrees with a second such line, and dispatches it
+# once the record opens or the line says none.
+test_spawn_refuses_a_review_whose_record_cannot_be_opened() {
+  local rec home proj fakebin out id brief record events
+  rec=$(make_home reviewgate)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  record="$home/data/reviewed-work/brief.md"
+  mkdir -p "${record%/*}"
+  # tests/lib.sh sends every guard event to one shared log; this case reads its own.
+  events="$TMP_ROOT/reviewgate-guard-events.jsonl"
+  printf '# Task\n\n## Firstmate spec\nBuild it.\n' > "$record"
+
+  scaffold_review() {  # <id> <review-of value>
+    FM_HOME="$home" "$BRIEF" "$1" proj --scout --review-of "$2" >/dev/null 2>&1 || fail "review brief $1 should scaffold"
+    fill_task_subsections "$home/data/$1/brief.md" "Have the work reviewed." "Report to firstmate."
+    fill_whole_dod "$home/data/$1/brief.md"
+  }
+
+  id=review-gone
+  scaffold_review "$id" reviewed-work
+  rm -f "$record"
+  out=$(FM_GUARD_EVENT_LOG="$events" run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_contains "$out" "Reviewed task record $record is not a readable file" "a review of a deleted record was not refused"
+  assert_contains "$out" "bin/fm-brief.sh <task> <repo> --review-of" "the refusal did not name the repair"
+  assert_absent "$home/data/$id/launch-brief.md" "a review that could not open its record was launched"
+
+  : > "$record"
+  out=$(FM_GUARD_EVENT_LOG="$events" run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_contains "$out" "Reviewed task record $record is empty" "an empty record was not refused"
+
+  printf '# Task\n\n## Firstmate spec\nBuild it.\n' > "$record"
+  out=$(FM_GUARD_EVENT_LOG="$events" run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_not_contains "$out" "Reviewed task record" "a review naming an openable record was refused"
+  assert_grep "Reviewed task record: $record" "$home/data/$id/launch-brief.md" "the launch brief lost the record line"
+
+  id=review-relative
+  scaffold_review "$id" reviewed-work
+  brief="$home/data/$id/brief.md"
+  awk -v line="Reviewed task record: data/reviewed-work/brief.md" '/^Reviewed task record:/ { print line; next } { print }' "$brief" > "$brief.new"
+  mv "$brief.new" "$brief"
+  out=$(FM_GUARD_EVENT_LOG="$events" run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_contains "$out" "invalid Reviewed task record: data/reviewed-work/brief.md; it requires an absolute path or none" \
+    "a relative record path was not refused"
+
+  id=review-twins
+  scaffold_review "$id" reviewed-work
+  brief="$home/data/$id/brief.md"
+  awk '/^Reviewed task record:/ && !done { print; print "Reviewed task record: none"; done = 1; next } { print }' "$brief" > "$brief.new"
+  mv "$brief.new" "$brief"
+  out=$(FM_GUARD_EVENT_LOG="$events" run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_contains "$out" "conflicting Reviewed task record lines; name one adopted record or none" \
+    "two disagreeing record lines were not refused"
+
+  id=review-none
+  scaffold_review "$id" none
+  out=$(FM_GUARD_EVENT_LOG="$events" run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_not_contains "$out" "Reviewed task record" "a review of work with no task record was refused"
+  assert_grep "Reviewed task record: none" "$home/data/$id/launch-brief.md" "the launch brief lost the none line"
+
+  id=review-plain
+  FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail "plain scout brief should scaffold"
+  fill_task_subsections "$home/data/$id/brief.md" "Find the cause." "Report only."
+  fill_whole_dod "$home/data/$id/brief.md"
+  out=$(FM_GUARD_EVENT_LOG="$events" run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_not_contains "$out" "Reviewed task record" "a brief with no record line was treated as a review"
+
+  # The refusal is its own guard decision, and it is never attributed to the
+  # placeholder guard: one event per decision, on its own id.
+  [ -f "$events" ] || fail "the spawn brief guards wrote no events"
+  jq -e 'select(.guard == "spawn-brief-review-record" and .decision == "deny")' "$events" >/dev/null \
+    || fail "the review-record refusal emitted no deny event"
+  jq -e 'select(.guard == "spawn-brief-review-record" and .decision == "allow")' "$events" >/dev/null \
+    || fail "an accepted review emitted no allow event for the review-record guard"
+  if jq -e 'select(.guard == "spawn-brief-dod-placeholders" and .decision == "deny")' "$events" >/dev/null; then
+    fail "a review-record refusal was attributed to the placeholder guard"
+  fi
+  pass "fm-spawn: a review brief is refused while its record cannot be opened and dispatched once it can"
+}
+
 # A ship spawn must stop when its delivery contract was never decided or cannot be
 # a task mode, and must leave no task metadata behind when it does.
 test_ship_spawn_requires_a_valid_delivery_contract() {
@@ -2191,6 +2274,7 @@ test_spawn_requires_a_finished_task_definition_of_done
 test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_positions
 test_dod_file_line_counts_only_inside_the_task_section
 test_spawn_accepts_a_dod_file_that_passes_the_same_check
+test_spawn_refuses_a_review_whose_record_cannot_be_opened
 test_project_mode_resolves_branch_prefix
 # A scout on its own non-fm branch in a governed project whose provisioner
 # refuses, after running any extra fixture Python line.

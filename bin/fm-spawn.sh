@@ -4731,6 +4731,11 @@ print_brief_dispatch_refusal() { # <brief> <problem-lines>
 $problems
 EOF
   printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
+  case "$problems" in
+    *'eviewed task record'*)
+      printf "error: repair: a 'Reviewed task record: <absolute path>' line under ## Firstmate spec must name a readable, nonempty file, or read 'Reviewed task record: none' when the reviewed work has no task record; bin/fm-brief.sh <task> <repo> --review-of <task-id|none> writes the line\n" >&2
+      ;;
+  esac
 }
 if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   # One verdict, one refusal: the helper lists every unfinished Task body and
@@ -4740,10 +4745,24 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   if [ "$RELAUNCH" -eq 0 ]; then
     if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF"); then
       print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
-      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --task "$ID" --source-ok true 2>/dev/null || true
+      # A review brief is its own guard: its refusal is not a placeholder refusal.
+      review_source_ok=true
+      case "$DISPATCH_PROBLEMS" in
+        *'unable to inspect the reviewed task record'*) review_source_ok=false ;;
+      esac
+      case "$DISPATCH_PROBLEMS" in
+        *'eviewed task record'*) "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-review-record deny --task "$ID" --source-ok "$review_source_ok" 2>/dev/null || true ;;
+      esac
+      if printf '%s\n' "$DISPATCH_PROBLEMS" | grep -vF 'eviewed task record' | grep -q .; then
+        "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --task "$ID" --source-ok true 2>/dev/null || true
+      fi
       exit 1
     fi
     "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders allow --task "$ID" --cleared-by proceed 2>/dev/null || true
+    # The review-record guard decides only for a brief that carries the line.
+    if [ -n "$(fm_brief_review_record "$BRIEF")" ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-review-record allow --task "$ID" --cleared-by proceed 2>/dev/null || true
+    fi
     if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
       echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
     fi
