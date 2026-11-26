@@ -333,12 +333,36 @@ fm_task_copy_same_repository() {  # <path> <project>
   [ "$path_common" = "$proj_common" ]
 }
 
+# Succeeds when every registration <canonical-clone> keeps in its common git
+# dir can be read. git leaves out a registration it cannot read and still exits
+# 0, so the list alone cannot tell a clone that registers nothing from one whose
+# registrations are hidden: the registration folder must list, and each
+# registration's folder must list and its gitdir file read. A registration with
+# no gitdir file is a broken one that git itself ignores, not an unreadable one.
+fm_task_copy_registrations_readable() {  # <canonical-clone>
+  local common store entry
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  store=$common/worktrees
+  [ -e "$store" ] || [ -L "$store" ] || return 0
+  [ -d "$store" ] && [ -r "$store" ] && [ -x "$store" ] || return 1
+  for entry in "$store"/* "$store"/.[!.]*; do
+    [ -d "$entry" ] || continue
+    [ -r "$entry" ] && [ -x "$entry" ] || return 1
+    [ -e "$entry/gitdir" ] || continue
+    [ -r "$entry/gitdir" ] || return 1
+  done
+  return 0
+}
+
 # Prints the canonical path of every worktree <canonical-clone> has registered
 # strictly inside itself, one per line. A registered copy whose directory is
 # gone keeps its raw path. Fails when the registration list cannot be read, so a
-# caller never takes an unreadable list for an empty one.
+# caller never takes an unreadable list for an empty one; that includes a list
+# git shortened because it could not read a registration
+# (fm_task_copy_registrations_readable).
 fm_task_copy_registered_nested() {  # <canonical-clone>
   local clone=$1 field path canon
+  fm_task_copy_registrations_readable "$clone" || return 1
   while IFS= read -r -d '' field; do
     case "$field" in
       registration-list-unreadable) return 1 ;;

@@ -4954,6 +4954,77 @@ test_by_path_refuses_a_gone_copy_when_a_registration_list_cannot_be_read() {
   pass 'teardown --copy does not report a gone copy done while a clone registration list cannot be read'
 }
 
+# git leaves out a registration it cannot read and still exits 0, so a list that comes back short is
+# not proof that no clone registers a gone copy. The registration folder, one registration's folder
+# and its gitdir file are each made unreadable with a real permission bit (git itself is not
+# replaced): the gone copy is refused as "could not be read", never reported done, and the stale
+# registration is left as it was. With every part readable the same fixture refuses for the stale
+# registration and names the repair, which shows the unreadable part is what changed the answer.
+test_by_path_does_not_report_a_gone_copy_done_while_a_registration_cannot_be_read() {
+  local shape case_dir rc store entry obstacle mode
+  [ "$(id -u)" != 0 ] || { pass 'skipped as root: a permission bit does not stop root'; return 0; }
+  for shape in store-folder entry-folder gitdir-file; do
+    make_by_path_case "by-path-store-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-store-$shape: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-store-$shape: the copy was not removed"
+    # The same path registered again and then removed behind git's back: a stale registration, for a
+    # path the audit record names.
+    git -C "$case_dir/project" worktree add -q -b "fm/stale-$shape" "$BP_COPY" main
+    rm -rf "$BP_COPY"
+    store=$BP_CLONE/.git/worktrees
+    entry=
+    for obstacle in "$store"/*; do
+      [ "$(cat "$obstacle/gitdir" 2>/dev/null)" = "$BP_COPY/.git" ] && entry=${obstacle##*/}
+    done
+    [ -n "$entry" ] || fail "by-path-store-$shape: the stale registration is not in the fixture"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-store-$shape: with every part readable the stale registration must refuse: $(cat "$case_dir/stderr")"
+    assert_grep 'worktree prune' "$case_dir/stderr" "by-path-store-$shape: the readable control does not name the repair"
+    case "$shape" in
+      store-folder) obstacle=$store; mode=755 ;;
+      entry-folder) obstacle=$store/$entry; mode=755 ;;
+      gitdir-file) obstacle=$store/$entry/gitdir; mode=644 ;;
+    esac
+    chmod 000 "$obstacle"
+    if [ "$shape" = gitdir-file ]; then
+      if cat "$obstacle" >/dev/null 2>&1; then chmod "$mode" "$obstacle"; fail "by-path-store-$shape: the fixture does not make the gitdir file unreadable"; fi
+    elif ls -A "$obstacle" >/dev/null 2>&1; then
+      chmod "$mode" "$obstacle"; fail "by-path-store-$shape: the fixture does not make the folder unreadable"
+    fi
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    chmod "$mode" "$obstacle"
+    expect_code 1 "$rc" "by-path-store-$shape: a gone copy must not be reported done while a registration cannot be read: $(cat "$case_dir/stderr")"
+    assert_grep 'could not be read' "$case_dir/stderr" "by-path-store-$shape: the refusal does not say the registration could not be read"
+    if grep -Fq 'already gone' "$case_dir/stderr"; then fail "by-path-store-$shape: a gone copy was reported done"; fi
+    git -C "$BP_CLONE" worktree list --porcelain | grep -Fqx "worktree $BP_COPY" || fail "by-path-store-$shape: the stale registration was pruned"
+    assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-store-$shape: the refused run changed the audit record"
+    assert_equals 1 "$(wc -l < "$case_dir/git-remove.log" | tr -d ' ')" "by-path-store-$shape: the refused run called git worktree remove"
+  done
+  # A present copy whose registration cannot be read is refused for that, not for being unregistered.
+  make_by_path_case by-path-store-present
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  store=$BP_CLONE/.git/worktrees
+  chmod 000 "$store"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  chmod 755 "$store"
+  expect_code 1 "$rc" "by-path-store-present: a present copy whose registration cannot be read must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be read' "$case_dir/stderr" 'by-path-store-present: the refusal does not say the registration could not be read'
+  by_path_assert_untouched "$case_dir" by-path-store-present
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-store-present: with the registration readable the same copy goes: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-store-present: the copy was not removed'
+  pass 'teardown --copy treats a registration folder, registration or gitdir file it cannot read as a list it cannot read'
+}
+
 # Git repositories the copy's own clone does not register, such as a separate clone or a worktree of
 # another project under .claude/ (which the clean proof skips), would go with the copy and their
 # commits with them. Every one found is refused; the same copy goes once it holds none.
@@ -5689,6 +5760,7 @@ test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_i
 test_by_path_resolves_a_slot_claim_naming_the_record_id_in_every_local_home
 test_by_path_refuses_a_present_copy_when_a_registration_list_cannot_be_read
 test_by_path_refuses_a_gone_copy_when_a_registration_list_cannot_be_read
+test_by_path_does_not_report_a_gone_copy_done_while_a_registration_cannot_be_read
 test_by_path_refuses_an_unregistered_nested_repository_under_the_copy
 test_by_path_refuses_when_the_audit_record_cannot_be_written
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row
