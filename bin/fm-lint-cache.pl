@@ -475,8 +475,12 @@ sub shell_word {
         if (substr($body, $$position, 2) eq '$(' || (!$quote && substr($body, $$position, 2) =~ /^[<>]\(/)) {
             my $start = $$position;
             $$position += 2;
-            my $program = balanced_text($body, $position, '(', ')');
-            push @subs, $program unless $literal || $program =~ /^\(/;
+            if (!$literal && substr($body, $$position, 1) eq '(') {
+                balanced_text($body, $position, '(', ')', \@subs);
+            } else {
+                my $program = balanced_text($body, $position, '(', ')');
+                push @subs, $program unless $literal || $program =~ /^\(/;
+            }
             $value .= $literal ? substr($body, $start, $$position - $start) : "\x01";
             next;
         }
