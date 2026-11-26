@@ -1281,6 +1281,8 @@ teardown_return_pending_target_ok() {
 # for every temporary file the protected mutations write before renaming it
 # into place; empty until then, and removed by the EXIT trap.
 TEARDOWN_RUN_DIR=
+# The file the copy-clearance scan reads Git's answers from (see require_cleanup_copy_clearance); removed by the EXIT trap.
+TEARDOWN_SCAN_TMP=
 
 # Record, once this task's slot is reserved (or, for a slot shared with another
 # task, once this task's claim beside it awaits release) and before any
@@ -1349,6 +1351,7 @@ teardown_release_locks() {
     fm_backlog_record_remove "$BACKLOG_CLOSE_STAGE" "pending-close staged record" "$STATE" || true
   fi
   [ -z "${TEARDOWN_RUN_DIR:-}" ] || rm -rf "${TEARDOWN_RUN_DIR:?}"
+  [ -z "${TEARDOWN_SCAN_TMP:-}" ] || rm -f "$TEARDOWN_SCAN_TMP"
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
     teardown_release_herdr_locks || true
   fi
@@ -4920,7 +4923,18 @@ require_exclusive_task_worktree_slot() {
 require_cleanup_copy_clearance() {
   local record_meta=$1 record_id=$2 record_state=$3 target=$4 allow_current=${5:-0} target_kind=${6:-}
   local canonical state_dir other_meta line field copy copy_real copy_common retiring i owner_home keep_current overlaps own skipped
-  canonical=$(fm_task_copy_canonical_dir "$target") || return 0
+  local -a rec_lines=()
+  local rec_kind wt_real
+  local scan_limit=${FM_TEARDOWN_SCAN_DEADLINE_SECS:-600} scan_end=0
+  fm_task_copy_canonical_dir_to canonical "$target" || return 0
+  # A scan that holds the project lock is bounded: it reads every task record of every local
+  # home, and a spawn or another teardown waits on that lock for as long as it runs. Past the
+  # deadline, checked before each record (a pure-bash scan cannot be interrupted), it refuses.
+  # The scan only reads, and it sits where its other refusals do, so a refusal here leaves exactly
+  # what they leave: nothing was changed by the scan, the EXIT trap releases the lock, and a retry
+  # is safe. No process is signalled. The value is read once per scan.
+  case "$scan_limit" in ''|*[!0-9]*|0) scan_limit=600 ;; esac
+  [ "$TREEHOUSE_PROJECT_LOCK_HELD" != 1 ] || scan_end=$((SECONDS + scan_limit))
   # A retiring secondmate's own registered home that is already gone holds
   # nothing to lose, so it alone is not a reason to refuse; every other home
   # the walk cannot prove still refuses.
@@ -4940,6 +4954,10 @@ require_cleanup_copy_clearance() {
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
+      if [ "$scan_end" -gt 0 ] && [ "$SECONDS" -ge "$scan_end" ]; then
+        echo "REFUSED: the copy-clearance scan for task $record_id ran past its ${scan_limit}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown" >&2
+        return 1
+      fi
       retiring=0
       own=0
       if [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ]; then
@@ -4957,9 +4975,9 @@ require_cleanup_copy_clearance() {
                && [ "$other_meta" -ef "${DESCENDANT_TASK_STATES[$i]}/${DESCENDANT_TASK_IDS[$i]}.meta" ]; then
               if [ "$allow_current" = home ]; then
                 retiring=1
-              elif [ "$(fm_meta_get "$other_meta" kind)" = secondmate ]; then
-                owner_home=$(fm_meta_get "$other_meta" home)
-                [ -n "$owner_home" ] || owner_home=$(fm_meta_get "$other_meta" worktree)
+              elif fm_meta_get_to rec_kind "$other_meta" kind; [ "$rec_kind" = secondmate ]; then
+                fm_meta_get_to owner_home "$other_meta" home
+                [ -n "$owner_home" ] || fm_meta_get_to owner_home "$other_meta" worktree
                 case "$record_state" in "$owner_home"/state|"$owner_home"/*/state) retiring=1 ;; esac
               fi
             fi
@@ -4973,7 +4991,12 @@ require_cleanup_copy_clearance() {
            "$(fm_meta_get "$other_meta" project)" "$(fm_meta_get "$other_meta" worktree)"; then
         keep_current=1
       fi
-      while IFS= read -r line || [ -n "$line" ]; do
+      # The record's paths are read by pure bash into an array (bin/fm-task-copy-lib.sh):
+      # a process substitution per record kept one pipe fd open per record until this
+      # function returned, and Bash 3.2 faulted in its next fork once a pipe reached fd 256.
+      fm_task_copy_record_paths_to "$other_meta"
+      rec_lines=(${FM_TASK_COPY_RECORD_PATHS[@]+"${FM_TASK_COPY_RECORD_PATHS[@]}"})
+      for line in ${rec_lines[@]+"${rec_lines[@]}"}; do
         field=${line%% *}
         if [ "$retiring" = 1 ] && [ "$field" != prior_worktree ]; then
           [ "$keep_current" = 1 ] || continue
@@ -4986,7 +5009,7 @@ require_cleanup_copy_clearance() {
           continue
         fi
         copy=${line#* }
-        copy_real=$(fm_task_copy_canonical_dir "$copy") || continue
+        fm_task_copy_canonical_dir_to copy_real "$copy" || continue
         # Returning a pool slot (target_kind=slot) refuses another ordinary
         # task's current worktree= only on an exact path match, as origin/main
         # does: the return resets that one slot and never removes a copy that
@@ -4995,8 +5018,9 @@ require_cleanup_copy_clearance() {
         # home) name custody no teardown may sweep away, so they keep the
         # component-aware overlap.
         overlaps=0
+        fm_meta_get_to rec_kind "$other_meta" kind
         if [ "$target_kind" = slot ] && [ "$field" = worktree ] && [ "$retiring" = 0 ] \
-           && [ "$(fm_meta_get "$other_meta" kind)" != secondmate ] && [ "$own" = 0 ]; then
+           && [ "$rec_kind" != secondmate ] && [ "$own" = 0 ]; then
           [ "$canonical" != "$copy_real" ] || overlaps=1
         elif fm_task_copy_paths_overlap "$canonical" "$copy_real"; then
           overlaps=1
@@ -5007,7 +5031,7 @@ require_cleanup_copy_clearance() {
         # fm_task_copy_prior_root_released's).
         if [ "$overlaps" = 1 ] && [ "$field" = prior_worktree ] && [ "$own" = 0 ] \
            && [ "$KIND" != secondmate ] && [ "$record_meta" = "$META" ] \
-           && [ "$canonical" = "$(fm_task_copy_canonical_dir "$WT" 2>/dev/null)" ] \
+           && fm_task_copy_canonical_dir_to wt_real "$WT" 2>/dev/null && [ "$canonical" = "$wt_real" ] \
            && fm_task_copy_prior_root_released "$other_meta" "$copy_real" "$canonical" "$record_meta" \
              "${FM_LOCAL_FIRSTMATE_STATES[@]}"; then
           overlaps=0
@@ -5017,14 +5041,21 @@ require_cleanup_copy_clearance() {
           echo "REFUSED: task $record_id's cleanup target $canonical is also task $(basename "$other_meta" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force." >&2
           return 1
         fi
-        if ! copy_common=$(git -C "$copy_real" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
-           || ! copy_common=$(fm_task_copy_canonical_dir "$copy_common"); then
+        # Git's answer goes through a file, not a command substitution: Bash 3.2 does not act on SIGTERM
+        # while it reads a command substitution's pipe, so a git that ignored SIGTERM would hold this
+        # teardown, and the project lock it holds here, past the signal. A foreground command is waited
+        # for with the signal handled, so the EXIT trap runs at once.
+        [ -n "$TEARDOWN_SCAN_TMP" ] || TEARDOWN_SCAN_TMP=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-scan.XXXXXX") || return 1
+        copy_common=
+        git -C "$copy_real" rev-parse --path-format=absolute --git-common-dir > "$TEARDOWN_SCAN_TMP" 2>/dev/null \
+          && IFS= read -r copy_common < "$TEARDOWN_SCAN_TMP" || copy_common=
+        if [ -z "$copy_common" ] || ! fm_task_copy_canonical_dir_to copy_common "$copy_common"; then
           continue
         fi
         fm_task_copy_paths_overlap "$canonical" "$copy_common" || continue
         echo "REFUSED: task $record_id's cleanup target $canonical overlaps Git common-dir storage $copy_common for task $(basename "$other_meta" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force." >&2
         return 1
-      done < <(fm_task_copy_record_paths "$other_meta")
+      done
     done
   done
   return 0

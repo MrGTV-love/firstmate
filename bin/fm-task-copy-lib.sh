@@ -92,6 +92,25 @@ fm_task_copy_canonical_dir() {  # <path>
   ( cd "$target" && pwd -P )
 }
 
+# The same canonical path assigned to <out-var> without a fork: a command substitution
+# forks a subshell, Bash 3.2 does not act on SIGTERM while it reads one's pipe, and a
+# fork that never finishes (the stall of data/fm-teardown-pure-bash-spin/report.md) then holds
+# its parent past the signal. The working directory and OLDPWD are put back; a caller's
+# own directory that is gone is replaced by /.
+fm_task_copy_canonical_dir_to() {  # <out-var> <path>
+  local _fm_cd_out=$1 _fm_cd_target=$2 _fm_cd_saved=$PWD _fm_cd_old=${OLDPWD-} _fm_cd_real
+  printf -v "$_fm_cd_out" '%s' ''
+  [ -n "$_fm_cd_target" ] || return 1
+  [ -d "$_fm_cd_target" ] || return 1
+  if ! cd -P -- "$_fm_cd_target"; then
+    return 1
+  fi
+  _fm_cd_real=$PWD
+  cd -- "$_fm_cd_saved" 2>/dev/null || cd / || true
+  OLDPWD=$_fm_cd_old
+  printf -v "$_fm_cd_out" '%s' "$_fm_cd_real"
+}
+
 fm_task_copy_paths_overlap() {  # <canonical-a> <canonical-b>
   local a=$1 b=$2
   [ -n "$a" ] && [ -n "$b" ] || return 1
@@ -350,20 +369,37 @@ fm_task_copy_registered_nested() {  # <canonical-clone>
   done < <(git -C "$clone" worktree list --porcelain -z 2>/dev/null || printf '\0registration-list-unreadable\0')
 }
 
-# The local copies a task record names, one "<field> <path>" line each: the
+# The local copies a task record names, one "<field> <path>" entry each: the
 # last worktree= and home= values (the values every reader of those fields
-# uses) and every prior_worktree= line.
-fm_task_copy_record_paths() {  # <meta>
+# uses) and every prior_worktree= line. Filled into FM_TASK_COPY_RECORD_PATHS by
+# pure bash, with no process substitution and no command substitution: a
+# per-record loop that read these through `< <(...)` kept one pipe fd open per
+# record until its function returned, and Bash 3.2 faulted in its next fork once
+# a pipe reached fd 256 (data/fm-teardown-pure-bash-spin/report.md). A caller
+# that makes other calls while it walks the entries copies the array first,
+# because a nested call refills it.
+FM_TASK_COPY_RECORD_PATHS=()
+fm_task_copy_record_paths_to() {  # <meta>
   local meta=$1 value line
+  FM_TASK_COPY_RECORD_PATHS=()
   for value in worktree home; do
-    line=$(fm_meta_get "$meta" "$value")
-    [ -z "$line" ] || printf '%s %s\n' "$value" "$line"
+    fm_meta_get_to line "$meta" "$value"
+    [ -z "$line" ] || FM_TASK_COPY_RECORD_PATHS+=("$value $line")
   done
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
-      prior_worktree=?*) printf 'prior_worktree %s\n' "${line#prior_worktree=}" ;;
+      prior_worktree=?*) FM_TASK_COPY_RECORD_PATHS+=("prior_worktree ${line#prior_worktree=}") ;;
     esac
   done < "$meta" 2>/dev/null || true
+}
+
+# The same entries, one "<field> <path>" line each, for a caller that wants text.
+fm_task_copy_record_paths() {  # <meta>
+  local entry
+  fm_task_copy_record_paths_to "$1"
+  for entry in ${FM_TASK_COPY_RECORD_PATHS[@]+"${FM_TASK_COPY_RECORD_PATHS[@]}"}; do
+    printf '%s\n' "$entry"
+  done
 }
 
 fm_task_copy_ancestor_current() {
@@ -419,6 +455,7 @@ FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
 fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta>...]
   local record_meta=$1 record_state=$2 path=$3
   local target state_dir other_meta line field other_path other_real skip
+  local -a rec_lines=()
   shift 3
   FM_TASK_COPY_OTHER_ID=
   FM_TASK_COPY_OTHER_FIELD=
@@ -439,7 +476,9 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
       for skip in "$@"; do
         [ "${other_meta##*/}" = "${skip##*/}" ] && [ "$other_meta" -ef "$skip" ] && continue 2
       done
-      while IFS= read -r line || [ -n "$line" ]; do
+      fm_task_copy_record_paths_to "$other_meta"
+      rec_lines=(${FM_TASK_COPY_RECORD_PATHS[@]+"${FM_TASK_COPY_RECORD_PATHS[@]}"})
+      for line in ${rec_lines[@]+"${rec_lines[@]}"}; do
         field=${line%% *}
         other_path=${line#* }
         [ -n "$other_path" ] || continue
@@ -454,7 +493,7 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
         FM_TASK_COPY_OTHER_ID=$(basename "$other_meta" .meta)
         FM_TASK_COPY_OTHER_FIELD=$field
         return 0
-      done < <(fm_task_copy_record_paths "$other_meta")
+      done
     done
   done
   return 1

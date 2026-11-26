@@ -3773,6 +3773,10 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: task $record_id's cleanup target $canonical overlaps Git common-dir storage $copy_common for task $(basename \"$other_meta\" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the copy-clearance scan for task $record_id ran past its ${scan_limit}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown\" >&2"
         }
       ]
     },
