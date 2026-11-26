@@ -70,6 +70,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-guard-sites.py`      | Enumerate every refusal site in the runtime code and map each to a registry entry for `fm-guard-lint.sh` ([signatures](guard-spec.md#refusal-sites)) |
 | `fm-guard-refcheck.sh`   | Prove every wired hook path resolves, every registry path exists, and no retired guard is referenced live |
 | `fm-guard-event.sh`      | Append one guard decision event per call, never influencing the decision it records |
+| `fm-home-write.sh`       | Write one untracked, gitignored record under `$FM_HOME/data/` when a background session's worktree guard refuses Write and Edit there; refuses every other target unchanged |
+| `fm-home-write.py`       | The engine behind `fm-home-write.sh`                                                 |
 | `fm-guard-metrics.sh`    | Compute per-guard and per-rule opportunities, fires, override rate, refusal-to-bypass ratio, clear cost, and the retirement verdict |
 | `fm-guard-workarounds.py` | Report read-only evidence of tree-equal merges and base-merge-only head changes ([spec](guard-spec.md#instrumentation)) |
 | `fm-supervision-liveness-lib.sh` | Shared supervision-liveness predicate and reason vocabulary for the turn-end guards and the fleet guard |
@@ -88,7 +90,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-remote-readiness-lib.sh` | Shared remote second-mate readiness gate: check and, when needed, repair then re-check through `fm-remote-doctor.sh` |
 | [`fm-project-origin-lib.sh`](../bin/fm-project-origin-lib.sh) | Accepted origin-form owner shared by both remote provisioning boundaries |
 | `fm-spawn.sh`            | Spawn crewmates, scouts, `id=repo` batches, and secondmates on the resolved harness and runtime backend |
-| `fm-git-strip-ai-trailers.sh` | Strip known AI commit trailers at commit-msg time and install a fleet launch's task Git hooks, including the credential checks |
+| `fm-git-strip-ai-trailers.sh` | Strip known AI commit trailers at commit-msg time, install a fleet launch's task Git hooks including the credential checks, and print their config hook rows |
 | `fm-backend.sh`          | Runtime-backend selection, meta helpers, selector resolution, and operation dispatch |
 | `fm-backend-hometag-lib.sh` | Shared per-installation home-tag derivation for zellij tab and cmux workspace titles |
 | `fm-composer-lib.sh`     | Single fleet-wide owner of composer shapes, capability-aware screen classification, and verdicts |

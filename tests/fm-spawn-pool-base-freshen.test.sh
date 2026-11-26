@@ -2412,14 +2412,27 @@ write_source_slot_owner() { # <repository> <A|B> [<exit-code>]
   {
     printf 'IDENTITY = "%s"\nEXIT_CODE = %s\n' "$identity" "$code"
     cat <<'PY'
+import hashlib
 import json
 import os
 import sys
 from pathlib import Path
 
 arg = lambda flag: sys.argv[sys.argv.index(flag) + 1]
+with open(__file__, 'rb') as own:
+    own_sha256 = hashlib.sha256(own.read()).hexdigest()
 with open(os.environ['FM_TEST_SOURCE_RECORD'], 'a', encoding='utf-8') as output:
-    output.write(json.dumps(dict(identity=IDENTITY, realpath=os.path.realpath(__file__), argv=sys.argv)) + '\n')
+    output.write(json.dumps(dict(identity=IDENTITY, realpath=os.path.realpath(__file__), argv=sys.argv,
+                                 sha256=own_sha256, pycache_prefix=sys.pycache_prefix)) + '\n')
+if os.environ.get('FM_TEST_SOURCE_TAMPER'):
+    # A substitution during the run, restored to the same bytes before it ends (the export is read-only).
+    os.chmod(__file__, 0o644)
+    with open(__file__, 'rb') as own:
+        kept = own.read()
+    with open(__file__, 'wb') as own:
+        own.write(kept + b'# substituted\n')
+    with open(__file__, 'wb') as own:
+        own.write(kept)
 if EXIT_CODE:
     print(json.dumps(dict(state='BLOCKED', reason='stale_copy_guard')))
     sys.exit(EXIT_CODE)
@@ -2500,7 +2513,6 @@ make_source_case() { # <shape> <entrypoint> [<origin-case>]
     SOURCE_SELECTED=$(git -C "$PROJECT_DIR" rev-parse main) || fail 'fixture selected base failed'
     SOURCE_BASE=$SOURCE_SELECTED
   fi
-  SOURCE_REALPATH=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$SOURCE_TARGET") || fail 'fixture guard realpath failed'
   export FM_TEST_SOURCE_RECORD="$CASE_DIR/executed.jsonl"
   export FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json"
   export FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log"
@@ -2517,17 +2529,33 @@ make_source_case() { # <shape> <entrypoint> [<origin-case>]
   preflight_task_temp "$id" || fail 'fixture task preflight failed'
 }
 
+# The script that runs is the clone's fetched origin version from D7's private read-only export (Amendment A1): its
+# path is the export's, never under the copy or the clone, its bytes are the origin blob's, it runs with a fresh
+# bytecode cache prefix, the export is gone after the run, and the copy's B never runs.
 assert_source_execution() { # <entrypoint>
-  python3 - "$FM_TEST_SOURCE_RECORD" "$SOURCE_TARGET" "$SOURCE_REALPATH" "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "$SOURCE_BASE" "$SOURCE_LOCAL_REF" "$1" <<'PY'
+  local origin_sha256
+  origin_sha256=$(git -C "$PROJECT_DIR" cat-file blob "refs/remotes/origin/HEAD:scripts/git-stability/provision_existing_slot.py" | shasum -a 256 | awk '{print $1}') ||
+    fail 'cannot hash the fetched origin provisioner'
+  python3 - "$FM_TEST_SOURCE_RECORD" "$origin_sha256" "$PROJECT_DIR" "$POOL_DIR" "$SOURCE_ID" "$SOURCE_BASE" "$SOURCE_LOCAL_REF" "$1" <<'PY'
 import json, os, sys
-record, target, realpath, project, copy, owner, base, local_ref, entry = sys.argv[1:]
+record, origin_sha256, project, copy, owner, base, local_ref, entry = sys.argv[1:]
 rows = [json.loads(line) for line in open(record, encoding='utf-8')]
 assert len(rows) == 1, ('expected exactly one clone execution, never B', rows)
 r = rows[0]
 print('source-record', entry, json.dumps(r, sort_keys=True), flush=True)
 assert r['identity'] == 'A', ('copy guard B ran instead of clone guard A', r)
-assert r['argv'][0] == target, ('executed script pathname is not the exact clone pathname', r)
-assert r['realpath'] == realpath, ('executed realpath differs from clone file', r)
+script = r['argv'][0]
+export = os.path.dirname(os.path.dirname(os.path.dirname(script)))
+assert script.endswith('/scripts/git-stability/provision_existing_slot.py'), ('executed script is not the provisioner path', r)
+assert os.path.basename(export).startswith('fm-slot-export.'), ('executed script is not in a verified export', r)
+for root in (copy, project):
+    real = os.path.realpath(root)
+    for candidate in (script, r['realpath']):
+        assert os.path.commonpath([real, os.path.realpath(candidate)]) != real, ('executed script lies under ' + root, r)
+assert r['realpath'] == os.path.realpath(script), ('the recorded script is not the file that ran', r)
+assert r['sha256'] == origin_sha256, ('the bytes that ran are not the fetched origin version', r)
+assert r['pycache_prefix'] and os.path.basename(r['pycache_prefix']).startswith('fm-slot-pycache.'), ('no fresh bytecode cache prefix', r)
+assert not os.path.exists(export), ('the export was not removed after the run', r)
 expected = ['--repo-root', project, '--worktree-path', os.path.realpath(copy), '--owner-id', owner,
             '--branch', 'fm/' + owner, '--base-sha', base]
 if local_ref:
@@ -2611,6 +2639,10 @@ PY
     if [ "$entry" = promotion ]; then
       assert_grep kind=scout "$HOME_DIR/state/$SOURCE_ID.meta" 'missing clone admitted promotion'
       assert_absent "$HOME_DIR/data/$SOURCE_ID/ship-instructions.md" 'missing clone published ship instructions'
+    elif [ "$entry" = relaunch ]; then
+      # fm-control's preflight asks the same clone check, so the relaunch is refused before the agent is stopped.
+      assert_contains "$out" 'cannot pass slot attestation' 'missing clone relaunch was not refused by the preflight'
+      assert_contains "$out" 'the running agent was not stopped' 'missing clone relaunch stopped the running agent'
     else
       assert_grep 'slot provisioning refused before admission' "$HOME_DIR/state/$SOURCE_ID.status" 'missing clone lost slot refusal status'
       assert_contains "$out" 'retained; no worker admitted' 'missing clone lost retained-copy refusal'
@@ -2641,14 +2673,14 @@ PY
         expect_code 0 "$base_rc" "base comparison setup failed: $(cat "$CASE_DIR/base.out")"
       fi
       python3 - "$CASE_DIR/head.argv.jsonl" "$FM_TEST_SOURCE_RECORD" "$PROJECT_DIR" "$POOL_DIR" <<'PY' || fail 'same-input base/head argv comparison failed'
-import json, sys
+import json, os, sys
 head_file, base_file, project, copy = sys.argv[1:]
 head = [json.loads(line) for line in open(head_file)]
 base = [json.loads(line) for line in open(base_file)]
 assert len(head) == len(base) == 1, (head, base)
 a, b = head[0]['argv'], base[0]['argv']
 assert base[0]['identity'] == 'B', ('base did not execute B', base)
-assert a[0] == project + '/scripts/git-stability/provision_existing_slot.py', a
+assert os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(a[0])))).startswith('fm-slot-export.'), a
 assert b[0] == copy + '/scripts/git-stability/provision_existing_slot.py', b
 assert a[1:] == b[1:], ('argv changed beyond executed source', a, b)
 print('same-input-argv-comparison PASS', json.dumps(dict(head=a, base=b), sort_keys=True))
@@ -2665,9 +2697,47 @@ test_project_provisioner_identical() { source_entry_case identical spawn; }
 test_project_provisioner_symlink() { source_entry_case symlink spawn; }
 test_project_provisioner_local_default() { source_entry_case local-default spawn; }
 test_project_provisioner_copy_missing() { source_entry_case copy-missing spawn; }
+test_project_provisioner_copy_missing_fresh() { source_entry_case copy-missing fresh; }
+test_project_provisioner_copy_missing_promotion() { source_entry_case copy-missing promotion; }
 test_project_provisioner_missing_spawn() { source_entry_case missing fresh; }
 test_project_provisioner_missing_promotion() { source_entry_case missing promotion; }
 test_project_provisioner_missing_relaunch() { source_entry_case missing relaunch; }
+
+# D4(c) end to end: a relaunch that recovers a refused first provisioning still refuses a copy that lacks the script and
+# runs no provisioner; the same copy without the recovery record runs the clone's export (test_project_provisioner_copy_missing).
+test_project_provisioner_recovery_copy_missing() {
+  local out rc=0 head
+  make_source_case copy-missing spawn recovery
+  make_stopped_tmux "$CASE_DIR/stopped"
+  head=$(git -C "$POOL_DIR" rev-parse HEAD) || fail 'fixture prepared head failed'
+  printf 'recovery=slot-provision-refused\nslot_prepared_head=%s\n' "$head" >> "$HOME_DIR/state/$SOURCE_ID.meta" || fail 'fixture recovery record failed'
+  out=$(run_source_entry spawn) || rc=$?
+  printf '%s\n' "$out" > "$CASE_DIR/entry.out"
+  [ "$rc" -ne 0 ] || fail "the recovery relaunch admitted a copy without the script: $out"
+  assert_contains "$out" "slot provisioner is missing from assigned copy" 'the recovery refusal was not named'
+  [ ! -e "$FM_TEST_SOURCE_RECORD" ] || fail "the recovery refusal ran a provisioner: $(cat "$FM_TEST_SOURCE_RECORD")"
+  [ ! -e "$FM_TEST_SLOT_RECORD" ] || fail 'the recovery refusal wrote a manifest'
+  [ ! -s "$FM_FAKE_LAUNCH_LOG" ] || fail 'the recovery refusal launched an agent'
+  pass 'project provisioner: a refused-first-provisioning recovery refuses a copy without the script and runs nothing'
+}
+
+# D7 on every route: the export's script, substituted during the run and restored to the same bytes before it ends, is
+# refused after the run by the export fingerprint (inode or change time), whatever the provisioner reported.
+source_tamper_case() { # <fresh|promotion>
+  local entry=$1 out rc=0
+  make_source_case different "$entry" tamper
+  out=$(FM_TEST_SOURCE_TAMPER=1 run_source_entry "$entry") || rc=$?
+  printf '%s\n' "$out" > "$CASE_DIR/entry.out"
+  [ "$rc" -ne 0 ] || fail "$entry admitted a run whose verified export was substituted: $out"
+  assert_contains "$out" 'slot provisioner source changed after it was verified' "$entry did not name the substitution"
+  assert_contains "$out" provisioner_source_changed "$entry did not report the substitution"
+  assert_grep '"identity": "A"' "$FM_TEST_SOURCE_RECORD" "$entry did not run the export it then refused"
+  [ ! -s "$FM_FAKE_LAUNCH_LOG" ] || fail "$entry launched an agent after a substitution"
+  pass "project provisioner: a substitution of the export during the run is refused after it ($entry)"
+}
+
+test_project_provisioner_tamper_spawn() { source_tamper_case fresh; }
+test_project_provisioner_tamper_promotion() { source_tamper_case promotion; }
 
 test_project_provisioner_missing_preserves_copy() {
   local before after rc=0 out
@@ -2819,6 +2889,11 @@ test_project_provisioner_identical
 test_project_provisioner_symlink
 test_project_provisioner_local_default
 test_project_provisioner_copy_missing
+test_project_provisioner_copy_missing_fresh
+test_project_provisioner_copy_missing_promotion
+test_project_provisioner_recovery_copy_missing
+test_project_provisioner_tamper_spawn
+test_project_provisioner_tamper_promotion
 test_project_provisioner_missing_spawn
 test_project_provisioner_missing_promotion
 test_project_provisioner_missing_relaunch

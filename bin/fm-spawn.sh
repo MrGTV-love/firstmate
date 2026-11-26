@@ -585,8 +585,9 @@
 #   history; a non-clean or otherwise doubtful copy is skipped as described above.
 #   A project carrying scripts/git-stability/provision_existing_slot.py additionally
 #   requires repeatable --owned-path <tracked-path> flags: explicit task scope,
-#   never inferred from the brief. bin/fm-slot-provision-lib.sh calls the registered
-#   project clone's provisioner, never the copy's (its header owns the origin check),
+#   never inferred from the brief. bin/fm-slot-provision-lib.sh runs the registered
+#   project clone's provisioner on every route, never the copy's, as a verified
+#   export of its fetched origin version (its header owns that check),
 #   before any harness admission, with origin/main's merge-base by
 #   default or the selected qualified local-default ref/SHA for unpublished local
 #   delivery. The latter requires the project's explicit --base-source local-default
@@ -601,8 +602,20 @@
 #   and a shell that starts late finds the attempt already claimed and runs nothing.
 #   It uses the assigned copy, never another worktree. Governed
 #   scouts start on fm/<id> so default promotion can adopt the same declaration.
-#   Relaunch reuses recorded scope and must pass the actual clean-slot contract;
-#   dirty relaunches refuse rather than bypassing attestation. --owned-path on a
+#   A relaunch is not a new scope declaration. When the record names its slot
+#   manifest and the relaunch is neither a relocation nor the recovery of a refused
+#   first provisioning, it adopts that recorded manifest (bin/fm-slot-provision-lib.sh
+#   fm_slot_adopt_check) and never runs the provisioner: the manifest must belong to
+#   this task's own copy, branch, base and scope and the copy-custody owners must
+#   agree, else it refuses by name with nothing changed. The task's own commits and
+#   uncommitted edits outside its recorded scope never block it and never change
+#   the scope; they are printed as a drift report. A pool slot another task claims refuses
+#   the relaunch by name unless that task's record places its copy inside the slot; no other peer claim is checked, and Vernant's push-time
+#   owned_paths gate stays the control. A relaunch with no recorded manifest keeps
+#   the provisioning route and must pass the clean-slot contract (a copy that
+#   predates the provisioner needs nothing more, because the clone's verified export
+#   runs on every route; only the recovery of a refused first provisioning still
+#   refuses a copy that lacks the script). --owned-path on a
 #   relaunch never overrides recorded scope: it is accepted only to scope a task
 #   with none recorded (for example, admitted before its project was governed),
 #   which then runs the same governed preparation; elsewhere it refuses. If that
@@ -667,7 +680,9 @@
 #   and toolchain home paths, the selected harness's store selectors, Claude's provider selectors and
 #   companions from bin/fm-worker-account-lib.sh, DSH's key name from
 #   bin/fm-dsh.py, the pane's numbered GIT_CONFIG entries and (after
-#   --allow-api-key) the Anthropic key names. /usr/bin/env -i starts the pane's
+#   --allow-api-key) the Anthropic key names. The pane's GIT_CONFIG_PARAMETERS
+#   is not kept by default; the task Git hook carrier below re-adds its own
+#   rows inside the filtered shell. /usr/bin/env -i starts the pane's
 #   own shell with only these names, dropping even readonly exports and names
 #   that are not shell identifiers. No other secret-valued name is kept.
 #   A present readable regular file replaces that whole default set with exactly
@@ -878,21 +893,40 @@
 # ~/.cursor/cli-config.json attribution-off is not durable (it does not travel
 # with this repo, defaults back to on when unset, and only feeds the CLI's
 # request to the server, so it suppresses the trailer rather than preventing
-# it). Every spawn installs state/<id>.git-hooks as a GIT_CONFIG core.hooksPath
-# for the pane: pre-commit and pre-push inspect credentials locally, while
-# commit-msg strips known AI trailers unless config/keep-ai-trailers is present,
-# for every launched runtime, Claude included as defense in depth. bin/fm-git-strip-ai-trailers.sh
-# owns the identities, the hook install, and chaining the repository git is
-# actually running in so a project husky hook still runs. Author identity is
-# not rewritten. Every launch reconciles numbered GIT_CONFIG entries in the
-# persistent destination shell before the clean-environment boundary,
-# without changing shell selection. It removes only core.hooksPath entries equal
-# to this task's generated directory, compacts survivors in order, and appends
-# this task's override on every launch. Unrelated entries and
-# operator hooksPath overrides remain in the pane and reach the worker by
-# default; an allowlist file instead governs which reach it. Reconciliation
-# repeats inside the filtered launch shell so credential checks still select
-# the generated hooks after env -i.
+# it). Every spawn installs state/<id>.git-hooks, whose hooks inspect
+# credentials locally at commit and push and, unless config/keep-ai-trailers is
+# present, strip known AI trailers at commit-msg, for every launched runtime,
+# Claude included as defense in depth. bin/fm-git-strip-ai-trailers.sh owns the
+# identities, the hook scripts, their rows, and the legacy carrier's chaining of
+# the repository's own hooks. Author identity is not rewritten.
+# Task Git hook carrier. Every launch selects one of two carriers inside each
+# shell that starts the worker: the persistent destination shell before the
+# clean-environment boundary, and the filtered launch shell after env -i, with
+# the pane's own PATH, so the git probed is the git the worker gets.
+#   config: the rows hook.fm-strip and hook.fm-scan-commit on commit-msg and
+#     hook.fm-scan-push on pre-push, appended to GIT_CONFIG_PARAMETERS and
+#     recorded exactly in FM_GIT_HOOK_ROWS. The repository's core.hooksPath
+#     stays in force, so its hooks, reference-transaction included, run
+#     natively. Selected only when the harness is in GIT_HOOKS_CONFIG_HARNESSES
+#     and `git hook list` on the composed rows names every fm hook.
+#   legacy: this task's directory as a numbered GIT_CONFIG core.hooksPath
+#     entry, verified with `git config --get core.hooksPath` against the same
+#     git; every other launch.
+# Each selection first removes this task's previous carrier of either kind:
+# every exact occurrence of FM_GIT_HOOK_ROWS and of this launch's rows in
+# GIT_CONFIG_PARAMETERS, and every numbered core.hooksPath entry equal to this
+# task's directory, compacting the survivors in order. Unrelated entries,
+# operator parameters and operator hooksPath overrides stay in the pane and
+# reach the worker by default; an allowlist file instead governs which reach
+# it, and bin/fm-worker-env.py keeps GIT_CONFIG_PARAMETERS and FM_GIT_HOOK_ROWS
+# together or not at all. The launch refuses to start the worker when git does
+# not resolve on the pane PATH, GIT_CONFIG_COUNT is not a number,
+# GIT_CONFIG_PARAMETERS is malformed, or the git honours neither carrier; the
+# refusing shell records its reason in the task temp root and fm-spawn fails
+# the spawn on it before typing anything more into the endpoint. A harness
+# joins GIT_HOOKS_CONFIG_HARNESSES only after
+# tests/fm-git-hook-carrier-live-e2e.test.sh proves the rows survive into its
+# tool shell (recorded in docs/verification/runtime-backends.md).
 # Publishing the record and moving this home's backlog item to In flight are one
 # step, not two: bin/fm-backlog-transition-lib.sh owns that invariant, and this
 # script performs the transition under the task's own meta lock before it reports
@@ -1171,6 +1205,7 @@ BRANCH_PREFIX_SET=0
 BASE_BRANCH=
 BASE_BRANCH_SET=0
 SLOT_OWNED_PATHS=()
+SLOT_ADOPT=0
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
 CAPTAIN_MODEL_PIN=
@@ -1977,6 +2012,7 @@ RELAUNCH_REPLACEMENT_WT=
 CONFIG_INHERIT_LOCK=
 CONFIG_INHERIT_LOCK_HELD=0
 GIT_HOOKS_DIR=
+GIT_HOOKS_ROWS=
 SPAWN_LAUNCH_SENT=0
 SPAWN_BRIEF_DELIVERED=0
 SPAWN_BRIEF_FAILURE_REASON=
@@ -2013,6 +2049,8 @@ parse_orca_worktree_result() {
 
 spawn_abort_cleanup() {
   local status=$? skill_meta_tmp
+  # A refusal that exits inside provisioning (spawn_slot_refused) never returns to fm_slot_provision's own drop.
+  fm_slot_export_drop
   if [ -n "$SPAWN_BASE_REF" ]; then
     git -C "$PROJ_ABS" update-ref -d "$SPAWN_BASE_REF" >/dev/null 2>&1 || true
     SPAWN_BASE_REF=
@@ -4789,7 +4827,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
         { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
         awk '{ sub(/\r$/, ""); print }' "$SOURCE_BRIEF" &&
         printf '\n# Dispatch egress capabilities\nRecorded destination classes: %s.\nNative semantic find is available only with semantic-search authorization and existing project/helper eligibility; otherwise it is absent.\nNever write or enlarge the task grant from a worker.\n' "$TASK_EGRESS" &&
-        { if [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
+        { if [ "$FM_SLOT_ADOPTED" = 1 ]; then fm_slot_contract_adopted "$BRANCH"; elif [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
         { [ -z "${1:-}" ] || cat "$1"; } &&
         if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
           fm_brief_intent_overlay "$CAPTAIN_INTENT" "$SOURCE_BRIEF"
@@ -6109,37 +6147,75 @@ agy_spawn_fail() {  # <detail>
 }
 
 # dsh-tui submits the brief as its opening prompt, so its own durable session
-# log is the start proof: a turn opening (busy) or already finishing (idle)
-# both mean the brief reached the agent. A resumed launch already holds the
-# earlier conversation, so only a turn that started beyond DSH_START_POSITION,
-# the log position taken before launch, counts. No pane-scrape fallback exists
-# because the log is the same source the busy classifier trusts. Separately,
+# log is the start proof, judged by bin/fm-dsh.py start-state on the FIRST turn
+# that started beyond DSH_START_POSITION, the log position taken before launch
+# (a resumed launch already holds the earlier conversation, and a later turn
+# never stands in for the first). That turn starts the launch only once the
+# provider accepted it, shown by an assistant/message: busy with one, or ended
+# after one. A turn that ended with reason error refuses at once with the
+# provider's text; one that ended any other way without acceptance refuses as
+# not accepted; one still unaccepted when the window ends refuses as such. No
+# pane-scrape fallback exists because the log is the same source the busy
+# classifier trusts. A turn that errs after this proof returned is outside it;
+# supervision owns later turn failures.
+# The screen is then admitted only while this launch's own dsh-tui is alive:
+# a running, unstopped dsh-tui launcher whose argv carries this launch's
+# --patch path (fm_dsh_launch_alive), checked after the capture, so a frame a
+# dead launch left on screen above a shell cannot pass. Separately,
 # require the live composer shape the steering parser understands: a successful
 # version command is not proof that a changed frontend remains compatible.
 dsh_wait_for_start() {
-  local state pane parse_error i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local state pane parse_error identity unaccepted=0 i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local patch=$DSH_RUNTIME/launch.yml window
   # shellcheck source=bin/fm-composer-lib.sh
   . "$SCRIPT_DIR/fm-composer-lib.sh"
   DSH_START_ERROR=
+  window=$(awk -v n="$max" -v s="$interval" 'BEGIN { printf "%g", n * s }')
+  # The launch's recorded model, effort and cwd let the composer check prove
+  # dsh's pre-usage status row; with no readable binding that row stays unproven.
+  identity=$(python3 "$SCRIPT_DIR/fm-dsh.py" status-identity "$STATE_REAL" "$ID" 2>/dev/null) || identity=
   while [ "$i" -lt "$max" ]; do
-    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
+    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" start-state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state='unknown: bin/fm-dsh.py start-state failed'
+    unaccepted=0
     case "$state" in
+      failed:*)
+        DSH_START_ERROR="dsh: first turn failed: ${state#failed: }"
+        return 1
+        ;;
+      failed)
+        DSH_START_ERROR="dsh: first turn ended in error with no provider text"
+        return 1
+        ;;
+      ended-unaccepted:*)
+        DSH_START_ERROR="dsh: first turn not accepted by the provider: it ended (${state#ended-unaccepted: }) without a response"
+        return 1
+        ;;
+      unaccepted) unaccepted=1 ;;
       busy | idle)
         if fm_backend_visible_capture_supported "$BACKEND"; then
           pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null) || pane=
         else
           pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null) || pane=
         fi
-        if parse_error=$(fm_composer_dsh_screen_check "$pane" 2>&1); then
+        # Checked after the capture: a launch that has exited never comes
+        # back under the same patch within this loop, so alive now means the
+        # screen just read was not left by a dead launch.
+        if ! fm_dsh_launch_alive "$patch"; then
+          DSH_START_ERROR="dsh: the launched dsh-tui process for $patch is not running"
+        elif parse_error=$(fm_composer_dsh_screen_check "$pane" "$identity" 2>&1); then
           return 0
+        else
+          DSH_START_ERROR=${parse_error#error: }
         fi
-        DSH_START_ERROR=${parse_error#error: }
         ;;
       unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;;
     esac
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"
   done
+  if [ "$unaccepted" = 1 ]; then
+    DSH_START_ERROR="dsh: first turn not accepted by the provider within ${window}s"
+  fi
   return 1
 }
 
@@ -6623,7 +6699,11 @@ spawn_slot_refused() {
       rm -f -- "$recovery"
     }
   fi
-  printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy and endpoint retained: $WT; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
+  if [ "$SLOT_ADOPT" = 1 ]; then
+    printf '%s\n' "$(status_stamp_line "blocked: slot adoption refused before admission; assigned copy and endpoint retained: $WT; see the spawn output for the refusal by name")" >>"$STATE/$ID.status"
+  else
+    printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy and endpoint retained: $WT; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
+  fi
   echo "error: assigned copy $WT and endpoint $T retained; no worker admitted" >&2
   exit 1
 }
@@ -6646,6 +6726,7 @@ while :; do
 spawn_validate_local_base "$WT" || exit 1
 SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
+SLOT_ADOPT=0
 if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
   if fm_slot_required "$PROJ_ABS" "$WT"; then
     fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1 || {
@@ -6686,6 +6767,10 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   if [ "$RELAUNCH" -eq 0 ]; then
     SLOT_FRESH_BASE=1
     fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+  elif fm_slot_adopt_route "$RELAUNCH_META" "$RELAUNCH_RELOCATING"; then
+    # The task's own recorded manifest is adopted, never re-provisioned (Main 115, rule S): nothing is
+    # prepared, moved or declared here, and the decision is taken once below.
+    SLOT_ADOPT=1
   elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
     prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
     if [ -n "$prepared_head" ]; then
@@ -6830,7 +6915,16 @@ spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
   [ "$rc" -le 255 ] || { echo 'error: assigned-copy provisioner completion status is out of range' >&2; return 1; }
   return "$rc"
 }
-if [ "$SLOT_GOVERNED" = 1 ]; then
+[ "$RELAUNCH" -eq 0 ] || ! fm_slot_recovery_route "$RELAUNCH_META" || FM_SLOT_RECOVERY_COPY_CHECK=1
+if [ "$SLOT_GOVERNED" = 1 ] && [ "$SLOT_ADOPT" = 1 ]; then
+  fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+  fm_slot_drift_report "$WT" "$ID" "$BRANCH" "$FM_SLOT_BASE_SHA" "${SLOT_OWNED_PATHS[@]}"
+  render_launch_brief || exit 1
+elif [ "$SLOT_GOVERNED" = 1 ]; then
+  # A relaunch that provisions a manifest on its own copy asks the adoption's custody owner first: a clean copy another
+  # task holds is refused by name and the provisioner is not run (D7 (e)). A fresh spawn and a relocation keep their routes.
+  [ "$RELAUNCH" -eq 0 ] || [ "$RELAUNCH_RELOCATING" = 1 ] ||
+    fm_slot_provision_custody "$PROJ_ABS" "$WT" "$ID" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
   fm_slot_provision spawn_slot_run_in_pane "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
     "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "$SLOT_SOURCE_REF" "$SLOT_SOURCE_SHA" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused
   render_launch_brief || exit 1
@@ -6986,6 +7080,146 @@ exclude_path() {
   mkdir -p "$(dirname "$EXCL")"
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >>"$EXCL"
 }
+# The identity of a launch artifact for the edit check: a regular file by its bytes, a symlink by its target text.
+spawn_wiring_sha() { # <path>: type, mode and bytes (a symlink by its target text), so a mode-only edit is an edit
+  python3 - "$1" <<'PY'
+import hashlib, os, stat, sys
+path = sys.argv[1]
+info = os.lstat(path)
+if stat.S_ISLNK(info.st_mode):
+    body = b"link:" + os.fsencode(os.readlink(path))
+elif stat.S_ISREG(info.st_mode):
+    with open(path, "rb") as handle:
+        body = handle.read()
+else:
+    body = b"other"
+print("%s:%o:%o" % (hashlib.sha256(body).hexdigest(), stat.S_IFMT(info.st_mode), stat.S_IMODE(info.st_mode)))
+PY
+}
+SPAWN_KEPT_SETTINGS=
+# The worker's kept settings are not lost to the fresh wiring: their hook and permission entries stay effective beside it.
+# Firstmate's own previous entries (busy and guard hooks of this task) are dropped from the kept side so they do not
+# pile up; no other key of the worker's file is carried into the active file, so an override such as disableAllHooks
+# or an env entry is never applied, and the mode is restored. The kept copy itself stays byte for byte at its kept path.
+# A kept file that does not parse stays byte for byte at its kept path and the report says so; the base for the merge is then
+# the most recent parseable version the launch can establish: the version staged in the index, else the committed one, so a
+# protection of a tracked file stays effective beside the fresh wiring (D1); an ignored file has no such version, so the fresh
+# wiring is written without it and the protections that exist only in the unparseable bytes are not effective.
+spawn_merge_kept_settings() { # <kept-path> <active-path>
+  python3 - "$1" "$2" "$ID" "$WT" <<'PY' || return 1
+import json, os, stat, subprocess, sys
+kept, active, task, worktree = sys.argv[1:5]
+try:
+    with open(kept, encoding="utf-8") as handle:
+        old = json.load(handle)
+    if not isinstance(old, dict):
+        raise ValueError("not a JSON object")
+except (OSError, ValueError) as exc:
+    old = None
+    source = ""
+    rel = os.path.relpath(active, worktree)
+    for ref in (":" + rel, "HEAD:" + rel):
+        shown = subprocess.run(["git", "-C", worktree, "show", ref], capture_output=True, stdin=subprocess.DEVNULL)
+        if shown.returncode != 0:
+            continue
+        try:
+            candidate = json.loads(shown.stdout.decode("utf-8"))
+        except ValueError:
+            continue
+        if isinstance(candidate, dict):
+            old, source = candidate, ("the version staged in the index" if ref.startswith(":") else "the committed version")
+            break
+    if old is None:
+        print("the kept settings %s do not parse (%s): they stay byte for byte at that path, the fresh wiring is written without them, and protections that exist only in those bytes are NOT effective" % (kept, exc), file=sys.stderr)
+        sys.exit(0)
+    print("the kept settings %s do not parse (%s): they stay byte for byte at that path; the hook and permission entries of %s stay effective beside the fresh wiring, and protections that exist only in the unparseable bytes are NOT effective" % (kept, exc, source), file=sys.stderr)
+with open(active, encoding="utf-8") as handle:
+    fresh = json.load(handle)
+ours = ("fm-busy-event.sh", "fm-jev-guard-hook.sh")
+def foreign(entry):
+    hooks = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(hooks, list):
+        return True
+    return not all(isinstance(h, dict) and any(m in str(h.get("command", "")) for m in ours) and task in str(h.get("command", "")) for h in hooks)
+merged = dict(fresh)
+merged_hooks = dict(old.get("hooks") if isinstance(old.get("hooks"), dict) else {})
+for event, entries in (fresh.get("hooks") or {}).items():
+    kept_entries = [e for e in merged_hooks.get(event, []) if foreign(e)] if isinstance(merged_hooks.get(event, []), list) else []
+    merged_hooks[event] = kept_entries + entries
+merged["hooks"] = merged_hooks
+rules = old.get("permissions") if isinstance(old.get("permissions"), dict) else {}
+rules = {k: rules[k] for k in ("allow", "deny", "ask") if k in rules}
+if rules:
+    merged["permissions"] = rules
+with open(active, "w", encoding="utf-8") as handle:
+    json.dump(merged, handle, separators=(",", ":"))
+    handle.write("\n")
+os.chmod(active, stat.S_IMODE(os.stat(kept).st_mode))
+print("merged the worker's kept hook and permission entries into the fresh wiring at %s; its other keys are not carried over" % active, file=sys.stderr)
+PY
+}
+# state/<id>.wiring-sha records each worktree launch artifact as it was written. A relaunch into the same copy that
+# finds one differing from its record, or with no record, keeps the original beside it under a collision-safe name,
+# excluded from Git, and says where; an artifact still equal to its record is regenerated without a kept copy.
+spawn_keep_edited_wiring() { # <prior-harness>
+  local harness path rel want got kept n
+  harness=$(fm_control_harness_family "$1") || return 0
+  while IFS= read -r path; do
+    case "$path" in "$WT"/*) ;; *) continue ;; esac
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    rel=${path#"$WT"/}
+    got=$(spawn_wiring_sha "$path") || return 1
+    want=$(awk -v r="$rel" '$2 == r { v = $1 } END { print v }' "$STATE_REAL/$ID.wiring-sha" 2>/dev/null || true)
+    if [ -n "$want" ] && [ "$want" = "$got" ]; then
+      # Unchanged since written. A settings file that already carries the worker's merged entries is the base for
+      # the next merge, so those entries survive the regeneration; no new kept copy is needed (the first one stays).
+      if [ "$rel" = .claude/settings.local.json ] &&
+        [ "$(awk -v r="$rel" '$2 == r { v = $3 } END { print v }' "$STATE_REAL/$ID.wiring-sha" 2>/dev/null)" = merged ]; then
+        cp -p -- "$path" "$STATE_REAL/$ID.settings-merge-base" || return 1
+        SPAWN_KEPT_SETTINGS=$STATE_REAL/$ID.settings-merge-base
+      fi
+      continue
+    fi
+    n=0
+    kept="$path.fm-kept.$(date +%s).$n"
+    while [ -e "$kept" ] || [ -L "$kept" ]; do n=$((n + 1)); kept="$path.fm-kept.$(date +%s).$n"; done
+    cp -pP -- "$path" "$kept" || return 1
+    [ "$(spawn_wiring_sha "$kept")" = "$got" ] || return 1
+    [ "$rel" != .claude/settings.local.json ] || SPAWN_KEPT_SETTINGS=$kept
+    exclude_path "${kept#"$WT"/}"
+    echo "kept the worker's edited launch artifact $rel byte for byte at ${kept#"$WT"/}; the fresh wiring is written beside it" >&2
+    # Only the settings file is merged, so the edits of any other launch artifact are set aside and recoverable but not
+    # effective; say so once, loudly, so no edited protection is lost silently (Main 3659).
+    if [ "$rel" != .claude/settings.local.json ]; then
+      if [ -z "$want" ]; then
+        # No launch record exists to say whether the worker edited it, so no edit is claimed.
+        echo "kept aside; no prior launch record to compare: $rel is set aside at $kept and the regenerated $rel replaced it" >&2
+      else
+        echo "WARNING: the worker's edits to $rel are set aside at $kept and are no longer active; the regenerated $rel replaced them" >&2
+      fi
+    fi
+  done <<EOF
+$(fm_control_harness_wiring_paths "$harness" "$WT" "$STATE_REAL" "$ID" "$KIND")
+EOF
+}
+spawn_record_wiring() {
+  local path rel
+  : >"$STATE_REAL/$ID.wiring-sha.tmp" || return 0
+  while IFS= read -r path; do
+    case "$path" in "$WT"/*) ;; *) continue ;; esac
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    rel=${path#"$WT"/}
+    # A merged settings file carries the worker's own entries: its record says so, so the next relaunch merges from it.
+    if [ -n "$SPAWN_KEPT_SETTINGS" ] && [ "$rel" = .claude/settings.local.json ]; then
+      printf '%s %s merged\n' "$(spawn_wiring_sha "$path")" "$rel" >>"$STATE_REAL/$ID.wiring-sha.tmp"
+      continue
+    fi
+    printf '%s %s\n' "$(spawn_wiring_sha "$path")" "$rel" >>"$STATE_REAL/$ID.wiring-sha.tmp"
+  done <<EOF
+$(fm_control_harness_wiring_paths "$(fm_control_harness_family "$HARNESS" 2>/dev/null || true)" "$WT" "$STATE_REAL" "$ID" "$KIND")
+EOF
+  mv -f -- "$STATE_REAL/$ID.wiring-sha.tmp" "$STATE_REAL/$ID.wiring-sha" 2>/dev/null || rm -f -- "$STATE_REAL/$ID.wiring-sha.tmp"
+}
 if [ "$RELAUNCH" -eq 1 ]; then
   # The fresh copy of a relocation is not firstmate's yet: this is the one place
   # that overwrites and deletes harness files in it, so the check that none of
@@ -6999,6 +7233,14 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # files and turn-end token registry entries behind, and even a same-harness
   # relaunch would orphan the retired busy generation's token
   # (bin/fm-control-lib.sh owns where those artifacts live).
+  # An adopted relaunch resumes the worker's own copy, so a launch artifact the worker edited since the last launch
+  # (its settings, its plugin) is kept byte for byte beside the fresh wiring instead of being deleted with it.
+  if [ "$SLOT_ADOPT" = 1 ]; then
+    spawn_keep_edited_wiring "$RELAUNCH_PRIOR_HARNESS" || {
+      echo "error: could not keep the worker's edited launch artifacts for task $ID; refusing to replace them" >&2
+      exit 1
+    }
+  fi
   clear_relaunch_harness_wiring "$RELAUNCH_PRIOR_HARNESS" "$WT" "$STATE_REAL" "$ID" "$KIND" || {
     echo "error: could not retire $RELAUNCH_PRIOR_HARNESS wiring for task $ID; refusing to arm the replacement" >&2
     exit 1
@@ -7295,6 +7537,9 @@ BUSY_GEN=
       mkdir -p "$WT/.claude"
       printf '{%s}\n' "$hooks_json" >"$WT/.claude/settings.local.json"
       exclude_path '.claude/settings.local.json'
+      if [ -n "$SPAWN_KEPT_SETTINGS" ]; then
+        spawn_merge_kept_settings "$SPAWN_KEPT_SETTINGS" "$WT/.claude/settings.local.json" || exit 1
+      fi
     fi
     ;;
   devin)
@@ -7704,19 +7949,23 @@ EOF
     fi
     ;;
   esac
+[ "$KIND" = secondmate ] || spawn_record_wiring
 
-# Per-task git hooksPath for local credential checks and AI trailer stripping.
+# Per-task Git hooks for local credential checks and AI trailer stripping.
 # Installed for every kind, including secondmate; keeping trailers disables
 # only the commit-msg strip, not the credential checks. Cursor and other non-Claude runtimes inject the trailer
-# after the typed message, so the typed message is not the object. The pane
-# always receives this directory via GIT_CONFIG_* below, which
-# overrides a project's husky core.hooksPath without rewriting it; the installer
-# chains the previous hooks so they still run. Real secondmate
-# homes are firstmate clones; a launch whose worktree is not git fails closed
-# rather than shipping a runtime that cannot check credentials or strip.
+# after the typed message, so the typed message is not the object. The launch
+# selects the carrier that brings them to the worker (header: "Task Git hook
+# carrier"). Real secondmate homes are firstmate clones; a launch whose
+# worktree is not git fails closed rather than shipping a runtime that cannot
+# check credentials or strip.
 GIT_HOOKS_DIR="$STATE_REAL/$ID.git-hooks"
 "$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" install "$GIT_HOOKS_DIR" "$WT" "$KEEP_AI_TRAILERS" || {
   echo "error: could not install the task Git hooks for $ID" >&2
+  exit 1
+}
+GIT_HOOKS_ROWS=$("$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" rows "$GIT_HOOKS_DIR" "$KEEP_AI_TRAILERS") || {
+  echo "error: could not compose the task Git hook rows for $ID" >&2
   exit 1
 }
 
@@ -8275,16 +8524,46 @@ if [ "$KIND" = secondmate ]; then
   # injected carrier and this on/off snapshot are guaranteed to agree.
   LAUNCH="FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home FM_HOME=$sq_home FM_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE FM_SUPERVISION_MODEL=$supervision_model $LAUNCH"
 fi
-# Reconcile before the allowlist boundary: a child cannot unset stale exports
-# in the persistent destination shell. Repeat inside the filtered child so
-# credential checks survive env -i; the header owns the reconciliation contract.
-# Use assignments rather than local declarations: destination shells include ksh.
+# Select the task Git hook carrier inside every shell that launches the worker:
+# the persistent destination shell (a child cannot unset its stale exports) and
+# again inside the filtered launch shell after env -i, with the pane's own PATH,
+# so the git that is probed is the git the worker gets. The header owns the
+# carrier contract. Use assignments rather than local declarations: destination
+# shells include ksh and zsh.
 # shellcheck disable=SC2016 # The destination shell expands this function.
-IFS= read -r -d '' GIT_HOOKS_LAUNCH_PREFIX <<'SH' || true
+IFS= read -r -d '' GIT_HOOKS_LAUNCH_FUNCTION <<'SH' || true
 fm_launch_git_hooks() {
-  fm_hooks=$1 fm_count=${GIT_CONFIG_COUNT-0}
-  fm_i=0 fm_out=0 fm_key= fm_value=
-  case "$fm_count" in ''|*[!0-9]*) return 0 ;; esac
+  fm_hooks=$1 fm_rows=$2 fm_carrier=$3
+  if ! command -v git >/dev/null 2>&1; then
+    fm_reason="fm-spawn: git does not resolve on this pane's PATH; refusing to launch a worker without the task Git hooks"
+    return 1
+  fi
+  fm_gcp=${GIT_CONFIG_PARAMETERS-}
+  for fm_old in "${FM_GIT_HOOK_ROWS-}" "$fm_rows"; do
+    [ -n "$fm_old" ] || continue
+    while :; do
+      case "$fm_gcp" in
+        *"$fm_old"*) fm_gcp="${fm_gcp%%"$fm_old"*}${fm_gcp#*"$fm_old"}" ;;
+        *) break ;;
+      esac
+    done
+  done
+  while :; do
+    case "$fm_gcp" in
+      ' '*) fm_gcp=${fm_gcp# } ;;
+      *' ') fm_gcp=${fm_gcp% } ;;
+      *) break ;;
+    esac
+  done
+  fm_count=${GIT_CONFIG_COUNT-0}
+  case "$fm_count" in
+    '') fm_count=0 ;;
+    *[!0-9]*)
+      fm_reason="fm-spawn: this pane's GIT_CONFIG_COUNT is not a number; refusing to launch a worker without the task Git hooks"
+      return 1
+      ;;
+  esac
+  fm_i=0 fm_out=0
   while [ "$fm_i" -lt "$fm_count" ]; do
     eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
     if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
@@ -8300,13 +8579,106 @@ fm_launch_git_hooks() {
     unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
     fm_i=$((fm_i + 1))
   done
+  if [ "$fm_out" -gt 0 ]; then export GIT_CONFIG_COUNT=$fm_out; else unset GIT_CONFIG_COUNT; fi
+  if [ -n "$fm_gcp" ] && ! GIT_CONFIG_PARAMETERS=$fm_gcp git config --list >/dev/null 2>&1; then
+    fm_reason="fm-spawn: this pane's GIT_CONFIG_PARAMETERS is malformed; refusing to launch a worker without the task Git hooks"
+    return 1
+  fi
+  if [ "$fm_carrier" = config ]; then
+    fm_new="${fm_gcp:+$fm_gcp }$fm_rows"
+    fm_cm=$(GIT_CONFIG_PARAMETERS=$fm_new git hook list commit-msg 2>/dev/null) || fm_cm=
+    fm_pp=$(GIT_CONFIG_PARAMETERS=$fm_new git hook list pre-push 2>/dev/null) || fm_pp=
+    fm_ok=1
+    printf '%s\n' "$fm_cm" | grep -qx fm-scan-commit || fm_ok=0
+    printf '%s\n' "$fm_pp" | grep -qx fm-scan-push || fm_ok=0
+    case "$fm_rows" in
+      *"'hook.fm-strip.event'"*) printf '%s\n' "$fm_cm" | grep -qx fm-strip || fm_ok=0 ;;
+    esac
+    if [ "$fm_ok" = 1 ]; then
+      export GIT_CONFIG_PARAMETERS="$fm_new" FM_GIT_HOOK_ROWS="$fm_rows"
+      fm_mode=config
+      return 0
+    fi
+  fi
+  if [ -n "$fm_gcp" ]; then export GIT_CONFIG_PARAMETERS="$fm_gcp"; else unset GIT_CONFIG_PARAMETERS; fi
+  unset FM_GIT_HOOK_ROWS
   export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
-  fm_out=$((fm_out + 1))
-  export GIT_CONFIG_COUNT=$fm_out
+  export GIT_CONFIG_COUNT=$((fm_out + 1))
+  if [ "$(git config --get core.hooksPath 2>/dev/null)" != "$fm_hooks" ]; then
+    fm_reason="fm-spawn: this pane's git honours neither task Git hook carrier; refusing to launch a worker without the task Git hooks"
+    return 1
+  fi
+  fm_mode=legacy
+  return 0
 }
 SH
-GIT_HOOKS_LAUNCH_PREFIX="$GIT_HOOKS_LAUNCH_PREFIX
-fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR"); unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks;"
+# Harnesses whose worker tool shell is proven to keep GIT_CONFIG_PARAMETERS
+# (the in-pane case recorded in docs/verification/runtime-backends.md). Only
+# these may run on the config carrier; every other launch keeps the legacy one.
+GIT_HOOKS_CONFIG_HARNESSES="claude"
+GIT_HOOKS_CARRIER=legacy
+case " $GIT_HOOKS_CONFIG_HARNESSES " in
+  *" $HARNESS "*) GIT_HOOKS_CARRIER=config ;;
+esac
+# git_hooks_guard <inner|outer> <launch text>: the launch text, run only after
+# the selector chose a carrier. On refusal the selector's reason is printed,
+# nothing runs, and the refusal is recorded for spawn_git_hooks_verdict below;
+# the inner (last) selector also records that it admitted the worker.
+GIT_HOOKS_VERDICT_REFUSED="$TASK_TMP/git-hooks-refused.$SPAWN_GEN"
+GIT_HOOKS_VERDICT_ADMITTED="$TASK_TMP/git-hooks-admitted.$SPAWN_GEN"
+git_hooks_guard() {
+  local unset_vars='unset fm_hooks fm_rows fm_carrier fm_gcp fm_old fm_count fm_i fm_out fm_key fm_value fm_new fm_cm fm_pp fm_ok fm_mode fm_reason; unset -f fm_launch_git_hooks'
+  local admitted=:
+  # shellcheck disable=SC2016 # The destination shell expands these references.
+  [ "$1" != inner ] || admitted='{ printf "%s\n" "$fm_mode" > '"$(shell_quote "$GIT_HOOKS_VERDICT_ADMITTED")"'; } 2>/dev/null || :'
+  # shellcheck disable=SC2016 # The destination shell expands these references.
+  printf '%s\nfm_reason=\nif fm_launch_git_hooks %s %s %s; then\n%s\n%s\n%s\nelse\nprintf "%%s\\n" "$fm_reason" >&2\n{ printf "%%s\\n" "$fm_reason" > %s; } 2>/dev/null || :\n%s\nfalse\nfi\n' \
+    "$GIT_HOOKS_LAUNCH_FUNCTION" "$(shell_quote "$GIT_HOOKS_DIR")" "$(shell_quote "$GIT_HOOKS_ROWS")" \
+    "$GIT_HOOKS_CARRIER" "$admitted" "$unset_vars" "$2" \
+    "$(shell_quote "$GIT_HOOKS_VERDICT_REFUSED")" "$unset_vars"
+}
+# A launch the selector refused leaves a bare shell in the endpoint. Wait,
+# bounded, for the launch's own verdict and fail the spawn on a refusal, before
+# any brief text is typed into that shell. A launch that records neither within
+# the bound (an endpoint that has not run it yet) warns and proceeds as before.
+# The bound is 100 polls of 0.1 s.
+# FM_GIT_HOOKS_VERDICT_POLLS is a test-only seam: it replaces the bound only when FM_TEST_SEAM=1 and it is a non-negative decimal integer.
+# Any other value, or the seam unset, keeps the bound of 100.
+spawn_git_hooks_verdict() {
+  local i=0 max=100 reason
+  if [ "${FM_TEST_SEAM:-}" = 1 ]; then
+    case ${FM_GIT_HOOKS_VERDICT_POLLS:-} in
+      '' | *[!0-9]*) ;;
+      *) max=$FM_GIT_HOOKS_VERDICT_POLLS ;;
+    esac
+  fi
+  while :; do
+    if [ -s "$GIT_HOOKS_VERDICT_REFUSED" ]; then
+      reason=$(head -n 1 "$GIT_HOOKS_VERDICT_REFUSED")
+      SPAWN_BRIEF_FAILURE_REASON="the launch refused to start a worker without the task Git hooks: $reason"
+      echo "error: $SPAWN_BRIEF_FAILURE_REASON; nothing was launched in window $T" >&2
+      if [ "$RELAUNCH" -eq 0 ]; then
+        # A fresh attempt leaves nothing behind: its endpoint holds only the
+        # refusing shell, so close it, which lets the abort cleanup remove the
+        # hooks dir, and write no status line for a task the abort unpublishes.
+        rovo_endpoint_cleanup
+      else
+        spawn_status_append "$(status_stamp_line "failed: $SPAWN_BRIEF_FAILURE_REASON")"
+      fi
+      return 1
+    fi
+    [ ! -e "$GIT_HOOKS_VERDICT_ADMITTED" ] || break
+    if [ "$i" -ge "$max" ]; then
+      [ "$max" -eq 0 ] ||
+        echo "warning: the launch in window $T recorded no Git hook carrier verdict within $max polls; proceeding" >&2
+      break
+    fi
+    i=$((i + 1))
+    sleep 0.1
+  done
+  rm -f "$GIT_HOOKS_VERDICT_ADMITTED" "$GIT_HOOKS_VERDICT_REFUSED" 2>/dev/null || true
+  return 0
+}
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi
@@ -8466,7 +8838,7 @@ LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_S
 # shellcheck disable=SC2016 # The destination pane expands this selector.
 LAUNCH_SHELL_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
-  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
+  LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$(git_hooks_guard inner "$LAUNCH")")"
 else
   # Numbered entries are destination-owned, so collect their values only there.
   IFS= read -r -d '' LAUNCH_GIT_CONFIG_ARGS <<'SH' || true
@@ -8483,7 +8855,7 @@ SH
   # Select the pane's absolute shell before clearing the environment. zsh -f
   # avoids reloading its .zshenv; noninteractive Bash/sh do not load startup
   # files when BASH_ENV/ENV are absent from the explicit keep set.
-  LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH") )"
+  LAUNCH="( $LAUNCH_SHELL_SELECTOR; $LAUNCH_GIT_CONFIG_ARGS exec $LAUNCH_ENV_PREFIX \"\$@\" \"\${fm_launch_shell:-/bin/sh}\" \${ZSH_VERSION:+-f} -c $(shell_quote "$(git_hooks_guard inner "$LAUNCH")") )"
 fi
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # Set all temp selectors inside the final environment boundary, not in the
@@ -8498,7 +8870,7 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   LAUNCH="( $LAUNCH_SHELL_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
 fi
 # The persistent pane shell, not only the confined child, keeps the task hooks.
-LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"
+LAUNCH=$(git_hooks_guard outer "$LAUNCH")
 # Implement the launch-delivery contract in this script's header. The full
 # home-identity hash isolates equal task ids across homes, and the spawn token in
 # the final filename keeps a buffered source line bound to this incarnation.
@@ -8547,6 +8919,15 @@ if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   exit 1
 fi
 sleep 0.3
+# The copy that was checked is the copy the worker starts in: the adopted slot is judged once more after everything
+# slow (brief, skill selection, wiring) and immediately before the launch is delivered.
+if [ "$SLOT_ADOPT" = 1 ]; then
+  FM_SLOT_ADOPT_WIRED=1
+  fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+elif [ "$SLOT_GOVERNED" = 1 ] && [ "$RELAUNCH" -eq 1 ] && [ "$RELAUNCH_RELOCATING" != 1 ]; then
+  # The provisioning route's custody, judged once more immediately before the launch is delivered (D7 (e)).
+  fm_slot_provision_custody "$PROJ_ABS" "$WT" "$ID" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
+fi
 spawn_send_or_abort "launch command" spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
@@ -8554,6 +8935,7 @@ if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
 fi
 spawn_send_or_abort "launch Enter" spawn_send_key "$T" Enter
 SPAWN_LAUNCH_SENT=1
+spawn_git_hooks_verdict || exit 1
 if [ "$HARNESS" = kimi ]; then
   if ! kimi_wait_for_ready; then
     kimi_spawn_fail "$KIMI_READY_FAILURE_DETAIL"

@@ -100,6 +100,33 @@ narrow, but do not eliminate, that risk. See docs/configuration.md's
 'Unrecorded pipeline author families' harm-model reassessment.
 Exact-head binding, report validation, captain-word/away rules and every live
 forge/hold check remain mandatory.
+Review carry-over: when the newest review names an earlier head R, no review
+row names the live head H, every other head with a review row is an ancestor
+of R (an earlier version R builds on, so no row order can skip a FAIL at a later
+version of the change), and no captain-word at H applies, verify asks whether
+H adds anything no read covered. It takes P, the merge base of the live --base
+and H (base-branch content H already contains), merges R into P with
+git merge-tree --write-tree, and requires that tree to equal H's tree exactly.
+A missing object, a conflict, or any byte of difference refuses with the usual
+head mismatch plus the reason. Only then are the reads at R judged by every rule
+above (FAIL standing, coverage of every author family, known newest reader,
+--review-only triggers), with authors derived at H; a captain-word never
+carries. An accepted carry-over prints the fact 'review carried from R: ...'
+and --json adds carried_from; its at is R's verdict time. Callers that
+consume verify: bin/fm-pr-merge.sh, bin/fm-pr-auto-review.py and
+bin/fm_open_loops.py. plan still answers for the exact head only; the
+auto-review lane asks verify first, so plan runs only when carry-over refused.
+A merge or rebase of the base into a reviewed PR therefore needs no new read,
+and neither does a rewrite that keeps the reviewed tree (an amended message,
+a squash, an empty commit) unless a review row names the head it replaced,
+which is then not an ancestor of R and refuses; a merge of a branch that is
+not on the base is unread content and refuses. The proof trusts
+--base to be a commit on the PR's base branch (every caller passes the live
+forge's base SHA; GitLab's is its stored merge base) and trusts the task
+worktree's object store, but runs the merge in an empty scratch repository
+so no worktree config, attribute or merge driver shapes it;
+see docs/configuration.md 'Review carry-over across a
+base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
 kimi, llama, and the exact native Claude names opus, sonnet, haiku, which are
@@ -183,6 +210,7 @@ import sqlite3
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 BIN = Path(__file__).resolve().parent
@@ -369,7 +397,7 @@ def newest(fd, pr):
 
 def git(worktree, *args):
     result = subprocess.run(["git", "-C", str(worktree), *args], capture_output=True,
-                            text=True, check=False, env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"})
+                            text=True, check=False, env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull})
     if result.returncode:
         raise RecordError(f"cannot read author commit evidence: git {' '.join(args)} in {worktree}")
     return result.stdout.strip()
@@ -470,13 +498,102 @@ def derived_authors(home, pr, head, task, base):
     return task, groups
 
 
-def verify(records, rows, head, home, pr, task, base, review_only=False, plan=False):
+CARRIED_FACT = "review carried from {head}: the live head is that reviewed change merged cleanly with its base"
+
+
+def isolated_merge_tree(scratch, objects, object_format, point, reviewed):
+    """Run git merge-tree --write-tree in an empty repository that borrows objects.
+
+    merge-tree writes the merged trees as objects and honors merge drivers,
+    attributes and configuration. The scratch repository reads the task's
+    objects through alternates, so the task store is unchanged, and it carries
+    no configuration, attributes, replace refs or grafts, so nothing the task
+    worktree, its .git directory or the caller's environment holds can shape
+    the merge: the result is plain git's own merge of the two commits.
+    """
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    repo = os.path.join(scratch, "proof.git")
+    env.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_ATTR_NOSYSTEM": "1",
+                "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull,
+                "XDG_CONFIG_HOME": scratch, "HOME": scratch, "GIT_TERMINAL_PROMPT": "0"})
+    made = subprocess.run(["git", "init", "-q", "--bare", "--template=", f"--object-format={object_format}", repo],
+                          capture_output=True, text=True, check=False, env=env)
+    if made.returncode:
+        return made
+    with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
+        handle.write(objects + "\n")
+    env["GIT_DIR"] = repo
+    return subprocess.run(["git", "-c", f"core.attributesFile={os.devnull}", "merge-tree", "--write-tree",
+                           "--no-messages", point, reviewed], capture_output=True, text=True, check=False, env=env)
+
+
+def carry_over_refusal(home, task, head, reviewed, base, others):
+    """None when the live head's tree is exactly the reviewed head merged with base content.
+
+    The base content is the merge base of the live forge base and the live head,
+    which is reachable from the base branch. Every other head in others (heads
+    with review rows) must be an ancestor of the reviewed head, so no read of a
+    later version of the change, such as a FAIL, can be skipped. Any extra line,
+    conflict resolution, unreadable object or failed computation returns the
+    reason the reviewed PASS cannot stand for head.
+    """
+    _, meta = task_metadata(home, task)
+    worktree = Path(nonempty(meta.get("worktree"), "task worktree"))
+    # Replace refs and grafts can both rewrite ancestry, so the proof reads neither.
+    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull}
+
+    def run(*args, extra=None):
+        return subprocess.run(["git", "-C", str(worktree), *args], capture_output=True, text=True,
+                              check=False, env={**env, **(extra or {})})
+
+    for ref in (head, reviewed, base):
+        if run("cat-file", "-e", f"{ref}^{{commit}}").returncode:
+            if ref == reviewed:
+                return f"reviewed head {ref} is not available in the task worktree; if the forge still serves it, fetch it with: {shlex.join(['git', '-C', str(worktree), 'fetch', 'origin', ref])}, otherwise the live head needs its own read"
+            fetch = shlex.join(["git", "-C", str(worktree), "fetch", "origin", base, head])
+            return f"commit {ref} is not available in the task worktree; fetch it with: {fetch}, then retry"
+    for other in sorted(others):
+        if run("cat-file", "-e", f"{other}^{{commit}}").returncode:
+            return f"a review row names head {other}, which is not available to prove the reviewed head builds on it; fetch it with: {shlex.join(['git', '-C', str(worktree), 'fetch', 'origin', other])}, or the live head needs its own read"
+        if run("merge-base", "--is-ancestor", other, reviewed).returncode:
+            return f"a review row names head {other}, which the reviewed head does not build on, so its reads may judge this change"
+    point = run("merge-base", base, head)
+    if point.returncode or not point.stdout.strip():
+        return f"the live head {head} shares no merge base with base {base}"
+    objects = run("rev-parse", "--path-format=absolute", "--git-path", "objects")
+    if objects.returncode or not objects.stdout.strip():
+        return "cannot locate the task worktree's object store"
+    object_format = run("rev-parse", "--show-object-format")
+    if object_format.returncode or not object_format.stdout.strip():
+        return "cannot read the task worktree's object format"
+    with tempfile.TemporaryDirectory(prefix="fm-review-carry-") as scratch:
+        merged = isolated_merge_tree(scratch, objects.stdout.strip(), object_format.stdout.strip(), point.stdout.strip(), reviewed)
+    if merged.returncode == 1:
+        return "the reviewed head does not merge cleanly with the base content the live head contains"
+    if merged.returncode:
+        detail = " ".join(line for line in merged.stderr.splitlines() if line.strip() and not line.startswith("hint:"))
+        return f"git merge-tree could not compute the merge (exit {merged.returncode}): {detail[:400]}"
+    lines = merged.stdout.splitlines()
+    if len(lines) != 1 or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", lines[0]):
+        return "git merge-tree printed something other than one tree id, so the merge cannot be judged"
+    live = run("rev-parse", "--verify", f"{head}^{{tree}}")
+    if live.returncode:
+        return f"cannot read the tree of live head {head}"
+    if lines[0] != live.stdout.strip():
+        return "the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read"
+    return None
+
+
+def verify(records, rows, head, home, pr, task, base, review_only=False, plan=False, reviewed=None):
     word = records["captain-word"]
     review = records["review"]
-    at_word = not (review_only or plan) and word is not None and word["head"] == head
+    # reviewed names the head whose reads stand for the live head; it differs only
+    # when the carry-over proof below has shown the live head adds no unread change.
+    read_head = reviewed or head
+    at_word = not (review_only or plan or reviewed) and word is not None and word["head"] == head
     start = max(i for i, row in enumerate(rows) if row["kind"] == "captain-word") + 1 if at_word else 0
     fails = [i for i in range(start, len(rows)) if rows[i]["kind"] == "review"
-             and rows[i]["head"] == head and rows[i]["verdict"] == "FAIL"]
+             and rows[i]["head"] == read_head and rows[i]["verdict"] == "FAIL"]
     if at_word and not fails:
         return "captain-word", word
     if not at_word and not plan:
@@ -484,8 +601,22 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
             raise VerificationError(f"no independent review record at live head {head}; --review-only requires a PASS recorded with fm-review-record.py review, and a captain-word is not a substitute")
         if review is None:
             raise VerificationError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
-        if review["head"] != head:
-            raise VerificationError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
+        if review["head"] != read_head:
+            mismatch = f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge"
+            # A read of the live head always speaks for it, so carry-over never overrides one.
+            if reviewed or any(row["kind"] == "review" and row["head"] == head for row in rows):
+                raise VerificationError(mismatch)
+            others = {row["head"] for row in rows if row["kind"] == "review" and row["head"] != review["head"]}
+            refusal = carry_over_refusal(home, task, head, review["head"], base, others)
+            if refusal:
+                raise VerificationError(f"{mismatch} (no carry-over: {refusal})")
+            try:
+                basis, evidence = verify({**records, "captain-word": None}, rows, head, home, pr, task, base,
+                                         review_only, reviewed=review["head"])
+            except VerificationError as exc:
+                raise VerificationError(f"{mismatch} (no carry-over: the reads at {review['head']} do not qualify: {exc})") from exc
+            return basis, {**evidence, "carried_from": review["head"],
+                           "facts": [*evidence.get("facts", []), CARRIED_FACT.format(head=review["head"])]}
     _, derived = derived_authors(home, pr, head, task, base)
     groups = {group: list(authors) for group, authors in derived.items()}
     derived_families = {a["family"] for authors in derived.values() for a in authors}
@@ -498,7 +629,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
                  else model(a["model"], "author_groups model")} for a in authors]
 
     def passes_at_head(window):
-        return [row for row in window if row["kind"] == "review" and row["head"] == head and row["verdict"] == "PASS"]
+        return [row for row in window if row["kind"] == "review" and row["head"] == read_head and row["verdict"] == "PASS"]
 
     passes = passes_at_head(rows)
     # Typed groups can only add author constraints, never erase the derived ones.
@@ -583,7 +714,7 @@ def verify(records, rows, head, home, pr, task, base, review_only=False, plan=Fa
             missing = uncovered(group, authors, passes_at_head(rows[index + 1:]))
             if not missing:
                 continue
-            reason = (f"verdict is FAIL at live head {head} (reader {failed['reader_model']}, report {failed['report']}); "
+            reason = (f"verdict is FAIL at {'live head ' + head if read_head == head else read_head} (reader {failed['reader_model']}, report {failed['report']}); "
                       f"no later exact-head PASS covers group {group}, family {','.join(missing)}, that this FAIL read; ")
             if "unknown" in missing:
                 raise VerificationError(f"{reason}{unknown_need(group, 'later ')}, set each read's actual trigger answers and local report, then record each with: {env} {review_command(unknown_reader_placeholder(group), [group], {**groups, group: authors})}; or {captain_help}")
@@ -635,6 +766,8 @@ def verification_json(pr, head, basis, row):
             report=row["report"])
         if isinstance(row.get("report_sha256"), str) and row["report_sha256"]:
             evidence["report_sha256"] = row["report_sha256"]
+        if row.get("carried_from"):
+            evidence["carried_from"] = row["carried_from"]
     if row.get("facts"):
         evidence["facts"] = row["facts"]
     return evidence

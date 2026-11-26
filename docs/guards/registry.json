@@ -5,6 +5,7 @@
   "audited": 30,
   "beyond_audit_active": [
     "turnend-ask-gate",
+    "spawn-git-hook-carrier",
     "live-lab-processes-stopped-before-remove",
     "merge-local-ff-only",
     "merge-unproved-outcome",
@@ -128,6 +129,7 @@
     "jev-block-renderer",
     "spawn-write-confinement-raw-parse",
     "slot-provision-attestation",
+    "slot-adopt-kept-wiring",
     "spawn-local-source-selection",
     "jev-tool-coverage",
     "jev-egress-grant",
@@ -163,7 +165,8 @@
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
     "teardown-entry-preflight",
-    "guard-lint-touched-registry"
+    "guard-lint-touched-registry",
+    "home-state-write"
   ],
   "guards": [
     {
@@ -295,6 +298,36 @@
       "tier": "C",
       "harm": "reversible",
       "layer_note": "Existing optional behavior, registered for bypass visibility only; no new refusal or allowance. Ordinary decision coverage remains uninstrumented."
+    },
+    {
+      "id": "spawn-git-hook-carrier",
+      "owner": "bin/fm-spawn.sh",
+      "invariant": "no worker starts in a pane whose git honours neither task Git hook carrier, or whose GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS is malformed",
+      "source": "the launch's own carrier selector (fm_launch_git_hooks in the staged launch text) run in the pane shell and again after env -i, which records a refusal reason in the task temp root",
+      "trigger": "git does not resolve on the pane PATH, GIT_CONFIG_COUNT is not a number, GIT_CONFIG_PARAMETERS is malformed, or the pane's git honours neither the config rows nor the numbered core.hooksPath",
+      "remedy": "fix the named pane condition (put git on the pane PATH, unset the malformed GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS, or use a git that honours the config rows or a numbered core.hooksPath), then spawn or relaunch again",
+      "test": "tests/fm-spawn-git-hook-carrier.test.sh",
+      "sites": [
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "SPAWN_BRIEF_FAILURE_REASON=\"the launch refused to start a worker without the task Git hooks: $reason\""
+        }
+      ],
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "layer": "runtime-block",
+      "budget": 1,
+      "tier": "C",
+      "harm": "reversible",
+      "layer_note": "The refusal happens in the pane before the harness starts; fm-spawn reports it by failing the spawn with the recorded reason. A fresh spawn then closes its endpoint and the abort cleanup removes the hooks dir and unpublishes the task, leaving no status line; a relaunch keeps its pane and records a failed: status line. Uninstrumented: no guard event is appended."
     },
     {
       "id": "secondmate-sync",
@@ -873,8 +906,8 @@
       "owner": "bin/fm-duration.py",
       "invariant": "Duration accounting never writes operational state into a foreign project checkout.",
       "layer": "runtime-block",
-      "source": "the resolved duration-ledger path, Git top level and Firstmate data-directory containment; existing decision points: site:bin/fm-duration.py:3702c3b723",
-      "trigger": "refuses to write the duration ledger inside a git work tree that is not a firstmate checkout data dir (e.g. a project copy)",
+      "source": "the resolved duration-ledger path, Git top level and Firstmate data-directory containment; existing decision points: site:bin/fm-duration.py:3702c3b723 (the ledger refusal) and site:bin/fm-duration.py:cb50826569 (the trip snapshot's refused-recording reason in write_trip_snapshot, whose snapshot write re-applies the same containment check before creating the file beside the table)",
+      "trigger": "refuses to write the duration ledger inside a git work tree that is not a firstmate checkout data dir (e.g. a project copy); on a no-progress or absolute stop the trip snapshot is then not written beside the table, its trip line names the refusal, and its rows go to stderr instead",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Select the owning Firstmate data directory with FM_DURATION_HOME=<firstmate-home>/data before retrying python3 bin/fm-duration.py run <key> -- <command>.",
@@ -894,6 +927,10 @@
         {
           "file": "bin/fm-duration.py",
           "match": "return refuse(f'{path} is inside a git work tree that is not a firstmate checkout data directory')"
+        },
+        {
+          "file": "bin/fm-duration.py",
+          "match": "reason = ('recording refused' if REFUSED else 'recording is off') if table is None else ''"
         }
       ]
     },
@@ -5546,7 +5583,7 @@
       "id": "slot-provision-attestation",
       "owner": "bin/fm-slot-provision-lib.sh",
       "sites": [
-        {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioning refused:", "count": 4},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioning refused:", "count": 9},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refused slot has an invalid prepared commit identity", "count": 2},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refusing to reset or overwrite it"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner refused task"},
@@ -5555,21 +5592,59 @@
         {"file": "bin/fm-slot-provision-lib.sh", "match": "cannot read fetched origin", "count": 2},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "{path} differs from fetched origin"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "mode differs from fetched origin"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "cannot read the import closure of project clone provisioner"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "could not be recorded; provisioning refused"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner source changed after it was verified"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner source gained files after it was verified"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "error: slot adoption refused:"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "fm_slot_adopt_refuse ", "count": 18},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "a relaunch is not a new scope declaration"},
+        {"file": "bin/fm-task-copy-lib.sh", "match": "so no other holder of $path is proved absent"},
+        {"file": "bin/fm-session-end-relaunch-lib.sh", "match": "s/.*slot adoption refused: "},
+        {"file": "bin/fm-session-end-relaunch-lib.sh", "match": "s/.*slot provisioning refused: "},
+        {"file": "bin/fm-session-end-relaunch-lib.sh", "match": "not retried by the scan until its cause changes"},
         {"file": "bin/fm-spawn.sh", "match": "could not record the refused slot checkpoint"},
         {"file": "bin/fm-spawn.sh", "match": "could not be confirmed stopped"},
         {"file": "bin/fm-control.sh", "match": "refused invalid --owned-path"},
-        {"file": "bin/fm-control.sh", "match": "refused relaunch of governed task", "count": 2}
+        {"file": "bin/fm-control.sh", "match": "refused relaunch of governed task", "count": 4}
       ],
       "invariant": "a governed assigned copy never admits a worker or ship transition without a matching PASS attestation from the project provisioner",
       "layer": "runtime-block",
-      "source": "the registered project clone's scripts/git-stability/provision_existing_slot.py compared with its fetched origin default-branch version, its report and manifest (execution contract: bin/fm-slot-provision-lib.sh header), plus the copy's git status, operation markers, common dir and task branch",
-      "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the clone provisioner or its fetched origin version is missing, unreadable or different, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme",
+      "source": "on the provisioning route, the registered project clone's scripts/git-stability/provision_existing_slot.py and its import closure compared (raw bytes and Git mode) with their fetched origin default-branch version, run on every route as a read-only private export of that version with a fresh bytecode cache and re-fingerprinted after the run (execution contract: bin/fm-slot-provision-lib.sh header and fm_slot_origin_provisioner), its report and manifest, plus the copy's git status, operation markers, common dir and task branch, and on the recovery of a refused first provisioning a read of whether the copy holds the script; on the adoption route of a same-task relaunch, the slot manifest the task record names, the copy's repository, branch and base, the copy-custody owners, and the copy's own out-of-scope commits and edits for the drift report",
+      "trigger": "the assigned copy is not isolated, belongs to another repository, is dirty, has an operation in progress, has a task or prepared branch that moved, the clone provisioner or a module it imports, or its fetched origin version, is missing, unreadable or different in bytes or mode, the verified export changed or gained a file during the run, the recovery of a refused first provisioning finds no script in the copy, the provisioner exits nonzero or reports anything but a PASS whose manifest matches the copy, owner, branch, base and owned paths, or the acquired shell does not start the provisioner within the no-progress budget or it reaches the absolute extreme; or, on the adoption route, the recorded manifest is missing, unreadable, not this task's own, or disagrees with the copy, owner, branch, base or scope, the copy is not isolated or belongs to another repository, or a copy-custody owner refuses (fm_slot_adopt_check refuses with `error: slot adoption refused: <reason>`)",
       "remedy": "preserve and reconcile the assigned copy's scratch state, then bin/fm-control.sh <task> relaunch --note <reason>, or bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off> --owned-path <tracked-path>",
       "budget": 1,
-      "test": "tests/fm-spawn-dispatch-profile.test.sh",
+      "test": "tests/fm-slot-adopt.test.sh",
       "tier": "C",
       "harm": "irreversible",
-      "layer_note": "deny without a guard event: bin/fm-spawn.sh and bin/fm-promote.sh stop before admission and print the refusal and the provisioner report on stderr, and bin/fm-control.sh refuses an unattestable governed relaunch before stopping the running agent; a refused spawn keeps the copy and records recovery=slot-provision-refused"
+      "layer_note": "deny without a guard event: bin/fm-spawn.sh and bin/fm-promote.sh stop before admission and print the refusal and the provisioner report on stderr, and bin/fm-control.sh refuses an unattestable governed relaunch before stopping the running agent; a refused spawn keeps the copy and records recovery=slot-provision-refused; on the adoption route bin/fm-control.sh runs fm_slot_adopt_check before the stop, and bin/fm-spawn.sh runs it again at launch and a last time after the stop, the wiring rewrite and the record publish, just before delivery, so a last-check refusal leaves the wiring and task record already written while the recorded manifest and scope stay unchanged; a relaunch never runs the provisioner on this route and prints own out-of-scope paths as a drift report instead of refusing; the provisioning route is also covered by tests/fm-spawn-dispatch-profile.test.sh, its clone-export source check on every entry point by tests/fm-spawn-pool-base-freshen.test.sh, and the adoption route by tests/fm-control-relaunch-adopt.test.sh"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slot-adopt-kept-wiring",
+      "owner": "bin/fm-spawn.sh",
+      "sites": [
+        {"file": "bin/fm-spawn.sh", "match": "could not keep the worker's edited launch artifacts for task $ID; refusing to replace them"}
+      ],
+      "invariant": "an adopted relaunch never replaces a launch artifact the worker edited since the last launch until a byte-for-byte kept copy of it is written and verified",
+      "layer": "runtime-block",
+      "source": "the per-task wiring record state/<id>.wiring-sha and the bytes of each harness launch artifact in the adopted copy",
+      "trigger": "an adopted relaunch finds a launch artifact whose bytes differ from the wiring record and cannot read it, copy it beside itself, or verify the copy byte for byte",
+      "remedy": "preserve the worker's edited launch artifact in the copy, then bin/fm-control.sh <task> relaunch --note <reason>",
+      "budget": 1,
+      "test": "tests/fm-control-relaunch-adopt.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "layer_note": "deny without a guard event: bin/fm-spawn.sh stops the adopted relaunch before the old wiring is retired and prints the refusal on stderr"
     },
     {
       "decision": "deny",
@@ -7050,7 +7125,7 @@
       "tier": "C",
       "harm": "reversible",
       "remedy_verified": "fixture",
-      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
+      "layer_note": "per-task hooks installed by bin/fm-git-strip-ai-trailers.sh, carried as selected by bin/fm-spawn.sh: under the config carrier the commit scan runs at commit-msg, after the repository pre-commit hook, and the push scan runs at pre-push beside the repository hook, which git feeds its own copy of the ref-update input; under the legacy carrier the pre-commit wrapper scans after the repository hook and the pre-push wrapper scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
     },
     {
       "decision": "deny",
@@ -7075,7 +7150,7 @@
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture",
-      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
+      "layer_note": "per-task hooks installed by bin/fm-git-strip-ai-trailers.sh, carried as selected by bin/fm-spawn.sh: under the config carrier the commit scan runs at commit-msg, after the repository pre-commit hook, and the push scan runs at pre-push beside the repository hook, which git feeds its own copy of the ref-update input; under the legacy carrier the pre-commit wrapper scans after the repository hook and the pre-push wrapper scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused. The shared Python deny decision and refusal messages are mapped once under git-commit-credential-shapes; GUARDS selects the pre-commit or pre-push telemetry id at runtime, so this source ownership also covers the push path without two registry entries claiming one site."
     },
     {
       "decision": "deny",
@@ -7578,6 +7653,36 @@
       "tier": "C",
       "harm": "reversible",
       "remedy_verified": "fixture",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active"
+    },
+    {
+      "id": "home-state-write",
+      "version": "1",
+      "owner": "bin/fm-home-write.py",
+      "sites": [
+        {"file": "bin/fm-home-write.py", "match": "fm-home-write: refused:", "count": 2},
+        {"file": "bin/fm-home-write.sh", "match": "fm-home-write: refused: FM_HOME is unset"},
+        {"file": "bin/fm-home-write.sh", "match": "fm-guard-event.sh\" home-state-write"}
+      ],
+      "emitters": ["bin/fm-home-write.sh"],
+      "invariant": "a home-state write through fm-home-write lands only on an untracked gitignored regular file under the home's data/ reached without links or nested repositories",
+      "layer": "runtime-block",
+      "source": "the resolved target path, lstat of each existing component, O_NOFOLLOW directory opens at write time, .git entries in every directory walked below data/, git ls-files --error-unmatch and git check-ignore --no-index in the FM_HOME working tree with inherited GIT_* variables removed, and the existing directory entries for case and Unicode variants",
+      "trigger": "a caller runs FM_HOME=<home> bin/fm-home-write.sh [--replace] <path> with a target outside data/, tracked, not ignored, behind a symbolic link or dot segment, inside a git repository or worktree nested below data/, a case variant of an existing name, or an existing file without --replace",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "write a data/ record with FM_HOME=<home> bin/fm-home-write.sh [--replace] data/<path> < <content-file>; change tracked material only in a task worktree made by bin/fm-spawn.sh",
+      "budget": 1,
+      "budget_reason": "one decision per invocation with no internal retry; a refusal names the rule, and a second refusal of the same target is a wrong target, not a transient",
+      "telemetry": "state/guard-events.jsonl; one home-state-write event per invocation with guard, decision, source_ok, elapsed_ms",
+      "test": "tests/fm-home-write.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
       "proxy": false,
       "proxy_reason": "",
       "precheck_gap": "",

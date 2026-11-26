@@ -16,7 +16,10 @@ Main-run readers use the default.
 --shell-prefix emits the equivalent names-only shell expansion used by
 fm-spawn, preserving listed non-exported destination variables without reading
 or serializing their values. fm-spawn adds the destination pane's numbered
-GIT_CONFIG entries as env arguments for the default launch. The new process does
+GIT_CONFIG entries as env arguments for the default launch.
+GIT_CONFIG_PARAMETERS and FM_GIT_HOOK_ROWS are kept together or not at all,
+so a kept GIT_CONFIG_PARAMETERS always brings the record of which of its rows
+are the task Git hooks. The new process does
 not inherit readonly exports or names outside the explicit set. --startup
 installs the existing confinement
 owner's shell-startup read rules on Darwin for direct readers. Linux has no
@@ -62,6 +65,8 @@ HARNESS_ROUTES = {
     "pi": ("PI_CODING_AGENT_DIR",),
     "pi-signed": ("PI_CODING_AGENT_DIR",),
 }
+# Names that must cross the boundary together (see main()).
+HOOK_ROW_PAIR = frozenset(("GIT_CONFIG_PARAMETERS", "FM_GIT_HOOK_ROWS"))
 NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
 
@@ -93,6 +98,11 @@ def main():
     names = FLOOR.union(args.keep)
     if args.harness is not None:
         names |= WORK.union(TOOLCHAIN, HARNESS_ROUTES.get(args.harness, ()))
+    # The task Git hook rows travel in GIT_CONFIG_PARAMETERS, and FM_GIT_HOOK_ROWS
+    # records exactly which rows are Firstmate's. Keeping one without the other
+    # would let the next selector miss the old rows, so keep both or neither.
+    if names & HOOK_ROW_PAIR:
+        names |= HOOK_ROW_PAIR
     if args.shell_prefix:
         if command or args.startup:
             parser.error("--shell-prefix accepts names only, without a command or --startup")
