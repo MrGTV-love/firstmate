@@ -1,0 +1,90 @@
+ok - the proof ignores merge drivers and attributes from the caller's global configuration in both locations
+ok - the proof's scratch repository is made beside the review records and removed afterwards
+ok - a state directory that takes no scratch repository refuses carry-over with its reason
+ok - once a same-tree rewrite is itself read, a later base update needs a fresh read
+ok - the proof ignores merge drivers and attributes from the task worktree and the caller's environment
+ok - the proof ignores a replace ref that would pass unread side work off as base content
+ok - a clean merge of a branch that is not on the base is unread content and refuses
+ok - the proof ignores a graft that would pass unread side work off as base content
+ok - a base older than the base content the live head merged refuses
+ok - the carry-over proof writes its merged trees to a scratch repository, and running it in the worktree makes the store change
+hint: Support for <GIT_DIR>/info/grafts is deprecated
+hint: and will be removed in a future Git version.
+hint:
+hint: Please use "git replace --convert-graft-file"
+hint: to convert the grafts into replace refs.
+hint:
+hint: Turn this message off by running
+hint: "git config set advice.graftFileDeprecated false"
+hint: Support for <GIT_DIR>/info/grafts is deprecated
+hint: and will be removed in a future Git version.
+hint:
+hint: Please use "git replace --convert-graft-file"
+hint: to convert the grafts into replace refs.
+hint:
+hint: Turn this message off by running
+hint: "git config set advice.graftFileDeprecated false"
+hint: Support for <GIT_DIR>/info/grafts is deprecated
+hint: and will be removed in a future Git version.
+hint:
+hint: Please use "git replace --convert-graft-file"
+hint: to convert the grafts into replace refs.
+hint:
+hint: Turn this message off by running
+hint: "git config set advice.graftFileDeprecated false"
+hint: Support for <GIT_DIR>/info/grafts is deprecated
+hint: and will be removed in a future Git version.
+hint:
+hint: Please use "git replace --convert-graft-file"
+hint: to convert the grafts into replace refs.
+hint:
+hint: Turn this message off by running
+hint: "git config set advice.graftFileDeprecated false"
+hint: Support for <GIT_DIR>/info/grafts is deprecated
+hint: and will be removed in a future Git version.
+hint:
+hint: Please use "git replace --convert-graft-file"
+hint: to convert the grafts into replace refs.
+hint:
+hint: Turn this message off by running
+hint: "git config set advice.graftFileDeprecated false"
+ok - grafts are ignored by the carry-over proof, so they cannot fake ancestry
+ok - a read of any head that is not an ancestor of R turns carry-over off, whatever the row order
+ok - reads of earlier heads that R builds on leave carry-over available
+ok - a read of any later head turns carry-over off, so row order cannot skip a FAIL
+ok - a rewrite that keeps the reviewed tree, such as an amended message, carries the PASS
+ok - a PASS carries to a head that is exactly the reviewed change merged with base content, and says so
+ok - a PASS carries across a clean rebase onto the base
+ok - an update that adds any unread line keeps the exact-head refusal
+ok - removing only the tree comparison lets the unread change through, so the refusal is the tree proof's
+ok - a conflicted update needs a fresh read even when the resolution keeps the reviewed side
+ok - a captain-word never carries to a new head; only recorded reads do
+ok - a FAIL standing at the reviewed head stands at the live head too
+ok - any read of the live head turns carry-over off
+ok - a reviewed head that is not available locally cannot carry
+ok - review-only --json reports immutable record-time independent evidence
+ok - default verify text and JSON preserve captain-word precedence
+ok - captain-word alone cannot satisfy review-only
+ok - stale head, FAIL, same family, unknown families and triggers are typed not-qualified
+ok - an unknown ship author family requires exact-head PASS reads from two known reader families
+ok - T1 unknown pipeline accepts one different-builder-family reader
+ok - T6 verify discloses the fact only for single-reader pipeline relief
+ok - pipeline boundary: same-ship
+ok - pipeline boundary: unknown-ship
+ok - pipeline boundary: unknown-reader
+ok - pipeline boundary: mixed-ship
+ok - pipeline boundary: no-ship
+ok - pipeline boundary: no-ship-declared
+ok - pipeline boundary: uncovered-known-pipeline
+ok - pipeline boundary: stale-head
+ok - a ship group with any unknown family gives the unknown pipeline group no relief
+ok - a later outside-ship-family pipeline read clears an exact-head FAIL and discloses the relief
+ok - relief that clears a FAIL after a captain-word discloses the fact
+ok - bare opus, sonnet and haiku ids map to anthropic while unknown ids stay untrusted
+ok - stored family fields cannot retroactively change recorded independence
+ok - not-qualified, unavailable and invalid-input failures stay distinguishable without parsing prose
+ok - default captain-word/FAIL precedence holds
+ok - a legacy record without report_sha256 omits the digest instead of fabricating it
+ok - plan names the owed author families from the exact head, ignores a FAIL and a captain-word, and writes nothing
+ok - plan applies the one-reader relief for an unrecorded pipeline family and the two-reader rule for any other unknown group exactly as verify does, names the families a reader must lie outside, and verify keeps its disclosure
+exit=0

@@ -1,0 +1,86 @@
+=== S1 clean base merge carries; scratch made in state/, removed; shared TMPDIR untouched ===
+  R=c6b8556bc96994a67469304d6b30fdcbabfa98f6  H=3f76f2aa8edfba165c4630d1d0ac2ee4f2c5b86e  T=82bd5fa4cefa74d4d0b2198ab53bb0bfbcd07831
+  OLD (407c3837):
+    exit=0
+    stdout| review: PASS
+    stdout| review: review carried from c6b8556bc96994a67469304d6b30fdcbabfa98f6: the live head is that reviewed change merged cleanly with its base
+    git init ran at: <lab>/s1/shared-tmp/fm-review-carry-2bb3vlgb/proof.git
+  NEW (bb94c642):
+    exit=0
+    stdout| review: PASS
+    stdout| review: review carried from c6b8556bc96994a67469304d6b30fdcbabfa98f6: the live head is that reviewed change merged cleanly with its base
+    git init ran at: <lab>/s1/home/state/.review-carry-djrl984z/proof.git
+    state/ dir listing after verify (hidden too):
+      review-records.jsonl
+      task-x1.meta
+    shared-tmp entries after verify: 0
+=== S2 unwritable state directory: typed refusal, no traceback ===
+  state mode: dr-x------  uid=501
+  OLD (407c3837):
+    exit=0
+    stdout| review: PASS
+    stdout| review: review carried from 268bce17c62d0929391863aac851c568c2cb1133: the live head is that reviewed change merged cleanly with its base
+  NEW (bb94c642):
+    exit=1
+    stdout| error: head mismatch: review names 268bce17c62d0929391863aac851c568c2cb1133, live head is ffd47befe8764824ba313b5f3522f77d4ab78d6f; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: cannot make the proof's scratch repository in the state directory: Permission denied); inspect review-records.jsonl in the PR task home before retrying
+  NEW --json:
+    {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 268bce17c62d0929391863aac851c568c2cb1133, live head is ffd47befe8764824ba313b5f3522f77d4ab78d6f; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: cannot make the proof's scratch repository in the state directory: Permission denied)"}}
+=== S3 same-tree rewrite of R (amend message), not itself read, then base merge: carries from R ===
+  R=4b04e5e9f3e21699b1b8ae208f994d33cf01bc3b rewrite=0342ccdfddbf5b85529e5b4074ac01b1b592f1cd H=d88bdfe787e349ee6aacac0322da8b6617938ea8
+  OLD (407c3837):
+    exit=0
+    stdout| review: PASS
+    stdout| review: review carried from 4b04e5e9f3e21699b1b8ae208f994d33cf01bc3b: the live head is that reviewed change merged cleanly with its base
+  NEW (bb94c642):
+    exit=0
+    stdout| review: PASS
+    stdout| review: review carried from 4b04e5e9f3e21699b1b8ae208f994d33cf01bc3b: the live head is that reviewed change merged cleanly with its base
+=== S4 (rewrite-last) same-tree rewrite that was itself read, then base merge: refuses ===
+  R=96ffd9b103cb8258d884823c89247665cc2f5d32 rewrite=f5d36cc10b109bfe28a20c01632332ac497d2e29 H=b2b8779a1f180d8307ba0ddab1f323b365dd25ca
+  OLD (407c3837):
+    exit=1
+    stdout| error: head mismatch: review names f5d36cc10b109bfe28a20c01632332ac497d2e29, live head is b2b8779a1f180d8307ba0ddab1f323b365dd25ca; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 96ffd9b103cb8258d884823c89247665cc2f5d32, which the reviewed head does not build on, so its reads may judge this change); inspect review-records.jsonl in the PR task home before retrying
+  NEW (bb94c642):
+    exit=1
+    stdout| error: head mismatch: review names f5d36cc10b109bfe28a20c01632332ac497d2e29, live head is b2b8779a1f180d8307ba0ddab1f323b365dd25ca; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 96ffd9b103cb8258d884823c89247665cc2f5d32, which the reviewed head does not build on, so its reads may judge this change); inspect review-records.jsonl in the PR task home before retrying
+=== S4 (original-last) same-tree rewrite that was itself read, then base merge: refuses ===
+  R=de94846938198a042ac70fbee0ff517c38388554 rewrite=2490a75a257476a7d2f2fb290a8eefeab4de1491 H=1f1ddd9c0ae1ee46e37cbeb4585b5e88f6174233
+  OLD (407c3837):
+    exit=1
+    stdout| error: head mismatch: review names de94846938198a042ac70fbee0ff517c38388554, live head is 1f1ddd9c0ae1ee46e37cbeb4585b5e88f6174233; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 2490a75a257476a7d2f2fb290a8eefeab4de1491, which the reviewed head does not build on, so its reads may judge this change); inspect review-records.jsonl in the PR task home before retrying
+  NEW (bb94c642):
+    exit=1
+    stdout| error: head mismatch: review names de94846938198a042ac70fbee0ff517c38388554, live head is 1f1ddd9c0ae1ee46e37cbeb4585b5e88f6174233; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 2490a75a257476a7d2f2fb290a8eefeab4de1491, which the reviewed head does not build on, so its reads may judge this change); inspect review-records.jsonl in the PR task home before retrying
+=== S5 (home) merge driver + attributes in caller's global config hide a conflict: refuses ===
+Auto-merging app.txt
+  live app.txt after driver-resolved merge: unread driver bytes
+  OLD (407c3837):
+    exit=1
+    stdout| error: head mismatch: review names 0018157ffb211f15864f80b8ebbacba0730a17f1, live head is d1ed0d9b65cc9c3f54bea720f442ef109aa311c5; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains); inspect review-records.jsonl in the PR task home before retrying
+  NEW (bb94c642):
+    exit=1
+    stdout| error: head mismatch: review names 0018157ffb211f15864f80b8ebbacba0730a17f1, live head is d1ed0d9b65cc9c3f54bea720f442ef109aa311c5; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains); inspect review-records.jsonl in the PR task home before retrying
+=== S5 (xdg) merge driver + attributes in caller's global config hide a conflict: refuses ===
+Auto-merging app.txt
+  live app.txt after driver-resolved merge: unread driver bytes
+  OLD (407c3837):
+    exit=1
+    stdout| error: head mismatch: review names 004793c94283364d7d484848cb8a21fd1fbcccfd, live head is aa27bccea9709cc2cea8ec0a4f4022818c855b78; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains); inspect review-records.jsonl in the PR task home before retrying
+  NEW (bb94c642):
+    exit=1
+    stdout| error: head mismatch: review names 004793c94283364d7d484848cb8a21fd1fbcccfd, live head is aa27bccea9709cc2cea8ec0a4f4022818c855b78; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains); inspect review-records.jsonl in the PR task home before retrying
+=== S6 accept/refuse unchanged: unread line hidden in base merge refuses, old and new ===
+  OLD (407c3837):
+    exit=1
+    stdout| error: head mismatch: review names ec7b922e1939c104d691830238ba6164db5277a2, live head is bfb07d7b2eaddf23f3947e97b7f36bf1f8e79d72; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read); inspect review-records.jsonl in the PR task home before retrying
+  NEW (bb94c642):
+    exit=1
+    stdout| error: head mismatch: review names ec7b922e1939c104d691830238ba6164db5277a2, live head is bfb07d7b2eaddf23f3947e97b7f36bf1f8e79d72; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read); inspect review-records.jsonl in the PR task home before retrying
+=== S7 accept/refuse unchanged: merge of a side branch not on the base refuses, old and new ===
+  OLD (407c3837):
+    exit=1
+    stdout| error: head mismatch: review names bac20ee3fd32e592a568c38024772de783281e87, live head is 25cb98655d8e92fd8771d70bd46a80d399401f0c; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read); inspect review-records.jsonl in the PR task home before retrying
+  NEW (bb94c642):
+    exit=1
+    stdout| error: head mismatch: review names bac20ee3fd32e592a568c38024772de783281e87, live head is 25cb98655d8e92fd8771d70bd46a80d399401f0c; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read); inspect review-records.jsonl in the PR task home before retrying
+=== lab removed on exit: <lab> ===
