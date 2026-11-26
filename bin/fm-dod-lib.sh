@@ -6,7 +6,7 @@
 # receives. Both paths must hand the worker the same contract: a promoted
 # no-mistakes worker that never received the ask-user escalation rule or the
 # `--yes` ban is the exact delivery hole this single owner exists to close.
-# fm_dod_block <no-mistakes|direct-PR|local-only> <task-id> [branch] [<forge>] [<base>] [<consent>] [<brief>]
+# fm_dod_block <no-mistakes|direct-PR|local-only> <task-id> [branch] [<forge>] [<base>] [<consent>] [<brief>] [<reconciled-source-sha256>]
 # prints the block on stdout with no trailing blank line. The caller validates the
 # mode; an unknown mode is refused rather than silently rendered as the pipeline
 # contract.
@@ -1170,8 +1170,17 @@ There is no pull request, no \`gh-axi\` call, and no forge CI result to report: 
 EOF
 }
 
-fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<brief>]
-  local mode=$1 id=$2 forge=${4:-none} base=${5:-} consent=${6:-} brief=${7:-}
+fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<brief>] [<reconciled-source-sha256>]
+  local mode=$1 id=$2 forge=${4:-none} base=${5:-} consent=${6:-} brief=${7:-} reconciled=${8:-} contract_reconciled=''
+  # The eighth argument binds a local-only task to the exact reconciled-successor
+  # declaration bin/fm-spawn.sh --reconciled-source judges; it exists only there.
+  if [ -n "$reconciled" ]; then
+    if [ "$mode" != local-only ] || [ -n "$base" ]; then
+      echo "error: fm_dod_block: a reconciled-source declaration applies only to local-only without a base branch" >&2
+      return 1
+    fi
+    contract_reconciled=" reconciled-source=$reconciled"
+  fi
   if [ "$mode" = no-mistakes ] && [ -z "$brief" ]; then
     echo "error: fm_dod_block: mode=no-mistakes needs the durable task brief to build its verification plan" >&2
     return 1
@@ -1285,7 +1294,7 @@ EOF
     local-only:*)
       cat <<EOF
 # Definition of done
-Delivery contract: mode=local-only
+Delivery contract: mode=local-only$contract_reconciled
 Ship branch: $branch
 This task ships **local-only**: no remote, no PR, no pipeline.
 The task is complete only when committed on your branch \`$branch\`. Do NOT push, do NOT open a PR, do NOT merge.
