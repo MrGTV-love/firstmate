@@ -731,6 +731,14 @@
     {
       "path": ".agents/skills/validation-supervision/SKILL.md",
       "audience": "agent-runtime"
+    },
+    {
+      "path": "tests/fixtures/model-picker-shadow/registry-eight/portable-receipt.txt",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/model-picker-shadow/registry/replay-receipt.txt",
+      "audience": "maintainer-verification"
     }
   ]
 }
