@@ -425,15 +425,21 @@ sub identity_path {
     return $absolute;
 }
 sub balanced_text {
-    my ($body, $position, $open, $close, $subs) = @_;
+    my ($body, $position, $open, $close, $subs, $in_arith) = @_;
     my $start = $$position;
     my $depth = 1;
-    my (@cases, $cmd_start);
+    my (@cases, @pat_depth, @pat_start, $cmd_start);
     $cmd_start = 1;
+    my $track_case = ($open eq '(' && !$in_arith);
     while ($$position < length $body) {
         my $char = substr($body, $$position, 1);
         if ($char eq $open) {
-            if ($open eq '(' && @cases && $cases[-1] eq 'pattern') {
+            if ($track_case && @cases && $cases[-1] eq 'pattern') {
+                if ($pat_start[-1]) {
+                    $pat_start[-1] = 0;
+                } else {
+                    $pat_depth[-1]++;
+                }
                 $$position++;
                 next;
             }
@@ -443,19 +449,25 @@ sub balanced_text {
             next;
         }
         if ($char eq $close) {
-            if ($open eq '(' && @cases && $cases[-1] eq 'pattern') {
-                $cases[-1] = 'body';
+            if ($track_case && @cases && $cases[-1] eq 'pattern') {
+                if ($pat_depth[-1] > 0) {
+                    $pat_depth[-1]--;
+                } else {
+                    $cases[-1] = 'body';
+                    $cmd_start = 1;
+                }
                 $$position++;
-                $cmd_start = 1;
                 next;
             }
             $$position++;
             return substr($body, $start, $$position - $start - 1) if --$depth == 0;
             next;
         }
-        if ($char eq ';' && $open eq '(' && @cases && $cases[-1] eq 'body'
+        if ($track_case && $char eq ';' && @cases && $cases[-1] eq 'body'
             && substr($body, $$position + 1, 1) =~ /[;&]/) {
             $cases[-1] = 'pattern';
+            $pat_depth[-1] = 0;
+            $pat_start[-1] = 1;
             $$position += 2;
             $cmd_start = 1;
             next;
@@ -465,7 +477,7 @@ sub balanced_text {
             $$position++;
             next;
         }
-        if ($char eq '#' && $open eq '(') {
+        if ($char eq '#' && $open eq '(' && !$in_arith) {
             my $end = index($body, "\n", $$position);
             $$position = $end < 0 ? length($body) : $end;
             next;
@@ -473,15 +485,24 @@ sub balanced_text {
         my $before = $$position;
         my $word = shell_word($body, $position, {}, $close);
         push @$subs, @{$word->{subs}} if defined $subs;
-        if ($open eq '(') {
+        if ($track_case) {
             if ($cmd_start && $word->{raw} eq 'case') {
                 push @cases, 'header';
+                push @pat_depth, 0;
+                push @pat_start, 0;
                 $cmd_start = 0;
             } elsif (@cases && $cases[-1] eq 'header' && $word->{raw} eq 'in') {
                 $cases[-1] = 'pattern';
-                $cmd_start = 0;
+                $pat_depth[-1] = 0;
+                $pat_start[-1] = 1;
+                $cmd_start = 1;
             } elsif ($cmd_start && @cases && $word->{raw} eq 'esac') {
                 pop @cases;
+                pop @pat_depth;
+                pop @pat_start;
+                $cmd_start = 0;
+            } elsif (@cases && $cases[-1] eq 'pattern') {
+                $pat_start[-1] = 0;
                 $cmd_start = 0;
             } elsif ($cmd_start && $word->{raw} =~ /^(?:if|then|elif|else|while|until|do|!|\{)$/) {
                 $cmd_start = 1;
@@ -520,7 +541,7 @@ sub shell_word {
             my $start = $$position;
             $$position += 2;
             if (!$literal && substr($body, $$position, 1) eq '(') {
-                balanced_text($body, $position, '(', ')', \@subs);
+                balanced_text($body, $position, '(', ')', \@subs, 1);
             } else {
                 my $program = balanced_text($body, $position, '(', ')');
                 push @subs, $program unless $literal || $program =~ /^\(/;
@@ -652,10 +673,12 @@ sub scan_heredoc_parent_subs {
         }
         if (substr($body, $position, 2) eq '$(') {
             $position += 2;
-            my $program = balanced_text($body, \$position, '(', ')');
-            if ($program =~ /^\(/) {
-                scan_heredoc_parent_subs($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child);
+            if (substr($body, $position, 1) eq '(') {
+                my @subs;
+                balanced_text($body, \$position, '(', ')', \@subs, 1);
+                scan_program($path, $_, $deps, $child_deps, $finite_backend, $parameters, $in_child) for @subs;
             } else {
+                my $program = balanced_text($body, \$position, '(', ')');
                 scan_program($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child);
             }
             next;
@@ -756,7 +779,7 @@ sub scan_program {
                         last if $line eq $heredoc->{delimiter};
                         $program .= "$line\n" if exists $heredoc->{parameters} || !$heredoc->{quoted};
                     }
-                    if (!$heredoc->{quoted}) {
+                    if (!$heredoc->{quoted} && $program =~ /\$\(|\`/) {
                         scan_heredoc_parent_subs($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child);
                     }
                     if (exists $heredoc->{parameters}) {
