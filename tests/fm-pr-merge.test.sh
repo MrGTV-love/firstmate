@@ -3429,8 +3429,85 @@ test_auto_review_retries_a_wake_that_failed_to_append() {
   pass "a failed wake append is never marked emitted: it is delivered after recovery, including for a terminal hold, and never repeated"
 }
 
+test_auto_review_scopes_closure_rereviews_and_caps_fail_loops() {
+  local case_dir h1 h2 h3 h4 dir2 patch2 contract2 dir_after
+  # After a recorded FAIL on h1, pushing fix commit h2 builds a closure-scoped review pack
+  # carrying closure-diff.patch (only h1..h2) and the prior FAIL report in contract.md.
+  case_dir=$(auto_case closure-pack)
+  auto_mode "$case_dir" "$AUTO_SONNET" fail
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  h1=$(auto_sha "$case_dir" h1)
+  expect_code 1 "$(auto_count '"verdict":"FAIL"' "$case_dir/state/review-records.jsonl")" "closure-pack: h1 FAIL must be recorded"
+  expect_code 0 "$(auto_merges "$case_dir")" "closure-pack: FAIL must not merge"
+  auto_mode "$case_dir" "$AUTO_SONNET" pass
+  printf 'closure-fix-line\n' > "$case_dir/wt/fix.txt"
+  git -C "$case_dir/wt" add fix.txt
+  git -C "$case_dir/wt" commit -q -m 'fix blocking finding'
+  auto_publish_head "$case_dir" h2
+  h2=$(auto_sha "$case_dir" h2)
+  auto_step "$case_dir"; auto_wait "$case_dir"
+  dir2="$case_dir/state/.pr-auto-review/task-x1.d/${h2:0:12}-$(auto_slug "$AUTO_SONNET")"
+  contract2="$dir2/contract.md"
+  patch2="$dir2/closure-diff.patch"
+  [ -f "$patch2" ] || fail "closure-pack: closure-diff.patch was not created for a re-review after FAIL"
+  grep -qF 'closure-fix-line' "$patch2" || fail "closure-pack: closure-diff.patch missing incremental fix diff"
+  ! grep -qF '+change' "$patch2" || fail "closure-pack: closure-diff.patch leaked unchanged h1 lines"
+  grep -qF '<!-- closure-re-review -->' "$contract2" || fail "closure-pack: contract.md missing closure-re-review marker"
+  grep -qF "VERDICT: FAIL head=$h1" "$contract2" || fail "closure-pack: contract.md missing prior FAIL report"
+  assert_grep "closure of ${h1:0:12}" "$(auto_event_file "$case_dir")" "closure-pack: event did not note closure re-review"
+  # Collect PASS while a check is pending so we can also prove a head after PASS gets a full review (not closure).
+  jq '.statusCheckRollup[0].status = "IN_PROGRESS"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+  auto_step "$case_dir"
+  expect_code 2 "$(auto_reviews "$case_dir")" "closure-pack: h2 PASS must be recorded"
+  printf 'after-pass\n' >> "$case_dir/wt/fix.txt"
+  git -C "$case_dir/wt" commit -q -am 'follow-on change after pass'
+  auto_publish_head "$case_dir" h3
+  h3=$(auto_sha "$case_dir" h3)
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  dir_after="$case_dir/state/.pr-auto-review/task-x1.d/${h3:0:12}-$(auto_slug "$AUTO_SONNET")"
+  [ ! -e "$dir_after/closure-diff.patch" ] || fail "closure-pack: a head after PASS must not receive a closure-diff.patch"
+  ! grep -qF '<!-- closure-re-review -->' "$dir_after/contract.md" || fail "closure-pack: a head after PASS must get a full review, not a closure check"
+  expect_code 1 "$(auto_merges "$case_dir")" "closure-pack: h3 PASS merges once"
+  auto_dump "$case_dir" "closure pack after FAIL, reset after PASS"
+
+  # Three consecutive distinct failed heads hit the default loop cap: h4 dispatches no read,
+  # holds once for Main with one wake, and still clears when a captain-word is recorded for h4.
+  case_dir=$(auto_case loop-cap)
+  auto_mode "$case_dir" "$AUTO_SONNET" fail
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  h1=$(auto_sha "$case_dir" h1)
+  auto_push "$case_dir"
+  h2=$(auto_sha "$case_dir" h2)
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  printf 'round3\n' >> "$case_dir/wt/changed.txt"
+  git -C "$case_dir/wt" commit -q -am 'round 3'
+  auto_publish_head "$case_dir" h3
+  h3=$(auto_sha "$case_dir" h3)
+  auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+  expect_code 3 "$(auto_calls "$case_dir")" "loop-cap: three failed heads should each be read once"
+  printf 'round4\n' >> "$case_dir/wt/changed.txt"
+  git -C "$case_dir/wt" commit -q -am 'round 4'
+  auto_publish_head "$case_dir" h4
+  h4=$(auto_sha "$case_dir" h4)
+  auto_step "$case_dir"; auto_step "$case_dir"
+  expect_code 3 "$(auto_calls "$case_dir")" "loop-cap: fourth head after 3 consecutive FAILs must not dispatch a reader"
+  expect_code 0 "$(auto_merges "$case_dir")" "loop-cap: capped head must not merge"
+  case $(auto_state "$case_dir") in "held: review loop cap reached (3 consecutive failed heads: "*) ;;
+    *) fail "loop-cap: expected loop cap hold state, got: $(auto_state "$case_dir")" ;; esac
+  expect_code 1 "$(auto_count "pr-review:task-x1:${h4:0:12}:review-loop-cap" "$case_dir/state/.wake-queue")" \
+    "loop-cap: repeat passes must wake Main exactly once for the capped head"
+  # Recording a captain-word for h4 is still recognized on the next pass (the cap hold is not terminal).
+  review_record_command "$case_dir" captain-word --pr "$AUTO_URL" --head "$h4" --words 'Merge h4 now.' >/dev/null
+  auto_step "$case_dir"
+  expect_code "held: a captain merge word is recorded for this head" "$(auto_state "$case_dir")" \
+    "loop-cap: a captain-word on a capped head must still be recognized"
+  auto_dump "$case_dir" "review loop cap after 3 consecutive FAILs"
+  pass "re-reviews after FAIL carry a scoped closure pack and incremental fix diff, PASS resets the streak, and 3 consecutive failed heads hold once for Main"
+}
+
 pr_merge_test_cases=(
 test_auto_review_green_uncovered_pr_is_read_recorded_and_merged
+test_auto_review_scopes_closure_rereviews_and_caps_fail_loops
 test_auto_review_makes_no_request_when_the_pr_is_not_ready
 test_auto_review_unset_or_unusable_runner_records_one_reason_per_head
 test_auto_review_chooses_readers_by_author_family
