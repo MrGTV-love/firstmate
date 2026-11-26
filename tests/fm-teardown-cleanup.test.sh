@@ -5377,6 +5377,55 @@ test_a_held_close_refuses_when_an_own_nested_copy_holds_a_bare_repository() {
   pass 'a held close refuses, with nothing removed, when an own nested copy holds a bare repository'
 }
 
+# A bare repository whose every file the enclosing repository tracks and holds unmodified is landed
+# content, a fixture, and does not count as another repository: the held close goes ahead. The same
+# bare repository with one untracked ref, one untracked object or one modified file counts and the
+# close refuses with nothing removed. The scan is the one teardown --copy uses too
+# (tests/fm-teardown.test.sh).
+test_a_held_close_counts_a_bare_repository_only_when_git_does_not_hold_it_landed() {
+  local rc shape second nested head
+  for shape in tracked-clean untracked-ref untracked-object modified-file; do
+    make_own_locked_copy_case "held-bare-tracked-$shape" enclosing
+    printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+    seed_backlog_in_flight "$FOREIGN_CASE"
+    nested=$FOREIGN_COPY/.claude/fixtures/repo.git
+    mkdir -p "${nested%/*}"
+    git clone -q --bare "$FOREIGN_CASE/project" "$nested" || fail "held-bare-tracked-$shape: cannot create the bare fixture"
+    git -C "$FOREIGN_COPY" add -f .claude/fixtures/repo.git
+    git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'track a bare fixture repository'
+    git -C "$FOREIGN_CASE/project" update-ref refs/heads/main "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
+    add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
+    head=$(git --git-dir="$nested" rev-parse HEAD)
+    case "$shape" in
+      untracked-ref) printf '%s\n' "$head" > "$nested/refs/heads/untracked-ref" ;;
+      untracked-object) printf 'an object nothing tracks\n' | git --git-dir="$nested" hash-object -w --stdin >/dev/null ;;
+      modified-file) printf 'changed after it was committed\n' >> "$nested/description" ;;
+    esac
+    second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+    git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+    held_foreign_unlanded "$second"
+    held_snapshot "$FOREIGN_CASE" "$second"
+    run_foreign_teardown rc
+    if [ "$shape" = tracked-clean ]; then
+      expect_code 0 "$rc" "held-bare-tracked-$shape: a tracked, clean bare fixture must not stop a held close: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "held-bare-tracked-$shape"
+      assert_absent "$FOREIGN_COPY" "held-bare-tracked-$shape: the own nested copy survived"
+    else
+      expect_code 1 "$rc" "held-bare-tracked-$shape: a bare repository git does not hold landed must stop a held close: $(cat "$FOREIGN_CASE/stderr")"
+      assert_present "$FOREIGN_COPY" "held-bare-tracked-$shape: the own nested copy was removed"
+      git --git-dir="$nested" cat-file -e "$head" || fail "held-bare-tracked-$shape: the bare repository lost its commit"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-bare-tracked-$shape: the task record was removed"
+      case "$shape" in
+        untracked-ref | untracked-object)
+          assert_grep "Git repository $nested inside task task-x1's nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+            "held-bare-tracked-$shape: the refusal did not name the bare repository: $(cat "$FOREIGN_CASE/stderr")" ;;
+      esac
+      held_assert_untouched "held-bare-tracked-$shape" "$FOREIGN_CASE" "$second"
+    fi
+  done
+  pass 'a held close ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object or a modified file'
+}
+
 # A submodule of the task's own repository is not another repository: its git
 # directory lives in the own repository's, so the held close still goes ahead.
 test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository() {
@@ -8728,6 +8777,7 @@ test_held_copy_record_has_one_exact_line_per_copy
 test_a_held_close_removes_only_the_tasks_own_nested_copy
 test_a_held_close_refuses_when_an_own_nested_copy_holds_another_repository
 test_a_held_close_refuses_when_an_own_nested_copy_holds_a_bare_repository
+test_a_held_close_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
 test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository
 test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal
 test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wait

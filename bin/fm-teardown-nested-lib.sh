@@ -1460,13 +1460,30 @@ teardown_foreign_copies_prove() {  # <slot>
   teardown_foreign_refusals_print
 }
 
+# Is <bare>, a bare repository found inside <copy>, landed content of the copy's own
+# repository? Only when git proves it: at least one file under it is tracked, and
+# git status for that directory (untracked files listed one by one, ignored ones
+# too) prints nothing, so every file under it is tracked and unmodified. An
+# untracked, ignored, modified or deleted file under it, a status that fails, and a
+# directory git cannot read are all "not proved": it counts as another repository.
+teardown_copy_bare_repo_landed() {  # <copy> <bare>
+  local own=$1 bare=$2 rel tracked changes
+  case "$bare" in "$own"/?*) rel=${bare#"$own"/} ;; *) return 1 ;; esac
+  tracked=$(git -C "$own" ls-files -z -- ":(literal)$rel" 2>/dev/null) || return 1
+  [ -n "$tracked" ] || return 1
+  changes=$(git -C "$own" status --porcelain=v1 -z -uall --ignored=traditional -- ":(literal)$rel" 2>/dev/null) || return 1
+  [ -z "$changes" ]
+}
+
 # Prints, one per line, every Git repository inside <copy> that is not the copy's
 # own: a nested clone or a linked worktree of another repository (a .git entry
 # whose common directory is not the copy's), and a bare repository (HEAD, objects
 # and refs together, which carries no .git entry), under ignored folders such as
-# .claude and .opencode too. Submodules of the copy's own repository and linked
-# worktrees of the same repository are not counted: the latter are registered
-# copies, proved on their own. Prints nothing else and changes nothing. Returns 0
+# .claude and .opencode too. Not counted: submodules of the copy's own repository,
+# linked worktrees of the same repository (registered copies, proved on their own)
+# and a bare repository whose every file the copy's own repository tracks and holds
+# unmodified (teardown_copy_bare_repo_landed), which is landed content. Prints
+# nothing else and changes nothing. Returns 0
 # when the whole copy was searched, 2 when the copy's own Git directory cannot be
 # read, and the failing find's status when a directory could not be searched; the
 # repositories found before a failed search are printed anyway. The one scan the
@@ -1491,6 +1508,7 @@ teardown_copy_other_repo_dirs() {  # <copy>
     bare=${hit%/objects}
     [ "${bare##*/}" != .git ] || continue
     { [ -f "$bare/HEAD" ] && [ -d "$bare/refs" ]; } || continue
+    ! teardown_copy_bare_repo_landed "$own" "$bare" || continue
     printf '%s\n' "$bare"
   done <<< "$listing"
   return "$status"

@@ -5305,6 +5305,56 @@ SH
   pass 'teardown --copy does not report a gone copy done while the projects folder cannot be read'
 }
 
+# A bare repository whose every file the copy's own repository tracks and holds unmodified is landed
+# content (a fixture) and does not count as another repository; with one untracked ref, one untracked
+# object or one modified file, or when git cannot be read about it, it counts and the run refuses. The
+# fixture sits under ignored .claude, force-added, so the clean proof does not see an untracked file
+# there and only the scan can. The same scan serves the ordinary held close
+# (tests/fm-teardown-cleanup.test.sh).
+test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed() {
+  local shape case_dir rc nested head
+  for shape in tracked-clean untracked-ref untracked-object modified-file unreadable; do
+    make_by_path_case "by-path-bare-tracked-$shape"
+    case_dir=$BP_CASE
+    printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    nested=$BP_COPY/.claude/fixtures/repo.git
+    mkdir -p "${nested%/*}"
+    git clone -q --bare "$case_dir/project" "$nested" || fail "by-path-bare-tracked-$shape: cannot create the bare fixture"
+    git -C "$BP_COPY" add -f .claude/fixtures/repo.git
+    git -C "$BP_COPY" commit -qm 'track a bare fixture repository'
+    git -C "$BP_COPY" push -q origin HEAD:main || fail "by-path-bare-tracked-$shape: cannot land the fixture commit on origin"
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    head=$(git --git-dir="$nested" rev-parse HEAD)
+    case "$shape" in
+      untracked-ref) printf '%s\n' "$head" > "$nested/refs/heads/untracked-ref" ;;
+      untracked-object) printf 'an object nothing tracks\n' | git --git-dir="$nested" hash-object -w --stdin >/dev/null ;;
+      modified-file) printf 'changed after it was committed\n' >> "$nested/description" ;;
+      unreadable)
+        cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in *" --ignored=traditional "*) echo 'fatal: cannot read the status' >&2; exit 128 ;; esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+        chmod +x "$case_dir/fakebin/git" ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = tracked-clean ]; then
+      expect_code 0 "$rc" "by-path-bare-tracked-$shape: a tracked, clean bare fixture must not stop the removal: $(cat "$case_dir/stderr")"
+      assert_absent "$BP_COPY" "by-path-bare-tracked-$shape: the copy was not removed"
+    else
+      expect_code 1 "$rc" "by-path-bare-tracked-$shape: a bare repository git does not hold landed must refuse: $(cat "$case_dir/stderr")"
+      git --git-dir="$nested" cat-file -e "$head" || fail "by-path-bare-tracked-$shape: the bare repository lost its commit"
+      case "$shape" in
+        untracked-ref | untracked-object | unreadable)
+          assert_grep "$nested" "$case_dir/stderr" "by-path-bare-tracked-$shape: the refusal does not name the bare repository" ;;
+      esac
+      by_path_assert_untouched "$case_dir" "by-path-bare-tracked-$shape"
+    fi
+  done
+  pass 'teardown --copy ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object, a modified file or an unreadable status'
+}
+
 # A process that begins holding the copy after the first holder scan has returned and before the
 # removal. The proofs the mode reuses read working directories again (pids_with_cwd_under), so a
 # late cwd is refused by them; a late open file is refused only by the holder scan that runs again
@@ -5524,6 +5574,7 @@ test_by_path_refuses_when_the_audit_record_cannot_be_written
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row
 test_by_path_exception_refusal_keeps_its_own_reason
 test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude
+test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
 test_by_path_preserves_claude_whole_and_removes_the_copy
 test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read
 test_by_path_refuses_a_holder_that_starts_after_the_first_scan

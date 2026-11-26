@@ -630,7 +630,10 @@
 #       git does not ignore is untracked and stops git's own non-forced removal;
 #     - it holds no other registered worktree and no other Git repository, found
 #       anywhere in it, .claude and .opencode included: a nested clone, another
-#       project's worktree or a bare repository (HEAD, objects and refs together);
+#       project's worktree or a bare repository (HEAD, objects and refs together),
+#       except a bare repository whose every file the copy's own repository tracks
+#       and holds unmodified, which is landed content (a fixture): an untracked,
+#       ignored, modified or unreadable file in it, or a failed git status, counts;
 #     - it carries no lock but Vernant's creation lock, whose launcher process must
 #       be proved gone: a ps that was refused, failed or said anything but "no such
 #       process" counts as possibly alive (rule=lock-launcher-owner);
