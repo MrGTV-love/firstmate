@@ -4827,12 +4827,32 @@ SH
   chmod +x "$1/fakebin/ps"
 }
 
+# A python3 whose `fm-proc-info.py table pid` answer leaves <pid> out and passes every other call to the
+# real one: the partial process table a confined reader sees when the sandbox that refused ps also hides
+# processes from it.
+by_path_hide_launcher_from_table() {  # <case> <pid>
+  local real_python
+  real_python=$(command -v python3)
+  cat > "$1/fakebin/python3" <<SH
+#!/usr/bin/env bash
+for last; do :; done
+if [ "\$#" -ge 3 ] && [ "\${@: -2:1}" = table ] && [ "\$last" = pid ]; then
+  "$real_python" "\$@" | grep -vx -- "$2"
+  exit 0
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$1/fakebin/python3"
+}
+
 # Only a proven absence counts as a launcher gone: a ps that was refused, failed or said something
 # other than "no such process" about a live launcher leaves the Vernant-locked copy where it is, and
-# the same copy with a launcher ps proves absent is still released.
+# the same copy with a launcher ps proves absent is still released. A refused ps is never settled by a
+# table read made under the same restriction (refused-hidden: the launcher is alive but the table the
+# confined reader sees leaves it out), because such a table is only part of the table.
 test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_it_proves_gone() {
-  local shape case_dir rc pid
-  for shape in refused error diagnostic absent; do
+  local shape case_dir rc pid real_python table
+  for shape in refused refused-hidden error diagnostic absent; do
     make_by_path_case "by-path-launcher-ps-$shape"
     case_dir=$BP_CASE
     BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
@@ -4844,7 +4864,16 @@ test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_i
       teardown_fixture_start "$case_dir" KILL sleep 300
       pid=$TEARDOWN_FIXTURE_PID
     fi
-    by_path_fake_launcher_ps "$case_dir" "$pid" "$shape"
+    by_path_fake_launcher_ps "$case_dir" "$pid" "${shape%-hidden}"
+    if [ "$shape" = refused-hidden ]; then
+      by_path_hide_launcher_from_table "$case_dir" "$pid"
+      # The fixture bites: the real table lists the live launcher, the one the confined reader sees does not.
+      real_python=$(command -v python3)
+      table=$("$real_python" "$ROOT/bin/fm-proc-info.py" table pid)
+      printf '%s\n' "$table" | grep -qx -- "$pid" || fail "by-path-launcher-ps-$shape: the real process table does not list the live launcher"
+      table=$(PATH="$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid)
+      if printf '%s\n' "$table" | grep -qx -- "$pid"; then fail "by-path-launcher-ps-$shape: the launcher is not hidden from the confined reader"; fi
+    fi
     by_path_locked "$case_dir" "$pid"
     rc=0
     FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -4855,6 +4884,7 @@ test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_i
     else
       expect_code 1 "$rc" "by-path-launcher-ps-$shape: a live launcher ps cannot prove gone must keep the copy: $(cat "$case_dir/stderr")"
       assert_grep 'rule=lock-launcher-owner' "$case_dir/stderr" "by-path-launcher-ps-$shape: no named rule"
+      assert_grep 'ps could not show that it is gone, so the copy is kept: end that process, or run this again where ps can answer for it' "$case_dir/stderr" "by-path-launcher-ps-$shape: the refusal does not name the next step"
       kill -0 "$pid" 2>/dev/null || fail "by-path-launcher-ps-$shape: the launcher is gone"
       by_path_assert_untouched "$case_dir" "by-path-launcher-ps-$shape"
       assert_absent "$case_dir/closeout.log" "by-path-launcher-ps-$shape: the driver executed a release"
@@ -4862,7 +4892,7 @@ test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_i
         || fail "by-path-launcher-ps-$shape: the copy is no longer locked"
     fi
   done
-  pass 'teardown --copy keeps a Vernant-locked copy when ps cannot prove its launcher gone, and releases it when ps proves the launcher absent'
+  pass 'teardown --copy keeps a Vernant-locked copy when ps cannot prove its launcher gone, even when a confined table read cannot see it, and releases it when ps proves the launcher absent'
 }
 
 # A pool slot's owner claim names a task id. A by-path run is no task, but its bundle record id is

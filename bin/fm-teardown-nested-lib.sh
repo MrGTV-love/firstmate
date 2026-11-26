@@ -255,18 +255,26 @@ teardown_pid_age_secs() {  # <pid>
 # Is the pid in a creation lock a launcher that may still be alive? A pid that
 # started after the lock file was written cannot be the process that wrote it:
 # pids are recycled. A start time that cannot be read counts as live. Only a read
-# that proves the process absent counts as gone: bin/fm-task-copy-lib.sh's
-# fm_task_copy_launcher_state sends a refused ps to the confined reader, and a ps
-# that failed, was refused without that reader's proof or said anything but "no
-# such process" leaves the launcher possibly alive. Returns 0 when it may be
-# alive, 1 when it is gone or a recycled pid.
+# that proves the process absent counts as gone: a ps that failed, was refused or
+# said anything but "no such process" leaves the launcher possibly alive. A
+# refused ps is not sent to the confined reader (fm_task_copy_launcher_state's
+# strict mode): a table read made under the restriction that refused ps can see
+# only part of the table, so it never proves a launcher absent. When the read
+# proves nothing, TEARDOWN_LOCK_LAUNCHER_UNPROVED holds the next step for the
+# refusal to print. Returns 0 when it may be alive, 1 when it is gone or a
+# recycled pid.
+TEARDOWN_LOCK_LAUNCHER_UNPROVED=
 teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
   local pid=$1 lock=$2 age mtime now state=0
-  fm_task_copy_launcher_state "$pid" || state=$?
+  TEARDOWN_LOCK_LAUNCHER_UNPROVED=
+  fm_task_copy_launcher_state "$pid" strict || state=$?
   case "$state" in
     0) ;;
     1) return 1 ;;
-    *) return 0 ;;
+    *)
+      TEARDOWN_LOCK_LAUNCHER_UNPROVED="; ps could not show that it is gone, so the copy is kept: end that process, or run this again where ps can answer for it"
+      return 0
+      ;;
   esac
   age=$(teardown_pid_age_secs "$pid") || return 0
   mtime=$(fm_lock_path_mtime "$lock") || return 0
@@ -1232,7 +1240,7 @@ teardown_foreign_copy_unowned() {  # <copy>
         if ! teardown_pid_is_task_own "$pid"; then
           TEARDOWN_FOREIGN_RULE='lock-launcher-owner'
           TEARDOWN_FOREIGN_PID=$pid
-          TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
+          TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running$TEARDOWN_LOCK_LAUNCHER_UNPROVED"
           return 1
         fi
         teardown_foreign_proc_record "$pid"

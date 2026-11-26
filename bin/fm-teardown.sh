@@ -636,7 +636,8 @@
 #       ignored, modified or unreadable file in it, or a failed git status, counts;
 #     - it carries no lock but Vernant's creation lock, whose launcher process must
 #       be proved gone: a ps that was refused, failed or said anything but "no such
-#       process" counts as possibly alive (rule=lock-launcher-owner);
+#       process" counts as possibly alive, and a process-table read made under the
+#       restriction that refused ps proves nothing (rule=lock-launcher-owner);
 #     - its HEAD passes teardown_landed with no branch and the plain no-mistakes
 #       rule (reachable from origin's default branch, or its content already
 #       there), or the recorded-bundle route above: a verified bundle recorded in

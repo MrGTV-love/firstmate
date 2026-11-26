@@ -65,12 +65,17 @@ fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
   esac
 }
 
-fm_task_copy_launcher_state() {  # <pid>
-  local pid=$1 observed diagnostic diagnostic_file rc=0
+# A refused ps (126) goes to the confined reader unless the caller passes
+# <strict>: a caller that releases a copy on this answer must not accept a
+# table read made under the restriction that refused ps, which can see only part
+# of the table, so with <strict> a refused ps is unknown (2), never absence.
+fm_task_copy_launcher_state() {  # <pid> [strict]
+  local pid=$1 strict=${2:-} observed diagnostic diagnostic_file rc=0
   diagnostic_file=$(mktemp "${TMPDIR:-/tmp}/fm-copy-ps.XXXXXX") || return 2
   observed=$(ps -p "$pid" -o pid= 2>"$diagnostic_file") || rc=$?
   if [ "$rc" = 126 ]; then
     rm -f -- "$diagnostic_file"
+    [ "$strict" != strict ] || return 2
     fm_task_copy_confined_launcher_state "$pid"
     return $?
   fi
