@@ -200,6 +200,9 @@ case "${1:-}" in
     done
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
+    if [ -f "$D/busy-on-capture" ]; then
+      cp "$D/busy-on-capture" "$D/../home/state/t1.busy-state"
+    fi
     if [ -f "$D/picker" ] && [ "$(cat "$D/picker")" = open ]; then
       cat "$D/picker-screen"
       exit 0
@@ -1198,6 +1201,50 @@ test_busy_agent_is_interrupted_before_the_exit_command() {
   pass "fm-control exit: a busy agent receives interrupt delivery before the exit command"
 }
 
+test_omp_measurement_exit_requires_unchanged_idle_generation() {
+  local dir state gen out rc
+  dir=$(new_case idle-gen)
+  add_task "$dir" t1 omp scout
+  alive_as "$dir" omp
+  state="$dir/home/state"
+  gen=$("$ROOT/bin/fm-busy-event.sh" arm "$state" t1)
+  printf 'busy_gen=%s\n' "$gen" >> "$state/t1.meta"
+
+  out=$(run_control "$dir" t1 exit --require-idle-gen "$gen"); rc=$?
+  expect_code 1 "$rc" "a busy measured worker must not be interrupted"
+  assert_contains "$out" 'no verified idle record' "busy refusal must explain the missing idle proof"
+  [ -z "$(literals "$dir")" ] && [ -z "$(keys_sent "$dir")" ] || fail 'busy measurement received lifecycle input'
+  assert_absent "$state/t1.control-exit" 'busy refusal must not mark deliberate exit'
+
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" t1 idle --gen "$gen" --source omp-ext --event agent-end \
+    || fail 'could not record the fixture OMP idle event'
+  out=$(run_control "$dir" t1 exit --require-idle-gen wrong-generation); rc=$?
+  expect_code 1 "$rc" "a different generation's idle cannot authorize a stop"
+  assert_contains "$out" 'no verified idle record' "wrong generation refusal must name the idle proof"
+  cp "$state/t1.busy-state" "$dir/fake/idle-original"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" t1 busy --gen "$gen" --source omp-ext --event agent-start \
+    || fail 'could not record a new fixture turn'
+  cp "$state/t1.busy-state" "$dir/fake/busy-on-capture"
+  cp "$dir/fake/idle-original" "$state/t1.busy-state"
+  out=$(run_control "$dir" t1 exit --require-idle-gen "$gen"); rc=$?
+  expect_code 1 "$rc" "an intervening turn must invalidate the idle receipt"
+  assert_contains "$out" 'proof changed during exit preparation' "late busy refusal must explain the changed proof"
+  [ -z "$(literals "$dir")" ] && [ -z "$(keys_sent "$dir")" ] || fail 'late busy measurement received lifecycle input'
+  assert_absent "$state/t1.control-exit" 'late busy refusal must not mark deliberate exit'
+
+  dir=$(new_case idle-gen-clean)
+  add_task "$dir" t1 omp scout
+  alive_as "$dir" omp
+  state="$dir/home/state"
+  gen=$("$ROOT/bin/fm-busy-event.sh" arm "$state" t1 --state idle --source omp-ext --event agent-end)
+  printf 'busy_gen=%s\n' "$gen" >> "$state/t1.meta"
+  out=$(run_control "$dir" t1 exit --require-idle-gen "$gen"); rc=$?
+  expect_code 0 "$rc" "a generation-bound idle worker should exit normally: $out"
+  [ "$(literals "$dir")" = /quit ] && [ -z "$(keys_sent "$dir")" ] \
+    || fail 'guarded idle exit should send only the ordinary quit command'
+  pass 'fm-control guarded OMP exit: refuses busy, changed and wrong-generation evidence without interrupting'
+}
+
 exit_picker_screen() {
   printf '%s\n' \
     'Background work is running' \
@@ -2007,6 +2054,7 @@ EOF
   pass "fm-control-lib: only a runtime's own recorded session has a relaunch resume form"
 }
 
+test_omp_measurement_exit_requires_unchanged_idle_generation
 test_exit_refuses_completion_output_from_a_failed_state_command
 test_exit_types_each_harness_verified_command
 test_interrupt_sends_each_harness_verified_key
