@@ -2451,7 +2451,7 @@
       "invariant": "Process reaping preserves any process whose task-copy custody cannot be proved.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:3b8c73e3b6",
-      "trigger": "refuses process reaping and preserves worktree/tasktmp when a matched process sits in a nested lane or descendant cwd whose ownership is unproven, leaked processes cannot be enumerated or identified, or survive 3 reap passes",
+      "trigger": "refuses process reaping and preserves worktree/tasktmp when a matched process sits in a nested lane or descendant cwd whose ownership is unproven, a process at a task root is not proved to descend from the task's validated endpoint pane shell, leaked processes cannot be enumerated or identified, or survive 3 reap passes",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2488,6 +2488,18 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: process $pid has its cwd at $dir but no readable birth identity, so its ownership by $ID cannot be proven; preserving it and task $ID without signalling.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: process $pid ($identity${command:+, $command}) has its cwd at $dir, but nothing proves it belongs to $ID: $TASK_ANCHOR_NOTE. It may be a shared service (a daemon that started in this copy), so teardown leaves it running and keeps the copy; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: leaked process $pid changed identity between its ownership proof and its signal for $ID; preserving the worktree/tasktmp for manual inspection or retry.\" >&2"
         }
       ]
     },
