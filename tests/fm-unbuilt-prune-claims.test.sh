@@ -176,9 +176,9 @@ fixed_root() {
     "$(expand '# hours in case the cause cleared. No ~H~ `treehouse ~PAY~`')" \
     '# net is built in this repository: the owner'"'"'s manual reaper,' \
     '# ~/.local/bin/treehouse-reap-clean, run by hand on named paths, is the' \
-    '# only net until the task fm-arm-prune-and-copy-sweep lands.'
+    '# only net until the task fm-pool-prune-gated-removal lands.'
   put_at "$1/docs/configuration.md" 898 \
-    "$(expand 'No ~H~ `treehouse ~PAY~` net is built in this repository:')"' the owner'"'"'s manual reaper `~/.local/bin/treehouse-reap-clean`, run by hand on named paths, is the only net until the task `fm-arm-prune-and-copy-sweep` lands.' \
+    "$(expand 'No ~H~ `treehouse ~PAY~` net is built in this repository:')"' the owner'"'"'s manual reaper `~/.local/bin/treehouse-reap-clean`, run by hand on named paths, is the only net until the task `fm-pool-prune-gated-removal` lands.' \
     'The prune does not alter what teardown itself preserves or refuses: the fallback acts only after teardown has refused, and the removal of a returned copy only after teardown has returned it.'
 }
 

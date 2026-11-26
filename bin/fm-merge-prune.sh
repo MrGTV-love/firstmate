@@ -139,7 +139,7 @@
 # hours in case the cause cleared. No hourly `treehouse prune --all --yes`
 # net is built in this repository: the owner's manual reaper,
 # ~/.local/bin/treehouse-reap-clean, run by hand on named paths, is the
-# only net until the task fm-arm-prune-and-copy-sweep lands.
+# only net until the task fm-pool-prune-gated-removal lands.
 #
 # A teardown that succeeds and returns the slot to the pool leaves it reset in
 # place, so the copy is still on disk with the task's record gone. The prune

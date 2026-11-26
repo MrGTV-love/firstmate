@@ -895,7 +895,7 @@ It is never forced or discarded.
 Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
 The wake is recorded as sent only after the wake queue took it, so a failed append is raised again by the next attempt.
 Each outcome is one line in `data/<id>/merge-prune.log`; a pruned copy raises no wake, and only a copy that stays raises its one wake, `check: merge-prune kept <copy> for <id>: <reason>`; the prune never writes to the task's status file.
-No hourly `treehouse prune --all --yes` net is built in this repository: the owner's manual reaper `~/.local/bin/treehouse-reap-clean`, run by hand on named paths, is the only net until the task `fm-arm-prune-and-copy-sweep` lands.
+No hourly `treehouse prune --all --yes` net is built in this repository: the owner's manual reaper `~/.local/bin/treehouse-reap-clean`, run by hand on named paths, is the only net until the task `fm-pool-prune-gated-removal` lands.
 The prune does not alter what teardown itself preserves or refuses: the fallback acts only after teardown has refused, and the removal of a returned copy only after teardown has returned it.
 `bin/fm-merge-prune.sh`'s header owns the exact mechanics; `tests/fm-merge-prune.test.sh` covers them against a fake pool and a stand-in `treehouse`.
 
