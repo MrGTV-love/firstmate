@@ -4575,6 +4575,10 @@ test_skipped_copies_are_released_only_when_clean_and_landed() {
     done
     printf ']\n'
   } > "$case_dir/pool.json"
+  # Two rows the spawn wrote for copies it passed over (another holder's lease): one names the acquisition pane, one is
+  # an older four-column row.
+  printf '%s\tpassed over\tholder-with-pane\t1\t@42\n%s\tpassed over\tholder-old-row\t1\n' \
+    "$case_dir/passed-with-pane" "$case_dir/passed-old-row" >> "$rec"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> '$log'
@@ -4584,6 +4588,10 @@ SH
   chmod +x "$case_dir/fakebin/treehouse"
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "skipped-copies: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fxq "notice: the record row for $case_dir/passed-with-pane names holder 'holder-with-pane', not this task's firstmate-skipped:task-x1; that lease is not this task's, so nothing is returned and the row is left as it is (acquisition pane @42 of the spawn may still stand in it)" "$case_dir/stderr" \
+    || fail "skipped-copies: the notice for a passed-over row did not name its acquisition pane"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fxq "notice: the record row for $case_dir/passed-old-row names holder 'holder-old-row', not this task's firstmate-skipped:task-x1; that lease is not this task's, so nothing is returned and the row is left as it is" "$case_dir/stderr" \
+    || fail "skipped-copies: the notice for a passed-over row without a pane changed"$'\n'"$(cat "$case_dir/stderr")"
   grep -Fq "process(es) are running inside it (acquisition pane @41 of the spawn may still stand in it)" "$case_dir/stderr" \
     || fail "skipped-copies: the refusal for the busy copy did not name its acquisition pane"$'\n'"$(cat "$case_dir/stderr")"
   grep -Fxq "$busy"$'\t'"dirty_tree"$'\t'"firstmate-skipped:task-x1"$'\t'"1"$'\t'"@41" "$rec" \

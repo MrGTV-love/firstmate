@@ -3533,6 +3533,54 @@ test_a_passed_over_pane_is_not_closed_on_abort() {
   pass "an abort leaves a pane in a passed-over copy open, and an abort before any copy closes the pane it created"
 }
 
+# A governed refusal of the clean copy reached after a pass-over records that copy in the task's recovery meta. The pane
+# rests there with a shell and no get in its foreground (the case's tmux names a tty and the case's ps lists one bash on it
+# once the refusal is recorded), so the abort stays not clean, and its error names the recovery meta, not an unrecorded copy.
+test_a_governed_refusal_after_a_pass_over_names_its_record() {
+  local id out status log real_ps meta
+  real_treehouse_ready || { echo "skip - no treehouse with lease --path and get --lease is installed"; return 0; }
+  id='pool-pane-governed-refusal'
+  make_real_pool_case pane-governed-refusal "$id" 2
+  write_refusing_slot_owner "$CASE_DIR/publisher"
+  git -C "$CASE_DIR/publisher" add scripts
+  git -C "$CASE_DIR/publisher" -c user.name=T -c user.email=t@example.invalid commit -qm 'add slot owner'
+  git -C "$CASE_DIR/publisher" push --quiet origin "$DEFAULT_BRANCH"
+  make_recovered_lease "${REAL_SLOTS[0]}"
+  log="$CASE_DIR/window.log"; : > "$log"
+  install_window_log "$log"
+  meta="$HOME_DIR/state/$id.meta"
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.logged" || fail "the tmux stub could not be wrapped"
+  cat > "$FAKEBIN_DIR/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *'#{pane_tty}'*) if grep -qx 'recovery=slot-provision-refused' '$meta' 2>/dev/null; then printf '/dev/fmtestpty\\n'; exit 0; fi ;;
+esac
+exec '$FAKEBIN_DIR/tmux.logged' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+  real_ps=$(command -v ps)
+  cat > "$FAKEBIN_DIR/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  '-t fmtestpty -o pid=,pgid=,tpgid=,comm=') printf '4242 4242 4242 bash\\n'; exit 0 ;;
+  '-p 4242 -o comm=') printf 'bash\\n'; exit 0 ;;
+esac
+exec '$real_ps' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/ps"
+  out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" --mode no-mistakes --yolo off --owned-path scripts)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a worker was admitted although the provisioner refused the clean copy"$'\n'"$out"
+  assert_no_launch "$CASE_DIR/launch.log"
+  assert_grep 'recovery=slot-provision-refused' "$meta" "the governed refusal was not recorded"
+  assert_contains "$out" "it rests in ${REAL_SLOTS[1]}, which is not a copy this spawn passed over or leased in place: that copy is recorded by the governed refusal in $meta, not in skipped-copies.tsv; this abort is not clean" \
+    "the abort did not name the governed refusal's record"
+  grep -q $'^@41\tunrecorded-copy\t' "$HOME_DIR/data/$id/acquisition-pane.tsv" \
+    || fail "the kept pane was not recorded with its outcome: $(cat "$HOME_DIR/data/$id/acquisition-pane.tsv" 2>&1)"
+  ! grep -Fq 'kill-window' "$log" || fail "the spawn closed the pane after a pass-over: $(cat "$log")"
+  pass "a governed refusal after a pass-over names its recovery record and the abort stays not clean"
+}
+
 # run_after_clean_copy_case <claim|base|hold>: a spawn whose pool hands it a copy with a recovered lease (passed over), then a
 # clean copy that is accepted and reached. The spawn then refuses at one point after that copy was reached: the claim (the
 # claim marker beside the copy is a directory), the base check (under local-only, the copy shows an origin the primary does
@@ -3962,6 +4010,7 @@ test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn
 test_a_pool_of_only_refused_copies_refuses_once_and_names_each
 test_a_refused_copy_handed_out_twice_does_not_loop
 test_a_passed_over_pane_is_not_closed_on_abort
+test_a_governed_refusal_after_a_pass_over_names_its_record
 test_an_abort_after_a_clean_copy_is_reached_keeps_the_pane
 test_the_after_clean_copy_case_rejects_a_restored_close
 test_slot_digest_sees_another_tasks_branch_move

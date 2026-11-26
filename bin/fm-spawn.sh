@@ -6362,7 +6362,12 @@ spawn_settle_passed_over_pane() {
       detail="treehouse process(es) $alive are in its foreground after the interrupt and can still take a copy no record names"
     elif ! spawn_slot_skipped "$path"; then
       outcome=unrecorded-copy
-      detail="it rests in $path, which is not a copy this spawn passed over or leased in place, so a shell there holds that copy outside skipped-copies.tsv"
+      if [ "$(fm_meta_get "$STATE/$ID.meta" recovery)" = slot-provision-refused ] &&
+        [ "$(real_path_or_raw "$(fm_meta_get "$STATE/$ID.meta" worktree)")" = "$(real_path_or_raw "$path")" ]; then
+        detail="it rests in $path, which is not a copy this spawn passed over or leased in place: that copy is recorded by the governed refusal in $STATE/$ID.meta, not in skipped-copies.tsv"
+      else
+        detail="it rests in $path, which is not a copy this spawn passed over or leased in place, so a shell there holds that copy outside skipped-copies.tsv"
+      fi
     elif [ -n "$gets" ]; then
       outcome=get-cancelled
       detail="the treehouse get running in it (pid(s) $gets) was interrupted and is gone, and it rests in $path, a copy this spawn passed over or leased in place"
