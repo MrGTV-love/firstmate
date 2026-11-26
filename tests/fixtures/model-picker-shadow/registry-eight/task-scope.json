@@ -1,0 +1,93 @@
+{
+  "records": [
+    {
+      "id": "aa-lcr",
+      "task_bound": true,
+      "binding_kind": "design-fixture",
+      "sources": [
+        "data/jev-roi-design/design.md:31-37",
+        "data/jev-roi-design/design.md:43"
+      ],
+      "acceptance_check": "QA links distant manual passages to independently keyed facts and locatable citations.",
+      "contrast": "A long prompt processed without synthesis is merely a capacity requirement."
+    },
+    {
+      "id": "frontiercode",
+      "task_bound": true,
+      "binding_kind": "repo-contract",
+      "sources": [
+        "docs/review-rubric.md:6-17",
+        "tests/fm-brief.test.sh:291-321"
+      ],
+      "acceptance_check": "A scoped repository implementation must satisfy blocking DoD checks, regression coverage and independent review. Example: scaffold rejects an invalid mode with the documented reason and leaves no brief.",
+      "contrast": "Prose-only design or a competition puzzle is not a patch with blocking checks."
+    },
+    {
+      "id": "ifbench",
+      "task_bound": true,
+      "binding_kind": "repo-contract",
+      "sources": [
+        "tests/fm-brief.test.sh:524-539"
+      ],
+      "acceptance_check": "The worker reporting contract requires one status event and one verbatim snapshot, exact status syntax and no findings text in the status. Treat as a format proxy only when this is an explicit graded output; test asserts emitted contract, not actual worker compliance.",
+      "contrast": "A persuasive well-written summary which omits the snapshot or paraphrases findings fails; ordinary style preference is not this check."
+    },
+    {
+      "id": "omniscience-accuracy",
+      "task_bound": true,
+      "binding_kind": "design-fixture",
+      "sources": [
+        "data/jev-roi-design/design.md:31-37",
+        "data/jev-roi-design/design.md:43"
+      ],
+      "acceptance_check": "Manual QA grades independently keyed facts and forbids unsupported claims. Conditional error and all-question accuracy are distinct weak proxies for correctness and restraint; neither proves citation support.",
+      "contrast": "Checking citation locations alone does not test factual correctness or restraint."
+    },
+    {
+      "id": "omniscience-hallucination-rate",
+      "task_bound": true,
+      "binding_kind": "design-fixture",
+      "sources": [
+        "data/jev-roi-design/design.md:31-37",
+        "data/jev-roi-design/design.md:43"
+      ],
+      "acceptance_check": "Manual QA grades independently keyed facts and forbids unsupported claims. Conditional error and all-question accuracy are distinct weak proxies for correctness and restraint; neither proves citation support.",
+      "contrast": "Checking citation locations alone does not test factual correctness or restraint."
+    },
+    {
+      "id": "scicode",
+      "task_bound": true,
+      "binding_kind": "design-fixture",
+      "sources": [
+        "data/jev-roi-design/design.md:31-35",
+        "data/jev-roi-design/design.md:43"
+      ],
+      "acceptance_check": "Implement a safe numerical routine that passes held-out tolerances and regressions.",
+      "contrast": "Scientific exposition without an implementation has no numerical acceptance test."
+    },
+    {
+      "id": "terminal-bench-4-0",
+      "task_bound": true,
+      "binding_kind": "design-fixture",
+      "sources": [
+        "data/jev-roi-design/design.md:31-35",
+        "data/jev-roi-design/design.md:43"
+      ],
+      "acceptance_check": "Lab repair requires actual terminal execution with tested postconditions. Version 2.1 is a separately reviewed family analogue, not the 4.0 fixture observation. Do not transfer values or count both.",
+      "contrast": "Advice about shell commands without an execution check does not satisfy the fixture."
+    },
+    {
+      "id": "terminalbench21",
+      "task_bound": true,
+      "binding_kind": "design-fixture",
+      "sources": [
+        "data/jev-roi-design/design.md:31-35",
+        "data/jev-roi-design/design.md:43"
+      ],
+      "acceptance_check": "Lab repair requires actual terminal execution with tested postconditions. Version 2.1 is a separately reviewed family analogue, not the 4.0 fixture observation. Do not transfer values or count both.",
+      "contrast": "Advice about shell commands without an execution check does not satisfy the fixture."
+    }
+  ],
+  "catalog_sha256": "4565582ded219c7047f41aaa045e7ead1d6b3bde0b19c912bcbc9b73757c91b6",
+  "semantic_review_sha256": "05719b3b56179bb77b32a21a7cfa33cea0fb47d8017ffa23db85441640d3c70c"
+}

@@ -264,8 +264,22 @@ def load_raw():
     from . import chartdiff, collect, embedded
 
     compare, skipped, quarantined = collect.ingest_cached_pages()
+    for variant, creator in collect.family_page_variants():
+        path = '/models/' + variant['family_page']
+        try:
+            f = collect.fetch_page(path, 'cohort', None, network=False)
+        except (collect.FetchError, collect.Rejected):
+            continue
+        if f.ts == 'unknown':
+            continue
+        row, reason = collect.ingest_model_variant(f.text, f.ts, path, variant['slug'], variant['name'], creator)
+        if reason:
+            quarantined.append({'file': path, 'slug': variant['slug'], 'fetched_at': f.ts, 'reason': reason})
+        else:
+            compare.setdefault(variant['slug'], []).append(row)
     evals, skipped_evals = {}, []
-    for slug in collect.EVAL_SLUGS:
+    _, inventory = collect.evaluation_inventory(False, False, None)
+    for slug in inventory['targets']:
         try:
             f = collect.fetch_page("/evaluations/" + slug, "evaluation", None, network=False)
         except collect.Rejected as e:

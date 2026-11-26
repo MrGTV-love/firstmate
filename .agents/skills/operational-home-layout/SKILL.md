@@ -143,7 +143,7 @@ state/               runtime records and signals; gitignored
   extensions/omp-primary-watch/lifecycle.log extensions/pi-primary-watch/lifecycle.log   primary watcher extension session-lifecycle record (size-capped with one .1 rotation); evidence only, safe to delete (.pi/extensions/lib/fm-watch-lifecycle.ts)
   .session-end-relaunch-<id> .session-end-handled-<id> <id>.control-exit   ship/scout session-end auto-relaunch attempt ledger, handled marker, and fm-control timed-out-exit marker (a completed exit retires the busy record instead); never touch (bin/fm-session-end-relaunch-lib.sh owns them); removed by teardown
   .session-end-refusal-<id> <id>.relaunch-drift <id>.wiring-sha   session-end refusal memory, the drift report a session-end relaunch printed, and the written-bytes record of each launch artifact; never touch (bin/fm-session-end-relaunch-lib.sh and bin/fm-spawn.sh own them); teardown does not remove these three
-  <id>.drift-report.txt   the complete drift report of the latest relaunch or slot-provisioning refusal, every path listed, replaced on each run; never touch (bin/fm-slot-provision-lib.sh owns it); teardown does not remove it
+  <id>.drift-report.txt   the most recent drift report a relaunch or slot-provisioning refusal wrote, every path listed or the one-line reason the report could not be produced, replaced by each successful write and kept by a failed one; never touch (bin/fm-slot-provision-lib.sh owns it); teardown does not remove it
   .watch-triage.log  watcher's absorbed-wake debug log (size-capped); never relied on, safe to delete
   .last-watcher-beat watcher liveness beacon, touched every poll (including while absorbing benign wakes); guard scripts read it
   .subsuper-* .supervise-daemon.*   sub-supervisor internals; never touch
@@ -157,5 +157,7 @@ Load `operational-home-layout` when locating, interpreting, or changing Firstmat
 `docs/configuration.md` is the single owner of the top-level operational-home layout and configuration schemas; each producing script's header and help own exact child fields and mutation mechanics.
 `FM_HOME` selects an instance's private `data/`, `state/`, `config/`, and `projects/`, while scripts continue to come from their tracked code root.
 Each secondmate has a persistent isolated `FM_HOME`, including its own state, backlog, projects, and session lock.
+
+When Claude Code refuses a background session's Write or Edit on a `data/` record because the session has not isolated into a worktree, write the record with `bin/fm-home-write.sh` (its header owns the contract) rather than a raw shell redirect or a copy from the job temp directory; tracked material still changes only in a task worktree.
 
 Tracked files hold shared instructions and tooling; `data/` holds durable private fleet records; `state/` holds runtime records and append-only status events; `config/` holds local operating choices; and `projects/` contains clones that are read-only to firstmate except under hard rule 1's concrete captain-approved project operation exception.

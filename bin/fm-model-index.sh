@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# fm-model-index.sh - validate the home model index and resolve dispatch roles.
+# fm-model-index.sh - validate the home model index, resolve dispatch roles,
+# print a harness catalog, and select a catalog's latest stable release.
 # Usage: fm-model-index.sh check [<harness> [<model>]]
 #        fm-model-index.sh model <harness> <literal-model|role:<role>|stand-in:<role>>
 #        fm-model-index.sh entry <harness> <concrete-model>
+#        fm-model-index.sh catalog <harness>
+#        fm-model-index.sh latest <harness> <provider/family> <tier>
 #        fm-model-index.sh profiles [<crew-dispatch.json>]
 #        fm-model-index.sh check-registry <path-to-json>
 # Schema owner: docs/configuration.md "Fleet model index".
+# latest selects the newest non-retired canonical stable release of exactly that
+# provider, family, and tier from the same live catalog used by check/freshness.
+# The unadorned field in bin/fm-model-family.jq owns the canonical id shape. No
+# variant, other-tier or provider fallback is allowed; absent or ambiguous
+# discovery exits 2.
 # check with no arguments is the index-edit check: every active id, including
 # stand-ins, against its own harness catalog. check <harness> checks only that
 # harness's entries, so fm-config-push can run each under its own account.
@@ -26,6 +34,16 @@
 # dispatch JSON. profiles with no file validates only the index and emits
 # nothing; omit the file for dispatch absence, never pass an empty sentinel.
 # entry emits true or false for exact primary/stand-in membership, offline.
+# catalog <harness> prints that harness's normalized catalog through
+# bin/fm-model-catalog-lib.sh, so intake judges a role from the same discovery
+# command, normalization, and FM_MODEL_CATALOG_DIR export the checks read. It
+# needs no index, writes nothing, and prints the normalized catalog on stdout
+# only on success: when the catalog cannot be read it keeps the reader's own
+# stderr alongside a notice and exits 2, and when the read holds no model it
+# exits 2 with a notice, so absent evidence never reads as a supported
+# model. It is the discovery read for roles no index entry names,
+# such as a program's own model calls (docs/configuration.md "Application
+# model roles").
 # check-registry requires an index and exactly one readable JSON registry file.
 # It scans string values and object keys that are whole identifier tokens (no
 # whitespace or control characters), using the retirement rule in the schema owner;
@@ -59,14 +77,14 @@ usage() { awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; 
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 VERB=${1:-}
 shift || die 'command required (see --help)'
-case "$VERB:$#" in check:0|check:1|check:2|check-registry:1|model:2|entry:2|profiles:0|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
+case "$VERB:$#" in check:0|check:1|check:2|check-registry:1|model:2|entry:2|catalog:1|latest:3|profiles:0|profiles:1) ;; *) die 'invalid arguments (see --help)' ;; esac
 if [ "$VERB" = model ] && [ ! -e "$INDEX" ] && [ ! -L "$INDEX" ]; then
   case "$2" in role:*|stand-in:*) die "index required to resolve '$2': $INDEX" ;; esac
   printf '%s\n' "$2"
   exit 0
 fi
 command -v jq >/dev/null 2>&1 || die 'jq required'
-TMP=$(mktemp -d) || die 'mktemp failed'
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-model-index.XXXXXX") || die 'mktemp failed'
 trap 'rm -rf "$TMP"' EXIT
 HAVE_INDEX=0
 if [ -e "$INDEX" ] || [ -L "$INDEX" ]; then
@@ -123,6 +141,33 @@ jq -r '.roles | to_entries[] | .key as $role | .value | to_entries[] |
 
 catalog() { fm_model_catalog "$1" "$TMP"; } # <harness>; normalized ids and optional alias targets
 validate_catalog() { fm_model_catalog_valid "$1"; }
+if [ "$VERB" = catalog ] || [ "$VERB" = latest ]; then
+  catalog "$1" > "$TMP/catalog.json" || {
+    notice "$1 catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export)"
+    exit 2
+  }
+  validate_catalog "$TMP/catalog.json" || {
+    notice "$1 catalog is empty or malformed"
+    exit 2
+  }
+  if [ "$VERB" = latest ]; then
+    # shellcheck disable=SC2016 # jq variables belong to the jq program.
+    jq -L "$SCRIPT_DIR" -er --arg family "$2" --arg tier "$3" --slurpfile idx "$TMP/index.json" 'include "fm-model-family";'"$LIB_JQ"'
+      [.models[] | (.resolved_id // .id) | select(retired(.) | not) | parse
+        | select((.prov + "/" + (.family // "")) == $family and .tier == $tier and (.version | length) > 0)
+        | select(.unadorned and .variant == "")]
+      | unique_by(.raw) as $eligible
+      | if ($eligible | length) == 0 then error("no eligible stable release for " + $family + "/" + $tier)
+        else ($eligible | map(.version) | max) as $latest
+          | [$eligible[] | select(.version == $latest)] as $newest
+          | if ($newest | length) == 1 then $newest[0].raw
+            else error("ambiguous current releases: " + ($newest | map(.raw) | join(", "))) end
+        end' "$TMP/catalog.json" || die "could not resolve current $2/$3 from the $1 catalog"
+  else
+    cat "$TMP/catalog.json"
+  fi
+  exit 0
+fi
 check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
   local role=$1 h=$2 m=$3 f="$TMP/catalog-$2.json"
   if [ "${FM_MODEL_CATALOG_CONTEXT:-}" = unavailable ] && [ -z "${FM_MODEL_CATALOG_DIR:-}" ]; then

@@ -7,6 +7,10 @@
 # local-default qualification, same-owner adoption and lease/liveness-gated replacement.
 # A selected local-default ref/SHA is passed explicitly by spawn; no local choice
 # is rederived from origin/main, and legacy callers send no new project flag.
+# A reconciled-successor source (bin/fm-spawn.sh --reconciled-source, via
+# FM_SLOT_SOURCE_KIND) is passed as --base-source reconciled-successor with its
+# declaration and evidence digests; the owner must attest all three in its report
+# and manifest, and an owner without that capability refuses (no local-default retry).
 # Firstmate never deletes/replaces its manifests or creates another worktree.
 # Call from a clean checkout on the task branch, using the project's existing
 # Python environment (no environment installation/sync). Preserve its full report.
@@ -16,6 +20,10 @@ FM_SLOT_PROVISIONED=0
 FM_SLOT_MANIFEST=
 FM_SLOT_BASE_SHA=
 FM_SLOT_BASE_REF=
+# Set by spawn for a reconciled-successor source; empty means local-default.
+FM_SLOT_SOURCE_KIND=
+FM_SLOT_SOURCE_DECLARATION_SHA256=
+FM_SLOT_SOURCE_EVIDENCE_SHA256=
 FM_SLOT_PREPARED_HEAD=
 # There is no undo. A refusal, or any failed check after a move has begun, leaves HEAD, every ref and every file exactly as
 # they are and says so (Main 1886 CUT).
@@ -176,8 +184,23 @@ fm_slot_provision_run() {
     fi
   fi
   FM_SLOT_PREPARED_HEAD=$old_head
-  local args=() path
-  [ -z "$local_ref" ] || args+=(--base-source local-default)
+  local args=() path source_kind=local-default
+  [ -z "$FM_SLOT_SOURCE_KIND" ] || source_kind=$FM_SLOT_SOURCE_KIND
+  case $source_kind in
+  local-default) [ -z "$local_ref" ] || args+=(--base-source local-default) ;;
+  reconciled-successor)
+    [ -n "$local_ref" ] && [ -n "$FM_SLOT_SOURCE_DECLARATION_SHA256" ] && [ -n "$FM_SLOT_SOURCE_EVIDENCE_SHA256" ] || {
+      echo 'error: a reconciled-successor slot source needs its source ref, declaration and evidence identities' >&2
+      return 1
+    }
+    # An owner without this capability refuses the argument; it is never
+    # retried as local-default.
+    args+=(--base-source reconciled-successor
+      --source-declaration-sha256 "$FM_SLOT_SOURCE_DECLARATION_SHA256"
+      --source-evidence-sha256 "$FM_SLOT_SOURCE_EVIDENCE_SHA256")
+    ;;
+  *) echo "error: unsupported slot source kind '$source_kind'" >&2; return 1 ;;
+  esac
   for path in "$@"; do args+=(--owned-path "$path"); done
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
@@ -191,18 +214,24 @@ fm_slot_provision_run() {
   fi
   fm_slot_export_drop
   if [ "$rc" -eq 0 ]; then
-    python3 - "$report" "$copy" "$id" "$branch" "$base" "$local_ref" "$@" <<'PY' || rc=$?
+    python3 - "$report" "$copy" "$id" "$branch" "$base" "$local_ref" "$source_kind" \
+      "$FM_SLOT_SOURCE_DECLARATION_SHA256" "$FM_SLOT_SOURCE_EVIDENCE_SHA256" "$@" <<'PY' || rc=$?
 import json
 import os
 import sys
 try:
     report = json.load(open(sys.argv[1], encoding="utf-8"))
+    kind = sys.argv[7]
     expected = dict(worktree_path=os.path.realpath(sys.argv[2]), owner_id=sys.argv[3],
-                    branch=sys.argv[4], base_sha=sys.argv[5], owned_paths=sys.argv[7:])
+                    branch=sys.argv[4], base_sha=sys.argv[5], owned_paths=sys.argv[10:])
     if sys.argv[6]:
         expected['base_ref'] = sys.argv[6]
-        if report.get('base_source') != 'local-default':
-            raise ValueError('provisioner did not attest local-default source')
+        if report.get('base_source') != kind:
+            raise ValueError('provisioner did not attest ' + kind + ' source')
+    if kind == 'reconciled-successor':
+        expected['base_source'] = kind
+        expected['source_declaration_sha256'] = sys.argv[8]
+        expected['source_evidence_sha256'] = sys.argv[9]
     if report.get("state") != "PASS":
         raise ValueError("provisioner did not report PASS")
     manifest = json.load(open(report["manifest_path"], encoding="utf-8"))
@@ -1129,10 +1158,12 @@ fm_slot_drift_text() { # <task-id> <report-output> <report-exit>
 
 # The out-of-scope paths this task's own work changed, one labelled path per line, with the standing residuals, on stderr.
 # Reads only the copy; the recorded scope, manifest and record are never edited by what this reports.
-# With a STATE directory, the complete report is also written to STATE/<id>.drift-report.txt (mode 600, replaced on every
-# run), and stderr prints every line except the `uncertain,ignored` lines past the first FM_SLOT_DRIFT_SAMPLE, which a
-# `  sampled:` line counts and points to that file. With no STATE, or when that file cannot be written, stderr prints
-# the complete report. Every other line, each `proven` path included, is always printed in full.
+# With a STATE directory, the complete report is also written to STATE/<id>.drift-report.txt (mode 600), and stderr
+# prints every line except the `uncertain,ignored` lines past the first FM_SLOT_DRIFT_SAMPLE, which a `  sampled:` line
+# counts and points to that file. Each successful write replaces that file, so a report that could not be produced
+# replaces an earlier list with its one line, while a failed write leaves the earlier file in place. With no STATE, or
+# when that file cannot be written, stderr prints the complete report. Every other line, each `proven` path included,
+# is always printed in full.
 fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   local copy=$1 id=$2 branch=$3 base=$4 out rc=0 report file='' tmp=''
   shift 4
@@ -1152,7 +1183,9 @@ fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
     if [ -d "$file" ] || ! tmp=$(mktemp "$STATE/.$id.drift-report.XXXXXX" 2>/dev/null); then
       file=''
     elif ! { printf '%s\n' "$report" > "$tmp" && chmod 600 "$tmp" && mv -f -- "$tmp" "$file"; }; then
-      rm -f -- "$tmp"
+      # The temp can be unremovable too (a state directory turned read-only), and the complete report is printed below
+      # either way, so a failed removal must not end the set -e callers.
+      rm -f -- "$tmp" 2>/dev/null || :
       file=''
     fi
   fi
@@ -1163,7 +1196,7 @@ fm_slot_drift_report() { # <copy> <task-id> <branch> <base-sha> <owned-path>...
   # The file path goes through the environment, because awk -v would read a backslash in it as an escape.
   printf '%s\n' "$report" | FM_SLOT_DRIFT_FILE=$file awk -v keep="$FM_SLOT_DRIFT_SAMPLE" '
     function summary() {
-      if (group > keep) print "  sampled: " group " uncertain,ignored path(s); the first " keep " are shown above, and every path of this report is listed in " ENVIRON["FM_SLOT_DRIFT_FILE"]
+      if (group > keep) print "  sampled: " group " uncertain,ignored path(s); the first " keep " are shown in this report, and every path of this report is listed in " ENVIRON["FM_SLOT_DRIFT_FILE"]
       done = 1
     }
     /^  drift: / {
