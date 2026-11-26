@@ -1177,6 +1177,50 @@ test_inspect_stale_needs_proven_absence() {
   pass "session-lock: inspect calls a holder stale only when the process read proves absence"
 }
 
+# fm-lock.sh status prints a process read that fails without proving absence as
+# unknown, and keeps the stale line for a read that proves absence. The lock
+# names pid 999999, which no live process holds, so the stand-in ps decides.
+lock_status_line() {  # <fm-lock.sh> <ps-rc>
+  local dir fakebin
+  dir="$TMP_ROOT/lock-status"
+  rm -rf "$dir"
+  fakebin=$(fm_fakebin "$dir")
+  mkdir -p "$dir/state"
+  printf '999999\n' > "$dir/state/.lock"
+  printf '#!/usr/bin/env bash\nexit %s\n' "$2" > "$fakebin/ps"
+  chmod +x "$fakebin/ps"
+  env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID PATH="$fakebin:$PATH" FM_HOME="$dir" "$1" status
+}
+
+# Names each status row that differs; empty when both rows hold.
+lock_status_wrong() {  # <fm-lock.sh>
+  local got
+  got=$(lock_status_line "$1" 2)
+  [ "$got" = 'lock: unknown (process read failed, holder pid 999999 not proven dead)' ] \
+    || printf '  failed read (ps exit 2): got %s\n' "$got"
+  got=$(lock_status_line "$1" 1)
+  [ "$got" = 'lock: stale (pid 999999 dead or not a harness)' ] \
+    || printf '  proven absence (ps exit 1): got %s\n' "$got"
+}
+
+test_lock_status_never_prints_a_failed_read_as_stale() {
+  local wrong mutant_dir
+  wrong=$(lock_status_wrong "$ROOT/bin/fm-lock.sh")
+  [ -z "$wrong" ] || fail "fm-lock.sh status rows differ:"$'\n'"$wrong"
+  # The mutant restores the old mapping: a failed read falls through to stale.
+  mutant_dir="$TMP_ROOT/lock-status-mutant"
+  mkdir -p "$mutant_dir"
+  ln -s "$ROOT"/bin/* "$mutant_dir/"
+  rm -f "$mutant_dir/fm-lock.sh"
+  grep -v '^    read-failed) ' "$ROOT/bin/fm-lock.sh" > "$mutant_dir/fm-lock.sh"
+  chmod +x "$mutant_dir/fm-lock.sh"
+  ! cmp -s "$ROOT/bin/fm-lock.sh" "$mutant_dir/fm-lock.sh" || fail "the old-mapping mutant did not change fm-lock.sh"
+  wrong=$(lock_status_wrong "$mutant_dir/fm-lock.sh")
+  [ "$wrong" = "  failed read (ps exit 2): got lock: stale (pid 999999 dead or not a harness)" ] \
+    || fail "the old-mapping mutant was not caught by the failed-read row alone:"$'\n'"$wrong"
+  pass "session-lock: status prints a failed process read as unknown and a proven absence as stale"
+}
+
 test_version_named_session_is_identified_on_both_platforms
 test_harness_at_namespace_pid1_is_examined
 test_ordinary_paths_are_never_harness_processes
@@ -1185,6 +1229,7 @@ test_competing_version_named_session_is_seen_as_live
 test_same_session_id_owns_a_recycled_background_chain
 test_anchor_pid_is_the_model_loop_process_only_for_a_trusted_id
 test_inspect_stale_needs_proven_absence
+test_lock_status_never_prints_a_failed_read_as_stale
 test_e2e_version_named_session_claims_the_home
 test_e2e_daemon_parented_session_claims_the_home
 test_e2e_daemon_parented_version_named_session_keeps_its_lock

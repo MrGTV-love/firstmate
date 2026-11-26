@@ -47,10 +47,18 @@ mkdir -p "$STATE" 2>/dev/null || {
 
 if [ "${1:-}" = "status" ]; then
   fm_session_lock_inspect "$STATE"
-  case "$FM_LOCK_INSPECT_STATE" in
+  # A numeric pid whose liveness stayed unknown is a process read that failed
+  # without proving absence, so it is never reported as stale. A live
+  # non-harness or malformed pid keeps the historical stale wording.
+  status_state=$FM_LOCK_INSPECT_STATE
+  if [ "$status_state:$FM_LOCK_INSPECT_LIVE_HARNESS" = unknown:unknown ]; then
+    case "$FM_LOCK_INSPECT_PID" in ''|*[!0-9]*) ;; *) status_state=read-failed ;; esac
+  fi
+  case "$status_state" in
     free) echo "lock: free" ;;
     unreadable) echo "lock: unreadable" ;;
     held) echo "lock: held by live harness pid $FM_LOCK_INSPECT_PID" ;;
+    read-failed) echo "lock: unknown (process read failed, holder pid $FM_LOCK_INSPECT_PID not proven dead)" ;;
     *) echo "lock: stale (pid $FM_LOCK_INSPECT_PID dead or not a harness)" ;;
   esac
   exit 0
