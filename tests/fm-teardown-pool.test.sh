@@ -37,7 +37,7 @@ test_tasktmp_preserves_current_and_prior_reassociated_copies() {
     cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -115,7 +115,7 @@ test_secondmate_home_preserves_other_tasks_prior_copy() {
       cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
       cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -188,7 +188,7 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -250,7 +250,7 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -363,7 +363,7 @@ test_reservation_window_reassignment_reproves_own_landing() {
     cp "$case_dir/state/task-x1.meta" "$case_dir/task-meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -2570,7 +2570,7 @@ test_forced_nested_secondmate_admits_only_locked_current_copies() {
     printf 'retained bytes\n' > "$child_home/retained.txt"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in
   kill-*)
     printf '%s\n' "\$*" >> "$case_dir/kill.log"
@@ -2695,7 +2695,7 @@ test_forced_descendant_reassociated_copy_preserves_checkout_and_storage() {
     cp "$home/state/child-b.meta" "$case_dir/child.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -2789,7 +2789,7 @@ test_cleanup_roots_preserve_foreign_copy_git_storage() {
         common=$(cd "$target/P/.git" && pwd -P)
         cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -2842,7 +2842,7 @@ test_tasktmp_preserves_reassociated_copy_git_storage() {
     common=$(cd "$tmp/P/.git" && pwd -P)
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -3020,6 +3020,85 @@ SH
 }
 
 # A custody refusal at a child's return is final; no fallback may delete the copy.
+# Forced secondmate cleanup returns each child worktree with treehouse return
+# --force, which ends every process with its cwd there, and no reap runs first.
+# A detached holder of the child worktree that nothing proves the retiring
+# task's makes that return refuse with nothing returned or signalled. The fault
+# control replaces the check with an unconditional pass in the case's own copy
+# of bin/: the forced return then runs with the holder inside.
+test_forced_child_return_refuses_an_unproven_holder() {
+  local mode case_dir home rc pid out i
+  for mode in guarded fault; do
+    case_dir=$(make_case "child-return-holder-$mode")
+    write_meta "$case_dir" local-only secondmate
+    configure_secondmate_with_tmux_children "$case_dir"
+    home="$case_dir/secondmate-home"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse"
+    out="$case_dir/holder.pid"
+    # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+    perl -MPOSIX -e '
+      my ($cwd, $out) = @ARGV;
+      my $first = fork(); die "fork" unless defined $first;
+      if ($first) { waitpid($first, 0); exit 0; }
+      POSIX::setsid();
+      my $second = fork(); die "fork" unless defined $second;
+      POSIX::_exit(0) if $second;
+      chdir $cwd or die "chdir";
+      open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+      exec "sleep", "300";' "$case_dir/child-a-wt" "$out"
+    for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+    pid=$(cat "$out") || fail "child-return-holder-$mode: the holder did not start"
+    teardown_fixture_track "$pid" KILL
+    sleep 0.3
+    if [ "$mode" = fault ]; then
+      rm "$case_dir/code-root/bin"
+      cp -R "$ROOT/bin" "$case_dir/code-root/bin"
+      python3 -I - "$case_dir/code-root/bin/fm-teardown.sh" <<'PY' || fail "child-return-holder-fault: the check could not be replaced"
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+head = "teardown_return_holders_proven() {  # <dir> <label>\n"
+assert text.count(head) == 1
+path.write_text(text.replace(head, head + "  return 0  # injected fault: no ownership check before the forced return\n"))
+PY
+    fi
+    rc=0
+    if [ "$mode" = fault ]; then
+      TEARDOWN="$case_dir/code-root/bin/fm-teardown.sh" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      assert_grep "return --force $case_dir/child-a-wt" "$case_dir/treehouse.log" \
+        "child-return-holder-fault: without the check the forced return did not run over the holder"
+    else
+      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 5 "$rc" "child-return-holder: the unproven holder must stop teardown: $(tail -3 "$case_dir/stderr")"
+      grep -Eq "REFUSED: process $pid .*which the forced return would end, but nothing proves it belongs to" "$case_dir/stderr" \
+        || fail "child-return-holder: the refusal did not name the holder: $(tail -3 "$case_dir/stderr")"
+      assert_absent "$case_dir/treehouse.log" 'child-return-holder: treehouse was asked to return the child worktree'
+      assert_present "$case_dir/child-a-wt/.git" 'child-return-holder: the child worktree was removed'
+      assert_present "$home/state/child-a.meta" 'child-return-holder: the child record was retired'
+      kill -0 "$pid" 2>/dev/null || fail "child-return-holder: the holder was signalled"
+      ownership_assert_unsignalled_pool "$case_dir" "$pid"
+    fi
+    teardown_fixture_stop "$pid"
+  done
+  pass "a forced child-worktree return refuses on a holder it cannot prove the task's, and the fault control shows the check is what stops it"
+}
+
+ownership_assert_unsignalled_pool() {  # <case-dir> <pid>
+  local f
+  for f in "$1"/state/*.teardown-processes "$1"/secondmate-home/state/*.teardown-processes; do
+    [ -f "$f" ] || continue
+    assert_no_grep $'\t'"$2"$'\t' "$f" "child-return-holder: teardown audited a signal for the holder"
+  done
+}
+
 test_child_return_custody_refusal_keeps_non_pool_worktree() {
   local case_dir home nested rc=0
   case_dir=$(make_case child-return-custody)
@@ -3030,7 +3109,7 @@ test_child_return_custody_refusal_keeps_non_pool_worktree() {
   git -C "$case_dir/project" worktree add -q --detach "$nested" main
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
@@ -4162,7 +4241,7 @@ test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap() {
   tasks-axi start live-task --file "$case_dir/data/backlog.md" >/dev/null
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 if [ -e "$case_dir/endpoint-stuck" ]; then
   case "\${1:-}" in
     kill-window) : > "$case_dir/kill-attempted"; exit 1 ;;
@@ -4243,7 +4322,7 @@ test_child_pool_return_custody_refusal_keeps_slot() {
   lock=$(git_index_lock_path "$slot")
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
@@ -4974,6 +5053,7 @@ test_unverified_pool_reservation_preserves_processes
 test_non_pool_returns_recheck_registered_copies
 test_return_missing_slot_reports_canonicalization_refusal
 test_child_return_custody_refusal_keeps_non_pool_worktree
+test_forced_child_return_refuses_an_unproven_holder
 test_child_pool_return_custody_refusal_keeps_slot
 test_reassigned_dirty_slot_retires_only_finished_task
 test_reassigned_slot_unlanded_task_refuses

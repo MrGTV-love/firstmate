@@ -503,7 +503,7 @@ test_forced_secondmate_teardown_holds_descendant_lifecycle_locks() {
   : > "$case_dir/treehouse.log"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/kill.log"
 exit 0
 SH
@@ -1650,6 +1650,11 @@ test_leaked_worktree_process_is_reaped() {
   pass "a leaked descendant process rooted under the task's worktree is reaped by teardown, not left surviving"
 }
 
+# Every ownership fixture process carries this argument; it stands for a
+# credential on a command line and must never reach teardown's output or audit.
+OWN_CANARY="fm-secret-canary-$$-ownership"
+export OWN_CANARY
+
 # Fix 2 ownership fixtures. A fake pane is the process the case's tmux stub
 # reports as the task pane's shell; its own cwd is the case directory, never a
 # scan root. ownership_pane <case-dir> [<leak-cwd> [ignore-term]] starts it,
@@ -1666,7 +1671,7 @@ ownership_pane() {
     if ($cwd ne "") {
       my $child = fork();
       die "fork" unless defined $child;
-      if (!$child) { $SIG{TERM} = "IGNORE" if $ignore; chdir $cwd or die "chdir"; exec "sleep", "300"; }
+      if (!$child) { $SIG{TERM} = "IGNORE" if $ignore; chdir $cwd or die "chdir"; exec "perl", "-e", "sleep 300", "--", $ENV{OWN_CANARY}; }
       open my $fh, ">", "$out.tmp" or die "open"; print {$fh} $child; close $fh; rename "$out.tmp", $out or die "rename";
     }
     sleep 300 while 1;' "$leak_cwd" "$case_dir/leak.pid" "$ignore"
@@ -1703,7 +1708,7 @@ ownership_detached() {
     chdir $cwd or die "chdir";
     open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
     open my $fh, ">", "$out.tmp" or die "open"; print {$fh} $$; close $fh; rename "$out.tmp", $out or die "rename";
-    exec "sleep", "300";' "$cwd" "$out" "$setsid"
+    exec "perl", "-e", "sleep 300", "--", $ENV{OWN_CANARY};' "$cwd" "$out" "$setsid"
   for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
   OWN_DETACHED_PID=$(cat "$out" 2>/dev/null) || fail "ownership fixture: the detached process did not start"
   teardown_fixture_track "$OWN_DETACHED_PID" KILL
@@ -1755,7 +1760,7 @@ path = pathlib.Path(sys.argv[1])
 text = path.read_text()
 head = "task_pid_proved_own() {  # <pid> <identity>\n"
 assert text.count(head) == 1
-fault = head + "  TASK_OWNED+=(\"$1\"$'\\t'\"$2\"); return 0  # injected fault: the old cwd-only verdict\n"
+fault = head + "  TASK_OWNED+=(\"$1\"$'\\t'\"$2\"$'\\t'0); return 0  # injected fault: the old cwd-only verdict\n"
 path.write_text(text.replace(head, fault))
 PY
   OWN_FAULT_TEARDOWN=$case_dir/code-root/bin/fm-teardown.sh
@@ -1785,8 +1790,12 @@ test_teardown_spares_a_detached_daemon_at_the_copy_root() {
   ownership_assert_unsignalled "$case_dir" "$pid" detached-daemon
   grep -Eq "REFUSED: process $pid .*nothing proves it belongs to task-x1" "$case_dir/stderr" \
     || fail "detached-daemon: the refusal did not name the process: $(tail -3 "$case_dir/stderr")"
+  "$REAL_PS_FOR_TEST" -ww -o command= -p "$pid" | grep -F -- "$OWN_CANARY" >/dev/null \
+    || fail "detached-daemon: the setup daemon does not carry the secret canary in its arguments"
+  assert_no_grep "$OWN_CANARY" "$case_dir/stderr" "detached-daemon: the refusal printed the daemon's arguments"
+  assert_no_grep "$OWN_CANARY" "$case_dir/stdout" "detached-daemon: teardown printed the daemon's arguments"
   teardown_fixture_stop "$pid"
-  pass "a detached daemon at the copy root that descends from no task process survives teardown, which refuses and keeps the copy"
+  pass "a detached daemon at the copy root that descends from no task process survives teardown, which refuses and keeps the copy without printing its arguments"
 }
 
 # Case 2: a leaked child of the task's pane, with its cwd at the copy root, is
@@ -1805,6 +1814,11 @@ test_teardown_reaps_a_leaked_child_of_the_task_pane() {
   ownership_wait_dead "$pid" || fail "pane-child: the task's leaked child survived teardown"
   assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
     "pane-child: the leaked child's signal was not audited"
+  assert_grep 'perl\ args-sha256=' "$case_dir/state/task-x1.teardown-processes" \
+    "pane-child: the audit does not name the executable with its argument hash"
+  assert_no_grep "$OWN_CANARY" "$case_dir/state/task-x1.teardown-processes" \
+    "pane-child: the audit recorded the leak's raw arguments"
+  assert_no_grep "$OWN_CANARY" "$case_dir/stderr" "pane-child: teardown printed the leak's arguments"
   # The stub treehouse removes nothing; the real-binary suite observes the copy go.
   assert_absent "$case_dir/state/task-x1.meta" "pane-child: the task did not close"
   ownership_alive "$OWN_PANE_PID" || fail "pane-child: teardown signalled the pane shell, whose cwd is not a root"
@@ -1886,7 +1900,7 @@ test_teardown_without_a_provable_pane_refuses_a_root_process() {
     expect_code 1 "$rc" "anchor-$state: teardown must refuse"
     assert_present "$case_dir/wt" "anchor-$state: the copy was removed"
     ownership_assert_unsignalled "$case_dir" "$pid" "anchor-$state"
-    grep -Eq "REFUSED: process $pid .*(no live pane shell could be read|has no readable birth identity)" "$case_dir/stderr" \
+    grep -Eq "REFUSED: process $pid .*(no single live pane shell could be read|has no readable birth identity)" "$case_dir/stderr" \
       || fail "anchor-$state: the refusal did not say the pane could not be proved: $(tail -3 "$case_dir/stderr")"
     teardown_fixture_stop "$pid"
   done
@@ -1902,8 +1916,9 @@ test_teardown_without_a_provable_pane_refuses_a_root_process() {
 }
 
 # A process proved through the pane keeps its proof after the reap ends the
-# shell it descended from: a TERM-ignoring leak whose parent shell (also at the
-# root) dies in the same pass is still force-killed.
+# shell it descended from: a TERM-ignoring leak in a process group of its own,
+# whose parent shell (also at the root) dies in the same pass, is still
+# force-killed on its retained pid and birth identity alone.
 test_teardown_proof_survives_the_parent_the_reap_ends() {
   local case_dir rc shell leak i
   case_dir=$(make_case ownership-parent-ended)
@@ -1919,7 +1934,7 @@ test_teardown_proof_survives_the_parent_the_reap_ends() {
     if (!$shell) {
       chdir $wt or die "chdir";
       my $leak = fork(); die "fork" unless defined $leak;
-      if (!$leak) { $SIG{TERM} = "IGNORE"; exec "sleep", "300"; }
+      if (!$leak) { setpgrp(0, 0) or die "setpgrp"; $SIG{TERM} = "IGNORE"; exec "sleep", "300"; }
       open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $leak\n"; close $fh; rename "$out.tmp", $out or die "rename";
       exec "sleep", "300";
     }
@@ -1931,6 +1946,11 @@ test_teardown_proof_survives_the_parent_the_reap_ends() {
   teardown_fixture_track "$shell" KILL
   teardown_fixture_track "$leak" KILL
   sleep 0.3
+  # The leak leads its own process group, so only its retained pid and birth
+  # identity, never a shared group, can keep its proof after its parent dies.
+  [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$leak" | tr -d ' ')" = "$leak" ] \
+    && [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$shell" | tr -d ' ')" != "$leak" ] \
+    || fail "parent-ended: setup leak does not lead a process group of its own"
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "parent-ended: teardown must succeed: $(cat "$case_dir/stderr")"
@@ -1977,6 +1997,184 @@ test_teardown_grace_child_that_leaves_the_group_is_refused() {
     || fail "grace-setsid: the refusal did not name the detached child: $(tail -3 "$case_dir/stderr")"
   teardown_fixture_stop "$child"
   pass "a child forked during the grace period that leaves the task's process group refuses unsignalled"
+}
+
+# The legitimate counterpart of the refused grace child: a proved process that
+# survives TERM and forks a child at the root meanwhile keeps that child its own
+# descendant, so the later pass proves it by parent chain and reaps it.
+test_process_spawned_during_grace_by_a_live_parent_is_reaped() {
+  local case_dir rc pid child i
+  case_dir=$(make_case grace-spawn-live-parent)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  teardown_fixture_start "$case_dir/wt" KILL perl -e '
+    my ($out) = @ARGV;
+    $SIG{CHLD} = "IGNORE";
+    $SIG{TERM} = sub {
+      return if -e $out;
+      my $child = fork(); die "fork" unless defined $child;
+      if (!$child) { $SIG{TERM} = "DEFAULT"; exec "sleep", "300"; }
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$child\n"; close $fh; rename "$out.tmp", $out or die "rename";
+    };
+    sleep 300 while 1;' "$case_dir/child.pid"
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  for i in $(seq 50); do [ -s "$case_dir/child.pid" ] && break; sleep 0.1; done
+  child=$(cat "$case_dir/child.pid" 2>/dev/null) || fail "grace-live-parent: the parent never forked"
+  if kill -0 "$child" 2>/dev/null; then teardown_fixture_track "$child" KILL; fi
+  expect_code 0 "$rc" "grace-live-parent: teardown must converge: $(tail -3 "$case_dir/stderr")"
+  ownership_wait_dead "$pid" || fail "grace-live-parent: the proved parent survived"
+  for i in $(seq 50); do kill -0 "$child" 2>/dev/null || break; sleep 0.1; done
+  kill -0 "$child" 2>/dev/null && fail "grace-live-parent: the live parent's child survived"
+  assert_grep $'\tTERM\t'"$child"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+    "grace-live-parent: the child's signal was not audited"
+  pass "a child forked during grace by a still-live proved parent is proved by parent chain and reaped"
+}
+
+# The tmux anchor is the only pane of the exact recorded window: an absent
+# window (tmux would answer a selector from the active window) or a second
+# pane in the recorded window proves nothing, so a leak under the pane
+# refuses unsignalled.
+test_teardown_tmux_anchor_needs_the_one_recorded_pane() {
+  local shape case_dir rc pid
+  for shape in absent second; do
+    case_dir=$(make_case "ownership-tmux-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    ownership_pane "$case_dir" "$case_dir/wt"
+    pid=$OWN_LEAK_PID
+    case "$shape" in
+      absent) printf 'fm-other-task\t%%7\t%s\n' "$OWN_PANE_PID" > "$case_dir/pane-rows" ;;
+      second) printf 'fm-task-x1\t%%1\t%s\nfm-task-x1\t%%2\t%s\n' "$$" "$OWN_PANE_PID" > "$case_dir/pane-rows" ;;
+    esac
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    ownership_alive "$pid" || fail "tmux-$shape: teardown signalled a leak under a pane it could not prove"
+    expect_code 1 "$rc" "tmux-$shape: teardown must refuse"
+    ownership_assert_unsignalled "$case_dir" "$pid" "tmux-$shape"
+    ownership_assert_unsignalled "$case_dir" "$OWN_PANE_PID" "tmux-$shape"
+    grep -Eq "REFUSED: process $pid .*no single live pane shell could be read" "$case_dir/stderr" \
+      || fail "tmux-$shape: the refusal did not say the pane could not be read: $(tail -3 "$case_dir/stderr")"
+    teardown_fixture_stop "$pid"
+  done
+  pass "an absent recorded tmux window, or a second pane in it, proves nothing and the leak refuses unsignalled"
+}
+
+# A group proof holds only while the group still holds a live chain-proved
+# process. Here the proved leak, alone in its own group, forks a setsid child on
+# TERM and exits; the fixture's ps reports the child in the leak's old group, as
+# a recycled group id would. The child is refused unsignalled.
+test_teardown_recycled_group_proves_nothing() {
+  local case_dir rc pid child group i
+  case_dir=$(make_case ownership-recycled-group)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  teardown_fixture_start "$case_dir/wt" KILL perl -MPOSIX -e '
+    my ($out) = @ARGV;
+    setpgrp(0, 0) or die "setpgrp";
+    $SIG{TERM} = sub {
+      my $child = fork(); die "fork" unless defined $child;
+      if (!$child) {
+        POSIX::setsid();
+        open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+        exec "sleep", "300";
+      }
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$child\n"; close $fh; rename "$out.tmp", $out or die "rename";
+      POSIX::_exit(0);
+    };
+    sleep 300 while 1;' "$case_dir/child.pid"
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  group=$("$REAL_PS_FOR_TEST" -o pgid= -p "$pid" | tr -d ' ')
+  [ "$group" = "$pid" ] || fail "recycled-group: setup leak does not lead its own group"
+  printf '%s\n' "$group" > "$case_dir/recycled-group"
+  cat > "$case_dir/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+# The detached child reads as a member of the proved leak's old group.
+child=$(cat "$FM_FAKE_RECYCLED_CHILD_FILE" 2>/dev/null || true)
+group=$(cat "$FM_FAKE_RECYCLED_GROUP_FILE")
+out=$("$REAL_PS_FOR_TEST" "$@") || exit $?
+[ -n "$child" ] || { printf '%s\n' "$out"; exit 0; }
+case " $* " in
+  *" pid=,ppid=,pgid= "*) printf '%s\n' "$out" | awk -v c="$child" -v g="$group" '$1 == c { $3 = g } { print }' ;;
+  *" pgid= "*) case " $* " in *" -p $child "*) printf '%s\n' "$group" ;; *) printf '%s\n' "$out" ;; esac ;;
+  *) printf '%s\n' "$out" ;;
+esac
+SH
+  chmod +x "$case_dir/fakebin/ps"
+  rc=0
+  FM_FAKE_RECYCLED_CHILD_FILE="$case_dir/child.pid" FM_FAKE_RECYCLED_GROUP_FILE="$case_dir/recycled-group" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  for i in $(seq 50); do [ -s "$case_dir/child.pid" ] && break; sleep 0.1; done
+  child=$(cat "$case_dir/child.pid" 2>/dev/null) || fail "recycled-group: the leak never forked"
+  teardown_fixture_track "$child" KILL
+  ownership_alive "$child" || fail "recycled-group: teardown signalled a process proved only by a recycled group"
+  expect_code 1 "$rc" "recycled-group: teardown must refuse: $(tail -3 "$case_dir/stderr")"
+  ownership_assert_unsignalled "$case_dir" "$child" recycled-group
+  grep -Eq "REFUSED: process $child .*nothing proves it belongs to task-x1" "$case_dir/stderr" \
+    || fail "recycled-group: the refusal did not name the child: $(tail -3 "$case_dir/stderr")"
+  teardown_fixture_stop "$child"
+  pass "a process in a group whose proved members are gone is unproven and refuses unsignalled"
+}
+
+# The tasktmp-only route (the task no longer owns its copy): an unproven holder
+# of the tasktmp root is named and left running, teardown continues and closes
+# the task, and a proved leak there is still reaped.
+test_tasktmp_only_route_names_an_unproven_holder_and_continues() {
+  local shape case_dir rc pid root
+  for shape in unproven proved; do
+    case_dir=$(make_case "tasktmp-only-$shape")
+    mkdir -p "$case_dir/home/state"
+    write_meta "$case_dir" no-mistakes ship
+    wt_commit_file "$case_dir" landed.txt "delivered work" "landed process fixture"
+    git -C "$case_dir/wt" push -q origin HEAD:main
+    git -C "$case_dir/project" fetch -q origin
+    seed_backlog_in_flight "$case_dir"
+    root="$case_dir/tasktmp"
+    mkdir -p "$root" "$case_dir/pool/1"
+    git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+    ln -s "pool/1/project" "$case_dir/wt"
+    printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' \
+      "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
+    printf 'task=other-task\nhome=%s\n' "$case_dir/other-home" > "$case_dir/pool/1/.fm-slot-owner"
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$case_dir/wt" "project=$case_dir/project" "tasktmp=$root" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1"
+    if [ "$shape" = unproven ]; then
+      ownership_pane "$case_dir"
+      ownership_detached "$root" setsid
+      pid=$OWN_DETACHED_PID
+    else
+      teardown_fixture_start "$root" KILL sleep 300
+      pid=$TEARDOWN_FIXTURE_PID
+      sleep 0.3
+    fi
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "tasktmp-only-$shape: teardown must continue: $(tail -3 "$case_dir/stderr")"
+    assert_grep "reassigned" "$case_dir/stderr" "tasktmp-only-$shape: the tasktmp-only route was not taken"
+    assert_absent "$case_dir/state/task-x1.meta" "tasktmp-only-$shape: the task did not close"
+    if [ "$shape" = unproven ]; then
+      ownership_alive "$pid" || fail "tasktmp-only-unproven: the unproven holder was signalled"
+      ownership_assert_unsignalled "$case_dir" "$pid" tasktmp-only-unproven
+      grep -Eq "REFUSED: process $pid .*nothing proves it belongs to task-x1" "$case_dir/stderr" \
+        || fail "tasktmp-only-unproven: the holder was not named: $(tail -3 "$case_dir/stderr")"
+      assert_grep "leaving the tasktmp process(es) named above running" "$case_dir/stderr" \
+        "tasktmp-only-unproven: teardown did not say it left the holder and continued"
+      teardown_fixture_stop "$pid"
+    else
+      ownership_wait_dead "$pid" || fail "tasktmp-only-proved: the proved tasktmp leak survived"
+      assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+        "tasktmp-only-proved: the leak's signal was not audited"
+    fi
+  done
+  pass "the tasktmp-only route names and leaves an unproven tasktmp holder and continues, and still reaps a proved leak"
 }
 
 # The narrowed claim: an orphan reparented to init that never left its session
@@ -2098,7 +2296,9 @@ test_ordinary_descendant_process_is_not_reaped() {
 test_process_refusal_has_no_close_replay_authority() {
   local scenario case_dir root pid other_pid birth other_birth rc path_without_lsof
   local flags=()
-  for scenario in descendant foreign missing-lsof audit tasktmp legacy existing-marker; do
+  # The tasktmp-only route names an unproven holder and continues instead
+  # (test_tasktmp_only_route_names_an_unproven_holder_and_continues).
+  for scenario in descendant foreign missing-lsof audit legacy existing-marker; do
     case_dir=$(make_case "refusal-replay-$scenario")
     mkdir -p "$case_dir/home/state"
     write_meta "$case_dir" no-mistakes ship
@@ -2154,7 +2354,7 @@ test_process_refusal_has_no_close_replay_authority() {
     cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 if [ "\${1:-}" = list-windows ]; then
   echo "can't find session: firstmate" >&2
   exit 1
@@ -2247,7 +2447,7 @@ exit 1
 SH
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 if [ "\${1:-}" = kill-window ]; then
   printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"
 fi
@@ -2576,7 +2776,7 @@ test_lsof_absent_refuses_without_signalling() {
   kill -0 "$pid" 2>/dev/null || fail "lsof-absent-refusal: setup sleeper did not start"
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 if [ "\${1:-}" = display-message ] && [ "\${*: -1}" = '#{pane_pid}' ]; then
   printf '%s\n' '$pid'
 fi
@@ -2748,9 +2948,9 @@ SH
   pass "an exec change preserves birth identity and the process is reaped"
 }
 
-test_process_spawned_during_grace_is_reaped_on_later_pass() {
+test_process_spawned_during_grace_after_its_parent_exits_is_refused() {
   local case_dir rc pid child_file child_pid="" parent_survived=0 child_survived=0
-  case_dir=$(make_case grace-spawn-convergence)
+  case_dir=$(make_case grace-spawn-refusal)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   child_file="$case_dir/child.pid"
@@ -2796,7 +2996,7 @@ PERL
   pid=$TEARDOWN_FIXTURE_PID
   local i=0
   while [ ! -e "$case_dir/ready" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
-  [ -e "$case_dir/ready" ] || fail "grace-spawn-convergence: parent not ready"
+  [ -e "$case_dir/ready" ] || fail "grace-spawn-refusal: parent not ready"
 
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -2810,11 +3010,17 @@ PERL
     parent_survived=1
     teardown_fixture_stop "$pid"
   fi
-  expect_code 0 "$rc" "grace-spawn-convergence: teardown should converge"
-  assert_present "$child_file" "grace-spawn-convergence: TERM handler did not spawn a child"
-  [ "$child_survived" -eq 0 ] || fail "grace-spawn-convergence: spawned child survived"
-  [ "$parent_survived" -eq 0 ] || fail "grace-spawn-convergence: original process survived"
-  pass "a process spawned during grace is reaped on a later pass"
+  # The parent exited after forking, so the child's group holds no live process
+  # proved the task's: a group id can be reused once its proved members are gone,
+  # so the child is unproven and the later pass refuses without signalling it.
+  expect_code 1 "$rc" "grace-spawn-refusal: teardown must refuse the child it can no longer prove"
+  assert_present "$child_file" "grace-spawn-refusal: TERM handler did not spawn a child"
+  [ "$child_survived" -eq 1 ] || fail "grace-spawn-refusal: the unproven child was signalled"
+  [ "$parent_survived" -eq 0 ] || fail "grace-spawn-refusal: original process survived"
+  ownership_assert_unsignalled "$case_dir" "$child_pid" grace-spawn-refusal
+  grep -Eq "REFUSED: process $child_pid .*nothing proves it belongs to task-x1" "$case_dir/stderr" \
+    || fail "grace-spawn-refusal: the refusal did not name the child: $(tail -3 "$case_dir/stderr")"
+  pass "a child spawned during grace whose proved parent then exits is refused unsignalled on the later pass"
 }
 
 test_persistent_scan_refuses_after_bounded_retries() {
@@ -2979,19 +3185,17 @@ EOF
 }
 
 # The incident: a worker's private no-mistakes home ran as a launchd agent whose
-# daemon held a directory inside the task copy. Without a retire step, teardown
-# found a process it could not prove custody of and refused (and a plain kill is
-# undone by launchd KeepAlive).
-test_private_nm_launch_agent_is_retired_before_teardown() {
+# daemon held a directory inside the task copy. A root inside the copy does not
+# prove the task created the agent (an independently managed service could have
+# it), and no record names the agents a task created, so teardown refuses before
+# any bootout or signal and leaves the agent, its plist and its daemon running.
+test_in_copy_nm_launch_agent_refuses_without_a_creation_record() {
   local case_dir rc pid label shared_state
   case_dir=$(make_case private-nm-agent)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   add_fake_launchctl "$case_dir"
   shared_state="$case_dir/shared-daemon-state"
-  printf '%s\n' running > "$shared_state"
-  FM_FAKE_NM_SHARED_DAEMON_STATE="$shared_state" "$case_dir/fakebin/no-mistakes" daemon stop
-  [ "$(cat "$shared_state")" = stopped ] || fail "private-nm-agent: fake daemon stop did not stop the shared daemon"
   printf '%s\n' running > "$shared_state"
   mkdir -p "$case_dir/wt/.no-mistakes/h"
   teardown_fixture_start "$case_dir/wt/.no-mistakes/h" KILL sleep 300
@@ -3004,24 +3208,22 @@ test_private_nm_launch_agent_is_retired_before_teardown() {
   rc=0
   FM_FAKE_NM_SHARED_DAEMON_STATE="$shared_state" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  if kill -0 "$pid" 2>/dev/null; then
-    teardown_fixture_stop "$pid"
-    fail "private-nm-agent: the private daemon survived teardown"
-  fi
-  expect_code 0 "$rc" "private-nm-agent: teardown must finish once the agent is retired"
-  assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" \
-    "private-nm-agent: teardown did not boot the agent out of the user domain"
-  assert_absent "$case_dir/launchagents/$label.plist" \
-    "private-nm-agent: the plist is still installed, so the agent returns at next login"
-  assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
-    "private-nm-agent: the plist was not archived under the task's data"
-  assert_grep "retired task-private no-mistakes launch agent $label" "$case_dir/stderr" \
-    "private-nm-agent: teardown did not report the retired agent"
+  kill -0 "$pid" 2>/dev/null || fail "private-nm-agent: teardown signalled the agent's daemon"
+  teardown_fixture_stop "$pid"
+  expect_code 1 "$rc" "private-nm-agent: teardown must refuse an in-copy agent no record proves the task's"
+  assert_no_grep "bootout" "$case_dir/launchctl-calls" "private-nm-agent: teardown booted out an unproven agent"
+  assert_present "$case_dir/launchctl-loaded/$label" "private-nm-agent: the agent was unloaded"
+  assert_present "$case_dir/launchagents/$label.plist" "private-nm-agent: the plist was moved"
+  assert_absent "$case_dir/data/task-x1/launchagent-backup" "private-nm-agent: something was archived"
+  assert_present "$case_dir/wt" "private-nm-agent: the copy was removed"
+  assert_present "$case_dir/state/task-x1.meta" "private-nm-agent: the task record was removed"
+  grep -Eq "REFUSED: no-mistakes launch agent $label .*no record of task-x1 proves the task created it" "$case_dir/stderr" \
+    || fail "private-nm-agent: the refusal did not name the agent: $(tail -3 "$case_dir/stderr")"
   [ "$(cat "$shared_state")" = running ] || fail "private-nm-agent: teardown stopped the shared daemon"
-  pass "a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes"
+  pass "an in-copy no-mistakes launch agent no record proves the task's refuses teardown with nothing booted out, archived or signalled"
 }
 
-test_private_nm_launch_agent_equivalent_roots_are_retired() {
+test_in_copy_nm_launch_agent_equivalent_roots_refuse() {
   local spelling case_dir wt root pid label rc
   for spelling in dot separators parent symlink; do
     case_dir=$(make_case "private-nm-agent-$spelling")
@@ -3045,21 +3247,14 @@ test_private_nm_launch_agent_equivalent_roots_are_retired() {
     rc=0
     FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
       run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    if kill -0 "$pid" 2>/dev/null; then
-      teardown_fixture_stop "$pid"
-      fail "private-nm-agent-$spelling: the private daemon survived teardown"
-    fi
-    expect_code 0 "$rc" "private-nm-agent-$spelling: teardown must finish"
-    assert_absent "$case_dir/launchctl-loaded/$label" \
-      "private-nm-agent-$spelling: the agent is still loaded"
-    assert_absent "$case_dir/launchagents/$label.plist" \
-      "private-nm-agent-$spelling: the plist is still installed"
-    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
-      "private-nm-agent-$spelling: the plist was not archived"
-    assert_absent "$case_dir/state/task-x1.meta" \
-      "private-nm-agent-$spelling: the task record survived teardown"
+    kill -0 "$pid" 2>/dev/null || fail "private-nm-agent-$spelling: the agent's daemon was signalled"
+    teardown_fixture_stop "$pid"
+    expect_code 1 "$rc" "private-nm-agent-$spelling: teardown must refuse"
+    assert_present "$case_dir/launchctl-loaded/$label" "private-nm-agent-$spelling: the agent was unloaded"
+    assert_present "$case_dir/launchagents/$label.plist" "private-nm-agent-$spelling: the plist was moved"
+    assert_present "$case_dir/state/task-x1.meta" "private-nm-agent-$spelling: the task record was removed"
   done
-  pass "equivalent private roots unload their agents and allow teardown to finish"
+  pass "every equivalent spelling of an in-copy agent root is recognized and refuses with the agent left loaded"
 }
 
 test_nested_nm_launch_agents_are_left_alone() {
@@ -3161,15 +3356,14 @@ test_absent_copy_nm_launch_agents_preserve_nested_ownership() {
       FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
         run_teardown "$case_dir" "${flags[@]+"${flags[@]}"}" \
         > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-      expect_code 0 "$rc" "absent-nm-agent-$recovery-$registrar: recovery refused: $(cat "$case_dir/stderr")"
+      # Agents rooted in the absent copy are no more proven the task's than in a
+      # present one, so recovery refuses with each of them left as found.
+      expect_code 1 "$rc" "absent-nm-agent-$recovery-$registrar: recovery must refuse the unproven agents: $(tail -3 "$case_dir/stderr")"
+      assert_no_grep "bootout" "$case_dir/launchctl-calls" "absent-nm-agent: an unproven agent was booted out"
       for hash in 1 2 3 4; do
         label="$NM_AGENT_PREFIX.$hash"
-        assert_absent "$case_dir/launchctl-loaded/$label" "absent-nm-agent: private agent remains loaded"
-        assert_absent "$case_dir/launchagents/$label.plist" "absent-nm-agent: private plist remains installed"
-        assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" "absent-nm-agent: private plist not archived"
-        if [ "$hash" -le 2 ]; then
-          assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" "absent-nm-agent: loaded private agent not booted out"
-        fi
+        assert_present "$case_dir/launchagents/$label.plist" "absent-nm-agent: an in-copy plist was moved"
+        [ "$hash" -gt 2 ] || assert_present "$case_dir/launchctl-loaded/$label" "absent-nm-agent: an in-copy agent was unloaded"
       done
       label="$NM_AGENT_PREFIX.nested"
       assert_present "$case_dir/launchctl-loaded/$label" "absent-nm-agent: nested agent was unloaded"
@@ -3177,10 +3371,10 @@ test_absent_copy_nm_launch_agents_preserve_nested_ownership() {
       assert_no_grep "$label" "$case_dir/launchctl-calls" "absent-nm-agent: nested agent was addressed"
       assert_absent "$case_dir/data/task-x1/launchagent-backup/$label.plist" "absent-nm-agent: nested plist was archived"
       assert_present "$home/state/other-lane.meta" "absent-nm-agent: nested task record was removed"
-      assert_absent "$case_dir/state/task-x1.meta" "absent-nm-agent: recovered task record remains"
+      assert_present "$case_dir/state/task-x1.meta" "absent-nm-agent: the refused task record was removed"
     done
   done
-  pass "absent-copy recovery retires private agents but preserves nested agents registered by local task projects"
+  pass "absent-copy recovery refuses on agents rooted in the absent copy and leaves nested agents registered by local task projects untouched"
 }
 
 # Every agent whose root is not inside THIS task's copy stays loaded and
@@ -3230,11 +3424,10 @@ test_foreign_nm_launch_agents_are_left_alone() {
   pass "agents rooted outside the task's copy, and unparsable plists, are never unloaded or moved"
 }
 
-# An agent that will not unload still owns its process and respawns it, so
-# teardown must stop with the plist and the task record intact.
-test_private_nm_launch_agent_bootout_failure_refuses() {
+# --force does not make an unproven in-copy agent the task's.
+test_in_copy_nm_launch_agent_refuses_even_with_force() {
   local case_dir rc pid label
-  case_dir=$(make_case private-nm-agent-stuck)
+  case_dir=$(make_case private-nm-agent-forced)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   add_fake_launchctl "$case_dir"
@@ -3246,22 +3439,21 @@ test_private_nm_launch_agent_bootout_failure_refuses() {
   add_nm_launch_agent "$case_dir" 3baa54c9 "$(cd "$case_dir/wt" && pwd -P)/.no-mistakes/h" "$pid"
 
   rc=0
-  FAKE_LAUNCHCTL_BOOTOUT_FAILS=1 FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+  FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
     run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  kill -0 "$pid" 2>/dev/null || { teardown_fixture_stop "$pid"; fail "private-nm-agent-stuck: process was signalled around a loaded agent"; }
+  kill -0 "$pid" 2>/dev/null || { teardown_fixture_stop "$pid"; fail "private-nm-agent-forced: process was signalled around an unproven agent"; }
   teardown_fixture_stop "$pid"
-  expect_code 1 "$rc" "private-nm-agent-stuck: teardown must refuse when the agent stays loaded"
-  assert_present "$case_dir/launchagents/$label.plist" "private-nm-agent-stuck: plist removed although the agent is still loaded"
-  assert_present "$case_dir/state/task-x1.meta" "private-nm-agent-stuck: task record removed"
-  assert_present "$case_dir/wt" "private-nm-agent-stuck: task copy removed"
-  assert_grep "REFUSED: no-mistakes launch agent $label (rooted in task-x1's copy) is still loaded" "$case_dir/stderr" \
-    "private-nm-agent-stuck: refusal does not name the agent"
-  pass "an agent that stays loaded after bootout stops teardown with its plist and the task copy intact"
+  expect_code 1 "$rc" "private-nm-agent-forced: forced teardown must still refuse"
+  assert_no_grep "bootout" "$case_dir/launchctl-calls" "private-nm-agent-forced: the agent was booted out"
+  assert_present "$case_dir/launchagents/$label.plist" "private-nm-agent-forced: plist removed"
+  assert_present "$case_dir/state/task-x1.meta" "private-nm-agent-forced: task record removed"
+  assert_present "$case_dir/wt" "private-nm-agent-forced: task copy removed"
+  pass "a forced teardown still refuses an in-copy agent no record proves the task's"
 }
 
-# A plist left behind by a reboot or a manual bootout has no loaded service; it
-# still brings the daemon back at next login, so it is archived too.
-test_private_nm_launch_agent_not_loaded_is_archived() {
+# A plist with no loaded service is no more proven than a loaded one: moving it
+# would break its owner's service at next login, so it refuses too.
+test_in_copy_nm_launch_agent_not_loaded_refuses() {
   local case_dir rc label wt root hash=0
   case_dir=$(make_case private-nm-agent-unloaded)
   write_meta "$case_dir" no-mistakes ship
@@ -3277,14 +3469,13 @@ test_private_nm_launch_agent_not_loaded_is_archived() {
   rc=0
   FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 0 "$rc" "private-nm-agent-unloaded: teardown should finish"
+  expect_code 1 "$rc" "private-nm-agent-unloaded: teardown must refuse"
   for hash in 1 2 3 4 5 6 7; do
     label="$NM_AGENT_PREFIX.$hash"
-    assert_absent "$case_dir/launchagents/$label.plist" "private-nm-agent-unloaded: plist still installed"
-    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
-      "private-nm-agent-unloaded: plist not archived"
+    assert_present "$case_dir/launchagents/$label.plist" "private-nm-agent-unloaded: plist moved"
   done
-  pass "a private no-mistakes plist with no loaded service is still archived"
+  assert_absent "$case_dir/data/task-x1/launchagent-backup" "private-nm-agent-unloaded: a plist was archived"
+  pass "an in-copy plist with no loaded service refuses with every plist left installed"
 }
 
 test_docker_differently_named_metadata_hardlinks_preserve_longer_siblings() {
@@ -3437,7 +3628,7 @@ test_docker_failed_lane_scan_names_its_cause() {
   before=$(cat "$store")
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in
   kill-window|kill-pane) : > "$case_dir/lane-scan-armed" ;;
 esac
@@ -4282,7 +4473,7 @@ test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup(
   prepare_teardown_source_copy "$case_dir"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/tmux.log"
 exit 0
 SH
@@ -5797,7 +5988,7 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
   late=$FOREIGN_SLOT/.claude/worktrees/fc-late
   cat > "$FOREIGN_CASE/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$FOREIGN_CASE/pane-pid" ] || cat "$FOREIGN_CASE/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$FOREIGN_CASE/pane-rows" ]; then cat "$FOREIGN_CASE/pane-rows"; elif [ -f "$FOREIGN_CASE/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$FOREIGN_CASE/pane-pid")"; fi ;; esac
 case "\${1:-}" in
   kill-window)
     : > "$FOREIGN_CASE/closing"
@@ -6820,6 +7011,39 @@ test_a_detached_process_at_the_slot_root_does_not_make_its_child_teardowns_own()
   teardown_fixture_stop "$FOREIGN_LAUNCHER"
   teardown_fixture_stop "$FOREIGN_AGENT"
   pass "a detached daemon at the slot root is no ownership anchor: its child launcher is not signalled and the copy is kept"
+}
+
+# Every scan decides before the first signal: with an unproven daemon at the
+# slot root beside a proved process whose child is the nested copy's lock
+# launcher, teardown refuses with nothing signalled, the proved launcher
+# included.
+test_a_mixed_slot_refuses_before_signalling_the_proved_nested_launcher() {
+  local rc
+  start_foreign_session_case foreign-mixed-anchor child
+  ownership_detached "$FOREIGN_SLOT" setsid
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*)
+    if kill -0 $FOREIGN_AGENT 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $FOREIGN_AGENT '$FOREIGN_SLOT'; fi
+    if kill -0 $OWN_DETACHED_PID 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $OWN_DETACHED_PID '$FOREIGN_SLOT'; fi
+    exit 0 ;;
+esac
+exit 1
+SH
+  run_foreign_teardown rc
+  kill -0 "$OWN_DETACHED_PID" 2>/dev/null || fail "mixed-anchor: the unproven daemon was signalled"
+  kill -0 "$FOREIGN_LAUNCHER" 2>/dev/null || fail "mixed-anchor: the proved launcher was signalled before the refusal"
+  kill -0 "$FOREIGN_AGENT" 2>/dev/null || fail "mixed-anchor: the proved session was signalled before the refusal"
+  expect_code 1 "$rc" "mixed-anchor: teardown must refuse: $(tail -3 "$FOREIGN_CASE/stderr")"
+  [ ! -f "$FOREIGN_CASE/state/task-x1.teardown-processes" ] \
+    || fail "mixed-anchor: teardown audited a signal: $(cat "$FOREIGN_CASE/state/task-x1.teardown-processes")"
+  grep -Eq "REFUSED: process $OWN_DETACHED_PID .*nothing proves it belongs to task-x1" "$FOREIGN_CASE/stderr" \
+    || fail "mixed-anchor: the refusal did not name the daemon: $(tail -3 "$FOREIGN_CASE/stderr")"
+  assert_foreign_copy_untouched mixed-anchor
+  teardown_fixture_stop "$OWN_DETACHED_PID"
+  kill "$FOREIGN_LAUNCHER" 2>/dev/null || true
+  pass "an unproven daemon at the slot root beside a proved nested launcher refuses with nothing signalled"
 }
 
 # A live launcher outside the task's session keeps its copy untouched. One inside
@@ -9063,6 +9287,9 @@ test_teardown_without_a_provable_pane_refuses_a_root_process
 test_teardown_proof_survives_the_parent_the_reap_ends
 test_teardown_refuses_an_orphan_it_cannot_prove
 test_teardown_grace_child_that_leaves_the_group_is_refused
+test_teardown_tmux_anchor_needs_the_one_recorded_pane
+test_teardown_recycled_group_proves_nothing
+test_tasktmp_only_route_names_an_unproven_holder_and_continues
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races
@@ -9079,7 +9306,8 @@ test_lsof_absent_refuses_without_signalling
 test_lsof_error_refuses_before_removal
 test_reused_pid_identity_is_not_force_killed
 test_exec_changed_process_is_still_reaped
-test_process_spawned_during_grace_is_reaped_on_later_pass
+test_process_spawned_during_grace_after_its_parent_exits_is_refused
+test_process_spawned_during_grace_by_a_live_parent_is_reaped
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
@@ -9175,6 +9403,7 @@ test_live_launcher_keeps_its_foreign_copy
 test_task_own_session_as_lock_launcher_does_not_block_release
 test_unrelated_or_stubborn_lock_launcher_keeps_its_foreign_copy
 test_a_detached_process_at_the_slot_root_does_not_make_its_child_teardowns_own
+test_a_mixed_slot_refuses_before_signalling_the_proved_nested_launcher
 test_process_in_foreign_copy_keeps_it
 test_task_own_process_inside_foreign_copy_is_ended_and_released
 test_two_foreign_copies_are_released_together_or_not_at_all
@@ -9197,13 +9426,13 @@ test_locked_own_nested_copy_stays_when_a_foreign_copy_is_refused
 test_locked_own_nested_copy_is_released_before_the_project_lock_wait
 test_closeout_refusal_reports_tail_and_preserves_complete_output
 test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records
-test_private_nm_launch_agent_is_retired_before_teardown
-test_private_nm_launch_agent_equivalent_roots_are_retired
+test_in_copy_nm_launch_agent_refuses_without_a_creation_record
+test_in_copy_nm_launch_agent_equivalent_roots_refuse
 test_foreign_nm_launch_agents_are_left_alone
 test_nested_nm_launch_agents_are_left_alone
 test_absent_copy_nm_launch_agents_preserve_nested_ownership
-test_private_nm_launch_agent_bootout_failure_refuses
-test_private_nm_launch_agent_not_loaded_is_archived
+test_in_copy_nm_launch_agent_refuses_even_with_force
+test_in_copy_nm_launch_agent_not_loaded_refuses
 test_teardown_removes_the_tasks_own_docker_stacks
 test_docker_differently_named_metadata_hardlinks_preserve_longer_siblings
 test_docker_removal_failure_keeps_the_task_records_until_a_rerun_succeeds

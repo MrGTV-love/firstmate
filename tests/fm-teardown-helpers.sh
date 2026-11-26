@@ -206,16 +206,16 @@ make_case() {
 # `treehouse return --force <wt>`: succeed silently.
 exit 0
 SH
-  # tmux kill-window etc. succeed silently. The task pane's shell pid, the
-  # anchor of teardown's process ownership proof, is read from the case's
-  # pane-pid file: by default this test runner's own shell, the parent of every
-  # teardown_fixture_start process, so those fixtures are the task's leaks.
-  # Ownership cases point it at a dedicated fake pane process instead.
+  # tmux kill-window etc. succeed silently. Teardown's process ownership proof
+  # anchors on the task pane's shell, which it finds with list-panes as the only
+  # pane of the recorded window: the case's pane-rows file is that listing
+  # verbatim (window name, pane id, pane pid), and without one a single row for
+  # fm-task-x1 carries the case's pane-pid file, by default this test runner's
+  # own shell, the parent of every teardown_fixture_start process, so those
+  # fixtures are the task's leaks. Ownership cases point it elsewhere.
   cat > "$fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in
-  *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;;
-esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 exit 0
 SH
   printf '%s\n' "$$" > "$case_dir/pane-pid"
@@ -2226,7 +2226,7 @@ printf '%s\n' '{"ok":true}'
 EOF
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in
   kill-window|kill-pane) exec "$case_dir/fakebin/child-boundary" "\$@" ;;
 esac
@@ -2470,7 +2470,7 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -2590,7 +2590,7 @@ nested_seed_task_files() {
   printf 'tasktmp=%s\n' "$case_dir/tasktmp" >> "$case_dir/state/task-x1.meta"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint.log" ;; esac
 exit 0
 SH
@@ -2787,7 +2787,7 @@ stuck_endpoint_tmux() {  # <case-dir>
   local case_dir=$1
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
 if [ -e "$case_dir/endpoint-stuck" ]; then
   case "\${1:-}" in
     kill-window) exit 1 ;;
