@@ -165,7 +165,8 @@
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
     "teardown-entry-preflight",
-    "guard-lint-touched-registry"
+    "guard-lint-touched-registry",
+    "backpass-core-role-inputs"
   ],
   "guards": [
     {
@@ -7650,6 +7651,34 @@
       "precheck_gap": "",
       "exemptions": [],
       "instrumented": true,
+      "status": "active"
+    },
+    {
+      "id": "backpass-core-role-inputs",
+      "version": "1",
+      "owner": "bin/fm-backpass.mjs",
+      "sites": [
+        {"file": "bin/fm-backpass.mjs", "match": "refusing an older core"}
+      ],
+      "invariant": "bin/fm-backpass.mjs launches an adopted Backpass core only when that core supports validated application role inputs, refusing older cores rather than silently dropping selected roles.",
+      "layer": "runtime-block",
+      "source": "the resolved Backpass core module exports and validated application role input arguments",
+      "trigger": "the resolved Backpass core module lacks validated application role input support when bin/fm-backpass.mjs invokes it",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "update or install a Backpass core that supports validated application role inputs before running bin/fm-backpass.mjs",
+      "budget": 1,
+      "budget_reason": "one preflight capability check per invocation",
+      "telemetry": "none; preflight refusal exits before launching Backpass",
+      "test": "tests/fm-dispatch-resolve.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
       "status": "active"
     }
   ],
