@@ -1,0 +1,5 @@
+2026-11-26T00:18:29Z
+runner: tests/fm-backend-herdr.test.sh definitions (everything before the unrelated server-start python suite), then only test_missing_registration_requires_process_evidence
+ok - herdr missing registration: only process proof establishes live agents or agent-free shells
+bash $S/tests/fm-backend-herdr.test.sh  5.27s user 15.01s system 5% cpu 6:43.70 total
+exit=0

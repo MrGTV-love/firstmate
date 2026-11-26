@@ -1,0 +1,26 @@
+2026-11-26T00:10:43Z
+
+=== bun-then-agent (pane w1:p1)
+Herdr foreground: [{"pid":66520,"name":"bash"}]
+real descendant tree of shell 55859 (pid ppid stat comm):
+BASE sample: shell
+HEAD sample: shell
+
+=== foreign-bun (pane w2:p1)
+Herdr foreground: [{"pid":67844,"name":"zsh"}]
+real descendant tree of shell 67844 (pid ppid stat comm):
+ 1632 67844 R+   (zsh)
+BASE sample: shell
+HEAD sample: shell
+
+=== agent-only (pane w3:p1)
+Herdr foreground: [{"pid":24250,"name":"zsh"}]
+real descendant tree of shell 24250 (pid ppid stat comm):
+BASE sample: shell
+HEAD sample: shell
+
+=== teardown
+herdr lab fm-lab-walk-97712-20788 torn down
+lab job PIDs recorded:    ; still alive after teardown: none
+scratch removed
+script exit=0

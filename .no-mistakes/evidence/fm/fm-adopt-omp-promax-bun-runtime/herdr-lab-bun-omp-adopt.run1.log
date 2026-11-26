@@ -1,0 +1,59 @@
+2026-11-25T23:21:27Z
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.EWRwxu herdr session=fm-lab-bunadopt-40250-15252 head=40c3578be3572c538184b316dfe3cfc13b6cbc4c base=7db75b5ab
+
+=== session lock: this shell's harness takes the lab home lock (the lock-owning main Firstmate)
+lock acquired: harness pid 53360
+lock acquired in lab home
+
+=== launch: natively resume the installed omp-promax Bun runtime in the lab pane (no prompt is submitted)
+
+=== Herdr pane process-info (real Herdr, real installed omp; environment not read)
+{"shell_pid":31271,"foreground_processes":[{"pid":95302,"name":"bun","argv0":"bun","argv":["/Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun","/Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts","--resume=/Users/charlesabrooker/tmp/fm-bunadopt.I582J2/task-session.jsonl"]}]}
+ps comm: /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun
+
+=== Herdr agent registration for the pane
+{"agent":null,"agent_session":null}
+
+=== identity predicate on the live PID: BASE vs HEAD fm_launch_proof_pid_is_omp
+BASE: is_omp=no
+HEAD: is_omp=yes
+HEAD fm-omp-identity.py interactive: {"verdict": "interactive", "start": "1795648977.890347", "pid": 95302}
+ exit=0
+HEAD fm-omp-identity.py writer:      may own: the installed omp interactive agent
+ exit=0
+HEAD fm-omp-identity.py holds task session:  exit=1
+
+=== incident symptom at HEAD before adopt: interrupt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.EWRwxu
+error: task bunadopt-task's endpoint reads 'unreadable' rather than a positively classified state; refusing to send a lifecycle key into an unattributed endpoint
+exit=1
+
+=== BASE adopt (expected red: process proof refusal)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.EWRwxu
+adopt refused: process proof needs the resolved foreground process to be a readable omp process
+exit=1
+record and meta unchanged by base adopt
+
+=== HEAD adopt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.EWRwxu
+adopt refused: session proof needs a readable omp session-file registration on the recorded pane
+exit=1
+record now: {"version":1,"spawn_gen":"gen-before-reboot","pid":2000000001,"task_session_file":"/Users/charlesabrooker/tmp/fm-bunadopt.I582J2/task-session.jsonl","current_session_file":""}
+record and meta unchanged
+
+=== screen tail
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 19.2.1 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+╭── π > ⬢ GPT-4.1 > 🌳 proj/wt > ⑂ fm/bunadopt-task ▶─0.7%────────────────────────────────────────────╎─┃────────1M───╮
+╰─                                                                                                                   ─╯
+
+=== teardown
+herdr lab fm-lab-bunadopt-40250-15252 torn down
+no lab process left under /Users/charlesabrooker/tmp/fm-bunadopt.I582J2
+lab home removed
+scratch removed
+script exit=0

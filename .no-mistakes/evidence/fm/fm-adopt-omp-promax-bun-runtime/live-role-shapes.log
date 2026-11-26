@@ -1,0 +1,59 @@
+2026-11-26T00:38:48Z
+40c3578be3572c538184b316dfe3cfc13b6cbc4c
+
+=== installed launcher, interactive, terminal stdin (expect interactive)
+argv: ['/Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax', '--no-session']
+stdin: tty; alive after 6s: True
+  interactive: exit=0 {"verdict": "interactive", "start": "1795653529.874187", "pid": 58993}
+  writer: exit=0 may own: the installed omp interactive agent
+
+=== installed launcher, --mode rpc (expect refused: protocol role)
+argv: ['/Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax', '--no-session', '--mode', 'rpc']
+stdin: tty; alive after 6s: True
+  interactive: exit=1 refused: a --mode run is a protocol or text role
+  writer: exit=0 may own: a --mode run is a protocol or text role
+
+=== installed launcher, --mode=rpc (expect refused: protocol role)
+argv: ['/Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax', '--no-session', '--mode=rpc']
+stdin: tty; alive after 6s: True
+  interactive: exit=1 refused: a --mode run is a protocol or text role
+  writer: exit=0 may own: a --mode run is a protocol or text role
+
+=== installed launcher, one argument value containing '--mode rpc' (expect interactive)
+argv: ['/Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax', '--no-session', '--system-prompt', 'hello --mode rpc']
+stdin: tty; alive after 6s: True
+  interactive: exit=0 {"verdict": "interactive", "start": "1795653592.440660", "pid": 28240}
+  writer: exit=0 may own: the installed omp interactive agent
+
+=== installed launcher, piped stdin held open, no prompt (expect refused: stdin not a terminal)
+argv: ['/Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax', '--no-session']
+stdin: pipe; alive after 6s: True
+  interactive: exit=1 refused: standard input is pipe, not a terminal: omp runs this as headless print mode
+  writer: exit=0 may own: standard input is pipe, not a terminal: omp runs this as headless print mode
+
+=== foreign executable presenting the installed runtime and script as argv (expect refused)
+argv: ['/Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun', '/Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts', '--no-session']  (kernel executable: /Users/charlesabrooker/tmp/fm-role-shapes.lh166yrx/sleeper)
+stdin: tty; alive after 2s: True
+  interactive: exit=1 refused: the executable is not a bun in a bin directory now
+  writer: exit=0 may own: the executable is not a bun in a bin directory now
+
+=== bun run dev (relative non-cli.ts argv[1]: expect writer unrelated)
+argv: ['/Users/charlesabrooker/.bun/bin/bun', 'run', 'dev']
+stdin: tty; alive after 4s: True
+  interactive: exit=1 refused: the script argument is not a cli.ts
+  writer: exit=1 unrelated: the script argument is not a cli.ts
+
+=== bun src/cli.ts relative (expect writer may-own, unresolved; interactive refused)
+argv: ['/Users/charlesabrooker/.bun/bin/bun', 'src/cli.ts']
+stdin: tty; alive after 4s: True
+  interactive: exit=2 unresolved: the script argument is a relative cli.ts, which the raw arguments cannot place
+  writer: exit=0 may own: the script argument is a relative cli.ts, which the raw arguments cannot place
+
+=== installed runtime on a scratch .../src/cli.ts (expect interactive refused)
+argv: ['/Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun', '/Users/charlesabrooker/tmp/fm-role-shapes.lh166yrx/proj/src/cli.ts']
+stdin: tty; alive after 4s: True
+  interactive: exit=1 refused: the script is not in the omp package now
+  writer: exit=0 may own: the script is not in the omp package now
+
+scratch removed: True
+exit=0

@@ -1,0 +1,29 @@
+......E......................
+======================================================================
+ERROR: test_guard_and_adapter_starts_race_to_one_server (__main__.StartupSafety.test_guard_and_adapter_starts_race_to_one_server)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M89ZXZ9VW8VWPZ6FSYSAKDBK/tests/herdr-server-start-fixture.py", line 387, in test_guard_and_adapter_starts_race_to_one_server
+    out, err = ensure.communicate(timeout=CALL_SECONDS)
+               ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 1395, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 2424, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        skip_check_and_raise=True)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 1434, in _check_timeout
+    raise TimeoutExpired(
+    ...<2 lines>...
+            stderr=b''.join(stderr_seq) if stderr_seq else None)
+subprocess.TimeoutExpired: Command '['bash', '-c', '. "$1/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure "$2"', 'fixture', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M89ZXZ9VW8VWPZ6FSYSAKDBK', 'fm-lab-start-y26sde01']' timed out after 30 seconds
+
+----------------------------------------------------------------------
+Ran 29 tests in 385.503s
+
+FAILED (errors=1)
+not ok - Herdr server startup safety regression
+bash tests/fm-backend-herdr.test.sh   8.50s user 14.53s system 4% cpu 9:03.55 total
+exit=1

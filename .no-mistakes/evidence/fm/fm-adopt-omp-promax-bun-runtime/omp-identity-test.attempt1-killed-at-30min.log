@@ -1,0 +1,12 @@
+ok - classifier: every recognized name keeps its verdict and the installed Bun shape stays other, owned by the identity rule
+ok - session binding: only a process holding the task session open for writing is tied to it; another session, none and unreadable are not
+ok - proc-info exe, argv, stdin read kernel facts with argument boundaries and fail for a missing process
+ok - incarnation: the delivered start identity separates same-second processes; a whole-second source cannot
+ok - identity: the process's own tree decides; a wrong package or a missing marker is foreign, and unreadable evidence is unresolved
+ok - replay: a capture is judged from its stored evidence alone, with the tree gone
+ok - role: worker roles, print, protocol, acp, subcommands and headless input are refused; the worker launch is admitted
+ok - live processes: actual executable, resolved script and role decide; foreign look-alikes, helpers and headless runs are refused
+ok - fail closed: unreadable evidence admits nothing; a process that started before the tree changed stays unresolved, and a fresh launch is admitted once the evidence returns
+ok - writer check fails open on any role or unreadable identity; adoption target fails closed; unrelated and dead pids may be replaced
+ok - PATH: a native omp first changes nothing: the Bun agent is recognized, a foreign Bun stays unrelated and a dead writer stays free
+ok - helper failure: a crash, a TypeError or a missing python3 is may-own in the writer check and never admits an adoption

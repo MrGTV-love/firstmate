@@ -1,0 +1,89 @@
+2026-11-25T23:35:02Z
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.QgYf2R herdr session=fm-lab-bunadopt-88872-13240 head=40c3578be3572c538184b316dfe3cfc13b6cbc4c base=7db75b5ab
+integration files: ./.omp/agent/extensions/herdr-omp-agent-state.ts ./.omp/agent/config.yml 
+
+=== session lock: this shell's harness takes the lab home lock (the lock-owning main Firstmate)
+lock acquired: harness pid 53360
+lock acquired in lab home
+
+=== launch: natively resume the installed omp-promax Bun runtime in the lab pane (no prompt is submitted)
+
+=== Herdr pane process-info (real Herdr, real installed omp; environment not read)
+{"shell_pid":33556,"foreground_processes":[{"pid":43404,"name":"bun","argv0":"bun","argv":["/Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun","/Users/charlesabrooker/.local/share/omp-promax-fix/src/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts","--resume=/Users/charlesabrooker/tmp/fm-bunadopt.0MVrLr/task-session.jsonl"]}]}
+ps comm: /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun
+
+=== Herdr agent registration for the pane (native, before any stand-in)
+{"agent":null,"agent_session":null}
+{"error":{"code":"agent_not_found","message":"agent target w1:p1 not found"},"id":"cli:agent:explain"}
+
+=== STAND-IN: report the restored registration Herdr kept for the task (omp, task session path), as Herdr's native restore leaves it
+{"agent":"omp","agent_session":null}
+
+=== identity predicate on the live PID: BASE vs HEAD fm_launch_proof_pid_is_omp
+BASE: is_omp=no
+HEAD: is_omp=yes
+HEAD fm-omp-identity.py interactive: {"verdict": "interactive", "start": "1795649759.607797", "pid": 43404}
+ exit=0
+HEAD fm-omp-identity.py writer:      may own: the installed omp interactive agent
+ exit=0
+HEAD fm-omp-identity.py holds task session:  exit=1
+
+=== incident symptom at HEAD before adopt: interrupt (relaunch is not run: a successful relaunch would start a real omp)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.QgYf2R
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M89ZXZ9VW8VWPZ6FSYSAKDBK/bin/fm-launch-proof-lib.sh: line 29: printf: write error: Broken pipe
+error: task bunadopt-task cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+exit=1
+
+=== the idle resumed omp holds no session file; type a titled /rename into the LAB omp (no model call) so it writes its session
+holds task session after rename:  exit=0
+open session files: 1
+
+=== BASE adopt (expected red: process proof refusal)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.QgYf2R
+adopt refused: process proof needs the resolved foreground process to be a readable omp process
+exit=1
+record and meta unchanged by base adopt
+
+=== HEAD adopt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.QgYf2R
+adopt refused: session proof needs a readable omp session-file registration on the recorded pane
+exit=1
+record now: {"version":1,"spawn_gen":"gen-before-reboot","pid":2000000001,"task_session_file":"/Users/charlesabrooker/tmp/fm-bunadopt.0MVrLr/task-session.jsonl","current_session_file":""}
+record and meta unchanged
+
+=== FOREIGN bunadopt-other-script: foreground {"pid":89842,"name":"bun","argv":["/Users/charlesabrooker/.bun/bin/bun","/Users/charlesabrooker/tmp/fm-bunadopt.0MVrLr/other/server.ts"]}
+HEAD interactive: refused: the script argument is not a cli.ts
+ exit=1
+HEAD writer: unrelated: the script argument is not a cli.ts
+ exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.QgYf2R
+adopt refused: process proof needs the resolved foreground process to be a readable omp process
+HEAD adopt exit=1
+record and meta unchanged
+
+=== FOREIGN bunadopt-runtime-other-cli: foreground {"pid":55558,"name":"bun","argv":["/Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun","/Users/charlesabrooker/tmp/fm-bunadopt.0MVrLr/other/src/cli.ts"]}
+HEAD interactive: refused: the script is not in the omp package now
+ exit=1
+HEAD writer: may own: the script is not in the omp package now
+ exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.QgYf2R
+adopt refused: process proof needs the resolved foreground process to be a readable omp process
+HEAD adopt exit=1
+record and meta unchanged
+
+=== screen tail
+ Update Available
+ New version 19.2.1 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Session renamed to "lab-title".
+
+╭── π > ⬢ GPT-4.1 > 🌳 proj/wt > ⑂ fm/bunadopt-task ▶─0.7%──────────────────────────────────╎─┃──────1M─◀ lab-title ──╮
+╰─                                                                                                                   ─╯
+
+=== teardown
+herdr lab fm-lab-bunadopt-88872-13240 torn down
+no lab process left under /Users/charlesabrooker/tmp/fm-bunadopt.0MVrLr
+lab home removed
+scratch removed
+script exit=0

@@ -1,0 +1,40 @@
+2026-11-26T00:07:56Z
+
+=== suspended-omp (pane w1:p1)
+Herdr foreground: [{"pid":32814,"name":"zsh"}]
+real descendants of shell 32814:
+56515 32814 RN   /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun
+BASE sample: shell
+HEAD sample: other
+
+=== bun-then-agent (pane w2:p1)
+Herdr foreground: [{"pid":95342,"name":"zsh"}]
+real descendants of shell 95342:
+BASE sample: shell
+HEAD sample: other
+
+=== bun-only (pane w3:p1)
+Herdr foreground: [{"pid":37881,"name":"zsh"}]
+real descendants of shell 37881:
+53090 37881 SN   /Users/charlesabrooker/.bun/bin/bun
+BASE sample: shell
+HEAD sample: other
+
+=== foreign-bun (pane w4:p1)
+Herdr foreground: [{"pid":17232,"name":"bash"}]
+real descendants of shell 96670:
+17232 96670 S+   bash
+BASE sample: unreadable
+HEAD sample: shell
+
+=== empty (pane w5:p1)
+Herdr foreground: [{"pid":90182,"name":"zsh"}]
+real descendants of shell 90182:
+BASE sample: shell
+HEAD sample: shell
+
+=== teardown
+herdr lab fm-lab-walk-26116-22107 torn down
+lab job PIDs recorded:  56515  25523  53090  17232  ; still alive after teardown: none
+scratch removed
+script exit=0

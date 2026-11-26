@@ -1,0 +1,57 @@
+2026-11-26T00:13:13Z
+
+=== bun-then-agent (pane w1:p1)
+Herdr foreground: [{"pid":45532,"name":"zsh"}]
+real descendant tree of shell 45532 (pid ppid stat comm):
+pane screen tail:
+ooker/tmp/fm-walk.lSLMgI/omp 600 &
+charlesabrooker@Mac-Studio fm-walk.lSLMgI % /Users/charlesabrooker/.bun/bin/bun /Users/charlesabrooker/tmp/fm-walk.lSLM
+gI/x/src/cli.ts & sleep 1; /Users/charlesabrooker/tmp/fm-walk.lSLMgI/omp 600 &
+[1] 46474
+BASE sample: other
+HEAD sample: other
+
+=== foreign-bun (pane w2:p1)
+Herdr foreground: [{"pid":14253,"name":"zsh"}]
+real descendant tree of shell 14253 (pid ppid stat comm):
+pane screen tail:
+charlesabrooker@Mac-Studio fm-walk.lSLMgI % /Users/charlesabrooker/.bun/bin/bun /Users/charlesabrooker/tmp/fm-walk.lSLM
+gI/x/server.ts &
+[1] 61045
+charlesabrooker@Mac-Studio fm-walk.lSLMgI %
+BASE sample: shell
+HEAD sample: shell
+
+=== agent-only (pane w3:p1)
+Herdr foreground: [{"pid":80068,"name":"bash"}]
+real descendant tree of shell 74134 (pid ppid stat comm):
+80068 74134 R+   bash
+pane screen tail:
+/Users/charlesabrooker/tmp/fm-walk.lSLMgI/omp 600 &
+BASE sample: shell
+HEAD sample: unreadable
+
+=== suspended-omp (pane w4:p1)
+Herdr foreground: [{"pid":55885,"name":"zsh"}]
+real descendant tree of shell 55885 (pid ppid stat comm):
+92183 55885 RN   /Users/charlesabrooker/.local/share/omp-promax-fix/runtime/node_modules/@oven/bun-darwin-aarch64/bin/bun
+pane screen tail:
+charlesabrooker@Mac-Studio fm-walk.lSLMgI % env HOME=/Users/charlesabrooker/tmp/fm-walk.lSLMgI/home OMP_SKIP_SETUP=1 OP
+ENAI_API_KEY=fm-non-submitting-fixture /Users/charlesabrooker/.local/share/omp-promax-fix/omp-promax --no-session &
+[1] 92183
+charlesabrooker@Mac-Studio fm-walk.lSLMgI %
+BASE sample: shell
+HEAD sample: other
+
+=== empty (pane w5:p1)
+Herdr foreground: [{"pid":44264,"name":"zsh"}]
+real descendant tree of shell 44264 (pid ppid stat comm):
+pane screen tail:
+BASE sample: shell
+HEAD sample: shell
+
+=== teardown
+herdr lab fm-lab-walk-9135-20954 torn down
+lab job PIDs recorded:   60448   92183  ; still alive after teardown: none
+scratch removed
+script exit=0
