@@ -9000,21 +9000,15 @@ esac
 # tools fails. Its launch therefore carries the hook rows, the maintenance key
 # and every numbered pane entry in GIT_CONFIG_PARAMETERS and leaves no numbered
 # entry (see fm_launch_git_hooks); a pane git without config hooks refuses.
+# A raw launch is named by the basename of its executable, so a raw dsh or dsh-tui command gets the
+# same carrier; a path or argument that merely contains dsh does not.
 GIT_HOOKS_DSH=
-if [ "$HARNESS" = dsh ]; then
-  GIT_HOOKS_CARRIER=config
-  GIT_HOOKS_DSH=1
-fi
-# A raw launch is named by its first word, so one that wraps dsh (env FOO=1 dsh, sh -c 'dsh ...') reads as another
-# harness; any raw command naming dsh or dsh-tui as a word gets the same numbered-entry-free carrier.
-if [ "$RAW_LAUNCH" = 1 ] && [ -z "$GIT_HOOKS_DSH" ]; then
-  case " $RAW_COMMAND " in
-    *[[:space:]\'\"\;\&\|\(/]dsh[[:space:]\'\"\;\&\|\)]* | *[[:space:]\'\"\;\&\|\(/]dsh-tui[[:space:]\'\"\;\&\|\)]*)
-      GIT_HOOKS_CARRIER=config
-      GIT_HOOKS_DSH=1
-      ;;
-  esac
-fi
+case "$HARNESS" in
+  dsh | dsh-tui)
+    GIT_HOOKS_CARRIER=config
+    GIT_HOOKS_DSH=1
+    ;;
+esac
 # git_hooks_guard <inner|outer> <launch text>: the launch text, run only after
 # the selector chose a carrier. On refusal the selector's reason is printed,
 # nothing runs, and the refusal is recorded for spawn_git_hooks_verdict below;

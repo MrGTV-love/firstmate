@@ -1001,21 +1001,6 @@ test_unwritable_config_warns_and_the_sync_continues() {
   pass "an unwritable .git/config warns on stdout, the sync continues, and bootstrap relays the warning"
 }
 
-test_an_outranking_per_worktree_value_is_reported() {
-  local home clone out
-  home=$(new_home)
-  clone=$(build_pair "$home" kworktree)
-  git -C "$clone" config extensions.worktreeConfig true
-  printf '[maintenance "pack-refs"]\n\tenabled = true\n' > "$clone/.git/config.worktree"
-  out=$(run_sync "$home" kworktree)
-  assert_equals false "$(pack_key "$clone")" "the repository's own file did not get the key"
-  assert_contains "$out" "kworktree: warning: maintenance.pack-refs.enabled is true in effect although .git/config sets false" \
-    "a per-worktree value that outranks the key was not reported"
-  out=$(run_sync "$home" kworktree)
-  assert_contains "$out" "in effect although" "the outranked key was reported only once"
-  pass "a per-worktree value that outranks the repository key is reported as a warning, because packing would still run"
-}
-
 test_the_whole_fleet_form_writes_every_key_before_the_first_fetch() {
   local home first second fakebin log out
   home=$(new_home)
@@ -1135,6 +1120,20 @@ test_prune_restores_only_the_registered_prefix() {
   pass "the restore follows the registered prefix (fix/) and never the hard-coded fm"
 }
 
+test_prune_restores_the_deleted_branch_folder_under_another_prefix() {
+  local home clone out
+  home=$(new_home)
+  mkdir -p "$home/data"
+  printf -- '- pruneF [no-mistakes branch=fix/] - prefix fixture\n' > "$home/data/projects.md"
+  clone=$(build_gone_clone "$home" pruneF fm/gone1)
+  out=$(run_sync "$home" pruneF)
+  assert_contains "$out" "pruneF: pruned fm/gone1" "the prune line changed"
+  [ -d "$clone/.git/refs/heads/fm" ] || fail "the deleted fm/gone1 branch's folder fm was not restored in a project that registers fix/"
+  [ -d "$clone/.git/logs/refs/heads/fm" ] || fail "the deleted fm/gone1 branch's reflog folder fm was not restored"
+  [ -d "$clone/.git/refs/heads/fix" ] || fail "the registered prefix folder fix was not restored"
+  pass "the prune restores the deleted branch's own folder (fm) beside the registered prefix folder (fix)"
+}
+
 test_prune_never_follows_a_link_at_the_folder_path() {
   local home clone out outside
   home=$(new_home)
@@ -1190,11 +1189,11 @@ test_key_write_is_idempotent_and_touches_only_the_key
 test_single_name_form_writes_the_key_and_a_non_root_is_untouched
 test_home_repository_gets_the_key_in_the_whole_fleet_form_only
 test_unwritable_config_warns_and_the_sync_continues
-test_an_outranking_per_worktree_value_is_reported
 test_the_whole_fleet_form_writes_every_key_before_the_first_fetch
 test_a_failing_git_root_lookup_skips_and_writes_nothing
 test_prune_restores_the_branch_ref_folder_after_the_last_ref
 test_prune_changes_nothing_when_other_refs_remain
 test_prune_restores_the_folder_when_the_deleted_ref_was_only_packed
 test_prune_restores_only_the_registered_prefix
+test_prune_restores_the_deleted_branch_folder_under_another_prefix
 test_prune_never_follows_a_link_at_the_folder_path

@@ -902,12 +902,13 @@ test_teardown_restores_the_branch_ref_folder_after_a_packed_only_delete() {
   pass "teardown restores refs/heads/fm after deleting a packed-only task branch"
 }
 
-test_teardown_restores_only_the_registered_prefix_and_never_follows_a_link() {
+test_teardown_restores_the_registered_and_the_deleted_branch_folder_and_never_follows_a_link() {
   local case_dir outside
   case_dir=$(run_branch_dirs_teardown branchdirs-prefix "- project [no-mistakes branch=fix/] - prefix fixture")
   assert_equals 0 "$(cat "$case_dir/rc")" "branchdirs-prefix: teardown failed: $(cat "$case_dir/stderr")"
   [ -d "$case_dir/project/.git/refs/heads/fix" ] || fail "branchdirs-prefix: the registered folder fix was not restored"
-  [ ! -e "$case_dir/project/.git/refs/heads/fm" ] || fail "branchdirs-prefix: a folder for the default prefix was made"
+  [ -d "$case_dir/project/.git/refs/heads/fm" ] || fail "branchdirs-prefix: the deleted fm/task-x1 branch's folder fm was not restored beside the registered fix"
+  [ -d "$case_dir/project/.git/logs/refs/heads/fm" ] || fail "branchdirs-prefix: the deleted branch's reflog folder fm was not restored"
   # A link at the first component of a two-segment prefix is never followed.
   case_dir=$TMP_ROOT/branchdirs-link
   outside="$TMP_ROOT/branchdirs-link-outside"
@@ -927,7 +928,7 @@ test_teardown_restores_only_the_registered_prefix_and_never_follows_a_link() {
   assert_equals 0 "$(cat "$case_dir/rc")" "branchdirs-link: teardown failed: $(cat "$case_dir/stderr")"
   assert_equals "" "$(ls -A "$outside")" "branchdirs-link: the restore made something behind the link at refs/heads/team"
   [ -L "$case_dir/project/.git/refs/heads/team" ] || fail "branchdirs-link: the link was replaced"
-  pass "teardown restores only the registered prefix and never follows a link at its folder path"
+  pass "teardown restores the registered prefix folder and the deleted branch's own folder, and never follows a link at its folder path"
 }
 
 test_teardown_skips_pipeline_spend_when_disabled() {
@@ -8718,7 +8719,7 @@ test_teardown_records_the_task_pipeline_spend
 test_teardown_skips_pipeline_spend_when_disabled
 test_teardown_restores_the_branch_ref_folder_after_the_last_ref
 test_teardown_restores_the_branch_ref_folder_after_a_packed_only_delete
-test_teardown_restores_only_the_registered_prefix_and_never_follows_a_link
+test_teardown_restores_the_registered_and_the_deleted_branch_folder_and_never_follows_a_link
 test_teardown_records_unavailable_spend_for_a_gone_worktree
 test_parked_own_run_is_aborted_before_teardown
 test_parked_own_run_concludes_on_passed_with_override_after_abort

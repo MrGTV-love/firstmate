@@ -1073,11 +1073,12 @@ test_orca_teardown_restores_the_branch_ref_folder() {
   [ -d "$BD_PROJ/.git/refs/heads/fm" ] || fail "Orca packed-only teardown left refs/heads/fm absent"
   run_orca_branch_dirs prefix
   [ -d "$BD_PROJ/.git/refs/heads/fix" ] || fail "Orca teardown did not restore the registered prefix folder"
-  [ ! -e "$BD_PROJ/.git/refs/heads/fm" ] || fail "Orca teardown made a folder for the default prefix"
+  [ -d "$BD_PROJ/.git/refs/heads/fm" ] || fail "Orca teardown did not restore the deleted fm/ branch's folder beside the registered fix"
+  [ -d "$BD_PROJ/.git/logs/refs/heads/fm" ] || fail "Orca teardown did not restore the deleted fm/ branch's reflog folder"
   run_orca_branch_dirs link
   assert_equals "" "$(ls -A "$BD_OUTSIDE")" "Orca teardown made something behind the link at refs/heads/team"
   [ -L "$BD_PROJ/.git/refs/heads/team" ] || fail "Orca teardown replaced the link"
-  pass "fm-teardown.sh backend=orca: the task-branch delete restores the registered branch-ref folder, and never follows a link"
+  pass "fm-teardown.sh backend=orca: the task-branch delete restores the registered and the deleted branch's branch-ref folders, and never follows a link"
 }
 
 test_teardown_skips_orca_worktree_when_path_missing() {

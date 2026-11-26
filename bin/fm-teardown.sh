@@ -5750,7 +5750,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
           git -C "$teardown_slot" branch -D "$branch" >/dev/null 2>&1 || true
           # Deleting the last loose ref under the ship-branch prefix makes git remove
           # the empty folder a confined worker's next commit cannot create.
-          fm_restore_branch_ref_dirs "$teardown_slot" "$(basename "$PROJ")"
+          fm_restore_branch_ref_dirs "$teardown_slot" "$(basename "$PROJ")" "$branch"
         fi
       fi
       # Remove our hook files so a reused pool worktree cannot fire signals for
@@ -7390,7 +7390,7 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
     if [ "$branch" != "HEAD" ]; then
       if git -C "$WT" checkout --detach -q 2>/dev/null; then
         git -C "$WT" branch -D "$branch" >/dev/null 2>&1 || true
-        fm_restore_branch_ref_dirs "$WT" "$(basename "$PROJ")"
+        fm_restore_branch_ref_dirs "$WT" "$(basename "$PROJ")" "$branch"
       fi
     fi
     rm -f "$WT/.claude/settings.local.json" "$WT/.opencode/plugins/fm-turn-end.js" \

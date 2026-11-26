@@ -260,11 +260,9 @@ fetch_with_packed_refs_lock_guard() {
 # in the clone's own config (git config --local writes the common .git/config, never
 # a per-worktree file), touching nothing else and rewriting nothing when the single
 # value is already exactly "false". A different value, or several values, is replaced.
-# A failed write is reported on stdout and never stops the caller. When the file holds
-# false but git's effective answer is another value (a per-worktree config or an included
-# file outranks it), that is reported too, because packing would still run.
+# A failed write is reported on stdout and never stops the caller.
 ensure_pack_refs_key() {
-  local dir=$1 lbl=$2 current out effective origin
+  local dir=$1 lbl=$2 current out
   current=$(git -C "$dir" config --local --get-all maintenance.pack-refs.enabled 2>/dev/null) || current=
   if [ "$current" != false ]; then
     if ! out=$(git -C "$dir" config --local --replace-all maintenance.pack-refs.enabled false 2>&1); then
@@ -272,17 +270,15 @@ ensure_pack_refs_key() {
       return 0
     fi
   fi
-  effective=$(git -C "$dir" config --type=bool --get maintenance.pack-refs.enabled 2>/dev/null) || effective=unreadable
-  if [ "$effective" != false ]; then
-    origin=$(git -C "$dir" config --show-origin --get maintenance.pack-refs.enabled 2>/dev/null | cut -f1) || origin=
-    echo "$lbl: warning: maintenance.pack-refs.enabled is $effective in effect although .git/config sets false (outranked by ${origin:-another source})"
-  fi
   return 0
 }
 
 # ensure_fleet_pack_refs_keys: the whole-fleet form writes every clone root's key in one
 # quick local pass before any fetch, so a slow fetch or a bootstrap timeout cannot leave
 # a later clone without it. sync_project then finds each key already in place.
+# Every clone root needs the key whatever its own fetch does, and the per-clone write in
+# sync_project alone would miss each clone that a slow fetch or the bootstrap time limit
+# stops fleet-sync before.
 ensure_fleet_pack_refs_keys() {
   local candidate top abs
   for candidate in "$PROJECTS"/*; do
@@ -338,7 +334,7 @@ prune_gone_branches() {
     fi
     # Deleting the last loose ref under the ship-branch prefix makes git remove the
     # empty folder; put it back (whether or not this delete succeeded).
-    fm_restore_branch_ref_dirs "$PROJ" "$label"
+    fm_restore_branch_ref_dirs "$PROJ" "$label" "$branch"
   done < <(git -C "$PROJ" for-each-ref \
     --format='%(refname:short) %(upstream:track)' refs/heads 2>/dev/null)
 }

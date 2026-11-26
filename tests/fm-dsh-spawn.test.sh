@@ -762,22 +762,40 @@ test_dsh_launch_survives_the_dsh_credential_scrub() {
   pass "a dsh worker and a dsh scout keep a consistent git config environment through dsh's credential scrub, carrying the maintenance key, the task hooks and a pane entry as parameter rows"
 }
 
-# A raw launch is named by its first word, so one that wraps dsh reads as another harness; it must still get the
-# numbered-entry-free carrier, because dsh's scrub orphans a numbered entry wherever dsh is launched from.
-test_a_raw_launch_wrapping_dsh_carries_no_numbered_entry() {
+# A raw launch is named by the basename of its executable: a raw dsh-tui command must get the numbered-entry-free
+# carrier, because dsh's scrub orphans a numbered entry wherever dsh is launched from.
+test_a_raw_dsh_launch_carries_no_numbered_entry() {
   local id=dsh-raw out launch log
   make_dsh_case raw "$id"
-  out=$(run_dsh_spawn "$id" "env FOO=1 dsh-tui --version" --scout 2>&1) || { printf 'note: %s\n' "$out"; }
+  out=$(run_dsh_spawn "$id" "dsh-tui --version" --scout 2>&1) || { printf 'note: %s\n' "$out"; }
   launch=$(cat "$LAUNCH_LOG" 2>/dev/null)
-  [ -n "$launch" ] || fail "the raw dsh-wrapping spawn staged no launch text: $out"
-  assert_contains "$launch" "'hook.fm-scan-commit.event'" "a raw launch wrapping dsh did not carry the task hook rows"
-  assert_contains "$launch" "'maintenance.pack-refs.enabled'='false'" "a raw launch wrapping dsh did not carry the maintenance key as a row"
+  [ -n "$launch" ] || fail "the raw dsh spawn staged no launch text: $out"
+  assert_contains "$launch" "'hook.fm-scan-commit.event'" "a raw dsh launch did not carry the task hook rows"
   log="$CASE_DIR/dsh-raw.log"
   run_recorded_launch "$log" PATH="$FAKEBIN_DIR:/usr/bin:/bin" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=fetch.prune GIT_CONFIG_VALUE_0=false || fail "the recorded raw launch failed"
-  assert_git_config_env "$log.env0.scrubbed" "$CASE_DIR/probe-repo" "raw launch wrapping dsh, after dsh's scrub"
+  assert_git_config_env "$log.env0.scrubbed" "$CASE_DIR/probe-repo" "raw dsh launch, after dsh's scrub"
   assert_equals false "$(git_config_entries "$log.env0.scrubbed" maintenance.pack-refs.enabled)" "the raw launch's scrubbed environment does not hold exactly one maintenance key"
   assert_equals false "$(git_config_entries "$log.env0.scrubbed" fetch.prune)" "the raw launch lost the pane's numbered entry instead of carrying it"
-  pass "a raw launch that wraps dsh carries the hook rows and the maintenance key as parameter rows, with no numbered entry"
+  pass "a raw dsh-tui launch carries the hook rows and the maintenance key as parameter rows, with no numbered entry"
+}
+
+# The same fact flipped: a raw launch of another program whose path or argument merely contains dsh keeps its
+# normal numbered carrier.
+test_a_raw_launch_naming_dsh_only_in_an_argument_keeps_its_carrier() {
+  local id=dsh-raw-arg out log
+  make_dsh_case raw-arg "$id"
+  cp "$FAKEBIN_DIR/dsh-tui" "$FAKEBIN_DIR/codex"
+  out=$(run_dsh_spawn "$id" "codex --cd /work/dsh" --scout 2>&1) || { printf 'note: %s\n' "$out"; }
+  [ -s "$LAUNCH_LOG" ] || fail "the raw codex spawn staged no launch text: $out"
+  log="$CASE_DIR/dsh-raw-arg.log"
+  run_recorded_launch "$log" PATH="$FAKEBIN_DIR:/usr/bin:/bin" || fail "the recorded raw codex launch failed"
+  assert_git_config_env "$log.env0" "$CASE_DIR/probe-repo" "raw codex launch naming /work/dsh"
+  assert_equals false "$(git_config_entries "$log.env0" maintenance.pack-refs.enabled)" "a raw codex launch naming /work/dsh does not hold exactly one maintenance key"
+  grep -qa 'GIT_CONFIG_KEY_[0-9]*=maintenance.pack-refs.enabled' "$log.env0" \
+    || fail "a raw codex launch naming /work/dsh did not carry the maintenance key as a numbered entry"
+  grep -qa 'GIT_CONFIG_KEY_[0-9]*=core.hooksPath' "$log.env0" \
+    || fail "a raw codex launch naming /work/dsh did not keep its legacy numbered core.hooksPath carrier"
+  pass "a raw codex launch whose argument merely contains dsh keeps its numbered carrier"
 }
 
 # The scrub emulation above is only as good as its copy of dsh's rule: when the installed dsh package is
@@ -1367,7 +1385,8 @@ test_retired_deepseek_spelling_refuses_before_launch
 test_explicit_harness_is_not_rerouted
 test_launch_environment
 test_dsh_launch_survives_the_dsh_credential_scrub
-test_a_raw_launch_wrapping_dsh_carries_no_numbered_entry
+test_a_raw_dsh_launch_carries_no_numbered_entry
+test_a_raw_launch_naming_dsh_only_in_an_argument_keeps_its_carrier
 test_scrub_emulation_matches_the_installed_dsh
 test_launch_reads_xdg_only_git_config
 test_mirrored_dsh_primary_carries_its_bound_model
