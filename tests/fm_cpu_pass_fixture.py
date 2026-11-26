@@ -812,7 +812,7 @@ def reserving_held(folder, runs):
     return count
 
 
-def agent_info(path):
+def agent_info(path, log=None, child=None):
     """The agent stand-in's marker, once it is written whole (the stand-in writes it in one call that is not atomic)."""
     found = {}
 
@@ -822,7 +822,7 @@ def agent_info(path):
             return True
         except (OSError, ValueError):
             return False
-    wait_for(whole, 'the agent marker %s written' % path.name)
+    wait_for(whole, 'the agent marker %s written' % path.name, log=log, child=child)
     return found
 
 

@@ -126,7 +126,7 @@ try:
             assert held == 0, (mode, repr(held))
         folder, db, env = gate_case('gate-forward')
         child, log = gate(folder, dict(env, CASE_TERM_BEFORE_FORWARD='1'), 'x', mode='trap')
-        wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
+        agent_info(folder / 'x.agent', log=log, child=child)
         began = time.monotonic()
         while not (folder / 'x.got-term').exists() and child.poll() is None:
             if time.monotonic() - began >= HANG_BACKSTOP_SECS:
