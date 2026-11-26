@@ -69,9 +69,13 @@ write_session_log() {
 make_spawn_fakebin() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
+  fm_test_fake_tmux_acquisition_support "$fakebin" || return
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
+. "${0%/*}/.fm-tmux-acquisition.sh"
+fm_test_fake_tmux_acquisition "$@" || exit $?
+[ "$__fm_fake_acquisition_command" = 0 ] || exit 0
 case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
@@ -949,6 +953,11 @@ EOF
   done
   pass "Muse preflight respects the allowlist while retaining stored authentication"
 }
+
+if [ "$#" -gt 0 ]; then
+  fm_test_run_cases -- "$@"
+  exit $?
+fi
 
 test_spawn_environment_allowlist_credential_preflight
 test_detects_versioned_process_ancestor

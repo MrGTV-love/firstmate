@@ -1013,9 +1013,16 @@ case "${1:-} ${2:-}" in
     fi
     exit 0 ;;
   'pane run')
-    if [ "${4:-}" = 'treehouse get' ] && [ -f "$D/herdr-treehouse-worktree" ]; then
-      cp "$D/herdr-treehouse-worktree" "$D/herdr-cwd-${3:-}"
-    fi
+    # The get arrives with its private GIT_TRACE2_EVENT prefix.
+    case "${4:-}" in
+      printf*__firstmate_acquire_*)
+        # The acquisition boundary is echoed into the pane, as a real shell would.
+        bash -c "${4:-}" > "$D/acquisition-marker" ;;
+      *'treehouse get')
+        if [ -f "$D/herdr-treehouse-worktree" ]; then
+          cp "$D/herdr-treehouse-worktree" "$D/herdr-cwd-${3:-}"
+        fi ;;
+    esac
     exit 0 ;;
   'pane send-text')
     # Mirrors the tmux fake's `becomes`: delivering the launch brief is what
@@ -1066,6 +1073,7 @@ case "${1:-} ${2:-}" in
         printf '╭── π > recovery╮\n╰─  ─╯\n'
       fi
     fi
+    [ ! -f "$D/acquisition-marker" ] || cat "$D/acquisition-marker"
     exit 0 ;;
   'pane send-keys')
     if [ -f "$D/recovery-case-id" ]; then

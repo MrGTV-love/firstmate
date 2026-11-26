@@ -7,6 +7,8 @@
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+# Existing scaled no-progress cases exercise the supported historical override.
+export SPAWN_ACQUIRE_STALL=600 SPAWN_ACQUIRE_CEILING=0
 BACKEND=${1:-tmux}
 command -v "$BACKEND" >/dev/null 2>&1 || { echo "skip: $BACKEND not found"; exit 0; }
 TMP_ROOT=$(fm_test_tmproot fm-spawn-acquisition)
@@ -108,6 +110,7 @@ cat > "$FAKEBIN/treehouse" <<SH
 trap 'rm -f "\$LEASE"; exit 0' HUP INT TERM
 trap 'rm -f "\$LEASE"' EXIT
 printf '%s\n' "\$\$" > "\$PIDFILE"
+printf '%s\n' "\${GIT_TRACE2_EVENT:-}" > "\$PIDFILE.trace"
 touch "\$LEASE"
 if [ "\$MODE" = slow ]; then
   while [ ! -e "\$ALLOW" ]; do /bin/sleep 0.02; done
@@ -227,9 +230,9 @@ if [ "${args[0]:-} ${args[1]:-}" = 'tab create' ]; then
   args+=(--env "HISTFILE=$HISTFILE")
 fi
 for ((i=0; i<${#args[@]}; i++)); do
-  if [ "${args[i]}" = 'treehouse get' ]; then
-    args[i]="export PATH='$FM_GET_FAKEBIN':\$PATH; treehouse get"
-  fi
+  case "${args[i]}" in
+    *'treehouse get') args[i]="export PATH='$FM_GET_FAKEBIN':\$PATH; ${args[i]}" ;;
+  esac
 done
 PATH="$FM_GET_REAL_PATH" exec "$FM_GET_LAB_HELPER" run "$FM_GET_LAB_SESSION" "${args[@]}"
 SH
@@ -329,6 +332,17 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
     [ -e "$LEASE" ] || fail 'successful spawn released its acquisition lease'
     protected_lease=$LEASE
     protected_pid=$(cat "$PIDFILE")
+    [ -s "$PIDFILE.trace" ] || fail 'get did not inherit its acquisition trace'
+    assert_absent "$(cat "$PIDFILE.trace")" 'successful acquisition retained trace output'
+    if [ "$BACKEND" = tmux ]; then
+      # The real acquired shell must not leak tracing into subsequent Git work.
+      "$REAL_TMUX" send-keys -t "firstmate:fm-$ID" \
+        "printf '%s\\n' \"\${GIT_TRACE2_EVENT-unset}\" > '$CASE/trace-env-after'; git -C '$CLEAN' status --porcelain > '$CASE/git-after'; touch '$CASE/trace-probe-done'" Enter
+      fm_test_wait_until --while-alive "$protected_pid" --progress-file "$CASE/trace-env-after" \
+        -- test -e "$CASE/trace-probe-done" || fail 'acquired-shell trace probe did not finish'
+      assert_equals unset "$(cat "$CASE/trace-env-after")" 'acquired shell retained Git tracing'
+      assert_absent "$(cat "$PIDFILE.trace")" 'later Git work recreated acquisition trace'
+    fi
     pass "$BACKEND successful launch retains its slot"
     continue
   fi
@@ -354,6 +368,8 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   [ ! -e "$LEASE" ] || fail "$MODE acquisition retained its slot after refusal: $out"
   pid=$(cat "$PIDFILE")
   ! kill -0 "$pid" 2>/dev/null || fail "$MODE left get subshell $pid alive"
+  [ -s "$PIDFILE.trace" ] || fail "$MODE get never inherited acquisition tracing"
+  assert_absent "$(cat "$PIDFILE.trace")" "$MODE refusal retained acquisition trace output"
   [ "$MODE" != slow ] || [ ! -e "$ARRIVED" ] || fail 'get completed after the deadline and stranded its slot'
   if [ "$BACKEND" = tmux ]; then
     tmux_windows=$("$REAL_TMUX" list-windows -t firstmate -F '#{window_id} #{window_name}') || fail 'spawn destroyed unrelated session'
