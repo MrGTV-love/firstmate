@@ -257,7 +257,7 @@ def model(value, field):
     if name.group(1) == "o" and name.group(2):
         return "openai"
     family = FAMILIES.get(name.group(1), "unknown")
-    if family == "zhipu" and not re.fullmatch(r"[a-z0-9][a-z0-9._:-]*", tail):
+    if family == "zhipu" and not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail):
         return "unknown"
     return family
 
@@ -494,7 +494,7 @@ def derived_authors(home, pr, head, task, base):
                         item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
-                        provider_family = PROVIDER_FAMILIES.get(provider.casefold()) if isinstance(provider, str) else None
+                        provider_family = PROVIDER_FAMILIES.get(provider) if isinstance(provider, str) else None
                         if provider_family:
                             if item["family"] == "unknown":
                                 item["family"] = provider_family

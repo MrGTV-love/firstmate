@@ -1170,7 +1170,7 @@ test_zhipu_glm_family_covers_other_families_and_blocks_self_review() {
   # 3. Unknown boundary: unrecognized models, punctuation-mangled ids, bare provider
   # routes, and prefix collisions stay unknown and refuse coverage.
   local bad_id
-  for bad_id in 'z-ai/mystery-1' 'glimpse-1' 'glm!!!' 'zai???' 'zai' 'zai/glm!!!'; do
+  for bad_id in 'z-ai/mystery-1' 'glimpse-1' 'glm!!!' 'glm---' 'glm-5.4---' 'zai???' 'zai' 'zai/glm!!!'; do
     case_dir=$(make_case "zhipu-unknown-$(printf '%s' "$bad_id" | tr -c 'a-z0-9' '-')" claude-opus-5-5)
     record_review "$case_dir" "$HEAD1" PASS "$bad_id" '{"ship":["claude-opus-5-5"]}' >/dev/null \
       || fail "record unknown-model PASS for $bad_id"
@@ -1180,9 +1180,9 @@ test_zhipu_glm_family_covers_other_families_and_blocks_self_review() {
     expect_not_qualified "$out" "unknown" "$bad_id unknown reader"
   done
 
-  # 4. Pipeline DB provider boundary: zai/z-ai normalize to zhipu and disagreeing
-  # model+provider fail closed, while non-Zhipu model aliases (e.g. model_provider='gpt')
-  # are NOT trusted as providers.
+  # 4. Pipeline DB provider boundary: exact lowercase zai/z-ai normalize to zhipu
+  # while non-Zhipu model aliases (model_provider='gpt') and non-canonical case/Unicode
+  # spellings (OpenAI, moonſhot) stay no-mistakes:unknown, matching origin/main.
   local nm_prov="$TMP_ROOT/zhipu-provider-db"
   mkdir -p "$nm_prov"
   python3 - "$nm_prov/state.sqlite" "$URL" <<'PY2' || fail "seed provider db"
@@ -1193,8 +1193,10 @@ CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT);
 CREATE TABLE runs (id TEXT PRIMARY KEY, pr_url TEXT, branch TEXT, repo_id TEXT);
 CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);
 """)
-db.execute("INSERT INTO runs VALUES ('r-gpt-alias', ?, 'fm/fixture', 'repo1')", (sys.argv[2],))
-db.execute("INSERT INTO agent_invocations VALUES ('r-gpt-alias', 'pi', 'mystery-9', 'gpt')")
+db.execute("INSERT INTO runs VALUES ('r-prov', ?, 'fm/fixture', 'repo1')", (sys.argv[2],))
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-9', 'gpt')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-10', 'OpenAI')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-11', 'moon\u017fhot')")
 db.commit()
 PY2
   case_dir=$(make_case zhipu-provider-no-widening claude-opus-5-5)
@@ -1202,8 +1204,10 @@ PY2
     || fail "record provider-boundary PASS"
   out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
     --task task-x1 --base "$BASE") || fail "plan failed on non-zhipu provider alias db"
-  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] != null and .groups["no-mistakes:openai"] == null' \
-    <<<"$out" >/dev/null || fail "model_provider=gpt must stay no-mistakes:unknown, not openai: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] | length == 3' <<<"$out" >/dev/null \
+    || fail "gpt/OpenAI/moonshot-long-s providers must all stay no-mistakes:unknown: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:openai"] == null and .groups["no-mistakes:moonshot"] == null' \
+    <<<"$out" >/dev/null || fail "non-canonical non-Zhipu providers must not widen attribution: $out"
 
   # 5. Positive sensitivity control: removing zhipu/glm makes zai/glm-5.4 refuse as unknown.
   local copy="$TMP_ROOT/zhipu-control-bin"
@@ -1233,23 +1237,23 @@ PY2
 import sys
 p = sys.argv[1]
 s = open(p).read()
-n1 = '    if family == "zhipu" and not re.fullmatch(r"[a-z0-9][a-z0-9._:-]*", tail):\n        return "unknown"\n'
-n2 = 'provider_family = PROVIDER_FAMILIES.get(provider.casefold())'
+n1 = '    if family == "zhipu" and not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail):\n        return "unknown"\n'
+n2 = 'provider_family = PROVIDER_FAMILIES.get(provider)'
 assert s.count(n1) == 1 and s.count(n2) == 1, "protection lines not found"
 s = s.replace(n1, '').replace(n2, 'provider_family = FAMILIES.get(provider.casefold())')
 open(p, "w").write(s)
 PY2
   case_dir=$(make_case zhipu-weak-tail claude-opus-5-5)
-  RECORD="$weak_copy/fm-review-record.py" record_review "$case_dir" "$HEAD1" PASS 'glm!!!' '{"ship":["claude-opus-5-5"]}' >/dev/null \
+  RECORD="$weak_copy/fm-review-record.py" record_review "$case_dir" "$HEAD1" PASS 'glm---' '{"ship":["claude-opus-5-5"]}' >/dev/null \
     || fail "record weak-tail control PASS"
   rc=0
   out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$weak_copy/fm-review-record.py" verify --pr "$URL" \
     --head "$HEAD1" --task task-x1 --base "$BASE" --review-only --json) || rc=$?
-  expect_code 0 "$rc" "protection control: dropping tail validation must let glm!!! pass, or this test observes nothing: $out"
+  expect_code 0 "$rc" "protection control: dropping tail validation must let glm--- pass, or this test observes nothing: $out"
   out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
     --task task-x1 --base "$BASE") || fail "weak provider control plan failed"
-  "$JQ_BIN" -e '.groups["no-mistakes:openai"] != null' <<<"$out" >/dev/null \
-    || fail "protection control: widening PROVIDER_FAMILIES to FAMILIES must attribute model_provider=gpt to openai: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:openai"] != null and .groups["no-mistakes:moonshot"] != null' <<<"$out" >/dev/null \
+    || fail "protection control: widening PROVIDER_FAMILIES with casefold must attribute gpt/OpenAI/long-s: $out"
   pass "zhipu/glm family covers other families, refuses same-family self-review, and keeps unknown ids and non-Zhipu provider aliases closed"
 }
 
