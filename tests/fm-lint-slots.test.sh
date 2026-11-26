@@ -710,6 +710,7 @@ SH
     rc=0
     # The command ends inside a guard read: it waits for a read in flight, marks
     # its end and exits.
+    # shellcheck disable=SC2016 # The Perl code is single-quoted on purpose: Perl expands its own $ARGV.
     PATH="$tmp/bin:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" fm_lint_gate_root 100000000 "$tmp/pool.$code/slots" "run$code" "$tmp/root.sh" -- \
       perl -e 'for (1 .. 6000) { last if -e $ARGV[0]; select(undef, undef, undef, 0.01); } -e $ARGV[0] or exit 9; open(my $fh, ">", $ARGV[1]) or exit 8; close $fh; exit $ARGV[2];' \
       "$tmp/inflight" "$tmp/ended" "$code" 2> "$tmp/err.$code" || rc=$?
@@ -2075,6 +2076,7 @@ test_ungoverned_shellcheck_memory_never_delays_a_governed_root() {
   fm_lint_hide_outside_shellcheck "$tmp/hide"
   fm_lint_optc_outside "$tmp/fake"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  # shellcheck disable=SC2016 # The Perl code is single-quoted on purpose: Perl expands its own $x.
   "$tmp/fake/shellcheck" -e '$x = "x" x (64 * 1048576); sleep 30' &
   outside=$!
   sleep 1.5
@@ -2133,6 +2135,7 @@ test_ungoverned_shellcheck_memory_never_stops_a_governed_root() {
   fm_lint_hide_outside_shellcheck "$tmp/hide"
   fm_lint_optc_outside "$tmp/fake"
   # Small while the roots are admitted, then 200 MiB: above the 120000 KiB budget alone.
+  # shellcheck disable=SC2016 # The Perl code is single-quoted on purpose: Perl expands its own $x.
   "$tmp/fake/shellcheck" -e 'select(undef, undef, undef, 8); $x = "x" x (200 * 1048576); sleep 30' &
   outside=$!
   sleep 0.5
@@ -6453,7 +6456,7 @@ test_an_unwritable_slot_directory_neither_fails_the_root_nor_blocks_admission() 
   mkdir -p "$tmp/rec"
   : > "$tmp/host.lock"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/b.sh"
-  FM_TEST_SIGNAL_LOG="$tmp/signals.log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER= FM_TEST_READER_MARK="$tmp/mark" \
+  FM_TEST_SIGNAL_LOG="$tmp/signals.log" FM_LINT_INTERNAL_PYTHON="$tmp/stub/python3" FM_TEST_READER='' FM_TEST_READER_MARK="$tmp/mark" \
     FM_LINT_INTERNAL_SLOT_PEAK_FILE="$tmp/rec/peak" FM_LINT_INTERNAL_HOST_LOCK="$tmp/host.lock" \
     perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss" -- sleep 30 > "$tmp/err" 2>&1 &
   pid=$!
