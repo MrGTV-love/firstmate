@@ -169,7 +169,11 @@ teardown_refuse_copy() {  # <rule> <missing> <copy>
   exit_text=$(teardown_copy_question "$1" "$3")
   if [ "$1" = ignored-bytes-preserved ] && [ "${FORCE:-}" != --force ] && [ "${LEGACY_RECORD_GIVEN:-0}" != 1 ]; then
     kind=machine
-    printf -v command 'FM_HOME=%q bash %q %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
+    if [ "${TEARDOWN_BY_PATH:-}" = 1 ]; then
+      printf -v command 'FM_HOME=%q bash %q --copy %q --record-id %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$TEARDOWN_BY_PATH_COPY" "$ID"
+    else
+      printf -v command 'FM_HOME=%q bash %q %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
+    fi
     exit_text=$command
     missing="$missing Restore readable source and writable preservation storage, then run the completing command."
   fi
@@ -954,7 +958,7 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
     if [ -f "$record" ] && [ ! -L "$record" ] \
         && own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") && [ -n "$own" ]; then
       teardown_bundle_refuse 'recorded bundles require attended teardown; unattended cleanup still requires landing'
-      echo 'Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.' >&2
+      echo "From the attended main session, after ending away or quiet mode, $TEARDOWN_RETRY_ACTION; the bundle must pass all preservation proofs there." >&2
     fi
     return 1
   fi
@@ -2906,6 +2910,7 @@ TEARDOWN_BY_PATH_CLONE=
 TEARDOWN_BY_PATH_HASH=
 TEARDOWN_BY_PATH_HOLDER=
 TEARDOWN_BY_PATH_WHY=
+TEARDOWN_BY_PATH_WHY_RULE=
 TEARDOWN_BY_PATH_LOG='record-less-copy-removals.log'
 
 # The one place a by-path run prints a refusal of its own. The checks below record
@@ -2917,6 +2922,14 @@ teardown_by_path_refuse() {  # <reason>
 }
 teardown_by_path_why() {  # <reason>
   TEARDOWN_BY_PATH_WHY=$1
+  TEARDOWN_BY_PATH_WHY_RULE=
+  return 1
+}
+# A refusal whose only cause is an input that could not be read: the exception
+# gives it rule inspection-unavailable, never a policy row.
+teardown_by_path_unread() {  # <reason>
+  TEARDOWN_BY_PATH_WHY=$1
+  TEARDOWN_BY_PATH_WHY_RULE=inspection-unavailable
   return 1
 }
 
@@ -3053,11 +3066,11 @@ teardown_by_path_locate() {  # <canonical-copy>
 teardown_by_path_holders() {  # <copy>
   local copy=$1 out line pid='' command='' fd='' name hits=''
   if ! command -v lsof >/dev/null 2>&1; then
-    teardown_by_path_why "$(fm_refuse_text "$copy") cannot be proved idle: lsof is not installed to list the processes holding it"
+    teardown_by_path_unread "$(fm_refuse_text "$copy") cannot be proved idle: lsof is not installed to list the processes holding it"
     return 1
   fi
   out=$(lsof -nP -w -Fpcfn 2>/dev/null) || {
-    teardown_by_path_why "$(fm_refuse_text "$copy") cannot be proved idle: the process scan failed"
+    teardown_by_path_unread "$(fm_refuse_text "$copy") cannot be proved idle: the process scan failed"
     return 1
   }
   while IFS= read -r line; do
@@ -3111,7 +3124,7 @@ teardown_by_path_other_repos() {  # <copy>
 teardown_by_path_inner() {  # <copy>
   local copy=$1 inner rc=0
   inner=$(fm_task_copy_registered_nested "$copy") || {
-    teardown_by_path_why "the worktrees registered inside $(fm_refuse_text "$copy") cannot be listed"
+    teardown_by_path_unread "the worktrees registered inside $(fm_refuse_text "$copy") cannot be listed"
     return 1
   }
   while IFS= read -r inner; do
@@ -3127,7 +3140,7 @@ teardown_by_path_inner() {  # <copy>
       return 1
       ;;
     *)
-      teardown_by_path_why "$(fm_refuse_text "$copy") could not be scanned for other Git repositories, so what removing it would delete cannot be proved"
+      teardown_by_path_unread "$(fm_refuse_text "$copy") could not be scanned for other Git repositories, so what removing it would delete cannot be proved"
       return 1
       ;;
   esac
@@ -3146,7 +3159,7 @@ teardown_by_path_claim() {
   case "$FM_TREEHOUSE_SLOT_OWNER" in
     absent) return 0 ;;
     unsafe)
-      teardown_by_path_why "the owner claim of pool slot $(fm_refuse_text "$TEARDOWN_BY_PATH_CLONE") cannot be read, so who the slot belongs to is unknown; inspect the claim file beside the slot"
+      teardown_by_path_unread "the owner claim of pool slot $(fm_refuse_text "$TEARDOWN_BY_PATH_CLONE") cannot be read, so who the slot belongs to is unknown; inspect the claim file beside the slot"
       return 1
       ;;
   esac
@@ -3156,7 +3169,7 @@ teardown_by_path_claim() {
     return 1
   }
   fm_local_firstmate_state_dirs "$STATE" || {
-    teardown_by_path_why "$FM_LOCAL_FIRSTMATE_ERROR"
+    teardown_by_path_unread "$FM_LOCAL_FIRSTMATE_ERROR"
     return 1
   }
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
@@ -3209,7 +3222,8 @@ teardown_by_path_audit() {  # <copy> <head> <proof>
 #      whole (fm_task_copy_preserve, teardown_preservable_ignored)
 # Locating the copy, the audit record, the path lock and the lack of any --force
 # are the route's mechanics, not the widened harm, and stay where they are. Any row
-# that holds, or cannot be read, refuses; the refusal names it, and
+# that holds, or cannot be read, refuses; the refusal names it (a row whose input
+# cannot be read as rule inspection-unavailable, never a policy row), and
 # TEARDOWN_BY_PATH_EXCEPTION_WHY and _RULE keep that reason for the final refusal.
 TEARDOWN_BY_PATH_EXCEPTION_WHY=
 TEARDOWN_BY_PATH_EXCEPTION_RULE=
@@ -3232,16 +3246,16 @@ teardown_by_path_exception_clear() {  # <bundle> <required-tips, space separated
     why_rule=$TEARDOWN_FOREIGN_RULE
     why=$TEARDOWN_FOREIGN_WHY
   elif ! teardown_by_path_holders "$copy"; then
-    why_rule='process-cwd-owner'
+    why_rule=${TEARDOWN_BY_PATH_WHY_RULE:-process-cwd-owner}
     why=$TEARDOWN_BY_PATH_WHY
   elif ! teardown_by_path_claim; then
-    why_rule='active-record-owner'
+    why_rule=${TEARDOWN_BY_PATH_WHY_RULE:-active-record-owner}
     why=$TEARDOWN_BY_PATH_WHY
   elif ! teardown_by_path_inner "$copy"; then
-    why_rule='registered-copy-proven'
+    why_rule=${TEARDOWN_BY_PATH_WHY_RULE:-registered-copy-proven}
     why=$TEARDOWN_BY_PATH_WHY
   elif ! teardown_bundle_record; then
-    why_rule='copy-preserved'
+    why_rule='inspection-unavailable'
     why=$TEARDOWN_BUNDLE_REASON
   else
     # shellcheck disable=SC2086 # Tips are full hex object names, one word each.
@@ -3259,6 +3273,7 @@ teardown_by_path_exception_clear() {  # <bundle> <required-tips, space separated
   fi
   TEARDOWN_BUNDLE_REASON=$reason_before
   TEARDOWN_BY_PATH_WHY=
+  TEARDOWN_BY_PATH_WHY_RULE=
   [ -n "$why" ] || return 0
   TEARDOWN_BY_PATH_EXCEPTION_WHY=$why
   TEARDOWN_BY_PATH_EXCEPTION_RULE=$why_rule
@@ -3377,7 +3392,7 @@ teardown_by_path_prove() {  # <copy>
     TEARDOWN_FOREIGN_WHY=$TEARDOWN_BY_PATH_EXCEPTION_WHY
   fi
   teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "copy $copy is not removed: $TEARDOWN_FOREIGN_WHY." "$copy"
-  teardown_by_path_why "$(fm_refuse_text "$copy") did not pass every proof"
+  teardown_by_path_why "$(fm_refuse_text "$copy did not pass every proof (rule=$TEARDOWN_FOREIGN_RULE)${TEARDOWN_FOREIGN_WHY:+: $TEARDOWN_FOREIGN_WHY}")"
   return 1
 }
 

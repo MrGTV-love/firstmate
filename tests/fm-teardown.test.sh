@@ -5048,65 +5048,118 @@ by_path_bundle_held_case() {  # <name> [project|slot]
     || fail 'cannot file the captain call'
 }
 
+# A git that runs <case>/plant.sh once, at the first `git bundle verify`: every check before the
+# route's own bundle verification has passed by then, and the by-path exception is the next one, so
+# harm made here is judged by the exception itself. It also logs every `worktree remove`.
+by_path_plant_at_first_verify() {  # <case>
+  cat > "$1/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" bundle verify "*)
+    if [ ! -e "$1/planted" ]; then
+      : > "$1/planted"
+      bash "$1/plant.sh" >/dev/null 2>&1 </dev/null
+    fi ;;
+  *" worktree remove "*) printf '%s\n' "\$*" >> "$1/git-remove.log" ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$1/fakebin/git"
+}
+
+# plant.sh lines that start <command> in the background and wait for it to write its own pid to
+# <case>/planted.pid, which it does once it holds the copy.
+by_path_plant_process() {  # <case> <command>
+  printf '%s &\n' "$2"
+  printf 'for _ in $(seq 100); do [ -s %q ] && break; sleep 0.05; done\n' "$1/planted.pid"
+}
+
 # The by-path exception to the held-task rule lets a bundle-held copy go on a captain-held row alone.
 # Its harm rows are judged where the exception is granted: H1 a live task record in any local home names
 # the copy, H2 a live task's claim on the copy's slot (a claim naming the run's own record id too),
 # H3 other work no bundle holds inside the copy (a registered worktree, or a Git repository or worktree
-# no clone registers, a bare repository included, under ignored .claude too), H4 a commit the verified
-# bundle does not hold, H5 a process in the copy, H6 a Vernant creation lock whose launcher is live, H7 a
-# dirty tree or an ignored file that exists nowhere else. Each row refuses the same bundle-held copy that
-# the control run, with every row clear, removes.
+# no clone registers, a bare repository included, under ignored .claude too), H4 a commit the bundle
+# record does not hold, H5 a process in the copy or holding a file open in it, H6 a Vernant creation
+# lock whose launcher is live, H7 a dirty tree or an ignored file that exists nowhere else. Each harm is
+# made at the first `git bundle verify`, after every earlier check has passed, so the exception is the
+# check that refuses it: its refusal names the row, and the final REFUSED line names it too. The control
+# run, and a dead launcher, with every row clear, remove the same bundle-held copy.
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row() {
-  local shape case_dir rc mate nested other pid
-  for shape in control h1-record-this-home h1-record-other-home h2-claim-record-id h3-nested-clone h3-other-worktree h3-registered-worktree h3-bare-repository h4-missing-tip h5-process-cwd h6-live-launcher h6-dead-launcher h7-dirty-tree h7-unique-ignored; do
+  local shape case_dir rc mate nested other pid rule reason last record tip
+  for shape in control h1-record-this-home h1-record-other-home h2-claim-record-id h3-nested-clone h3-other-worktree h3-registered-worktree h3-bare-repository h4-missing-tip h5-process-cwd h5-open-file h6-live-launcher h6-dead-launcher h7-dirty-tree h7-unique-ignored; do
     case "$shape" in h2-*) by_path_bundle_held_case "by-path-exc-$shape" slot ;; *) by_path_bundle_held_case "by-path-exc-$shape" ;; esac
     case_dir=$BP_CASE
     mate=$case_dir/mate-home
     nested=$BP_COPY/.claude/nested
-    mkdir -p "$mate/state" "$mate/data" "$BP_HOME/data"
+    pid=
+    record=$case_dir/data/rec-1/preservation-bundles.tsv
+    mkdir -p "$mate/state" "$mate/data" "$BP_HOME/data" "$case_dir/staged"
     printf -- '- mate-x - fixture scope (home: %s; scope: fixture; projects: project; added 2026-11-25)\n' "$mate" > "$BP_HOME/data/secondmates.md"
+    by_path_plant_at_first_verify "$case_dir"
+    : > "$case_dir/plant.sh"
     case "$shape" in
       h1-record-this-home)
-        fm_write_meta "$case_dir/state/task-x1.meta" "window=firstmate:fm-task-x1" "kind=ship" "home=$BP_COPY" "spawn_gen=by-path-test" ;;
+        rule=active-record-owner reason="task task-x1's active record names it"
+        fm_write_meta "$case_dir/staged/task-x1.meta" "window=firstmate:fm-task-x1" "kind=ship" "home=$BP_COPY" "spawn_gen=by-path-test"
+        printf 'mv %q %q\n' "$case_dir/staged/task-x1.meta" "$case_dir/state/task-x1.meta" > "$case_dir/plant.sh" ;;
       h1-record-other-home)
-        fm_write_meta "$mate/state/task-x1.meta" "window=firstmate:fm-task-x1" "kind=ship" "prior_worktree=$BP_COPY" "spawn_gen=by-path-test" ;;
+        rule=active-record-owner reason="task task-x1's active record names it"
+        fm_write_meta "$case_dir/staged/task-x1.meta" "window=firstmate:fm-task-x1" "kind=ship" "prior_worktree=$BP_COPY" "spawn_gen=by-path-test"
+        printf 'mv %q %q\n' "$case_dir/staged/task-x1.meta" "$mate/state/task-x1.meta" > "$case_dir/plant.sh" ;;
       h2-claim-record-id)
-        printf 'task=rec-1\nhome=%s\n' "$mate" > "$case_dir/pool/1/.fm-slot-owner"
-        fm_write_meta "$mate/state/rec-1.meta" "window=firstmate:fm-rec-1" "kind=ship" "spawn_gen=by-path-test" ;;
-      h3-nested-clone | h3-other-worktree)
+        rule=active-record-owner reason='is claimed by task rec-1, whose record is live'
+        printf 'task=rec-1\nhome=%s\n' "$mate" > "$case_dir/staged/claim"
+        fm_write_meta "$case_dir/staged/rec-1.meta" "window=firstmate:fm-rec-1" "kind=ship" "spawn_gen=by-path-test"
+        printf 'mv %q %q\nmv %q %q\n' "$case_dir/staged/claim" "$case_dir/pool/1/.fm-slot-owner" \
+          "$case_dir/staged/rec-1.meta" "$mate/state/rec-1.meta" > "$case_dir/plant.sh" ;;
+      h3-nested-clone)
+        rule=registered-copy-proven reason='that no clone registers'
         printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
         mkdir -p "${nested%/*}"
-        if [ "$shape" = h3-nested-clone ]; then
-          git clone -q "$case_dir/project" "$nested" || fail "by-path-exc-$shape: cannot clone the fixture"
-        else
-          other=$case_dir/other-project
-          git init -q -b main "$other" && git -C "$other" commit -q --allow-empty -m 'other project' \
-            && git -C "$other" worktree add -q -b fm/other "$nested" main || fail "by-path-exc-$shape: cannot add the other worktree"
-        fi
-        printf 'unpushed work\n' > "$nested/unpushed.txt"
-        git -C "$nested" add unpushed.txt
-        git -C "$nested" commit -qm 'unpushed work in a repository nothing registers'
-        BP_NESTED_HEAD=$(git -C "$nested" rev-parse HEAD) ;;
+        git clone -q "$case_dir/project" "$case_dir/staged/nested" || fail "by-path-exc-$shape: cannot clone the fixture"
+        printf 'unpushed work\n' > "$case_dir/staged/nested/unpushed.txt"
+        git -C "$case_dir/staged/nested" add unpushed.txt
+        git -C "$case_dir/staged/nested" commit -qm 'unpushed work in a repository nothing registers'
+        BP_NESTED_HEAD=$(git -C "$case_dir/staged/nested" rev-parse HEAD)
+        printf 'mv %q %q\n' "$case_dir/staged/nested" "$nested" > "$case_dir/plant.sh" ;;
+      h3-other-worktree)
+        rule=registered-copy-proven reason='that no clone registers'
+        printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        mkdir -p "${nested%/*}"
+        other=$case_dir/other-project
+        git init -q -b main "$other" || fail "by-path-exc-$shape: cannot create the other project"
+        git -C "$other" commit -q --allow-empty -m 'other project' || fail "by-path-exc-$shape: cannot commit in the other project"
+        printf 'git -C %q worktree add -q -b fm/other %q main\nprintf %q > %q\ngit -C %q add unpushed.txt\ngit -C %q commit -qm %q\n' \
+          "$other" "$nested" 'unpushed work\n' "$nested/unpushed.txt" "$nested" "$nested" 'unpushed work in a repository nothing registers' > "$case_dir/plant.sh" ;;
       h3-registered-worktree)
+        rule=registered-copy-proven reason='holds registered worktree'
         printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
         mkdir -p "$BP_COPY/.claude"
-        git -C "$BP_COPY" worktree add -q -b fm/inner "$BP_COPY/.claude/inner" HEAD || fail "by-path-exc-$shape: cannot add the inner worktree" ;;
+        printf 'git -C %q worktree add -q -b fm/inner %q HEAD\n' "$BP_COPY" "$BP_COPY/.claude/inner" > "$case_dir/plant.sh" ;;
       h3-bare-repository)
+        rule=registered-copy-proven reason='that no clone registers'
         printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
         nested=$BP_COPY/.claude/backup.git
         mkdir -p "${nested%/*}"
-        git clone -q --bare "$case_dir/project" "$nested" || fail "by-path-exc-$shape: cannot create the bare repository"
-        BP_NESTED_HEAD=$(git --git-dir="$nested" commit-tree 'HEAD^{tree}' -p HEAD -m 'unlanded commit only a bare repository holds')
-        git --git-dir="$nested" update-ref refs/heads/unlanded "$BP_NESTED_HEAD" ;;
+        git clone -q --bare "$case_dir/project" "$case_dir/staged/backup.git" || fail "by-path-exc-$shape: cannot create the bare repository"
+        BP_NESTED_HEAD=$(git --git-dir="$case_dir/staged/backup.git" commit-tree 'HEAD^{tree}' -p HEAD -m 'unlanded commit only a bare repository holds')
+        git --git-dir="$case_dir/staged/backup.git" update-ref refs/heads/unlanded "$BP_NESTED_HEAD"
+        printf 'mv %q %q\n' "$case_dir/staged/backup.git" "$nested" > "$case_dir/plant.sh" ;;
       h4-missing-tip)
-        printf 'made after the bundle\n' > "$BP_COPY/after-bundle.txt"
-        git -C "$BP_COPY" add after-bundle.txt
-        git -C "$BP_COPY" commit -qm 'a commit the recorded bundle never saw'
-        BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD) ;;
+        rule=copy-preserved reason="record does not list unlanded tip $BP_HEAD"
+        tip=$(git -C "$case_dir/project" rev-parse main)
+        awk -F'\t' -v OFS='\t' -v tip="$tip" '{ $3 = tip; print }' "$record" > "$case_dir/staged/record"
+        printf 'mv %q %q\n' "$case_dir/staged/record" "$record" > "$case_dir/plant.sh" ;;
       h5-process-cwd)
-        teardown_fixture_start "$BP_COPY" KILL sleep 300
-        pid=$TEARDOWN_FIXTURE_PID ;;
+        rule=process-cwd-owner reason='is running in it'
+        # shellcheck disable=SC2016 # $1 is expanded by the planted bash, not here.
+        by_path_plant_process "$case_dir" "$(printf '(cd %q && exec bash -c %q bash %q)' "$BP_COPY" 'echo $$ > "$1"; exec sleep 300' "$case_dir/planted.pid")" > "$case_dir/plant.sh" ;;
+      h5-open-file)
+        rule=process-cwd-owner reason='is in use: process'
+        # shellcheck disable=SC2016 # $1 and $2 are expanded by the planted bash, not here.
+        by_path_plant_process "$case_dir" "$(printf 'bash -c %q bash %q %q' 'exec 3< "$1"; echo $$ > "$2"; exec sleep 300' "$BP_COPY/.git" "$case_dir/planted.pid")" > "$case_dir/plant.sh" ;;
       h6-live-launcher | h6-dead-launcher)
+        rule=lock-launcher-owner reason='launcher'
         by_path_vernant_driver "$case_dir"
         if [ "$shape" = h6-live-launcher ]; then
           teardown_fixture_start "$case_dir" KILL sleep 300
@@ -5115,15 +5168,23 @@ test_by_path_exception_to_the_held_task_rule_judges_each_harm_row() {
           dead_launcher_pid
           pid=$FOREIGN_DEAD_PID
         fi
-        by_path_locked "$case_dir" "$pid" ;;
+        printf 'git -C %q worktree lock --reason %q %q\n' "$case_dir/project" \
+          "vernant-session-active owner=launcher:$pid launcher=$pid" "$BP_COPY" > "$case_dir/plant.sh" ;;
       h7-dirty-tree)
-        printf 'an edit no commit holds\n' >> "$BP_COPY/work.txt" ;;
+        rule=copy-preserved reason='uncommitted'
+        printf 'printf %q >> %q\n' 'an edit no commit holds\n' "$BP_COPY/work.txt" > "$case_dir/plant.sh" ;;
       h7-unique-ignored)
+        rule=copy-ignored-files reason='ignored files that exist nowhere else: secret.txt'
         printf '%s\n' secret.txt >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
-        printf 'exists nowhere else\n' > "$BP_COPY/secret.txt" ;;
+        printf 'printf %q > %q\n' 'exists nowhere else\n' "$BP_COPY/secret.txt" > "$case_dir/plant.sh" ;;
     esac
     rc=0
     FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ -s "$case_dir/planted.pid" ]; then
+      pid=$(cat "$case_dir/planted.pid")
+      teardown_fixture_track "$pid"
+    fi
+    assert_present "$case_dir/planted" "by-path-exc-$shape: the route never reached its own bundle verification: $(cat "$case_dir/stderr")"
     if [ "$shape" = control ] || [ "$shape" = h6-dead-launcher ]; then
       expect_code 0 "$rc" "by-path-exc-$shape: with every harm row clear the bundle-held copy goes: $(cat "$case_dir/stderr")"
       assert_absent "$BP_COPY" "by-path-exc-$shape: the copy was not removed"
@@ -5132,26 +5193,76 @@ test_by_path_exception_to_the_held_task_rule_judges_each_harm_row() {
       assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-exc-$shape: not exactly one audit record"
     else
       expect_code 1 "$rc" "by-path-exc-$shape: a harm row that holds must refuse the bundle-held copy: $(cat "$case_dir/stderr")"
+      assert_grep 'the by-path exception to the held-task rule does not apply' "$case_dir/stderr" "by-path-exc-$shape: the exception did not refuse: $(cat "$case_dir/stderr")"
+      assert_grep " rule=$rule " "$case_dir/stderr" "by-path-exc-$shape: the typed refusal does not name rule $rule: $(cat "$case_dir/stderr")"
+      last=$(grep '^REFUSED:' "$case_dir/stderr" | tail -n 1)
+      case "$last" in
+        *"(rule=$rule): "*"$reason"*) ;;
+        *) fail "by-path-exc-$shape: the final REFUSED line does not name rule $rule and its reason ($reason): $last" ;;
+      esac
       by_path_assert_untouched "$case_dir" "by-path-exc-$shape"
       assert_absent "$case_dir/data/rec-1/preserved-bundles" "by-path-exc-$shape: the bundle was stored for a refused run"
       case "$shape" in
         h3-nested-clone | h3-other-worktree)
           assert_present "$nested/unpushed.txt" "by-path-exc-$shape: the nested repository's work is gone"
-          assert_equals "$BP_NESTED_HEAD" "$(git -C "$nested" rev-parse HEAD)" "by-path-exc-$shape: the nested repository's HEAD moved" ;;
+          git -C "$nested" cat-file -e "$(git -C "$nested" rev-parse HEAD)" || fail "by-path-exc-$shape: the nested repository lost its commit" ;;
         h3-bare-repository)
           git --git-dir="$nested" cat-file -e "$BP_NESTED_HEAD" || fail "by-path-exc-$shape: the bare repository lost its commit" ;;
         h3-registered-worktree)
           assert_present "$BP_COPY/.claude/inner" "by-path-exc-$shape: the inner worktree is gone" ;;
-        h5-process-cwd)
-          kill -0 "$pid" 2>/dev/null || fail "by-path-exc-$shape: the run signalled the process" ;;
-        h6-live-launcher)
-          assert_grep 'rule=lock-launcher-owner' "$case_dir/stderr" "by-path-exc-$shape: no named rule"
-          kill -0 "$pid" 2>/dev/null || fail "by-path-exc-$shape: the run signalled the launcher"
-          assert_absent "$case_dir/closeout.log" "by-path-exc-$shape: the driver executed a release" ;;
+        h5-process-cwd | h5-open-file | h6-live-launcher)
+          kill -0 "$pid" 2>/dev/null || fail "by-path-exc-$shape: the run signalled the process"
+          [ "$shape" != h6-live-launcher ] || assert_absent "$case_dir/closeout.log" "by-path-exc-$shape: the driver executed a release" ;;
       esac
     fi
+    [ -z "$pid" ] || teardown_fixture_stop "$pid"
   done
-  pass 'the by-path exception to the held-task rule removes a bundle-held copy only while no live record, live slot claim or other unbundled work stands in the way'
+  pass 'the by-path exception to the held-task rule itself refuses each harm row made after every earlier check, names that row in the final REFUSED line, and removes the bundle-held copy while every row is clear'
+}
+
+# A by-path exception row that only could not read its input is no policy judgment: a failed process
+# scan, an unreadable slot claim, a repository scan that cannot finish and a malformed bundle record,
+# each made at the first `git bundle verify`, refuse with rule inspection-unavailable, and no policy
+# refusal or friction event is recorded for them.
+test_by_path_exception_gives_an_unreadable_input_no_policy_row() {
+  local shape case_dir rc last reason
+  for shape in lsof-failed claim-unreadable scan-unfinished record-malformed; do
+    case "$shape" in claim-*) by_path_bundle_held_case "by-path-exc-unread-$shape" slot ;; *) by_path_bundle_held_case "by-path-exc-unread-$shape" ;; esac
+    case_dir=$BP_CASE
+    by_path_plant_at_first_verify "$case_dir"
+    : > "$case_dir/plant.sh"
+    case "$shape" in
+      lsof-failed)
+        reason='the process scan failed'
+        printf '#!/usr/bin/env bash\n[ "${1:-}" != -nP ] || [ ! -e %q ] || exit 1\nexec %q "$@"\n' "$case_dir/planted" "$REAL_LSOF_FOR_TEST" > "$case_dir/fakebin/lsof"
+        chmod +x "$case_dir/fakebin/lsof" ;;
+      claim-unreadable)
+        reason='cannot be read, so who the slot belongs to is unknown'
+        printf 'mkdir %q\n' "$case_dir/pool/1/.fm-slot-owner" > "$case_dir/plant.sh" ;;
+      scan-unfinished)
+        reason='could not be scanned for other Git repositories'
+        printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        printf 'mkdir -p %q\nchmod 000 %q\n' "$BP_COPY/.claude/sealed" "$BP_COPY/.claude/sealed" > "$case_dir/plant.sh" ;;
+      record-malformed)
+        reason='malformed preservation record'
+        printf 'printf %q > %q\n' 'not a bundle record\n' "$case_dir/data/rec-1/preservation-bundles.tsv" > "$case_dir/plant.sh" ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ ! -d "$BP_COPY/.claude/sealed" ] || chmod 755 "$BP_COPY/.claude/sealed"
+    assert_present "$case_dir/planted" "by-path-exc-unread-$shape: the route never reached its own bundle verification: $(cat "$case_dir/stderr")"
+    expect_code 1 "$rc" "by-path-exc-unread-$shape: an unreadable input must still refuse: $(cat "$case_dir/stderr")"
+    assert_grep 'the by-path exception to the held-task rule does not apply' "$case_dir/stderr" "by-path-exc-unread-$shape: the exception did not refuse: $(cat "$case_dir/stderr")"
+    last=$(grep '^REFUSED:' "$case_dir/stderr" | tail -n 1)
+    case "$last" in
+      *"(rule=inspection-unavailable): "*"$reason"*) ;;
+      *) fail "by-path-exc-unread-$shape: the final REFUSED line does not name rule inspection-unavailable and its reason ($reason): $last" ;;
+    esac
+    if grep -q '^REFUSED: guard=' "$case_dir/stderr"; then fail "by-path-exc-unread-$shape: an unreadable input was refused as a policy row: $(cat "$case_dir/stderr")"; fi
+    assert_absent "$BP_HOME/state/friction.jsonl" "by-path-exc-unread-$shape: a friction event was recorded for an unreadable input"
+    by_path_assert_untouched "$case_dir" "by-path-exc-unread-$shape"
+  done
+  pass 'an exception row that only could not read its input refuses with rule inspection-unavailable and records no policy refusal'
 }
 
 # The exception's own reason is the last word: harm that appears after every earlier check has passed (a
@@ -5182,8 +5293,8 @@ SH
   expect_code 1 "$rc" "by-path-exc-reason: harm planted after the early checks must refuse: $(cat "$case_dir/stderr")"
   assert_present "$nested/.git" 'by-path-exc-reason: the planted repository was not planted'
   assert_grep 'bundle preservation unavailable' "$case_dir/stderr" 'by-path-exc-reason: the exception did not refuse'
-  grep '^REFUSED:' "$case_dir/stderr" | grep -Fq 'no clone registers' || fail "by-path-exc-reason: the final REFUSED line does not carry the exception's reason: $(cat "$case_dir/stderr")"
-  if grep '^REFUSED:' "$case_dir/stderr" | grep -Fq 'is not proved landed'; then fail 'by-path-exc-reason: the final REFUSED line is the generic landing envelope'; fi
+  grep '^REFUSED:' "$case_dir/stderr" | tail -n 1 | grep -Fq 'no clone registers' || fail "by-path-exc-reason: the final REFUSED line does not carry the exception's reason: $(cat "$case_dir/stderr")"
+  if grep '^REFUSED:' "$case_dir/stderr" | grep -Fq 'is not proved landed'; then fail 'by-path-exc-reason: a REFUSED line is the generic landing envelope'; fi
   by_path_assert_untouched "$case_dir" by-path-exc-reason
   pass 'a refusal by the by-path exception keeps the exception own reason as the final REFUSED text'
 }
@@ -5252,6 +5363,8 @@ test_by_path_preserves_claude_whole_and_removes_the_copy() {
       preserve-cannot-publish)
         expect_code 1 "$rc" "by-path-claude-$shape: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
         assert_grep 'could not be preserved' "$case_dir/stderr" "by-path-claude-$shape: no named reason"
+        grep '^completing-command: ' "$case_dir/stderr" | grep -Fq -- "fm-teardown.sh --copy $BP_COPY --record-id pres-1" \
+          || fail "by-path-claude-$shape: the completing command is not the --copy form: $(grep '^completing-command: ' "$case_dir/stderr")"
         assert_present "$BP_COPY/.claude/settings.local.json" "by-path-claude-$shape: the settings file is gone"
         by_path_registered "$BP_CLONE" "$BP_COPY" || fail "by-path-claude-$shape: the copy is no longer registered"
         assert_absent "$case_dir/git-remove.log" "by-path-claude-$shape: git worktree remove was called"
@@ -5572,6 +5685,7 @@ test_by_path_refuses_a_gone_copy_when_a_registration_list_cannot_be_read
 test_by_path_refuses_an_unregistered_nested_repository_under_the_copy
 test_by_path_refuses_when_the_audit_record_cannot_be_written
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row
+test_by_path_exception_gives_an_unreadable_input_no_policy_row
 test_by_path_exception_refusal_keeps_its_own_reason
 test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude
 test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
