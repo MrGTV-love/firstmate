@@ -717,7 +717,7 @@ sub scan_heredoc_parent_subs {
 }
 sub scan_program {
     my ($path, $body, $deps, $child_deps, $finite_backend, $parameters, $in_child) = @_;
-    my ($position, @words, @heredocs, @cases, $stdin);
+    my ($position, @words, @heredocs, @cases, @pat_depth, @pat_start, $stdin);
     $position = 0;
     while ($position < length $body) {
         pos($body) = $position;
@@ -768,10 +768,18 @@ sub scan_program {
             my $separator = $1;
             $position = pos($body);
             if (@cases && $cases[-1] eq 'pattern') {
-                $cases[-1] = 'body' if $separator eq ')';
+                if ($separator eq '(') {
+                    if ($pat_start[-1]) { $pat_start[-1] = 0; } else { $pat_depth[-1]++; }
+                } elsif ($separator eq ')') {
+                    if ($pat_depth[-1] > 0) { $pat_depth[-1]--; } else { $cases[-1] = 'body'; }
+                }
             } else {
                 command_dependencies($path, \@words, $deps, $child_deps, $finite_backend, $stdin, $in_child);
-                $cases[-1] = 'pattern' if @cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/;
+                if (@cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/) {
+                    $cases[-1] = 'pattern';
+                    $pat_depth[-1] = 0;
+                    $pat_start[-1] = 1;
+                }
             }
             @words = ();
             $stdin = undef;
@@ -801,10 +809,36 @@ sub scan_program {
         }
         my $word = shell_word($body, \$position, $parameters);
         scan_program($path, $_, $deps, $child_deps, $finite_backend, $parameters, $in_child) for @{$word->{subs}};
-        if (!@words && $word->{raw} eq 'case') { push @cases, 'header'; next; }
-        if (@cases && $cases[-1] eq 'header') { $cases[-1] = 'pattern' if $word->{raw} eq 'in'; next; }
-        if (@cases && $word->{raw} eq 'esac' && !@words) { pop @cases; next; }
-        next if @cases && $cases[-1] eq 'pattern';
+        if (@cases && $cases[-1] eq 'pattern') {
+            if ($pat_start[-1] && $word->{raw} eq 'esac') {
+                pop @cases;
+                pop @pat_depth;
+                pop @pat_start;
+            } else {
+                $pat_start[-1] = 0;
+            }
+            next;
+        }
+        if (@cases && $cases[-1] eq 'header') {
+            if ($word->{raw} eq 'in') {
+                $cases[-1] = 'pattern';
+                $pat_depth[-1] = 0;
+                $pat_start[-1] = 1;
+            }
+            next;
+        }
+        if (!@words && $word->{raw} eq 'case') {
+            push @cases, 'header';
+            push @pat_depth, 0;
+            push @pat_start, 0;
+            next;
+        }
+        if (@cases && $word->{raw} eq 'esac' && !@words) {
+            pop @cases;
+            pop @pat_depth;
+            pop @pat_start;
+            next;
+        }
         push @words, $word;
     }
     command_dependencies($path, \@words, $deps, $child_deps, $finite_backend, $stdin, $in_child);

@@ -1155,7 +1155,6 @@ SH
 #!/usr/bin/env bash
 bash <<EOF
 : ${VALUE:-$(( $(case "${1:-x}" in x)
-# shellcheck source=bin/library.sh
 . bin/library.sh
 library_value
 printf '0\n'
@@ -1167,7 +1166,6 @@ SH
 shopt -s extglob
 bash <<EOF
 : ${VALUE:-$(( $(case "${1:-x}" in (@(x|case))
-# shellcheck source=bin/library.sh
 . bin/library.sh
 library_value
 printf '0\n'
@@ -1178,7 +1176,6 @@ SH
 #!/usr/bin/env bash
 cat <<EOF
 ${VALUE:-$(case "${1:-x}" in (case) :;; (*) :;; esac
-# shellcheck source=bin/library.sh
 . bin/library.sh
 library_value)}
 EOF
