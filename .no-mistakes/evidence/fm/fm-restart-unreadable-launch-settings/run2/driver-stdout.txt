@@ -1,0 +1,80 @@
+lab session=fm-lab-rstunpin-81919-1290 FM_HOME=/Users/charlesabrooker/tmp/fm-lab.jUnmRA
+=================== STAGE orphan
+PRECOND orph: agent_state=alive attributed_pid=6240 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND orph: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-orph'
+PRECOND orph: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.VYT6Dv/orph-home
+PRECOND orph: fm_launch_proof_herdr verdict: unknown
+setup: launch script recorded caffeinate pid '6342'; its row:  6342     1  6240 /usr/bin/caffeinate -w 88887
+   [orphan] group member pid=6240 ppid=88559 comm=/Users/charlesabrooker/.local/bin/claude env=readable exe=/Users/charlesabrooker/.local/share/claude/versions/2.1.332
+   [orphan] group member pid=6342 ppid=1 comm=/usr/bin/caffeinate env=UNREADABLE exe=/usr/bin/caffeinate
+HEAD judge with orphan platform binary in group: unknown|the environment of live group process 6342 cannot be read, so the agent's process group cannot be judged
+BASE verdict with orphan platform binary in group: managed
+--- HEAD fm-control interrupt (orphan platform binary in group) (orph) rc=1
+$ bin/fm-control.sh orph interrupt
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jUnmRA
+  | error: task orph cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: the environment of live group process 6342 cannot be read, so the agent's process group cannot be judged; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+  state-diff: 2a3
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.jUnmRA/state/guard-events.jsonl
+  keys/inputs sent to w1:p1 by this call: 0 ; screen: same ; protected state: changed
+RESULT S11-orphan-platform pass :: judge=unknown|the environment of live group process 6342 cannot be read, so the agent's process group cannot be judged; interrupt rc=1 names pid 6342, 0 inputs, screen same, state changed
+--- HEAD reboot recover (orphan platform binary in group) (orph) rc=1
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jUnmRA
+  | REBOOT_RECOVERY: orph: the environment of live group process 6342 cannot be read, so the agent's process group cannot be judged; no lifecycle action taken; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+  keys/inputs sent to w1:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S11-orphan-platform pass :: recover reports and refuses: rc=1, 0 inputs
+orphan caffeinate alive after holder ended: no
+HEAD judge after the orphan caffeinate ended: managed|
+--- HEAD fm-control interrupt (after orphan ended) (orph) rc=0
+$ bin/fm-control.sh orph interrupt
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jUnmRA
+  | interrupt-delivered orph harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+  keys/inputs sent to w1:p1 by this call: 1 ; screen: same ; protected state: same
+RESULT S11-control pass :: after the orphan ended: judge=managed|; interrupt rc=0 sends=1: interrupt-delivered orph harness=claude backend=herdr verified=agent-alive cancel=unconfirmed 
+=================== STAGE busy-managed
+PRECOND busy: agent_state=alive attributed_pid=76422 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND busy: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-busy'
+PRECOND busy: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.VYT6Dv/busy-home
+PRECOND busy: fm_launch_proof_herdr verdict: managed
+setup: tool shell child of the agent:  (Enter attempts: 1)
+   [busy] group member pid=76422 ppid=18642 comm=/Users/charlesabrooker/.local/bin/claude env=readable exe=/Users/charlesabrooker/.local/share/claude/versions/2.1.332
+   [busy] group member pid=92269 ppid=76422 comm=caffeinate env=UNREADABLE exe=/usr/bin/caffeinate
+unreadable group members besides the agent: 1
+RESULT S9-precondition pass :: busy managed claude has 1 unreadable group member(s) (caffeinate / tool shell)
+HEAD verdict with a running shell child: managed|
+BASE verdict with a running shell child: managed
+RESULT S9-verdict pass :: head verdict managed = base verdict managed
+--- HEAD reboot recover (busy managed) (busy) rc=0
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jUnmRA
+  keys/inputs sent to w2:p1 by this call: 0 ; screen: changed ; protected state: same
+--- BASE reboot recover (busy managed) (busy) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jUnmRA
+  keys/inputs sent to w2:p1 by this call: 0 ; screen: changed ; protected state: same
+RESULT S9-recover pass :: head recover rc=0 silent, 0 inputs; base recover rc=0 silent
+   [before-head-interrupt] group member pid=76422 ppid=18642 comm=/Users/charlesabrooker/.local/bin/claude env=readable exe=/Users/charlesabrooker/.local/share/claude/versions/2.1.332
+   [before-head-interrupt] group member pid=92269 ppid=76422 comm=caffeinate env=UNREADABLE exe=/usr/bin/caffeinate
+RESULT S9b-precondition pass :: tool shell child pid=25036 comm=/bin/zsh exe=/bin/zsh is present and its environment is unreadable just before the head interrupt
+--- HEAD fm-control interrupt (busy managed) (busy) rc=0
+$ bin/fm-control.sh busy interrupt
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jUnmRA
+  | interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+  keys/inputs sent to w2:p1 by this call: 1 ; screen: changed ; protected state: same
+setup: tool shell child of the agent: 3854 (Enter attempts: 1)
+   [before-base-interrupt] group member pid=1132 ppid=76422 comm=caffeinate env=UNREADABLE exe=/usr/bin/caffeinate
+   [before-base-interrupt] group member pid=76422 ppid=18642 comm=/Users/charlesabrooker/.local/bin/claude env=readable exe=/Users/charlesabrooker/.local/share/claude/versions/2.1.332
+--- BASE fm-control interrupt (busy managed) (busy) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-control.sh busy interrupt
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.jUnmRA
+  | interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+  keys/inputs sent to w2:p1 by this call: 1 ; screen: changed ; protected state: same
+RESULT S9-interrupt pass :: head rc=0 sends=1: interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed  | base rc=0 sends=1: interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed 
+done
+lab session fm-lab-rstunpin-81919-1290 torn down
+native pid 88887 exited
+native pid 6240 exited
+native pid 76422 exited
+lab home removed: /Users/charlesabrooker/tmp/fm-lab.jUnmRA
+private tree removed: /Users/charlesabrooker/tmp/fm-rst-live.VYT6Dv
+driver exit=0

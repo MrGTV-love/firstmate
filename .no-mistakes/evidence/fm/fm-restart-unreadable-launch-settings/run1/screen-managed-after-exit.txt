@@ -1,0 +1,2 @@
+charlesabrooker@Mac-Studio mgd-home % bash /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/mgd-launch.sh
+charlesabrooker@Mac-Studio mgd-home %

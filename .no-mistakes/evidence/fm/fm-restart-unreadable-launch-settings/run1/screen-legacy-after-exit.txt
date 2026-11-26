@@ -1,0 +1,2 @@
+charlesabrooker@Mac-Studio legacy-home % bash /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/legacy-launch.sh
+charlesabrooker@Mac-Studio legacy-home %

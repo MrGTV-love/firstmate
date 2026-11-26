@@ -1,0 +1,346 @@
+lab session=fm-lab-rstunpin-11680-14921 FM_HOME=/Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+=================== STAGE managed-restart
+PRECOND mgdr: agent_state=alive attributed_pid=31814 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND mgdr: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-mgdr'
+PRECOND mgdr: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/mgdr-home
+PRECOND mgdr: fm_launch_proof_herdr verdict: managed
+--- fm-secondmate-restart on managed lane (managed-restart) (mgdr) rc=3
+$ env FM_SECONDMATE_PERSIST_WAIT=5 FM_SECONDMATE_PERSIST_POLL=1 bin/fm-secondmate-restart.sh mgdr
+  | nudged: mgdr: it did not confirm within 5s that its open work is written down, so its conversation was not spent
+  | summary: 0 of 1 restarted, 1 nudged, 0 unreached
+  state-diff: 2a3,6
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/.guard-watcher-stale-banner
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/guard-events.jsonl
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/mgdr.inbox/001.msg
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/mgdr.inbox/002.msg
+  state-diff: 3a8,9
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/pending-replies/2b5e85666a00e7bd
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/pending-replies/bf49e5700c177183
+  keys/inputs sent to w1:p1 by this call: 2 ; screen: changed ; protected state: changed
+  polls: 12; verdicts:   11 managed    1 unknown 
+  inbox records: 2 ; pending-reply records: 2
+RESULT S8-managed-restart pass :: managed lane not refused by attribution: rc=3 sends=2; nudged: mgdr: it did not confirm within 5s that its open work is written down, so its conversation was not spent summary: 0 of 1 restarted, 1 nudged, 0 unreached 
+=================== STAGE managed-restart-base
+PRECOND mgdr: agent_state=alive attributed_pid=54826 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND mgdr: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-mgdr'
+PRECOND mgdr: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/mgdr-home
+PRECOND mgdr: fm_launch_proof_herdr verdict: managed
+--- fm-secondmate-restart on managed lane (managed-restart-base) (mgdr) rc=3
+$ env FM_SECONDMATE_PERSIST_WAIT=5 FM_SECONDMATE_PERSIST_POLL=1 /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-secondmate-restart.sh mgdr
+  | nudged: mgdr: it did not confirm within 5s that its open work is written down, so its conversation was not spent
+  | summary: 0 of 1 restarted, 1 nudged, 0 unreached
+  state-diff: 6a7,8
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/mgdr.inbox/003.msg
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/mgdr.inbox/004.msg
+  state-diff: 7a10
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/pending-replies/26684f3e6ec7bd49
+  state-diff: 9a13
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/pending-replies/d758929764be5e9c
+  keys/inputs sent to w2:p1 by this call: 5 ; screen: changed ; protected state: changed
+  polls: 8; verdicts:    8 managed 
+  inbox records: 4 ; pending-reply records: 4
+RESULT S8-managed-restart-base pass :: managed lane not refused by attribution: rc=3 sends=5; nudged: mgdr: it did not confirm within 5s that its open work is written down, so its conversation was not spent summary: 0 of 1 restarted, 1 nudged, 0 unreached 
+=================== STAGE startup
+PRECOND boot: agent_state=alive attributed_pid=68691 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND boot: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-boot'
+PRECOND boot: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/boot-home
+PRECOND boot: fm_launch_proof_herdr verdict: managed
+startup samples: 9; with an unreadable sh member: managed=1 other=0
+startup verdicts overall:    2 managed    7 unknown 
+RESULT S9c-startup-sh pass :: 1 sample(s) show verdict managed while an unreadable /bin/sh descendant was in the agent's group; 0 non-managed such samples (startup-samples.tsv)
+=================== STAGE busy-managed
+PRECOND busy: agent_state=alive attributed_pid=96035 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND busy: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-busy'
+PRECOND busy: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/busy-home
+PRECOND busy: fm_launch_proof_herdr verdict: managed
+setup: tool shell child of the agent:  (Enter attempts: 1)
+   [busy] group member pid=94697 ppid=96035 comm=caffeinate env=UNREADABLE exe=/usr/bin/caffeinate
+   [busy] group member pid=96035 ppid=35558 comm=/Users/charlesabrooker/.local/bin/claude env=readable exe=/Users/charlesabrooker/.local/share/claude/versions/2.1.332
+unreadable group members besides the agent: 1
+RESULT S9-precondition pass :: busy managed claude has 1 unreadable group member(s) (caffeinate / tool shell)
+HEAD verdict with a running shell child: managed|
+BASE verdict with a running shell child: managed
+RESULT S9-verdict pass :: head verdict managed = base verdict managed
+--- HEAD reboot recover (busy managed) (busy) rc=0
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  keys/inputs sent to w4:p1 by this call: 0 ; screen: changed ; protected state: same
+--- BASE reboot recover (busy managed) (busy) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  keys/inputs sent to w4:p1 by this call: 0 ; screen: changed ; protected state: same
+RESULT S9-recover pass :: head recover rc=0 silent, 0 inputs; base recover rc=0 silent
+   [before-head-interrupt] group member pid=94697 ppid=96035 comm=caffeinate env=UNREADABLE exe=/usr/bin/caffeinate
+   [before-head-interrupt] group member pid=96035 ppid=35558 comm=/Users/charlesabrooker/.local/bin/claude env=readable exe=/Users/charlesabrooker/.local/share/claude/versions/2.1.332
+RESULT S9b-precondition FAIL :: no unreadable tool shell child just before the head interrupt (shell_kid='')
+--- HEAD fm-control interrupt (busy managed) (busy) rc=0
+$ bin/fm-control.sh busy interrupt
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+  keys/inputs sent to w4:p1 by this call: 1 ; screen: changed ; protected state: same
+setup: tool shell child of the agent: 88440 (Enter attempts: 1)
+   [before-base-interrupt] group member pid=70954 ppid=96035 comm=caffeinate env=UNREADABLE exe=/usr/bin/caffeinate
+   [before-base-interrupt] group member pid=96035 ppid=35558 comm=/Users/charlesabrooker/.local/bin/claude env=readable exe=/Users/charlesabrooker/.local/share/claude/versions/2.1.332
+--- BASE fm-control interrupt (busy managed) (busy) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-control.sh busy interrupt
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+  keys/inputs sent to w4:p1 by this call: 1 ; screen: changed ; protected state: same
+RESULT S9-interrupt pass :: head rc=0 sends=1: interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed  | base rc=0 sends=1: interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed 
+=================== STAGE orphan
+PRECOND orph: agent_state=alive attributed_pid=80801 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND orph: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-orph'
+PRECOND orph: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/orph-home
+PRECOND orph: fm_launch_proof_herdr verdict: managed
+setup: caffeinate -t 200 rows: 
+   [orphan] group member pid=80801 ppid=63429 comm=/Users/charlesabrooker/.local/bin/claude env=readable exe=/Users/charlesabrooker/.local/share/claude/versions/2.1.332
+RESULT S11-orphan-platform FAIL :: setup: no orphaned caffeinate in the agent's group was produced
+=================== STAGE unpinned-wrapper
+PRECOND d1wrap: agent_state=alive attributed_pid=33358 comm=/opt/homebrew/bin/node args='/opt/homebrew/bin/node /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/launcher/bin/teamclaude run -- --resume 00000000-0000-4000-8000-000000000001'
+PRECOND d1wrap: env has PATH/HOME: 2 ; FM_SPAWN_GEN: ''
+PRECOND d1wrap: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/d1wrap-home
+PRECOND d1wrap: children of attributed pid: 42254  (/Users/charlesabrooker/.local/bin/claude )
+PRECOND d1wrap: fm_launch_proof_herdr verdict: unmanaged
+--- reboot recover (d1wrap) rc=1
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | REBOOT_RECOVERY: d1wrap: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1wrap relaunch", or decide the lane by hand
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S2-unpinned-wrapper pass :: recover: rc=1, cause present, 0 inputs, screen same, state same
+--- reboot recover --one (d1wrap) rc=1
+$ bin/fm-reboot-recover.sh recover --one
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | REBOOT_RECOVERY: d1wrap: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1wrap relaunch", or decide the lane by hand
+  state-diff: 3a4
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/.reboot-recovery-cursor
+  state-diff: 4a6
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/d1wrap.reboot-notice
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: changed
+RESULT S2-unpinned-wrapper pass :: recover --one: rc=1, cause present, 0 inputs, screen same, state changed
+--- fm-control interrupt (d1wrap) rc=1
+$ bin/fm-control.sh d1wrap interrupt
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task d1wrap cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1wrap relaunch", or decide the lane by hand
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S2-unpinned-wrapper pass :: interrupt: rc=1, cause present, 0 inputs, screen same, state same
+--- fm-control exit (d1wrap) rc=1
+$ bin/fm-control.sh d1wrap exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task d1wrap cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1wrap relaunch", or decide the lane by hand
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S2-unpinned-wrapper pass :: exit: rc=1, cause present, 0 inputs, screen same, state same
+--- fm-control stay (d1wrap) rc=1
+$ bin/fm-control.sh d1wrap stay
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task d1wrap cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1wrap relaunch", or decide the lane by hand
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S2-unpinned-wrapper pass :: stay: rc=1, cause present, 0 inputs, screen same, state same
+--- fm-control relaunch (d1wrap) rc=1
+$ bin/fm-control.sh d1wrap relaunch
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task d1wrap cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1wrap relaunch", or decide the lane by hand
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S2-unpinned-wrapper pass :: relaunch: rc=1, cause present, 0 inputs, screen same, state same
+--- fm-control relaunch --recover-launch (d1wrap) rc=1
+$ bin/fm-control.sh d1wrap relaunch --recover-launch
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: launch recovery for d1wrap found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1wrap relaunch", or decide the lane by hand
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S2-unpinned-wrapper pass :: relaunch --recover-launch: rc=1, cause present, 0 inputs, screen same, state same
+--- fm-control adopt (d1wrap) rc=1
+$ bin/fm-control.sh d1wrap adopt
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh d1wrap relaunch"; nothing was changed
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S2-unpinned-wrapper pass :: adopt refuses, nothing changed
+--- fm-secondmate-restart (d1wrap) rc=3
+$ env FM_SECONDMATE_PERSIST_WAIT=5 FM_SECONDMATE_PERSIST_POLL=1 bin/fm-secondmate-restart.sh d1wrap
+  | unreached: d1wrap: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh d1wrap relaunch", or decide the lane by hand
+  | summary: 0 of 1 restarted, 0 nudged, 1 unreached
+  keys/inputs sent to w6:p1 by this call: 0 ; screen: same ; protected state: same
+  inbox records after restart: 0 ; pending-reply files: 8
+RESULT S2-unpinned-wrapper FAIL :: secondmate restart rc=3 sends=0 state=same
+=================== STAGE unreadable
+PRECOND unread: agent_state=alive attributed_pid=43728 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND unread: env has PATH/HOME: 0 ; FM_SPAWN_GEN: ''
+PRECOND unread: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/unread-home
+PRECOND unread: fm_launch_proof_herdr verdict: unknown
+--- reboot recover (unread) rc=1
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | REBOOT_RECOVERY: unread: live launch settings are unreadable; no lifecycle action taken; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+  keys/inputs sent to w7:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S4-unreadable pass :: recover: rc=1, cause present, 0 inputs, screen same, state same
+--- fm-control exit (unread) rc=1
+$ bin/fm-control.sh unread exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task unread cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live launch settings are unreadable; no foreground process could be attributed in the recorded pane, or its environment could not be read; retry once it can be read, or decide the lane by hand
+  keys/inputs sent to w7:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S4-unreadable pass :: exit: rc=1, cause present, 0 inputs, screen same, state same
+=================== STAGE pinned-elsewhere
+PRECOND pinx: agent_state=alive attributed_pid=47819 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND pinx: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-somebody-else'
+PRECOND pinx: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/pinx-home
+PRECOND pinx: fm_launch_proof_herdr verdict: pinned-elsewhere
+--- reboot recover (pinx) rc=1
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | REBOOT_RECOVERY: pinx: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; no lifecycle action taken; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+  keys/inputs sent to w8:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S3-pinned-elsewhere pass :: recover: rc=1, cause present, 0 inputs, screen same, state same
+--- fm-control exit (pinx) rc=1
+$ bin/fm-control.sh pinx exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task pinx cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+  keys/inputs sent to w8:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S3-pinned-elsewhere pass :: exit: rc=1, cause present, 0 inputs, screen same, state same
+=================== STAGE managed
+PRECOND mgd: agent_state=alive attributed_pid=38614 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND mgd: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-mgd'
+PRECOND mgd: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/mgd-home
+PRECOND mgd: fm_launch_proof_herdr verdict: managed
+--- reboot recover (mgd) rc=0
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  keys/inputs sent to w9:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S5-managed pass :: recover silent rc=0 for managed lane
+--- BASE reboot recover (mgd) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  keys/inputs sent to w9:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S5-managed-base info :: base recover rc=0 sends=0
+--- fm-control relaunch --recover-launch (mgd) rc=0
+$ bin/fm-control.sh mgd relaunch --recover-launch
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | recovery-skipped mgd launch=managed
+  keys/inputs sent to w9:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S5-managed pass :: recover-launch: launch=managed skip
+contested probe verdict: contested
+--- fm-control exit (peer shares home) (mgd) rc=1
+$ bin/fm-control.sh mgd exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task mgd cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: another task record (mgdpeer.meta) claims this pane, this home or worktree, or a worktree around the agent's working directory; something other than this task's own agent tree, directory or record shares its pane; Main inspects the pane and decides the lane by hand
+  keys/inputs sent to w9:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S7-contested pass :: exit: rc=1, cause present, 0 inputs, screen same, state same
+verdict after peer removed: managed
+--- fm-control exit (managed) (mgd) rc=0
+$ bin/fm-control.sh mgd exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | stopped mgd harness=claude backend=herdr endpoint=fm-lab-rstunpin-11680-14921:w9:p1 worktree=/Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/mgd-home
+  state-diff: 6a7
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/mgd.control-exit
+  keys/inputs sent to w9:p1 by this call: 2 ; screen: changed ; protected state: changed
+RESULT S5-managed pass :: exit is not refused by attribution (rc=0, sends=2)
+=================== STAGE legacy
+PRECOND legacy: agent_state=alive attributed_pid=76655 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND legacy: env has PATH/HOME: 2 ; FM_SPAWN_GEN: ''
+PRECOND legacy: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/legacy-home
+PRECOND legacy: fm_launch_proof_herdr verdict: unknown
+--- reboot recover (legacy) rc=0
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  keys/inputs sent to wA:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S6-legacy pass :: recover rc=0 (legacy unproven skip), no input
+--- BASE reboot recover (legacy) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  keys/inputs sent to wA:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S6-legacy-base info :: base recover rc=0 sends=0
+--- BASE fm-control relaunch --recover-launch (legacy) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-control.sh legacy relaunch --recover-launch
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | recovery-skipped legacy launch=legacy-unproven
+  keys/inputs sent to wA:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S6-legacy-base info :: base recover-launch rc=0: recovery-skipped legacy launch=legacy-unproven
+--- fm-control relaunch --recover-launch (legacy) rc=0
+$ bin/fm-control.sh legacy relaunch --recover-launch
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | recovery-skipped legacy launch=legacy-unproven
+  keys/inputs sent to wA:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S6-legacy pass :: recover-launch reports legacy skip
+--- fm-control exit (legacy) (legacy) rc=0
+$ bin/fm-control.sh legacy exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | stopped legacy harness=claude backend=herdr endpoint=fm-lab-rstunpin-11680-14921:wA:p1 worktree=/Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/legacy-home
+  state-diff: 6a7
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/legacy.control-exit
+  keys/inputs sent to wA:p1 by this call: 2 ; screen: changed ; protected state: changed
+RESULT S6-legacy pass :: legacy exit not refused by attribution (rc=0 sends=2)
+=================== STAGE stopped
+PRECOND stopH: agent_state=dead
+--- H reboot recover (shell-only pane) (stopH) rc=0
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  keys/inputs sent to wB:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S10-stopped-H info :: recover rc=0 sends=0 report=no
+--- H fm-control exit (shell-only pane) (stopH) rc=0
+$ bin/fm-control.sh stopH exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | already-stopped stopH harness=claude backend=herdr endpoint=fm-lab-rstunpin-11680-14921:wB:p1 worktree=/Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/stopH-home
+  keys/inputs sent to wB:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S10-stopped-H info :: exit rc=0 sends=0: already-stopped stopH harness=claude backend=herdr endpoint=fm-lab-rstunpin-11680-14921:wB:p1 worktree=/Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/stopH-home 
+PRECOND stopB: agent_state=dead
+--- B reboot recover (shell-only pane) (stopB) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  keys/inputs sent to wC:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S10-stopped-B info :: recover rc=0 sends=0 report=no
+--- B fm-control exit (shell-only pane) (stopB) rc=0
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-control.sh stopB exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | already-stopped stopB harness=claude backend=herdr endpoint=fm-lab-rstunpin-11680-14921:wC:p1 worktree=/Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/stopB-home
+  keys/inputs sent to wC:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S10-stopped-B info :: exit rc=0 sends=0: already-stopped stopB harness=claude backend=herdr endpoint=fm-lab-rstunpin-11680-14921:wC:p1 worktree=/Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/stopB-home 
+=================== STAGE base-unpinned
+PRECOND d1base: agent_state=alive attributed_pid=68582 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND d1base: env has PATH/HOME: 2 ; FM_SPAWN_GEN: ''
+PRECOND d1base: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/d1base-home
+PRECOND d1base: fm_launch_proof_herdr verdict: unmanaged
+--- BASE reboot recover (d1base) rc=1
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | REBOOT_RECOVERY: d1base: live launch settings are unreadable; no lifecycle action taken
+  keys/inputs sent to wD:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT BASE-unpinned info :: recover rc=1 sends=0 unreadable-wording=yes
+--- BASE fm-control exit (d1base) rc=1
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-control.sh d1base exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task d1base cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+  keys/inputs sent to wD:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT BASE-unpinned info :: exit rc=1 sends=0 unreadable-wording=no
+--- BASE fm-control relaunch (d1base) rc=1
+$ /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-control.sh d1base relaunch
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+  | error: task d1base cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+  keys/inputs sent to wD:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT BASE-unpinned info :: relaunch rc=1 sends=0 unreadable-wording=no
+--- BASE fm-secondmate-restart (d1base) rc=3
+$ env FM_SECONDMATE_PERSIST_WAIT=5 FM_SECONDMATE_PERSIST_POLL=1 /Users/charlesabrooker/tmp/fm-base-6b775a16a.6kcvZM/bin/fm-secondmate-restart.sh d1base
+  | nudged: d1base: it did not confirm within 5s that its open work is written down, so its conversation was not spent
+  | summary: 0 of 1 restarted, 1 nudged, 0 unreached
+  state-diff: 4a5,6
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/d1base.inbox/001.msg
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/d1base.inbox/002.msg
+  state-diff: 15a18
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/pending-replies/61384fcf6863aac2
+  state-diff: 17a21
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.OOuDcQ/state/pending-replies/feaaec25d9ca6643
+  keys/inputs sent to wD:p1 by this call: 0 ; screen: same ; protected state: changed
+RESULT BASE-unpinned info :: secondmate-restart rc=3 sends=0 inbox=0
+done
+lab session fm-lab-rstunpin-11680-14921 torn down
+native pid 31814 exited
+native pid 54826 exited
+native pid 68691 exited
+native pid 96035 exited
+native pid 80801 exited
+native pid 12873 exited
+native pid 33358 exited
+native pid 42254 exited
+native pid 43728 exited
+native pid 47819 exited
+native pid 38614 exited
+native pid 76655 exited
+native pid 68582 exited
+lab home removed: /Users/charlesabrooker/tmp/fm-lab.OOuDcQ
+private tree removed: /Users/charlesabrooker/tmp/fm-rst-live.LYkYDm

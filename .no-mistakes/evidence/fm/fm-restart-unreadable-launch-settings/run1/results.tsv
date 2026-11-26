@@ -1,0 +1,40 @@
+S8-managed-restart	pass	managed lane not refused by attribution: rc=3 sends=2; nudged: mgdr: it did not confirm within 5s that its open work is written down, so its conversation was not spent summary: 0 of 1 restarted, 1 nudged, 0 unreached 
+S8-managed-restart-base	pass	managed lane not refused by attribution: rc=3 sends=5; nudged: mgdr: it did not confirm within 5s that its open work is written down, so its conversation was not spent summary: 0 of 1 restarted, 1 nudged, 0 unreached 
+S9c-startup-sh	pass	1 sample(s) show verdict managed while an unreadable /bin/sh descendant was in the agent's group; 0 non-managed such samples (startup-samples.tsv)
+S9-precondition	pass	busy managed claude has 1 unreadable group member(s) (caffeinate / tool shell)
+S9-verdict	pass	head verdict managed = base verdict managed
+S9-recover	pass	head recover rc=0 silent, 0 inputs; base recover rc=0 silent
+S9b-precondition	FAIL	no unreadable tool shell child just before the head interrupt (shell_kid='')
+S9-interrupt	pass	head rc=0 sends=1: interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed  | base rc=0 sends=1: interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed 
+S11-orphan-platform	FAIL	setup: no orphaned caffeinate in the agent's group was produced
+S2-unpinned-wrapper	pass	recover: rc=1, cause present, 0 inputs, screen same, state same
+S2-unpinned-wrapper	pass	recover --one: rc=1, cause present, 0 inputs, screen same, state changed
+S2-unpinned-wrapper	pass	interrupt: rc=1, cause present, 0 inputs, screen same, state same
+S2-unpinned-wrapper	pass	exit: rc=1, cause present, 0 inputs, screen same, state same
+S2-unpinned-wrapper	pass	stay: rc=1, cause present, 0 inputs, screen same, state same
+S2-unpinned-wrapper	pass	relaunch: rc=1, cause present, 0 inputs, screen same, state same
+S2-unpinned-wrapper	pass	relaunch --recover-launch: rc=1, cause present, 0 inputs, screen same, state same
+S2-unpinned-wrapper	pass	adopt refuses, nothing changed
+S2-unpinned-wrapper	FAIL	secondmate restart rc=3 sends=0 state=same
+S4-unreadable	pass	recover: rc=1, cause present, 0 inputs, screen same, state same
+S4-unreadable	pass	exit: rc=1, cause present, 0 inputs, screen same, state same
+S3-pinned-elsewhere	pass	recover: rc=1, cause present, 0 inputs, screen same, state same
+S3-pinned-elsewhere	pass	exit: rc=1, cause present, 0 inputs, screen same, state same
+S5-managed	pass	recover silent rc=0 for managed lane
+S5-managed-base	info	base recover rc=0 sends=0
+S5-managed	pass	recover-launch: launch=managed skip
+S7-contested	pass	exit: rc=1, cause present, 0 inputs, screen same, state same
+S5-managed	pass	exit is not refused by attribution (rc=0, sends=2)
+S6-legacy	pass	recover rc=0 (legacy unproven skip), no input
+S6-legacy-base	info	base recover rc=0 sends=0
+S6-legacy-base	info	base recover-launch rc=0: recovery-skipped legacy launch=legacy-unproven
+S6-legacy	pass	recover-launch reports legacy skip
+S6-legacy	pass	legacy exit not refused by attribution (rc=0 sends=2)
+S10-stopped-H	info	recover rc=0 sends=0 report=no
+S10-stopped-H	info	exit rc=0 sends=0: already-stopped stopH harness=claude backend=herdr endpoint=fm-lab-rstunpin-11680-14921:wB:p1 worktree=/Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/stopH-home 
+S10-stopped-B	info	recover rc=0 sends=0 report=no
+S10-stopped-B	info	exit rc=0 sends=0: already-stopped stopB harness=claude backend=herdr endpoint=fm-lab-rstunpin-11680-14921:wC:p1 worktree=/Users/charlesabrooker/tmp/fm-rst-live.LYkYDm/stopB-home 
+BASE-unpinned	info	recover rc=1 sends=0 unreadable-wording=yes
+BASE-unpinned	info	exit rc=1 sends=0 unreadable-wording=no
+BASE-unpinned	info	relaunch rc=1 sends=0 unreadable-wording=no
+BASE-unpinned	info	secondmate-restart rc=3 sends=0 inbox=0

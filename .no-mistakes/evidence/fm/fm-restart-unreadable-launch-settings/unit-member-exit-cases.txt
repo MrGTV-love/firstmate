@@ -1,0 +1,9 @@
+== test_launch_proof_member_gone_reads_the_live_table
+ok - the exit proof keeps a live member and sees one in another group, a zombie, and one that has exited
+rc=
+== test_launch_proof_claude_refusal_checks
+Terminated: 15
+rc=
+== test_launch_proof_pid_exe_reads_the_live_path
+ok - the executable path reader reads a live process and fails for one that is gone
+rc=

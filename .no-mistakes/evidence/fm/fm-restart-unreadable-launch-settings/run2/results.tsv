@@ -1,0 +1,8 @@
+S11-orphan-platform	pass	judge=unknown|the environment of live group process 6342 cannot be read, so the agent's process group cannot be judged; interrupt rc=1 names pid 6342, 0 inputs, screen same, state changed
+S11-orphan-platform	pass	recover reports and refuses: rc=1, 0 inputs
+S11-control	pass	after the orphan ended: judge=managed|; interrupt rc=0 sends=1: interrupt-delivered orph harness=claude backend=herdr verified=agent-alive cancel=unconfirmed 
+S9-precondition	pass	busy managed claude has 1 unreadable group member(s) (caffeinate / tool shell)
+S9-verdict	pass	head verdict managed = base verdict managed
+S9-recover	pass	head recover rc=0 silent, 0 inputs; base recover rc=0 silent
+S9b-precondition	pass	tool shell child pid=25036 comm=/bin/zsh exe=/bin/zsh is present and its environment is unreadable just before the head interrupt
+S9-interrupt	pass	head rc=0 sends=1: interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed  | base rc=0 sends=1: interrupt-delivered busy harness=claude backend=herdr verified=agent-alive cancel=unconfirmed 

@@ -1,0 +1,10 @@
+wall	judge_seconds	verdict	reason	attributed	members(pid:ppid:comm:env:exe)
+1795649582.648	5.861	unknown			
+1795649595.644	6.207	unknown			
+1795649604.998	0.373	unknown			
+1795649609.308	2.795	unknown			
+1795649613.270	4.912	unknown			
+1795649621.107	3.564	unknown		68691	
+1795649642.072	25.726	managed		68691	76211:68691:/bin/sh:U:/bin/bash 78830:76211:ps:U:/bin/ps 79057:76211:grep:U:/usr/bin/grep 79417:76211:grep:U:/usr/bin/grep 
+1795649708.305	5.082	unknown		68691	
+1795649720.164	16.162	managed		68691	

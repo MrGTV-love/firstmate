@@ -1,0 +1,13 @@
+wall	judge_seconds	verdict	reason	group
+1795648598.726	19.209	managed		31814:/Users/charlesabrooker/.local/bin/claude 
+1795648628.227	5.382	managed		31814:/Users/charlesabrooker/.local/bin/claude 
+1795648642.698	7.252	managed		31814:/Users/charlesabrooker/.local/bin/claude 
+1795648657.344	3.067	managed		31814:/Users/charlesabrooker/.local/bin/claude 
+1795648666.685	1.805	managed		31814:/Users/charlesabrooker/.local/bin/claude 
+1795648673.699	12.754	managed		31814:/Users/charlesabrooker/.local/bin/claude 
+1795648700.384	17.462	managed		31814:/Users/charlesabrooker/.local/bin/claude 
+1795648729.077	17.178	managed		31814:/Users/charlesabrooker/.local/bin/claude 90283:caffeinate 
+1795648759.419	39.542	managed		31814:/Users/charlesabrooker/.local/bin/claude 90283:caffeinate 
+1795648825.630	37.788	managed		31814:/Users/charlesabrooker/.local/bin/claude 90283:caffeinate 
+1795648881.695	33.462	managed		31814:/Users/charlesabrooker/.local/bin/claude 90283:caffeinate 
+1795648934.405	21.965	unknown	the listed foreground process 90283 is missing from the process-group table, so the agent's process group cannot be judged	31814:/Users/charlesabrooker/.local/bin/claude 
