@@ -2746,7 +2746,7 @@ test_reconciled_source_interrupt_kill() { run_reconciled_interrupt_case KILL; }
 # guard: the source branch moves only AFTER the first checkpoint's last check
 # (R contained in S) passed, so only the second checkpoint can refuse it.
 test_reconciled_source_second_checkpoint_refuses() {
-  local alt before_claim
+  local alt
   make_reconciled_case rs-checkpoint2 "rs-checkpoint2-$$"
   alt=$(printf 'moved after checkpoint one\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$RS_TREE" -p "$RS_S")
   RS_MUTATE_AT="-C * merge-base --is-ancestor $RS_R $RS_S"
