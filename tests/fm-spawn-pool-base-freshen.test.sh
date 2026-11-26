@@ -2872,6 +2872,553 @@ test_project_provisioner_origin_missing_ref() { project_provisioner_origin_case 
 test_project_provisioner_origin_missing_clone() { project_provisioner_origin_case missing-clone; }
 test_project_provisioner_origin_default_branch() { project_provisioner_origin_case default-branch; }
 
+# --- reconciled-successor source (--reconciled-source) -----------------------
+#
+# The named local default L and origin's default R diverge. S merges both on a
+# direct non-default branch and is approved by a labelled SYNTHETIC fixture
+# proposal and response. Every case runs the real spawn path with a git shim that
+# only logs argv (and, for movement controls, makes one named change at one named
+# point), then judges real Git and file state, not just output.
+
+# rs_json <path> <python-expression-producing-a-dict-or-text> [raw]
+rs_write() { # <path> <content>
+  printf '%s' "$2" > "$1"
+}
+rs_sha() { shasum -a 256 < "$1" | awk '{print $1}'; }
+rs_assert_line() { grep -Fx -- "$1" "$2" >/dev/null || fail "$3"; }
+
+# make_reconciled_case <name> <id>: sets RS_* globals; returns nothing.
+make_reconciled_case() {
+  local name=$1 id=$2 rec tree
+  rec=$(make_case "$name" "$id")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR"
+  fm_test_fake_gh "$FAKEBIN_DIR"
+  fm_test_fake_gh_axi "$FAKEBIN_DIR"
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  RS_R=$(git -C "$PROJECT_DIR" rev-parse origin/main)
+  printf 'accepted local-only work\n' > "$PROJECT_DIR/accepted-a.txt"
+  git -C "$PROJECT_DIR" add accepted-a.txt
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted A'
+  RS_L=$(git -C "$PROJECT_DIR" rev-parse refs/heads/main)
+  tree=$(git -C "$PROJECT_DIR" merge-tree --write-tree "$RS_L" "$RS_R")
+  RS_S=$(printf 'reconcile L with R\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid \
+    commit-tree "$tree" -p "$RS_L" -p "$RS_R")
+  RS_TREE=$(git -C "$PROJECT_DIR" rev-parse "$RS_S^{tree}")
+  git -C "$PROJECT_DIR" update-ref refs/heads/reconciled/s "$RS_S"
+  RS_ID=$id
+  RS_PROJECT=$PROJECT_DIR
+  RS_REF=refs/heads/reconciled/s
+  RS_SHA=$RS_S
+  RS_GRANT=reconciled-source-admission
+  RS_DISPOSITION=affirmative
+  RS_CONFLICTS='[]'
+  RS_VERSION=1
+  RS_POOL_BEFORE=$(git -C "$POOL_DIR" rev-parse HEAD)
+  rs_write_evidence
+}
+
+# rs_write_evidence: (re)write proposal, response and declaration from RS_* values.
+rs_write_evidence() {
+  RS_PROPOSAL="$CASE_DIR/proposal.json"
+  RS_RESPONSE="$CASE_DIR/response.json"
+  RS_DECL="$CASE_DIR/declaration.json"
+  python3 -I - "$RS_PROPOSAL" "${RS_P_TASK:-$RS_ID}" "${RS_P_PROJECT:-$RS_PROJECT}" "$RS_REF" "$RS_SHA" "${RS_P_TREE:-$RS_TREE}" "$RS_GRANT" <<'PY'
+import json, sys
+path, task, project, ref, sha, tree, grant = sys.argv[1:8]
+json.dump({"schema": "fm-reconciled-source-proposal/1", "grant": grant, "task": task, "project": project,
+           "source_ref": ref, "source_sha": sha, "source_tree": tree,
+           "text": "SYNTHETIC FIXTURE APPROVAL - may task " + task + " start from " + ref + " at " + sha + "?"},
+          open(path, "w"), indent=1)
+PY
+  python3 -I - "$RS_RESPONSE" "${RS_R_REFERENT:-$(rs_sha "$RS_PROPOSAL")}" "$RS_DISPOSITION" "$RS_CONFLICTS" <<'PY'
+import json, sys
+path, ref, disposition, conflicts = sys.argv[1:5]
+json.dump({"schema": "fm-reconciled-source-response/1", "proposal_sha256": ref, "answer": "approved",
+           "disposition": disposition, "recorded_by": "SYNTHETIC fixture Parent",
+           "conflicting_decisions": json.loads(conflicts)}, open(path, "w"), indent=1)
+PY
+  python3 -I - "$RS_DECL" "$RS_VERSION" "${RS_D_TASK:-$RS_ID}" "${RS_D_PROJECT:-$RS_PROJECT}" "$RS_REF" "${RS_D_SHA:-$RS_SHA}" "${RS_D_TREE:-$RS_TREE}" \
+    "$RS_PROPOSAL" "${RS_D_PSHA:-$(rs_sha "$RS_PROPOSAL")}" "$RS_RESPONSE" "${RS_D_RSHA:-$(rs_sha "$RS_RESPONSE")}" <<'PY'
+import json, sys
+a = sys.argv
+version = json.loads(a[2])
+json.dump({"version": version, "task": a[3], "project": a[4], "source_ref": a[5], "source_sha": a[6],
+           "source_tree": a[7], "proposal_path": a[8], "proposal_sha256": a[9],
+           "response_path": a[10], "response_sha256": a[11]}, open(a[1], "w"), indent=1)
+PY
+  rs_bind_brief
+}
+
+rs_bind_brief() { # [declaration-sha-or-none]
+  local sha=${1:-$(rs_sha "$RS_DECL")}
+  fm_test_spawn_brief "$HOME_DIR" "$RS_ID"
+  [ "$sha" = none ] || printf '\n# Definition of done\nDelivery contract: mode=local-only reconciled-source=%s\n' "$sha" >> "$HOME_DIR/data/$RS_ID/brief.md"
+}
+
+# rs_trace_shim [<mutation-script>]: a git wrapper that logs argv to $CASE_DIR/git.trace.
+# The optional mutation runs once, right after the first command matching RS_MUTATE_AT.
+rs_trace_shim() {
+  local real_git
+  real_git=$(command -v git)
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'real=%q\ntrace=%q\nmarker=%q\n' "$real_git" "$CASE_DIR/git.trace" "$CASE_DIR/mutated"
+    printf 'mutate_at=%q\n' "${RS_MUTATE_AT:-}"
+    printf 'mutate() {\n%s\n}\n' "${1:-:}"
+    cat <<'SH'
+printf '%s\n' "$*" >> "$trace"
+"$real" "$@"
+rc=$?
+if [ -n "$mutate_at" ] && [ ! -e "$marker" ] && case "$*" in $mutate_at) true ;; *) false ;; esac; then
+  : > "$marker"
+  mutate
+fi
+exit "$rc"
+SH
+  } > "$FAKEBIN_DIR/git"
+  chmod +x "$FAKEBIN_DIR/git"
+}
+
+rs_spawn() { # [extra args...]
+  RS_RC=0
+  RS_OUT=$(run_spawn "$RS_ID" --mode local-only --yolo off --reconciled-source "$RS_DECL" "$@" 2>&1) || RS_RC=$?
+}
+
+rs_assert_refused() { # <reason-substring> <label>
+  [ "$RS_RC" -ne 0 ] || fail "$2: reconciled source unexpectedly admitted"$'\n'"$RS_OUT"
+  assert_contains "$RS_OUT" "$1" "$2: refusal reason missing"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$RS_POOL_BEFORE" ] || fail "$2: refusal changed the assigned copy"
+  [ ! -f "$HOME_DIR/state/$RS_ID.meta" ] || fail "$2: refusal published task metadata"
+  [ ! -f "${POOL_DIR%/*}/.fm-slot-owner" ] || fail "$2: refusal claimed the assigned copy"
+  rs_assert_defaults_kept "$2"
+  rs_assert_lock_released "$2"
+}
+
+rs_assert_defaults_kept() { # <label>
+  [ "$(git -C "$PROJECT_DIR" rev-parse refs/heads/main)" = "$RS_L" ] || fail "$1: named local default moved"
+  [ "$(git -C "$CASE_DIR/origin.git" rev-parse refs/heads/main)" = "$(rs_origin_main)" ] || fail "$1: remote default changed by spawn"
+}
+rs_origin_main() { git -C "$CASE_DIR/origin.git" rev-parse refs/heads/main; }
+
+rs_assert_lock_released() { # <label>
+  local lock
+  for lock in "$HOME_DIR"/state/.treehouse-project-*.lock; do
+    [ ! -e "$lock" ] || fail "$1: this attempt left its PROJECT lock $lock behind"
+  done
+}
+
+rs_assert_selected() { # <label>
+  expect_code 0 "$RS_RC" "$1: reconciled source was not admitted"$'\n'"$RS_OUT"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$RS_S" ] || fail "$1: the copy does not start at the approved S"
+  [ "$(git -C "$POOL_DIR" rev-parse 'HEAD^{tree}')" = "$RS_TREE" ] || fail "$1: the copy tree is not S's tree"
+  cmp -s "$POOL_DIR/accepted-a.txt" <(printf 'accepted local-only work\n') || fail "$1: L's bytes missing from the copy"
+  cmp -s "$POOL_DIR/advanced-main.txt" <(printf 'must survive a newly spawned branch\n') || fail "$1: R's bytes missing from the copy"
+  local meta=$HOME_DIR/state/$RS_ID.meta
+  rs_assert_line 'source_kind=reconciled-successor' "$meta" "$1: kind not recorded"
+  rs_assert_line "source_sha=$RS_S" "$meta" "$1: S not recorded"
+  rs_assert_line "source_tree=$RS_TREE" "$meta" "$1: tree not recorded"
+  rs_assert_line "source_ref=$RS_REF" "$meta" "$1: source ref not recorded"
+  rs_assert_line "source_local_sha=$RS_L" "$meta" "$1: L not recorded"
+  rs_assert_line "source_origin_sha=$(rs_origin_main)" "$meta" "$1: R not recorded"
+  rs_assert_line "source_declaration_sha256=$(rs_sha "$RS_DECL")" "$meta" "$1: declaration identity not recorded"
+  assert_contains "$RS_OUT" "selected=$RS_REF@$RS_S kind=reconciled-successor" "$1: selection line missing"
+  rs_assert_defaults_kept "$1"
+  rs_assert_no_project_fetch "$1"
+}
+
+# Privacy: the new-input path never fetches through the PROJECT (whose store holds
+# the private S/L objects); its only remote contact is ls-remote, which sends no haves.
+rs_assert_no_project_fetch() { # <label>
+  [ -f "$CASE_DIR/git.trace" ] || fail "$1: git trace missing"
+  if grep -E '(^| )(fetch|pull|fetch-pack|remote update)( |$)' "$CASE_DIR/git.trace" >/dev/null; then
+    fail "$1: the reconciled path ran a fetch: $(grep -E '(^| )(fetch|pull|fetch-pack)( |$)' "$CASE_DIR/git.trace" | head -3)"
+  fi
+  grep -q 'ls-remote --symref origin HEAD' "$CASE_DIR/git.trace" || fail "$1: no single remote-default discovery was observed"
+  [ "$(grep -c 'ls-remote --symref origin HEAD' "$CASE_DIR/git.trace")" = 1 ] || fail "$1: remote default was discovered more than once"
+}
+
+test_reconciled_source_selects_approved_successor() {
+  make_reconciled_case rs-positive "rs-positive-$$"
+  rs_trace_shim
+  # Omitted new input still refuses the same divergent pair before assignment.
+  fm_test_spawn_brief "$HOME_DIR" "$RS_ID"
+  local rc=0 out
+  out=$(run_spawn "$RS_ID" --mode local-only --yolo off 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'omitted --reconciled-source admitted a divergent pair'
+  assert_contains "$out" 'defaults diverge' 'omitted-input divergence reason missing'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$RS_POOL_BEFORE" ] || fail 'omitted-input refusal changed the copy'
+  rs_assert_lock_released 'omitted-input'
+  # The ordinary omitted-input path fetched; judge only the new-input attempt.
+  : > "$CASE_DIR/git.trace"
+  rs_bind_brief
+  rs_spawn
+  rs_assert_selected 'approved reconciled successor'
+  pass 'reconciled source: omitted input refuses divergence; the approved successor is selected with L, R, provenance and no fetch'
+}
+
+# One refusal per distinct mechanism; each run uses a fresh fixture so state cannot leak.
+run_reconciled_refusal_case() { # <shape>
+  local shape=$1 alt real_git
+  make_reconciled_case "rs-$shape" "rs-$shape-$$"
+  case "$shape" in
+    missing-r)
+      # T-like: a source that contains L but not R.
+      RS_S=$(printf 'L only\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$RS_L^{tree}" -p "$RS_L")
+      RS_SHA=$RS_S RS_TREE=$(git -C "$PROJECT_DIR" rev-parse "$RS_S^{tree}")
+      git -C "$PROJECT_DIR" update-ref "$RS_REF" "$RS_S"; rs_write_evidence ;;
+    missing-l)
+      RS_S=$(printf 'R only\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$RS_R^{tree}" -p "$RS_R")
+      RS_SHA=$RS_S RS_TREE=$(git -C "$PROJECT_DIR" rev-parse "$RS_S^{tree}")
+      git -C "$PROJECT_DIR" update-ref "$RS_REF" "$RS_S"; rs_write_evidence ;;
+    task) RS_D_TASK=some-other-task RS_P_TASK=some-other-task rs_write_evidence ;;
+    project)
+      mkdir -p "$CASE_DIR/other-project"
+      RS_D_PROJECT="$CASE_DIR/other-project" RS_P_PROJECT="$CASE_DIR/other-project" rs_write_evidence ;;
+    declined) RS_DISPOSITION=declined rs_write_evidence ;;
+    unclear) RS_DISPOSITION=unclear rs_write_evidence ;;
+    conflicting) RS_CONFLICTS='["2026-11-23 later answer withdraws this approval"]' rs_write_evidence ;;
+    engineering) RS_GRANT=engineering-review-and-tests rs_write_evidence ;;
+    wrong-tree) RS_P_TREE=$(git -C "$PROJECT_DIR" rev-parse "$RS_L^{tree}") rs_write_evidence ;;
+    referent) RS_R_REFERENT=$(printf 'other proposal' | shasum -a 256 | awk '{print $1}') rs_write_evidence ;;
+    hash) RS_D_PSHA=$(printf 'not the proposal' | shasum -a 256 | awk '{print $1}') rs_write_evidence ;;
+    version) RS_VERSION=2 rs_write_evidence ;;
+    short-sha) RS_D_SHA=${RS_S:0:12} rs_write_evidence ;;
+    duplicate-key)
+      python3 -I - "$RS_DECL" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read().rstrip()
+assert s.endswith("}")
+open(p, "w").write(s[:-1] + ',\n "task": "' + 'rs-duplicate' + '"\n}')
+PY
+      rs_bind_brief ;;
+    extra-key)
+      python3 -I - "$RS_DECL" <<'PY'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p)); d["allow_divergence"] = True; json.dump(d, open(p, "w"))
+PY
+      rs_bind_brief ;;
+    default-ref) RS_REF=refs/heads/main RS_SHA=$RS_L RS_TREE=$(git -C "$PROJECT_DIR" rev-parse "$RS_L^{tree}") rs_write_evidence ;;
+    remote-ref) RS_REF=refs/remotes/origin/main rs_write_evidence ;;
+    symbolic-ref)
+      git -C "$PROJECT_DIR" symbolic-ref refs/heads/reconciled/alias "$RS_REF"
+      RS_REF=refs/heads/reconciled/alias rs_write_evidence ;;
+    ref-moved-before)
+      alt=$(printf 'other\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$RS_TREE" -p "$RS_S")
+      git -C "$PROJECT_DIR" update-ref "$RS_REF" "$alt" ;;
+    no-origin) git -C "$PROJECT_DIR" remote remove origin ;;
+    origin-ahead)
+      # Origin advances to R2 outside S before the invocation; the cached
+      # tracking ref still names the contained R.
+      printf 'public advance two\n' > "$CASE_DIR/publisher/public-two.txt"
+      git -C "$CASE_DIR/publisher" add public-two.txt
+      git -C "$CASE_DIR/publisher" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'public R2'
+      git -C "$CASE_DIR/publisher" push --quiet origin main ;;
+    origin-renamed)
+      git -C "$CASE_DIR/origin.git" branch trunk main
+      git -C "$CASE_DIR/origin.git" symbolic-ref HEAD refs/heads/trunk ;;
+    brief-missing) rs_bind_brief none ;;
+    brief-other) rs_bind_brief "$(printf 'other declaration' | shasum -a 256 | awk '{print $1}')" ;;
+    declaration-moved)
+      RS_MUTATE_AT='-C * ls-remote --symref origin HEAD *'
+      rs_trace_shim "python3 -I -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); json.dump(d, open(p, \"w\"), indent=2)' '$RS_DECL'" ;;
+    response-moved)
+      RS_MUTATE_AT='-C * ls-remote --symref origin HEAD *'
+      rs_trace_shim "printf ' ' >> '$RS_RESPONSE'" ;;
+    ref-moved-after-plan)
+      RS_MUTATE_AT='-C * ls-remote --symref origin HEAD *'
+      alt=$(printf 'other\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$RS_TREE" -p "$RS_S")
+      rs_trace_shim "'$(command -v git)' -C '$PROJECT_DIR' update-ref '$RS_REF' '$alt'" ;;
+    local-moved-after-plan)
+      # Move L right after planning read it, so only the locked checkpoint can see it.
+      RS_MUTATE_AT='-C * rev-parse --verify --quiet refs/heads/main^{commit}'
+      alt=$(printf 'concurrent local\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$RS_L^{tree}" -p "$RS_L")
+      rs_trace_shim "'$(command -v git)' -C '$PROJECT_DIR' update-ref refs/heads/main '$alt' '$RS_L'" ;;
+    origin-swapped)
+      git clone --quiet --bare "$CASE_DIR/origin.git" "$CASE_DIR/origin-swap.git"
+      RS_MUTATE_AT='-C * ls-remote --symref origin HEAD *'
+      rs_trace_shim "'$(command -v git)' -C '$PROJECT_DIR' remote set-url origin 'file://$CASE_DIR/origin-swap.git'" ;;
+    rewrite-changed)
+      git clone --quiet --bare "$CASE_DIR/origin.git" "$CASE_DIR/origin-rewrite.git"
+      git -C "$PROJECT_DIR" remote set-url origin 'https://fixture.invalid/firstmate.git'
+      git -C "$PROJECT_DIR" config "url.file://$CASE_DIR/origin.git.insteadOf" 'https://fixture.invalid/firstmate.git'
+      RS_MUTATE_AT='-C * ls-remote --symref origin HEAD *'
+      rs_trace_shim "'$(command -v git)' -C '$PROJECT_DIR' config --unset 'url.file://$CASE_DIR/origin.git.insteadOf'; '$(command -v git)' -C '$PROJECT_DIR' config 'url.file://$CASE_DIR/origin-rewrite.git.insteadOf' 'https://fixture.invalid/firstmate.git'" ;;
+    read-error)
+      # A controlled Git error on the containment predicate, distinct from false.
+      RS_MUTATE_AT=never
+      real_git=$(command -v git)
+      cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$CASE_DIR/git.trace'
+case "\$*" in *"merge-base --is-ancestor $RS_L $RS_S"*) echo 'fatal: controlled object read error' >&2; exit 128 ;; esac
+exec '$real_git' "\$@"
+SH
+      chmod +x "$FAKEBIN_DIR/git" ;;
+  esac
+  [ -x "$FAKEBIN_DIR/git" ] || rs_trace_shim
+  case "$shape" in
+    repeated) rs_spawn --reconciled-source "$RS_DECL" ;;
+    with-base) rs_spawn --base-branch main ;;
+    publish) RS_RC=0; RS_OUT=$(run_spawn "$RS_ID" --mode direct-PR --yolo off --reconciled-source "$RS_DECL" 2>&1) || RS_RC=$? ;;
+    scout) RS_RC=0; RS_OUT=$(run_spawn "$RS_ID" --scout --reconciled-source "$RS_DECL" 2>&1) || RS_RC=$? ;;
+    batch) RS_RC=0; RS_OUT=$(fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" "$RS_ID=$PROJECT_DIR" --mode local-only --yolo off --reconciled-source "$RS_DECL" 2>&1) || RS_RC=$? ;;
+    *) rs_spawn ;;
+  esac
+  case "$shape" in
+    missing-r|origin-ahead) ;;
+  esac
+  case "$shape" in
+    missing-r) rs_assert_refused 'does not contain the remote default' "$shape" ;;
+    missing-l) rs_assert_refused 'does not contain the named local default' "$shape" ;;
+    task) rs_assert_refused 'but this invocation is task' "$shape" ;;
+    project) rs_assert_refused "but this invocation's project resolves to" "$shape" ;;
+    declined) rs_assert_refused 'is "declined", not an affirmative' "$shape" ;;
+    unclear) rs_assert_refused 'is "unclear", not an affirmative' "$shape" ;;
+    conflicting) rs_assert_refused 'unresolved conflicting or superseding decision' "$shape" ;;
+    engineering) rs_assert_refused 'not reconciled-source admission' "$shape" ;;
+    wrong-tree) rs_assert_refused 'approved proposal source_tree' "$shape" ;;
+    referent) rs_assert_refused 'does not answer this exact proposal' "$shape" ;;
+    hash) rs_assert_refused 'proposal bytes do not match' "$shape" ;;
+    version) rs_assert_refused 'version 2 is unsupported' "$shape" ;;
+    short-sha) rs_assert_refused 'must be a full lowercase object id' "$shape" ;;
+    duplicate-key) rs_assert_refused 'repeats key "task"' "$shape" ;;
+    extra-key) rs_assert_refused 'unsupported key allow_divergence' "$shape" ;;
+    default-ref) rs_assert_refused 'must not be the named default' "$shape" ;;
+    remote-ref) rs_assert_refused 'direct refs/heads/<branch> name' "$shape" ;;
+    symbolic-ref) rs_assert_refused 'is a symbolic ref' "$shape" ;;
+    ref-moved-before|ref-moved-after-plan) rs_assert_refused "not the approved $RS_S" "$shape" ;;
+    no-origin)
+      [ "$RS_RC" -ne 0 ] || fail 'no-origin admitted'
+      assert_contains "$RS_OUT" 'no configured origin' 'no-origin reason missing'
+      [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$RS_POOL_BEFORE" ] || fail 'no-origin changed the copy'
+      [ ! -f "$HOME_DIR/state/$RS_ID.meta" ] || fail 'no-origin published metadata'
+      rs_assert_lock_released no-origin ;;
+    origin-ahead) rs_assert_refused 'is not a local commit' "$shape" ;;
+    origin-renamed) rs_assert_refused 'not origin'"'"'s current default (trunk)' "$shape" ;;
+    brief-missing|brief-other) rs_assert_refused 'reconciled-source mismatch' "$shape" ;;
+    declaration-moved) [ -e "$CASE_DIR/mutated" ] || fail 'declaration mutation did not run'; rs_assert_refused 'declaration changed after this attempt judged it' "$shape" ;;
+    response-moved) [ -e "$CASE_DIR/mutated" ] || fail 'response mutation did not run'; rs_assert_refused 'approval response changed' "$shape" ;;
+    local-moved-after-plan)
+      [ -e "$CASE_DIR/mutated" ] || fail 'local mutation did not run'
+      [ "$RS_RC" -ne 0 ] || fail 'moved local default admitted'
+      assert_contains "$RS_OUT" 'default changed or is ambiguous' 'moved local default reason missing'
+      [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$RS_POOL_BEFORE" ] || fail 'moved local default changed the copy'
+      rs_assert_lock_released "$shape" ;;
+    origin-swapped|rewrite-changed)
+      [ -e "$CASE_DIR/mutated" ] || fail "$shape mutation did not run"
+      rs_assert_refused "effective identity changed" "$shape" ;;
+    read-error) rs_assert_refused 'git exit 128' "$shape" ;;
+    repeated) rs_assert_refused 'was given 2 times' "$shape" ;;
+    with-base) rs_assert_refused 'pass one source, not both' "$shape" ;;
+    publish) rs_assert_refused 'applies only to --mode local-only' "$shape" ;;
+    scout) rs_assert_refused 'applies only to a fresh local-only ship spawn' "$shape" ;;
+    batch) rs_assert_refused 'batch dispatch cannot carry it' "$shape" ;;
+    *) fail "unknown reconciled refusal shape $shape" ;;
+  esac
+  pass "reconciled source refuses: $shape"
+}
+
+test_reconciled_source_refusals() {
+  local shape
+  for shape in missing-r missing-l task project declined unclear conflicting engineering wrong-tree referent hash \
+    version short-sha duplicate-key extra-key default-ref remote-ref symbolic-ref ref-moved-before no-origin \
+    origin-ahead origin-renamed brief-missing brief-other declaration-moved response-moved ref-moved-after-plan \
+    local-moved-after-plan origin-swapped rewrite-changed read-error repeated with-base publish scout batch; do
+    run_reconciled_refusal_case "$shape"
+  done
+}
+
+# Effective-origin identity: a stable url.insteadOf rewrite is admitted, and a
+# synthetic sentinel in the effective URL never reaches feature output or records.
+test_reconciled_source_rewrite_and_sentinel() {
+  local sentinel=FMSENTINELnonfunctional7Q
+  make_reconciled_case rs-sentinel "rs-sentinel-$$"
+  mv "$CASE_DIR/origin.git" "$CASE_DIR/origin-$sentinel.git"
+  git -C "$PROJECT_DIR" remote set-url origin "https://fixture-user:$sentinel@fixture.invalid/firstmate.git"
+  git -C "$PROJECT_DIR" config "url.file://$CASE_DIR/origin-$sentinel.git.insteadOf" "https://fixture-user:$sentinel@fixture.invalid/firstmate.git"
+  ln -s "origin-$sentinel.git" "$CASE_DIR/origin.git"
+  [ "$(git -C "$PROJECT_DIR" ls-remote --get-url origin)" = "file://$CASE_DIR/origin-$sentinel.git" ] || fail 'rewrite fixture is not effective'
+  rs_trace_shim
+  rs_spawn
+  rs_assert_selected 'stable rewrite'
+  assert_not_contains "$RS_OUT" "$sentinel" 'spawn output leaked the effective-origin sentinel'
+  if grep -rl "$sentinel" "$HOME_DIR/state" "$HOME_DIR/data/$RS_ID" 2>/dev/null | grep -v '/brief.md$' | grep -q .; then
+    fail "feature records leaked the sentinel: $(grep -rl "$sentinel" "$HOME_DIR/state" "$HOME_DIR/data/$RS_ID")"
+  fi
+  rs_assert_line "source_origin_identity_sha256=$(printf '%s' "file://$CASE_DIR/origin-$sentinel.git" | shasum -a 256 | awk '{print $1}')" \
+    "$HOME_DIR/state/$RS_ID.meta" 'effective origin identity not recorded as its digest'
+  pass 'reconciled source: stable effective-origin rewrite admitted; the sentinel reaches the identity input but no output or record'
+}
+
+# F-INTERRUPT: a supported interruption (SIGTERM, then SIGKILL) of only this
+# owned spawn while it holds the PROJECT lock at the locked checkpoint, then a
+# corrected same-task attempt on the same project progresses.
+run_reconciled_interrupt_case() { # <TERM|KILL>
+  local sig=$1 real_git out rc=0
+  make_reconciled_case "rs-interrupt-$sig" "rs-interrupt-$sig-$$"
+  real_git=$(command -v git)
+  cat > "$FAKEBIN_DIR/git" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> '$CASE_DIR/git.trace'
+case "\$*" in
+  *"merge-base --is-ancestor $RS_L $RS_S"*)
+    if [ ! -e '$CASE_DIR/interrupted' ]; then
+      : > '$CASE_DIR/interrupted'
+      for lock in '$HOME_DIR'/state/.treehouse-project-*.lock; do [ -e "\$lock" ] && printf '%s\n' "\$lock" > '$CASE_DIR/lock-at-interrupt'; done
+      pid=\$PPID
+      while [ -n "\$pid" ] && [ "\$pid" -gt 1 ]; do
+        if ps -o args= -p "\$pid" 2>/dev/null | grep -q 'fm-spawn.sh'; then
+          printf '%s\n' "\$pid" > '$CASE_DIR/interrupted-pid'
+          kill -$sig "\$pid"
+          sleep 1
+          exit 1
+        fi
+        pid=\$(ps -o ppid= -p "\$pid" 2>/dev/null | tr -d ' ')
+      done
+    fi ;;
+esac
+exec '$real_git' "\$@"
+SH
+  chmod +x "$FAKEBIN_DIR/git"
+  rs_spawn
+  [ -e "$CASE_DIR/interrupted-pid" ] || fail "$sig: the owned spawn was not interrupted at the locked checkpoint"$'\n'"$RS_OUT"
+  [ -s "$CASE_DIR/lock-at-interrupt" ] || fail "$sig: interruption did not happen while the PROJECT lock was held"
+  [ "$RS_RC" -ne 0 ] || fail "$sig: the interrupted spawn reported success"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$RS_POOL_BEFORE" ] || fail "$sig: interruption changed the assigned copy"
+  [ ! -f "$HOME_DIR/state/$RS_ID.meta" ] || fail "$sig: interruption published task metadata"
+  rs_assert_defaults_kept "$sig interrupted"
+  cp "$CASE_DIR/git.trace" "$CASE_DIR/git.trace.interrupted"
+  : > "$CASE_DIR/git.trace"
+  rs_trace_shim
+  rs_spawn
+  rs_assert_selected "$sig same-task retry"
+  rs_assert_lock_released "$sig retry"
+  pass "reconciled source: $sig at the locked checkpoint leaves no blocking state; the same task then progresses"
+}
+test_reconciled_source_interrupt_term() { run_reconciled_interrupt_case TERM; }
+test_reconciled_source_interrupt_kill() { run_reconciled_interrupt_case KILL; }
+
+# Corrected same-task retry after a planning refusal and after a locked refusal.
+# The second locked checkpoint (before the assigned copy is prepared) is its own
+# guard: the source branch moves only AFTER the first checkpoint's last check
+# (R contained in S) passed, so only the second checkpoint can refuse it.
+test_reconciled_source_second_checkpoint_refuses() {
+  local alt
+  make_reconciled_case rs-checkpoint2 "rs-checkpoint2-$$"
+  alt=$(printf 'moved after checkpoint one\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$RS_TREE" -p "$RS_S")
+  RS_MUTATE_AT="-C * merge-base --is-ancestor $RS_R $RS_S"
+  rs_trace_shim "'$(command -v git)' -C '$PROJECT_DIR' update-ref '$RS_REF' '$alt' '$RS_S'"
+  rs_spawn
+  [ -e "$CASE_DIR/mutated" ] || fail 'checkpoint-two mutation did not run'
+  [ "$(grep -c -- "merge-base --is-ancestor $RS_R $RS_S" "$CASE_DIR/git.trace")" = 1 ] || fail 'the first checkpoint did not finish exactly once before the move'
+  [ "$RS_RC" -ne 0 ] || fail 'a source moved between the locked checkpoints was admitted'
+  assert_contains "$RS_OUT" "not the approved $RS_S" 'second-checkpoint refusal reason missing'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$RS_POOL_BEFORE" ] || fail 'second-checkpoint refusal reset or prepared the copy'
+  [ "$(git -C "$PROJECT_DIR" rev-parse "$RS_REF")" = "$alt" ] || fail 'the moved source branch was rewritten'
+  [ ! -f "$HOME_DIR/state/$RS_ID.meta" ] || fail 'second-checkpoint refusal published task metadata'
+  rs_assert_defaults_kept 'second checkpoint'
+  rs_assert_lock_released 'second checkpoint'
+  pass 'reconciled source: a source moved after the first locked checkpoint is refused at the second, before the copy is prepared'
+}
+
+test_reconciled_source_same_task_retry() {
+  make_reconciled_case rs-retry "rs-retry-$$"
+  rs_trace_shim
+  RS_DISPOSITION=declined rs_write_evidence
+  rs_spawn
+  rs_assert_refused 'not an affirmative' 'planning refusal'
+  RS_DISPOSITION=affirmative rs_write_evidence
+  : > "$CASE_DIR/git.trace"
+  RS_MUTATE_AT='-C * ls-remote --symref origin HEAD *'
+  rs_trace_shim "printf ' ' >> '$RS_RESPONSE'"
+  rs_spawn
+  rs_assert_refused 'approval response changed' 'locked refusal'
+  rs_write_evidence
+  rm -f "$CASE_DIR/mutated"
+  : > "$CASE_DIR/git.trace"
+  RS_MUTATE_AT='' rs_trace_shim
+  rs_spawn
+  rs_assert_selected 'corrected same-task retry'
+  pass 'reconciled source: a corrected same-task declaration progresses after planning and locked refusals'
+}
+
+# Governed project with an OLD provisioner whose --base-source only knows
+# origin-merge-base/local-default (argparse choices): it must refuse through its
+# own nonzero exit/stderr, with no local-default fallback and no worker start.
+test_reconciled_source_old_governed_owner_refuses() {
+  local rc=0 out tree accepted
+  make_reconciled_case rs-old-owner "rs-old-owner-$$"
+  # Every route runs only the fetched origin version of the clone provisioner,
+  # so the old owner goes onto the shared history (origin's default R) before L
+  # diverges. The origin check then passes and its own argparse is what refuses.
+  accepted="$CASE_DIR/old-owner.accepted"
+  git -C "$PROJECT_DIR" reset -q --hard "$RS_R" || fail 'old owner fixture reset failed'
+  mkdir -p "$PROJECT_DIR/scripts/git-stability"
+  {
+    cat <<'PY'
+import argparse, sys
+p = argparse.ArgumentParser()
+for a in ("--repo-root", "--worktree-path", "--owner-id", "--branch", "--base-sha"):
+    p.add_argument(a, required=True)
+p.add_argument("--base-source", choices=("origin-merge-base", "local-default"), default="origin-merge-base")
+p.add_argument("--owned-path", action="append", default=[])
+p.parse_args()
+PY
+    printf 'open(%s, "w").write("accepted\\n")\nsys.exit(0)\n' "$(python3 -I -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$accepted")"
+  } > "$PROJECT_DIR/scripts/git-stability/provision_existing_slot.py" || fail 'old owner write failed'
+  git -C "$PROJECT_DIR" add scripts
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'old governed owner'
+  git -C "$PROJECT_DIR" push --quiet origin main || fail 'old owner publish failed'
+  git -C "$PROJECT_DIR" fetch --quiet origin || fail 'old owner fetch failed'
+  RS_R=$(git -C "$PROJECT_DIR" rev-parse origin/main)
+  [ "$(rs_origin_main)" = "$RS_R" ] || fail 'old owner is not the fetched origin version'
+  printf 'accepted local-only work\n' > "$PROJECT_DIR/accepted-a.txt"
+  git -C "$PROJECT_DIR" add accepted-a.txt
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted A'
+  RS_L=$(git -C "$PROJECT_DIR" rev-parse refs/heads/main)
+  tree=$(git -C "$PROJECT_DIR" merge-tree --write-tree "$RS_L" "$RS_R")
+  RS_S=$(printf 'reconcile governed L with R\n' | git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit-tree "$tree" -p "$RS_L" -p "$RS_R")
+  RS_SHA=$RS_S RS_TREE=$(git -C "$PROJECT_DIR" rev-parse "$RS_S^{tree}")
+  git -C "$PROJECT_DIR" update-ref "$RS_REF" "$RS_S"
+  rs_write_evidence
+  rs_trace_shim
+  rs_spawn --owned-path README.md
+  [ "$RS_RC" -ne 0 ] || fail 'old governed owner admitted a reconciled source'
+  assert_contains "$RS_OUT" "invalid choice: 'reconciled-successor'" 'old owner refusal did not come through its own argument channel'
+  assert_contains "$RS_OUT" 'no agent or ship transition admitted' 'adapter did not report the refusal'
+  [ ! -e "$accepted" ] || fail 'old owner accepted a fallback'
+  if grep -q -- '--base-source local-default' "$CASE_DIR/git.trace" 2>/dev/null; then fail 'adapter retried as local-default'; fi
+  ! grep -q '^source_kind=' "$HOME_DIR/state/$RS_ID.meta" 2>/dev/null || fail 'refused governed attempt recorded a successful admission'
+  pass 'reconciled source: an old governed project owner refuses through its own argparse channel, with no local-default fallback'
+}
+
+# Ordinary local landing accepts a reconciled-successor task only through its
+# own clean fast-forward guard.
+test_reconciled_source_lands_by_fast_forward() {
+  local meta out rc=0 head
+  make_reconciled_case rs-land "rs-land-$$"
+  rs_trace_shim
+  rs_spawn
+  rs_assert_selected 'landing precondition'
+  meta=$HOME_DIR/state/$RS_ID.meta
+  git -C "$POOL_DIR" checkout --quiet -B "fm/$RS_ID"
+  printf 'task work\n' > "$POOL_DIR/task-work.txt"
+  git -C "$POOL_DIR" add task-work.txt
+  git -C "$POOL_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'task work'
+  head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  out=$(FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
+    FM_CONFIG_OVERRIDE="$HOME_DIR/config" HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" \
+    "$ROOT/bin/fm-merge-local.sh" "$RS_ID" 2>&1) || rc=$?
+  expect_code 0 "$rc" "reconciled task did not land by fast-forward"$'\n'"$out"
+  [ "$(git -C "$PROJECT_DIR" rev-parse refs/heads/main)" = "$head" ] || fail 'local main is not the landed task head'
+  git -C "$PROJECT_DIR" merge-base --is-ancestor "$RS_R" refs/heads/main || fail 'landed main lost R'
+  git -C "$PROJECT_DIR" merge-base --is-ancestor "$RS_L" refs/heads/main || fail 'landed main lost L'
+  [ "$(rs_origin_main)" = "$RS_R" ] || fail 'landing changed the remote'
+  pass 'reconciled source: the task lands into local main only through the normal fast-forward guard'
+}
+
 # Scratch exports let the same behavioral cases discriminate base and mutants.
 ROOT=${FM_TEST_SOURCE_IMPLEMENTATION_ROOT:-$ROOT}
 
@@ -2923,6 +3470,15 @@ test_local_only_origin_late
 test_local_only_origin_freshness
 test_local_only_origin_copy_missing
 test_local_only_origin_primary_missing
+test_reconciled_source_selects_approved_successor
+test_reconciled_source_refusals
+test_reconciled_source_rewrite_and_sentinel
+test_reconciled_source_interrupt_term
+test_reconciled_source_interrupt_kill
+test_reconciled_source_second_checkpoint_refuses
+test_reconciled_source_same_task_retry
+test_reconciled_source_old_governed_owner_refuses
+test_reconciled_source_lands_by_fast_forward
 test_freshness_introduces_slot_owner
 test_freshness_introduces_scout_slot_owner
 test_freshness_slot_owner_requires_scope
