@@ -901,7 +901,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
             fcntl.flock(lock, fcntl.LOCK_EX)
             child, log = gate(folder, dict(env, CASE_SLEEP_BARRIER='1'), 'x', mode='exit-0')
-            wait_for(lambda: (folder / 'sleeping').exists(), 'gate reached its first queue sleep')
+            wait_for(lambda: (folder / 'sleeping').exists(), 'gate reached its first queue sleep', log=log, child=child)
             time.sleep(pause)
             fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
             (folder / 'release-sleep').touch()
@@ -1284,7 +1284,10 @@ if intent.startswith('reg'):
             env.update(extra)
             child = launch(mem_guard + ['bash', '-c', line.format(abs=client)], env, folder / 'x')
             pending(folder, 1)
-            time.sleep(2)
+            # Wait for the second client's own decision (a waiting line after the enclosing admission) before hold-a is
+            # released, so the enclosing start still counts when the second decides.
+            wait_for(lambda: 'pipeline-start waiting' in (folder / 'x.stderr').read_text().partition('pipeline-start admitted')[2]
+                     or 'b' in calls(folder), '%s: the second client decides' % label, log=folder / 'x', child=child)
             assert 'b' not in calls(folder) and child.poll() is None, (label, 'the second ran without the enclosing start counted', calls(folder))
             if label == 'client-running':
                 (folder / 'release-hold-a').touch()

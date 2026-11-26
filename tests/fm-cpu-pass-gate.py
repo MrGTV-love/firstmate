@@ -13,6 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fm_cpu_pass_fixture import *  # noqa: E402,F401,F403
 from fm_cpu_pass_fixture import cleanup  # noqa: E402
 
+outside_orphans = []  # (pid, start time) of each outside orphan this script started and has not yet killed
+
 try:
     if not KERNEL_FACTS:
         # Off macOS the gate has no kernel facts to record an attempt with: a mapped ci launch that fits refuses with
@@ -616,11 +618,14 @@ os.waitpid(child, 0)
     def outside_orphan(folder):
         # An unrelated orphan outside the launch coalition: started in its own session by a shell that exits, so its
         # parent becomes launchd and it is neither the test root's descendant nor a registered case process.
+        # It lives until killed (orphan_present, or the finally below on a failure), so a slow decision cannot outlast it.
         marker = folder / 'outside.pid'
-        subprocess.Popen(['/bin/sh', '-c', '(sleep 60 & echo $! > %s) ; exit 0' % marker], start_new_session=True).wait()
+        subprocess.Popen(['/bin/sh', '-c', '(sleep 86400 & echo $! > %s) ; exit 0' % marker], start_new_session=True).wait()
         wait_for(lambda: marker.exists() and marker.read_text().strip(), 'the outside orphan started')
         pid = int(marker.read_text())
-        return pid, start_us(pid)
+        orphan = (pid, start_us(pid))
+        outside_orphans.append(orphan)
+        return orphan
 
     def orphan_present(folder, orphan):
         # The control's own premise, checked after the decision: the orphan is alive, the same process, lineage lost and
@@ -639,6 +644,7 @@ os.waitpid(child, 0)
         assert seen is not None and launch and None not in launch and seen not in launch, (
             'control premise: the orphan is in another coalition than the launch', seen, launch)
         os.kill(pid, signal.SIGKILL)
+        outside_orphans.remove(orphan)
 
     def same_run_never_passes_its_live_attempt():
         # Main 1712 item 2 (review finding 2): X's first launch is live and unseen; a second launch of X decides with X as
@@ -869,4 +875,9 @@ os.waitpid(child, 0)
 
     print(json.dumps(dict(result='pass', artifacts=str(root), invocations=records)), flush=True)
 finally:
-    cleanup()
+    try:
+        for pid, started in outside_orphans:
+            if start_us(pid) == started:
+                os.kill(pid, signal.SIGKILL)
+    finally:
+        cleanup()
