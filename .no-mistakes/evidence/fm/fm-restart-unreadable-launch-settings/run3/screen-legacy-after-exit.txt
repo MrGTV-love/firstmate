@@ -1,0 +1,3 @@
+bash /Users/charlesabrooker/tmp/fm-rst-live.nSCsRR/legacy-launch.sh
+charlesabrooker@Mac-Studio legacy-home % bash /Users/charlesabrooker/tmp/fm-rst-live.nSCsRR/legacy-launch.sh
+charlesabrooker@Mac-Studio legacy-home %

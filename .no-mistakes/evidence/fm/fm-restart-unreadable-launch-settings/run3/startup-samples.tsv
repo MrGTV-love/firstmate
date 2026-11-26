@@ -1,0 +1,9 @@
+wall	judge_seconds	verdict	reason	attributed	members(pid:ppid:comm:env:exe)
+1795679446.376	8.978	unknown			
+1795679458.150	4.915	unknown			
+1795679465.625	2.736	unknown			
+1795679473.517	3.211	unknown			
+1795679479.423	7.712	unknown		82464	
+1795679499.096	29.565	managed		82464	75180:82464:/bin/sh:U:/bin/bash 76276:75180:ps:U:/bin/ps 76280:75180:grep:U:/usr/bin/grep 76417:75180:grep:U:/usr/bin/grep 
+1795679569.502	14.243	unknown	the listed foreground process 76417 is missing from the process-group table, so the agent's process group cannot be judged	82464	
+1795679591.586	15.132	managed		82464	

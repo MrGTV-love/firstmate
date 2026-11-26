@@ -1,0 +1,25 @@
+lab session=fm-lab-rstunpin-27250-19328 FM_HOME=/Users/charlesabrooker/tmp/fm-lab.k0ko5H
+=================== STAGE pinned-elsewhere
+PRECOND pinx: agent_state=alive attributed_pid=49133 comm=/Users/charlesabrooker/.local/bin/claude args='/Users/charlesabrooker/.local/bin/claude'
+PRECOND pinx: env has PATH/HOME: 2 ; FM_SPAWN_GEN: 'gen-somebody-else'
+PRECOND pinx: kernel cwd: /Users/charlesabrooker/tmp/fm-rst-live.D2LVQ5/pinx-home
+PRECOND pinx: fm_launch_proof_herdr verdict: pinned-elsewhere
+--- reboot recover (pinx) rc=1
+$ bin/fm-reboot-recover.sh recover
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.k0ko5H
+  | REBOOT_RECOVERY: pinx: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; no lifecycle action taken; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+  state-diff: 2a3
+  state-diff: > /Users/charlesabrooker/tmp/fm-lab.k0ko5H/state/guard-events.jsonl
+  keys/inputs sent to w1:p1 by this call: 0 ; screen: changed ; protected state: changed
+RESULT S3-pinned-elsewhere FAIL :: recover: rc=1 sends=0 screen=changed state=changed
+--- fm-control exit (pinx) rc=1
+$ bin/fm-control.sh pinx exit
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.k0ko5H
+  | error: task pinx cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is pinned to another launch generation: a process in its tree carries a launch pin for a different spawn_gen than this record; the process belongs to another launch; Main inspects the pane and decides the lane by hand
+  keys/inputs sent to w1:p1 by this call: 0 ; screen: same ; protected state: same
+RESULT S3-pinned-elsewhere pass :: exit: rc=1, cause present, 0 inputs, screen same, state same
+done
+lab session fm-lab-rstunpin-27250-19328 torn down
+native pid 49133 exited
+lab home removed: /Users/charlesabrooker/tmp/fm-lab.k0ko5H
+private tree removed: /Users/charlesabrooker/tmp/fm-rst-live.D2LVQ5

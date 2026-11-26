@@ -1,0 +1,3 @@
+ok - fm-control guarded OMP exit: refuses busy, changed and wrong-generation evidence without interrupting
+ok - fm-control exit: completion output from a failed state command keeps the picker refusal
+ok - fm-control exit: every verified harness gets its own verified exit command

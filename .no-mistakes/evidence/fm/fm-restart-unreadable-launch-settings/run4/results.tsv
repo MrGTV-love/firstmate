@@ -1,0 +1,4 @@
+S4-unreadable	pass	recover: rc=1, cause present, 0 inputs, screen same, state changed
+S4-unreadable	pass	exit: rc=1, cause present, 0 inputs, screen same, state same
+S3-pinned-elsewhere	FAIL	recover: rc=0 sends=0 screen=same state=same
+S3-pinned-elsewhere	FAIL	exit: rc=1 sends=0 screen=changed state=same

@@ -1,0 +1,954 @@
+pane get w1:p1
+agent get w1:p1
+status --json
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+pane process-info --pane w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+status --json
+pane process-info --pane w1:p1
+pane read w1:p1 --source visible --format ansi
+agent get w1:p1
+status --json
+pane read w1:p1 --source visible --format ansi
+pane process-info --pane w1:p1
+agent get w1:p1
+agent get w1:p1
+status --json
+pane read w1:p1 --source visible --format ansi
+pane process-info --pane w1:p1
+status --json
+pane send-text w1:p1 : Firstmate instruction waiting: 'mgdr.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+status --json
+pane read w1:p1 --source visible --format ansi
+agent get w1:p1
+status --json
+pane send-keys w1:p1 enter
+pane process-info --pane w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+pane process-info --pane w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+pane get w1:p1
+agent get w1:p1
+pane process-info --pane w1:p1
+pane process-info --pane w1:p1
+status --json
+pane read w1:p1 --source visible --format ansi
+agent get w1:p1
+pane process-info --pane w1:p1
+status --json
+pane read w1:p1 --source recent --lines 200
+pane process-info --pane w1:p1
+pane get w2:p1
+agent get w2:p1
+pane process-info --pane w2:p1
+status --json
+pane get w2:p1
+agent get w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane get w2:p1
+agent get w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane get w2:p1
+agent get w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane get w2:p1
+agent get w2:p1
+pane process-info --pane w2:p1
+status --json
+pane read w2:p1 --source visible --format ansi
+agent get w2:p1
+status --json
+pane read w2:p1 --source visible --format ansi
+pane process-info --pane w2:p1
+agent get w2:p1
+pane process-info --pane w2:p1
+agent get w2:p1
+status --json
+pane read w2:p1 --source visible --format ansi
+status --json
+pane process-info --pane w2:p1
+pane send-text w2:p1 : Firstmate instruction waiting: 'mgdr.inbox/003.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+status --json
+pane read w2:p1 --source visible --format ansi
+agent get w2:p1
+status --json
+pane process-info --pane w2:p1
+pane send-keys w2:p1 enter
+agent get w2:p1
+agent get w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w2:p1
+pane get w2:p1
+agent get w2:p1
+pane process-info --pane w2:p1
+status --json
+pane read w2:p1 --source visible --format ansi
+pane process-info --pane w2:p1
+agent get w2:p1
+status --json
+pane read w2:p1 --source visible --format ansi
+agent get w2:p1
+pane process-info --pane w2:p1
+agent get w2:p1
+status --json
+pane read w2:p1 --source visible --format ansi
+status --json
+pane send-text w2:p1 : Firstmate instruction waiting: 'mgdr.inbox/004.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+status --json
+pane read w2:p1 --source visible --format ansi
+pane process-info --pane w2:p1
+agent get w2:p1
+status --json
+pane read w2:p1 --source recent --lines 200
+status --json
+pane send-keys w2:p1 enter
+pane process-info --pane w2:p1
+status --json
+pane read w2:p1 --source visible --format ansi
+status --json
+pane read w2:p1 --source visible --format ansi
+status --json
+pane send-keys w2:p1 enter
+status --json
+pane read w2:p1 --source visible --format ansi
+pane process-info --pane w2:p1
+status --json
+pane read w2:p1 --source visible --format ansi
+agent get w2:p1
+pane process-info --pane w2:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane get w3:p1
+agent get w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane get w3:p1
+agent get w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane process-info --pane w3:p1
+pane get w4:p1
+agent get w4:p1
+status --json
+pane get w4:p1
+agent get w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+pane get w4:p1
+agent get w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+pane get w4:p1
+agent get w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+pane get w4:p1
+agent get w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+pane get w4:p1
+agent get w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+status --json
+pane send-keys w4:p1 escape
+pane get w4:p1
+pane get w4:p1
+agent get w4:p1
+pane process-info --pane w4:p1
+pane get w4:p1
+agent get w4:p1
+pane process-info --pane w4:p1
+pane process-info --pane w4:p1
+status --json
+pane send-keys w4:p1 escape
+pane get w4:p1
+pane get w4:p1
+agent get w4:p1
+pane process-info --pane w4:p1
+pane get w5:p1
+agent get w5:p1
+status --json
+pane get w5:p1
+agent get w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane get w5:p1
+agent get w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane get w5:p1
+agent get w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane get w5:p1
+agent get w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+pane get w5:p1
+agent get w5:p1
+pane process-info --pane w5:p1
+pane process-info --pane w5:p1
+status --json
+pane send-keys w5:p1 escape
+pane get w5:p1
+pane get w5:p1
+agent get w5:p1
+pane process-info --pane w5:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+status --json
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w6:p1
+agent get w6:p1
+pane process-info --pane w6:p1
+pane process-info --pane w6:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+status --json
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w7:p1
+agent get w7:p1
+pane process-info --pane w7:p1
+pane process-info --pane w7:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+status --json
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w8:p1
+agent get w8:p1
+pane process-info --pane w8:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get w9:p1
+agent get w9:p1
+pane process-info --pane w9:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+status --json
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane process-info --pane wA:p1
+status --json
+agent get wA:p1
+status --json
+pane read wA:p1 --source visible --format ansi
+agent get wA:p1
+status --json
+pane read wA:p1 --source visible --format ansi
+agent get wA:p1
+agent get wA:p1
+status --json
+pane read wA:p1 --source visible --format ansi
+status --json
+pane send-text wA:p1 /exit
+status --json
+pane read wA:p1 --source visible --format ansi
+agent get wA:p1
+status --json
+pane send-keys wA:p1 enter
+agent get wA:p1
+agent get wA:p1
+agent get wA:p1
+agent get wA:p1
+agent get wA:p1
+agent get wA:p1
+status --json
+pane read wA:p1 --source visible --format ansi
+agent get wA:p1
+agent get wA:p1
+agent get wA:p1
+agent get wA:p1
+agent get wA:p1
+agent get wA:p1
+pane get wA:p1
+agent get wA:p1
+pane process-info --pane wA:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane process-info --pane wB:p1
+pane process-info --pane wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane process-info --pane wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+status --json
+agent get wB:p1
+status --json
+pane read wB:p1 --source visible --format ansi
+agent get wB:p1
+status --json
+pane read wB:p1 --source visible --format ansi
+agent get wB:p1
+agent get wB:p1
+status --json
+pane read wB:p1 --source visible --format ansi
+status --json
+pane send-text wB:p1 /exit
+status --json
+pane read wB:p1 --source visible --format ansi
+agent get wB:p1
+status --json
+pane send-keys wB:p1 enter
+agent get wB:p1
+agent get wB:p1
+agent get wB:p1
+agent get wB:p1
+agent get wB:p1
+agent get wB:p1
+status --json
+pane read wB:p1 --source visible --format ansi
+agent get wB:p1
+agent get wB:p1
+agent get wB:p1
+agent get wB:p1
+agent get wB:p1
+agent get wB:p1
+pane get wB:p1
+agent get wB:p1
+pane process-info --pane wB:p1
+pane get wC:p1
+agent get wC:p1
+pane process-info --pane wC:p1
+pane get wC:p1
+agent get wC:p1
+pane process-info --pane wC:p1
+pane get wC:p1
+agent get wC:p1
+pane process-info --pane wC:p1
+pane get wD:p1
+agent get wD:p1
+pane process-info --pane wD:p1
+pane get wD:p1
+agent get wD:p1
+pane process-info --pane wD:p1
+pane get wD:p1
+agent get wD:p1
+pane process-info --pane wD:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane process-info --pane wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+pane process-info --pane wE:p1
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+status --json
+pane read wE:p1 --source visible --format ansi
+status --json
+pane read wE:p1 --source recent --lines 200
+pane get wE:p1
+agent get wE:p1
+pane process-info --pane wE:p1
+status --json
+pane read wE:p1 --source visible --format ansi
+status --json
+pane read wE:p1 --source recent --lines 200

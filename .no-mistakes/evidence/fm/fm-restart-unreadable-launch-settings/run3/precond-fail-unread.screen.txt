@@ -1,0 +1,4 @@
+bash /Users/charlesabrooker/tmp/fm-rst-live.nSCsRR/unread-launch.sh
+#!/usr/bin/env bash
+
+exec env -i TERM=xterm-256color CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-rst-live.nSCsRR/claude-config FM_LAB_CLAUDE_BIN=/Users/charlesabrooker/.local/bin/claude /Users/charlesabrooker/.local/bin/claude 

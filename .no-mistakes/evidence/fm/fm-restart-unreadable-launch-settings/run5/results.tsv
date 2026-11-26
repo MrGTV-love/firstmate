@@ -1,0 +1,2 @@
+S3-pinned-elsewhere	FAIL	recover: rc=1 sends=0 screen=changed state=changed
+S3-pinned-elsewhere	pass	exit: rc=1, cause present, 0 inputs, screen same, state same

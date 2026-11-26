@@ -1,0 +1,10 @@
+wall	judge_seconds	verdict	reason	group
+1795679129.688	17.134	managed		79248:/Users/charlesabrooker/.local/bin/claude 
+1795679159.898	17.554	managed		79248:/Users/charlesabrooker/.local/bin/claude 
+1795679187.001	23.960	managed		79248:/Users/charlesabrooker/.local/bin/claude 
+1795679224.179	11.887	managed		79248:/Users/charlesabrooker/.local/bin/claude 
+1795679241.480	8.628	managed		79248:/Users/charlesabrooker/.local/bin/claude 90751:caffeinate 
+1795679268.821	16.868	managed		79248:/Users/charlesabrooker/.local/bin/claude 90751:caffeinate 
+1795679298.080	33.711	managed		79248:/Users/charlesabrooker/.local/bin/claude 90751:caffeinate 
+1795679354.998	27.180	managed		79248:/Users/charlesabrooker/.local/bin/claude 90751:caffeinate 
+1795679392.460	20.777	managed		79248:/Users/charlesabrooker/.local/bin/claude 90751:caffeinate 
