@@ -431,6 +431,11 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
       [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ] && continue
+      # An unreadable record cannot be read as "names no overlapping copy": the scan cannot be completed.
+      [ -r "$other_meta" ] || {
+        echo "REFUSED: task record $other_meta cannot be read, so no other holder of $path is proved absent; nothing was changed" >&2
+        return 2
+      }
       for skip in "$@"; do
         [ "${other_meta##*/}" = "${skip##*/}" ] && [ "$other_meta" -ef "$skip" ] && continue 2
       done

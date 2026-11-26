@@ -101,6 +101,13 @@ export FM_MERGE_PRUNE=0
 # disposable state.
 export FM_GITHUB_ACCOUNTING=0
 
+# bin/fm-spawn.sh waits, bounded, for the launch's own Git hook carrier verdict,
+# which only an endpoint that runs the launch writes. Fake endpoints never run
+# it, so the suite waits for none by default; a real-endpoint case sets
+# FM_GIT_HOOKS_VERDICT_POLLS itself. fm-spawn honours it only under the
+# FM_TEST_SEAM marker exported above.
+export FM_GIT_HOOKS_VERDICT_POLLS="${FM_GIT_HOOKS_VERDICT_POLLS:-0}"
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary

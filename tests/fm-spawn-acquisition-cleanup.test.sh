@@ -963,6 +963,9 @@ exec '$SLOT_CASE/native/codex' "\$@"
 SH
   chmod +x "$FAKEBIN/codex"
   "$REAL_TMUX" kill-window -t "firstmate:fm-$SLOT_ID"
+  # The earlier task is retired, so its record no longer holds the copy; a live record naming it would be refused by
+  # the relaunch's copy-custody check before the provisioner this case exercises ever runs.
+  rm -f "$FM_HOME/state/$SLOT_ID.meta"
   git -C "$SLOT_COPY" checkout -qb retained-ahead
   printf 'prior work must survive recovery\n' >> "$SLOT_COPY/README.md"
   git -C "$SLOT_COPY" add README.md
