@@ -16,6 +16,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Automatic review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
+| A program's own model roles, such as a Backpass pass | [Application model roles](#application-model-roles) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
@@ -1311,6 +1312,50 @@ The same transitions retire that line to `Historical preserved in bundle <path>,
 Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
 A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
 A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
+
+## Application model roles
+
+Some firstmate work hands model choices to a program that runs its own model stages, such as a Backpass analysis, consolidation, or proposal pass.
+Those roles use the same intake boundary as a worker profile: [`dispatch-profile-intake`](../.agents/skills/dispatch-profile-intake/SKILL.md) owns the decision procedure, and [`model-and-effort.md`](../.agents/skills/harness-adapters/references/common/model-and-effort.md) owns discovery, effort precedence, and its accepted-set rule.
+No second selector, dispatch rule, typed brief, shadow-picker choice, or manufactured task identity supplies them.
+They have no configuration file of their own: each request resolves them again, so a program's own configuration default or a previously cached result never becomes the selection.
+The [fleet model index](#fleet-model-index-configmodel-indexjson) and [`config/crew-dispatch.json`](#crew-dispatch-profiles-configcrew-dispatchjson) keep their worker meanings, so a home with neither file resolves these roles through ordinary intake; their absence is discovery, not a policy vote.
+
+**One complete selection per role.** Firstmate classifies each model-calling role from the work itself and resolves a complete agent, provider-qualified model, and effective effort for it before that role's first model call.
+Pass every value the program's own default could otherwise decide, because an omitted argument is not a selection.
+A role the program reuses keeps the selection its stage inherits instead of acquiring a second one, and an earlier stage that produced no model call removes no requirement on a later one.
+
+**Backpass handoff.** Backpass reads its two production selections from its own command line: `--analysis-agent`, `--analysis-model`, and `--analysis-effort` for the per-transcript analysis pass, and `--synthesis-agent`, `--synthesis-model`, and `--synthesis-effort` for the proposal pass.
+Its consolidation pass between them runs on the analysis selection, so a full pass, or a proposal that reuses cached analysis, still needs the analysis selection complete before consolidation starts.
+`backpass analyze` reaches analysis only, `backpass propose` folds existing evidence and then consolidates and synthesizes, and `backpass` with no command runs the whole pass; Backpass's own `--help` owns the remaining commands, flags, and its project configuration precedence.
+Resolve the actual executable before reading that help or launching a pass.
+When this home has `data/tools/backpass/node_modules/.bin/backpass`, use that home-local file rather than a shared or global installation of the same name, and check that the resolved file exists and is executable instead of assuming an installation or a supported version.
+That local adoption belongs to this home and leaves the shared installation unchanged.
+Classify each role independently from the work and the applicable policy, so the two roles can legitimately land in the same class and neither inherits the other's classification or model.
+Resolve the requested effort through [`model-and-effort.md`](../.agents/skills/harness-adapters/references/common/model-and-effort.md) against Backpass's current accepted set, established by its own help or validation, rather than copying that capability list into fleet policy.
+An independent review keeps its own configured review runtime and never supplies a production role, and a selected Claude role still needs native TeamClaude, so an eligible permitted route takes precedence instead of selecting an unimplemented one and waiting.
+
+**Route and account.** A selection is usable only on the route and account it names: a GPT production call runs through omp's `openai-codex` provider, which needs no billing exception, while an `openai/*` or `openrouter/*` selector is API-billed and is never selected for one ([OMP fallback approvals](#omp-fallback-approvals-configomp-approved-fallback-chains) owns that route contract).
+A fallback chain, an ambient default, or a credentialed title or helper role that a program's invocation would otherwise inherit is not part of the selection.
+That invocation clears it for the call through existing invocation-scoped configuration, the way `bin/fm-spawn.sh` clears it for a worker, and the operator's own self-session configuration stays unchanged.
+Where permitted-only execution cannot be established that way, the route is ineligible for the role: name the missing capability and stop the affected call instead of running it on a route no selection authorized.
+Established pooled headroom comes from `bin/fm-dispatch-capacity.sh --harness omp --model <id> --json`, not from quota-axi's single Codex account, and its accounts, statuses, and reason are the capacity evidence a selection records.
+
+**Discovery and currentness.** Read the catalog through the single catalog owner, which is the same read the index and spawn checks perform, so intake and validation see one normalized surface:
+
+```sh
+bin/fm-model-index.sh catalog omp
+FM_MODEL_CATALOG_DIR=/path/to/exports bin/fm-model-index.sh catalog omp
+```
+
+The read prints the harness's normalized `{"models":[{"id":"..."}]}` catalog, needs no index, and exits 2 with a notice when the catalog cannot be read or holds no model, so unavailable or empty evidence never reads as a supported model.
+Select from the ids that catalog lists for the named provider and the classified reasoning class, and let the catalog decide which id is current: a newer eligible model of the same class takes the role with no configuration edit, and a candidate is superseded only when a newer model of the same class exists.
+`bin/fm-model-freshness.sh check <harness> <model>` owns that same-family comparison and marks a newer model of another tier, which never rejects or downgrades a class-correct candidate.
+An index notice, a silent freshness check, an unverified alias, a catalog id no call has served, and a catalog this environment cannot read each establish no currentness and no successful launch.
+
+**Provenance.** Keep the record with the run's own evidence so the selection can be re-derived: each role's agent and model, the requested effort with its winning source, the transformation and the value actually passed, the discovery command with its time and environment, and the catalog or freshness output that decided it.
+That record is per-run evidence, not a new configuration file, dispatch rule, role table, or home state.
+
 
 ## Model-picker benchmark data (FM_MODEL_PICKER_DATA)
 
