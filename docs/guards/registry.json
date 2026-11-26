@@ -166,7 +166,8 @@
     "slack-command-refusal-line",
     "teardown-entry-preflight",
     "guard-lint-touched-registry",
-    "home-state-write"
+    "home-state-write",
+    "tasks-axi-duplicate-close"
   ],
   "guards": [
     {
@@ -7681,6 +7682,37 @@
       "precheck_gap": "",
       "exemptions": [],
       "instrumented": true,
+      "status": "active"
+    },
+    {
+      "id": "tasks-axi-duplicate-close",
+      "version": "1",
+      "owner": "bin/fm-tasks-axi.sh",
+      "sites": [
+        {
+          "file": "bin/fm-tasks-axi.sh",
+          "match": "dup_refuse_",
+          "count": 8
+        }
+      ],
+      "invariant": "A duplicate close through fm-tasks-axi --duplicate-of never closes a row whose work could exist outside the surviving row it names.",
+      "layer": "runtime-block",
+      "source": "read inside the row's control and meta locks: the row's tasks-axi state, holds and blocked-by edges; state/<id>.meta and the row's dispatch files under state/; git for-each-ref and git worktree list in the project repository the row's repo field names; the entries of data/<id>/; the survivor's tasks-axi show --full state, body and links",
+      "trigger": "bin/fm-tasks-axi.sh done <id> --duplicate-of <keep> refuses when the row is not a queued ship or scout with no hold, or has a task record, a dispatch file, a ref whose last name part is <id> or ends in <id> after a separator, a git worktree list copy with an <id> path part, data/<id>/skipped-copies.tsv or any data/<id>/ entry besides plain brief.md and dod.md, or a row waiting on it, or when <keep> is missing, is the row itself, carries a 'duplicate of ' body line, or is Done without a pr: or report: link",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Leave the row queued and read the refusal; when the named fact is real, dispatch or finish the row's work, or close it with the captain's own drop words through FM_HOME=<home> bin/fm-tasks-axi.sh done <id> --drop-file <file-with-the-captain-words>.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-tasks-axi.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
       "status": "active"
     }
   ],
