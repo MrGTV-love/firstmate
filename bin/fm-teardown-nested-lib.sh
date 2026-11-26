@@ -21,7 +21,8 @@
 #   - no other active task record names it, no process outside this teardown's
 #     own runs in it, and no live process outside this teardown's own is its
 #     lock launcher (a process is this teardown's own when it, or an ancestor by
-#     parent chain, has a cwd exactly at a root retire sweeps, and a pid that
+#     parent chain, has a cwd exactly at a root retire sweeps and passes Fix 2's
+#     ownership proof in bin/fm-teardown.sh, and a pid that
 #     started after the lock file was written is recycled and owns nothing). The
 #     retire phase sends TERM to each such launcher and each such process running
 #     in the copy, waits a bounded time, and sends no KILL; one still alive
@@ -74,7 +75,8 @@
 # STATE, WT, TASK_TMP, FORCE, KIND, LEGACY_RECORD_GIVEN, TEARDOWN_NESTED_COPIES,
 # TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT, TEARDOWN_HELD_SLOT) and functions
 # (teardown_landed, pids_with_cwd_under, task_process_identity,
-# task_process_identity_matches, task_record_process_signal) it uses.
+# task_process_identity_matches, task_pid_proved_own, task_record_process_signal)
+# it uses.
 # bin/fm-copy-sweep.sh also calls teardown_preserve_ignored, with DATA set to its
 # data directory and ID to a per-release id, for a copy it proved on its own, and
 # teardown_run_closeout for such a copy that is locked.
@@ -259,9 +261,12 @@ teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
 
 # Reads into TEARDOWN_OWN_SCAN the "pid<TAB>cwd" lines of the processes whose cwd
 # is exactly a root the retire phase sweeps (the task's copy, the returned slot,
-# a nested copy of the task, its scratch directory). Fails when a scan fails.
+# a nested copy of the task, its scratch directory) and that Fix 2's ownership
+# proof (task_pid_proved_own) shows are the task's own: a cwd at a root alone,
+# such as a shared daemon's, never makes a process or its children teardown's.
+# Fails when a scan fails.
 teardown_own_scan() {
-  local root out owned_pid owned_path
+  local root out owned_pid owned_path owned_identity
   TEARDOWN_OWN_SCAN=
   TEARDOWN_OWN_SCANNED=0
   for root in "$WT" "$TEARDOWN_RETURN_SLOT" "$TASK_TMP" \
@@ -270,7 +275,10 @@ teardown_own_scan() {
     root=$(cd "$root" && pwd -P) || return 1
     out=$(pids_with_cwd_under "$root") || return 1
     while IFS=$'\t' read -r owned_pid owned_path; do
-      [ "$owned_path" != "$root" ] || TEARDOWN_OWN_SCAN+="$owned_pid"$'\t'"$owned_path"$'\n'
+      [ -n "$owned_pid" ] && [ "$owned_path" = "$root" ] || continue
+      owned_identity=$(task_process_identity "$owned_pid") || continue
+      task_pid_proved_own "$owned_pid" "$owned_identity" || continue
+      TEARDOWN_OWN_SCAN+="$owned_pid"$'\t'"$owned_path"$'\n'
     done <<< "$out"
   done
   TEARDOWN_OWN_SCANNED=1

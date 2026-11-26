@@ -206,11 +206,19 @@ make_case() {
 # `treehouse return --force <wt>`: succeed silently.
 exit 0
 SH
-  cat > "$fakebin/tmux" <<'SH'
+  # tmux kill-window etc. succeed silently. The task pane's shell pid, the
+  # anchor of teardown's process ownership proof, is read from the case's
+  # pane-pid file: by default this test runner's own shell, the parent of every
+  # teardown_fixture_start process, so those fixtures are the task's leaks.
+  # Ownership cases point it at a dedicated fake pane process instead.
+  cat > "$fakebin/tmux" <<SH
 #!/usr/bin/env bash
-# tmux kill-window etc.: succeed silently.
+case "\$*" in
+  *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;;
+esac
 exit 0
 SH
+  printf '%s\n' "$$" > "$case_dir/pane-pid"
   add_gh_no_pr "$case_dir"
   # Default hermetic no-mistakes stub: `axi status` answers FM_FAKE_AXI_STATUS
   # verbatim (empty by default, i.e. no active run - the pre-teardown run-abort
@@ -2218,6 +2226,7 @@ printf '%s\n' '{"ok":true}'
 EOF
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in
   kill-window|kill-pane) exec "$case_dir/fakebin/child-boundary" "\$@" ;;
 esac
@@ -2461,6 +2470,7 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -2580,6 +2590,7 @@ nested_seed_task_files() {
   printf 'tasktmp=%s\n' "$case_dir/tasktmp" >> "$case_dir/state/task-x1.meta"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint.log" ;; esac
 exit 0
 SH
@@ -2776,6 +2787,7 @@ stuck_endpoint_tmux() {  # <case-dir>
   local case_dir=$1
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 if [ -e "$case_dir/endpoint-stuck" ]; then
   case "\${1:-}" in
     kill-window) exit 1 ;;
@@ -3270,7 +3282,9 @@ SH
 # session runs in the slot and whose creation lock names a launcher. shape agent:
 # the launcher is the session itself; child: a descendant of the session whose
 # cwd is /; stubborn: that descendant, ignoring TERM; unrelated: a process outside
-# the session. The session is not told to take its descendant down. Sets
+# the session; detached: the "session" is a double-forked session leader that
+# descends from no task process (a shared daemon), and the launcher is its child
+# with cwd /. The session is not told to take its descendant down. Sets
 # FOREIGN_AGENT and FOREIGN_LAUNCHER. The stub lsof reports the session in the
 # slot while it lives, as lsof reports a process by its cwd.
 start_foreign_session_case() {
@@ -3285,6 +3299,27 @@ start_foreign_session_case() {
       FOREIGN_AGENT=$TEARDOWN_FIXTURE_PID
       for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
       FOREIGN_LAUNCHER=$(cat "$pidfile")
+      ;;
+    detached)
+      # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+      perl -MPOSIX -e '
+        my ($cwd, $out) = @ARGV;
+        my $first = fork(); die "fork" unless defined $first;
+        if ($first) { waitpid($first, 0); exit 0; }
+        POSIX::setsid();
+        my $second = fork(); die "fork" unless defined $second;
+        POSIX::_exit(0) if $second;
+        chdir $cwd or die "chdir";
+        open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+        $SIG{CHLD} = "IGNORE";
+        my $child = fork(); die "fork" unless defined $child;
+        if (!$child) { chdir "/"; exec "sleep", "300"; }
+        open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $child\n"; close $fh; rename "$out.tmp", $out or die "rename";
+        sleep 300 while 1;' "$FOREIGN_SLOT" "$pidfile"
+      for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
+      read -r FOREIGN_AGENT FOREIGN_LAUNCHER < "$pidfile" || fail "detached session fixture did not start"
+      teardown_fixture_track "$FOREIGN_AGENT" KILL
+      teardown_fixture_track "$FOREIGN_LAUNCHER" KILL
       ;;
     *)
       teardown_fixture_start "$FOREIGN_SLOT" KILL sleep 300

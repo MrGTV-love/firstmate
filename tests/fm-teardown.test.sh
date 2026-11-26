@@ -2890,6 +2890,7 @@ test_recorded_slot_lost_lease_still_refuses() {
   # Lose a real lease after reservation but before the final return check.
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 if [ "\${1:-}" = kill-window ]; then
   printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' '$slot' > '$case_dir/pool/treehouse-state.json'
 fi
@@ -3199,6 +3200,7 @@ test_bundle_stored_after_entry_is_owner_only() {
   : > "$case_dir/run-dir-stages.log"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) rm -f '$case_dir/data/task-x1/preserved-bundles/'*.bundle ;; esac
 exit 0
 SH
@@ -3403,6 +3405,7 @@ test_bundle_restore_memo_misses_a_changed_record_or_bundle() {
       recorded-tips)
         cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) printf '%s\t%s\t%s\n' '$BUNDLE_PATH' "\$(shasum -a 256 '$BUNDLE_PATH' | awk '{print \$1}')" '$head' > '$case_dir/data/task-x1/preservation-bundles.tsv' ;; esac
 exit 0
 SH
@@ -3412,6 +3415,7 @@ SH
         tips=$(git bundle list-heads "$BUNDLE_PATH" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
         cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*)
   head -c $((size - 16)) '$BUNDLE_PATH' > '$BUNDLE_PATH.cut' && mv '$BUNDLE_PATH.cut' '$BUNDLE_PATH'
   printf '%s\t%s\t%s\n' '$BUNDLE_PATH' "\$(shasum -a 256 '$BUNDLE_PATH' | awk '{print \$1}')" '$tips' > '$case_dir/data/task-x1/preservation-bundles.tsv' ;;
@@ -3839,6 +3843,7 @@ test_bundle_is_reverified_before_copy_removal() {
   # Endpoint cleanup happens after admission but before the final safety proof.
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) printf 'changed after admission\\n' >> "$BUNDLE_PATH" ;; esac
 exit 0
 SH

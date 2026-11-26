@@ -37,6 +37,7 @@ test_tasktmp_preserves_current_and_prior_reassociated_copies() {
     cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -114,6 +115,7 @@ test_secondmate_home_preserves_other_tasks_prior_copy() {
       cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
       cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -186,6 +188,7 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -247,6 +250,7 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -359,6 +363,7 @@ test_reservation_window_reassignment_reproves_own_landing() {
     cp "$case_dir/state/task-x1.meta" "$case_dir/task-meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -2565,6 +2570,7 @@ test_forced_nested_secondmate_admits_only_locked_current_copies() {
     printf 'retained bytes\n' > "$child_home/retained.txt"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in
   kill-*)
     printf '%s\n' "\$*" >> "$case_dir/kill.log"
@@ -2689,6 +2695,7 @@ test_forced_descendant_reassociated_copy_preserves_checkout_and_storage() {
     cp "$home/state/child-b.meta" "$case_dir/child.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -2782,6 +2789,7 @@ test_cleanup_roots_preserve_foreign_copy_git_storage() {
         common=$(cd "$target/P/.git" && pwd -P)
         cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -2834,6 +2842,7 @@ test_tasktmp_preserves_reassociated_copy_git_storage() {
     common=$(cd "$tmp/P/.git" && pwd -P)
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -3021,6 +3030,7 @@ test_child_return_custody_refusal_keeps_non_pool_worktree() {
   git -C "$case_dir/project" worktree add -q --detach "$nested" main
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
@@ -4152,6 +4162,7 @@ test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap() {
   tasks-axi start live-task --file "$case_dir/data/backlog.md" >/dev/null
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 if [ -e "$case_dir/endpoint-stuck" ]; then
   case "\${1:-}" in
     kill-window) : > "$case_dir/kill-attempted"; exit 1 ;;
@@ -4232,6 +4243,7 @@ test_child_pool_return_custody_refusal_keeps_slot() {
   lock=$(git_index_lock_path "$slot")
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH

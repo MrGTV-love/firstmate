@@ -305,7 +305,7 @@
 # record names it; no process outside this teardown runs in it and no live
 # process outside this teardown is its lock launcher (a process is teardown's
 # own when it, or an ancestor by parent chain, has a cwd exactly at a root retire
-# sweeps, and a launcher pid that started after the lock file was written is a
+# sweeps and passes Fix 2's ownership proof, and a launcher pid that started after the lock file was written is a
 # recycled pid and owns nothing); retire sends TERM to each such launcher and
 # each such process running in the copy, waits a bounded time, and sends no KILL,
 # and one still alive refuses the release, named by its pid, while a process
@@ -672,6 +672,25 @@
 #     root via `lsof -a -d cwd` (cheap: bounded by process count, not by
 #     walking the worktree's file tree) and sends TERM, then KILL after a short
 #     grace period to any survivor whose process identity still matches.
+#     Ownership: a cwd at a root is only where to look. A shared service can
+#     start inside a copy and keep that cwd (observed 2026-11-26: the shared
+#     no-mistakes daemon auto-started in a task's slot was killed by that
+#     task's teardown, ending 12 pipeline runs in three homes). A process is
+#     signalled only when task_pid_proved_own proves it the task's: it is the
+#     shell of the validated endpoint's pane (tmux pane_pid, Herdr shell_pid,
+#     read once and bound to its birth identity) or descends from it by parent
+#     chain in one process-table read, or descends from a process already
+#     proved, which keeps its proof by pid and birth identity after the reap
+#     ends the shell above it. An inherited environment or session cannot
+#     prove ownership: a daemon inherits its launcher's environment, and a
+#     harness tool shell can be its own session leader. Any other process at a
+#     root - a detached daemon, an orphan reparented to init, or every process
+#     when the endpoint is gone, windowless, unreadable, or not tmux or Herdr -
+#     refuses before any signal, even with --force, naming its pid, birth
+#     identity and command, and the copy and task stay. Proceeding would not
+#     spare it: the `treehouse return --force` that follows ends every process
+#     with its cwd in the slot. The tasktmp-only sweep ignores the refusal, so
+#     there the holder is named and left running while teardown continues.
 #     Nested-lane boundary: a matched cwd inside a linked git worktree that
 #     sits beneath either root (registered by any repository, the project or
 #     a sibling clone, and including lanes this task's own worker created) is
@@ -691,8 +710,9 @@
 #     One exception: before this sweep, retire sends TERM to a creation-lock
 #     launcher of a foreign nested copy and to a process running in that copy,
 #     each only when the ancestry test proved it teardown's own (it is, or
-#     descends by parent chain from, a process whose cwd is exactly a scan root),
-#     whatever its own cwd. It waits a bounded time and sends no KILL; one still
+#     descends by parent chain from, a process whose cwd is exactly a scan root
+#     and that the ownership proof above shows is the task's), whatever its own
+#     cwd. It waits a bounded time and sends no KILL; one still
 #     alive refuses, named by its pid, and a process that fails the test is never
 #     signalled and refuses.
 #     A missing lsof refuses too: without the scan no target can be audited, so
@@ -4313,6 +4333,29 @@ conclude_task_no_mistakes_run() {  # <worktree>
   return 1
 }
 
+# Fix 2 ownership anchor (see script header): the pid of the shell the task's
+# validated endpoint pane was started with, read live from $T on the backends
+# that report it (tmux pane_pid, Herdr shell_pid). Prints nothing when there is
+# no endpoint, the backend reports none, or the read fails; nothing is then
+# provable, so a process found at a root refuses instead of being signalled.
+task_endpoint_shell_pid() {
+  local out pid=
+  [ -n "${T:-}" ] || return 0
+  case "${BACKEND:-}" in
+    tmux)
+      pid=$(tmux display-message -p -t "$T" '#{pane_pid}' 2>/dev/null </dev/null) || pid=
+      ;;
+    herdr)
+      out=$(fm_backend_herdr_cli "${T%%:*}" pane process-info --pane "${T#*:}" 2>/dev/null </dev/null) || out=
+      pid=$(printf '%s' "$out" | jq -r --arg pane "${T#*:}" \
+        'select(.result.process_info.pane_id == $pane) | .result.process_info.shell_pid // empty' 2>/dev/null) || pid=
+      ;;
+  esac
+  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$pid" -gt 1 ] || return 0
+  printf '%s\n' "$pid"
+}
+
 # Fix 2 (see script header): pid and matched cwd path for every process whose
 # CURRENT WORKING DIRECTORY is exactly $1 or under it, from a bounded system-wide
 # `lsof -a -d cwd` scan (never the recursive +D file-tree walk). Never $$.
@@ -4376,6 +4419,67 @@ task_process_identity_matches() {  # <pid> <identity>
 
 task_pid_list_contains() {  # <pid-list> <pid>
   printf '%s\n' "$1" | grep -Fxq "$2"
+}
+
+# Fix 2 ownership proof (see script header). TASK_ANCHOR_PID/IDENTITY is the
+# endpoint's pane shell, read once per teardown; TASK_OWNED holds every
+# "pid<TAB>birth identity" already proved, so a proved process keeps its proof
+# after the reap ends the shell it descended from.
+TASK_ANCHOR_READ=0
+TASK_ANCHOR_PID=
+TASK_ANCHOR_IDENTITY=
+TASK_ANCHOR_NOTE=
+TASK_OWNED=()
+
+task_anchor_load() {
+  [ "$TASK_ANCHOR_READ" = 0 ] || return 0
+  TASK_ANCHOR_READ=1
+  TASK_ANCHOR_PID=$(task_endpoint_shell_pid) || TASK_ANCHOR_PID=
+  if [ -z "$TASK_ANCHOR_PID" ]; then
+    TASK_ANCHOR_NOTE="no live pane shell could be read from the task's endpoint ${T:-<none>}"
+  elif ! TASK_ANCHOR_IDENTITY=$(task_process_identity "$TASK_ANCHOR_PID"); then
+    TASK_ANCHOR_NOTE="the endpoint's pane shell $TASK_ANCHOR_PID has no readable birth identity"
+    TASK_ANCHOR_PID=
+  else
+    TASK_ANCHOR_NOTE="it does not descend from the task's pane shell $TASK_ANCHOR_PID ($TASK_ANCHOR_IDENTITY)"
+  fi
+}
+
+task_owned_contains() {  # <pid> <identity>
+  local entry
+  for entry in ${TASK_OWNED[@]+"${TASK_OWNED[@]}"}; do
+    [ "$entry" != "$1"$'\t'"$2" ] || return 0
+  done
+  return 1
+}
+
+# Succeeds when the process <pid>, whose birth identity is <identity>, is the
+# task's own: already proved, or the anchor itself or a descendant of the anchor
+# or of a proved process by the parent chain in one process table read, where
+# that ancestor still has its recorded birth identity. A proof is recorded.
+task_pid_proved_own() {  # <pid> <identity>
+  local pid=$1 identity=$2 table member entry
+  task_owned_contains "$pid" "$identity" && return 0
+  task_anchor_load
+  table=$(ps -axo pid=,ppid= 2>/dev/null) || return 1
+  [ -n "$table" ] || return 1
+  while IFS= read -r member; do
+    [ -n "$member" ] || continue
+    if [ -n "$TASK_ANCHOR_PID" ] && [ "$member" = "$TASK_ANCHOR_PID" ] \
+       && task_process_identity_matches "$member" "$TASK_ANCHOR_IDENTITY"; then
+      TASK_OWNED+=("$pid"$'\t'"$identity")
+      return 0
+    fi
+    for entry in ${TASK_OWNED[@]+"${TASK_OWNED[@]}"}; do
+      [ "${entry%%$'\t'*}" = "$member" ] || continue
+      task_process_identity_matches "$member" "${entry#*$'\t'}" || continue
+      TASK_OWNED+=("$pid"$'\t'"$identity")
+      return 0
+    done
+  done < <(printf '%s\n' "$table" | awk -v p="$pid" '
+    { parent[$1] = $2 }
+    END { for (n = 0; p > 1 && n < 64 && (p in parent); n++) { print p; p = parent[p] } }')
+  return 1
 }
 
 # Canonical form of <path> even when its tail no longer exists: the nearest
@@ -4496,7 +4600,7 @@ task_pids_under_roots() {  # <dir>...
   TASK_PIDS_ERROR="lsof failed"
   TASK_PID_CWDS=()
   TASK_SCAN_PIDS=()
-  local dir dir_matches pid path lane identity root pids=""
+  local dir dir_matches pid path lane identity command root pids=""
   local -a scan_roots
   scan_roots=()
   for dir in "$@"; do
@@ -4543,6 +4647,26 @@ task_pids_under_roots() {  # <dir>...
         echo "REFUSED: process $pid ($identity) matched path $path beneath scan root $dir, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$path
         TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"
+        return 1
+      fi
+      # A cwd at the root is where to look, never proof of ownership.
+      if ! identity=$(task_process_identity "$pid"); then
+        # A process that has exited (kernel ESRCH) needs no proof.
+        if perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$pid"; then
+          continue
+        fi
+        echo "REFUSED: process $pid has its cwd at $dir but no readable birth identity, so its ownership by $ID cannot be proven; preserving it and task $ID without signalling." >&2
+        TASK_PIDS_FAILED_DIR=$dir
+        TASK_PIDS_ERROR="process $pid at the root has no readable birth identity"
+        return 1
+      fi
+      if ! task_pid_proved_own "$pid" "$identity" \
+         || ! task_process_identity_matches "$pid" "$identity"; then
+        task_anchor_load
+        command=$(LC_ALL=C ps -ww -p "$pid" -o command= 2>/dev/null | cut -c1-200) || command=
+        echo "REFUSED: process $pid ($identity${command:+, $command}) has its cwd at $dir, but nothing proves it belongs to $ID: $TASK_ANCHOR_NOTE. It may be a shared service (a daemon that started in this copy), so teardown leaves it running and keeps the copy; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved." >&2
+        TASK_PIDS_FAILED_DIR=$dir
+        TASK_PIDS_ERROR="process $pid at the root is not proven to belong to $ID"
         return 1
       fi
       TASK_SCAN_PIDS+=("$pid")
@@ -4610,6 +4734,11 @@ reap_task_worktree_processes() {  # <label> <dir>...
           return 1
         fi
         continue
+      fi
+      # Only the exact process the scan proved is ever tracked for a signal.
+      if ! task_owned_contains "$pid" "$identity"; then
+        echo "REFUSED: leaked process $pid changed identity between its ownership proof and its signal for $ID; preserving the worktree/tasktmp for manual inspection or retry." >&2
+        return 1
       fi
       tracked_pids+=("$pid")
       tracked_identities+=("$identity")

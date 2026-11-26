@@ -448,6 +448,7 @@ test_isolated_tmux_invalid_and_valid_cleanup() {
   printf '%s\n' "$socket_id" > "$dir/socket.identity"
   cat > "$dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$dir/pane-pid" ] || cat "$dir/pane-pid" ;; esac
 set -eu
 [ -z "\${TMUX:-}" ] && [ -z "\${TMUX_PANE:-}" ] || exit 91
 [ "\${FM_TEST_TMUX_SOCKET:-}" = '$socket_id' ] || exit 92
@@ -689,6 +690,7 @@ test_recorded_endpoint_that_changed_directory_still_tears_down() {
   # endpoint identity still owns the lifecycle; cwd alone must not brick it.
   cat > "$dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$dir/pane-pid" ] || cat "$dir/pane-pid" ;; esac
 if [ "\${1:-}" = display-message ]; then
   printf '%s\n' '$dir/other-directory'
   exit 0
@@ -1238,6 +1240,7 @@ write_close_failing_tmux_shim() {  # <dir> <socket-name> <real-tmux>
   local dir=$1 socket=$2 real=$3
   cat > "$dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$dir/pane-pid" ] || cat "$dir/pane-pid" ;; esac
 set -u
 printf 'tmux' >> "\${FM_RUNTIME_LOG:?}"
 printf ' <%s>' "\$@" >> "\${FM_RUNTIME_LOG:?}"

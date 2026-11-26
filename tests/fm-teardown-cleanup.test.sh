@@ -503,6 +503,7 @@ test_forced_secondmate_teardown_holds_descendant_lifecycle_locks() {
   : > "$case_dir/treehouse.log"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 printf '%s\n' "\$*" >> "$case_dir/kill.log"
 exit 0
 SH
@@ -1626,9 +1627,9 @@ test_leaked_worktree_process_is_reaped() {
   land_shippable_commit "$case_dir"
 
   # A backgrounded, disowned process rooted (by cwd) under the task's own
-  # worktree - the same shape the observed incident's leaked `go test`
-  # binaries took (reparented to init, no live task meta to attribute them
-  # to once an unpatched teardown had already run).
+  # worktree and started under the task's pane (the case's default pane shell
+  # is this runner, its parent). One reparented to init proves nothing and is
+  # refused instead (test_teardown_refuses_an_orphan_it_cannot_prove).
   teardown_fixture_start "$case_dir/wt" KILL sleep 300
   pid=$TEARDOWN_FIXTURE_PID
   sleep 0.3
@@ -1647,6 +1648,323 @@ test_leaked_worktree_process_is_reaped() {
   assert_present "$case_dir/state/task-x1.teardown-processes" \
     "leaked-process-reap: teardown removed the durable process identity audit"
   pass "a leaked descendant process rooted under the task's worktree is reaped by teardown, not left surviving"
+}
+
+# Fix 2 ownership fixtures. A fake pane is the process the case's tmux stub
+# reports as the task pane's shell; its own cwd is the case directory, never a
+# scan root. ownership_pane <case-dir> [<leak-cwd> [ignore-term]] starts it,
+# points the case's pane-pid file at it and sets OWN_PANE_PID; with a leak cwd
+# it also starts a child of the pane there (ignoring TERM when asked) and sets
+# OWN_LEAK_PID.
+ownership_pane() {
+  local case_dir=$1 leak_cwd=${2:-} ignore=${3:-} i
+  rm -f "$case_dir/leak.pid"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  teardown_fixture_start "$case_dir" KILL perl -e '
+    my ($cwd, $out, $ignore) = @ARGV;
+    $SIG{CHLD} = "IGNORE";
+    if ($cwd ne "") {
+      my $child = fork();
+      die "fork" unless defined $child;
+      if (!$child) { $SIG{TERM} = "IGNORE" if $ignore; chdir $cwd or die "chdir"; exec "sleep", "300"; }
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} $child; close $fh; rename "$out.tmp", $out or die "rename";
+    }
+    sleep 300 while 1;' "$leak_cwd" "$case_dir/leak.pid" "$ignore"
+  OWN_PANE_PID=$TEARDOWN_FIXTURE_PID
+  printf '%s\n' "$OWN_PANE_PID" > "$case_dir/pane-pid"
+  OWN_LEAK_PID=
+  [ -n "$leak_cwd" ] || return 0
+  for i in $(seq 100); do [ -s "$case_dir/leak.pid" ] && break; sleep 0.05; done
+  OWN_LEAK_PID=$(cat "$case_dir/leak.pid" 2>/dev/null) || fail "ownership fixture: the pane's leak did not start"
+  teardown_fixture_track "$OWN_LEAK_PID" KILL
+  for i in $(seq 100); do
+    [ "$(cd "$leak_cwd" && pwd -P)" = "$("$REAL_LSOF_FOR_TEST" -a -d cwd -p "$OWN_LEAK_PID" -Fn 2>/dev/null | sed -n 's/^n//p')" ] && return 0
+    sleep 0.05
+  done
+  fail "ownership fixture: the pane's leak never entered $leak_cwd"
+}
+
+# ownership_detached <cwd> [setsid]: a double-forked process whose cwd is <cwd>,
+# reparented to init and so descended from no pane; with setsid it also leaves
+# its session, as a daemon such as the shared no-mistakes daemon does when it
+# auto-starts inside a task copy. Sets OWN_DETACHED_PID.
+ownership_detached() {
+  local cwd=$1 setsid=${2:-} out i
+  out=$(mktemp "$TMP_ROOT/detached.XXXXXX")
+  rm -f "$out"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  perl -MPOSIX -e '
+    my ($cwd, $out, $setsid) = @ARGV;
+    my $first = fork(); die "fork" unless defined $first;
+    if ($first) { waitpid($first, 0); exit 0; }
+    POSIX::setsid() if $setsid;
+    my $second = fork(); die "fork" unless defined $second;
+    POSIX::_exit(0) if $second;
+    chdir $cwd or die "chdir";
+    open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+    open my $fh, ">", "$out.tmp" or die "open"; print {$fh} $$; close $fh; rename "$out.tmp", $out or die "rename";
+    exec "sleep", "300";' "$cwd" "$out" "$setsid"
+  for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+  OWN_DETACHED_PID=$(cat "$out" 2>/dev/null) || fail "ownership fixture: the detached process did not start"
+  teardown_fixture_track "$OWN_DETACHED_PID" KILL
+  for i in $(seq 100); do
+    [ "$(cd "$cwd" && pwd -P)" = "$("$REAL_LSOF_FOR_TEST" -a -d cwd -p "$OWN_DETACHED_PID" -Fn 2>/dev/null | sed -n 's/^n//p')" ] && break
+    sleep 0.05
+  done
+}
+
+# Succeeds when <pid> descends from <ancestor> by its live parent chain.
+ownership_descends_from() {  # <pid> <ancestor>
+  local p=$1 n=0
+  while [ -n "$p" ] && [ "$p" -gt 1 ] && [ "$n" -lt 64 ]; do
+    [ "$p" != "$2" ] || return 0
+    p=$("$REAL_PS_FOR_TEST" -o ppid= -p "$p" 2>/dev/null | tr -d '[:space:]')
+    n=$((n + 1))
+  done
+  return 1
+}
+
+ownership_alive() {  # <pid>
+  local signal birth
+  IFS=$'\t' read -r signal birth < "$TEARDOWN_FIXTURE_PROCESSES/$1" || return 1
+  teardown_fixture_live "$1" "$birth"
+}
+
+ownership_wait_dead() {  # <pid>
+  local i
+  for i in $(seq 50); do ownership_alive "$1" || return 0; sleep 0.1; done
+  return 1
+}
+
+ownership_assert_unsignalled() {  # <case-dir> <pid> <label>
+  [ ! -f "$1/state/task-x1.teardown-processes" ] \
+    || assert_no_grep $'\t'"$2"$'\t' "$1/state/task-x1.teardown-processes" "$3: teardown audited a signal for process $2"
+}
+
+# ownership_fault_bin <case-dir>: the case runs a copy of bin/ in which the
+# ownership proof is replaced by the old cwd-only verdict (every process at a
+# root is the task's). Only the case's own copy changes; the shipped bin/ is
+# untouched. Sets OWN_FAULT_TEARDOWN.
+ownership_fault_bin() {
+  local case_dir=$1
+  rm "$case_dir/code-root/bin"
+  cp -R "$ROOT/bin" "$case_dir/code-root/bin"
+  python3 -I - "$case_dir/code-root/bin/fm-teardown.sh" <<'PY' || fail "ownership fault: the proof could not be replaced in the case's copy"
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+head = "task_pid_proved_own() {  # <pid> <identity>\n"
+assert text.count(head) == 1
+fault = head + "  TASK_OWNED+=(\"$1\"$'\\t'\"$2\"); return 0  # injected fault: the old cwd-only verdict\n"
+path.write_text(text.replace(head, fault))
+PY
+  OWN_FAULT_TEARDOWN=$case_dir/code-root/bin/fm-teardown.sh
+}
+
+# Case 1 of the ownership plan (the 2026-11-26 incident's shape): a detached,
+# session-leading process at the copy root that descends from no task process
+# survives teardown, and the copy and the task stay.
+test_teardown_spares_a_detached_daemon_at_the_copy_root() {
+  local case_dir rc pid
+  case_dir=$(make_case ownership-detached-daemon)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  ownership_pane "$case_dir"
+  ownership_detached "$case_dir/wt" setsid
+  pid=$OWN_DETACHED_PID
+  ownership_alive "$pid" || fail "detached-daemon: setup daemon did not start"
+  if ownership_descends_from "$pid" "$OWN_PANE_PID" || ownership_descends_from "$pid" "$$"; then
+    fail "detached-daemon: setup daemon descends from the pane or the runner (ppid $("$REAL_PS_FOR_TEST" -o ppid= -p "$pid"))"
+  fi
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  ownership_alive "$pid" || fail "detached-daemon: teardown killed a process it could not prove was the task's"
+  expect_code 1 "$rc" "detached-daemon: teardown must refuse while an unproven process holds the copy root"
+  assert_present "$case_dir/wt" "detached-daemon: teardown removed the copy"
+  assert_present "$case_dir/state/task-x1.meta" "detached-daemon: teardown removed the task record"
+  ownership_assert_unsignalled "$case_dir" "$pid" detached-daemon
+  grep -Eq "REFUSED: process $pid .*nothing proves it belongs to task-x1" "$case_dir/stderr" \
+    || fail "detached-daemon: the refusal did not name the process: $(tail -3 "$case_dir/stderr")"
+  teardown_fixture_stop "$pid"
+  pass "a detached daemon at the copy root that descends from no task process survives teardown, which refuses and keeps the copy"
+}
+
+# Case 2: a leaked child of the task's pane, with its cwd at the copy root, is
+# still reaped, and the copy goes.
+test_teardown_reaps_a_leaked_child_of_the_task_pane() {
+  local case_dir rc pid
+  case_dir=$(make_case ownership-pane-child)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  ownership_pane "$case_dir" "$case_dir/wt"
+  pid=$OWN_LEAK_PID
+  ownership_descends_from "$pid" "$OWN_PANE_PID" || fail "pane-child: setup leak is not the pane's child"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "pane-child: teardown must succeed: $(cat "$case_dir/stderr")"
+  ownership_wait_dead "$pid" || fail "pane-child: the task's leaked child survived teardown"
+  assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+    "pane-child: the leaked child's signal was not audited"
+  # The stub treehouse removes nothing; the real-binary suite observes the copy go.
+  assert_absent "$case_dir/state/task-x1.meta" "pane-child: the task did not close"
+  ownership_alive "$OWN_PANE_PID" || fail "pane-child: teardown signalled the pane shell, whose cwd is not a root"
+  pass "a leaked child of the task's pane at the copy root is reaped and the task closes"
+}
+
+# Case 3 (fault control): with the old cwd-only verdict injected into the case's
+# own copy of bin/, case 1's survival assertion fails for the expected reason -
+# the detached daemon is audited and killed.
+test_teardown_ownership_fault_control_kills_the_detached_daemon() {
+  local case_dir rc pid
+  case_dir=$(make_case ownership-fault-control)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  ownership_fault_bin "$case_dir"
+  ownership_pane "$case_dir"
+  ownership_detached "$case_dir/wt" setsid
+  pid=$OWN_DETACHED_PID
+  ownership_alive "$pid" || fail "fault-control: setup daemon did not start"
+  rc=0
+  TEARDOWN=$OWN_FAULT_TEARDOWN run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  if ownership_alive "$pid"; then
+    teardown_fixture_stop "$pid"
+    fail "fault-control: the injected cwd-only verdict did not falsify case 1's survival assertion: $(tail -5 "$case_dir/stderr")"
+  fi
+  assert_grep $'\tTERM\t'"$pid"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+    "fault-control: the daemon died without the cwd-only reap's audited TERM"
+  pass "the old cwd-only verdict, injected only into the case's copy, kills the detached daemon, so case 1 discriminates"
+}
+
+# A mixed copy refuses before any signal: neither the task's own leak nor the
+# unproven daemon beside it is signalled.
+test_teardown_mixed_copy_signals_nothing() {
+  local case_dir rc leak daemon
+  case_dir=$(make_case ownership-mixed)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  ownership_pane "$case_dir" "$case_dir/wt"
+  leak=$OWN_LEAK_PID
+  ownership_detached "$case_dir/wt" setsid
+  daemon=$OWN_DETACHED_PID
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  ownership_alive "$daemon" || fail "mixed: the unproven daemon was killed"
+  ownership_alive "$leak" || fail "mixed: the task's leak was signalled although teardown refused"
+  expect_code 1 "$rc" "mixed: teardown must refuse"
+  assert_present "$case_dir/wt" "mixed: the copy was removed"
+  ownership_assert_unsignalled "$case_dir" "$daemon" mixed
+  ownership_assert_unsignalled "$case_dir" "$leak" mixed
+  teardown_fixture_stop "$daemon"
+  teardown_fixture_stop "$leak"
+  pass "a copy holding both the task's leak and an unproven daemon refuses before signalling either"
+}
+
+# The anchor's absent, forged and dead states prove nothing: a process at the
+# root refuses unsignalled. A quiet copy needs no anchor and still closes.
+test_teardown_without_a_provable_pane_refuses_a_root_process() {
+  local case_dir rc pid state dead
+  for state in absent forged dead; do
+    case_dir=$(make_case "ownership-anchor-$state")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    case "$state" in
+      absent) rm -f "$case_dir/pane-pid" ;;
+      forged) printf '12x\n' > "$case_dir/pane-pid" ;;
+      dead)
+        sleep 300 &
+        dead=$!
+        kill "$dead"; wait "$dead" 2>/dev/null || true
+        printf '%s\n' "$dead" > "$case_dir/pane-pid"
+        ;;
+    esac
+    teardown_fixture_start "$case_dir/wt" KILL sleep 300
+    pid=$TEARDOWN_FIXTURE_PID
+    sleep 0.3
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    ownership_alive "$pid" || fail "anchor-$state: teardown killed a process with no provable pane"
+    expect_code 1 "$rc" "anchor-$state: teardown must refuse"
+    assert_present "$case_dir/wt" "anchor-$state: the copy was removed"
+    ownership_assert_unsignalled "$case_dir" "$pid" "anchor-$state"
+    grep -Eq "REFUSED: process $pid .*(no live pane shell could be read|has no readable birth identity)" "$case_dir/stderr" \
+      || fail "anchor-$state: the refusal did not say the pane could not be proved: $(tail -3 "$case_dir/stderr")"
+    teardown_fixture_stop "$pid"
+  done
+  case_dir=$(make_case ownership-anchor-quiet)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  rm -f "$case_dir/pane-pid"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "anchor-quiet: a copy nobody holds must close without a pane: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" "anchor-quiet: the quiet task did not close"
+  pass "an absent, forged or dead pane proves nothing, so a root process refuses unsignalled, while a quiet copy still closes"
+}
+
+# A process proved through the pane keeps its proof after the reap ends the
+# shell it descended from: a TERM-ignoring leak whose parent shell (also at the
+# root) dies in the same pass is still force-killed.
+test_teardown_proof_survives_the_parent_the_reap_ends() {
+  local case_dir rc shell leak i
+  case_dir=$(make_case ownership-parent-ended)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  # The pane's child shell sits at the root and starts a TERM-ignoring leak there.
+  rm -f "$case_dir/leak.pid"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  teardown_fixture_start "$case_dir" KILL perl -e '
+    my ($wt, $out) = @ARGV;
+    $SIG{CHLD} = "IGNORE";
+    my $shell = fork(); die "fork" unless defined $shell;
+    if (!$shell) {
+      chdir $wt or die "chdir";
+      my $leak = fork(); die "fork" unless defined $leak;
+      if (!$leak) { $SIG{TERM} = "IGNORE"; exec "sleep", "300"; }
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $leak\n"; close $fh; rename "$out.tmp", $out or die "rename";
+      exec "sleep", "300";
+    }
+    sleep 300 while 1;' "$case_dir/wt" "$case_dir/leak.pid"
+  OWN_PANE_PID=$TEARDOWN_FIXTURE_PID
+  printf '%s\n' "$OWN_PANE_PID" > "$case_dir/pane-pid"
+  for i in $(seq 100); do [ -s "$case_dir/leak.pid" ] && break; sleep 0.05; done
+  read -r shell leak < "$case_dir/leak.pid" || fail "parent-ended: setup did not start"
+  teardown_fixture_track "$shell" KILL
+  teardown_fixture_track "$leak" KILL
+  sleep 0.3
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "parent-ended: teardown must succeed: $(cat "$case_dir/stderr")"
+  ownership_wait_dead "$shell" || fail "parent-ended: the pane's child shell survived"
+  ownership_wait_dead "$leak" || fail "parent-ended: the TERM-ignoring leak survived after its parent was ended"
+  assert_grep $'\tKILL\t'"$leak"$'\t' "$case_dir/state/task-x1.teardown-processes" \
+    "parent-ended: the leak was not force-killed under its kept proof"
+  pass "a proved leak keeps its proof after the reap ends its parent shell, and is force-killed"
+}
+
+# The narrowed claim: an orphan reparented to init that never left its session
+# is not provably the task's either, so it refuses unsignalled, as does an
+# unproven daemon at the task's tasktmp root.
+test_teardown_refuses_an_orphan_it_cannot_prove() {
+  local case_dir rc pid root
+  for root in wt tasktmp; do
+    case_dir=$(make_case "ownership-orphan-$root")
+    write_meta "$case_dir" no-mistakes ship
+    printf '%s\n' "tasktmp=$case_dir/tasktmp" >> "$case_dir/state/task-x1.meta"
+    mkdir -p "$case_dir/tasktmp"
+    land_shippable_commit "$case_dir"
+    ownership_pane "$case_dir"
+    if [ "$root" = wt ]; then ownership_detached "$case_dir/$root"; else ownership_detached "$case_dir/$root" setsid; fi
+    pid=$OWN_DETACHED_PID
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    ownership_alive "$pid" || fail "orphan-$root: teardown killed an orphan it could not prove"
+    expect_code 1 "$rc" "orphan-$root: teardown must refuse"
+    assert_present "$case_dir/wt" "orphan-$root: the copy was removed"
+    ownership_assert_unsignalled "$case_dir" "$pid" "orphan-$root"
+    assert_grep "REFUSED: process $pid " "$case_dir/stderr" "orphan-$root: the refusal did not name the orphan"
+    teardown_fixture_stop "$pid"
+  done
+  pass "an orphan reparented to init at the copy root, and an unproven daemon at the tasktmp root, refuse unsignalled"
 }
 
 test_process_identity_is_recorded_before_term_and_kill() {
@@ -1798,6 +2116,7 @@ test_process_refusal_has_no_close_replay_authority() {
     cp "$case_dir/state/unrelated.meta" "$case_dir/unrelated.meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 if [ "\${1:-}" = list-windows ]; then
   echo "can't find session: firstmate" >&2
   exit 1
@@ -1890,6 +2209,7 @@ exit 1
 SH
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 if [ "\${1:-}" = kill-window ]; then
   printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"
 fi
@@ -2218,6 +2538,7 @@ test_lsof_absent_refuses_without_signalling() {
   kill -0 "$pid" 2>/dev/null || fail "lsof-absent-refusal: setup sleeper did not start"
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 if [ "\${1:-}" = display-message ] && [ "\${*: -1}" = '#{pane_pid}' ]; then
   printf '%s\n' '$pid'
 fi
@@ -3073,6 +3394,7 @@ test_docker_failed_lane_scan_names_its_cause() {
   before=$(cat "$store")
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 case "\${1:-}" in
   kill-window|kill-pane) : > "$case_dir/lane-scan-armed" ;;
 esac
@@ -3917,6 +4239,7 @@ test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup(
   prepare_teardown_source_copy "$case_dir"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$case_dir/pane-pid" ] || cat "$case_dir/pane-pid" ;; esac
 printf '%s\n' "\$*" >> "$case_dir/tmux.log"
 exit 0
 SH
@@ -5431,6 +5754,7 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
   late=$FOREIGN_SLOT/.claude/worktrees/fc-late
   cat > "$FOREIGN_CASE/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) [ ! -f "$FOREIGN_CASE/pane-pid" ] || cat "$FOREIGN_CASE/pane-pid" ;; esac
 case "\${1:-}" in
   kill-window)
     : > "$FOREIGN_CASE/closing"
@@ -6433,6 +6757,26 @@ test_task_own_session_as_lock_launcher_does_not_block_release() {
     fi
   done
   pass "a lock launcher that is the task's own session, or a descendant the cwd sweep cannot reach, is ended by retire and released with the slot"
+}
+
+# A cwd at the slot root does not make a process teardown's own for the nested
+# copy rule either: a detached daemon there, descended from no task process, is
+# not an ownership anchor, so its child, the copy's lock launcher, is never
+# signalled, and the daemon is refused by Fix 2 rather than reaped.
+test_a_detached_process_at_the_slot_root_does_not_make_its_child_teardowns_own() {
+  local rc
+  start_foreign_session_case foreign-detached-anchor detached
+  run_foreign_teardown rc
+  kill -0 "$FOREIGN_LAUNCHER" 2>/dev/null || fail "detached-anchor: the daemon's child launcher was signalled"
+  kill -0 "$FOREIGN_AGENT" 2>/dev/null || fail "detached-anchor: the detached daemon at the slot root was signalled"
+  expect_code 1 "$rc" "detached-anchor: teardown must refuse: $(tail -3 "$FOREIGN_CASE/stderr")"
+  [ ! -f "$FOREIGN_CASE/state/task-x1.teardown-processes" ] \
+    || assert_no_grep "	TERM	$FOREIGN_LAUNCHER	" "$FOREIGN_CASE/state/task-x1.teardown-processes" \
+      "detached-anchor: teardown audited a signal for the daemon's child"
+  assert_foreign_copy_untouched detached-anchor
+  teardown_fixture_stop "$FOREIGN_LAUNCHER"
+  teardown_fixture_stop "$FOREIGN_AGENT"
+  pass "a detached daemon at the slot root is no ownership anchor: its child launcher is not signalled and the copy is kept"
 }
 
 # A live launcher outside the task's session keeps its copy untouched. One inside
@@ -8668,6 +9012,13 @@ test_another_branchs_parked_run_is_never_touched
 test_top_level_pipeline_discovery_failures_remain_best_effort
 test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
+test_teardown_spares_a_detached_daemon_at_the_copy_root
+test_teardown_reaps_a_leaked_child_of_the_task_pane
+test_teardown_ownership_fault_control_kills_the_detached_daemon
+test_teardown_mixed_copy_signals_nothing
+test_teardown_without_a_provable_pane_refuses_a_root_process
+test_teardown_proof_survives_the_parent_the_reap_ends
+test_teardown_refuses_an_orphan_it_cannot_prove
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races
@@ -8779,6 +9130,7 @@ test_recycled_launcher_pid_does_not_own_a_foreign_copy
 test_live_launcher_keeps_its_foreign_copy
 test_task_own_session_as_lock_launcher_does_not_block_release
 test_unrelated_or_stubborn_lock_launcher_keeps_its_foreign_copy
+test_a_detached_process_at_the_slot_root_does_not_make_its_child_teardowns_own
 test_process_in_foreign_copy_keeps_it
 test_task_own_process_inside_foreign_copy_is_ended_and_released
 test_two_foreign_copies_are_released_together_or_not_at_all

@@ -307,6 +307,10 @@ STATE="$TEST_DIR/home-primary/state"
   export PROJ="$TEST_DIR/project-primary" STATE="$TEST_DIR/home-primary/state"
   # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
+  # The task pane's shell, the anchor of the reaper's ownership proof, is this
+  # test's shell: the generated processes are its children.
+  # shellcheck disable=SC2329 # Called by the sourced reaper's ownership proof.
+  task_endpoint_shell_pid() { printf '%s\n' "$$"; }
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline owned inventory failed"
   [ "$TASK_PIDS" = "$OFFLINE_OWNED_PID" ] || fail "offline inventory did not isolate the owned process: $TASK_PIDS"
   ID=offline-owned BACKEND=herdr reap_task_worktree_processes worktree "$TEST_DIR/offline-owned" || fail "offline owned reaper failed"
