@@ -90,7 +90,9 @@
 #          FMX_PAIRING_TOKEN. When opted in, bootstrap requires curl+jq, writes
 #          the relay poll shim and 30s cadence config, and prints an FMX line.
 #          Fleet sync fetches, fast-forwards safe default-branch states, reports
-#          recovered and STUCK clone drift, and prunes gone local branches; it is
+#          recovered and STUCK clone drift, and prunes gone local branches; it also
+#          relays its "<label>: warning: could not set maintenance.pack-refs.enabled=false"
+#          line when a clone's key write failed; it is
 #          bounded by FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT when it is a non-empty
 #          numeric override, while non-numeric values fall back to 20s.
 #          When the override is unset or blank, the timeout is
@@ -347,6 +349,7 @@ fleet_sync_relay_filtered_output() {
       *': skipped:'*) echo "FLEET_SYNC: $line" ;;
       *': STUCK:'*) echo "FLEET_SYNC: $line" ;;
       *': recovered:'*) echo "FLEET_SYNC: $line" ;;
+      *': warning:'*) echo "FLEET_SYNC: $line" ;;
     esac
   done < "$tmp"
 }

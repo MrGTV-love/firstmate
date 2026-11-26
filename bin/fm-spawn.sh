@@ -909,10 +909,16 @@
 #   legacy: this task's directory as a numbered GIT_CONFIG core.hooksPath
 #     entry, verified with `git config --get core.hooksPath` against the same
 #     git; every other launch.
+# Both carriers also add one numbered GIT_CONFIG maintenance.pack-refs.enabled=false
+# entry, so git's own automatic maintenance never packs the loose refs and deletes
+# the empty refs/heads/<prefix> folder a confined worker's next commit cannot
+# create (bin/fm-fleet-sync.sh sets the same key in every clone's own config; a
+# carrier covers only processes that inherit it).
 # Each selection first removes this task's previous carrier of either kind:
 # every exact occurrence of FM_GIT_HOOK_ROWS and of this launch's rows in
-# GIT_CONFIG_PARAMETERS, and every numbered core.hooksPath entry equal to this
-# task's directory, compacting the survivors in order. Unrelated entries,
+# GIT_CONFIG_PARAMETERS, every numbered core.hooksPath entry equal to this
+# task's directory, and every numbered maintenance.pack-refs.enabled entry (so
+# the inner and the outer selection leave exactly one), compacting the survivors in order. Unrelated entries,
 # operator parameters and operator hooksPath overrides stay in the pane and
 # reach the worker by default; an allowlist file instead governs which reach
 # it, and bin/fm-worker-env.py keeps GIT_CONFIG_PARAMETERS and FM_GIT_HOOK_ROWS
@@ -8490,7 +8496,10 @@ fi
 # shellcheck disable=SC2016 # The destination shell expands this function.
 IFS= read -r -d '' GIT_HOOKS_LAUNCH_FUNCTION <<'SH' || true
 fm_launch_git_hooks() {
-  fm_hooks=$1 fm_rows=$2 fm_carrier=$3
+  fm_hooks=$1 fm_rows=$2 fm_carrier=$3 fm_dsh=${4-}
+  if [ -n "$fm_dsh" ]; then
+    fm_rows="$fm_rows 'maintenance.pack-refs.enabled'='false'"
+  fi
   if ! command -v git >/dev/null 2>&1; then
     fm_reason="fm-spawn: git does not resolve on this pane's PATH; refusing to launch a worker without the task Git hooks"
     return 1
@@ -8523,7 +8532,7 @@ fm_launch_git_hooks() {
   fm_i=0 fm_out=0
   while [ "$fm_i" -lt "$fm_count" ]; do
     eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
-    if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
+    if { [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; } && [ "$fm_key" != maintenance.pack-refs.enabled ]; then
       if [ "$fm_i" -ne "$fm_out" ]; then
         export "GIT_CONFIG_KEY_$fm_out=$fm_key" "GIT_CONFIG_VALUE_$fm_out=$fm_value"
       fi
@@ -8531,6 +8540,22 @@ fm_launch_git_hooks() {
     fi
     fm_i=$((fm_i + 1))
   done
+  if [ "$fm_dsh" = inner ]; then
+    fm_i=0
+    while [ "$fm_i" -lt "$fm_out" ]; do
+      eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
+      if [ -n "$fm_key" ]; then
+        fm_key=$(printf '%s' "$fm_key" | sed "s/'/'\\\\''/g")
+        fm_value=$(printf '%s' "$fm_value" | sed "s/'/'\\\\''/g")
+        fm_gcp="${fm_gcp:+$fm_gcp }'$fm_key'='$fm_value'"
+      fi
+      fm_i=$((fm_i + 1))
+    done
+    fm_out=0
+  elif [ -z "$fm_dsh" ]; then
+    export "GIT_CONFIG_KEY_$fm_out=maintenance.pack-refs.enabled" "GIT_CONFIG_VALUE_$fm_out=false"
+    fm_out=$((fm_out + 1))
+  fi
   fm_i=$fm_out
   while [ "$fm_i" -lt "$fm_count" ]; do
     unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
@@ -8557,6 +8582,10 @@ fm_launch_git_hooks() {
       return 0
     fi
   fi
+  if [ -n "$fm_dsh" ]; then
+    fm_reason="fm-spawn: this pane's git has no config-based hooks, and dsh drops every numbered GIT_CONFIG_KEY_n entry from its tools (its credential-name scrub), so the legacy carrier cannot reach a dsh worker; refusing to launch a worker without the task Git hooks"
+    return 1
+  fi
   if [ -n "$fm_gcp" ]; then export GIT_CONFIG_PARAMETERS="$fm_gcp"; else unset GIT_CONFIG_PARAMETERS; fi
   unset FM_GIT_HOOK_ROWS
   export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
@@ -8577,6 +8606,18 @@ GIT_HOOKS_CARRIER=legacy
 case " $GIT_HOOKS_CONFIG_HARNESSES " in
   *" $HARNESS "*) GIT_HOOKS_CARRIER=config ;;
 esac
+# dsh is not in that list because its live proof is pending, but it cannot use the
+# legacy carrier at all: dsh's subprocess scrub removes every environment name that
+# matches /KEY|PASSWORD|SECRET|TOKEN/i, so a numbered GIT_CONFIG_KEY_n vanishes
+# while GIT_CONFIG_COUNT and GIT_CONFIG_VALUE_n stay and every git call in its
+# tools fails. Its launch therefore carries the hook rows, the maintenance key
+# and every numbered pane entry in GIT_CONFIG_PARAMETERS and leaves no numbered
+# entry (see fm_launch_git_hooks); a pane git without config hooks refuses.
+GIT_HOOKS_DSH=
+if [ "$HARNESS" = dsh ]; then
+  GIT_HOOKS_CARRIER=config
+  GIT_HOOKS_DSH=1
+fi
 # git_hooks_guard <inner|outer> <launch text>: the launch text, run only after
 # the selector chose a carrier. On refusal the selector's reason is printed,
 # nothing runs, and the refusal is recorded for spawn_git_hooks_verdict below;
@@ -8584,14 +8625,15 @@ esac
 GIT_HOOKS_VERDICT_REFUSED="$TASK_TMP/git-hooks-refused.$SPAWN_GEN"
 GIT_HOOKS_VERDICT_ADMITTED="$TASK_TMP/git-hooks-admitted.$SPAWN_GEN"
 git_hooks_guard() {
-  local unset_vars='unset fm_hooks fm_rows fm_carrier fm_gcp fm_old fm_count fm_i fm_out fm_key fm_value fm_new fm_cm fm_pp fm_ok fm_mode fm_reason; unset -f fm_launch_git_hooks'
-  local admitted=:
+  local unset_vars='unset fm_hooks fm_rows fm_carrier fm_dsh fm_gcp fm_old fm_count fm_i fm_out fm_key fm_value fm_new fm_cm fm_pp fm_ok fm_mode fm_reason; unset -f fm_launch_git_hooks'
+  local admitted=: dsh_mode=
+  [ -z "$GIT_HOOKS_DSH" ] || dsh_mode=$1
   # shellcheck disable=SC2016 # The destination shell expands these references.
   [ "$1" != inner ] || admitted='{ printf "%s\n" "$fm_mode" > '"$(shell_quote "$GIT_HOOKS_VERDICT_ADMITTED")"'; } 2>/dev/null || :'
   # shellcheck disable=SC2016 # The destination shell expands these references.
-  printf '%s\nfm_reason=\nif fm_launch_git_hooks %s %s %s; then\n%s\n%s\n%s\nelse\nprintf "%%s\\n" "$fm_reason" >&2\n{ printf "%%s\\n" "$fm_reason" > %s; } 2>/dev/null || :\n%s\nfalse\nfi\n' \
+  printf '%s\nfm_reason=\nif fm_launch_git_hooks %s %s %s %s; then\n%s\n%s\n%s\nelse\nprintf "%%s\\n" "$fm_reason" >&2\n{ printf "%%s\\n" "$fm_reason" > %s; } 2>/dev/null || :\n%s\nfalse\nfi\n' \
     "$GIT_HOOKS_LAUNCH_FUNCTION" "$(shell_quote "$GIT_HOOKS_DIR")" "$(shell_quote "$GIT_HOOKS_ROWS")" \
-    "$GIT_HOOKS_CARRIER" "$admitted" "$unset_vars" "$2" \
+    "$GIT_HOOKS_CARRIER" "$(shell_quote "$dsh_mode")" "$admitted" "$unset_vars" "$2" \
     "$(shell_quote "$GIT_HOOKS_VERDICT_REFUSED")" "$unset_vars"
 }
 # A launch the selector refused leaves a bare shell in the endpoint. Wait,

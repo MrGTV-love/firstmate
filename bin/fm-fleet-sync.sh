@@ -20,6 +20,17 @@
 # repository (the firstmate checkout) and be synced under that directory's label.
 # Anything else is reported as "skipped: not a clone root" naming the repository
 # that would have been touched.
+# Every candidate that passes that check, whatever its delivery mode, remote or
+# state, also gets maintenance.pack-refs.enabled=false in its own .git/config,
+# written right after the check and before the registry, local-only, origin and
+# fetch steps (see ensure_pack_refs_key); the whole-fleet form writes the home
+# repository the same way. This is the one writer of the key: git's own automatic
+# maintenance would otherwise pack the loose refs and delete the empty
+# refs/heads/<prefix> folder a confined worker's next commit has no grant to
+# create. A write that fails prints "<label>: warning: could not set
+# maintenance.pack-refs.enabled=false: <first git line>" on stdout, which
+# bin/fm-bootstrap.sh relays, and the sync continues. The prune below restores that
+# folder after a last-ref delete (bin/fm-branch-ref-dirs-lib.sh).
 # Pruning never deletes the checked-out branch or a branch that still has a
 # worktree, so it cannot discard unlanded work; set FM_FLEET_PRUNE=0 to disable it.
 # When the fetch fails on an orphaned .git/packed-refs.lock (left by a ref rewrite
@@ -43,6 +54,8 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 # shellcheck source=bin/fm-lock-lib.sh
 . "$SCRIPT_DIR/fm-lock-lib.sh"
+# shellcheck source=bin/fm-branch-ref-dirs-lib.sh
+. "$SCRIPT_DIR/fm-branch-ref-dirs-lib.sh"
 # Inert unless FM_TIMING_LOG names a file; only the deferred network stage sets it.
 # shellcheck source=bin/fm-timing-lib.sh
 . "$SCRIPT_DIR/fm-timing-lib.sh"
@@ -242,6 +255,31 @@ fetch_with_packed_refs_lock_guard() {
   return "$rc"
 }
 
+# ensure_pack_refs_key <work-tree-root> <label>: put maintenance.pack-refs.enabled=false
+# in the clone's own config (git config --local writes the common .git/config, never
+# a per-worktree file), touching nothing else and rewriting nothing when the single
+# value is already exactly "false". A different value, or several values, is replaced.
+# A failed write is reported on stdout and never stops the caller.
+ensure_pack_refs_key() {
+  local dir=$1 lbl=$2 current out
+  current=$(git -C "$dir" config --local --get-all maintenance.pack-refs.enabled 2>/dev/null) || current=
+  [ "$current" != false ] || return 0
+  if ! out=$(git -C "$dir" config --local --replace-all maintenance.pack-refs.enabled false 2>&1); then
+    echo "$lbl: warning: could not set maintenance.pack-refs.enabled=false: $(first_line "$out")"
+  fi
+  return 0
+}
+
+# ensure_home_pack_refs_key: the same key for the home repository, when $FM_HOME is
+# the root of its own work tree (a plain directory is left alone).
+ensure_home_pack_refs_key() {
+  local top abs
+  top=$(git -C "$FM_HOME" rev-parse --show-toplevel 2>/dev/null) || return 0
+  abs=$(cd "$FM_HOME" && pwd -P) || return 0
+  [ -n "$top" ] && [ "$top" -ef "$abs" ] || return 0
+  ensure_pack_refs_key "$FM_HOME" "firstmate"
+}
+
 prune_gone_branches() {
   # Delete local branches whose upstream tracking branch is gone - the remote
   # branch was deleted, which in this fleet means its PR merged - as long as
@@ -272,6 +310,9 @@ prune_gone_branches() {
     if git -C "$PROJ" branch -D -- "$branch" >/dev/null 2>&1; then
       echo "$label: pruned $branch"
     fi
+    # Deleting the last loose ref under the ship-branch prefix makes git remove the
+    # empty folder; put it back (whether or not this delete succeeded).
+    fm_restore_branch_ref_dirs "$PROJ" "$label"
   done < <(git -C "$PROJ" for-each-ref \
     --format='%(refname:short) %(upstream:track)' refs/heads 2>/dev/null)
 }
@@ -350,6 +391,7 @@ sync_project() {
     echo "$label: skipped: not a clone root (git would act on $proj_top)"
     return 0
   fi
+  ensure_pack_refs_key "$PROJ" "$label"
   if ! mode_line=$("$FM_ROOT/bin/fm-project-mode.sh" "$label" 2>/dev/null); then
     echo "$label: skipped: registry entry does not resolve to a delivery posture (run bin/fm-project-mode.sh $label for the refusal)"
     return 0
@@ -474,6 +516,7 @@ if [ $# -eq 1 ]; then
   exit 0
 fi
 
+ensure_home_pack_refs_key
 [ -d "$PROJECTS" ] || exit 0
 for proj in "$PROJECTS"/*; do
   [ -e "$proj" ] || continue

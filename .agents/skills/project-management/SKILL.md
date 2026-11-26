@@ -66,6 +66,7 @@ A forge composes with `no-mistakes`, `direct-PR`, and `no-mistakes-prod-only`, a
 
 Confirm the source URL, local project name, delivery posture, and autonomy posture, stating the resolved default for each rather than asking the captain to invent one.
 Clone into `projects/<name>` and add the registry entry only after the destination is known to be unused.
+Then run the one step in "After clone or git init" below.
 A `no-mistakes` or `no-mistakes-prod-only` project must have an `origin` remote and must complete the initialization procedure below, because a conditional policy's product-facing work runs the pipeline while its internal-only work still takes the direct PR.
 A `direct-PR` project needs an `origin` remote but skips no-mistakes initialization.
 A `local-only` project may have no remote and skips no-mistakes initialization.
@@ -76,10 +77,16 @@ Confirm the matching CLI is authenticated for a non-GitHub host: `glab auth logi
 Creating a GitHub repository is outward-facing.
 Before making that remote change, propose the repository name, owner or organization, visibility, and delivery posture, defaulting visibility to private and the posture to `no-mistakes-prod-only`, then obtain the captain's explicit consent for those exact values; a stated default never replaces that consent.
 Use `gh-axi` for the approved GitHub operation and consult its current help rather than relying on remembered flags.
-After remote creation succeeds, clone it locally, add the registry entry, and initialize it according to its delivery posture.
+After remote creation succeeds, clone it locally, add the registry entry, run the one step in "After clone or git init" below, and initialize it according to its delivery posture.
 
-For a purely `local-only` project, create a local Git repository under its unused `projects/<name>` path, add the registry entry, and make no GitHub call.
+For a purely `local-only` project, create a local Git repository under its unused `projects/<name>` path, add the registry entry, run the one step in "After clone or git init" below, and make no GitHub call.
 The captain's request to create that local project authorizes this local initialization, but it does not authorize an unmentioned remote repository.
+
+## After clone or git init
+
+Run `bin/fm-fleet-sync.sh <name>` once the clone or `git init` exists and the registry entry is added.
+It is the single writer of `maintenance.pack-refs.enabled=false` in a project clone's own `.git/config`, which stops git's automatic ref packing from deleting the empty ship-branch folder a confined worker's next commit cannot create.
+Its header owns the contract and the warning it prints when the write fails; read that line and resolve it before dispatching work.
 
 ## Initialize
 

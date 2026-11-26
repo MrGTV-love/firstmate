@@ -400,10 +400,23 @@ record="${BASH_SOURCE[0]%/*}/dsh-record"
 [ ! -f "$record" ] || { IFS= read -r log; IFS= read -r repo; } < "$record"
 env > "$log"
 printf '%s\n' "$@" > "$log.args"
+# The environment as launched, and as the real dsh hands it to its tools: dsh's subprocess scrub
+# (@deepseek-ai/dsh-subprocess, scrubbedParentEnv) drops every name matching /KEY|PASSWORD|SECRET|TOKEN/i
+# and every DSH_* name, so a numbered GIT_CONFIG_KEY_n never reaches a tool while GIT_CONFIG_COUNT and
+# GIT_CONFIG_VALUE_n do.
+env -0 > "$log.env0"
+env -0 | while IFS= read -r -d '' entry; do
+  name=${entry%%=*}
+  case "$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]')" in
+    *KEY* | *PASSWORD* | *SECRET* | *TOKEN* | DSH_*) continue ;;
+  esac
+  printf '%s\0' "$entry"
+done > "$log.env0.scrubbed"
 if [ -n "$repo" ]; then
   git -C "$repo" commit --allow-empty -q --no-verify -m probe
   git -C "$repo" log -1 --format=%ae > "$log.author"
   git -C "$repo" config --get core.hooksPath > "$log.hooks"
+  git -C "$repo" hook list commit-msg > "$log.hooklist" 2>&1
 fi
 exit 0
 SH
@@ -608,8 +621,12 @@ $foreign="*|"$foreign="*) fail "the launch must clear the inherited $foreign" ;;
   assert_contains "$(cat "$log.args")" "brief for $id" "the brief must reach dsh-tui as the opening prompt"
   assert_equals "$KNOWN_EMAIL" "$(cat "$log.author")" \
     "a commit under the private HOME must keep the operator's configured git author"
-  assert_contains "$(cat "$log.hooks")" "$id.git-hooks" \
-    "the GIT_CONFIG core.hooksPath guard must survive beside the operator's global git config"
+  # A dsh launch cannot use a numbered entry (dsh's scrub drops the key names), so the task hooks reach it as
+  # config hook rows: the operator's own core.hooksPath stays in force and the task hooks run beside it.
+  assert_contains "$(cat "$log.hooklist")" "fm-scan-commit" \
+    "the task Git hooks must survive, as config hook rows, beside the operator's global git config"
+  assert_not_contains "$(cat "$log.hooks")" "$id.git-hooks" \
+    "a dsh launch must not carry a numbered core.hooksPath entry that dsh's scrub would orphan"
   assert_equals "" "$(sed -n 's/^GIT_CONFIG_GLOBAL=//p' "$log")" \
     "with none exported the launch must not name a global git config file, which would hide the XDG one"
   assert_equals "$real_home/.no-mistakes" "$(sed -n 's/^NM_HOME=//p' "$log")" \
@@ -623,6 +640,69 @@ $foreign="*|"$foreign="*) fail "the launch must clear the inherited $foreign" ;;
   run_recorded_launch "$log" NM_HOME= || fail "the launch with an empty NM_HOME failed"
   assert_equals "$real_home/.no-mistakes" "$(sed -n 's/^NM_HOME=//p' "$log")" "an empty NM_HOME must select the operator's default home"
   pass "fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME"
+}
+
+# dsh's own subprocess scrub removes every environment name that matches KEY, PASSWORD, SECRET or TOKEN
+# (@deepseek-ai/dsh-subprocess, SENSITIVE_ENV_PATTERN), so a numbered GIT_CONFIG_KEY_n never reaches a dsh tool
+# while GIT_CONFIG_COUNT and GIT_CONFIG_VALUE_n do, and every git call there fails ("missing config key").
+# The recorder applies that scrub to the launched environment; the shared check (tests/lib.sh,
+# git_config_env_problems) must then find the environment consistent for a dsh worker and a dsh scout, on the
+# DeepSeek model the fleet runs, with and without a numbered entry already in the pane.
+test_dsh_launch_survives_the_dsh_credential_scrub() {
+  local kind id log values probe
+  for kind in scout ship scout-allowlist; do
+    id="dsh-scrub-$kind"
+    make_dsh_case "scrub-$kind" "$id"
+    if [ "$kind" = scout-allowlist ]; then
+      # The allowlist route: /bin/sh -c with exactly the listed names; the carrier still runs inside it.
+      printf '%s\n' DEEPSEEK_API_KEY GIT_CONFIG_GLOBAL > "$HOME_DIR/config/launch-env-allowlist"
+    fi
+    if [ "$kind" != ship ]; then
+      out=$(run_dsh_spawn "$id" --model "$DSH_MODEL" --scout) || fail "dsh scout spawn failed: $out"
+    else
+      out=$(run_dsh_spawn "$id" --model "$DSH_MODEL" --mode local-only --yolo off) || fail "dsh ship spawn failed: $out"
+    fi
+    probe="$CASE_DIR/probe-repo"
+    for variant in plain pane-entry; do
+      log="$CASE_DIR/dsh-$variant.log"
+      if [ "$variant" = plain ]; then
+        run_recorded_launch "$log" DEEPSEEK_API_KEY=fake-deepseek-sentinel || fail "$kind: the recorded dsh launch failed"
+      else
+        run_recorded_launch "$log" DEEPSEEK_API_KEY=fake-deepseek-sentinel \
+          GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=fetch.prune GIT_CONFIG_VALUE_0=false || fail "$kind: the recorded dsh launch with a pane entry failed"
+      fi
+      assert_git_config_env "$log.env0.scrubbed" "$probe" "dsh $kind ($variant), after dsh's scrub"
+      assert_git_config_env "$log.env0" "$probe" "dsh $kind ($variant), as launched"
+      values=$(git_config_entries "$log.env0.scrubbed" maintenance.pack-refs.enabled)
+      assert_equals false "$values" "dsh $kind ($variant): the scrubbed environment does not hold exactly one maintenance.pack-refs.enabled=false"
+      assert_contains "$(tr '\0' '\n' < "$log.env0.scrubbed" | sed -n 's/^GIT_CONFIG_PARAMETERS=//p')" "hook.fm-scan-commit.event" \
+        "dsh $kind ($variant): the task Git hook rows did not survive dsh's scrub"
+      if [ "$variant" = pane-entry ] && [ "$kind" != scout-allowlist ]; then
+        assert_equals false "$(git_config_entries "$log.env0.scrubbed" fetch.prune)" \
+          "dsh $kind: the pane's numbered fetch.prune entry was lost instead of carried through the scrub"
+      fi
+    done
+  done
+  pass "a dsh worker and a dsh scout keep a consistent git config environment through dsh's credential scrub, carrying the maintenance key, the task hooks and a pane entry as parameter rows"
+}
+
+# The scrub emulation above is only as good as its copy of dsh's rule: when the installed dsh package is
+# present, call its own exported function on a launch-shaped environment and compare the surviving names.
+test_scrub_emulation_matches_the_installed_dsh() {
+  local pkg node out expect
+  node=$(command -v node) || { printf 'pending: node is not installed, so the scrub emulation is not anchored to dsh itself\n'; return; }
+  for pkg in /opt/homebrew/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-subprocess "$HOME"/.dsh/node_modules/@deepseek-ai/dsh-subprocess; do
+    [ -f "$pkg/lib/index.js" ] && break
+    pkg=
+  done
+  [ -n "$pkg" ] || { printf 'pending: the dsh package is not installed here, so the scrub emulation is not anchored to dsh itself\n'; return; }
+  out=$(GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/x GIT_CONFIG_KEY_1=maintenance.pack-refs.enabled GIT_CONFIG_VALUE_1=false \
+    GIT_CONFIG_PARAMETERS="'a.b'='c'" FM_GIT_HOOK_ROWS=x DSH_PROBE=1 SOME_TOKEN=t \
+    "$node" --input-type=module -e "import {scrubbedParentEnv} from '$pkg/lib/index.js'; console.log(Object.keys(scrubbedParentEnv()).filter(k=>/^(GIT_CONFIG_(COUNT|KEY_|VALUE_|PARAMETERS)|FM_GIT_HOOK_ROWS|DSH_PROBE|SOME_TOKEN)/.test(k)).sort().join(' '))") \
+    || fail "the installed dsh package could not be called"
+  expect="FM_GIT_HOOK_ROWS GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_CONFIG_VALUE_0 GIT_CONFIG_VALUE_1"
+  assert_equals "$expect" "$out" "dsh's own scrub no longer treats GIT_CONFIG_* names as this suite's emulation does"
+  pass "dsh's installed scrub drops GIT_CONFIG_KEY_n and keeps GIT_CONFIG_COUNT, GIT_CONFIG_VALUE_n and GIT_CONFIG_PARAMETERS, as the emulation does"
 }
 
 # An operator who keeps git identity only in the XDG git config has no
@@ -1063,6 +1143,8 @@ test_deepseek_spelling_without_a_harness_routes_to_dsh
 test_retired_deepseek_spelling_refuses_before_launch
 test_explicit_harness_is_not_rerouted
 test_launch_environment
+test_dsh_launch_survives_the_dsh_credential_scrub
+test_scrub_emulation_matches_the_installed_dsh
 test_launch_reads_xdg_only_git_config
 test_mirrored_dsh_primary_carries_its_bound_model
 test_secondmate_launch_carries_brief_and_operator_home
