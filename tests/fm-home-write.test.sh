@@ -16,6 +16,7 @@ BIN="$ROOT/bin"
 WRITE="$BIN/fm-home-write.sh"
 
 sha() { if [ -e "$1" ] || [ -L "$1" ]; then shasum -a 256 < "$1" | cut -d' ' -f1; else echo absent; fi; }
+file_mode() { case "$(uname -s)" in Darwin) /usr/bin/stat -f %Lp "$1" ;; *) stat -c %a "$1" ;; esac; }
 
 make_home() {  # <name> [gitignore-body]
   local home="$TMP_ROOT/$1"
@@ -121,7 +122,7 @@ test_existing_needs_replace() {
   chmod 600 "$H/data/existing.md"
   run_write "$H" "replaced" --replace data/existing.md || fail "C8: --replace refused"
   [ "$(cat "$H/data/existing.md")" = replaced ] || fail "C8: replace bytes did not land"
-  [ "$(stat -f %Lp "$H/data/existing.md" 2>/dev/null || stat -c %a "$H/data/existing.md")" = 600 ] || fail "C8: mode not kept"
+  [ "$(file_mode "$H/data/existing.md")" = 600 ] || fail "C8: mode not kept"
   pass "C8-existing-needs-replace"
 }
 
