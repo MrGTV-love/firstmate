@@ -1,0 +1,565 @@
+{
+  "replay_note": "Offline reconstruction from archived HTML plus timestamp sidecars. Same historical sitemap supplied as previous baseline for a no-drift control; absence of drift is relative to this baseline, not evidence of a second dated collection. No prior methodology changes asserted.",
+  "evaluation_inventory": {
+    "advertised": [
+      "artificial-analysis-long-context-reasoning",
+      "frontiercode",
+      "ifbench",
+      "omniscience",
+      "scicode",
+      "terminalbench-2-1",
+      "terminalbench-4-0"
+    ],
+    "last_method_evidence": {
+      "artificial-analysis-long-context-reasoning": {
+        "source": "https://artificialanalysis.ai/evaluations/artificial-analysis-long-context-reasoning",
+        "fetched_at": "2026-10-16T01:17:37Z",
+        "page_sha256": "0c7574b5fc34286eec39df0135a1284093f566d8c9644a48a8854a2e7ae932ae",
+        "datasets": [
+          {
+            "description": "Average cost per task (USD), broken down by input, cache hit, cache write, reasoning, and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-LCR v1.1: Cost per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Write"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Hit"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Input"
+              }
+            ]
+          },
+          {
+            "description": "Independently benchmarked by Artificial Analysis \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-LCR v1.1: Score",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "A A- L C R v1.1"
+              }
+            ]
+          },
+          {
+            "description": "Output tokens used to run one task, broken down by reasoning and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-LCR v1.1: Output Tokens per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              }
+            ]
+          },
+          {
+            "description": "Weighted average decode time (minutes) per task; excludes TTFT and overhead time \u00b7 Lower is better \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-LCR v1.1: Time per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "A A- L C R v1.1 time per task"
+              }
+            ]
+          }
+        ]
+      },
+      "frontiercode": {
+        "source": "https://artificialanalysis.ai/evaluations/frontiercode",
+        "fetched_at": "2026-10-16T01:17:35Z",
+        "page_sha256": "1d099acc9ff99dd1d0ca9ee2edf0652b80f55580917aac1870ef0cc29f8b2dd2",
+        "datasets": [
+          {
+            "description": "Average cost per task (USD), broken down by input, cache hit, cache write, reasoning, and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "FrontierCode 1.1: Cost per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Write"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Hit"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Input"
+              }
+            ]
+          },
+          {
+            "description": "Mean score over three attempts per task (attempts that fail a blocking check or are flagged for looking up the solution score zero) \u00b7 Independently benchmarked by Artificial Analysis \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "FrontierCode 1.1: Score",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Frontier Code 1.1"
+              }
+            ]
+          },
+          {
+            "description": "Output tokens used to run one task, broken down by reasoning and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "FrontierCode 1.1: Output Tokens per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              }
+            ]
+          },
+          {
+            "description": "Weighted average decode time (minutes) per task; excludes TTFT and overhead time \u00b7 Lower is better \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "FrontierCode 1.1: Time per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Frontier Code 1.1 time per task"
+              }
+            ]
+          }
+        ]
+      },
+      "ifbench": {
+        "source": "https://artificialanalysis.ai/evaluations/ifbench",
+        "fetched_at": "2026-10-16T01:17:47Z",
+        "page_sha256": "c90948ad2660530af190cb67ca5dd33bccb97c3a7c9bb35e133c2d9a3f9ea239",
+        "datasets": [
+          {
+            "description": "Average cost per task (USD), broken down by input, cache hit, cache write, reasoning, and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "IFBench: Cost per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Write"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Hit"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Input"
+              }
+            ]
+          },
+          {
+            "description": "Independently benchmarked by Artificial Analysis \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "IFBench: Score",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "I F Bench"
+              }
+            ]
+          },
+          {
+            "description": "Output tokens used to run one task, broken down by reasoning and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "IFBench: Output Tokens per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              }
+            ]
+          },
+          {
+            "description": "Weighted average decode time (minutes) per task; excludes TTFT and overhead time \u00b7 Lower is better \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "IFBench: Time per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "I F Bench time per task"
+              }
+            ]
+          }
+        ]
+      },
+      "omniscience": {
+        "source": "https://artificialanalysis.ai/evaluations/omniscience",
+        "fetched_at": "2026-10-16T01:17:38Z",
+        "page_sha256": "a29c742fb436f9a9bd1c73d67a7eea037ea42a4268cd235bfbeb608be1ba3673",
+        "datasets": [
+          {
+            "description": "AA-Omniscience Accuracy (higher is better) measures the proportion of correctly answered questions out of all questions, regardless of whether the model chooses to answer \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-Omniscience Accuracy",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Omniscience Accuracy"
+              }
+            ]
+          },
+          {
+            "description": "AA-Omniscience Hallucination Rate (lower is better) measures how often the model answers incorrectly when it should have refused or admitted to not knowing the answer. It is defined as the proportion of incorrect answers out of all non-correct responses, i.e. incorrect / (incorrect + partial answers + not attempted) \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-Omniscience Hallucination Rate",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Omniscience Hallucination Rate"
+              }
+            ]
+          },
+          {
+            "description": "AA-Omniscience Index (higher is better) measures knowledge reliability and hallucination. It rewards correct answers, penalizes hallucinations, and has no penalty for refusing to answer. Scores range from -100 to 100, where 0 means as many correct as incorrect answers, and negative scores mean more incorrect than correct. \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-Omniscience Index: Score",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Omniscience Index"
+              }
+            ]
+          },
+          {
+            "description": "AA-Omniscience Index \u00b7 Scores are normalized per domain across all models tested, where green represents the highest score for that domain and red represents the lowest score for that domain. \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-Omniscience Index Across Domains (Normalized)",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Omniscience"
+              }
+            ]
+          },
+          {
+            "description": "Average cost per task (US cents), broken down by input, cache hit, cache write, reasoning, and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-Omniscience: Cost per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Write"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Hit"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Input"
+              }
+            ]
+          },
+          {
+            "description": "Software Engineering AA-Omniscience Index \u00b7 Scores are normalized per language across all models tested, where green represents the highest score for that language and red represents the lowest score for that language. \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Software Engineering AA-Omniscience Index Across Languages (Normalized)",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Omniscience"
+              }
+            ]
+          },
+          {
+            "description": "Tokens used to run the evaluation \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "AA-Omniscience Index: Token Usage",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer Tokens"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning Tokens"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Input Tokens"
+              }
+            ]
+          }
+        ]
+      },
+      "scicode": {
+        "source": "https://artificialanalysis.ai/evaluations/scicode",
+        "fetched_at": "2026-10-16T01:17:39Z",
+        "page_sha256": "db446c8c9510e1a46b7987d0f6cca1d6faece74343fa4c127e0792e938c5f2c5",
+        "datasets": [
+          {
+            "description": "Average cost per task (USD), broken down by input, cache hit, cache write, reasoning, and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "SciCode: Cost per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Write"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Hit"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Input"
+              }
+            ]
+          },
+          {
+            "description": "Benchmark curated by scientists across 16 disciplines. SciCode is under review following an independent audit of the dataset \u00b7 Independently benchmarked by Artificial Analysis \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "SciCode: Score",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Sci Code"
+              }
+            ]
+          },
+          {
+            "description": "Output tokens used to run one task, broken down by reasoning and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "SciCode: Output Tokens per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              }
+            ]
+          },
+          {
+            "description": "Weighted average decode time (minutes) per task; excludes TTFT and overhead time \u00b7 Lower is better \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "SciCode: Time per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Sci Code time per task"
+              }
+            ]
+          }
+        ]
+      },
+      "terminalbench-2-1": {
+        "source": "https://artificialanalysis.ai/evaluations/terminalbench-2-1",
+        "fetched_at": "2026-10-16T01:17:52Z",
+        "page_sha256": "998e0dc96f6db98943a39876d9dda9af4f10c32b08b53b7fc0014750e7b08c03",
+        "datasets": [
+          {
+            "description": "Average cost per task (USD), broken down by input, cache hit, cache write, reasoning, and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Terminal-Bench 2.1: Cost per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Write"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Hit"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Input"
+              }
+            ]
+          },
+          {
+            "description": "Benchmark developed by the Laude Institute and open-source contributors \u00b7 Independently benchmarked by Artificial Analysis \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Terminal-Bench 2.1: Score",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Terminal- Bench 2.1"
+              }
+            ]
+          },
+          {
+            "description": "Output tokens used to run one task, broken down by reasoning and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Terminal-Bench 2.1: Output Tokens per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              }
+            ]
+          },
+          {
+            "description": "Weighted average decode time (minutes) per task; excludes TTFT and overhead time \u00b7 Lower is better \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Terminal-Bench 2.1: Time per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Terminal- Bench 2.1 time per task"
+              }
+            ]
+          }
+        ]
+      },
+      "terminalbench-4-0": {
+        "source": "https://artificialanalysis.ai/evaluations/terminalbench-4-0",
+        "fetched_at": "2026-10-16T01:17:33Z",
+        "page_sha256": "3c35600fdfb9d03103bb2f94a5fe71019c106766fb1d788c0fdbef869cb7b511",
+        "datasets": [
+          {
+            "description": "Average cost per task (USD), broken down by input, cache hit, cache write, reasoning, and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Terminal-Bench 4.0: Cost per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Write"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Cache Hit"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Input"
+              }
+            ]
+          },
+          {
+            "description": "Benchmark developed by the Laude Institute, Stanford, and open-source contributors \u00b7 Independently benchmarked by Artificial Analysis \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Terminal-Bench 4.0: Score",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Terminal- Bench 4.0"
+              }
+            ]
+          },
+          {
+            "description": "Output tokens used to run one task, broken down by reasoning and answer tokens \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Terminal-Bench 4.0: Output Tokens per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Answer"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Reasoning"
+              }
+            ]
+          },
+          {
+            "description": "Weighted average decode time (minutes) per task; excludes TTFT and overhead time \u00b7 Lower is better \u00b7 Evaluation results measured independently by Artificial Analysis",
+            "measurementTechnique": "Independent test run by Artificial Analysis on dedicated hardware.",
+            "name": "Terminal-Bench 4.0: Time per Task",
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Terminal- Bench 4.0 time per task"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "problem": null,
+    "missing_from_sitemap": [],
+    "missing_pages": [
+      "aa-omniscience-decision",
+      "artificial-analysis-cyber-index",
+      "artificial-analysis-decision-index",
+      "cwe-bench-aa",
+      "cybergym-e2e-aa",
+      "deepsecbench-aa",
+      "hle-multichoice",
+      "when2call",
+      "wildguardtest"
+    ],
+    "changed_method_evidence": {},
+    "newly_discovered": []
+  }
+}
