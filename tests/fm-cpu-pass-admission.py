@@ -1738,6 +1738,59 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             for child in (a, b):
                 os.killpg(child.pid, signal.SIGKILL); child.wait()
 
+    def covered_probe(label, starts, recorded, held, wrappers=()):
+        """(the probe's projected bytes, its line, the first start's line) beside STARTS admitted in a checkout on repo/main.
+
+        Run x on repo/main is counted with RECORDED (head_sha, submitted_head_sha), HEAD meaning the checkout's own;
+        HELD None makes x a CI waiter with nothing visible, else x is visible at review holding HELD. Each start is
+        (words, shell): shell runs the words in a bash -c string. {other} names a second registered repository's
+        checkout (repo2/main, no counted run), and NONCE holds a --launch-nonce. Each name in WRAPPERS that is not a
+        program on PATH gets a stand-in that drops its leading options and runs the rest.
+        """
+        folder, db, env = case('r14-' + label, measured=True, available=12 * GIB)
+        checkout = bound_repo(folder, db, env)
+        for name in wrappers:
+            if shutil.which(name, path=env['PATH']) is None:
+                (folder / 'bindbin' / name).write_text(
+                    '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in -*) shift ;; *) break ;; esac; done\nexec "$@"\n')
+                (folder / 'bindbin' / name).chmod(0o700)
+        other = folder / 'other-checkout'
+        subprocess.run(['git', 'init', '-q', '-b', 'main', str(other)], check=True, stdin=subprocess.DEVNULL)
+        change(db, "INSERT INTO repos (id, working_path) VALUES ('repo2', ?)", (str(other),))
+        env['NONCE'] = '--launch-nonce=n1'
+        subprocess.run(['git', '-C', str(checkout), '-c', 'user.name=t', '-c', 'user.email=t@example.invalid',
+                        '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'base'],
+                       check=True, stdin=subprocess.DEVNULL)
+        head = subprocess.run(['git', '-C', str(checkout), 'rev-parse', 'HEAD'], check=True, capture_output=True,
+                              text=True, stdin=subprocess.DEVNULL).stdout.strip()
+        change(db, "INSERT INTO runs (id, status, repo_id, branch, head_sha, submitted_head_sha) VALUES"
+                   " ('x', 'running', 'repo', 'main', ?, ?)", tuple(head if value == 'HEAD' else value for value in recorded))
+        steps(db, [('x', 'ci' if held is None else 'review', 'running', None)])
+        prove(folder, db, 'x')
+        if held is not None:
+            facts(folder, available=12 * GIB, runs=[('repo', 'x', held)])
+        admitted = []
+        for index, (words, shell) in enumerate(starts):
+            name = 'a%d' % index
+            words = [word.replace('{other}', str(other)) for word in words]
+            command = ['bash', '-c', 'sleep 3600; ' + ' '.join(words)] if shell else words
+            admitted.append(launch_in(cli + ['pipeline-start', '--'] + command, env, folder / name, checkout))
+            wait_for(lambda name=name: 'pipeline-start admitted' in (folder / (name + '.stderr')).read_text(),
+                     label + ': ' + name + ' admitted')
+        probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
+        wait_for(lambda: 'projected=' in (folder / 'probe.stderr').read_text(), label + ': the probe decides')
+        text = (folder / 'probe.stderr').read_text()
+        first = (folder / 'a0.stderr').read_text()
+        for child in admitted + [probe]:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            child.wait()
+        covering = 'x:ci-waiting:0:unseen' if held is None else 'x:active:%d' % max(held, GIB)
+        assert covering in text, (label, text)
+        return int(re.search(r'projected=(\d+)', text).group(1)), text, first
+
     def replacing_start_carries_r():
         # R14-1 (R = 3 GiB, S = 8 GiB, A = 1 GiB): run x on repo/main is counted. A start admitted in the checkout on
         # repo/main is covered by x. Only a proven reattach (axi run, no --launch-nonce, HEAD equal to x's head_sha or
@@ -1750,6 +1803,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         # 1 + 2 + 8 = 11, never the double charge 1 + 3 + 8; D = 4 projects 4 + 8 = 12, never 4 + 3 + 8. R16-1: an env -S
         # string expands ${VAR} after the admission splits it, so ${NONCE} there may hide a nonce: 3 + 8. An env -C start
         # is bound to the directory it names: in a second repository with no counted run it is covered by nothing, 3 + 8.
+        # R17-1: an env -S string whose only hiding is an escape (\_) is no proof either, 3 + 8.
         rerun = (['no-mistakes', 'rerun'], True)
         nonce = (['no-mistakes', 'axi', 'run', '--intent', 'hold-a', '--launch-nonce', 'n1'], True)
         plain = (['no-mistakes', 'axi', 'run', '--intent', 'hold-a'], True)
@@ -1757,6 +1811,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         literal = (['no-mistakes', 'axi', 'run', '--intent', 'hold? $x'], False)
         split = (['env', '-S', 'no-mistakes axi run --intent hold-a ${NONCE}'], False)
         elsewhere = (['env', '-C', '{other}', 'no-mistakes', 'axi', 'run', '--intent', 'hold-a'], False)
+        escape = (['env', '-S', 'no-mistakes axi run --intent hold-a\\_--launch-nonce=n1'], False)
         for label, starts, recorded, held, expected, ident in (
                 ('reattach-head', [plain], ('HEAD', None), None, 8, 'r14-proven-reattach-charged'),
                 ('reattach-submitted', [plain], ('0' * 40, 'HEAD'), None, 8, 'r14-proven-reattach-submitted-charged'),
@@ -1767,49 +1822,40 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                 ('argv-characters', [literal], ('HEAD', None), None, 8, 'r15-argv-characters-refused'),
                 ('env-split-nonce', [split], ('HEAD', None), None, 11, 'r16-env-split-proven'),
                 ('env-chdir-elsewhere', [elsewhere], ('HEAD', None), None, 11, 'r16-env-chdir-bound-to-admitting'),
+                ('env-split-escape', [escape], ('HEAD', None), None, 11, 'r17-env-split-escape-proven'),
                 ('two-replacing', [rerun, nonce], ('HEAD', None), None, 11, 'r14-two-replacing-charged-twice'),
                 ('visible-below-r', [rerun], ('HEAD', None), GIB // 2, 11, 'r15-below-r-double-charged'),
                 ('visible-above-r', [rerun], ('HEAD', None), 4 * GIB, 12, 'r15-above-r-double-charged')):
-            folder, db, env = case('r14-' + label, measured=True, available=12 * GIB)
-            checkout = bound_repo(folder, db, env)
-            other = folder / 'other-checkout'
-            subprocess.run(['git', 'init', '-q', '-b', 'main', str(other)], check=True, stdin=subprocess.DEVNULL)
-            change(db, "INSERT INTO repos (id, working_path) VALUES ('repo2', ?)", (str(other),))
-            env['NONCE'] = '--launch-nonce=n1'
-            subprocess.run(['git', '-C', str(checkout), '-c', 'user.name=t', '-c', 'user.email=t@example.invalid',
-                            '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'base'],
-                           check=True, stdin=subprocess.DEVNULL)
-            head = subprocess.run(['git', '-C', str(checkout), 'rev-parse', 'HEAD'], check=True, capture_output=True,
-                                  text=True, stdin=subprocess.DEVNULL).stdout.strip()
-            change(db, "INSERT INTO runs (id, status, repo_id, branch, head_sha, submitted_head_sha) VALUES"
-                       " ('x', 'running', 'repo', 'main', ?, ?)", tuple(head if value == 'HEAD' else value for value in recorded))
-            steps(db, [('x', 'ci' if held is None else 'review', 'running', None)])
-            prove(folder, db, 'x')
-            if held is not None:
-                facts(folder, available=12 * GIB, runs=[('repo', 'x', held)])
-            admitted = []
-            for index, (words, shell) in enumerate(starts):
-                name = 'a%d' % index
-                words = [word.replace('{other}', str(other)) for word in words]
-                command = ['bash', '-c', 'sleep 3600; ' + ' '.join(words)] if shell else words
-                admitted.append(launch_in(cli + ['pipeline-start', '--'] + command, env, folder / name, checkout))
-                wait_for(lambda name=name: 'pipeline-start admitted' in (folder / (name + '.stderr')).read_text(),
-                         label + ': ' + name + ' admitted')
-            probe = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'probe')], env, folder / 'probe')
-            wait_for(lambda: 'projected=' in (folder / 'probe.stderr').read_text(), label + ': the probe decides')
-            text = (folder / 'probe.stderr').read_text()
-            projected = int(re.search(r'projected=(\d+)', text).group(1))
+            projected, text, first = covered_probe(label, starts, recorded, held)
             harm(ident, projected == expected * GIB, label, projected, text)
             if label == 'env-chdir-elsewhere':
-                assert 'start_repo=repo2 start_branch=main' in (folder / 'a0.stderr').read_text(), (folder / 'a0.stderr').read_text()
-            covering = 'x:ci-waiting:0:unseen' if held is None else 'x:active:%d' % max(held, GIB)
-            assert covering in text, (label, text)
-            for child in admitted + [probe]:
-                try:
-                    os.killpg(child.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                child.wait()
+                assert 'start_repo=repo2 start_branch=main' in first, first
+
+    def every_wrapper_hides_no_nonce():
+        # R17-1 (R = 3 GiB, S = 8 GiB), one row per transparent wrapper: from a checkout at the HEAD of counted run x, a
+        # CI waiter charged 0, a start through each wrapper carries --launch-nonce behind it, so it may replace x and the
+        # probe projects 3 + 8, never 0 + 8. A start through env -S is never a proven reattach, whatever its words hold:
+        # env reads \_ as a word break, so an escape-only string hides a nonce in no expansion. A start through env -C or
+        # --chdir is bound to the directory it names: repo2/main, which has no counted run, so 3 + 8. A wrapper added to
+        # the engine's list with no row here fails this case.
+        import importlib.util
+        engine_spec = importlib.util.spec_from_file_location('fm_cpu_pass_wrappers', str(repo / 'bin/fm-cpu-pass.py'))
+        engine = importlib.util.module_from_spec(engine_spec)
+        engine_spec.loader.exec_module(engine)
+        client = ['no-mistakes', 'axi', 'run', '--intent', 'hold-a']
+        rows = {'env': ['env', 'FM_WRAPPED=1'], 'nice': ['nice', '-n', '5'], 'nohup': ['nohup'], 'command': ['command'],
+                'exec': ['exec'], 'time': ['time', '-p'], 'stdbuf': ['stdbuf', '-oL']}
+        assert set(rows) == set(engine.TRANSPARENT), ('a transparent wrapper has no row', sorted(set(engine.TRANSPARENT) ^ set(rows)))
+        cases = [(name, words + client + ['--launch-nonce=n1'], None) for name, words in sorted(rows.items())] + [
+            ('env-S-escape', ['env', '-S', ' '.join(client) + '\\_--launch-nonce=n1'], None),
+            ('env-S-variable', ['env', '-S', ' '.join(client) + ' ${NONCE}'], None),
+            ('env-C', ['env', '-C', '{other}'] + client, 'start_repo=repo2 start_branch=main'),
+            ('env-chdir', ['env', '--chdir={other}'] + client, 'start_repo=repo2 start_branch=main')]
+        for label, command, bound in cases:
+            projected, text, first = covered_probe('wrap-' + label, [(command, False)], ('HEAD', None), None, wrappers=rows)
+            harm('r17-wrapper-%s-proven' % label, projected == 11 * GIB, label, projected, text)
+            if bound is not None:
+                harm('r17-wrapper-%s-bound-to-admitting' % label, bound in first, label, first)
 
     def base_rule_from_line(text):
         """The base rule's decision recomputed from one admission or waiting line alone (P1, LIVE(a)).
@@ -2089,6 +2135,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                        ('Main 3852 every route is charged once', every_route_charged_once),
                        ('P5.lock the named collision under the branch rule', named_collision_branch),
                        ('R14-1 only a proven reattach adds nothing to its covering run', replacing_start_carries_r),
+                       ('R17-1 no transparent wrapper hides a nonce from the charge', every_wrapper_hides_no_nonce),
                        ('P1 the line recomputes the base rule', p1_old_rule_recomputed),
                        ('R16-2 before activation a run is charged max(D, R)', pre_activation_not_stricter),
                        ('P6(a) lines name the checkout, the pool and the start', lines_name_checkout_pool_and_start),

@@ -151,9 +151,9 @@ Pipeline starts:
     the no-mistakes fork (backlog task nm-run-creation-admission).
   - The start lock serializes each decision with the publication of its
     admitted start's pending reservation (a locked pending-*.lock naming the
-    admitting pid, the admitted no-mistakes arguments and whether they were
-    read from text that expands them later (a shell's command string or an
-    env -S string), the running run IDs of the decision and the start's
+    admitting pid, the admitted no-mistakes arguments and where they were
+    read from: real arguments, a shell's command string, which the shell
+    expands later, or an env -S string (ENV_SPLIT), the running run IDs of the decision and the start's
     binding, read from the directory its client runs in: the admitting one, or
     the one env -C/--chdir names), then is released. Every later decision counts each
     admitted start at the full R, and as one run in the count fallback and the
@@ -167,11 +167,11 @@ Pipeline starts:
     it is a proven reattach (proven_reattach): `axi run` with no --launch-nonce
     whose recorded HEAD is the run's head_sha or submitted_head_sha. Every other
     covered start (a rerun, a caller's own --launch-nonce, a HEAD that differs
-    or is not known, a word read from a shell's command string or an env -S
-    string that is expanded later, which may hide a nonce; a word of a real
-    argument vector is never refused for its characters, and every word of a
-    start through env -S is read as expandable, those after its string
-    included, an overcharge never an undercount) may replace the run, whose own charge can be far below R
+    or is not known, a word read from a shell's command string that the shell
+    expands later, which may hide a nonce, and every start through env -S,
+    whose escapes and ${VAR} the admission does not read as env does, whatever
+    its words hold; a word of a real argument vector is never refused for its
+    characters) may replace the run, whose own charge can be far below R
     (a CI waiter is charged what it holds), so the branch carries the larger
     of the run's demand and R, once per branch however many such starts it
     has. The cost: while such a start's command runs, a run it only drives is
@@ -300,7 +300,7 @@ import tempfile
 import subprocess
 import sys
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 try:
     import fcntl  # type: ignore
@@ -877,6 +877,7 @@ PIPELINE_PRIORITIES = ("merge-train", "machinery", "vernant-build", "other")
 HOST_STATE_DB = "~/.no-mistakes/state.sqlite"
 INTENT_OPTIONS = ("--intent", "--intent-file")
 SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
+ENV_SPLIT = "env-S"  # where a start's arguments were read from: an env -S string (start_route; proven_reattach)
 SHELL_OPERATOR_CHARS = "();<>|&\n"
 
 
@@ -939,10 +940,11 @@ def fresh_pipeline_start(command: List[str]) -> bool:
     return start_route(command) is not None
 
 
-def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool, Optional[str]]]:
-    """(no-mistakes arguments, whether another admission route sits in between, whether the arguments were read from
-    text that expands them later (a shell's command string, or an env -S string, which expands ${VAR}), the directory
-    the client runs in relative to this one (env -C/--chdir), or None for this one) of the new run COMMAND begins, or None.
+def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, Union[bool, str], Optional[str]]]:
+    """(no-mistakes arguments, whether another admission route sits in between, where the arguments were read from
+    (False: real arguments; True: a shell's command string, which the shell expands later; ENV_SPLIT: an env -S
+    string, which env reads with its own escapes and ${VAR}, at any depth), the directory the client runs in relative
+    to this one (env -C/--chdir), or None for this one) of the new run COMMAND begins, or None.
 
     Only the executable position counts: leading VAR=value words, the
     transparent wrappers env, nice, nohup, command, exec, time and stdbuf with
@@ -972,7 +974,7 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool, Opt
             fresh = rest[:1] == ["rerun"] or rest[:2] == ["axi", "run"] and any(
                 option in INTENT_OPTIONS or option.startswith(tuple(intent + "=" for intent in INTENT_OPTIONS))
                 for option in rest[2:])
-            return (rest, routed, expanded, chdir) if fresh else None
+            return (rest, routed, ENV_SPLIT if expanded else False, chdir) if fresh else None
         if name in TRANSPARENT:
             operands = wrapper_operands(name, rest)
             if operands is None:
@@ -1006,7 +1008,8 @@ def start_route(command: List[str]) -> Optional[Tuple[List[str], bool, bool, Opt
             found = shell_string_start(string)
             if found is None:
                 return None
-            return found[0], routed or found[1], True, os.path.join(chdir or "", found[3] or "") or None
+            source = ENV_SPLIT if expanded or found[2] == ENV_SPLIT else True
+            return found[0], routed or found[1], source, os.path.join(chdir or "", found[3] or "") or None
         if name in ROUTES:
             if name == "fm-mem-guard.sh" and rest[:2] == ["run", "--"]:
                 words, routed = rest[2:], True
@@ -1055,7 +1058,7 @@ def without_shell_comments(string: str) -> str:
     return "".join(kept)
 
 
-def shell_string_start(string: str) -> Optional[Tuple[List[str], bool, bool, Optional[str]]]:
+def shell_string_start(string: str) -> Optional[Tuple[List[str], bool, Union[bool, str], Optional[str]]]:
     """The first new run one of the simple commands of a shell command string begins, as start_route returns it.
 
     Comments and redirections (an operator with < or >, a file-descriptor number
@@ -2149,15 +2152,17 @@ def proven_reattach(args, shell, binding, heads: frozenset) -> bool:
     """Whether a covered start is proven to reattach to its covering run rather than replace it.
 
     Proof is `axi run` with no --launch-nonce (in either form) whose binding
-    records the HEAD the run records (its head_sha or submitted_head_sha). When
-    SHELL is not False (the arguments were read from text that expands them
-    later, a shell's command string or an env -S string, or the entry does not
-    say), a word holding a character that may expand later ($X, ${X}, a glob, ~)
-    may hide a nonce and is no proof; a word of a real argument vector is never
-    refused for its characters. A rerun, a start whose arguments or HEAD are not
-    known, and a HEAD that differs are no proof.
+    records the HEAD the run records (its head_sha or submitted_head_sha). A
+    start through env -S (SHELL is ENV_SPLIT) is never proof, whatever its words
+    hold: env reads the string with escapes and ${VAR} the admission does not
+    read as env does. When SHELL is otherwise not False (the arguments were read
+    from a shell's command string, or the entry does not say), a word holding a
+    character the shell expands later ($X, a glob, ~) may hide a nonce and is no
+    proof; a word of a real argument vector is never refused for its characters.
+    A rerun, a start whose arguments or HEAD are not known, and a HEAD that
+    differs are no proof.
     """
-    if not isinstance(args, list) or args[:2] != ["axi", "run"]:
+    if not isinstance(args, list) or args[:2] != ["axi", "run"] or shell == ENV_SPLIT:
         return False
     if any(word == "--launch-nonce" or word.startswith("--launch-nonce=")
            or (shell is not False and any(char in word for char in SHELL_EXPANSION_CHARS)) for word in args[2:]):
