@@ -1,0 +1,180 @@
+{
+  "records": [
+    {
+      "id": "aa-lcr",
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/artificial-analysis-long-context-reasoning",
+      "labels": [
+        {
+          "id": 5,
+          "label": "AA-LCR v1.1",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": "1.1",
+          "example": {
+            "slug": "a-x-k2",
+            "source": "comparison-table",
+            "raw": "70%",
+            "value": 0.7,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "frontiercode",
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/frontiercode",
+      "labels": [
+        {
+          "id": 20,
+          "label": "FrontierCode",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": null,
+          "example": {
+            "slug": "claude-fable-5-1",
+            "source": "rendered-chart",
+            "raw": "49.0%",
+            "value": 0.49,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "ifbench",
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/ifbench",
+      "labels": [
+        {
+          "id": 29,
+          "label": "IFBench",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": null,
+          "example": {
+            "slug": "grok-4-20",
+            "source": "rendered-chart",
+            "raw": "81.2%",
+            "value": 0.812,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "omniscience-accuracy",
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/omniscience",
+      "labels": [
+        {
+          "id": 42,
+          "label": "AA-Omniscience Accuracy",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": null,
+          "example": {
+            "slug": "claude-fable-5",
+            "source": "rendered-chart",
+            "raw": "65%",
+            "value": 0.65,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "omniscience-hallucination-rate",
+      "direction": "lower",
+      "source": "https://artificialanalysis.ai/evaluations/omniscience",
+      "labels": [
+        {
+          "id": 43,
+          "label": "AA-Omniscience Hallucination Rate",
+          "unit": null,
+          "scale": "fraction",
+          "version": null,
+          "example": {
+            "slug": "claude-fable-5",
+            "source": "rendered-chart",
+            "raw": "64%",
+            "value": 0.64,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "scicode",
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/scicode",
+      "labels": [
+        {
+          "id": 58,
+          "label": "SciCode",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": null,
+          "example": {
+            "slug": "a-x-k2",
+            "source": "comparison-table",
+            "raw": "41%",
+            "value": 0.41,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "terminal-bench-4-0",
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/terminalbench-4-0",
+      "labels": [
+        {
+          "id": 61,
+          "label": "Terminal-Bench 4.0",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": null,
+          "example": {
+            "slug": "a-x-k2",
+            "source": "comparison-table",
+            "raw": "0%",
+            "value": 0.0,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "terminalbench21",
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/terminalbench-2-1",
+      "labels": [
+        {
+          "id": 62,
+          "label": "Terminal-Bench 2.1",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": null,
+          "example": {
+            "slug": "claude-fable-5-1",
+            "source": "rendered-chart",
+            "raw": "91.4%",
+            "value": 0.914,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ]
+    }
+  ]
+}
