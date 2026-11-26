@@ -1139,7 +1139,75 @@ PY2
   pass "the proof ignores a replace ref that would pass unread side work off as base content"
 }
 
+test_zhipu_glm_family_covers_other_families_and_blocks_self_review() {
+  local case_dir out rc
+  # 1. Legitimate case: zai/glm-5.4 PASS covers an anthropic author group and plan reports zero owed families.
+  case_dir=$(make_case zhipu-covers-anthropic claude-opus-5-5)
+  record_review "$case_dir" "$HEAD1" PASS zai/glm-5.4 '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record zai/glm-5.4 PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 0 "$rc" "zai/glm-5.4 PASS must cover anthropic author group: $out"
+  "$JQ_BIN" -e '.ok == true and .reader_family == "zhipu" and .author_groups.ship[0].family == "anthropic"' \
+    <<<"$out" >/dev/null || fail "expected reader_family=zhipu covering anthropic: $out"
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "plan failed after zai/glm-5.4 PASS"
+  "$JQ_BIN" -e '.uncovered == []' <<<"$out" >/dev/null || fail "plan must report no uncovered groups: $out"
+
+  # 2. Harmful case (same family): glm/zhipu reader MUST NOT cover a glm/zhipu author across route spellings.
+  case_dir=$(make_case zhipu-blocks-self openrouter/z-ai/glm-5.4)
+  record_review "$case_dir" "$HEAD1" PASS zai/glm-5.4 '{"ship":["openrouter/z-ai/glm-5.4"]}' >/dev/null \
+    || fail "record same-family glm PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "zai/glm-5.4 PASS must refuse same-family openrouter/z-ai/glm-5.4 author: $out"
+  expect_not_qualified "$out" "zhipu" "same-family zhipu self-review"
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "plan failed on same-family zhipu"
+  "$JQ_BIN" -e '.uncovered | length == 1 and .[0].families == ["zhipu"]' <<<"$out" >/dev/null \
+    || fail "plan must keep zhipu uncovered after same-family PASS: $out"
+
+  # 3. Unknown boundary: unrecognized models (including prefix collisions like glimpse-1 or z-ai/mystery) stay unknown.
+  case_dir=$(make_case zhipu-keeps-unknown-closed claude-opus-5-5)
+  record_review "$case_dir" "$HEAD1" PASS z-ai/mystery-1 '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record unknown-model PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "z-ai/mystery-1 must remain unknown and refuse coverage: $out"
+  expect_not_qualified "$out" "unknown" "z-ai/mystery-1 unknown reader"
+
+  case_dir=$(make_case zhipu-keeps-prefix-collision-closed claude-opus-5-5)
+  record_review "$case_dir" "$HEAD1" PASS glimpse-1 '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record glimpse-1 PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "glimpse-1 must remain unknown and refuse coverage: $out"
+  expect_not_qualified "$out" "unknown" "glimpse-1 unknown reader"
+
+  # 4. Sensitivity control: removing the zhipu aliases makes zai/glm-5.4 refuse as unknown.
+  local copy="$TMP_ROOT/zhipu-control-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY2' || fail "plant sensitivity control"
+import sys
+p = sys.argv[1]
+s = open(p).read()
+needle = '            "zhipu": "zhipu", "glm": "zhipu", "zai": "zhipu"}'
+assert s.count(needle) == 1, "zhipu family line not found"
+open(p, "w").write(s.replace(needle, '}'))
+PY2
+  case_dir=$(make_case zhipu-control claude-opus-5-5)
+  RECORD="$copy/fm-review-record.py" record_review "$case_dir" "$HEAD1" PASS zai/glm-5.4 '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record control PASS"
+  rc=0
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "control: without zhipu mapping zai/glm-5.4 must refuse as unknown: $out"
+  expect_not_qualified "$out" "unknown" "zhipu control refusal"
+  pass "zhipu/glm family covers other families, refuses same-family self-review, and keeps unknown ids closed"
+}
+
 fm_test_run_cases \
+  test_zhipu_glm_family_covers_other_families_and_blocks_self_review \
   test_carry_over_ignores_a_merge_driver_in_the_task_worktree \
   test_carry_over_ignores_replace_refs \
   test_carry_over_refuses_a_branch_that_is_not_on_the_base \

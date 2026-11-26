@@ -128,10 +128,10 @@ so no worktree config, attribute or merge driver shapes it;
 see docs/configuration.md 'Review carry-over across a
 base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
-xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
-kimi, llama, and the exact native Claude names opus, sonnet, haiku, which are
-deliberately anthropic because Claude records bare model names); route prefixes
-ending in / are dropped. Stored typed family fields
+xai, moonshot, meta, zhipu (aliases claude, gpt, chatgpt, codex, oN, gemini,
+gemma, grok, kimi, llama, glm, zai, and the exact native Claude names opus,
+sonnet, haiku, which are deliberately anthropic because Claude records bare
+model names); route prefixes ending in / are dropped. Stored typed family fields
 never decide independence. Uncovered-group refusals name each uncovered family,
 reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
@@ -220,7 +220,8 @@ FAMILIES = {"anthropic": "anthropic", "claude": "anthropic",
             "openai": "openai", "gpt": "openai", "chatgpt": "openai", "codex": "openai",
             "google": "google", "gemini": "google", "gemma": "google",
             "deepseek": "deepseek", "xai": "xai", "grok": "xai",
-            "moonshot": "moonshot", "kimi": "moonshot", "meta": "meta", "llama": "meta"}
+            "moonshot": "moonshot", "kimi": "moonshot", "meta": "meta", "llama": "meta",
+            "zhipu": "zhipu", "glm": "zhipu", "zai": "zhipu"}
 RECORDED_FAMILIES = set(FAMILIES.values()) | {"unknown"}
 
 
@@ -483,10 +484,11 @@ def derived_authors(home, pr, head, task, base):
                         item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
-                        if provider in RECORDED_FAMILIES - {"unknown"}:
+                        provider_family = FAMILIES.get(provider.casefold()) if isinstance(provider, str) else None
+                        if provider_family in RECORDED_FAMILIES - {"unknown"}:
                             if item["family"] == "unknown":
-                                item["family"] = provider
-                            elif item["family"] != provider:
+                                item["family"] = provider_family
+                            elif item["family"] != provider_family:
                                 item["family"] = "unknown"
                         models.append(item)
     except (sqlite3.Error, OSError):
