@@ -2367,7 +2367,7 @@ def admitted_client_running(holder: int, admitted, exclude: frozenset = frozense
     The client may be the binary itself or a script whose interpreter carries it
     as its first argument. True when the process table, or a live process's
     arguments, cannot be read, so an unreadable fact never stops a start being
-    counted (Main 1712).
+    counted (Main 1712), unless runs_no_client proves that process is none.
     """
     if not isinstance(admitted, list):
         return False
@@ -2390,7 +2390,7 @@ def admitted_client_running(holder: int, admitted, exclude: frozenset = frozense
                 continue
             words = process_argv(child)
             if words is None:
-                if pid_dead(child) is not True:
+                if pid_dead(child) is not True and not runs_no_client(child):
                     return True  # a live process whose arguments cannot be read could be the client
                 continue
             if words and os.path.basename(words[0]) != "no-mistakes" and len(words) > 1 and os.path.basename(words[1]) == "no-mistakes":
@@ -2398,6 +2398,27 @@ def admitted_client_running(holder: int, admitted, exclude: frozenset = frozense
             if words and os.path.basename(words[0]) == "no-mistakes" and same_start_args(admitted, words[1:]):
                 return True
     return False
+
+
+def runs_no_client(pid: int) -> bool:
+    """Whether PID, whose arguments cannot be read, is proven to run no no-mistakes client of this user.
+
+    On Darwin the kernel refuses this user the arguments of a zombie and of a
+    process running as another effective user, such as setuid-root ps, which
+    fm-duration.py runs to sample its command's progress. A zombie has ended;
+    this user's client runs as this user. The residual: a client run as another
+    user (through sudo) inside an admitted command is not seen as its client.
+    False whenever the record cannot be read, and on every other platform.
+    """
+    if sys.platform != "darwin":
+        return False
+    try:
+        import struct
+        info = sibling("fm_proc_info", "fm-proc-info.py")
+        record = info.kinfo(pid)
+        return record[info.P_STAT] == info.SZOMB or struct.unpack_from("I", record, info.E_UID)[0] != os.geteuid()
+    except (OSError, LookupError, ValueError, IndexError, AttributeError, TypeError, struct.error):
+        return False
 
 
 @contextlib.contextmanager

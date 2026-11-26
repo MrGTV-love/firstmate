@@ -101,12 +101,13 @@ def control(condition, *detail):
         raise AssertionError(('control: %r' % (detail,))[:1500])
 
 
-def kinfo(pid, parent, start_us, traced=False):
+def kinfo(pid, parent, start_us, traced=False, uid=None):
     data = bytearray(proc.KINFO_SIZE)
     struct.pack_into('qq', data, proc.P_START, start_us // 1000000, start_us % 1000000)
     struct.pack_into('i', data, proc.P_PID, pid)
     struct.pack_into('i', data, proc.E_PPID, parent)
     struct.pack_into('i', data, proc.P_FLAG, 0x800 if traced else 0)
+    struct.pack_into('I', data, proc.E_UID, os.geteuid() if uid is None else uid)  # a case process runs as this user unless told
     data[proc.P_STAT] = 2
     return bytes(data)
 
@@ -202,7 +203,7 @@ class World:
             for pid, (from_read, facts) in getattr(self, 'scheduled', {}).items():
                 if self.table_reads >= from_read:
                     self.processes[pid] = facts  # a process that exists from that census on
-            return b''.join(kinfo(pid, p['parent'], p['start'], p.get('traced', False)) for pid, p in self.processes.items()) + self.tail
+            return b''.join(kinfo(pid, p['parent'], p['start'], p.get('traced', False), p.get('uid')) for pid, p in self.processes.items()) + self.tail
         if mib[:3] == (proc.CTL_KERN, proc.KERN_PROC, proc.KERN_PROC_PID) and mib[3] in self.processes:
             p = self.processes[mib[3]]
             confirm = p.get('confirm')
@@ -212,7 +213,7 @@ class World:
                 return b'X'
             if confirm == 'oversize':
                 return kinfo(mib[3], p['parent'], p['start']) + b'\0' * 16  # a longer answer than one record
-            return kinfo(mib[3], p['parent'], p['start'] + (1 if confirm == 'other' else 0), p.get('traced', False))
+            return kinfo(mib[3], p['parent'], p['start'] + (1 if confirm == 'other' else 0), p.get('traced', False), p.get('uid'))
         if mib[:2] == (proc.CTL_KERN, proc.KERN_PROCARGS2) and mib[2] in self.argv:
             argc, words = self.argv[mib[2]]
             return struct.pack('i', argc) + b'/bin/fake\0\0' + b''.join(w.encode() + b'\0' for w in words)
@@ -667,7 +668,10 @@ def m1759_completed_first_run():
         w = pending_world('m1759-completed-' + label)
         w.pending(dict(holder=os.getppid(), args=args, before=[], created_ns=time.time_ns() - 10 ** 9))
         if completed:
-            w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('first', 'completed', 'repo', ?)", (NOW,))
+            # Created after the admission, at this case's own time: the file-level NOW is the suite's start, which is
+            # before this admission once earlier cases take more than a second, and such a row is no client of it.
+            w.sql("INSERT INTO runs (id, status, repo_id, created_at) VALUES ('first', 'completed', 'repo', ?)",
+                  (int(time.time()),))
         engine.HOST_STATE_DB = str(w.db)
         engine.sibling = lambda module, filename: proc
         got = engine.claim_round(str(w.pool), args, True)
@@ -1333,17 +1337,20 @@ def m1876_short_argv():
     # Finding 6: a process below the holder 4242 whose argument record declares 5 words and carries 2 is unknown (it
     # could be the admitted client): the enclosing entry is counted, 11 against 10 waits. Read as a shorter, nonmatching
     # list, the entry is skipped and 8 admits. Controls: its whole record, not the client: skipped, 8 admits; the whole
-    # record of the client: counted, 11 waits.
+    # record of the client: counted, 11 waits. The kernel refuses this user the arguments of a process running as another
+    # user (setuid-root ps, which fm-duration.py runs to sample progress): this user's client runs as this user, so that
+    # process is no client: skipped, 8 admits; the same-user 'short' case is its control.
     args = ['axi', 'run', '--intent', 'x']
     for label, record in (('short', (5, ['no-mistakes', 'axi'])), ('other', (1, ['bash'])),
-                          ('client', (5, ['no-mistakes'] + args))):
-        w = World('m1876-argv-' + label, available=10).process(777, parent=4242, start=101000000)
+                          ('client', (5, ['no-mistakes'] + args)), ('other-user', (5, ['no-mistakes', 'axi']))):
+        uid = 0 if label == 'other-user' else None
+        w = World('m1876-argv-' + label, available=10).process(777, parent=4242, start=101000000, uid=uid)
         w.real_argv = True
         w.argv[777] = record
         w.pending(dict(holder=4242, args=args, before=[], created_ns=1))
         if label == 'short':
             below_holder(4242, lambda: waits('m1876-short-argv', w, 11))
-        elif label == 'other':
+        elif label in ('other', 'other-user'):
             below_holder(4242, lambda: admits(w, 8))
         else:
             below_holder(4242, lambda: waits('m1876-short-argv-control', w, 11))

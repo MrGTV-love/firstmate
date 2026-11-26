@@ -1784,7 +1784,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
         for child in admitted + [probe]:
             try:
                 os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):  # macOS answers EPERM for a group whose one process exited unreaped
                 pass
             child.wait()
         covering = 'x:ci-waiting:0:unseen' if held is None else 'x:active:%d' % max(held, GIB)
