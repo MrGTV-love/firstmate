@@ -1,0 +1,157 @@
+################ head (8ab34cf12) / differ
+scenario=differ
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=0
+--- stderr/stdout of fm_slot_provision
+{"state": "PASS", "manifest_path": "$LAB/manifest.json", "worktree_path": "$LAB/task copy", "owner_id": "task-1", "branch": "fm/task-1", "base_sha": "08ea52bb9772029df3ef60df886c3cbc92afc9ec", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+--- execution record (which provisioner ran, with argv)
+{"identity": "A", "argv": ["/Users/charlesabrooker/tmp/fm-slot-export.KfqvTc/scripts/git-stability/provision_existing_slot.py", "--repo-root", "$LAB/project", "--worktree-path", "$LAB/task copy", "--owner-id", "task-1", "--branch", "fm/task-1", "--base-sha", "08ea52bb9772029df3ef60df886c3cbc92afc9ec", "--owned-path", "README.md", "--owned-path", "scripts"]}
+--- manifest written: yes
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=1
+
+################ base (992eb720f) / differ
+scenario=differ
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=0
+--- stderr/stdout of fm_slot_provision
+{"state": "PASS", "manifest_path": "$LAB/manifest.json", "worktree_path": "$LAB/task copy", "owner_id": "task-1", "branch": "fm/task-1", "base_sha": "f8fabd91d11c64133cff7504a02bdaee364efbeb", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+--- execution record (which provisioner ran, with argv)
+{"identity": "B", "argv": ["$LAB/task copy/scripts/git-stability/provision_existing_slot.py", "--repo-root", "$LAB/project", "--worktree-path", "$LAB/task copy", "--owner-id", "task-1", "--branch", "fm/task-1", "--base-sha", "f8fabd91d11c64133cff7504a02bdaee364efbeb", "--owned-path", "README.md", "--owned-path", "scripts"]}
+--- manifest written: yes
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=1
+
+################ head (8ab34cf12) / stale-copy
+scenario=stale-copy
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=0
+--- stderr/stdout of fm_slot_provision
+{"state": "PASS", "manifest_path": "$LAB/manifest.json", "worktree_path": "$LAB/task copy", "owner_id": "task-1", "branch": "fm/task-1", "base_sha": "7c1d42f7594db88c159542f20027f0ca286ad6b4", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+--- execution record (which provisioner ran, with argv)
+{"identity": "A", "argv": ["/Users/charlesabrooker/tmp/fm-slot-export.2YIB9j/scripts/git-stability/provision_existing_slot.py", "--repo-root", "$LAB/project", "--worktree-path", "$LAB/task copy", "--owner-id", "task-1", "--branch", "fm/task-1", "--base-sha", "7c1d42f7594db88c159542f20027f0ca286ad6b4", "--owned-path", "README.md", "--owned-path", "scripts"]}
+--- manifest written: yes
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=1
+
+################ base (992eb720f) / stale-copy
+scenario=stale-copy
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=2
+--- stderr/stdout of fm_slot_provision
+{"state": "BLOCKED", "reason": "stale_copy_guard"}
+error: slot provisioner refused task task-1 (exit 2); no agent or ship transition admitted; the copy is left exactly where it is (refs/heads/fm/task-1 at 12f3e0fd5fcd29d8430ac3c3e6ed452ea6d76acc); report: $LAB/report
+--- execution record (which provisioner ran, with argv)
+{"identity": "B", "argv": ["$LAB/task copy/scripts/git-stability/provision_existing_slot.py", "--repo-root", "$LAB/project", "--worktree-path", "$LAB/task copy", "--owner-id", "task-1", "--branch", "fm/task-1", "--base-sha", "8a0752498ae767b95b9034d5d5469d9d5c728aa1", "--owned-path", "README.md", "--owned-path", "scripts"]}
+--- manifest written: no
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=0
+
+################ head (8ab34cf12) / copy-missing
+scenario=copy-missing
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=0
+--- stderr/stdout of fm_slot_provision
+{"state": "PASS", "manifest_path": "$LAB/manifest.json", "worktree_path": "$LAB/task copy", "owner_id": "task-1", "branch": "fm/task-1", "base_sha": "4429ac5c2461c2caf3e0743166b998b21a263319", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+--- execution record (which provisioner ran, with argv)
+{"identity": "A", "argv": ["/Users/charlesabrooker/tmp/fm-slot-export.tY3Yr6/scripts/git-stability/provision_existing_slot.py", "--repo-root", "$LAB/project", "--worktree-path", "$LAB/task copy", "--owner-id", "task-1", "--branch", "fm/task-1", "--base-sha", "4429ac5c2461c2caf3e0743166b998b21a263319", "--owned-path", "README.md", "--owned-path", "scripts"]}
+--- manifest written: yes
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=1
+
+################ base (992eb720f) / copy-missing
+scenario=copy-missing
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=1
+--- stderr/stdout of fm_slot_provision
+error: slot provisioner is missing from assigned copy $LAB/task copy
+--- execution record (which provisioner ran, with argv)
+(none ran)
+--- manifest written: no
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=0
+
+################ head (8ab34cf12) / recovery-copy-missing
+scenario=recovery-copy-missing
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=1
+--- stderr/stdout of fm_slot_provision
+error: slot provisioner is missing from assigned copy $LAB/task copy
+--- execution record (which provisioner ran, with argv)
+(none ran)
+--- manifest written: no
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=0
+
+################ base (992eb720f) / recovery-copy-missing
+scenario=recovery-copy-missing
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=1
+--- stderr/stdout of fm_slot_provision
+error: slot provisioner is missing from assigned copy $LAB/task copy
+--- execution record (which provisioner ran, with argv)
+(none ran)
+--- manifest written: no
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=0
+
+################ head (8ab34cf12) / missing-clone
+scenario=missing-clone
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=1
+--- stderr/stdout of fm_slot_provision
+error: slot provisioner is missing from project clone $LAB/project: $LAB/project/scripts/git-stability/provision_existing_slot.py; provisioning refused; run fleet sync
+--- execution record (which provisioner ran, with argv)
+(none ran)
+--- manifest written: no
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=0
+
+################ base (992eb720f) / missing-clone
+scenario=missing-clone
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=0
+--- stderr/stdout of fm_slot_provision
+{"state": "PASS", "manifest_path": "$LAB/manifest.json", "worktree_path": "$LAB/task copy", "owner_id": "task-1", "branch": "fm/task-1", "base_sha": "a8a741e6094ec9e9e8e5d54aa21a8ea306a3fc64", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+--- execution record (which provisioner ran, with argv)
+{"identity": "B", "argv": ["$LAB/task copy/scripts/git-stability/provision_existing_slot.py", "--repo-root", "$LAB/project", "--worktree-path", "$LAB/task copy", "--owner-id", "task-1", "--branch", "fm/task-1", "--base-sha", "a8a741e6094ec9e9e8e5d54aa21a8ea306a3fc64", "--owned-path", "README.md", "--owned-path", "scripts"]}
+--- manifest written: yes
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=1
+
+################ head (8ab34cf12) / lagging-clone
+scenario=lagging-clone
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=1
+--- stderr/stdout of fm_slot_provision
+error: slot provisioner $LAB/project/scripts/git-stability/provision_existing_slot.py differs from fetched origin version refs/remotes/origin/main:scripts/git-stability/provision_existing_slot.py; provisioning refused; run fleet sync
+--- execution record (which provisioner ran, with argv)
+(none ran)
+--- manifest written: no
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=0
+
+################ base (992eb720f) / lagging-clone
+scenario=lagging-clone
+clone=$LAB/project
+copy=$LAB/task copy
+fm_slot_provision rc=0
+--- stderr/stdout of fm_slot_provision
+{"state": "PASS", "manifest_path": "$LAB/manifest.json", "worktree_path": "$LAB/task copy", "owner_id": "task-1", "branch": "fm/task-1", "base_sha": "e15cc4b52eb45ead5ea6d2d2261ca776df99e29d", "owned_paths": ["README.md", "scripts"], "lifecycle_state": "worktree_active"}
+--- execution record (which provisioner ran, with argv)
+{"identity": "B", "argv": ["$LAB/task copy/scripts/git-stability/provision_existing_slot.py", "--repo-root", "$LAB/project", "--worktree-path", "$LAB/task copy", "--owner-id", "task-1", "--branch", "fm/task-1", "--base-sha", "e15cc4b52eb45ead5ea6d2d2261ca776df99e29d", "--owned-path", "README.md", "--owned-path", "scripts"]}
+--- manifest written: yes
+--- copy HEAD/branch/refs unchanged: yes
+--- FM_SLOT_PROVISIONED=1
+
