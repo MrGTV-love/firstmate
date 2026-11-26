@@ -1,0 +1,13 @@
+# record reset to the prior record so the write has work to do
+# S11: SIGTERM while the archive is staged (before publish) -> nothing published
+# archive mktemp reached (RERECORD_STAGE=staged, before publish); sending TERM to pid 60047
+r3-drive.sh: line 97: 60047 Terminated: 15          PATH="$FB:$PATH" FM_LAB_FAULT=$FAULT FM_LAB_FAULT_DIR=$FM_HOME "$C" rrt rerecord-slot --manifest-sha "$(msha)" --note "$NOTE" > "$FM_HOME/s11.out" 2>&1
+rc=143
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+record unchanged
+audits: before=5 after=5
+no staged leftovers in state/

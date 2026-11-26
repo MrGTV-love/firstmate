@@ -1,0 +1,7 @@
+ok - SF4-head-unrestored: the restore after a failed post-publish check cannot stage: the run says it published, that the prior record could not be restored, and names the archive; the record holds the staged bytes
+ok - SF4-head-restore-publish: the restore publish after a failed post-publish check fails: the rollback names its error, and the run's outcome line is printed once
+ok - L20: step 3 closes a first audit as superseded-other, then the second's resumed restore fails: the stop names the first audit
+ok - S7-R1b: defense-in-depth observation recorded
+ok - S20: R9d with publishing mapped to rollback: the trap rolls back, the pending mv lands, staged bytes stand under a rolled-back audit record
+ok - S22: R9e with committing mapped to rollback: the trap restores P, the late commit rename lands, P stands under a published audit record
+rc=0

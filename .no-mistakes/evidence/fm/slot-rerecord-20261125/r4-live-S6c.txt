@@ -1,0 +1,6 @@
+# S6c: renewal owned by another task -> refused
+renewed: owner=other-task base=3457450d92edda156036885b53d7dc526119fac6 scope=src lib tools
+$ fm-control.sh rrt rerecord-slot --manifest-sha 7f3e3d13c3f903a6bc1c0b32ed34fa343f6dee0dafeb36739c408003aa4f0674 --note Lab ruling: re-record after the slot renewal
+error: slot rerecord refused: owner_mismatch: manifest owner is 'other-task', the task is 'rrt'; no record, manifest, copy or journal was changed
+rc=1
+record unchanged

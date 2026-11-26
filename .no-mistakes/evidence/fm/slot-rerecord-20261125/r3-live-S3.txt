@@ -1,0 +1,11 @@
+# S3: write with a wrong --manifest-sha
+$ fm-control.sh rrt rerecord-slot --manifest-sha 0000000000000000000000000000000000000000000000000000000000000000 --note Lab ruling: re-record after the slot renewal
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: manifest_sha_mismatch: the manifest sha256 is 9bbca5282dc1fcdb6f0223022503e5f6d37c4eea08fe28751ee165806d3d0907, but --manifest-sha names 0000000000000000000000000000000000000000000000000000000000000000; review the manifest again and bind the digest fm-control.sh <id> rerecord-slot --check prints; no record, manifest, copy or journal was changed
+rc=1
+record unchanged
+audit dir: ls: /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord: No such file or directory

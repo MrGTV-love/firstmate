@@ -1,0 +1,16 @@
+ok - ORACLE: rec_inventory catches a same-byte rewrite and a created-then-deleted archive
+ok - JOURNAL-CLASSES: every class of fm_control_relaunch_journal_verdict
+ok - L1: exit 0; slot_lines are M1 and the manifest scope; one archive equal to the prior record; audit published; labels as frozen
+ok - L2: exit 0 as L1; journal bytes unchanged
+ok - L3: second exit 0 already recorded; rec_inventory unchanged; one archive and one audit record
+ok - L4: --check exit 0 with the frozen lines; rec_inventory, journal and manifest unchanged; send-keys empty
+ok - L4b: --check with a live spawn-lock holder exits 0 advisory: launch_proof=launch_in_progress, write_would=refuse:launch_in_progress; holder keeps the lock
+ok - L5: exit 0; released_scope=src printed and in the audit record
+ok - L6: side_branch_only=tools/y.sh paths=1/1 and side_branch_mixed=lib paths=1/2 in --check and in the audit record; none for tools/x.sh or src
+ok - L7: exit 0; added_scope=tools/sub rule=c
+ok - L8: exit 0 already recorded; rec_inventory unchanged; no archive or audit record
+ok - L9: --check and write exit 0 already recorded with journal_proof=failed-open and stopped_proof=ok; nothing written
+ok - L9b: --check and write exit 0 already recorded with journal_proof=complete and stopped_proof=agent_not_proven_stopped; --check predicts write_would=already recorded; nothing written; send-keys empty
+ok - L10: exit 0 as L1; journal and .meta-prior unchanged; published lines are the renewal's
+ok - L11: uncommitted_newly_covered=1 and added_uncommitted_newly_covered=1 in the output and audit record; copy unchanged
+ok - L12: exit 0 as L10 over a dead holder's spawn lock; no spawn lock remains

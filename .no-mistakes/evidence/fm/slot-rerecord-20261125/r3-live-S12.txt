@@ -1,0 +1,31 @@
+# re-record (fault-free) before the relaunch
+$ fm-control.sh rrt rerecord-slot --manifest-sha <sha> --note ...
+rerecord-slot rrt: base 5b6b98762a3459c038c2fdd5c7d2e836ed31dec1 -> df8ab23e358ee5543501456d9d56c3bdf219c11b; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/prior-meta.20261126T043024Z.7d54bc32ddef.0
+# S12: relaunch after rerecord is admitted (endpoint: a plain shell pane in fmlab:fm-rrt)
+fmlab:fm-rrt cmd=bash
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/projects/manifests/manifest.json
+slot_base_sha=df8ab23e358ee5543501456d9d56c3bdf219c11b
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+$ fm-control.sh rrt relaunch --note resume after slot renewal
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89W4CZM5PXRFWG112YQ3V2Q/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/launch-brief.md records no ship branch; defaulting to legacy branch fm/rrt
+warning: /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for rrt: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched rrt harness=claude from=claude model=default effort=default backend=tmux endpoint=fmlab:fm-rrt worktree=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/projects/wt
+rc=0
+fmlab:fm-rrt cmd=bash
+# lab tmux server stopped: no server running on /private/tmp/tmux-501/default

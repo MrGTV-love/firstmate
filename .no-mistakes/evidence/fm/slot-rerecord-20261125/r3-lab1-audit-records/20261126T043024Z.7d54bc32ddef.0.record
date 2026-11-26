@@ -1,0 +1,20 @@
+v1
+result=published
+archive=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/prior-meta.20261126T043024Z.7d54bc32ddef.0
+task=rrt
+prior_sha256=7d54bc32ddef3d55dbb940882511755e49604047037829162c638250855c274a
+staged=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/state/.rrt.meta.rerecord.XqJaVU
+staged_sha256=b504b9fbdcb58a8267cac4abb9678beb46ea9186cfe000c373411e7ca3fef57a
+prior_block_sha256=7c99c308d6c89aca05a63541128e06c9b92324d3944ab6e24bdeec66f0b81567
+staged_block_sha256=67cd905ce818eb4fb9587c19a7de2fc45a2af0e969d6f2107715de5132525940
+manifest=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/projects/manifests/manifest.json
+manifest_sha256=151f0c3281a1ab2b4160bc5e256ac09b860376609faa36faad7c77d0b3ce71a5
+old_base=5b6b98762a3459c038c2fdd5c7d2e836ed31dec1
+new_base=df8ab23e358ee5543501456d9d56c3bdf219c11b
+head=3a4fe9067ba843b08d17ce6e129ac1da61d57dc8
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+note="Lab ruling: re-record after the slot renewal"

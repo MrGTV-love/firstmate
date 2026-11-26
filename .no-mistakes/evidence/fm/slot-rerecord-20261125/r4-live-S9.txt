@@ -1,0 +1,19 @@
+# S9: step 3 closes a first audit (superseded-other), then the resumed restore of a crashed write fails (fault: restore)
+# simulated SIGKILL after publish: 20261126T062142Z.152bdc03fbca.0.record result=pending
+# copy HEAD moved inside scope to 2388300
+# audits before:
+  0-first.record: result=pending
+  20261126T060716Z.152bdc03fbca.0.record: result=published
+  20261126T061654Z.152bdc03fbca.0.record: result=published-recovered
+  20261126T062142Z.152bdc03fbca.0.record: result=pending
+$ [PATH fault: restore] fm-control.sh rrt rerecord-slot --manifest-sha f115c6270dfd605334b62e33ef4516c463a98f5e4ebafe0682205ad586b1a1d0 --note Lab ruling: re-record after the slot renewal
+lab-fault: mktemp /Users/charlesabrooker/tmp/fm-lab.IbTtp1/state/.rrt.meta.rerecord-restore.XXXXXX
+error: could not stage the restore of task rrt's record; the prior record is archived at /Users/charlesabrooker/tmp/fm-lab.IbTtp1/data/rrt/slot-rerecord/prior-meta.20261126T062142Z.152bdc03fbca.0
+error: before stopping, this run reconciled earlier interrupted runs: audit /Users/charlesabrooker/tmp/fm-lab.IbTtp1/data/rrt/slot-rerecord/0-first.record superseded-other (the audit was closed with the task record left unchanged); no manifest, copy or journal was changed
+rc=1
+# audits after:
+  0-first.record: result=superseded-other
+  20261126T060716Z.152bdc03fbca.0.record: result=published
+  20261126T061654Z.152bdc03fbca.0.record: result=published-recovered
+  20261126T062142Z.152bdc03fbca.0.record: result=rolling-back
+count 'reconciled earlier interrupted runs'=1  'this run stopped'=0

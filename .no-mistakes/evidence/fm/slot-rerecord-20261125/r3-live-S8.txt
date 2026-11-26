@@ -1,0 +1,48 @@
+# S8: own publish, then the audit commit fails, then the restore cannot stage (fault: commit+restore)
+# record reset to the S7 archive (prior slot lines):
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/projects/manifests/manifest.json
+slot_base_sha=5b6b98762a3459c038c2fdd5c7d2e836ed31dec1
+slot_owned_path=src
+$ [PATH fault: commit+restore] fm-control.sh rrt rerecord-slot --manifest-sha 151f0c3281a1ab2b4160bc5e256ac09b860376609faa36faad7c77d0b3ce71a5 --note Lab ruling: re-record after the slot renewal
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+lab-fault: mktemp /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/.audit.XXXXXX
+lab-fault: mktemp /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/.audit.XXXXXX
+warning: the audit record /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/20261126T041256Z.7d54bc32ddef.0.record could not be marked rolling-back
+lab-fault: mktemp /Users/charlesabrooker/tmp/fm-lab.zYMxI5/state/.rrt.meta.rerecord-restore.XXXXXX
+error: could not stage the restore of task rrt's record; the prior record is archived at /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/prior-meta.20261126T041256Z.7d54bc32ddef.0
+error: this run published task rrt's record and the prior record could not be restored; it is archived at /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/prior-meta.20261126T041256Z.7d54bc32ddef.0; the audit record /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/20261126T041256Z.7d54bc32ddef.0.record is pending; no manifest, copy or journal was changed
+rc=1
+new audit 20261126T041256Z.7d54bc32ddef.0.record: result=pending
+record holds this run's staged bytes (publish landed, restore failed)
+count 'could not be restored'=1  'this run stopped'=0  'reconciled earlier interrupted runs'=0
+# next write run without the fault reconciles it:
+$ fm-control.sh rrt rerecord-slot --check
+pending_audit=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/20261126T041256Z.7d54bc32ddef.0.record result=pending state=untouched-staged
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+manifest_sha256=151f0c3281a1ab2b4160bc5e256ac09b860376609faa36faad7c77d0b3ce71a5
+base=df8ab23e358ee5543501456d9d56c3bdf219c11b -> df8ab23e358ee5543501456d9d56c3bdf219c11b
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+verdict_basis=pre-reconcile: the proof lines and the base and scope lines describe the current record before reconciliation; run --check again after a write run reconciles 20261126T041256Z.7d54bc32ddef.0.record to see the verdict it would then reach
+write_would=reconcile-pending:20261126T041256Z.7d54bc32ddef.0.record
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha 151f0c3281a1ab2b4160bc5e256ac09b860376609faa36faad7c77d0b3ce71a5 --note '<the ruling this carries out>'
+rc=0
+$ fm-control.sh rrt rerecord-slot --manifest-sha 151f0c3281a1ab2b4160bc5e256ac09b860376609faa36faad7c77d0b3ce71a5 --note Lab ruling: re-record after the slot renewal
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+rerecord-slot rrt: already recorded
+rerecord-slot rrt: before finding it already recorded, this run reconciled earlier interrupted runs: audit /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/20261126T041256Z.7d54bc32ddef.0.record published-recovered (the audit was closed with the record left as published); no manifest, copy or journal was changed
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+rc=0
+  20261126T040834Z.7d54bc32ddef.0.record: result=published
+  20261126T041256Z.7d54bc32ddef.0.record: result=published-recovered

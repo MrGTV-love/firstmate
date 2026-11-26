@@ -1,0 +1,12 @@
+# S1: relaunch before rerecord, after the project renewed the slot (base M1, scope src+lib+tools/x.sh)
+renewed: owner=rrt base=df8ab23e358ee5543501456d9d56c3bdf219c11b scope=src lib tools/x.sh
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/projects/manifests/manifest.json
+slot_base_sha=5b6b98762a3459c038c2fdd5c7d2e836ed31dec1
+slot_owned_path=src
+$ fm-control.sh rrt relaunch --note resume after slot renewal
+error: slot adoption refused: base_mismatch: manifest base is 'df8ab23e358ee5543501456d9d56c3bdf219c11b', the recorded base is '5b6b98762a3459c038c2fdd5c7d2e836ed31dec1'; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task rrt: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fm-lab.zYMxI5/projects/wt; preserve and reconcile it first (a base_mismatch or scope_mismatch after the durable slot record was renewed is re-recorded with fm-control.sh rrt rerecord-slot --check, then without --check); the running agent was not stopped
+rc=1
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/projects/manifests/manifest.json
+slot_base_sha=5b6b98762a3459c038c2fdd5c7d2e836ed31dec1
+slot_owned_path=src

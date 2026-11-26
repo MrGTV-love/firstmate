@@ -1,0 +1,24 @@
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Fzf58I TMUX_TMPDIR=/tmp/fml.CzfhKB target=8be7324deedb28940801dd185b76a14d67e96d8e
+lock acquired: harness pid 15195
+# fixture task rrt built
+renewed: owner=rrt base=cfb184b8e2eb863f443f4c525325748db51eef86 scope=src lib tools/x.sh
+# record still names the old base, so a write is needed:
+slot_base_sha=b3346071bfcd60b20c6911d573c865bf43ddec25
+# S11: SIGTERM while the archive is staged (before publish) -> nothing published
+# archive mktemp reached (RERECORD_STAGE=staged, before publish); sending TERM to pid 73315
+/Users/charlesabrooker/.no-mistakes/evidence/01M89W4CZM5PXRFWG112YQ3V2Q/r4-drive.sh: line 101: 73315 Terminated: 15          PATH="$FB:$PATH" FM_LAB_FAULT=$FAULT FM_LAB_FAULT_DIR=$FM_HOME "$C" rrt rerecord-slot --manifest-sha "$(msha)" --note "$NOTE" > "$FM_HOME/s11.out" 2>&1
+rc=143
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+record unchanged
+audits: before=0 after=0
+no staged leftovers in state/
+# after the TERM, --check still predicts the write (nothing was published):
+base=b3346071bfcd60b20c6911d573c865bf43ddec25 -> cfb184b8e2eb863f443f4c525325748db51eef86
+write_would=pass
+# lab tmux server stopped
+teardown rc=0
+lab removed

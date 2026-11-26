@@ -1,0 +1,10 @@
+# S3b: write with no --note
+$ fm-control.sh rrt rerecord-slot --manifest-sha e6550bcfc4b8f6ad8b98a9b59a2336383737a28a25d37c1375b445b5fe39912b
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: note_required: a write needs --note (or --note-file) naming the ruling it carries out; no record, manifest, copy or journal was changed
+rc=1
+record unchanged

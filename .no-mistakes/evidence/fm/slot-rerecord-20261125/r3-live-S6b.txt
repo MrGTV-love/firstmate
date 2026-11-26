@@ -1,0 +1,6 @@
+# S6b: renewal that does not cover a changed path (tools missing) -> refused
+renewed: owner=rrt base=df8ab23e358ee5543501456d9d56c3bdf219c11b scope=src lib
+$ fm-control.sh rrt rerecord-slot --manifest-sha b38a3a218f3630548728104e342280dc782735e085249bc186db041c020384ec --note Lab ruling: re-record after the slot renewal
+error: slot rerecord refused: scope_uncovered_change: tools/x.sh; no record, manifest, copy or journal was changed
+rc=1
+record unchanged

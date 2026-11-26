@@ -1,0 +1,15 @@
+window=fmlab:fm-rrt
+endpoint_task_id=rrt
+worktree=/Users/charlesabrooker/tmp/fm-lab.IbTtp1/projects/wt
+project=/Users/charlesabrooker/tmp/fm-lab.IbTtp1/projects/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+yolo=off
+tasktmp=/tmp/fm-rrt
+model=default
+effort=default
+branch=fm/rrt
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.IbTtp1/projects/manifests/manifest.json
+slot_base_sha=7be7c715356caa72729bd85e9705fc273ce2e4f2
+slot_owned_path=src

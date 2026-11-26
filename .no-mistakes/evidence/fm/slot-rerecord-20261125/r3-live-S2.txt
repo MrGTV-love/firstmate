@@ -1,0 +1,19 @@
+# S2: --check reports the write and writes nothing
+       4
+$ fm-control.sh rrt rerecord-slot --check
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+manifest_sha256=9bbca5282dc1fcdb6f0223022503e5f6d37c4eea08fe28751ee165806d3d0907
+base=5b6b98762a3459c038c2fdd5c7d2e836ed31dec1 -> df8ab23e358ee5543501456d9d56c3bdf219c11b
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=pass
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha 9bbca5282dc1fcdb6f0223022503e5f6d37c4eea08fe28751ee165806d3d0907 --note '<the ruling this carries out>'
+rc=0
+record sha before=7d54bc32ddef3d55dbb940882511755e49604047037829162c638250855c274a after=7d54bc32ddef3d55dbb940882511755e49604047037829162c638250855c274a
+audit dir: ls: /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord: No such file or directory

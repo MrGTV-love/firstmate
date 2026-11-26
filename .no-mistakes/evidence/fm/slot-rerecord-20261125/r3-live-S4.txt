@@ -1,0 +1,28 @@
+# S4: real claude agent running in the task window -> refused
+# lab tmux (private TMUX_TMPDIR=/tmp/fml.BYKB2B) panes:
+fmlab:fm-rrt cmd=2.1.332 pid=40205
+$ fm-control.sh rrt rerecord-slot --check
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+manifest_sha256=9bbca5282dc1fcdb6f0223022503e5f6d37c4eea08fe28751ee165806d3d0907
+base=5b6b98762a3459c038c2fdd5c7d2e836ed31dec1 -> df8ab23e358ee5543501456d9d56c3bdf219c11b
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=agent_not_proven_stopped
+write_would=refuse:agent_not_proven_stopped
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha 9bbca5282dc1fcdb6f0223022503e5f6d37c4eea08fe28751ee165806d3d0907 --note '<the ruling this carries out>'
+rc=0
+$ fm-control.sh rrt rerecord-slot --manifest-sha 9bbca5282dc1fcdb6f0223022503e5f6d37c4eea08fe28751ee165806d3d0907 --note Lab ruling: re-record after the slot renewal
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: agent_not_proven_stopped: the endpoint fmlab:fm-rrt reads 'alive'; stop it with fm-control.sh <id> exit, then re-record; no record, manifest, copy or journal was changed
+rc=1
+record unchanged
+# lab tmux server stopped: no server running on /private/tmp/fml.BYKB2B/tmux-501/default

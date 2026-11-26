@@ -1,0 +1,77 @@
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.1HRPXG TMUX_TMPDIR=/tmp/fml.yIWKoH
+lock acquired: harness pid 93329
+# fixture task rrt built
+renewed: owner=rrt base=525c38e76ea4906b00299a9af34ef2d80a60298e scope=src lib tools/x.sh
+error: slot adoption refused: base_mismatch: manifest base is '525c38e76ea4906b00299a9af34ef2d80a60298e', the recorded base is '846c718a5f14fb35b0b3de337f6ee5bf9b5192f8'; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task rrt: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fm-lab.1HRPXG/projects/wt; preserve and reconcile it first (a base_mismatch or scope_mismatch after the durable slot record was renewed is re-recorded with fm-control.sh rrt rerecord-slot --check, then without --check); the running agent was not stopped
+rc=1
+rerecord-slot rrt: base 846c718a5f14fb35b0b3de337f6ee5bf9b5192f8 -> 525c38e76ea4906b00299a9af34ef2d80a60298e; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.1HRPXG/data/rrt/slot-rerecord/prior-meta.20261126T044251Z.75ce3ab5faa0.0
+rc=0
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.1HRPXG/projects/manifests/manifest.json
+slot_base_sha=525c38e76ea4906b00299a9af34ef2d80a60298e
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+# panes before relaunch:
+/private/tmp/fml.yIWKoH/tmux-501/default fmlab:fm-rrt cmd=zsh
+/private/tmp/fml.yIWKoH/tmux-501/default keep:bash cmd=bash
+/private/tmp/fml.yIWKoH/tmux-501/default keep:placeholder cmd=bash
+$ fm-control.sh rrt relaunch --note resume after slot renewal
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89W4CZM5PXRFWG112YQ3V2Q/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/data/rrt/launch-brief.md records no ship branch; defaulting to legacy branch fm/rrt
+warning: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/data/rrt/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for rrt: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched rrt harness=claude from=claude model=default effort=default backend=tmux endpoint=fmlab:fm-rrt worktree=/Users/charlesabrooker/tmp/fm-lab.1HRPXG/projects/wt
+rc=0
+# panes after relaunch:
+/private/tmp/fml.yIWKoH/tmux-501/default fmlab:fm-rrt cmd=bash
+/private/tmp/fml.yIWKoH/tmux-501/default keep:bash cmd=bash
+/private/tmp/fml.yIWKoH/tmux-501/default keep:placeholder cmd=bash
+phase=complete
+exit_result=already-stopped
+# capture of fmlab:fm-rrt (last lines):
+ you trust?
+ Claude Code'll be able to read, edit, and execute files here. Its skills,
+ commands, and agents load and can run commands, and so can the git settings of
+ its repository. Your answer holds for this session.
+ Security guide
+ ❯ No, exit
+   Yes, add it
+ Enter to confirm · Esc to cancel
+# lab tmux server stopped
+# teardown: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89W4CZM5PXRFWG112YQ3V2Q/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.1HRPXG && rm -rf /Users/charlesabrooker/tmp/fm-lab.1HRPXG
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/fm-scan-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/fm-strip: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/fm-scan-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state/rrt.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.1HRPXG: Directory not empty
+teardown rc=1
+lab still present

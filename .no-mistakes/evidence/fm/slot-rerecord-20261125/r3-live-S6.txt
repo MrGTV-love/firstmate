@@ -1,0 +1,6 @@
+# S6: renewal with a scope entry outside recorded scope and changed paths (docs.txt) -> refused
+renewed: owner=rrt base=df8ab23e358ee5543501456d9d56c3bdf219c11b scope=src lib tools/x.sh docs.txt
+$ fm-control.sh rrt rerecord-slot --manifest-sha 160a52ea0923fdc1948d72592344a7b778f9babfbb8874aae0ce0c105f5435ee --note Lab ruling: re-record after the slot renewal
+error: slot rerecord refused: scope_entry_not_own_work: docs.txt is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added; no record, manifest, copy or journal was changed
+rc=1
+record unchanged

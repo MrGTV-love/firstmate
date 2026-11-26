@@ -1,0 +1,41 @@
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Sbu3Hy TMUX_TMPDIR=/tmp/fml.fSH9kN
+lock acquired: harness pid 93329
+# fixture task rrt built
+## A: the manifest names a replacement copy (wt2), not the copy the task record names
+renewed: worktree=/Users/charlesabrooker/tmp/fm-lab.Sbu3Hy/projects/wt2 branch=fm/rrt owner=rrt base=236d5390c8d060829f5518534f8283096b18aaa0
+$ fm-control.sh rrt rerecord-slot --manifest-sha d69235d38e918ac8a43605d7728fd7fecefa4a6597820b8e6d714286979acb4b --note Lab ruling: re-record after the slot renewal
+error: slot rerecord refused: worktree_path_mismatch: manifest names '/Users/charlesabrooker/tmp/fm-lab.Sbu3Hy/projects/wt2', the task copy is '/Users/charlesabrooker/tmp/fm-lab.Sbu3Hy/projects/wt'; no record, manifest, copy or journal was changed
+rc=1
+## B: the manifest names another branch
+renewed: worktree=/Users/charlesabrooker/tmp/fm-lab.Sbu3Hy/projects/wt branch=fm/other-branch owner=rrt base=236d5390c8d060829f5518534f8283096b18aaa0
+$ fm-control.sh rrt rerecord-slot --manifest-sha a21d85045942880f6e70360d6c05ab97b06403abbb70355e2172ba7e0b6001ed --note Lab ruling: re-record after the slot renewal
+error: slot rerecord refused: branch_mismatch: manifest branch is 'fm/other-branch', the task branch is 'fm/rrt'; no record, manifest, copy or journal was changed
+rc=1
+## C: a worker (FM_TASK_ID set) runs the write against a good renewal
+renewed: worktree=/Users/charlesabrooker/tmp/fm-lab.Sbu3Hy/projects/wt branch=fm/rrt owner=rrt base=236d5390c8d060829f5518534f8283096b18aaa0
+$ FM_TASK_ID=rrt fm-control.sh rrt rerecord-slot --manifest-sha 1b5b1a35e3dec164122c1f44c1a70f888811e1b59055247e80b8e92314ddc2b8 --note Lab ruling: re-record after the slot renewal
+error: slot rerecord refused: actor_not_main: a worker (FM_TASK_ID is set) never re-records slot identity; no record, manifest, copy or journal was changed
+rc=1
+task record sha unchanged across A-C: 0ff0b950716992531923848f9e3c71ce3ac52b82e683c8e7934c4e8a54174f88
+# audit dir after A-C: ls: /Users/charlesabrooker/tmp/fm-lab.Sbu3Hy/data/rrt/slot-rerecord: No such file or directory
+## D: control: the same good renewal as main is accepted
+$ fm-control.sh rrt rerecord-slot --manifest-sha 1b5b1a35e3dec164122c1f44c1a70f888811e1b59055247e80b8e92314ddc2b8 --note Lab ruling: re-record after the slot renewal
+rerecord-slot rrt: base 73be0bccdc8fd737426fb30d1fe1b05027cb27a7 -> 236d5390c8d060829f5518534f8283096b18aaa0; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.Sbu3Hy/data/rrt/slot-rerecord/prior-meta.20261126T051111Z.0ff0b9507169.0
+rc=0
+task record sha 0ff0b950716992531923848f9e3c71ce3ac52b82e683c8e7934c4e8a54174f88 -> 7fea8d4ee9939919398213d84692fa3d436549b148625a4e363a60252fd2cd11
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.Sbu3Hy/projects/manifests/manifest.json
+slot_base_sha=236d5390c8d060829f5518534f8283096b18aaa0
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+# audit dir after D:
+total 16
+drwx------@ 4 charlesabrooker  staff   128 Nov 25 23:11 .
+drwxr-xr-x@ 4 charlesabrooker  staff   128 Nov 25 23:11 ..
+-rw-------@ 1 charlesabrooker  staff  1129 Nov 25 23:11 20261126T051111Z.0ff0b9507169.0.record
+-rw-------@ 1 charlesabrooker  staff   443 Nov 25 23:07 prior-meta.20261126T051111Z.0ff0b9507169.0
+no rerecord staging files in state/
+# lab tmux server stopped
+# teardown: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M89W4CZM5PXRFWG112YQ3V2Q/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.Sbu3Hy && rm -rf /Users/charlesabrooker/tmp/fm-lab.Sbu3Hy
+tmux teardown rc=0
+lab removed

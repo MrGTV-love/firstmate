@@ -1,0 +1,9 @@
+# S5: renewal whose base is not merge-base origin/main HEAD (M0 kept) -> refused
+renewed: owner=rrt base=7be7c715356caa72729bd85e9705fc273ce2e4f2 scope=src lib tools/x.sh
+$ fm-control.sh rrt rerecord-slot --check
+error: slot rerecord refused: base_not_merge_base: the manifest base 7be7c715356caa72729bd85e9705fc273ce2e4f2 is not merge-base(origin/main, HEAD) = 3457450d92edda156036885b53d7dc526119fac6; renew the durable record against the current merge-base (this verb never fetches: if origin/main is stale, fetch it in the primary clone first); no record, manifest, copy or journal was changed
+rc=1
+$ fm-control.sh rrt rerecord-slot --manifest-sha 92aaa8fd43376edd17248015e4f237f7fd586b39c2733014a85126d29a7bdc59 --note Lab ruling: re-record after the slot renewal
+error: slot rerecord refused: base_not_merge_base: the manifest base 7be7c715356caa72729bd85e9705fc273ce2e4f2 is not merge-base(origin/main, HEAD) = 3457450d92edda156036885b53d7dc526119fac6; renew the durable record against the current merge-base (this verb never fetches: if origin/main is stale, fetch it in the primary clone first); no record, manifest, copy or journal was changed
+rc=1
+record unchanged

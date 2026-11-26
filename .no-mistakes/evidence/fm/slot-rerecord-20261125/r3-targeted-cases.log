@@ -1,0 +1,10 @@
+ok - L14: pending untouched-staged audit, HEAD moved, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines, writes nothing; the write rolls the crash back, then refuses agent_not_proven_stopped and its tail names the rolled-back audit and the restored record
+ok - L17: a snapshot error after step 3 rolled a crash back names the rolled-back audit and the restored record, not 'nothing was changed'; with no pending audit the same error says nothing was changed
+ok - L21: TERM in step 5 after step 3 abandoned a crashed write: the trap names that audit once; with no step 3 entries it names none
+ok - R9a: exit 143 under TERM in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - R9d: first run exit 143 (TERM runs the trap at once: 1); staged bytes, pending, no restore; second run already recorded, published-recovered, one archive, audit_agrees
+ok - R9e: first run exit 143; staged bytes, audit published by the late rename, no restore, audit_agrees; second run unchanged, one archive
+ok - SF4-head-reconciled: a crashed earlier write is abandoned in step 3, then HEAD moves after the rebind: the refusal says the run published and restored the prior record and names the abandoned audit
+ok - SF4-head-unrestored: the restore after a failed post-publish check cannot stage: the run says it published, that the prior record could not be restored, and names the archive; the record holds the staged bytes
+ok - L20: step 3 closes a first audit as superseded-other, then the second's resumed restore fails: the stop names the first audit
+rc=0

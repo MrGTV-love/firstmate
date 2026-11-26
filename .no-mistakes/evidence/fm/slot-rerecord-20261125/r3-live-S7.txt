@@ -1,0 +1,38 @@
+# S7: good renewal; write publishes, second write is a no-op
+renewed: owner=rrt base=df8ab23e358ee5543501456d9d56c3bdf219c11b scope=src lib tools/x.sh
+$ fm-control.sh rrt rerecord-slot --manifest-sha 151f0c3281a1ab2b4160bc5e256ac09b860376609faa36faad7c77d0b3ce71a5 --note Lab ruling: re-record after the slot renewal
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base 5b6b98762a3459c038c2fdd5c7d2e836ed31dec1 -> df8ab23e358ee5543501456d9d56c3bdf219c11b; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord/prior-meta.20261126T040834Z.7d54bc32ddef.0
+rc=0
+record sha 7d54bc32ddef3d55dbb940882511755e49604047037829162c638250855c274a -> b504b9fbdcb58a8267cac4abb9678beb46ea9186cfe000c373411e7ca3fef57a
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.zYMxI5/projects/manifests/manifest.json
+slot_base_sha=df8ab23e358ee5543501456d9d56c3bdf219c11b
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+  20261126T040834Z.7d54bc32ddef.0.record: result=published
+archive: prior-meta.20261126T040834Z.7d54bc32ddef.0
+$ fm-control.sh rrt rerecord-slot --manifest-sha 151f0c3281a1ab2b4160bc5e256ac09b860376609faa36faad7c77d0b3ce71a5 --note Lab ruling: re-record after the slot renewal
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+rerecord-slot rrt: already recorded
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+rc=0
+audit count: 1
+$ fm-control.sh rrt rerecord-slot --check
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+rerecord-slot rrt: already recorded
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=already recorded
+rc=0

@@ -1,0 +1,7 @@
+# S2: --check reports the write and writes nothing
+       4
+$ fm-control.sh rrt rerecord-slot --check
+error: slot rerecord refused: scope_entry_not_own_work: tools is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added; no record, manifest, copy or journal was changed
+rc=1
+record sha before=7d54bc32ddef3d55dbb940882511755e49604047037829162c638250855c274a after=7d54bc32ddef3d55dbb940882511755e49604047037829162c638250855c274a
+audit dir: ls: /Users/charlesabrooker/tmp/fm-lab.zYMxI5/data/rrt/slot-rerecord: No such file or directory

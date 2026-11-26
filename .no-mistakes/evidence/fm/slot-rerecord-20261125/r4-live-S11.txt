@@ -1,0 +1,14 @@
+# S11: SIGTERM while the archive is staged (before publish) -> nothing published
+# archive mktemp reached (RERECORD_STAGE=staged, before publish); sending TERM to pid 38039
+/Users/charlesabrooker/.no-mistakes/evidence/01M89W4CZM5PXRFWG112YQ3V2Q/r4-drive.sh: line 101: kill: (38039) - No such process
+rc=0
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+rerecord-slot rrt: already recorded
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+record unchanged
+audits: before=5 after=5
+no staged leftovers in state/
