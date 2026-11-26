@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Pick the one project skill a worker should load, for its launch instructions.
 # Usage: fm-skill-pick.sh --brief <filled-brief> --catalog <skill-dir>... [--record <file>] [--kind ship|scout]
+#                        [--attempt-journal <new-private-file> <spawn-generation>]
+# The optional attempt journal is written only if the picker engine runs and
+# binds that recording to the generation allocated before selector execution.
+# A wrapper no-send result is established by the separate accounting receipt.
 # bin/fm-skill-pick.mjs runs the TypeSafe skill-suggestion cookbook recipe on
 # the vendored hyper-jev client; its header owns recipe and roster mechanics.
 # docs/configuration.md "Worker skill selection" owns provider policy and setup.
@@ -9,7 +13,9 @@
 # over every string a request can carry, and the keys from fm-typesafe-lib.sh,
 # passed to Node on stdin.
 # Output: the "# Skill selection" launch-instructions section. --record also
-# writes status= (picked, none or unavailable), reason= and picked= lines.
+# writes status= (picked, none or unavailable), reason=, picked= and accounting= lines.
+# accounting is JSON with logical client calls, transport attempts and reported input/output counts.
+# Null means unverified; these aggregates are not an individual provider-call census.
 # Any failure yields status unavailable with its reason; exit 2 is a usage error.
 # A TypeSafe HTTP 402, 401, or 403 in the reason goes to bin/fm-typesafe-health.sh
 # record, so a credit or key failure reaches the captain once.
@@ -21,11 +27,15 @@ SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 FM_HOME=${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}
 CONFIG=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
-BRIEF='' RECORD='' KIND=ship CATALOGS=()
+BRIEF='' RECORD='' JOURNAL_ARGS=() KIND=ship CATALOGS=()
 usage() { awk 'NR==1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; }
 die() { printf 'error: %s\nhelp: Run bin/fm-skill-pick.sh --help\n' "$1" >&2; exit 2; }
 while [ $# -gt 0 ]; do
   case "$1" in
+    --attempt-journal)
+      [ $# -ge 3 ] && [ -n "$2" ] && [[ "$3" =~ ^[A-Za-z0-9_.:/-]{1,128}$ ]] && [ "${#JOURNAL_ARGS[@]}" -eq 0 ] \
+        || die 'expected one --attempt-journal path and spawn generation'
+      JOURNAL_ARGS=("$2" "$3"); shift 3 ;;
     --brief|--catalog|--record|--kind)
       [ $# -ge 2 ] && [ -n "$2" ] || die "$1 requires a value"
       case "$1" in
@@ -44,7 +54,9 @@ done
 case "$KIND" in ship|scout) ;; *) die "--kind must be ship or scout" ;; esac
 
 STATUS=unavailable REASON='' PICKED='' SKILL_PATH='' FIT='' PROVIDER='' MODEL=''
-WORK=$(mktemp -d) || die "could not allocate temporary files"
+# All wrapper exits before the engine ran are affirmative no-call results.
+ACCOUNTING='{"client_calls":0,"transport_attempts":0,"input_tokens":0,"output_tokens":0}'
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/fm-skill-pick.XXXXXX") || die "could not allocate temporary files"
 trap 'rm -rf "$WORK"' EXIT
 umask 077
 : > "$WORK/not-judged"
@@ -73,7 +85,7 @@ finish() {
     *) printf 'Skill selection was unavailable for this task (%s). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.\n' "$REASON" ;;
   esac
   [ ! -s "$WORK/not-judged" ] || printf 'Not judged, so check them yourself if relevant: %s.\n' "$(cat "$WORK/not-judged")"
-  [ -z "$RECORD" ] || printf 'status=%s\nreason=%s\npicked=%s\n' "$STATUS" "$REASON" "$PICKED" > "$RECORD" 2>/dev/null || true
+  [ -z "$RECORD" ] || printf 'status=%s\nreason=%s\npicked=%s\naccounting=%s\n' "$STATUS" "$REASON" "$PICKED" "$ACCOUNTING" > "$RECORD" 2>/dev/null || true
   exit 0
 }
 unavailable() { REASON=$1; finish; }
@@ -93,12 +105,16 @@ node "$SCRIPT_DIR/fm-skill-pick.mjs" roster "${CATALOGS[@]}" > "$WORK/roster.jso
   unavailable "$(cat "$WORK/error")"
 jq -r '[.not_judged[] | "\(.name) (\(.reason))"] | join(", ") | select(length > 0)' "$WORK/roster.json" > "$WORK/not-judged" 2>/dev/null ||
   : > "$WORK/not-judged"
+ACCOUNTING='{"client_calls":null,"transport_attempts":null,"input_tokens":null,"output_tokens":null}'
 printf '%s\n%s\n' "$TYPESAFE_API_KEY_PRIVATE" "$OPENROUTER_API_KEY_PRIVATE" |
-  node "$SCRIPT_DIR/fm-skill-pick.mjs" pick "$WORK/task" "$WORK/roster.json" "$CONFIG/dispatch-never-send" "$WORK/scan" > "$WORK/result" 2> "$WORK/error" ||
+  node "$SCRIPT_DIR/fm-skill-pick.mjs" pick "$WORK/task" "$WORK/roster.json" "$CONFIG/dispatch-never-send" "$WORK/scan" \
+    "${JOURNAL_ARGS[@]+"${JOURNAL_ARGS[@]}"}" > "$WORK/result" 2> "$WORK/error" ||
   unavailable "the skill picker stopped with an error: $(cat "$WORK/error")"
 field() { sed -n "s/^$1=//p" "$WORK/result" | head -n 1; }
 STATUS=$(field status) REASON=$(field reason) PICKED=$(field picked) SKILL_PATH=$(field path | jq -r '.')
 FIT=$(field fit) PROVIDER=$(field provider) MODEL=$(field model)
+reported=$(field accounting)
+[ -z "$reported" ] || ACCOUNTING=$reported
 case "$STATUS" in
   picked|none) ;;
   *) STATUS=unavailable; [ -n "$REASON" ] || REASON="the skill picker gave no result" ;;
