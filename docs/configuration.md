@@ -16,6 +16,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Automatic review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
+| A program's own model roles, such as a Backpass pass | [Application model roles](#application-model-roles) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
@@ -1311,6 +1312,50 @@ The same transitions retire that line to `Historical preserved in bundle <path>,
 Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
 A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
 A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
+
+## Application model roles
+
+Some firstmate work hands model choices to a program that runs its own model stages, such as a Backpass analysis, consolidation, or proposal pass.
+Those roles use the same intake boundary as a worker profile: [`dispatch-profile-intake`](../.agents/skills/dispatch-profile-intake/SKILL.md) owns the decision procedure, and [`model-and-effort.md`](../.agents/skills/harness-adapters/references/common/model-and-effort.md) owns discovery, effort precedence, and its accepted-set rule.
+No second selector, dispatch rule, typed brief, shadow-picker choice, or manufactured task identity supplies them.
+They have no configuration file of their own: each request resolves them again, so a program's own configuration default or a previously cached result never becomes the selection.
+The [fleet model index](#fleet-model-index-configmodel-indexjson) and [`config/crew-dispatch.json`](#crew-dispatch-profiles-configcrew-dispatchjson) keep their worker meanings, so a home with neither file resolves these roles through ordinary intake; their absence is discovery, not a policy vote.
+
+**One complete selection per role.** Firstmate classifies each model-calling role from the work itself and resolves a complete agent, provider-qualified model, and effective effort for it before that role's first model call.
+Pass every value the program's own default could otherwise decide, because an omitted argument is not a selection.
+A role the program reuses keeps the selection its stage inherits instead of acquiring a second one, and an earlier stage that produced no model call removes no requirement on a later one.
+
+**Backpass handoff.** Backpass reads its two production selections from its own command line: `--analysis-agent`, `--analysis-model`, and `--analysis-effort` for the per-transcript analysis pass, and `--synthesis-agent`, `--synthesis-model`, and `--synthesis-effort` for the proposal pass.
+Its consolidation pass between them runs on the analysis selection, so a full pass, or a proposal that reuses cached analysis, still needs the analysis selection complete before consolidation starts.
+`backpass analyze` reaches analysis only, `backpass propose` folds existing evidence and then consolidates and synthesizes, and `backpass` with no command runs the whole pass; Backpass's own `--help` owns the remaining commands, flags, and its project configuration precedence.
+Resolve the actual executable before reading that help or launching a pass.
+When this home has `data/tools/backpass/node_modules/.bin/backpass`, use that home-local file rather than a shared or global installation of the same name, and check that the resolved file exists and is executable instead of assuming an installation or a supported version.
+That local adoption belongs to this home and leaves the shared installation unchanged.
+Classify each role independently from the work and the applicable policy, so the two roles can legitimately land in the same class and neither inherits the other's classification or model.
+Resolve the requested effort through [`model-and-effort.md`](../.agents/skills/harness-adapters/references/common/model-and-effort.md) against Backpass's current accepted set, established by its own help or validation, rather than copying that capability list into fleet policy.
+An independent review keeps its own configured review runtime and never supplies a production role, and a selected Claude role still needs native TeamClaude, so an eligible permitted route takes precedence instead of selecting an unimplemented one and waiting.
+
+**Route and account.** A selection is usable only on the route and account it names: a GPT production call runs through omp's `openai-codex` provider, which needs no billing exception, while an `openai/*` or `openrouter/*` selector is API-billed and is never selected for one ([OMP fallback approvals](#omp-fallback-approvals-configomp-approved-fallback-chains) owns that route contract).
+A fallback chain, an ambient default, or a credentialed title or helper role that a program's invocation would otherwise inherit is not part of the selection.
+That invocation clears it for the call through existing invocation-scoped configuration, the way `bin/fm-spawn.sh` clears it for a worker, and the operator's own self-session configuration stays unchanged.
+Where permitted-only execution cannot be established that way, the route is ineligible for the role: name the missing capability and stop the affected call instead of running it on a route no selection authorized.
+Established pooled headroom comes from `bin/fm-dispatch-capacity.sh --harness omp --model <id> --json`, not from quota-axi's single Codex account, and its accounts, statuses, and reason are the capacity evidence a selection records.
+
+**Discovery and currentness.** Read the catalog through the single catalog owner, which is the same read the index and spawn checks perform, so intake and validation see one normalized surface:
+
+```sh
+bin/fm-model-index.sh catalog omp
+FM_MODEL_CATALOG_DIR=/path/to/exports bin/fm-model-index.sh catalog omp
+```
+
+The read prints the harness's normalized `{"models":[{"id":"..."}]}` catalog, needs no index, and exits 2 with a notice when the catalog cannot be read or holds no model, so unavailable or empty evidence never reads as a supported model.
+Select from the ids that catalog lists for the named provider and the classified reasoning class, and let the catalog decide which id is current: a newer eligible model of the same class takes the role with no configuration edit, and a candidate is superseded only when a newer model of the same class exists.
+`bin/fm-model-freshness.sh check <harness> <model>` owns that same-family comparison and marks a newer model of another tier, which never rejects or downgrades a class-correct candidate.
+An index notice, a silent freshness check, an unverified alias, a catalog id no call has served, and a catalog this environment cannot read each establish no currentness and no successful launch.
+
+**Provenance.** Keep the record with the run's own evidence so the selection can be re-derived: each role's agent and model, the requested effort with its winning source, the transformation and the value actually passed, the discovery command with its time and environment, and the catalog or freshness output that decided it.
+That record is per-run evidence, not a new configuration file, dispatch rule, role table, or home state.
+
 
 ## Model-picker benchmark data (FM_MODEL_PICKER_DATA)
 
@@ -2825,6 +2870,7 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 
 - `FM_REVIEW_RUNNER`, else the first non-comment line of `config/review-runner`, names an absolute path to the review lane's runner.
 - The runner is called as `<runner> <review-dir> <pr-url> <head> pr.diff <project-path> <model>`; `<review-dir>` holds `contract.md`, `pr.diff` and `ci-evidence.md`, and the runner writes `review.md` there.
+- When a new head follows a recorded `FAIL` on an earlier head of the same PR without an intervening `PASS` or captain merge word, `contract.md` opens with a closure-check header and the prior `FAIL` report, and `closure-diff.patch` in `<review-dir>` carries the incremental diff from that failed head when it is locally reachable.
 - `pr.diff` comes from `bin/fm-review-diff.sh` and is used only when the PR head it fetched is the head being read; otherwise the pack is not built.
 - The model that served the read is taken only from one runner stdout line exactly `served-model: <model id>`, never from prose notices or logs. With none, the read is not recorded, the head is held as `served model unknown` with the report path and the requested model, Main is woken, and no further read is requested for that head. Main's runner prints the line only when one model served every reply and no fallback was recorded, and prints nothing otherwise, so a read it cannot vouch for holds for Main.
 - No path is hardcoded in a tracked script, and the runner's own internals are out of scope.
@@ -2855,13 +2901,14 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 - The sidecar `state/.pr-auto-review/<task>.json` holds the request, the outstanding read, the recorded verdict, the merge attempt and the events already emitted; each request's review pack, lock and result sit under `state/.pr-auto-review/<task>.d/`.
 - A read runs detached under a lock, so a restart neither loses nor repeats it; a pass never waits for it.
 - Outcomes are sidecar events (read requested, verdict recorded, queued, merged with the full PR URL, fail, held with its reason, no eligible reader, runner unavailable), printed oldest first by `bin/fm-pr-auto-review.py events <task>`, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `waiting: <reason>` (the PR is not yet green), `queued`, `merged`, `fail`, `held: <reason>` or `idle`.
-- A check wake `check: pr-review <task>: ...` tells Main, once per head and reason, about a FAIL, an INCOMPLETE, a held protected class or missing protected-class answer, an unknown served model, an unknown author family, a missing reader or runner, a refused merge, a PR that left the merge queue and is still open, an unavailable verify or plan, a review record that leaves nothing to read yet does not qualify, a PASS that cannot be recorded, and a review pack that was not built. A wake that could not be appended is kept in the sidecar as pending, is not counted as emitted, and is retried by every later pass until it is delivered, once.
+- A check wake `check: pr-review <task>: ...` tells Main, once per head and reason, about a FAIL, an INCOMPLETE, a review loop cap hold, a held protected class or missing protected-class answer, an unknown served model, an unknown author family, a missing reader or runner, a refused merge, a PR that left the merge queue and is still open, an unavailable verify or plan, a review record that leaves nothing to read yet does not qualify, a PASS that cannot be recorded, and a review pack that was not built. A wake that could not be appended is kept in the sidecar as pending, is not counted as emitted, and is retried by every later pass until it is delivered, once.
 - A read still out for an older head never stops a newer head from being read on the normal cadence; once it ends it is marked returned and is never recorded, planned or reported, so it cannot displace the live head's verdict.
 - Nothing is written to the task's status log: a trailing `note:` there would replace the worker's `done:` as the latest event and change how `bin/fm-crew-state.sh` reads a ship whose PR is in review.
 - The merge is `bin/fm-pr-merge.sh <task> <url>` with no other argument, only after `verify` accepts an independent-review PASS for the live head; a refusal holds with its reason and is retried after ten minutes, and an away record is left to `bin/fm-pr-merge.sh`'s own away handling. A captain-word recorded for the head is left to Main.
 - When `bin/fm-pr-merge.sh` reports the PR queued, the state reads `queued` and nothing is called again while the forge reports it queued; a merged PR then reads `merged`. If the forge instead reports the PR open and out of the queue, for example because someone removed it or the queue ejected it, the head is held once with one check wake, `bin/fm-pr-merge.sh` is not called again for that head, and a new head is judged fresh.
 - The sidecar's next due time spaces each task's forge read; a task is swept with its meta.
 - `FM_PR_AUTO_REVIEW_INTERVAL` (seconds, default 120) spaces the forge read per task, and `FM_PR_AUTO_REVIEW_MERGE_RETRY` (seconds, default 600) spaces merge retries; both are cadences, not bounds on any work.
+- `FM_PR_AUTO_REVIEW_MAX_FAIL_ROUNDS` (default 3; `0` disables the cap) bounds consecutive distinct failed heads on one PR without an intervening `PASS` or captain merge word; once reached, a newer head is held once for Main instead of dispatching another automatic review.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
