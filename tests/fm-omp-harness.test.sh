@@ -349,8 +349,10 @@ test_native_attempt_path_isolated_per_launch() {
     # Replay the emitted launch verbatim as a fresh shell with a deliberately
     # stale ambient path. Refuse to execute a launch that lost its fake tool.
     assert_launch_contains "$(<"$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "$stage launch must name only the fake OMP binary"
-    actual=$(HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_REPORT_ATTEMPT_PATH=1 \
+    printf 'FM_FAKE_OMP_REPORT_ATTEMPT_PATH=1\n' > "$FAKEBIN_DIR/.fm-fake-config"
+    actual=$(HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" \
       FM_OMP_CODEX_ATTEMPT_JOURNAL="$CASE_DIR/other-launch.jsonl" bash "$LAUNCH_LOG")
+    rm -f "$FAKEBIN_DIR/.fm-fake-config"
     expect_code 0 $? "$stage captured launch shell must succeed: $actual"
     assert_equals "attempt-journal=$expected" "$actual" "$stage native capture used the wrong path"
     prior_gen=$gen

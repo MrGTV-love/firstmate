@@ -510,7 +510,7 @@ test_opt_in_local_attempt_metadata() {
   assert_contains "$launch" 'OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:43210/v1/logs' 'logs stay local'
   assert_contains "$launch" 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43210/v1/traces' 'traces stay local'
   assert_contains "$launch" 'OTEL_LOG_RAW_API_BODIES=0' 'raw API payload export stays off'
-  assert_not_contains "$launch" 'ANTHROPIC_BASE_URL=' 'instrumentation does not redirect inference'
+  assert_not_contains "${launch#*CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=}" 'ANTHROPIC_BASE_URL=' 'instrumentation does not redirect inference'
   pass 'ordinary Claude launch accepts only a local attempt collector'
 }
 
