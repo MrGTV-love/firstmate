@@ -1,0 +1,48 @@
+{
+  "records": [
+    {
+      "id": "aa-lcr",
+      "labels": [
+        {
+          "id": 5,
+          "label": "AA-LCR v1.1",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": "1.1",
+          "example": {
+            "slug": "a-x-k2",
+            "source": "comparison-table",
+            "raw": "70%",
+            "value": 0.7,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ],
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/artificial-analysis-long-context-reasoning"
+    },
+    {
+      "id": "terminal-bench-4-0",
+      "labels": [
+        {
+          "id": 61,
+          "label": "Terminal-Bench 4.0",
+          "unit": "fraction",
+          "scale": "fraction",
+          "version": null,
+          "example": {
+            "slug": "a-x-k2",
+            "source": "comparison-table",
+            "raw": "0%",
+            "value": 0.0,
+            "variant": "",
+            "ci": null
+          }
+        }
+      ],
+      "direction": "higher",
+      "source": "https://artificialanalysis.ai/evaluations/terminalbench-4-0"
+    }
+  ]
+}
