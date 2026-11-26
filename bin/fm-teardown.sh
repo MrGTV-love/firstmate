@@ -4683,7 +4683,9 @@ task_pids_under_roots() {  # <dir>...
       if ! task_pid_proved_own "$pid" "$identity" \
          || ! task_process_identity_matches "$pid" "$identity"; then
         task_anchor_load
-        command=$(LC_ALL=C ps -ww -p "$pid" -o command= 2>/dev/null | cut -c1-200) || command=
+        # The executable name only: arguments can carry credentials.
+        command=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) || command=
+        command=${command##*/}
         echo "REFUSED: process $pid ($identity${command:+, $command}) has its cwd at $dir, but nothing proves it belongs to $ID: $TASK_ANCHOR_NOTE. It may be a shared service (a daemon that started in this copy), so teardown leaves it running and keeps the copy; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved." >&2
         TASK_PIDS_FAILED_DIR=$dir
         TASK_PIDS_ERROR="process $pid at the root is not proven to belong to $ID"
