@@ -33,6 +33,20 @@
 #   only inserts dispatch_log rows and amends shadow rows it logged (a launched rule route, a
 #   superseded flag in gates), and never touches the benchmark matrix or verdict.json.
 #
+# Registry challenger: additionally set FM_MODEL_PICKER_REGISTRY to the operator-supplied
+#   catalog.json with sibling semantic-review.json, task-scope.json and observations.jsonl.gz.
+#   Registry replay uses frozen historical evidence unless FM_MODEL_PICKER_REGISTRY_SNAPSHOT
+#   names a collector snapshot.json; that mode also requires agreement with sibling method-pins.json.
+#   Supply FM_MODEL_PICKER_METHOD_PINS_SHA256 from a separately retained review commitment.
+#   An uncommitted or changed pins file holds the replay; missing metric pins or changed declarations hold affected metrics.
+#   FM_MODEL_PICKER_ACCEPTANCE names an independently supplied JSON file with task_sha256
+#   (exact sanitized UTF-8 bytes from --task-text, no newline normalization), authorized_safe_scope: true, binding_kind (design-fixture
+#   or repo-contract), and explicit tags from the review vocabulary. Optional evidence_not_after
+#   (YYYY-MM-DDTHH:MM:SSZ) bounds captured observations and method receipts, not policy history.
+#   No task or project prose enters this challenger request. Without
+#   matched eligible routes and reviewed evidence the challenger logs a refusal, never a
+#   legacy fallback. Registry mode is offline request replay only: no keys, provider calls or picks.
+#
 # Key handling: the TypeSafe key reaches bin/fm_model_picker/shadow.py on file descriptor 3,
 #   never on argv, never exported, never written. When no caller supplies fd 3, the shared
 #   accessor fm_typesafe_key resolves it exactly as the resolver does. Every request passes
@@ -80,7 +94,7 @@ if [ "$ACTION" = observe ]; then
   # shellcheck source=bin/fm-model-picker-shadow-lib.sh
   . "$SCRIPT_DIR/fm-model-picker-shadow-lib.sh"
   fm_model_picker_shadow_enabled || exit 0
-  if [ ! -e /dev/fd/3 ]; then
+  if [ -z "${FM_MODEL_PICKER_REGISTRY+x}" ] && [ ! -e /dev/fd/3 ]; then
     # shellcheck source=bin/fm-typesafe-lib.sh
     . "$SCRIPT_DIR/fm-typesafe-lib.sh"
     if ! fm_typesafe_key "$FM_HOME"; then
