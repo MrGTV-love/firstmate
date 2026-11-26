@@ -33,16 +33,23 @@ rr_record() { # <id> <result> <observation>
   [ -z "$RR_RESULTS" ] || printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$RR_RESULTS"
 }
 
-rr_ok() { # <id> <observation>
+rr_once_ok() { # <id>: fails the case when a run in it named one outcome more than once
   [ ! -s "$TMP_ROOT/rr-once-violations" ] ||
     fail "$1: a run named one outcome more than once"$'\n'"$(cat "$TMP_ROOT/rr-once-violations")"
+}
+rr_pass() { rr_once_ok "$1"; pass "$2"; } # <id> <message>: every passing case ends here or in rr_ok
+
+rr_ok() { # <id> <observation>
+  rr_once_ok "$1"
   rr_record "$1" pass "$2"
   pass "$1: $2"
 }
 
-# Every run of the verb names each outcome at most once; rr_run records any output that repeats one, and rr_ok fails
-# the case that produced it.
-RR_ONCE_PHRASES=('this run stopped' 'reconciled earlier interrupted runs' 'could not be restored')
+# Every run of the verb names each outcome at most once; rr_run records any output that repeats one, and rr_pass fails
+# the case that produced it. A failed restore publish prints its own error ("task <id>'s prior record could not be
+# restored (...)") before the run's outcome line, so each of the two is counted on its own.
+RR_ONCE_PHRASES=('this run stopped' 'reconciled earlier interrupted runs' 'the prior record could not be restored'
+  "'s prior record could not be restored (")
 rr_once_check() { # <output>
   local phrase n
   for phrase in "${RR_ONCE_PHRASES[@]}"; do
@@ -1750,6 +1757,22 @@ test_SF4_head_with_a_failed_restore() {
   [ "$(printf '%s\n' "$out" | grep -c 'this run stopped')" = 0 ] || fail "SF4-head-unrestored: the trap printed a kept-rename line after the run reported"$'\n'"$out"
   rr_ok SF4-head-unrestored "the restore after a failed post-publish check cannot stage: the run says it published, that the prior record could not be restored, and names the archive; the record holds the staged bytes"
 }
+# SF4-head whose restore publish fails: the rollback prints its own error, then the run prints its outcome line once.
+test_SF4_head_with_a_failed_restore_publish() {
+  local out rc a
+  rr_setup_SF4head SF4-head-restore-publish
+  rr_wrap fm-backlog-transition-lib.sh fm_backlog_atomic_transition
+  rr_shim fm-backlog-transition-lib.sh 'fm_backlog_atomic_transition() { case "${2:-}" in *.meta.rerecord-restore.*) FM_BACKLOG_TRANSITION_ERROR="injected restore publish failure"; return 1 ;; esac; real_fm_backlog_atomic_transition "$@"; }'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "SF4-head-restore-publish: expected a failure"$'\n'"$out"
+  a=$(rr_audits)
+  [ "$(rr_count "$a")" = 1 ] || fail "SF4-head-restore-publish: expected one audit record, got '$a'"
+  [ "$(rr_sha "$RR_META")" = "$(rr_field "$a" staged_sha256)" ] || fail "SF4-head-restore-publish: the record does not hold the staged bytes"
+  assert_contains "$out" "error: task $RR_ID's prior record could not be restored (injected restore publish failure); it is archived at $(rr_field "$a" archive)" "SF4-head-restore-publish"
+  assert_contains "$out" "error: this run published task $RR_ID's record and the prior record could not be restored; it is archived at $(rr_field "$a" archive); the audit record $a is rolling-back; no manifest, copy or journal was changed" "SF4-head-restore-publish"
+  [ "$(printf '%s\n' "$out" | grep -c 'this run stopped')" = 0 ] || fail "SF4-head-restore-publish: the trap printed a kept-rename line after the run reported"$'\n'"$out"
+  rr_ok SF4-head-restore-publish "the restore publish after a failed post-publish check fails: the rollback names its error, and the run's outcome line is printed once"
+}
 
 # Step 3 closes a first audit record, then the resumed restore of a second one fails: the stop names the first.
 test_L20_a_failed_step_3_restore_names_the_audit_closed_before_it() {
@@ -1910,7 +1933,7 @@ test_S7_R1b_defense_in_depth() {
     *) fail "S7/R1b: an unexpected refusal"$'\n'"$out" ;;
   esac
   rr_record S7-R1b observation "R1b under S7: $where; defense in depth, not an S7 result"
-  pass "S7-R1b: defense-in-depth observation recorded"
+  rr_pass S7-R1b "S7-R1b: defense-in-depth observation recorded"
 }
 rr_rollback_noop() { rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_rollback() { return 0; }'; }
 test_S8_rollback() {
@@ -2084,7 +2107,7 @@ test_S20_publishing_rolls_back() {
   rr_make_f S20-R9d
   if ! rr_term_runs_trap_with_child; then
     rr_record S20 unverified "this bash holds TERM until the foreground child exits, so the publishing window cannot be entered"
-    pass "S20: unverified on this bash"; return 0
+    rr_pass S20 "S20: unverified on this bash"; return 0
   fi
   rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_trap_action() { case "${1:-}" in staged) echo discard ;; published|publishing) echo rollback ;; committing|restoring) echo keep ;; *) echo none ;; esac; }'
   p=$(rr_sha "$RR_META")
@@ -2106,7 +2129,7 @@ test_S22_committing_rolls_back() {
   rr_make_f S22-R9e
   if ! rr_term_runs_trap_with_child; then
     rr_record S22 unverified "this bash holds TERM until the foreground child exits, so the committing window cannot be entered"
-    pass "S22: unverified on this bash"; return 0
+    rr_pass S22 "S22: unverified on this bash"; return 0
   fi
   rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_trap_action() { case "${1:-}" in staged) echo discard ;; published|committing) echo rollback ;; publishing|restoring) echo keep ;; *) echo none ;; esac; }'
   p=$(rr_sha "$RR_META")
@@ -2288,6 +2311,7 @@ test_R11_an_unreadable_audit_record_refuses_until_moved_aside
 test_SF4_head_moved_after_the_rebind
 test_SF4_head_after_a_reconciled_crash
 test_SF4_head_with_a_failed_restore
+test_SF4_head_with_a_failed_restore_publish
 test_L20_a_failed_step_3_restore_names_the_audit_closed_before_it
 test_SF4_owner_changed_after_the_rebind
 test_SF5_term_to_relaunch_leaves_the_launcher_holding_the_spawn_lock
