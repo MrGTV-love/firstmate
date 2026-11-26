@@ -1119,11 +1119,40 @@ SH
 launch=':'
 /bin/sh -c "$launch"
 SH
-  for root in bin/top-caller.sh bin/child-only.sh bin/dynamic-child.sh; do
+  cat > "$repo/bin/unquoted-heredoc-sub.sh" <<'SH'
+#!/usr/bin/env bash
+bash <<EOF
+$(
+# shellcheck source=bin/library.sh
+. bin/library.sh
+library_value
+)
+EOF
+SH
+  cat > "$repo/bin/mixed-child.sh" <<'SH'
+#!/usr/bin/env bash
+message=${1:-hello}
+# shellcheck disable=SC2016
+bash -c ". bin/library.sh; echo $message"
+SH
+  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/child-only.sh bin/dynamic-child.sh bin/mixed-child.sh; do
     out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "baseline $root failed: $out"
     assert_not_contains "$out" "cache hit $root" "baseline $root must run cold"
   done
+  # Mixed dynamic/static -c string must still select on its literal target and stay off unrelated edits.
+  local diff_file="$tmp/mixed.diff" sel="$tmp/mixed.sel" listed
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$sel" || fail "mixed-child select failed"
+  listed=$'\n'
+  while IFS= read -r -d '' root; do listed+="$root"$'\n'; done < "$sel"
+  assert_contains "$listed" $'\n''bin/mixed-child.sh'$'\n' "mixed dynamic+static -c string omitted static caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-sub.sh'$'\n' "unquoted heredoc parent-shell sub omitted caller selection"
+  fm_lint_write_diff_file "$diff_file" bin/dynamic-child.sh
+  perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$sel" || fail "unrelated mixed-child select failed"
+  listed=$'\n'
+  while IFS= read -r -d '' root; do listed+="$root"$'\n'; done < "$sel"
+  assert_not_contains "$listed" $'\n''bin/mixed-child.sh'$'\n' "unrelated edit fanned out to mixed dynamic+static -c caller"
   # Mutate bin/library.sh so library_value requires $1, triggering cross-file SC2119.
   cat > "$repo/bin/library.sh" <<'SH'
 #!/usr/bin/env bash
@@ -1131,22 +1160,25 @@ library_value() {
   printf '%s\n' "$1"
 }
 SH
-  # Sensitivity control: top-level sourced caller MUST invalidate cache and fail real ShellCheck.
-  rc=0
-  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-    "$repo/bin/fm-lint.sh" --jobs 1 bin/top-caller.sh 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "control: mutating sourced library must fail top-level caller under real ShellCheck: $out"
-  assert_contains "$out" SC2119 "control: mutated sourced library did not surface cross-file SC2119"
-  assert_not_contains "$out" 'cache hit bin/top-caller.sh' "control: mutated sourced library reused stale top-caller cache"
+  # Sensitivity controls: top-level source AND parent-shell unquoted heredoc substitution
+  # MUST both invalidate cache and fail real ShellCheck with SC2119.
+  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh; do
+    rc=0
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || rc=$?
+    [ "$rc" -ne 0 ] || fail "control: mutating sourced library must fail $root under real ShellCheck: $out"
+    assert_contains "$out" SC2119 "control: mutated sourced library did not surface cross-file SC2119 for $root"
+    assert_not_contains "$out" "cache hit $root" "control: mutated sourced library reused stale cache for $root"
+  done
   # Child-shell string roots are not read by ShellCheck: real ShellCheck still passes and cache hits.
-  for root in bin/child-only.sh bin/dynamic-child.sh; do
+  for root in bin/child-only.sh bin/dynamic-child.sh bin/mixed-child.sh; do
     out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$root failed after library mutation: $out"
     assert_contains "$out" "cache hit $root" "$root must reuse cache when only a child-shell string target changes"
     out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
       "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "uncached real ShellCheck on $root must agree with cache: $out"
   done
-  pass "real ShellCheck confirms child-shell strings stay outside its read set while top-level sources still invalidate"
+  pass "real ShellCheck confirms child-shell strings stay outside its read set while top-level and unquoted-heredoc parent sources invalidate"
 }
 
 test_relative_root_and_production_child_shell_helpers_stay_cacheable() {

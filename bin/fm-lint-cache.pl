@@ -575,9 +575,9 @@ sub command_dependencies {
                 my $payload = shift @words;
                 return unless defined $payload;
                 # ShellCheck never parses or reads files referenced inside child
-                # bash/sh -c strings: keep resolved targets for caller selection
-                # only, never as ShellCheck cache inputs or unknown-source poison.
-                return if $payload->{value} =~ /\x01/;
+                # bash/sh -c strings: keep statically resolved targets for caller
+                # selection only, never as ShellCheck cache inputs or unknown-source
+                # poison, even when another part of the -c payload is dynamic.
                 my %child_parameters;
                 $child_parameters{$_} = $words[$_]{value} for 0 .. $#words;
                 scan_program($path, $payload->{value}, $deps, $child_deps, $finite_backend, \%child_parameters, 1);
@@ -591,6 +591,46 @@ sub command_dependencies {
         my %child_parameters;
         $child_parameters{$_ + 1} = $words[$_]{value} for 0 .. $#words;
         $stdin->{parameters} = \%child_parameters;
+    }
+}
+sub scan_heredoc_parent_subs {
+    my ($path, $body, $deps, $child_deps, $finite_backend, $parameters, $in_child) = @_;
+    my $position = 0;
+    while ($position < length $body) {
+        my $char = substr($body, $position, 1);
+        if ($char eq '\\') {
+            $position += 2;
+            next;
+        }
+        if (substr($body, $position, 2) eq '$(') {
+            $position += 2;
+            my $program = balanced_text($body, \$position, '(', ')');
+            scan_program($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child)
+                unless $program =~ /^\(/;
+            next;
+        }
+        if (substr($body, $position, 2) eq '${') {
+            $position += 2;
+            my @subs;
+            balanced_text($body, \$position, '{', '}', \@subs);
+            scan_program($path, $_, $deps, $child_deps, $finite_backend, $parameters, $in_child) for @subs;
+            next;
+        }
+        if ($char eq '`') {
+            $position++;
+            my $program = '';
+            while ($position < length $body) {
+                my $part = substr($body, $position++, 1);
+                last if $part eq '`';
+                if ($part eq '\\' && $position < length($body) && substr($body, $position, 1) =~ /[\$`\\]/) {
+                    $part = substr($body, $position++, 1);
+                }
+                $program .= $part;
+            }
+            scan_program($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child);
+            next;
+        }
+        $position++;
     }
 }
 sub scan_program {
@@ -663,7 +703,10 @@ sub scan_program {
                         $position = $end < length($body) ? $end + 1 : $end;
                         $line =~ s/^\t+// if $heredoc->{tabs};
                         last if $line eq $heredoc->{delimiter};
-                        $program .= "$line\n" if exists $heredoc->{parameters};
+                        $program .= "$line\n" if exists $heredoc->{parameters} || !$heredoc->{quoted};
+                    }
+                    if (!$heredoc->{quoted}) {
+                        scan_heredoc_parent_subs($path, $program, $deps, $child_deps, $finite_backend, $parameters, $in_child);
                     }
                     if (exists $heredoc->{parameters}) {
                         my $child_parameters = $heredoc->{quoted} ? $heredoc->{parameters} : $parameters;
