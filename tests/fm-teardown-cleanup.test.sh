@@ -5345,6 +5345,38 @@ test_a_held_close_refuses_when_an_own_nested_copy_holds_another_repository() {
   pass "a held close refuses, with nothing removed, when an own nested copy holds a separate repository or another project's worktree"
 }
 
+# A bare repository carries no .git entry, so the scan every caller shares (the held close of an
+# own nested copy here, teardown --copy in tests/fm-teardown.test.sh) finds it by its HEAD, objects
+# and refs together. A commit only that repository holds would go with the copy.
+test_a_held_close_refuses_when_an_own_nested_copy_holds_a_bare_repository() {
+  local rc second nested commit
+  make_own_locked_copy_case held-bare-repo enclosing
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_CASE/project" rev-parse main)"
+  seed_backlog_in_flight "$FOREIGN_CASE"
+  second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+  held_foreign_unlanded "$second"
+  nested=$FOREIGN_COPY/.claude/backup.git
+  mkdir -p "$FOREIGN_COPY/.claude"
+  git clone -q --bare "$FOREIGN_CASE/project" "$nested" || fail 'held-bare-repo: cannot create the bare repository'
+  commit=$(git --git-dir="$nested" commit-tree 'HEAD^{tree}' -p HEAD -m 'unlanded commit only a bare repository holds') \
+    || fail 'held-bare-repo: cannot create the commit'
+  git --git-dir="$nested" update-ref refs/heads/unlanded "$commit"
+  held_snapshot "$FOREIGN_CASE" "$second"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "held-bare-repo: a held close must not remove an own copy that holds a bare repository: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "Git repository $nested inside task task-x1's nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+    "held-bare-repo: the refusal did not name the bare repository: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "nothing was removed" "$FOREIGN_CASE/stderr" 'held-bare-repo: the refusal did not say nothing was removed'
+  assert_present "$FOREIGN_COPY" 'held-bare-repo: the own nested copy was removed'
+  git --git-dir="$nested" cat-file -e "$commit" || fail 'held-bare-repo: the bare repository lost its commit'
+  assert_equals "$commit" "$(git --git-dir="$nested" rev-parse refs/heads/unlanded)" 'held-bare-repo: the bare repository ref moved'
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" 'held-bare-repo: the task record was removed'
+  held_assert_untouched held-bare-repo "$FOREIGN_CASE" "$second"
+  pass 'a held close refuses, with nothing removed, when an own nested copy holds a bare repository'
+}
+
 # A submodule of the task's own repository is not another repository: its git
 # directory lives in the own repository's, so the held close still goes ahead.
 test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository() {
@@ -8695,6 +8727,7 @@ test_task_closes_beside_a_foreign_copy_with_unpushed_commits
 test_held_copy_record_has_one_exact_line_per_copy
 test_a_held_close_removes_only_the_tasks_own_nested_copy
 test_a_held_close_refuses_when_an_own_nested_copy_holds_another_repository
+test_a_held_close_refuses_when_an_own_nested_copy_holds_a_bare_repository
 test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository
 test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal
 test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wait

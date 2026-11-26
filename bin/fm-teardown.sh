@@ -603,9 +603,10 @@
 #   as a copy whose record was lost. It reads no task record and takes no --force,
 #   --drop-file or --legacy-record: each is refused by name with exit 2, and so is
 #   a relative path, a symbolic link or an unknown flag. It reuses the ordinary
-#   foreign-copy code unchanged (bin/fm-teardown-nested-lib.sh, "By-path teardown"
-#   owns the mechanics): the same landed-work test, the same recorded-bundle route
-#   and the same non-forced removal. docs/agent-control.md owns the operator steps.
+#   foreign-copy code (bin/fm-teardown-nested-lib.sh, "By-path teardown" owns the
+#   mechanics): the same landed-work test, the same recorded-bundle route and the
+#   same non-forced removal; the held-task exception and the ignored-file preserve
+#   below are what differ. docs/agent-control.md owns the operator steps.
 #   The target is a worktree registered strictly inside a project clone under this
 #   home's projects/ or inside a Treehouse pool slot of one, and is removed with
 #   non-forced `git -C <clone> worktree remove` (Vernant's closeout driver when it
@@ -622,25 +623,34 @@
 #     - no process has it as cwd or holds a file open in it, by a scan of every open
 #       file that refuses when it cannot run, run first and again immediately before
 #       the audit line and the removal; nothing is ever signalled;
-#     - it is a clean worktree root that holds no ignored file existing nowhere
-#       else, no other registered worktree, no Git repository or worktree that no
-#       clone registers (a separate clone or another project's worktree, under
-#       .claude/ too), and no lock but Vernant's creation lock, whose launcher
-#       process must be proved gone: a ps that was refused, failed or said anything
-#       but "no such process" counts as possibly alive (rule=lock-launcher-owner);
+#     - it is a clean worktree root and holds no ignored file that exists nowhere
+#       else outside .claude and .opencode, which are preserved whole (the retained
+#       mode of the ignored-file preserve) in data/<record-id>/nested-copy-preserved
+#       before the removal; ignored files only: .claude or .opencode content that
+#       git does not ignore is untracked and stops git's own non-forced removal;
+#     - it holds no other registered worktree and no other Git repository, found
+#       anywhere in it, .claude and .opencode included: a nested clone, another
+#       project's worktree or a bare repository (HEAD, objects and refs together);
+#     - it carries no lock but Vernant's creation lock, whose launcher process must
+#       be proved gone: a ps that was refused, failed or said anything but "no such
+#       process" counts as possibly alive (rule=lock-launcher-owner);
 #     - its HEAD passes teardown_landed with no branch and the plain no-mistakes
 #       rule (reachable from origin's default branch, or its content already
 #       there), or the recorded-bundle route above: a verified bundle recorded in
 #       data/<record-id>/preservation-bundles.tsv, attended only, and the captain's
 #       land-or-drop call, which for a copy with no task row is ANY open
 #       captain-held row whose reason names the bundle path and every recorded tip.
-#       That exception to the held-task rule is judged at the point it is granted
-#       (teardown_by_path_exception_clear): it holds only while no live record in
-#       any local home names the copy, no live task's slot claim stands on it (the
-#       run's own record id included), and the copy holds no other registered
-#       worktree and no Git repository no clone registers. When no row names the
-#       bundle, the refusal prints the exact bin/fm-captain-hold.sh hold command.
-#       Landed work needs no call.
+#       That exception to the held-task rule is judged where it is granted
+#       (teardown_by_path_exception_clear), by the owner of each proof, whatever ran
+#       before it: a clean stable tree and no unique ignored file, no live record in
+#       any local home, no process in the copy or holding a file in it, no creation
+#       lock launcher that may be alive, no live task's slot claim (the run's own
+#       record id included), no other registered worktree or Git repository, and
+#       the recorded bundle verified again with every recorded tip named by the open
+#       call; its refusal names that row. Locating the copy, the audit record, the
+#       path lock and the lack of any --force are the route's mechanics, not the
+#       widened harm. When no row names the bundle, the refusal prints the exact
+#       bin/fm-captain-hold.sh hold command. Landed work needs no call.
 #   The record id names data/<record-id>/ for the bundle record: --record-id <id>,
 #   or by default `copy-` and the first 16 hex digits of the SHA-256 of the copy's
 #   canonical path, which a refusal prints. An id that names a live task refuses.
@@ -653,7 +663,8 @@
 #   no clone still registers, every registration list read, exits 0 and names its
 #   audit line, or refuses when no line names it; a gone copy a clone still
 #   registers refuses and names `git worktree prune`, which this mode never runs,
-#   and a registration list that cannot be read refuses, for a present copy too.
+#   and a registration list or projects folder that cannot be read refuses, for a
+#   present copy too.
 #
 # Transient / stale worktree git lock recovery (teardown-lock-race): a crew process
 # killed mid-git-operation can leave a .git/worktrees/<wt>/index.lock (or, for a

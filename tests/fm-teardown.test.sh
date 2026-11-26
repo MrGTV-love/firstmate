@@ -5052,11 +5052,13 @@ by_path_bundle_held_case() {  # <name> [project|slot]
 # Its harm rows are judged where the exception is granted: H1 a live task record in any local home names
 # the copy, H2 a live task's claim on the copy's slot (a claim naming the run's own record id too),
 # H3 other work no bundle holds inside the copy (a registered worktree, or a Git repository or worktree
-# no clone registers, under ignored .claude too). Each row refuses the same bundle-held copy that the
-# control run, with every row clear, removes.
+# no clone registers, a bare repository included, under ignored .claude too), H4 a commit the verified
+# bundle does not hold, H5 a process in the copy, H6 a Vernant creation lock whose launcher is live, H7 a
+# dirty tree or an ignored file that exists nowhere else. Each row refuses the same bundle-held copy that
+# the control run, with every row clear, removes.
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row() {
-  local shape case_dir rc mate nested other
-  for shape in control h1-record-this-home h1-record-other-home h2-claim-record-id h3-nested-clone h3-other-worktree h3-registered-worktree; do
+  local shape case_dir rc mate nested other pid
+  for shape in control h1-record-this-home h1-record-other-home h2-claim-record-id h3-nested-clone h3-other-worktree h3-registered-worktree h3-bare-repository h4-missing-tip h5-process-cwd h6-live-launcher h6-dead-launcher h7-dirty-tree h7-unique-ignored; do
     case "$shape" in h2-*) by_path_bundle_held_case "by-path-exc-$shape" slot ;; *) by_path_bundle_held_case "by-path-exc-$shape" ;; esac
     case_dir=$BP_CASE
     mate=$case_dir/mate-home
@@ -5089,12 +5091,43 @@ test_by_path_exception_to_the_held_task_rule_judges_each_harm_row() {
         printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
         mkdir -p "$BP_COPY/.claude"
         git -C "$BP_COPY" worktree add -q -b fm/inner "$BP_COPY/.claude/inner" HEAD || fail "by-path-exc-$shape: cannot add the inner worktree" ;;
+      h3-bare-repository)
+        printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        nested=$BP_COPY/.claude/backup.git
+        mkdir -p "${nested%/*}"
+        git clone -q --bare "$case_dir/project" "$nested" || fail "by-path-exc-$shape: cannot create the bare repository"
+        BP_NESTED_HEAD=$(git --git-dir="$nested" commit-tree 'HEAD^{tree}' -p HEAD -m 'unlanded commit only a bare repository holds')
+        git --git-dir="$nested" update-ref refs/heads/unlanded "$BP_NESTED_HEAD" ;;
+      h4-missing-tip)
+        printf 'made after the bundle\n' > "$BP_COPY/after-bundle.txt"
+        git -C "$BP_COPY" add after-bundle.txt
+        git -C "$BP_COPY" commit -qm 'a commit the recorded bundle never saw'
+        BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD) ;;
+      h5-process-cwd)
+        teardown_fixture_start "$BP_COPY" KILL sleep 300
+        pid=$TEARDOWN_FIXTURE_PID ;;
+      h6-live-launcher | h6-dead-launcher)
+        by_path_vernant_driver "$case_dir"
+        if [ "$shape" = h6-live-launcher ]; then
+          teardown_fixture_start "$case_dir" KILL sleep 300
+          pid=$TEARDOWN_FIXTURE_PID
+        else
+          dead_launcher_pid
+          pid=$FOREIGN_DEAD_PID
+        fi
+        by_path_locked "$case_dir" "$pid" ;;
+      h7-dirty-tree)
+        printf 'an edit no commit holds\n' >> "$BP_COPY/work.txt" ;;
+      h7-unique-ignored)
+        printf '%s\n' secret.txt >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        printf 'exists nowhere else\n' > "$BP_COPY/secret.txt" ;;
     esac
     rc=0
-    run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    if [ "$shape" = control ]; then
+    FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = control ] || [ "$shape" = h6-dead-launcher ]; then
       expect_code 0 "$rc" "by-path-exc-$shape: with every harm row clear the bundle-held copy goes: $(cat "$case_dir/stderr")"
       assert_absent "$BP_COPY" "by-path-exc-$shape: the copy was not removed"
+      [ "$shape" != h6-dead-launcher ] || assert_equals 1 "$(wc -l < "$case_dir/closeout.log" | tr -d ' ')" "by-path-exc-$shape: the closeout driver did not run exactly once"
       assert_grep "land-or-drop call for bundle $case_dir/bundles/work.bundle is held on task bundle-call" "$case_dir/stderr" "by-path-exc-$shape: the call was not named"
       assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-exc-$shape: not exactly one audit record"
     else
@@ -5105,12 +5138,171 @@ test_by_path_exception_to_the_held_task_rule_judges_each_harm_row() {
         h3-nested-clone | h3-other-worktree)
           assert_present "$nested/unpushed.txt" "by-path-exc-$shape: the nested repository's work is gone"
           assert_equals "$BP_NESTED_HEAD" "$(git -C "$nested" rev-parse HEAD)" "by-path-exc-$shape: the nested repository's HEAD moved" ;;
+        h3-bare-repository)
+          git --git-dir="$nested" cat-file -e "$BP_NESTED_HEAD" || fail "by-path-exc-$shape: the bare repository lost its commit" ;;
         h3-registered-worktree)
           assert_present "$BP_COPY/.claude/inner" "by-path-exc-$shape: the inner worktree is gone" ;;
+        h5-process-cwd)
+          kill -0 "$pid" 2>/dev/null || fail "by-path-exc-$shape: the run signalled the process" ;;
+        h6-live-launcher)
+          assert_grep 'rule=lock-launcher-owner' "$case_dir/stderr" "by-path-exc-$shape: no named rule"
+          kill -0 "$pid" 2>/dev/null || fail "by-path-exc-$shape: the run signalled the launcher"
+          assert_absent "$case_dir/closeout.log" "by-path-exc-$shape: the driver executed a release" ;;
       esac
     fi
   done
   pass 'the by-path exception to the held-task rule removes a bundle-held copy only while no live record, live slot claim or other unbundled work stands in the way'
+}
+
+# The exception's own reason is the last word: harm that appears after every earlier check has passed (a
+# nested repository planted at the first `git bundle verify`) is refused by the by-path exception, and the
+# final REFUSED line names that row, not the generic "HEAD is not proved landed" envelope.
+test_by_path_exception_refusal_keeps_its_own_reason() {
+  local case_dir rc nested
+  by_path_bundle_held_case by-path-exc-reason
+  case_dir=$BP_CASE
+  printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+  nested=$BP_COPY/.claude/planted
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" bundle verify "*)
+    if [ ! -e "$case_dir/planted" ]; then
+      : > "$case_dir/planted"
+      mkdir -p "$BP_COPY/.claude"
+      "$REAL_GIT_FOR_TEST" clone -q "$case_dir/project" "$nested"
+    fi ;;
+  *" worktree remove "*) printf '%s\n' "\$*" >> "$case_dir/git-remove.log" ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-exc-reason: harm planted after the early checks must refuse: $(cat "$case_dir/stderr")"
+  assert_present "$nested/.git" 'by-path-exc-reason: the planted repository was not planted'
+  assert_grep 'bundle preservation unavailable' "$case_dir/stderr" 'by-path-exc-reason: the exception did not refuse'
+  grep '^REFUSED:' "$case_dir/stderr" | grep -Fq 'no clone registers' || fail "by-path-exc-reason: the final REFUSED line does not carry the exception's reason: $(cat "$case_dir/stderr")"
+  if grep '^REFUSED:' "$case_dir/stderr" | grep -Fq 'is not proved landed'; then fail 'by-path-exc-reason: the final REFUSED line is the generic landing envelope'; fi
+  by_path_assert_untouched "$case_dir" by-path-exc-reason
+  pass 'a refusal by the by-path exception keeps the exception own reason as the final REFUSED text'
+}
+
+# A bare repository carries no .git entry; the scan finds it by its HEAD, objects and refs together, under
+# ignored .claude too, and a commit only it holds is never deleted with the copy.
+test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude() {
+  local case_dir rc nested commit
+  make_by_path_case by-path-bare
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+  nested=$BP_COPY/.claude/backup.git
+  mkdir -p "${nested%/*}"
+  git clone -q --bare "$case_dir/project" "$nested" || fail 'by-path-bare: cannot create the bare repository'
+  commit=$(git --git-dir="$nested" commit-tree 'HEAD^{tree}' -p HEAD -m 'unlanded commit only a bare repository holds')
+  git --git-dir="$nested" update-ref refs/heads/unlanded "$commit"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-bare: a copy holding a bare repository must refuse: $(cat "$case_dir/stderr")"
+  assert_grep "$nested" "$case_dir/stderr" 'by-path-bare: the refusal does not name the bare repository'
+  git --git-dir="$nested" cat-file -e "$commit" || fail 'by-path-bare: the bare repository lost its commit'
+  by_path_assert_untouched "$case_dir" by-path-bare
+  rm -rf "$nested"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-bare: the same copy without the bare repository must go: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-bare: the copy was not removed'
+  pass 'teardown --copy refuses a copy holding a bare repository with an unpushed commit under .claude, and removes the same copy once it holds none'
+}
+
+# .claude and .opencode are preserved whole (the retained mode) before the removal: a unique ignored file
+# there is found in data/<record-id>/nested-copy-preserved afterwards instead of being lost or refused.
+# One that git does not ignore is untracked content and stops git's own non-forced removal, and a preserve
+# that cannot publish leaves the copy where it is.
+test_by_path_preserves_claude_whole_and_removes_the_copy() {
+  local shape case_dir rc kept
+  for shape in ignored not-ignored preserve-cannot-publish; do
+    make_by_path_case "by-path-claude-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    mkdir -p "$BP_COPY/.claude/sub" "$BP_COPY/.opencode"
+    printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+    printf 'unique note\n' > "$BP_COPY/.claude/sub/note.txt"
+    printf 'unique opencode state\n' > "$BP_COPY/.opencode/state.json"
+    [ "$shape" = not-ignored ] || printf '%s\n' .claude/ .opencode/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    if [ "$shape" = preserve-cannot-publish ]; then
+      mkdir -p "$case_dir/data/pres-1"
+      printf 'a file where the preserve parent must be a directory\n' > "$case_dir/data/pres-1/nested-copy-preserved"
+    fi
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" --record-id pres-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    case "$shape" in
+      ignored)
+        expect_code 0 "$rc" "by-path-claude-$shape: a copy whose only unique files sit under .claude and .opencode must go: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "by-path-claude-$shape: the copy was not removed"
+        kept=$(find "$case_dir/data/pres-1/nested-copy-preserved" -type d -name files -print -quit 2>/dev/null)
+        [ -n "$kept" ] || fail "by-path-claude-$shape: nothing was preserved under data/pres-1/nested-copy-preserved"
+        assert_equals 'unique settings' "$(cat "$kept/.claude/settings.local.json")" "by-path-claude-$shape: .claude/settings.local.json was not preserved with its bytes"
+        assert_equals 'unique note' "$(cat "$kept/.claude/sub/note.txt")" "by-path-claude-$shape: .claude/sub/note.txt was not preserved with its bytes"
+        assert_equals 'unique opencode state' "$(cat "$kept/.opencode/state.json")" "by-path-claude-$shape: .opencode/state.json was not preserved with its bytes" ;;
+      not-ignored)
+        expect_code 1 "$rc" "by-path-claude-$shape: untracked, not ignored .claude content stops git's own removal: $(cat "$case_dir/stderr")"
+        by_path_assert_untouched "$case_dir" "by-path-claude-$shape"
+        assert_present "$BP_COPY/.claude/settings.local.json" "by-path-claude-$shape: the settings file is gone" ;;
+      preserve-cannot-publish)
+        expect_code 1 "$rc" "by-path-claude-$shape: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+        assert_grep 'could not be preserved' "$case_dir/stderr" "by-path-claude-$shape: no named reason"
+        assert_present "$BP_COPY/.claude/settings.local.json" "by-path-claude-$shape: the settings file is gone"
+        by_path_registered "$BP_CLONE" "$BP_COPY" || fail "by-path-claude-$shape: the copy is no longer registered"
+        assert_absent "$case_dir/git-remove.log" "by-path-claude-$shape: git worktree remove was called"
+        rm -f "$case_dir/data/pres-1/nested-copy-preserved"
+        rc=0
+        run_by_path "$case_dir" "$BP_COPY" --record-id pres-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        expect_code 0 "$rc" "by-path-claude-$shape: with the obstacle gone the copy goes: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "by-path-claude-$shape: the copy was not removed" ;;
+    esac
+  done
+  pass 'teardown --copy preserves .claude and .opencode whole and removes the copy, refuses when git does not ignore them, and keeps the copy when the preserve cannot publish'
+}
+
+# An unreadable projects folder is not an empty one: a gone copy with an audit line is not reported done
+# while the folder that lists the clones cannot be read. A link to nothing is unreadable for any user; a
+# listing that fails is made by a ls that fails for that folder.
+test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read() {
+  local shape case_dir rc
+  for shape in dangling-link listing-fails; do
+    make_by_path_case "by-path-projects-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-projects-$shape: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-projects-$shape: the copy was not removed"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-projects-$shape: with a readable folder a finished removal is reported: $(cat "$case_dir/stderr")"
+    assert_grep 'is already gone, and this run removed nothing' "$case_dir/stderr" "by-path-projects-$shape: no finished-removal message with a readable folder"
+    case "$shape" in
+      dangling-link)
+        rm -rf "$BP_HOME/projects"
+        ln -s "$case_dir/no-such-folder" "$BP_HOME/projects" ;;
+      listing-fails)
+        cat > "$case_dir/fakebin/ls" <<SH
+#!/usr/bin/env bash
+for last; do :; done
+if [ "\$last" = "$BP_HOME/projects" ]; then echo 'ls: cannot read the folder' >&2; exit 1; fi
+exec /bin/ls "\$@"
+SH
+        chmod +x "$case_dir/fakebin/ls" ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-projects-$shape: a gone copy must not be reported done while the projects folder cannot be read: $(cat "$case_dir/stderr")"
+    assert_grep 'could not be read' "$case_dir/stderr" "by-path-projects-$shape: the refusal does not say the folder could not be read"
+    if grep -Fq 'already gone' "$case_dir/stderr"; then fail "by-path-projects-$shape: a gone copy was reported done"; fi
+    assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-projects-$shape: the refused rerun changed the audit record"
+  done
+  pass 'teardown --copy does not report a gone copy done while the projects folder cannot be read'
 }
 
 # A process that begins holding the copy after the first holder scan has returned and before the
@@ -5330,6 +5522,10 @@ test_by_path_refuses_a_gone_copy_when_a_registration_list_cannot_be_read
 test_by_path_refuses_an_unregistered_nested_repository_under_the_copy
 test_by_path_refuses_when_the_audit_record_cannot_be_written
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row
+test_by_path_exception_refusal_keeps_its_own_reason
+test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude
+test_by_path_preserves_claude_whole_and_removes_the_copy
+test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read
 test_by_path_refuses_a_holder_that_starts_after_the_first_scan
 )
 
