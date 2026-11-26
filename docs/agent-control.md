@@ -153,7 +153,9 @@ The [verification record](verification/runtime-backends.md#claude-background-tas
    On the adoption route, the task's own out-of-scope commits and uncommitted edits never block it, never change the recorded scope, and are printed as a labelled drift report by both `fm-control relaunch` and `fm-spawn --relaunch`.
    When `STATE` is a directory and the write succeeds, each run also writes the complete report to `state/<id>.drift-report.txt`; when more than a bounded sample of `uncertain,ignored` (git-ignored or generated) paths changed, the printed report then shows that sample, their count and the file's path, and every other path, each `proven` one included, is always printed.
    With no such directory, or when the write fails, the complete report is printed instead.
-   Each later report for the task replaces that file, so a session-end relaunch wake that quotes the first report's count can name a file whose list differs from that count.
+   Each later report whose write succeeds replaces that file.
+   A report that could not be produced replaces it with its one-line reason, and a failed write leaves the earlier file in place.
+   A session-end relaunch wake that quotes one report's count can therefore name a file whose list differs from that count.
    A path that reaches `HEAD` only through a merged side branch is labelled `uncertain`, never `proven`, and the launch artifacts Firstmate wrote (named by `state/<id>.wiring-sha`) and its `<artifact>.fm-kept.<time>.<n>` kept copies of them are not listed.
    A relaunch through `bin/fm-control.sh` that succeeds also removes that task's own `state/.session-end-refusal-<id>`, so a later death is a new cause; a hand-run `bin/fm-spawn.sh --relaunch` does not clear it, which is the documented manual-relaunch limit.
    A pool slot that another task claims refuses the relaunch by name (`custody_slot_claim`), unless that task's own record places its copy strictly inside the slot; a relaunch checks no other peer claims beyond that.
