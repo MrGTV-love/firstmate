@@ -3114,7 +3114,7 @@ rerecord_die() { # <message naming the step 3 entries>
 
 do_rerecord_slot() {
   local project copy branch manifest snap prior_sha manifest_sha head old_base new_base noop=0 line
-  local default tip jclass launch_proof=ok journal_proof stopped_proof=ok backlog_proof=ok would=pass
+  local jclass launch_proof=ok journal_proof stopped_proof=ok backlog_proof=ok would=pass
   local staged_sha added=0 released=0 side=0 entries note_json rc
   local -a prior=() scope=()
   local journal="$STATE/$ID.control-relaunch"
@@ -3194,22 +3194,12 @@ do_rerecord_slot() {
   # 5. Content and location proofs (1, 4, 5, 6, 7).
   fm_slot_rerecord_prove_shape "$snap/record" || rerecord_refuse
   fm_slot_rerecord_prove_records "$project" "$copy" "$manifest" || rerecord_refuse
-  fm_slot_rerecord_identity_verdict "$snap/manifest.json" "$copy" "$branch" "$ID" > "$snap/identity" || true
-  fm_slot_rerecord_verdict_ok "$snap/identity" manifest_unreadable || rerecord_refuse
+  fm_slot_rerecord_identity_step "$snap" "$snap/manifest.json" "$copy" "$branch" "$ID" || rerecord_refuse
   fm_slot_rerecord_prove_copy "$project" "$copy" "$branch" "$ID" "$META" "$STATE" "$snap/manifest.json" || rerecord_refuse
   old_base=$(fm_meta_get "$snap/record" slot_base_sha)
-  fm_slot_rerecord_base_verdict "$snap/manifest.json" "$copy" "$project" "$old_base" "$head" > "$snap/base" || true
-  fm_slot_rerecord_verdict_ok "$snap/base" base_invalid || rerecord_refuse
-  default=$(fm_task_copy_default_branch "$project" 2>/dev/null) || default=
-  tip=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --verify --quiet "refs/remotes/origin/$default^{commit}" 2>/dev/null) || tip=
-  fm_slot_own_line_paths "$copy" "$tip" "$head" > "$snap/own-line" 2>"$snap/own-line.err" ||
-    { fm_slot_rerecord_fail scope_entry_not_own_work "the task's own first-parent line could not be read from the copy, so no entry can be attributed"; rerecord_refuse; }
-  fm_slot_rerecord_uncommitted_paths "$copy" > "$snap/uncommitted" 2>"$snap/uncommitted.err" ||
-    { fm_slot_rerecord_fail scope_release_strands_work "the copy's uncommitted set could not be read, so no stranded work is proved absent"; rerecord_refuse; }
   while IFS= read -r line; do prior+=("$line"); done < <(sed -n 's/^slot_owned_path=//p' "$snap/record")
-  fm_slot_rerecord_scope_verdict "$snap/manifest.json" "$copy" "$head" "$snap/own-line" "$snap/uncommitted" \
-    ${prior[@]+"${prior[@]}"} > "$snap/scope" || true
-  fm_slot_rerecord_verdict_ok "$snap/scope" scope_invalid || rerecord_refuse
+  fm_slot_rerecord_history_step "$snap" "$snap/manifest.json" "$copy" "$project" "$old_base" "$head" \
+    ${prior[@]+"${prior[@]}"} || rerecord_refuse
   fm_slot_rerecord_prove_no_strand "$snap/uncommitted" "$snap/manifest.json" ${prior[@]+"${prior[@]}"} || rerecord_refuse
 
   # The report lines, printed for every run that reached here.

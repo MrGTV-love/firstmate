@@ -940,6 +940,40 @@ test_E2_relaunch_without_rerecord_refuses_base_mismatch() {
   rr_ok E2 "relaunch on F refuses base_mismatch; record unchanged; sentinel empty"
 }
 
+# rr_replay_before_write <id>: fm_slot_rerecord_verdict on the case's live manifest, judged against the record as it is
+# before the write (its base and scope), as RR_REPLAY.
+rr_replay_before_write() {
+  local base line rc
+  local -a prior=()
+  base=$(rr_field "$RR_META" slot_base_sha)
+  while IFS= read -r line; do prior+=("$line"); done < <(sed -n 's/^slot_owned_path=//p' "$RR_META")
+  RR_REPLAY=$(bash -c '. "$1/bin/fm-task-copy-lib.sh" && . "$1/bin/fm-slot-provision-lib.sh" && shift && fm_slot_rerecord_verdict "$@"' \
+    _ "$ROOT" "$RR_MANIFEST" "$RR_DIR/wt" "$RR_DIR/proj" "$RR_ID" "fm/$RR_ID" "$base" ${prior[@]+"${prior[@]}"}); rc=$?
+  [ "$rc" = 0 ] || fail "$1: the replay could not run (exit $rc): $RR_REPLAY"
+}
+
+# The replay and the write run one content-proof sequence: on the same renewed manifest, the replay against the
+# pre-write record gives the write's own verdict, its report lines when admitted and its refusal when refused.
+test_RP1_the_replay_and_the_write_give_one_content_verdict() {
+  local out rc line reason
+  rr_make_f RP1
+  rr_replay_before_write RP1
+  [ "$(printf '%s\n' "$RR_REPLAY" | head -n 1)" = ok ] || fail "RP1: the replay refused the admitted renewal: $RR_REPLAY"
+  out=$(rr_write); rc=$?
+  expect_code 0 "$rc" "RP1 write"$'\n'"$out"
+  [ "$(printf '%s\n' "$RR_REPLAY" | wc -l | tr -d ' ')" -gt 1 ] || fail "RP1: the replay printed no report lines: $RR_REPLAY"
+  while IFS= read -r line; do
+    printf '%s\n' "$out" | grep -qxF -- "$line" || fail "RP1: the write did not print the replay's report line '$line'"$'\n'"$out"
+  done < <(printf '%s\n' "$RR_REPLAY" | sed -n '2,$p')
+  rr_setup_H6 RP1-refused
+  rr_replay_before_write RP1-refused
+  reason=${RR_REPLAY%%$'\t'*}
+  [ "$reason" = scope_entry_not_own_work ] || fail "RP1: the replay did not refuse the untouched entry: $RR_REPLAY"
+  [ "$(printf '%s\n' "$RR_REPLAY" | wc -l | tr -d ' ')" = 1 ] || fail "RP1: the replay refusal is not one line: $RR_REPLAY"
+  rr_expect_refusal RP1-refused "$reason: ${RR_REPLAY#*$'\t'};"
+  rr_ok RP1 "on one renewed manifest the replay gives the write's verdict: ok with the write's report lines, and the write's refusal reason and detail"
+}
+
 
 # --- harmful cases (H) and their setups -------------------------------------------------------------
 # Each rr_setup_<ID> builds F and changes its decisive fact; the sensitivity controls reuse the same setups.
@@ -2235,6 +2269,7 @@ test_L18_an_audit_that_cannot_be_rewritten_is_named_as_not_closed
 test_L19_an_already_recorded_run_names_the_audit_it_reconciled
 test_E1_relaunch_after_rerecord_adopts
 test_E2_relaunch_without_rerecord_refuses_base_mismatch
+test_RP1_the_replay_and_the_write_give_one_content_verdict
 test_H1_owner_mismatch
 test_H2_worktree_path_mismatch
 test_H3_base_not_forward
