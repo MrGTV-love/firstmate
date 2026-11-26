@@ -428,15 +428,43 @@ sub balanced_text {
     my ($body, $position, $open, $close, $subs) = @_;
     my $start = $$position;
     my $depth = 1;
+    my (@cases, $cmd_start);
+    $cmd_start = 1;
     while ($$position < length $body) {
         my $char = substr($body, $$position, 1);
-        if ($char eq $open) { $depth++; $$position++; next; }
+        if ($char eq $open) {
+            if ($open eq '(' && @cases && $cases[-1] eq 'pattern') {
+                $$position++;
+                next;
+            }
+            $depth++;
+            $$position++;
+            $cmd_start = 1;
+            next;
+        }
         if ($char eq $close) {
+            if ($open eq '(' && @cases && $cases[-1] eq 'pattern') {
+                $cases[-1] = 'body';
+                $$position++;
+                $cmd_start = 1;
+                next;
+            }
             $$position++;
             return substr($body, $start, $$position - $start - 1) if --$depth == 0;
             next;
         }
-        if ($char =~ /[\s;&|<>]/) { $$position++; next; }
+        if ($char eq ';' && $open eq '(' && @cases && $cases[-1] eq 'body'
+            && substr($body, $$position + 1, 1) =~ /[;&]/) {
+            $cases[-1] = 'pattern';
+            $$position += 2;
+            $cmd_start = 1;
+            next;
+        }
+        if ($char =~ /[\s;&|<>]/) {
+            $cmd_start = 1 if $char =~ /[\n;|&]/;
+            $$position++;
+            next;
+        }
         if ($char eq '#' && $open eq '(') {
             my $end = index($body, "\n", $$position);
             $$position = $end < 0 ? length($body) : $end;
@@ -445,6 +473,22 @@ sub balanced_text {
         my $before = $$position;
         my $word = shell_word($body, $position, {}, $close);
         push @$subs, @{$word->{subs}} if defined $subs;
+        if ($open eq '(') {
+            if ($cmd_start && $word->{raw} eq 'case') {
+                push @cases, 'header';
+                $cmd_start = 0;
+            } elsif (@cases && $cases[-1] eq 'header' && $word->{raw} eq 'in') {
+                $cases[-1] = 'pattern';
+                $cmd_start = 0;
+            } elsif ($cmd_start && @cases && $word->{raw} eq 'esac') {
+                pop @cases;
+                $cmd_start = 0;
+            } elsif ($cmd_start && $word->{raw} =~ /^(?:if|then|elif|else|while|until|do|!|\{)$/) {
+                $cmd_start = 1;
+            } else {
+                $cmd_start = 0;
+            }
+        }
         $$position++ if $$position == $before;
     }
     return substr($body, $start);
