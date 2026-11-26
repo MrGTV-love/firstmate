@@ -37,7 +37,8 @@
 # the ordinary beacon threshold and the separate finite cap for a bound
 # rewake during a legitimate handling turn.
 #
-# Recovery, only for a verdict other than healthy or idle, under this home's watchdog lock:
+# Recovery, only for a verdict other than healthy, idle, or unknown-session,
+# under this home's watchdog lock:
 #   1. Stop a live watcher only after identity-bound repeated observations
 #      prove no process-tree CPU or beacon progress for STALE_SECS. First or
 #      uncertain samples and advancing work are preserved regardless of beacon
@@ -60,7 +61,8 @@
 # FM_WATCHDOG_ALARM_INTERVAL_SECS (default 3600). A healthy or idle verdict
 # clears the episode.
 #
-# Exit 0: healthy, idle, recovered, or waiting out the retry interval.
+# Exit 0: healthy, idle, unknown-session, recovered, or waiting out the retry
+# interval.
 # Exit 1: still unhealthy after an attempt, including a no-op. Exit 2: usage.
 # State: state/.watchdog-episode (attempt count and times), state/.watchdog.log
 # (bounded), state/.watchdog.lock, and state/.watchdog-progress (identity-bound

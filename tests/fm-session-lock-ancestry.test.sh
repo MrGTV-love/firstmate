@@ -1168,7 +1168,7 @@ acquire_against_holder() {  # <dir> <fakebin> <holder-pid> <mode>
 }
 
 test_unreadable_live_holder_is_unknown_and_never_taken_over() {
-  local fakebin got dir holder harness_dir fake_info
+  local fakebin got dir holder fake_info
   REAL_PS=$(command -v ps)
   fakebin=$(fm_fakebin "$TMP_ROOT/holder-read")
   holder_ps_fixture "$fakebin"
@@ -1187,10 +1187,7 @@ test_unreadable_live_holder_is_unknown_and_never_taken_over() {
   got=$(alive_status "$fakebin" comm-126 /nonexistent/fm-proc-info.py); [ "$got" = 2 ] || fail "a7: ps exit 126 with an unusable fallback answered $got, expected 2"
   pass "session-lock: fm_harness_pid_alive answers 0 live harness, 1 dead or not a harness, 2 unreadable"
 
-  # A live holder outside the chain: a plain sleep, and one named claude.
-  harness_dir="$TMP_ROOT/holder-read/harness"
-  mkdir -p "$harness_dir"
-  ln -s /bin/sleep "$harness_dir/claude"
+  # A live holder outside the chain; the stand-in ps sets its identity.
   /bin/sleep 300 & holder=$!
   BG_FIXTURE_PIDS+=("$holder")
   kill -0 "$holder" || fail "the live holder fixture did not start"
