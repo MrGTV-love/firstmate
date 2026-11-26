@@ -123,7 +123,7 @@ TEARDOWN_CLOSEOUT_OUT=
 TEARDOWN_CLOSEOUT_STDOUT=
 TEARDOWN_FOREIGN_RULE=
 TEARDOWN_FOREIGN_PID=
-TEARDOWN_FOREIGN_HELD=
+TEARDOWN_FOREIGN_HOLDER_FILE=
 TEARDOWN_REFUSED_COPIES=()
 TEARDOWN_FRICTION_GUARD=FM-TEARDOWN-PRESERVATION
 
@@ -144,8 +144,8 @@ teardown_copy_question() {  # <rule> <copy>
     copy-ignored-files) printf 'What owner-approved disposition covers the ignored files only %s holds (%s)? Keep the copy; no removal or discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     copy-anchor-commit) printf 'Which commit does the existing preservation anchor protect, and does it cover %s (%s)? Keep the copy and the anchor; no overwrite is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     process-cwd-owner)
-      if [ -n "$TEARDOWN_FOREIGN_HELD" ]; then
-        printf 'Which task or person owns process %s, which holds %s open in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$TEARDOWN_FOREIGN_HELD" "$2"
+      if [ -n "$TEARDOWN_FOREIGN_HOLDER_FILE" ]; then
+        printf 'Which task or person owns process %s, which holds %s open in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$TEARDOWN_FOREIGN_HOLDER_FILE" "$2"
       else
         printf 'Which task or person owns process %s, which is running in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2"
       fi ;;
@@ -1188,7 +1188,7 @@ teardown_foreign_copy_unowned() {  # <copy>
   local copy=$1 rc=0 pids pid
   TEARDOWN_OWN_SCANNED=0
   TEARDOWN_FOREIGN_PID=
-  TEARDOWN_FOREIGN_HELD=
+  TEARDOWN_FOREIGN_HOLDER_FILE=
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
   fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
   case "$rc" in
@@ -3106,7 +3106,7 @@ teardown_by_path_holders() {  # <copy>
   done <<< "$out"
   [ -z "$hits" ] || {
     TEARDOWN_FOREIGN_PID=${hits%% *}
-    TEARDOWN_FOREIGN_HELD=$held
+    TEARDOWN_FOREIGN_HOLDER_FILE=$held
     teardown_by_path_why "$(fm_refuse_text "$copy") is in use: $TEARDOWN_BY_PATH_HOLDER (processes holding it: $hits)"
     return 1
   }
@@ -3293,7 +3293,7 @@ teardown_by_path_exception_clear() {  # <bundle> <required-tips, space separated
   TEARDOWN_BY_PATH_EXCEPTION_WHY=$why
   TEARDOWN_BY_PATH_EXCEPTION_RULE=$why_rule
   TEARDOWN_BY_PATH_EXCEPTION_PID=$TEARDOWN_FOREIGN_PID
-  TEARDOWN_BY_PATH_EXCEPTION_HELD=$TEARDOWN_FOREIGN_HELD
+  TEARDOWN_BY_PATH_EXCEPTION_HELD=$TEARDOWN_FOREIGN_HOLDER_FILE
   teardown_bundle_refuse "$1: the by-path exception to the held-task rule does not apply: $why"
 }
 
@@ -3408,7 +3408,7 @@ teardown_by_path_prove() {  # <copy>
     TEARDOWN_FOREIGN_RULE=$TEARDOWN_BY_PATH_EXCEPTION_RULE
     TEARDOWN_FOREIGN_WHY=$TEARDOWN_BY_PATH_EXCEPTION_WHY
     TEARDOWN_FOREIGN_PID=$TEARDOWN_BY_PATH_EXCEPTION_PID
-    TEARDOWN_FOREIGN_HELD=$TEARDOWN_BY_PATH_EXCEPTION_HELD
+    TEARDOWN_FOREIGN_HOLDER_FILE=$TEARDOWN_BY_PATH_EXCEPTION_HELD
   fi
   teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "copy $copy is not removed: $TEARDOWN_FOREIGN_WHY." "$copy"
   teardown_by_path_why "$(fm_refuse_text "$copy did not pass every proof (rule=$TEARDOWN_FOREIGN_RULE)${TEARDOWN_FOREIGN_WHY:+: $TEARDOWN_FOREIGN_WHY}")"
