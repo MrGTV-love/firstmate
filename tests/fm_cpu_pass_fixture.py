@@ -196,14 +196,26 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
     if os.environ.get('CASE_SWALLOW_INTERRUPT'):
         # A KeyboardInterrupt raised inside a callee is lost there (as one raised in an import's module-lock
         # callback is printed as ignored): the queue's sleep swallows it, so only a recorded signal can stop the wait.
-        import time
-        real_sleep = time.sleep
+        # Once the test writes swallow-arm, the next queue sleep says swallow-armed and lasts until the signal lands in
+        # it; swallowing it writes interrupt-swallowed.
+        import time, pathlib
+        real_sleep, swallow_folder = time.sleep, pathlib.Path(os.environ['CASE_FOLDER'])
         def swallowing_sleep(seconds):
             try:
+                if (swallow_folder / 'swallow-arm').exists():
+                    (swallow_folder / 'swallow-armed').touch()
+                    while True:
+                        real_sleep(3600)
                 real_sleep(seconds)
             except KeyboardInterrupt:
-                pass
+                (swallow_folder / 'interrupt-swallowed').touch()
         time.sleep = swallowing_sleep
+    if os.environ.get('CASE_TERM_BEFORE_FORWARD'):
+        # A SIGTERM that reaches the gate before it forwards signals is caught and dropped, so a test can repeat the
+        # signal until it is forwarded. A handler, never SIG_IGN: exec resets a handler for the agent, and an agent
+        # that inherits SIG_IGN could not trap the signal.
+        import signal
+        signal.signal(signal.SIGTERM, lambda *_: None)
     if os.environ.get('CASE_PROCESS_TABLE_UNREADABLE'):
         # The process table cannot be read (both readers the engine uses), so no running client can be seen.
         try:
@@ -636,9 +648,10 @@ mode = os.environ.get('CASE_AGENT', 'wait')
 if os.environ.get('CASE_SESSION_ID'):  # a Claude-shaped first stream-json line naming this launch's session
     sys.stdout.write(json.dumps(dict(type='system', subtype='init', session_id=os.environ['CASE_SESSION_ID'])) + chr(10))
     sys.stdout.flush()
+term_default = signal.getsignal(signal.SIGTERM) == signal.SIG_DFL
 if mode == 'trap':  # installed before the marker that tells the test to signal
     signal.signal(signal.SIGTERM, lambda *a: (folder / (run + '.got-term')).touch() or sys.exit(0))
-(folder / (run + '.agent')).write_text(json.dumps(dict(pid=os.getpid(), pgid=os.getpgid(0), started_ns=time.time_ns(),
+(folder / (run + '.agent')).write_text(json.dumps(dict(pid=os.getpid(), pgid=os.getpgid(0), started_ns=time.time_ns(), term_default=term_default,
     cwd=os.getcwd(), argv=sys.argv[2:], stdin=sys.stdin.read() if mode not in ('wait', 'trap') else '')))
 if mode == 'escape':  # an orphaned descendant: own session, every descriptor closed, an empty environment, then the agent exits
     if os.fork() == 0:

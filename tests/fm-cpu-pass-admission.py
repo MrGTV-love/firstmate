@@ -438,7 +438,8 @@ try:
         clients[priority] = launch(cli + ['pipeline-start', '--priority', priority, '--'] + client_start(folder, db, env, priority)[0],
             env, folder / priority, cwd=folder / ('wt-%s' % priority))
         pending(folder, len(clients))
-    wait_for(lambda: (folder / 'order').exists() or all(held_decision(folder / (priority + '.stderr')) for priority in classes),
+    wait_for(lambda: (folder / 'order').exists() or all('pipeline-start waiting:' in (folder / (priority + '.stderr')).read_text()
+                                                         for priority in classes),
              'every class-ordered start to print its waiting line')
     assert not (folder / 'order').exists()
     change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
@@ -527,8 +528,10 @@ try:
     pending(folder, 1)
     wait_for(lambda: 'waiting: counted=1 limit=1 ' in log.read_text(), 'queued at full count on a live WAL database')
     clean_stop(db, writer)
-    # Longer than two maximum poll delays: the queue reads the stopped state.
-    time.sleep(1.2)
+    # The next notice reports a decision taken on the stopped state.
+    seen = log.read_text().count('waiting: counted=1 limit=1 ')
+    wait_for(lambda: log.read_text().count('waiting: counted=1 limit=1 ') > seen, 'a decision on the stopped WAL database',
+             log=folder / 'queued', child=child)
     assert child.poll() is None and not marker.exists(), log.read_text()
     writer = sqlite3.connect(db, isolation_level=None)
     writer.execute("UPDATE runs SET status='completed'")
@@ -575,9 +578,13 @@ try:
     swallowed = launch(cli + ['pipeline-start', '--priority', 'merge-train', '--', 'touch', str(folder / 'swallowed')],
                        dict(env, CASE_SWALLOW_INTERRUPT='1'), folder / 'swallowed')
     pending(folder, 2)
-    time.sleep(0.3)
+    wait_for(lambda: 'pipeline-start waiting:' in (folder / 'swallowed.stderr').read_text(), 'the swallowing start inside its wait',
+             log=folder / 'swallowed', child=swallowed)
+    (folder / 'swallow-arm').touch()
+    wait_for(lambda: (folder / 'swallow-armed').exists(), 'the swallowing start in its queue sleep', log=folder / 'swallowed', child=swallowed)
     os.killpg(swallowed.pid, signal.SIGINT)
     finish(swallowed, 130)
+    assert (folder / 'interrupt-swallowed').exists(), 'the KeyboardInterrupt was not swallowed by the queue sleep'
     assert not (folder / 'swallowed').exists() and survivor.poll() is None
     change(db, "UPDATE runs SET status='completed'")
     finish(survivor)

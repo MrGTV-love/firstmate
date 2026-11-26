@@ -125,12 +125,17 @@ try:
             held = settled_held(folder, ['x'])
             assert held == 0, (mode, repr(held))
         folder, db, env = gate_case('gate-forward')
-        child, log = gate(folder, env, 'x', mode='trap')
+        child, log = gate(folder, dict(env, CASE_TERM_BEFORE_FORWARD='1'), 'x', mode='trap')
         wait_for(lambda: (folder / 'x.agent').exists(), 'agent started')
-        time.sleep(0.2)
-        os.kill(child.pid, signal.SIGTERM)
+        began = time.monotonic()
+        while not (folder / 'x.got-term').exists() and child.poll() is None:
+            if time.monotonic() - began >= HANG_BACKSTOP_SECS:
+                hang_backstop_expired('the gate to forward SIGTERM to its agent', began, log)
+            os.kill(child.pid, signal.SIGTERM)
+            time.sleep(0.2)
         finish(child, 0)
         assert (folder / 'x.got-term').exists()
+        assert agent_info(folder / 'x.agent')['term_default'], 'the agent started with SIGTERM not at its default action'
         # An agent that cannot be launched gives the shell's statuses unchanged and keeps no reservation.
         for missing, code in ((str(folder / 'no-such-agent'), 127), (str(folder / 'wt-x'), 126)):
             out = subprocess.run(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', missing], env=env, cwd=str(folder / 'wt-x'),
@@ -425,12 +430,12 @@ try:
         child, log = gate(folder, dict(env, CASE_CLOCK_FILE=str(clock)), 'x')
         wait_for(lambda: 'held for capacity' in wakes(folder), 'held', log=log, child=child)
         drive(clock, 2, wall=round_started + 5.5)
-        ended = round_started + 5.5
         finish(child, 75)
         text = stderr_of(log)
         # The gate reads the round 3.5 s old, so it holds 1.5 s; the clock then reads 5.5 s into the round.
         assert 'hold bound reached' in text and re.search(r'hold_bound=[012]s budget=6s round_elapsed=[34]s ci_fix_p99=1s', text), text
-        assert ended < round_started + 6 and not (folder / 'x.agent').exists(), (ended - round_started, text)
+        elapsed, held_for = int(re.search(r'round_elapsed=(\d+)s', text).group(1)), int(re.search(r'; held (\d+)s;', text).group(1))
+        assert elapsed + held_for < 6 and not (folder / 'x.agent').exists(), (elapsed, held_for, text)
         # An immediate launch with capacity arriving in time is admitted.
         folder, db, env = gate_case('gate-bound-round-fit', available=GIB, timeout='6s', ci_ms=(1000,), round_age=1,
                                     runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
