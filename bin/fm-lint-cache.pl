@@ -486,23 +486,31 @@ sub balanced_text {
         my $word = shell_word($body, $position, {}, $close);
         push @$subs, @{$word->{subs}} if defined $subs;
         if ($track_case) {
-            if ($cmd_start && $word->{raw} eq 'case') {
+            if (@cases && $cases[-1] eq 'pattern') {
+                if ($pat_start[-1] && $word->{raw} eq 'esac') {
+                    pop @cases;
+                    pop @pat_depth;
+                    pop @pat_start;
+                } else {
+                    $pat_start[-1] = 0;
+                }
+                $cmd_start = 0;
+            } elsif (@cases && $cases[-1] eq 'header') {
+                if ($word->{raw} eq 'in') {
+                    $cases[-1] = 'pattern';
+                    $pat_depth[-1] = 0;
+                    $pat_start[-1] = 1;
+                }
+                $cmd_start = 0;
+            } elsif ($cmd_start && $word->{raw} eq 'case') {
                 push @cases, 'header';
                 push @pat_depth, 0;
                 push @pat_start, 0;
                 $cmd_start = 0;
-            } elsif (@cases && $cases[-1] eq 'header' && $word->{raw} eq 'in') {
-                $cases[-1] = 'pattern';
-                $pat_depth[-1] = 0;
-                $pat_start[-1] = 1;
-                $cmd_start = 1;
             } elsif ($cmd_start && @cases && $word->{raw} eq 'esac') {
                 pop @cases;
                 pop @pat_depth;
                 pop @pat_start;
-                $cmd_start = 0;
-            } elsif (@cases && $cases[-1] eq 'pattern') {
-                $pat_start[-1] = 0;
                 $cmd_start = 0;
             } elsif ($cmd_start && $word->{raw} =~ /^(?:if|then|elif|else|while|until|do|!|\{)$/) {
                 $cmd_start = 1;

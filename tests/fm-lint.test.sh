@@ -1166,12 +1166,21 @@ SH
 #!/usr/bin/env bash
 shopt -s extglob
 bash <<EOF
-: ${VALUE:-$(( $(case "${1:-x}" in (@(x|y))
+: ${VALUE:-$(( $(case "${1:-x}" in (@(x|case))
 # shellcheck source=bin/library.sh
 . bin/library.sh
 library_value
 printf '0\n'
 ;; esac) + 1 ))}
+EOF
+SH
+  cat > "$repo/bin/unquoted-heredoc-case-pattern-keyword.sh" <<'SH'
+#!/usr/bin/env bash
+cat <<EOF
+${VALUE:-$(case "${1:-x}" in (case) :;; (*) :;; esac
+# shellcheck source=bin/library.sh
+. bin/library.sh
+library_value)}
 EOF
 SH
   cat > "$repo/bin/unquoted-heredoc-arith-vars.sh" <<'SH'
@@ -1210,7 +1219,7 @@ SH
 # shellcheck source=bin/unknown-lib.sh
 . bin/unknown-lib.sh /dev/null
 SH
-  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/unquoted-heredoc-arith.sh bin/unquoted-heredoc-param-arith.sh bin/unquoted-heredoc-case-arith.sh bin/unquoted-heredoc-extglob-case.sh bin/unquoted-heredoc-arith-vars.sh bin/unquoted-heredoc-empty-case.sh bin/child-only.sh bin/dynamic-child.sh bin/mixed-child.sh; do
+  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/unquoted-heredoc-arith.sh bin/unquoted-heredoc-param-arith.sh bin/unquoted-heredoc-case-arith.sh bin/unquoted-heredoc-extglob-case.sh bin/unquoted-heredoc-case-pattern-keyword.sh bin/unquoted-heredoc-arith-vars.sh bin/unquoted-heredoc-empty-case.sh bin/child-only.sh bin/dynamic-child.sh bin/mixed-child.sh; do
     out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "baseline $root failed: $out"
     assert_not_contains "$out" "cache hit $root" "baseline $root must run cold"
@@ -1228,6 +1237,7 @@ SH
   assert_contains "$listed" $'\n''bin/unquoted-heredoc-param-arith.sh'$'\n' "unquoted heredoc parameter-expansion arithmetic-nested sub omitted caller selection"
   assert_contains "$listed" $'\n''bin/unquoted-heredoc-case-arith.sh'$'\n' "unquoted heredoc case-in-arithmetic sub omitted caller selection"
   assert_contains "$listed" $'\n''bin/unquoted-heredoc-extglob-case.sh'$'\n' "unquoted heredoc extglob-case sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-case-pattern-keyword.sh'$'\n' "unquoted heredoc literal (case) pattern sub omitted caller selection"
   assert_contains "$listed" $'\n''bin/unquoted-heredoc-arith-vars.sh'$'\n' "unquoted heredoc arith-vars sub omitted caller selection"
   assert_contains "$listed" $'\n''bin/unquoted-heredoc-empty-case.sh'$'\n' "unquoted heredoc empty-case sub omitted caller selection"
   fm_lint_write_diff_file "$diff_file" bin/unknown-lib.sh
@@ -1252,7 +1262,7 @@ SH
   # Sensitivity controls: top-level source AND parent-shell unquoted heredoc substitutions
   # (direct, arithmetic, param-arith, case, extglob-case, arith-vars, empty-case)
   # MUST invalidate cache and fail real ShellCheck with SC2119.
-  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/unquoted-heredoc-arith.sh bin/unquoted-heredoc-param-arith.sh bin/unquoted-heredoc-case-arith.sh bin/unquoted-heredoc-extglob-case.sh bin/unquoted-heredoc-arith-vars.sh bin/unquoted-heredoc-empty-case.sh; do
+  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/unquoted-heredoc-arith.sh bin/unquoted-heredoc-param-arith.sh bin/unquoted-heredoc-case-arith.sh bin/unquoted-heredoc-extglob-case.sh bin/unquoted-heredoc-case-pattern-keyword.sh bin/unquoted-heredoc-arith-vars.sh bin/unquoted-heredoc-empty-case.sh; do
     rc=0
     out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || rc=$?
