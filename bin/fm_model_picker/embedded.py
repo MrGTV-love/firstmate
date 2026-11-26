@@ -57,6 +57,7 @@ _S = [
     ("critpt", "critpt", "CritPt", "fraction", "fraction", False, "CritPt", "critpt"),
     ("automationbench-aa", "automationBenchPartialScore", "AutomationBench-AA", "fraction", "fraction", False, "AutomationBench-AA", "automationbench-aa"),
     ("terminal-bench-4-0", "terminalBench40", "Terminal-Bench 4.0", "fraction", "fraction", False, "Terminal-Bench 4.0", "terminalbench-4-0"),
+    ("frontiercode-2-0", "frontierCode20", "FrontierCode-AA 2.0", "fraction", "fraction", False, "FrontierCode-AA 2.0", "frontiercode-2-0"),
     ("harveylabaa", "harveyLab", "Harvey-LAB-AA", "fraction", "fraction", False, None, "harvey-lab-aa"),
     ("math500", "math500", "MATH-500", "fraction", "fraction", False, None, "math-500"),
     ("mmlupro", "mmluPro", "MMLU-Pro", "fraction", "fraction", False, None, "mmlu-pro"),
