@@ -1979,6 +1979,264 @@ test_growth_guard_never_stops_the_watch_reader() {
   pass "the growth guard stops a root over the budget but never the resident watch's reader, seen by its full command under an interpreter named Python or by its bare name"
 }
 
+# Option C (Main 4257, 4262): the budget and the growth guard count governed roots
+# only, those whose gate the host ledger names. Memory no ledger entry governs
+# never delays or stops a governed root. Each case below starts its own processes,
+# uses its own host lock and ledger, and reads ps itself to prove its fixture did
+# what it says (an outside process that is named shellcheck and holds the memory
+# stated, a root that is or is not stopped).
+
+# fm_lint_optc_name <pid>: the process name the gate's table gives <pid> (the
+# basename of the first word of its ps command).
+fm_lint_optc_name() {
+  ps -o command= -p "$1" | awk '{ n = $1; sub(/.*\//, "", n); print n; exit }'
+}
+
+# fm_lint_optc_rss <pid>: <pid>'s resident size in KiB from ps (0 when gone).
+fm_lint_optc_rss() {
+  local rss
+  rss=$(ps -o rss= -p "$1" 2>/dev/null | tr -d ' ')
+  printf '%s\n' "${rss:-0}"
+}
+
+# fm_lint_optc_outside <dir>: a process named shellcheck that is not a lint (a
+# symlink to the real perl, so ps names it shellcheck), for ungoverned memory.
+fm_lint_optc_outside() {
+  mkdir -p "$1"
+  ln -sf "$(perl -MCwd=abs_path -e 'print abs_path($^X)')" "$1/shellcheck"
+}
+
+# fm_lint_optc_fake_gate <dir>: a lint gate of a checkout without the ledger: a
+# script named fm-lint-cache.pl that the table reads as a gate (perl ... gate
+# <pool>) and that runs a child holding FM_TEST_MIB MiB after FM_TEST_DELAY s,
+# for FM_TEST_SECS s. It writes no ledger entry.
+fm_lint_optc_fake_gate() {
+  mkdir -p "$1"
+  cat > "$1/fm-lint-cache.pl" <<'PL'
+my $pid = fork() // die "fork: $!";
+if (!$pid) {
+    exec 'perl', '-e', 'select(undef, undef, undef, $ARGV[0]); $x = "x" x ($ARGV[1] * 1048576); sleep $ARGV[2]',
+        $ENV{FM_TEST_DELAY} // 0, $ENV{FM_TEST_MIB} // 1, $ENV{FM_TEST_SECS} // 30;
+    die "exec: $!";
+}
+waitpid($pid, 0);
+PL
+}
+
+# fm_lint_optc_gate <tmp> <label> <budget KiB> <MiB> <secs> [delay]: a governed
+# gate in its own pool under <tmp>, sharing <tmp>/host's lock and ledger, whose
+# watched root holds <MiB> MiB (after [delay] s) for <secs> s; its root's
+# command carries the tag optc-<label>. Runs in the background; OPTC_COUNTED names
+# the outside pid the ps shim keeps.
+fm_lint_optc_gate() {
+  local tmp=$1 label=$2 budget=$3 mib=$4 secs=$5 delay=${6:-0}
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_TEST_COUNTED_SHELLCHECK_PID="${OPTC_COUNTED:-0}" \
+    FM_LINT_INTERNAL_HOST_LOCK="$tmp/host/host.lock" FM_LINT_INTERNAL_HOST_RSS_KIB="$budget" FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/$label-pool" 2 "$label" "$tmp/$label.wait" -- \
+    perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 8388608 "$tmp/rss.$label" -- \
+    perl -e "my \$tag = 'optc-$label'; select(undef, undef, undef, $delay); \$x = 'x' x ($mib * 1048576); sleep $secs" \
+    > "$tmp/$label.out" 2>&1 &
+}
+
+# fm_lint_optc_stopped <secs> <label>...: watches the tagged roots for <secs> s
+# and prints the labels of those ever seen stopped (ps stat T), one per line.
+fm_lint_optc_stopped() {
+  local end=$((SECONDS + $1)) label rows seen=' '
+  shift
+  while [ "$SECONDS" -lt "$end" ]; do
+    rows=$(ps -axo stat=,command=)
+    for label in "$@"; do
+      case "$seen" in *" $label "*) continue ;; esac
+      printf '%s\n' "$rows" | awk -v tag="optc-$label'" 'index($0, tag) && $1 ~ /T/ { found = 1 } END { exit !found }' && seen="$seen$label "
+    done
+    sleep 0.2
+  done
+  for label in $seen; do printf '%s\n' "$label"; done
+}
+
+# fm_lint_optc_root_pid <label>: the pid of the tagged root (empty when none).
+fm_lint_optc_root_pid() {
+  ps -axo pid=,command= | awk -v tag="optc-$1'" 'index($0, tag) && $0 !~ /awk/ { print $1; exit }'
+}
+
+# fm_lint_optc_wait_root <label>: waits up to 15 s for the tagged root to run.
+fm_lint_optc_wait_root() {
+  local deadline=$((SECONDS + 15))
+  until [ -n "$(fm_lint_optc_root_pid "$1")" ]; do
+    [ "$SECONDS" -lt "$deadline" ] || return 1
+    sleep 0.1
+  done
+}
+
+test_ungoverned_shellcheck_memory_never_delays_a_governed_root() {
+  local tmp outside pid name rss
+  tmp=$(fm_test_tmproot fm-lint-optc-admit-named)
+  mkdir -p "$tmp/hide" "$tmp/host"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  fm_lint_optc_outside "$tmp/fake"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/a.sh"
+  "$tmp/fake/shellcheck" -e '$x = "x" x (64 * 1048576); sleep 30' &
+  outside=$!
+  sleep 1.5
+  name=$(fm_lint_optc_name "$outside")
+  rss=$(fm_lint_optc_rss "$outside")
+  [ "$name" = shellcheck ] || { fm_lint_kill_tree "$outside"; fail "fixture: the outside process is named '$name', not shellcheck, so this case proves nothing"; }
+  [ "$rss" -gt 16384 ] || { fm_lint_kill_tree "$outside"; fail "fixture: the outside shellcheck holds $rss KiB, not above the 16384 KiB budget"; }
+  echo "outside shellcheck pid=$outside rss=$rss KiB, budget 16384 KiB, no ledger entry"
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" FM_TEST_COUNTED_SHELLCHECK_PID="$outside" \
+    FM_LINT_INTERNAL_HOST_LOCK="$tmp/host/host.lock" FM_LINT_INTERNAL_HOST_RSS_KIB=16384 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/pool" 2 own "$tmp/own.wait" -- /bin/sh -c ": > '$tmp/marker'" > "$tmp/own.out" 2>&1 &
+  pid=$!
+  sleep 4
+  if [ ! -e "$tmp/marker" ]; then
+    fm_lint_kill_tree "$outside" "$pid"
+    fail "a governed root waited 4 s behind $rss KiB of ungoverned shellcheck memory (budget 16384 KiB, nothing governed held)"$'\n'"$(cat "$tmp/own.out")"
+  fi
+  wait "$pid" || { fm_lint_kill_tree "$outside"; fail "the governed root failed: $(cat "$tmp/own.out")"; }
+  fm_lint_kill_tree "$outside"
+  pass "a governed root starts at once while an ungoverned shellcheck holds $rss KiB above the 16384 KiB budget"
+}
+
+test_an_ungoverned_lint_gate_never_delays_a_governed_root() {
+  local tmp fake child pid rss
+  tmp=$(fm_test_tmproot fm-lint-optc-admit-gate)
+  mkdir -p "$tmp/hide" "$tmp/host"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  fm_lint_optc_fake_gate "$tmp/old"
+  FM_TEST_MIB=64 FM_TEST_SECS=30 perl "$tmp/old/fm-lint-cache.pl" gate "$tmp/old-pool" 2 old "$tmp/old.wait" &
+  fake=$!
+  child=$(fm_lint_child_of "$fake" "perl -e") || { fm_lint_kill_tree "$fake"; fail "fixture: the ungoverned gate never started its child"; }
+  sleep 1.5
+  rss=$(fm_lint_optc_rss "$child")
+  [ "$rss" -gt 16384 ] || { fm_lint_kill_tree "$fake"; fail "fixture: the ungoverned gate's child holds $rss KiB, not above the 16384 KiB budget"; }
+  [ -z "$(ls "$tmp/host/host.lock.ledger" 2>/dev/null)" ] || { fm_lint_kill_tree "$fake"; fail "fixture: the ledger is not empty before the governed root asks"; }
+  echo "ungoverned gate pid=$fake child=$child rss=$rss KiB, budget 16384 KiB, no ledger entry"
+  PATH="$tmp/hide:$PATH" FM_TEST_GATE_POOL_PREFIX="$tmp/" \
+    FM_LINT_INTERNAL_HOST_LOCK="$tmp/host/host.lock" FM_LINT_INTERNAL_HOST_RSS_KIB=16384 FM_LINT_INTERNAL_ROOT_CAP_KIB=1024 \
+    perl "$ROOT/bin/fm-lint-cache.pl" gate "$tmp/pool" 2 own "$tmp/own.wait" -- /bin/sh -c ": > '$tmp/marker'" > "$tmp/own.out" 2>&1 &
+  pid=$!
+  sleep 4
+  if [ ! -e "$tmp/marker" ]; then
+    fm_lint_kill_tree "$fake" "$pid"
+    fail "a governed root waited 4 s behind an ungoverned lint gate holding $rss KiB (budget 16384 KiB, nothing governed held)"$'\n'"$(cat "$tmp/own.out")"
+  fi
+  wait "$pid" || { fm_lint_kill_tree "$fake"; fail "the governed root failed: $(cat "$tmp/own.out")"; }
+  fm_lint_kill_tree "$fake"
+  pass "a governed root starts at once while a lint gate the ledger does not name holds $rss KiB above the 16384 KiB budget"
+}
+
+test_ungoverned_shellcheck_memory_never_stops_a_governed_root() {
+  local tmp outside rss name stopped
+  [ "$(uname)" = Darwin ] || { pass "SKIP (not macOS): the growth guard holds roots only under the macOS resident watch"; return; }
+  tmp=$(fm_test_tmproot fm-lint-optc-guard-named)
+  mkdir -p "$tmp/hide" "$tmp/host"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  fm_lint_optc_outside "$tmp/fake"
+  # Small while the roots are admitted, then 200 MiB: above the 120000 KiB budget alone.
+  "$tmp/fake/shellcheck" -e 'select(undef, undef, undef, 8); $x = "x" x (200 * 1048576); sleep 30' &
+  outside=$!
+  sleep 0.5
+  name=$(fm_lint_optc_name "$outside")
+  [ "$name" = shellcheck ] || { fm_lint_kill_tree "$outside"; fail "fixture: the outside process is named '$name', not shellcheck"; }
+  OPTC_COUNTED=$outside fm_lint_optc_gate "$tmp" older 120000 8 25
+  fm_lint_optc_wait_root older || { fm_lint_kill_tree "$outside"; fail "the older governed root never started: $(cat "$tmp/older.out")"; }
+  sleep 1.2
+  OPTC_COUNTED=$outside fm_lint_optc_gate "$tmp" younger 120000 8 25
+  fm_lint_optc_wait_root younger || { fm_lint_kill_tree "$outside"; fail "the younger governed root never started: $(cat "$tmp/younger.out")"; }
+  stopped=$(fm_lint_optc_stopped 12 older younger)
+  rss=$(fm_lint_optc_rss "$outside")
+  pkill -KILL -f "optc-older'" 2>/dev/null; pkill -KILL -f "optc-younger'" 2>/dev/null
+  fm_lint_kill_tree "$outside"
+  wait 2>/dev/null
+  [ "$rss" -gt 120000 ] || fail "fixture: the outside shellcheck held only $rss KiB at the end, not above the 120000 KiB budget"
+  [ -z "$stopped" ] || fail "the growth guard stopped governed root(s) [$(printf '%s' "$stopped" | tr '\n' ' ')] while only an ungoverned shellcheck ($rss KiB) was over the 120000 KiB budget"
+  echo "outside shellcheck pid=$outside rss=$rss KiB, budget 120000 KiB; governed roots 8 MiB each, stopped: none"
+  pass "an ungoverned shellcheck holding $rss KiB, above the 120000 KiB budget alone, stops neither the oldest nor a younger governed root"
+}
+
+test_an_ungoverned_lint_gate_never_stops_a_governed_root() {
+  local tmp fake child rss stopped
+  [ "$(uname)" = Darwin ] || { pass "SKIP (not macOS): the growth guard holds roots only under the macOS resident watch"; return; }
+  tmp=$(fm_test_tmproot fm-lint-optc-guard-gate)
+  mkdir -p "$tmp/hide" "$tmp/host"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  fm_lint_optc_fake_gate "$tmp/old"
+  # Started first, so it is the oldest gate on the host; it grows to 200 MiB after 8 s.
+  FM_TEST_DELAY=8 FM_TEST_MIB=200 FM_TEST_SECS=30 perl "$tmp/old/fm-lint-cache.pl" gate "$tmp/old-pool" 2 old "$tmp/old.wait" &
+  fake=$!
+  child=$(fm_lint_child_of "$fake" "perl -e") || { fm_lint_kill_tree "$fake"; fail "fixture: the ungoverned gate never started its child"; }
+  sleep 1.2
+  fm_lint_optc_gate "$tmp" older 120000 8 25
+  fm_lint_optc_wait_root older || { fm_lint_kill_tree "$fake"; fail "the older governed root never started: $(cat "$tmp/older.out")"; }
+  sleep 1.2
+  fm_lint_optc_gate "$tmp" younger 120000 8 25
+  fm_lint_optc_wait_root younger || { fm_lint_kill_tree "$fake"; fail "the younger governed root never started: $(cat "$tmp/younger.out")"; }
+  stopped=$(fm_lint_optc_stopped 12 older younger)
+  rss=$(fm_lint_optc_rss "$child")
+  pkill -KILL -f "optc-older'" 2>/dev/null; pkill -KILL -f "optc-younger'" 2>/dev/null
+  fm_lint_kill_tree "$fake"
+  wait 2>/dev/null
+  [ "$rss" -gt 120000 ] || fail "fixture: the ungoverned gate's child held only $rss KiB at the end, not above the 120000 KiB budget"
+  [ -z "$stopped" ] || fail "the growth guard stopped governed root(s) [$(printf '%s' "$stopped" | tr '\n' ' ')] because an ungoverned lint gate ($rss KiB) was over the 120000 KiB budget"
+  echo "ungoverned gate pid=$fake child rss=$rss KiB (oldest gate), budget 120000 KiB; governed roots 8 MiB each, stopped: none"
+  pass "a lint gate the ledger does not name, holding $rss KiB and older than every governed gate, stops no governed root"
+}
+
+test_an_ungoverned_lint_gate_is_never_the_oldest() {
+  local tmp fake rss root stopped
+  [ "$(uname)" = Darwin ] || { pass "SKIP (not macOS): the growth guard holds roots only under the macOS resident watch"; return; }
+  tmp=$(fm_test_tmproot fm-lint-optc-guard-oldest)
+  mkdir -p "$tmp/hide" "$tmp/host"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  fm_lint_optc_fake_gate "$tmp/old"
+  FM_TEST_MIB=1 FM_TEST_SECS=40 perl "$tmp/old/fm-lint-cache.pl" gate "$tmp/old-pool" 2 old "$tmp/old.wait" &
+  fake=$!
+  fm_lint_child_of "$fake" "perl -e" > /dev/null || { fm_lint_kill_tree "$fake"; fail "fixture: the ungoverned gate never started its child"; }
+  sleep 1.2
+  # The only governed root grows over the budget by itself: it is the oldest
+  # governed gate, so it must run on; an older gate the ledger does not name
+  # must not take that place.
+  fm_lint_optc_gate "$tmp" only 120000 200 25 3
+  fm_lint_optc_wait_root only || { fm_lint_kill_tree "$fake"; fail "the governed root never started: $(cat "$tmp/only.out")"; }
+  stopped=$(fm_lint_optc_stopped 12 only)
+  root=$(fm_lint_optc_root_pid only)
+  rss=$(fm_lint_optc_rss "${root:-0}")
+  pkill -KILL -f "optc-only'" 2>/dev/null
+  fm_lint_kill_tree "$fake"
+  wait 2>/dev/null
+  [ "$rss" -gt 120000 ] || fail "fixture: the governed root held only $rss KiB, not above the 120000 KiB budget, so the guard had no reason to act"
+  [ -z "$stopped" ] || fail "the growth guard stopped the oldest governed root ($rss KiB, over the 120000 KiB budget) because an older lint gate the ledger does not name ran"
+  echo "governed root rss=$rss KiB, budget 120000 KiB, an older ungoverned gate pid=$fake; stopped: none"
+  pass "the oldest governed gate keeps running over the budget ($rss KiB) even when an older gate the ledger does not name is on the host"
+}
+
+test_a_guard_that_cannot_list_the_ledger_counts_its_own_root_and_says_so() {
+  local tmp stopped_before stopped_after
+  [ "$(uname)" = Darwin ] || { pass "SKIP (not macOS): the growth guard holds roots only under the macOS resident watch"; return; }
+  tmp=$(fm_test_tmproot fm-lint-optc-guard-unlisted)
+  mkdir -p "$tmp/hide" "$tmp/host"
+  fm_lint_hide_outside_shellcheck "$tmp/hide"
+  fm_lint_optc_gate "$tmp" older 120000 8 30
+  fm_lint_optc_wait_root older || fail "the older governed root never started: $(cat "$tmp/older.out")"
+  sleep 1.2
+  fm_lint_optc_gate "$tmp" younger 120000 200 30 1
+  fm_lint_optc_wait_root younger || { pkill -KILL -f "optc-older'"; fail "the younger governed root never started: $(cat "$tmp/younger.out")"; }
+  # Control: with the ledger readable the younger root, over the budget and not
+  # the oldest governed gate, is stopped.
+  stopped_before=$(fm_lint_optc_stopped 6 younger)
+  chmod 000 "$tmp/host/host.lock.ledger"
+  sleep 3
+  stopped_after=$(fm_lint_optc_stopped 6 younger)
+  chmod 700 "$tmp/host/host.lock.ledger"
+  pkill -KILL -f "optc-older'" 2>/dev/null; pkill -KILL -f "optc-younger'" 2>/dev/null
+  wait 2>/dev/null
+  [ -n "$stopped_before" ] || fail "control: the younger governed root over the budget was never stopped while the ledger was readable, so this case proves nothing"
+  [ -z "$stopped_after" ] || fail "with the ledger unlistable the younger root stayed stopped: its guard did not fall back to its own root"
+  grep -q "cannot list the host ledger $tmp/host/host.lock.ledger" "$tmp/younger.out" \
+    || fail "the guard did not name the unlistable ledger on stderr: $(cat "$tmp/younger.out")"
+  pass "a guard that cannot list the ledger counts only its own root, resumes it, and names the ledger path once on stderr"
+}
+
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
   local tmp rc out outside pid deadline real fixture mark
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): wrapper around the real ShellCheck"; return; }
@@ -2003,10 +2261,11 @@ test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
   mark="/var/tmp/firstmate-lint-$(id -u)/lint-slots/history/$(perl -MDigest::SHA=sha256_hex -e 'print sha256_hex($ARGV[0])' "full:$fixture")"
   [ -s "$mark" ] || fail "the wrapper run left no record in the host pool ($mark)"
   rm -f "$mark"
-  # Harmful: the same wrapper pointed at its own pool, while a real ShellCheck
-  # outside it holds more than the 4 MiB budget the private gate helper is given
-  # here (no real ShellCheck holds the fixed 3.5 GiB), is not admitted although
-  # its pool is empty, and runs once the outside one ends.
+  # Option C (Main 4257): the same wrapper pointed at its own pool, while a real
+  # ShellCheck that no ledger entry governs holds more than the 4 MiB budget the
+  # private gate helper is given here, still starts at once: ungoverned memory is
+  # never a reason a governed root waits. The analysis it starts still runs and
+  # completes (the marker and the gate's exit status).
   rm -f "$tmp/analysis.marker"
   mkfifo "$tmp/hold"
   "$real" - < "$tmp/hold" > /dev/null 2>&1 &
@@ -2017,21 +2276,19 @@ test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound() {
     fm_lint_gate_root 4096 "$tmp/own-pool" wrapper "$tmp/a.sh" -- "$tmp/bin/shellcheck" --norc -- "$tmp/a.sh" \
     > "$tmp/wrapper.out" 2>&1 9>&- &
   pid=$!
-  sleep 4
-  if [ -e "$tmp/analysis.marker" ]; then
-    exec 9>&-
-    kill "$outside" "$pid" 2>/dev/null || true
-    fail "a wrapper in its own pool started while a real shellcheck outside it held more than the 4 MiB budget"
-  fi
-  exec 9>&-
-  wait "$outside" 2>/dev/null || true
-  deadline=$((SECONDS + 30))
+  deadline=$((SECONDS + 4))
   until [ -e "$tmp/analysis.marker" ]; do
-    [ "$SECONDS" -lt "$deadline" ] || { kill "$pid" 2>/dev/null || true; fail "the wrapper stayed queued after the outside shellcheck ended"; }
+    [ "$SECONDS" -lt "$deadline" ] || {
+      exec 9>&-
+      kill "$outside" "$pid" 2>/dev/null || true
+      fail "a wrapper in its own pool waited 4 s behind a real shellcheck that no ledger entry governs"
+    }
     sleep 0.2
   done
-  wait "$pid" || fail "the wrapper run failed after the outside shellcheck ended"$'\n'"$(cat "$tmp/wrapper.out")"
-  pass "a wrapper around the real ShellCheck uses the host pool by default and is held back by real shellcheck memory outside its own pool"
+  wait "$pid" || { exec 9>&-; kill "$outside" 2>/dev/null || true; fail "the wrapper run failed beside the ungoverned shellcheck"$'\n'"$(cat "$tmp/wrapper.out")"; }
+  exec 9>&-
+  wait "$outside" 2>/dev/null || true
+  pass "a wrapper around the real ShellCheck uses the host pool by default, and a real shellcheck no ledger entry governs never holds it back"
 }
 
 test_slot_file_failures_refuse_and_never_run_unbounded() {
@@ -5268,7 +5525,7 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
     pass "SKIP (the resident watch runs on native macOS only): reader loss fails the root"
     return
   fi
-  local tmp repo real_python real_ps rc=0
+  local tmp repo real_python real_ps waited rc=0
   tmp=$(fm_test_tmproot fm-lint-reader-loss)
   repo=$(fm_lint_isolated_copy "$tmp" loss)
   real_python=$(command -v python3) || fm_lint_fail_settled "python3 is not on PATH"
@@ -5287,16 +5544,26 @@ test_a_root_whose_readers_are_lost_fails_and_no_queued_root_is_admitted() {
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run whose only root ran unmeasured exited 0: $(cat "$tmp/only.out")"
   grep -q 'reason=unmeasured' "$tmp/only.out" || fm_lint_fail_settled "the run did not name the unmeasured root: $(cat "$tmp/only.out")"
   # (2) Two workers, one slot: the second root waits at the gate while the first
-  # runs unmeasured, and is then not admitted.
+  # runs unmeasured, and is then not admitted. (Main 4313 (c)) Its end names it as
+  # not started, never as an analysis error (status 2 is the gate's refusal, not
+  # ShellCheck's), and its gate wait is its queue time, not its analysis time.
   : > "$tmp/starts.log"
   rc=0
   ( cd "$repo" && env PATH="$tmp/fake:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_HOST_SLOTS=1 \
       FM_TEST_READER=exit FM_TEST_ANALYSIS_SECS=5 FM_TEST_ANALYSIS_RC=0 \
-      FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh --jobs 2 bin/consumer.sh bin/library.sh > "$tmp/queued.out" 2>&1 ) || rc=$?
+      FM_TEST_SIGNAL_LOG="$tmp/signals.log" bash bin/fm-lint.sh --jobs 2 --telemetry "$tmp/queued.tsv" \
+      bin/consumer.sh bin/library.sh > "$tmp/queued.out" 2>&1 ) || rc=$?
   [ "$rc" -ne 0 ] || fm_lint_fail_settled "a run with an unmeasured root exited 0: $(cat "$tmp/queued.out")"
   [ "$(grep -c -- '-- bin/' "$tmp/starts.log")" -eq 1 ] || fm_lint_fail_settled "a root waiting at the gate was admitted after the run's watch lost every reader: $(cat "$tmp/starts.log")"
   grep -q 'admits no new root' "$tmp/queued.out" || fm_lint_fail_settled "the gate did not say why it admitted no root: $(cat "$tmp/queued.out")"
-  pass "a root that ran unmeasured fails the run and records no success, also as the only root; a root already waiting at the gate is not admitted"
+  grep -Eq '^fm-lint: end bin/(consumer|library)\.sh reason=not-started rc=2 ' "$tmp/queued.out" \
+    || fm_lint_fail_settled "the root the gate refused was not named as not started: $(cat "$tmp/queued.out")"
+  ! grep -q 'reason=error:2' "$tmp/queued.out" \
+    || fm_lint_fail_settled "the gate's refusal was reported as an analysis error: $(cat "$tmp/queued.out")"
+  waited=$(awk -F '\t' '$1 == "end" && $10 == "not-started" { print $17 }' "$tmp/queued.roots.tsv" 2>/dev/null)
+  [ "${waited:-0}" -ge 1000 ] \
+    || fm_lint_fail_settled "the refused root's gate wait was not recorded as queue time (wait_ms=${waited:-none}): $(cat "$tmp/queued.roots.tsv" 2>/dev/null)"
+  pass "a root that ran unmeasured fails the run and records no success, also as the only root; a root already waiting at the gate is not admitted, and its end names it as not started, with its wait as queue time"
 }
 
 # (Main 1775 N4) A reply that names a member whose pid now belongs to a process that
@@ -6191,6 +6458,12 @@ test_the_roots_log_records_each_roots_queue_wait_in_wait_ms
 test_a_waiting_gate_reading_the_table_never_stops_a_younger_running_root
 test_the_queue_head_reads_the_process_table_at_most_twice_a_second
 test_growth_guard_never_stops_the_watch_reader
+test_ungoverned_shellcheck_memory_never_delays_a_governed_root
+test_an_ungoverned_lint_gate_never_delays_a_governed_root
+test_ungoverned_shellcheck_memory_never_stops_a_governed_root
+test_an_ungoverned_lint_gate_never_stops_a_governed_root
+test_an_ungoverned_lint_gate_is_never_the_oldest
+test_a_guard_that_cannot_list_the_ledger_counts_its_own_root_and_says_so
 test_a_wrapper_around_the_real_shellcheck_shares_the_host_wide_memory_bound
 test_memory_budget_bounds_the_aggregate_across_homes
 test_a_high_host_slot_count_does_not_raise_the_memory_limit

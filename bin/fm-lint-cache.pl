@@ -461,11 +461,12 @@ if (($ARGV[0] // '') eq 'probe') {
 # and what its root holds now: its gate's whole process tree in one read of the
 # live process table, and the peak the macOS watch publishes beside the slot
 # (slot.<n>.peak, through FM_LINT_INTERNAL_SLOT_PEAK_FILE). The turn is taken
-# only if those charges, plus the current resident size outside the held roots
-# (the running lint trees of other pools and every other process named
-# shellcheck, from another caller or a wrapper script around the real
-# ShellCheck), plus the request's own charge fit the budget, or nothing is held
-# and nothing runs outside, so a root larger than the budget runs alone. A held
+# only if those charges plus the request's own charge fit the budget, or nothing
+# is held, so a root larger than the budget runs alone. Only governed roots count:
+# this pool's held slots and the host ledger's live entries. Memory no ledger
+# entry governs (another caller's ShellCheck, a lint from a checkout without the
+# ledger) never blocks a turn; that residual belongs to the host memory guard
+# (bin/fm-mem-guard.sh), which reads host pressure when a run is admitted. A held
 # slot is charged the worst case when its record names no charge. Admission
 # needs a readable table: while neither ps nor fm-proc-info.py answers, the
 # request whose turn it is retries, and after about 5 s it names the table on
@@ -663,11 +664,10 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
         }
         return $total;
     };
-    # Every lint gate on the host, whatever pool it uses, the processes below
-    # it, and every other process named shellcheck: the table reduced to
-    # { total => KiB in all of them, gates => { gate pid => [process set, start,
-    #   running] }, named => KiB of processes named shellcheck in no gate's tree }.
-    # total counts only gates that are running. A gate's own table and
+    # Every lint gate on the host, whatever pool it uses, and the processes below
+    # it: the table reduced to { gate pid => [process set, start, running] }.
+    # Which of them are governed (named by a ledger entry) is the caller's
+    # question. A gate's own table and
     # owner reads (ps, fm-proc-info.py table or memory, also seen as a bare or
     # parenthesized command name, a <defunct> row or, before their exec, the
     # gate's own command) are not in its set, so a gate runs only once its
@@ -676,7 +676,7 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
         my ($table) = @_;
         my %children;
         push @{$children{$table->{$_}[0]}}, $_ for keys %$table;
-        my (%gates, %in_tree, %running);
+        my %gates;
         for my $pid (keys %$table) {
             # A gate is a perl running this script's gate mode; a process that only
             # carries those words later in its arguments (check, timeout) is not one.
@@ -695,33 +695,8 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
             # gates must not count each other, or none would ever be admitted.
             my $started = keys(%set) > 1;
             $gates{$pid} = [\%set, $table->{$pid}[4], $started];
-            $in_tree{$_} = 1 for keys %set;
-            $running{$_} = 1 for $started ? keys %set : ();
         }
-        my ($total, $named) = (0, 0);
-        $total += $table->{$_}[1] for keys %running;
-        for my $pid (keys %$table) {
-            next if $in_tree{$pid} || $table->{$pid}[2] ne 'shellcheck';
-            $named += $table->{$pid}[1];
-        }
-        return {total => $total + $named, named => $named, gates => \%gates};
-    };
-    # KiB resident in lint trees of other pools and in processes named
-    # shellcheck outside every gate: memory this pool does not hold.
-    my $foreign = sub {
-        my ($table, @held) = @_;
-        my $view = $host_view->($table);
-        my %own;
-        for my $entry (@held) {
-            my ($pid) = @$entry;
-            $own{$_} = 1 for defined $pid && $view->{gates}{$pid} ? keys %{$view->{gates}{$pid}[0]} : ();
-        }
-        my $total = $view->{named};
-        for my $gate (keys %{$view->{gates}}) {
-            next if $gate == $$ || $own{$gate} || !$view->{gates}{$gate}[2];
-            for my $pid (keys %{$view->{gates}{$gate}[0]}) { $total += $table->{$pid}[1] unless $own{$pid}; }
-        }
-        return $total;
+        return \%gates;
     };
     my ($table, $table_at);
     # Whether a stopped gate other than this one has <needle> in its command.
@@ -753,6 +728,23 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     eval { make_path($ledger_dir, {mode => 0700}); 1 } or $refuse->($ledger_dir, $@);
     -d $ledger_dir && -w _ or $refuse->($ledger_dir, 'not a writable directory');
     my ($ledger_fh, $ledger_path);
+    # The gate pids the ledger governs, read only by name (entry.<gate pid>.<ticket>)
+    # for the growth guard: nothing is opened, locked or removed, and no reading
+    # refuses. A name whose pid is not a live gate in the table is ignored there.
+    # A ledger directory that cannot be listed governs no other gate: the guard
+    # then counts its own root alone, and says so once on stderr naming the path.
+    my $ledger_unlisted_said;
+    my $governed_gates = sub {
+        my $listing;
+        unless (opendir($listing, $ledger_dir)) {
+            print STDERR "fm-lint-gate: the growth guard cannot list the host ledger $ledger_dir ($!); "
+                . "it counts only its own root until the ledger can be read again\n" unless $ledger_unlisted_said++;
+            return;
+        }
+        my @pids = map { /\Aentry\.([0-9]+)\.[0-9]+\z/ ? $1 + 0 : () } readdir $listing;
+        closedir $listing;
+        return @pids;
+    };
     # Every live ledger entry as [gate pid, charge KiB, peak file], and the ended
     # ones removed. An empty entry is one being written by an admitting gate that
     # has not yet filled it: it counts at the worst case for 5 s and is then
@@ -803,8 +795,14 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
         my $dir = dirname($abort_file);
         return -e $abort_file || !(-d $dir && -w _);
     };
+    # A refused root never started: its time queued here is recorded as its wait,
+    # so fm-lint.sh does not count it as analysis time.
     my $refuse_aborted = sub {
         unlink($ticket_path) if $ticket_path;
+        if (open(my $fh, '>', $wait_file)) {
+            printf {$fh} "%d\n", $waited_from && $queued ? (Time::HiRes::time() - $waited_from) * 1000 : 0;
+            close $fh;
+        }
         my $why = '';
         if (open(my $mark, '<', $abort_file)) { $why = <$mark> // ''; close $mark; }
         chomp $why;
@@ -909,9 +907,9 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                 # header) (FM_LINT_INTERNAL_HOST_LOCK), which an admitted gate keeps until
                 # its command has started, so no two pools admit on one reading. A
                 # gate that cannot take that lock waits; nothing decides without
-                # it. The budget counts the held roots, the memory outside them and the
-                # new root; a root takes its turn alone only when no held root
-                # runs and nothing runs outside. Without a table nothing is
+                # it. The budget counts the held roots and the new root; a root
+                # takes its turn alone only when no root is held. Memory no ledger
+                # entry governs never blocks a turn. Without a table nothing is
                 # admitted, and after about 5 s without one the request is
                 # refused.
                 my $line = '';
@@ -954,9 +952,9 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                         }
                     } else {
                         undef $census_from;
-                        # A new root is admitted when its charge, every held root's
-                        # charge (never below what that root holds now) and the memory
-                        # outside them fit the budget; no wait for a watch sample. A
+                        # A new root is admitted when its charge and every held root's
+                        # charge (never below what that root holds now) fit the budget;
+                        # no wait for a watch sample. A
                         # live ledger entry that cannot be read as an entry refuses
                         # admission: its root, charge and record are unknown.
                         my @malformed = map { $_->[4] } grep { defined $_->[4] } @unnamed;
@@ -964,9 +962,8 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
                             print STDERR "fm-lint: host ledger entry " . join(', ', @malformed) . " is held by a live process but cannot be read as an entry; "
                                 . "no root is admitted on this host until it is freed\n";
                         }
-                        my $outside = $foreign->($table, @host_charges);
-                        $fits = !@malformed && (!@host_charges && !$outside
-                            || $charged->($table, @host_charges) + $outside + $charge_kib <= $budget_kib);
+                        $fits = !@malformed && (!@host_charges
+                            || $charged->($table, @host_charges) + $charge_kib <= $budget_kib);
                     }
                 }
                 if ($fits && $aborted->()) { flock($host, LOCK_UN); $refuse_aborted->(); }
@@ -1049,19 +1046,22 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
     # record was measured on this input, so the budget holds at every reading
     # for roots that stay within their records. The residual is a root that
     # grows beyond its record on an unchanged input (analysis noise, a file the
-    # analysis follows that the walk does not see). While the lint trees of
-    # every pool on the host, plus any other process named shellcheck, hold
+    # analysis follows that the walk does not see). While the running governed
+    # roots (this gate's and every gate the host ledger names, in any pool) hold
     # more than the budget, this gate holds its root unless it belongs to the
-    # oldest running gate, and releases it as soon as the total fits again or its
-    # gate becomes the oldest. The hold is <peak file>.hold: the root's resident
+    # oldest running governed gate, and releases it as soon as the total fits
+    # again or its gate becomes the oldest. Memory no ledger entry governs
+    # (another caller's ShellCheck, a lint from a checkout without the ledger) is
+    # neither counted nor ever the reason a root is held, and an ungoverned gate is
+    # never the oldest; the host memory guard (bin/fm-mem-guard.sh) owns that
+    # residual when it admits a run. The hold is <peak file>.hold: the root's resident
     # watch, which owns the root's process group, stops that group while the file
     # exists and resumes it when the file is gone. Only the group is signalled,
     # by the process that created it and has not reaped its leader; no process of
     # the root is signalled by its pid. A root without a resident watch (outside macOS, or
     # under the enforced envelope) is not held. A stopped root keeps what it holds
-    # but cannot grow further, and the oldest running gate is never held (unless
-    # processes named shellcheck outside every gate alone hold the budget), so
-    # every root finishes. No polling guard can remove what roots grow inside one
+    # but cannot grow further, and the oldest running governed gate is never held,
+    # so every root finishes. No polling guard can remove what roots grow inside one
     # reading interval (up to 2 s at or below 60 percent of the budget, 0.5 s above
     # it).
     $hold_path = length($peak_file // '') ? "$peak_file.hold" : undef;
@@ -1078,15 +1078,22 @@ if (($ARGV[0] // '') eq 'gate' || ($ARGV[0] // '') eq 'census') {
         $guard_busy = 1;
         my $table = $process_table->();
         my $view = $table && $host_view->($table);
-        my $mine = $view && $view->{gates}{$$};
-        my $next = $mine && $view->{total} * 5 > $budget_kib * 3 ? 0.5 : 2;
+        my $mine = $view && $view->{$$};
+        # The running governed gates: this one and every running gate the ledger
+        # names; their trees are the total the budget is judged on.
+        my %governed = map { $_ => 1 } $$, ($mine ? $governed_gates->() : ());
+        my @running = grep { $governed{$_} && $view->{$_}[2] } keys %{$view // {}};
+        my (%member, $total);
+        $member{$_} = 1 for map { keys %{$view->{$_}[0]} } @running;
+        $total += $table->{$_}[1] for keys %member;
+        $total //= 0;
+        my $next = $mine && $total * 5 > $budget_kib * 3 ? 0.5 : 2;
         Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), $next, $next) if $next != $poll;
         $poll = $next;
         if (!$mine) { $guard_busy = 0; return; }
-        my ($oldest) = sort { $view->{gates}{$a}[1] <=> $view->{gates}{$b}[1] || $a <=> $b }
-            grep { $view->{gates}{$_}[2] } keys %{$view->{gates}};
-        my $over = $view->{total} > $budget_kib;
-        if ($over && (!defined $oldest || $oldest != $$ || $view->{named} >= $budget_kib)) {
+        my ($oldest) = sort { $view->{$a}[1] <=> $view->{$b}[1] || $a <=> $b } @running;
+        my $over = $total > $budget_kib;
+        if ($over && (!defined $oldest || $oldest != $$)) {
             if (defined $hold_path && !-e $hold_path && open(my $hold, '>', $hold_path)) { close $hold; }
         } else {
             $resume->();

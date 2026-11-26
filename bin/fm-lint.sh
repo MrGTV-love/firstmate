@@ -145,11 +145,9 @@
 # envelope). The cost: a root whose input changed by more than 10 percent runs
 # once on the worst-case charge, so the first lint after an edit that big runs
 # such roots one at a time.
-# A cold root takes its turn only when its charge, every held root's current
+# A cold root takes its turn only when its charge and every held root's current
 # charge (every root admitted on this host, in any pool: the host-wide ledger
-# below) and the resident size outside the held roots (the lint trees of older
-# gates that name no ledger entry and every other process named shellcheck)
-# together fit the budget; a held root's current charge is the larger
+# below) together fit the budget; a held root's current charge is the larger
 # of its charge at admission and what its tree holds now, read when the root
 # asks for its turn. That reading is the live process table (resident size
 # only, from ps or libproc) and, where the macOS watch runs, the watch's own
@@ -184,10 +182,16 @@
 # or holds another start time), never because the run that started it or any
 # descriptor died; a probe that runs past its bound
 # (PROBE_BOUND_SECONDS, 30 s) is never ended, and it and every run waiting that
-# long report "blocked" on stderr and keep waiting. With nothing held
-# and nothing running outside, one root is always admitted, so a root larger
-# than the budget runs alone once that outside memory has ended, and queued roots
-# wait rather than fail. When a root's analysis completes, a record whose input
+# long report "blocked" on stderr and keep waiting. With nothing held, one root
+# is always admitted, so a root larger than the budget runs alone, and queued
+# roots wait rather than fail. THE BOUND COVERS GOVERNED ROOTS ONLY (Main 4257,
+# option C): the ShellCheck this script starts, through a gate that the ledger
+# names. Memory no ledger entry governs (another caller's ShellCheck, a lint run
+# from a checkout without the ledger) is neither counted against the budget nor
+# ever the reason a governed root waits or is held: counting it let other runs'
+# use starve this one (Main 4252). That residual is owned by the host memory
+# guard (bin/fm-mem-guard.sh), which reads host memory pressure when a
+# no-mistakes run is admitted. When a root's analysis completes, a record whose input
 # is in the band above is raised to the peak this run measured (the watch's
 # peak and /usr/bin/time's maximum resident size) if that is higher, keeping
 # its input size, and is never lowered, so the narrower memory retry, which
@@ -220,21 +224,24 @@
 # nothing. The residual is a root that grows beyond its charge (analysis noise,
 # or a file it follows that the dependency walk does not see), so each gate also
 # watches the host
-# while its root runs: while the lint trees of every pool on the
-# host, plus any other process named shellcheck, hold more than the budget, a
-# gate holds its own root unless it belongs to the oldest running gate (it writes
+# while its root runs: while the running governed roots (its own and every gate
+# the ledger names, in any pool) hold more than the budget, a
+# gate holds its own root unless it belongs to the oldest running governed gate (it writes
 # <peak file>.hold, and the root's resident watch stops the root's process group
 # with SIGSTOP; no process of the root is signalled by its pid), and releases it once the total
 # fits again or its gate is the oldest. A root on a host without the resident
 # watch is not held. A stopped root keeps what it holds but cannot grow
-# further, and the oldest running gate is never stopped, so its growth is
+# further, and the oldest running governed gate is never stopped, so its growth is
 # bounded by the per-root bounds below and every root still finishes. No
 # polling guard can remove what roots grow inside one reading interval (up to
 # 2 s at or below 60 percent of the budget, 0.5 s above it); the trusted
 # charge, not the guard, is what keeps the total within the budget.
 # The time a root spends stopped counts toward
-# its deadline. Processes named shellcheck outside every gate are counted but
-# not stopped; when they alone hold the budget, every gate waits and stops.
+# its deadline. The guard learns which gates are governed by listing the ledger
+# directory by name only; a ledger it cannot list governs no other gate, so the
+# guard counts its own root alone and says so once on stderr naming the path
+# (admission, which reads the same ledger under the host lock, refuses every
+# new root while it cannot; see below).
 # The oldest is judged by each process's absolute start time (ps lstart), ties
 # broken by pid, so every gate names the same one. A gate reads the host every
 # 0.5 s while its last reading was above 60 percent of the budget and every 2 s
@@ -246,7 +253,7 @@
 # (3.06 s in 60 s) and about 0.20 of a core at the 0.5 s rate (6.1 s in 30 s);
 # a lone two-worker run below 60 percent spends about 0.1 of a core on it.
 # A lone default two-worker run keeps both workers only while
-# both roots' charges and any outside memory fit the budget: on a pool with
+# both roots' charges fit the budget: on a pool with
 # no history it runs one root at a time until its roots are recorded, and two
 # recorded roots of 7.2 GiB each (14.4 GiB) also run one at a time.
 # Admission also needs a free slot among the count cap; fairness does not
@@ -274,10 +281,10 @@
 # cannot be opened or read is a charge the gate cannot account for: the gate
 # refuses (exit 2) and names it. The pool, the lock and the ledger are per user
 # (the shell's UID), and the bound applies to the runs of one UID only: a lint run
-# by another OS user on the same host keeps its own and is not counted here,
-# except as processes named shellcheck in the table read at admission. That is a
-# residual; no cross-UID bound is claimed. A pool whose gates predate
-# the ledger is still counted through its slot files and its processes. Each lint
+# by another OS user on the same host keeps its own and is not counted here.
+# That is a residual; no cross-UID bound is claimed. A held slot of the deciding
+# gate's own pool whose gate predates the ledger is still counted through its slot
+# file and its gate's tree; another pool's such gates are not counted (above). Each lint
 # run also writes a run entry there (run.<pid>.<time>, held for the run's life)
 # naming the perl and python it resolved, its bound mechanism and its per-root
 # address-space and resident limits; the private modes this script runs for its
@@ -417,7 +424,8 @@
 # <telemetry-without-.tsv>.roots.tsv (or <telemetry>.roots.tsv if there is no
 # .tsv suffix); otherwise it lives only in the
 # run's scratch dir. Reason values are ok, findings, memory-fallback,
-# timeout, memory, signal:<sig>, limit-unavailable, or error:<rc>.
+# timeout, memory, signal:<sig>, limit-unavailable, not-started (the gate
+# refused a waiting root because the run was marked to stop), or error:<rc>.
 # Memory requires process-level evidence (a GHC exhaustion status or runtime
 # error on stderr), not an echoed source excerpt or an OOM phrase in a
 # filename. In partition mode begin/end
@@ -630,6 +638,11 @@ fm_lint_classify_root() {  # <rc> <root-stderr-file>
   fi
   if grep -qE '^[^[:space:]:]+: (out of memory \(requested [0-9]+ bytes\)|Heap exhausted;)$|: resource exhausted \((Cannot allocate memory|out of memory)\)$|^Out of memory!$' "$err" 2>/dev/null; then
     printf 'memory\n'; return 0
+  fi
+  # Status 2 with the gate's stopped-run refusal is a root the run never started
+  # (the gate refused it while it waited), not a ShellCheck error.
+  if [ "$rc" = 2 ] && grep -q '^fm-lint: this run admits no new root: ' "$err" 2>/dev/null; then
+    printf 'not-started\n'; return 0
   fi
   if [ "$rc" = 1 ]; then
     printf 'findings\n'; return 0
