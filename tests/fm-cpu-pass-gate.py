@@ -262,8 +262,11 @@ try:
         assert (folder / 'm2').exists()
 
         # Hold bound: budget 3 s minus the CI-fix p99 of 1 s holds 2 s, then refuses visibly; the agent never starts.
+        # These bound cases start the round after any healthy case ends (the gate clamps a future start's elapsed time to
+        # 0), so the bound is the budget less the percentile however long the host takes to start the gate; the round's
+        # elapsed time is the subject of P9.bound below.
         folder, db, env = gate_case('gate-bound', available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)],
-                                    timeout='3s', ci_ms=(500, 1000))
+                                    timeout='3s', ci_ms=(500, 1000), round_age=-HANG_BACKSTOP_SECS)
         began = time.monotonic()
         child, log = gate(folder, env, 'x')
         finish(child, 75)
@@ -282,7 +285,8 @@ try:
                                                           ('default-30m', None, (600000,), 1200, 1800, 600)):
             for outcome in ('fits-before', 'refused-at'):
                 folder, db, env = gate_case('gate-real-bound-%s-%s' % (label, outcome), available=GIB, timeout=timeout, ci_ms=ci_ms,
-                                            runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
+                                            runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)],
+                                            round_age=-HANG_BACKSTOP_SECS)
                 if timeout is None:
                     # The key omitted from an existing config: the daemon's built-in 30 minutes apply.
                     (folder / 'home' / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\n')
