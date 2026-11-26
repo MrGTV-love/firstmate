@@ -536,6 +536,7 @@ family_for_basename() {
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|fm-omp-fallback-chain-live-e2e.test.sh|\
     fm-omp-stale-wake-live-e2e.test.sh|\
     fm-jev-guard-omp-live-e2e.test.sh|fm-jev-guard-claude-live-e2e.test.sh|\
+    fm-git-hook-carrier-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
     fm-pr-state-live-e2e.test.sh|\
     fm-sessionstart-hook-live-e2e.test.sh|fm-sessionstart-instruction-refresh-live-e2e.test.sh|\
@@ -561,7 +562,7 @@ family_for_basename() {
     fm-send-inbox.test.sh|fm-spawn-batch.test.sh|\
     fm-spawn-dispatch-profile.test.sh|fm-claude-trust.test.sh|\
     fm-worker-account.test.sh|fm-teamclaude-launch.test.sh|\
-    fm-git-strip-ai-trailers.test.sh|\
+    fm-git-strip-ai-trailers.test.sh|fm-spawn-git-hook-carrier.test.sh|\
     fm-home-writes.test.sh|fm-trace-context-spawn.test.sh|fm-spawn-worktree-settle.test.sh|\
     fm-spawn-acquisition-cleanup.test.sh|\
     fm-spawn-retained-copy.test.sh|\
@@ -1852,6 +1853,9 @@ families_for_changed_path() {
     tests/fm-jev-guard-native-assert.py|tests/fm-jev-guard-native-fixture.py)
       printf '%s\n' "__script__:fm-jev-guard-omp-live-e2e.test.sh"
       printf '%s\n' "__script__:fm-jev-guard-claude-live-e2e.test.sh"
+      ;;
+    tests/fm-git-hook-carrier-live-provider.py)
+      printf '%s\n' "__script__:fm-git-hook-carrier-live-e2e.test.sh"
       ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family

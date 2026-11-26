@@ -546,6 +546,90 @@ test_two_printed_reports_are_listed_once() {
   pass "two printed reports are listed once, with a count that matches the paths, in the wake and in the durable file"
 }
 
+# A report that sampled its long uncertain,ignored group carries the sample line, with the count and the file that lists
+# every path, in the wake and in the durable file.
+test_a_sampled_report_carries_its_count_and_full_list_file() {
+  local dir report line file capped i note
+  note="That file holds the most recent drift report written for this task, which a later report can replace, so its list can differ from this count."
+  line='  sampled: 300 uncertain,ignored path(s); the first 20 are shown in this report, and every path of this report is listed in /home/state/lane.drift-report.txt'
+  report=$(printf '%s\n' 'relaunch drift report for lane: 301 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged' \
+    '  drift: proven docs/b.txt' '  drift: uncertain,ignored cache/1' "$line" '  limitation: shallow history' '  a relaunch is not a new scope declaration')
+  dir=$(make_lane drift-sampled)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the scan failed"
+  assert_contains "$FM_SESSION_END_WAKE" ": sampled: ${line#  sampled: } | " 'the wake did not carry the sample count and the full-list file'
+  assert_contains "$FM_SESSION_END_WAKE" "(the printed drift report is in $dir/state/lane.relaunch-drift)" 'the wake called a sampled report complete'
+  file="$dir/state/lane.relaunch-drift"
+  grep -x -F "$line" "$file" >/dev/null || fail "the durable file lost the sample line: $(cat "$file")"
+  assert_contains "$FM_SESSION_END_WAKE" ": sampled: ${line#  sampled: } | $note | " 'the wake did not say the full-list file holds the latest report'
+  [ "$(grep -A1 -x -F "$line" "$file" | tail -n 1)" = "  $note" ] || fail "the durable file does not say the full-list file holds the latest report: $(cat "$file")"
+  # a report with many proven paths: the pointer to the full list survives the wake's fallback length cap
+  # shellcheck source=bin/fm-push-transition-lib.sh
+  . "$ROOT/bin/fm-push-transition-lib.sh"
+  report='relaunch drift report for lane: 400 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged'
+  for i in $(seq 1 120); do report=$report$'\n'"  drift: proven docs/generated/very/long/directory/name/for/path-number-$i.txt"; done
+  report=$report$'\n'"  drift: uncertain,ignored cache/1"$'\n'"$line"$'\n'"  a relaunch is not a new scope declaration"
+  dir=$(make_lane drift-sampled-long)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the long sampled scan failed"
+  capped=$(watch_delivery_clean_reason "$FM_SESSION_END_WAKE")
+  [ "${#FM_SESSION_END_WAKE}" -gt "${#capped}" ] || fail 'the fixture reason is not over the fallback cap'
+  assert_contains "$capped" '/home/state/lane.drift-report.txt' 'the full-list file was lost at the fallback cap'
+  assert_contains "$capped" "$note" 'the latest-report sentence was lost at the fallback cap'
+  pass "a sampled drift report carries its count and the file listing every path in the wake, through the length cap, and the durable file"
+}
+
+# real_sampled_report <dir>: the drift report bin/fm-slot-provision-lib.sh prints for a copy with 25 changed git-ignored
+# paths and a STATE directory, so its sample line is the one a relaunch really prints.
+real_sampled_report() {
+  local dir=$1 copy=$1/copy base i
+  git init -q -b main "$copy"
+  printf 'x\n' >"$copy/a.txt"
+  git -C "$copy" add -A
+  git -C "$copy" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  base=$(git -C "$copy" rev-parse HEAD)
+  printf '*.log\n' >>"$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)"
+  for i in $(seq 1 25); do printf 'x\n' >"$copy/gen-$i.log"; done
+  mkdir -p "$dir/report-state"
+  STATE="$dir/report-state" bash -c '. "$1/bin/fm-slot-provision-lib.sh"; fm_slot_drift_report "$2" lane main "$3" src 2>&1' \
+    _ "$ROOT" "$copy" "$base"
+}
+
+# The wake puts a sampled report's sample segment before its entries, so the sample line must not say its sample is
+# above: the first sampled entry follows that segment in the wake, and the real sample line says where the sample is
+# without a direction.
+test_a_real_sampled_report_says_where_its_sample_is() {
+  local dir report wake before_sample before_entry
+  dir=$(make_lane drift-real-sampled)
+  report=$(real_sampled_report "$dir")
+  assert_contains "$report" '  sampled: 25 uncertain,ignored path(s)' "the fixture is vacuous: the real report was not sampled: $report"
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the scan failed"
+  wake=$FM_SESSION_END_WAKE
+  assert_contains "$wake" ': sampled: 25 uncertain,ignored path(s)' "the wake lost the sample line: $wake"
+  assert_contains "$wake" 'uncertain,ignored gen-1.log' "the wake lost the first sampled entry: $wake"
+  before_sample=${wake%%: sampled: 25 *} before_entry=${wake%%uncertain,ignored gen-1.log*}
+  [ "${#before_sample}" -lt "${#before_entry}" ] || fail "the first sampled entry does not follow the sample line in the wake: $wake"
+  assert_not_contains "$wake" 'shown above' 'the wake says the sample is above the sample line, but the entries follow it'
+  pass "a real sampled report's sample line is true in the wake, where its first entry follows it"
+}
+
+# The kind of a drift report comes from its own sample line, never from path text: a complete report whose path holds
+# ": sampled: " is still called complete.
+test_a_path_holding_the_sample_marker_is_still_a_complete_report() {
+  local dir report
+  report=$(printf '%s\n' 'relaunch drift report for lane: 1 out-of-scope path(s) changed by this task'"'"'s own work; the recorded scope is unchanged' \
+    '  drift: proven notes: sampled: draft.txt' '  a relaunch is not a new scope declaration')
+  dir=$(make_lane drift-marker-path)
+  FM_SESSION_END_CONTROL_RC=0 FM_SESSION_END_CONTROL_OUT="$report" scan_lane_fresh "$dir" || fail "the scan failed"
+  assert_contains "$FM_SESSION_END_WAKE" 'notes: sampled: draft.txt' "the wake lost the path: $FM_SESSION_END_WAKE"
+  assert_contains "$FM_SESSION_END_WAKE" "(the complete drift report is in $dir/state/lane.relaunch-drift)" \
+    'a complete report whose path holds ": sampled: " was called printed'
+  dir=$(make_lane drift-marker-path-refusal)
+  FM_SESSION_END_CONTROL_RC=1 FM_SESSION_END_CONTROL_OUT="$(printf '%s\n' "$report" 'error: slot provisioning refused: dirty_worktree; preserve and reconcile')" \
+    scan_lane_fresh "$dir" || fail "the refusal scan failed"
+  assert_contains "$FM_SESSION_END_WAKE" "(the complete drift report is in $dir/state/lane.relaunch-drift)" \
+    'a refused relaunch whose complete report has a path holding ": sampled: " was called printed'
+  pass "a complete drift report whose path holds the sample marker is called complete on a relaunch and a refusal"
+}
+
 # The could-not-be-produced report is one line: the durable file holds that header and nothing after it.
 test_could_not_be_produced_report_is_one_line() {
   local dir header out
@@ -637,6 +721,9 @@ test_long_drift_report_keeps_its_durable_reference_at_the_fallback
 test_a_non_refusal_failure_keeps_its_retry
 test_drift_report_reaches_the_observer
 test_two_printed_reports_are_listed_once
+test_a_sampled_report_carries_its_count_and_full_list_file
+test_a_real_sampled_report_says_where_its_sample_is
+test_a_path_holding_the_sample_marker_is_still_a_complete_report
 test_could_not_be_produced_report_is_one_line
 test_relaunch_hands_control_the_watcher_home
 test_missing_endpoint_is_not_relaunched
