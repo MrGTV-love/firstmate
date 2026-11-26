@@ -1183,18 +1183,20 @@ test_carry_over_ignores_global_config_and_global_attributes() {
     fi
     # The suite runs every case with GIT_CONFIG_GLOBAL=/dev/null; these calls
     # lift only that, so the planted files are the caller's real global config.
-    ( unset GIT_CONFIG_GLOBAL; export HOME="$fake" XDG_CONFIG_HOME="$fake/xdg"
-      cgit "$case_dir" merge -q --no-edit trunk >"$case_dir/merge.out" 2>&1 ) \
+    env -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" \
+      git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+      merge -q --no-edit trunk >"$case_dir/merge.out" 2>&1 \
       || fail "$layout: the global driver must resolve the conflict: $(cat "$case_dir/merge.out")"
     live=$(cgit "$case_dir" rev-parse HEAD)
     [ "$(cat "$case_dir/wt/app.txt")" = "unread driver bytes" ] || fail "$layout fixture: the global driver wrote the merged file"
     rc=0
-    out=$( unset GIT_CONFIG_GLOBAL; export HOME="$fake" XDG_CONFIG_HOME="$fake/xdg"
-      verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    out=$(env -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" \
+      NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" \
+        --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
     expect_code 1 "$rc" "$layout: a global merge driver must not hide a conflict resolution: $out"
     expect_not_qualified "$out" "does not merge cleanly" "$layout global merge driver"
     rc=0
-    out=$( unset GIT_CONFIG_GLOBAL; export HOME="$fake" XDG_CONFIG_HOME="$fake/xdg"
+    out=$(env -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" \
       NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
         --head "$live" --task task-x1 --base "$TRUNK" --json) || rc=$?
     expect_code 0 "$rc" "$layout control: an unisolated proof must honor the global driver and carry: $out"
