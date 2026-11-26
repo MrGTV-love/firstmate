@@ -36,7 +36,7 @@ These skills are not captain-invocable; load them only at their precise triggers
 - `captain-facing-wording` - load before translating worker or supervision evidence into captain-facing chat, including PR review or merge replies.
 - `check-result-handling` - load on any `check:` wake before acting on its named result.
 - `crew-brief-authoring` - load before creating or changing a ship, scout, or secondmate brief, and before spawning or promoting work from one.
-- `dispatch-profile-intake` - load at every crewmate or scout intake before resolving dispatch profiles.
+- `dispatch-profile-intake` - load at every crewmate or scout intake before resolving dispatch profiles, and before a request that hands model choices to a program's own model calls.
 - `knowledge-routing` - load before recording durable knowledge, captain preferences, learnings, or project memory.
 - `task-delivery` - load before selecting, executing, supervising, or reviewing a task's delivery path.
 - `worker-steering` - load before steering a worker or secondmate, answering a keyed worker decision, retrying an unconfirmed steer, or relaying a changed task request.
