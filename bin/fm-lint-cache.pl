@@ -401,9 +401,11 @@ if (defined $mode && $mode eq 'check') {
 }
 die "fm-lint-cache: invalid private invocation\n" unless defined $root && ($mode eq 'select' || $mode eq 'check');
 chdir $root or die "fm-lint-cache: chdir $root: $!\n";
+my $canonical_root = abs_path('.');
+$root = $canonical_root if defined $canonical_root;
 my @inventory = sort map { glob $_ } qw(bin/*.sh bin/backends/*.sh tests/*.sh);
 my @source_candidates = @inventory;
-my (%text, %edges, %unknown);
+my (%text, %edges, %select_edges, %unknown);
 sub contents {
     my ($path) = @_;
     return $text{$path} if exists $text{$path};
@@ -520,8 +522,8 @@ sub shell_word {
     return {value => $value, raw => substr($body, $raw_start, $$position - $raw_start), subs => \@subs};
 }
 sub source_dependency {
-    my ($path, $word, $deps, $finite_backend) = @_;
-    unless (defined $word) { $unknown{$path} = 1; return; }
+    my ($path, $word, $deps, $finite_backend, $in_child) = @_;
+    unless (defined $word) { $unknown{$path} = 1 unless $in_child; return; }
     my $source = $word->{value};
     return if $source eq '/dev/null';
     if ($source =~ m{^\x01(/[^\x01\$`*?\[\\<>&|'"]+)\z}) {
@@ -535,11 +537,11 @@ sub source_dependency {
         $deps->{$source} = 1;
     } else {
         return if $finite_backend && ($word->{raw} eq '"$adapter"' || $word->{raw} eq '$adapter');
-        $unknown{$path} = 1;
+        $unknown{$path} = 1 unless $in_child;
     }
 }
 sub command_dependencies {
-    my ($path, $words, $deps, $finite_backend, $stdin) = @_;
+    my ($path, $words, $deps, $child_deps, $finite_backend, $stdin, $in_child) = @_;
     my @words = @$words;
     while (@words) {
         my $raw = $words[0]{raw} // $words[0]{value};
@@ -550,12 +552,13 @@ sub command_dependencies {
     }
     return unless @words;
     my $command = shift @words;
+    my $target_deps = $in_child ? $child_deps : $deps;
     if ($command->{value} =~ /^(?:builtin|command)$/ && @words && $words[0]{value} =~ /^(?:source|\.)$/) {
-        $unknown{$path} = 1;
+        $unknown{$path} = 1 unless $in_child;
         shift @words;
-        source_dependency($path, $words[0], $deps, $finite_backend);
+        source_dependency($path, $words[0], $target_deps, $finite_backend, $in_child);
     } elsif ($command->{value} =~ /^(?:source|\.)$/) {
-        source_dependency($path, $words[0], $deps, $finite_backend);
+        source_dependency($path, $words[0], $target_deps, $finite_backend, $in_child);
     } else {
         while ($command->{value} =~ /^(?:exec|command|env)$/ && @words) {
             shift @words while @words && ($words[0]{value} =~ /^-/ || $words[0]{value} =~ /^[A-Za-z_]\w*=/);
@@ -571,10 +574,13 @@ sub command_dependencies {
             if ($option->{value} =~ /^-[A-Za-z]*c[A-Za-z]*$/) {
                 my $payload = shift @words;
                 return unless defined $payload;
-                if ($payload->{value} =~ /\x01/) { $unknown{$path} = 1; return; }
+                # ShellCheck never parses or reads files referenced inside child
+                # bash/sh -c strings: keep resolved targets for caller selection
+                # only, never as ShellCheck cache inputs or unknown-source poison.
+                return if $payload->{value} =~ /\x01/;
                 my %child_parameters;
                 $child_parameters{$_} = $words[$_]{value} for 0 .. $#words;
-                scan_program($path, $payload->{value}, $deps, $finite_backend, \%child_parameters);
+                scan_program($path, $payload->{value}, $deps, $child_deps, $finite_backend, \%child_parameters, 1);
                 return;
             }
             $stdin_mode = 1 if $option->{value} =~ /^-[A-Za-z]*s[A-Za-z]*$/;
@@ -588,7 +594,7 @@ sub command_dependencies {
     }
 }
 sub scan_program {
-    my ($path, $body, $deps, $finite_backend, $parameters) = @_;
+    my ($path, $body, $deps, $child_deps, $finite_backend, $parameters, $in_child) = @_;
     my ($position, @words, @heredocs, @cases, $stdin);
     $position = 0;
     while ($position < length $body) {
@@ -599,9 +605,9 @@ sub scan_program {
             $position = pos($body);
             if ($comment =~ /^#\s*shellcheck\s+.*?\bsource=(?:"([^"]+)"|'([^']+)'|([^\s]+))/) {
                 my $source = defined $1 ? $1 : defined $2 ? $2 : $3;
-                $deps->{$source} = 1 unless $source eq '/dev/null';
+                ($in_child ? $child_deps : $deps)->{$source} = 1 unless $source eq '/dev/null';
             }
-            $unknown{$path} = 1 if $comment =~ /^#\s*shellcheck\s+.*\bsource-path=/;
+            $unknown{$path} = 1 if !$in_child && $comment =~ /^#\s*shellcheck\s+.*\bsource-path=/;
             next;
         }
         if (substr($body, $position, 2) eq '[[' || substr($body, $position, 2) eq '((') {
@@ -610,7 +616,7 @@ sub scan_program {
             while ($position < length($body) && substr($body, $position, 2) ne $close) {
                 if (substr($body, $position, 1) =~ /[\s;&|<>()]/) { $position++; next; }
                 my $word = shell_word($body, \$position, $parameters);
-                scan_program($path, $_, $deps, $finite_backend, $parameters) for @{$word->{subs}};
+                scan_program($path, $_, $deps, $child_deps, $finite_backend, $parameters, $in_child) for @{$word->{subs}};
             }
             $position += 2;
             push @words, {value => 'test'};
@@ -622,7 +628,7 @@ sub scan_program {
             $position++ while substr($body, $position, 1) =~ /[ \t]/;
             my $heredoc = $operator =~ /^(?:[0-9]+)?<<-?$/;
             my $target = shell_word($body, \$position, $parameters, undef, $heredoc);
-            scan_program($path, $_, $deps, $finite_backend, $parameters) for @{$target->{subs}};
+            scan_program($path, $_, $deps, $child_deps, $finite_backend, $parameters, $in_child) for @{$target->{subs}};
             my $input = $operator =~ /^(?:0)?</;
             $stdin = undef if $input;
             if ($heredoc) {
@@ -642,7 +648,7 @@ sub scan_program {
             if (@cases && $cases[-1] eq 'pattern') {
                 $cases[-1] = 'body' if $separator eq ')';
             } else {
-                command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
+                command_dependencies($path, \@words, $deps, $child_deps, $finite_backend, $stdin, $in_child);
                 $cases[-1] = 'pattern' if @cases && $separator eq ';' && substr($body, $position, 1) =~ /[;&]/;
             }
             @words = ();
@@ -661,8 +667,7 @@ sub scan_program {
                     }
                     if (exists $heredoc->{parameters}) {
                         my $child_parameters = $heredoc->{quoted} ? $heredoc->{parameters} : $parameters;
-                        $unknown{$path} = 1 if !$heredoc->{quoted} && $program =~ /[\$`]/;
-                        scan_program($path, $program, $deps, $finite_backend, $child_parameters);
+                        scan_program($path, $program, $deps, $child_deps, $finite_backend, $child_parameters, 1);
                     }
                 }
                 @heredocs = ();
@@ -670,33 +675,38 @@ sub scan_program {
             next;
         }
         my $word = shell_word($body, \$position, $parameters);
-        scan_program($path, $_, $deps, $finite_backend, $parameters) for @{$word->{subs}};
+        scan_program($path, $_, $deps, $child_deps, $finite_backend, $parameters, $in_child) for @{$word->{subs}};
         if (!@words && $word->{raw} eq 'case') { push @cases, 'header'; next; }
         if (@cases && $cases[-1] eq 'header') { $cases[-1] = 'pattern' if $word->{raw} eq 'in'; next; }
         if (@cases && $word->{raw} eq 'esac' && !@words) { pop @cases; next; }
         next if @cases && $cases[-1] eq 'pattern';
         push @words, $word;
     }
-    command_dependencies($path, \@words, $deps, $finite_backend, $stdin);
+    command_dependencies($path, \@words, $deps, $child_deps, $finite_backend, $stdin, $in_child);
 }
 sub dependencies {
     my ($path) = @_;
     return @{$edges{$path}} if exists $edges{$path};
     my $body = contents($path);
-    my %deps;
+    my (%deps, %child_deps);
     my $finite_backend = identity_path($path) eq 'bin/fm-backend.sh';
     if ($finite_backend) {
         $deps{"bin/backends/$_.sh"} = 1 for qw(tmux herdr zellij orca cmux);
     }
     if (defined $body) {
-        scan_program($path, $body, \%deps, $finite_backend, {});
+        scan_program($path, $body, \%deps, \%child_deps, $finite_backend, {}, 0);
     }
+    $select_edges{$path} = [sort map { identity_path($_) } keys %child_deps];
     return @{$edges{$path} = [sort map { identity_path($_) } keys %deps]};
 }
 sub closure {
-    my ($path, $seen) = @_;
+    my ($path, $seen, $include_child) = @_;
     return if $seen->{$path}++;
-    closure($_, $seen) for dependencies($path);
+    my @direct = dependencies($path);
+    closure($_, $seen, $include_child) for @direct;
+    if ($include_child) {
+        closure($_, $seen, $include_child) for @{$select_edges{$path} || []};
+    }
 }
 if ($mode eq 'select') {
     local $/ = "\0";
@@ -707,7 +717,7 @@ if ($mode eq 'select') {
     my (%selected, %closures, %inputs);
     for my $path (@inventory) {
         my %seen;
-        closure($path, \%seen);
+        closure($path, \%seen, 1);
         $closures{$path} = \%seen;
         $inputs{$_} = 1 for keys %seen;
     }
@@ -736,10 +746,10 @@ my $path = $args[-1];
 die "fm-lint-cache: missing analysis command\n" unless defined $path && defined $tool;
 $path = identity_path($path);
 sub fingerprint {
-    %text = (); %edges = (); %unknown = ();
+    %text = (); %edges = (); %select_edges = (); %unknown = ();
     return undef unless defined contents($tool);
     my %seen;
-    closure($path, \%seen);
+    closure($path, \%seen, 0);
     return undef if grep { $unknown{$_} } keys %seen;
     my @key_args = map { my $arg = $_; $arg =~ s{^\Q$root\E/}{}; $arg } @args;
     my @parts = ('fm-lint-cache-v1', $^O, @key_args);
