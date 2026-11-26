@@ -2753,18 +2753,18 @@ do_relaunch() {
           || die "launch recovery for $ID found $(fm_launch_proof_refusal_cause unmanaged); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META")"
         # An unpinned omp names its cause and next action as claude does (Main
         # 1901 (b), Main 1928 F3); it keeps the skip and zero exit omp always had.
-        echo "recovery-skipped $ID launch=unmanaged: $(fm_launch_proof_refusal_cause unmanaged "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META")"
+        echo "recovery-skipped $ID launch=unmanaged: $(fm_launch_proof_refusal_cause unmanaged "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$META" "$detail")"
         return 0
         ;;
       pinned-elsewhere|contested)
-        die "launch recovery for $ID found $(fm_launch_proof_refusal_cause "$state" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$state" "$META")"
+        die "launch recovery for $ID found $(fm_launch_proof_refusal_cause "$state" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$state" "$META" "$detail")"
         ;;
       unknown)
         if [ "$legacy" = 1 ]; then
           echo "recovery-skipped $ID launch=legacy-unproven"
           return 0
         fi
-        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken ($(fm_launch_proof_refusal_cause unknown "$detail"); $(fm_launch_proof_refusal_next unknown "$META"))"
+        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken ($(fm_launch_proof_refusal_cause unknown "$detail"); $(fm_launch_proof_refusal_next unknown "$META" "$detail"))"
         ;;
       *) die "invalid launch proof for $ID: $state" ;;
     esac

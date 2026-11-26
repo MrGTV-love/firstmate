@@ -209,6 +209,7 @@ There is no repair: the omp adoption route was removed (Main 1874, Main 1901), a
 A live omp process without the launch pin matching its record is `unmanaged`, whatever its session record names: every lifecycle consumer refuses it with that cause and the next action, and the reboot sweep and `relaunch --recover-launch` inspections report the same cause and next action, keeping their zero exit for omp.
 The next action is to stop it by hand in its pane and relaunch it with `bin/fm-control.sh <task-id> relaunch`, whose stopped-agent proofs govern that relaunch, or to decide the lane by hand.
 A launch-pinned omp process still needs its session record to name it and its current session; when it does not, it is `unmanaged` with that cause.
+Its next action is not a relaunch, since the pinned agent may be running another conversation: Main inspects the pane and decides the lane by hand.
 
 ### A restored claude agent
 
@@ -219,6 +220,7 @@ For every harness whose record carries `launch_proof=env-v1`, a token equal to t
 A member whose environment read or parent read fails is skipped as exited only on positive proof: `kill -0` reports no such process, `ps` shows it exited and not reaped (state `Z`), or its pid now belongs to another process group; a start-time difference is no proof, and a live member of the group that cannot be read still refuses.
 A listed foreground process that the process table itself lacks stays unaccounted for and refuses.
 A failed check is `contested` (another process, directory or record shares the pane), `pinned-elsewhere`, or `unknown` (a read that could not be completed), each with its own cause; only after every check passes does a matching token keep its unchanged managed outcome.
+An `unknown` verdict with its own cause names the next action to retry once that cause is cleared, or to decide the lane by hand.
 The claim inventory reads this home's records, every local home the root inventory reaches, and each local secondmate home a reached record names, with an exact set of physical paths as its cycle guard; on the host `attribution` verb it reads only the record's own state directory and the home that record names.
 Every lifecycle consumer names which verdict refused and why.
 Nothing can authorize an unpinned native restore: `adopt` refuses every task, and no argv, process-table text, transcript, working directory, or claim counts as proof for claude; the working directory, the process group and the claims can only refuse.

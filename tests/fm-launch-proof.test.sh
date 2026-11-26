@@ -1238,6 +1238,16 @@ test_launch_proof_omp_has_no_adoption_route() (
   session_record 4343
   out=$(fm_launch_proof_herdr_refusal "$META" lab:w1:p2) && fail 'a pinned omp whose session record names another process was authorized'
   assert_contains "$out" 'its omp session record does not name this live process' 'the refusal names the session cause'
+  assert_contains "$out" 'Main inspects the pane and decides the lane by hand' 'the session refusal names its own next action'
+  assert_not_contains "$out" 'native restore' 'the session refusal does not call a pinned agent a native restore'
+  assert_not_contains "$out" 'relaunch' 'the session refusal does not advise ending the open conversation'
+  session_record 4242
+  # shellcheck disable=SC2329
+  lsof() { return 1; }
+  out=$(fm_launch_proof_herdr_refusal "$META" lab:w1:p2) && fail 'a pinned omp whose working directory cannot be read was authorized'
+  assert_contains "$out" 'kernel working directory cannot be read; retry once the cause named above is cleared, or decide the lane by hand' \
+    'an unknown verdict with its own cause names the neutral next action'
+  assert_not_contains "$out" 'no foreground process could be attributed' 'the judged unknown does not borrow the unattributed wording'
   pass 'omp has no adoption route: an unpinned omp refuses with its cause whatever its session record says, and a pinned omp keeps its session proof'
 )
 

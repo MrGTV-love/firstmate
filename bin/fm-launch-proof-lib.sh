@@ -759,10 +759,19 @@ fm_launch_proof_refusal_cause() { # <unmanaged|pinned-elsewhere|contested|unknow
   esac
 }
 
-# Nothing can authorize an unpinned native restore, so its next action is the
-# guarded relaunch of a positively stopped agent, or a decision by hand.
-fm_launch_proof_refusal_next() { # <unmanaged|pinned-elsewhere|contested|unknown> <meta>
+# The next action follows the judged <cause> when one is present, otherwise the
+# verdict. Nothing can authorize an unpinned native restore, so its next action
+# is the guarded relaunch of a positively stopped agent, or a decision by hand.
+fm_launch_proof_refusal_next() { # <unmanaged|pinned-elsewhere|contested|unknown> <meta> [<cause>]
   local id=${2##*/}
+  if [ "${3:-}" = "$FM_LAUNCH_PROOF_OMP_SESSION_CAUSE" ]; then
+    printf 'the pinned agent may be running a conversation other than its task session; Main inspects the pane and decides the lane by hand'
+    return
+  fi
+  if [ "$1" = unknown ] && [ -n "${3:-}" ]; then
+    printf 'retry once the cause named above is cleared, or decide the lane by hand'
+    return
+  fi
   case "$1" in
     contested) printf 'something other than this task'"'"'s own agent tree, directory or record shares its pane; Main inspects the pane and decides the lane by hand' ;;
     unmanaged) printf 'no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh %s relaunch", or decide the lane by hand' "${id%.meta}" ;;
@@ -799,7 +808,7 @@ fm_launch_proof_herdr_refusal() { # <meta> <expected-endpoint>
   fi
   if ! proof=$(fm_launch_proof_record_proof "$1") || { [ "$proof" != absent ] && [ "$proof" != proof=env-v1 ]; }; then
     case "$harness" in claude|omp)
-      printf '%s; %s' "$FM_LAUNCH_PROOF_RECORD_CAUSE" "$(fm_launch_proof_refusal_next unknown "$1")" ;;
+      printf '%s; %s' "$FM_LAUNCH_PROOF_RECORD_CAUSE" "$(fm_launch_proof_refusal_next unknown "$1" "$FM_LAUNCH_PROOF_RECORD_CAUSE")" ;;
     esac
     return 1
   fi
@@ -809,7 +818,7 @@ fm_launch_proof_herdr_refusal() { # <meta> <expected-endpoint>
   [ "$verdict" != managed ] || return 0
   case "$harness" in claude|omp)
     printf '%s; %s' "$(fm_launch_proof_refusal_cause "$verdict" "${judged#*$'\t'}")" \
-      "$(fm_launch_proof_refusal_next "$verdict" "$1")" ;;
+      "$(fm_launch_proof_refusal_next "$verdict" "$1" "${judged#*$'\t'}")" ;;
   esac
   return 1
 }

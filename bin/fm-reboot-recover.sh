@@ -163,7 +163,7 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
         continue
       fi
       notice "$id" "launch-unreadable $identity" \
-        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unknown "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unknown "$meta")" && result=1
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unknown "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unknown "$meta" "$detail")" && result=1
       continue
       ;;
     unmanaged)
@@ -182,11 +182,11 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
       # An unpinned omp names its cause and next action as claude does (Main
       # 1901 (b), Main 1928 F3); it keeps the zero status omp always had.
       notice "$id" "unmanaged $identity" \
-        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$meta")" || true
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause unmanaged "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next unmanaged "$meta" "$detail")" || true
       ;;
     pinned-elsewhere|contested)
       notice "$id" "$proof $identity" \
-        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause "$proof" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$proof" "$meta")" && result=1
+        "REBOOT_RECOVERY: $id: $(fm_launch_proof_refusal_cause "$proof" "$detail"); no lifecycle action taken; $(fm_launch_proof_refusal_next "$proof" "$meta" "$detail")" && result=1
       continue
       ;;
     *) result=1 ;;
