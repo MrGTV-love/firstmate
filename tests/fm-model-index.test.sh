@@ -53,6 +53,27 @@ mkdir -p "$TMP_ROOT/no-index/config"
 [ "$(FM_HOME="$TMP_ROOT/no-index" "$TOOL" entry codex current)" = false ] || fail 'entry membership without an index was not false'
 pass 'entry membership is exact, per-harness, and includes configured stand-ins'
 
+# catalog <harness> is the discovery read for a role no index entry names, so it
+# must answer from the same catalog owner, without an index, and never turn
+# absent evidence into a model list.
+mkdir -p "$TMP_ROOT/no-index-home"
+[ "$(FM_HOME="$TMP_ROOT/no-index-home" "$TOOL" catalog codex | jq -c '[.models[].id]')" = '["current","old","next"]' ] || fail 'catalog readout did not print the normalized harness catalog without an index'
+printf '%s\n' '{"models":[{"id":"current"},{"id":"old"},{"id":"next"},{"id":"newer"}]}' > "$CATALOGS/codex.json"
+[ "$(FM_HOME="$TMP_ROOT/no-index-home" "$TOOL" catalog codex | jq -r '.models[-1].id')" = newer ] || fail 'a catalog release change did not reach the discovery read'
+printf '%s\n' '{"models":[{"id":"current"},{"id":"old"},{"id":"next"}]}' > "$CATALOGS/codex.json"
+code=0
+FM_MODEL_CATALOG_DIR="$TMP_ROOT/no-catalogs" "$TOOL" catalog codex > "$TMP_ROOT/catalog-absent.out" 2> "$TMP_ROOT/catalog-absent.err" || code=$?
+[ "$code" -eq 2 ] || fail "an absent catalog export did not refuse ($code)"
+[ ! -s "$TMP_ROOT/catalog-absent.out" ] || fail 'an absent catalog export printed a model list'
+assert_contains "$(cat "$TMP_ROOT/catalog-absent.err")" "$TMP_ROOT/no-catalogs/codex.json" 'an absent catalog export must report the unreadable source on stderr'
+printf '%s\n' '{"models":[]}' > "$CATALOGS/pi.json"
+code=0
+"$TOOL" catalog pi > "$TMP_ROOT/catalog-empty.out" 2> "$TMP_ROOT/catalog-empty.err" || code=$?
+[ "$code" -eq 2 ] || fail "an empty catalog did not refuse ($code)"
+[ ! -s "$TMP_ROOT/catalog-empty.out" ] || fail 'an empty catalog printed a model list'
+rm -f "$CATALOGS/pi.json"
+pass 'catalog prints the normalized catalog without an index and refuses absent or empty evidence'
+
 printf '%s\n' '{"rules":[{"when":"hard","use":[{"harness":"codex","role":"strong","effort":"high"},{"harness":"claude","model":"literal"}]}],"default":{"harness":"omp","role":"routine","stand_in":true,"provider":"vendor"}}' > "$TMP_ROOT/dispatch.json"
 "$TOOL" profiles "$TMP_ROOT/dispatch.json" > "$TMP_ROOT/concrete.json" 2> "$TMP_ROOT/profile-warnings"
 jq -e '.rules[0].use[0] == {harness:"codex",model:"current",effort:"high"} and .rules[0].use[1].model == "literal" and .default == {harness:"omp",model:"openrouter/vendor/stand-in",provider:"vendor"}' "$TMP_ROOT/concrete.json" >/dev/null || fail 'concrete profiles lose policy fields or select wrong ids'
