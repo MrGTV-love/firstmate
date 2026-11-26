@@ -61,15 +61,15 @@ try:
 
         # A busy wake-queue lock never holds the gate: the refusal exits at once and its wake is spilled to state/.wake-spill.<seq>,
         # which the next append to that queue, or the watcher's next start, replays.
-        holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && sleep 60', 'bash',
+        holder = subprocess.Popen(['bash', '-c', '. "$1" && fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" && touch "$2" && sleep 3600', 'bash',
                                    str(repo / 'bin/fm-wake-lib.sh'), str(folder / 'queue-held')], env=env, start_new_session=True)
         children.append(holder)
         wait_for(lambda: (folder / 'queue-held').exists(), 'wake-queue lock held')
         before = wakes(folder)
-        started_at = time.monotonic()
         child, log = gate(folder, env, 'nowhere', cwd=folder / 'elsewhere', log='unmapped-busy')
         finish(child, 75)
-        assert time.monotonic() - started_at < 10 and wakes(folder) == before
+        # The refusal ended while the holder still held the queue lock: the gate never waited for it.
+        assert holder.poll() is None and wakes(folder) == before
         spilled = ''.join(p.read_text() for p in (folder / 'fmhome' / 'state').glob('.wake-spill.[0-9]*'))
         assert 'launch-gate-unmapped' in spilled and 'unmapped worktree' in spilled, spilled
         # Gates that spill at the same moment each keep their own spill file: none is overwritten.
@@ -93,7 +93,7 @@ try:
             out = root / ('pipe-%d' % len(records))
             probe = ['bash', '-c', 'yes | head -1 >/dev/null; echo "${PIPESTATUS[0]}" > "$1"', 'probe', str(out)]
             records.append(dict(command=command + probe))
-            subprocess.run(command + probe, env=env, cwd=str(cwd), stdin=subprocess.DEVNULL, timeout=30, check=True)
+            run_to_exit(command + probe, 'the SIGPIPE probe to exit', env=env, cwd=str(cwd), stdin=subprocess.DEVNULL, check=True)
             return out.read_text().strip()
         folder, db, env = gate_case('gate-sigpipe', runs=(('x', 'ci', 'running', None), ('y', 'review', 'fixing', 77)))
         launch_gate = ['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--']
@@ -293,7 +293,7 @@ try:
                 assert child.poll() is None and not (folder / 'x.agent').exists(), (label, log.with_suffix('.stderr').read_text())
                 if outcome == 'fits-before':
                     facts(folder, available=40 * GIB)
-                    wait_for(lambda: (folder / 'x.agent').exists(), label + ': admitted before the bound')
+                    wait_for(lambda: (folder / 'x.agent').exists(), label + ': admitted before the bound', log=log, child=child)
                     (folder / 'x.release').touch()
                     finish(child)
                 else:
@@ -384,7 +384,7 @@ try:
             time.sleep(0.5)
             assert not (folder / 'x.agent').exists() and child.poll() is None, (label, stderr_of(log))
             facts(folder, available=40 * GIB)
-            wait_for(lambda: (folder / 'x.agent').exists(), label + ': admitted by itself')
+            wait_for(lambda: (folder / 'x.agent').exists(), label + ': admitted by itself', log=log, child=child)
             assert 'launch-gate admitted: ' in stderr_of(log) and reserving_held(folder, ['x']) == 1, label
             (folder / 'x.release').touch()
             finish(child)
@@ -426,7 +426,7 @@ try:
         child, log = gate(folder, env, 'x')
         wait_for(lambda: 'held for capacity' in wakes(folder), 'held')
         facts(folder, available=40 * GIB)
-        wait_for(lambda: (folder / 'x.agent').exists(), 'admitted inside its bound')
+        wait_for(lambda: (folder / 'x.agent').exists(), 'admitted inside its bound', log=log, child=child)
         (folder / 'x.release').touch()
         finish(child)
         # An unreadable round start, or one that leaves no positive bound, holds not at all: one immediate decision.
@@ -485,11 +485,12 @@ try:
     def hold_record_written():
         # Every held launch leaves the record the held-row rule reads: run, step, gate start, attempt.
         folder, db, env = gate_case('gate-hold-record', available=GIB, runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
+        launched_at = time.time()
         child, log = gate(folder, env, 'x')
         wait_for(lambda: 'held for capacity' in wakes(folder), 'held')
         records_seen = [json.loads(line) for line in (folder / 'pool' / 'launch-holds.jsonl').read_text().splitlines()]
         assert len(records_seen) == 1 and records_seen[0]['run'] == 'x' and records_seen[0]['step'] == 'ci', records_seen
-        assert abs(records_seen[0]['gate_started'] - time.time()) < 30 and re.match(r'\d+:\d+$', records_seen[0]['attempt']), records_seen
+        assert launched_at <= records_seen[0]['gate_started'] <= time.time() and re.match(r'\d+:\d+$', records_seen[0]['attempt']), records_seen
         os.killpg(child.pid, signal.SIGKILL)
         finish(child, -signal.SIGKILL)
 
@@ -553,11 +554,11 @@ try:
         folder, db, env = storage_case('gate-hold-unwritable', False, True)
         (folder / 'home' / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\nagent_timeout: "240m"\n')
         change(db, "UPDATE agent_invocations SET duration_ms = 60000, completed_at = started_at + 60")
-        began = time.monotonic()
         child, log = gate(folder, env, 'x')
+        # A gate that held silently would hold to its bound, 14400 - 60 s, far past the hang backstop finish waits.
         finish(child, 75)
         text = stderr_of(log)
-        assert time.monotonic() - began < 20 and 'launch-gate refused: hold line not recorded: run x' in text, text
+        assert 'launch-gate refused: hold line not recorded: run x' in text, text
         assert not (folder / 'x.agent').exists()
         lines = storage_read(folder)[0]
         assert len(lines) == 1 and 'hold line not recorded' in lines[0] and 'next action: ' in lines[0], lines
@@ -610,7 +611,7 @@ os.waitpid(child, 0)
             wait_for(lambda: (folder / 'below.ready').exists(), 'the agent below the dispatcher runs')
             os.kill(child.pid, number)
             wait_for(lambda: (folder / ('below.got-%d' % number)).exists(), 'signal %d reached the agent below the dispatcher' % number)
-            child.wait(timeout=30)
+            wait_exit(child, 'the gate to exit after signal %d' % number, log=folder / 'gate')
 
     def outside_orphan(folder):
         # An unrelated orphan outside the launch coalition: started in its own session by a shell that exits, so its

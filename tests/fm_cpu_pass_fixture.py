@@ -287,12 +287,63 @@ def skipped_without_kernel_facts(name):
     return True
 
 
-def wait_for(predicate, description):
-    until = time.monotonic() + 30
+# A wait for an expected event (a decision line, a marker, an exit) ends when the event happens. This backstop only
+# catches a true hang: a decision on a loaded host can take minutes, so no healthy run comes near it. Read at call
+# time, so a control may lower it on this module.
+HANG_BACKSTOP_SECS = 600
+
+
+def last_product_line(log=None):
+    """The last line a fixture process wrote: LOG's stderr or stdout when given, else the newest recorded output."""
+    paths = [Path(str(log) + suffix) for suffix in ('.stderr', '.stdout')] if log is not None else [
+        Path(record[key]) for record in records for key in ('stderr', 'stdout') if record.get(key)]
+    written = []
+    for path in paths:
+        try:
+            lines = path.read_text(errors='replace').splitlines()
+            if lines:
+                written.append((path.stat().st_mtime_ns, path, lines[-1]))
+        except OSError:
+            pass
+    if not written:
+        return 'none'
+    _, path, line = max(written, key=lambda item: item[0])
+    return '%s: %s' % (path.name, line)
+
+
+def hang_backstop_expired(description, began, log=None):
+    raise AssertionError('fixture hang backstop (%d s) expired after %.1f s waiting for %s; last product line: %s' % (
+        HANG_BACKSTOP_SECS, time.monotonic() - began, description, last_product_line(log)))
+
+
+def wait_for(predicate, description, log=None, child=None):
+    """Wait until PREDICATE holds; when CHILD (the launch whose effect it watches) has exited without it, fail at once."""
+    began = time.monotonic()
     while not predicate():
-        if time.monotonic() >= until:
-            raise AssertionError('fixture observation fence: ' + description)
+        if child is not None and child.poll() is not None and not predicate():
+            raise AssertionError('pid %d exited with %r after %.1f s before %s; last product line: %s' % (
+                child.pid, child.returncode, time.monotonic() - began, description, last_product_line(log)))
+        if time.monotonic() - began >= HANG_BACKSTOP_SECS:
+            hang_backstop_expired(description, began, log)
         time.sleep(0.025)
+
+
+def wait_exit(child, description, log=None):
+    """CHILD's exit status, waiting only on its exit, bounded by the hang backstop."""
+    began = time.monotonic()
+    try:
+        return child.wait(timeout=HANG_BACKSTOP_SECS)
+    except subprocess.TimeoutExpired:
+        hang_backstop_expired(description, began, log)
+
+
+def run_to_exit(command, description, **options):
+    """subprocess.run(COMMAND, **OPTIONS), waiting only on its exit, bounded by the hang backstop."""
+    began = time.monotonic()
+    try:
+        return subprocess.run(command, timeout=HANG_BACKSTOP_SECS, **options)
+    except subprocess.TimeoutExpired:
+        hang_backstop_expired(description, began)
 
 
 GIB = 2 ** 30
@@ -434,7 +485,7 @@ def launch(command, env, log, cwd=None):
 
 
 def finish(child, code=0):
-    actual = child.wait(timeout=30)
+    actual = wait_exit(child, 'pid %d to exit with %r' % (child.pid, code))
     assert actual == code, (actual, code, records)
 
 

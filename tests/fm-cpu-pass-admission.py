@@ -848,11 +848,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         # F3: words of data that spell a start are not a start; the memory route runs the command unchanged.
         folder, db, env = case('fix-f3', cores=3, running=1)
         child = launch(mem_guard + ['printf', '%s ', 'no-mistakes', 'axi', 'run', '--intent', 'goal'], env, folder / 'data')
-        try:
-            code = child.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            os.killpg(child.pid, signal.SIGKILL); child.wait()
-            raise AssertionError('printf of start words waited at pipeline-start')
+        code = wait_exit(child, 'printf of start words to exit (it must not wait at pipeline-start)', log=folder / 'data')
         assert code == 0 and (folder / 'data.stdout').read_text() == 'no-mistakes axi run --intent goal ', (code, (folder / 'data.stderr').read_text())
 
     def visible_agent():
@@ -884,7 +880,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         # F5: the gate dies at its pid handoff to the watcher; no agent may run on without it.
         folder, db, env = gate_case('fix-f5')
         child, log = gate(folder, dict(env, CASE_KILL_BEFORE_PID='1'), 'x')
-        child.wait(timeout=30)
+        wait_exit(child, 'child to exit')
         time.sleep(1.5)
         if (folder / 'x.agent').exists():
             pid = agent_info(folder / 'x.agent')['pid']
@@ -909,7 +905,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             time.sleep(pause)
             fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
             (folder / 'release-sleep').touch()
-            code = child.wait(timeout=30)
+            code = wait_exit(child, 'child to exit')
             text = log.with_suffix('.stderr').read_text()
             if admitted:
                 assert code == 0 and (folder / 'x.agent').exists(), (label, code, text)
@@ -926,7 +922,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
         child, log = gate(folder, env, 'x', mode='exit-0')
         wait_for(lambda: 'launch-gate waiting: another start is registering' in log.with_suffix('.stderr').read_text(), 'contention notice')
         fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
-        assert child.wait(timeout=30) == 0
+        assert wait_exit(child, 'child to exit') == 0
         queue = wakes(folder)
         assert 'held for capacity before its ci agent starts, waited ' in queue and 'another start is registering' in queue, queue
         assert 'run x (fm/x) admitted after ' in queue, queue
@@ -1019,7 +1015,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 time.sleep(0.5)
                 assert not (folder / 'y.agent').exists() and child.poll() is None, (label, (folder / 'gate-y.stderr').read_text())
                 os.killpg(child.pid, signal.SIGTERM)
-                child.wait(timeout=30)
+                wait_exit(child, 'child to exit')
             else:
                 wait_for(lambda: (folder / 'y.agent').exists(), label + ': y starts once x is proven agentless')
                 assert 'x:ci-waiting:0:unseen' in (folder / 'gate-y.stderr').read_text(), (folder / 'gate-y.stderr').read_text()
@@ -1055,7 +1051,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                     # A plain reattachment still passes at once while the interception cannot be placed.
                     change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = ?", ('xargs-' + label,))
                     reattach = launch(route + ['no-mistakes', 'axi', 'run'], dict(env, CASE_NAME='reattach'), folder / 'r')
-                    assert reattach.wait(timeout=30) == 0 and 'pipeline-start admitted' not in (folder / 'r.stderr').read_text(), (folder / 'r.stderr').read_text()
+                    assert wait_exit(reattach, 'reattach to exit') == 0 and 'pipeline-start admitted' not in (folder / 'r.stderr').read_text(), (folder / 'r.stderr').read_text()
 
     def wrapper_shapes():
         # R2: every wrapper form the parser models joins the queue once through each route; reattachment,
@@ -1096,7 +1092,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
                 change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'existing'")  # active but not counted
                 child = launch(wrap(shape), env, folder / 'r2')
-                code = child.wait(timeout=30)
+                code = wait_exit(child, 'child to exit')
                 text = (folder / 'r2.stderr').read_text() + (folder / 'r2.stdout').read_text()
                 assert code == 0, (route_name, name, code, text)
                 with sqlite3.connect(db) as connection:
@@ -1157,7 +1153,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
                 change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'existing'")  # active but not counted
                 child = launch(['bash', '-c', 'printf "input\\n" | "$@"', 'feed'] + route + ['xargs', '-I', '{}'] + words, env, folder / 'x')
-                code = child.wait(timeout=30)
+                code = wait_exit(child, 'child to exit')
                 text = (folder / 'x.stderr').read_text() + (folder / 'x.stdout').read_text()
                 with sqlite3.connect(db) as connection:
                     new_rows = connection.execute("SELECT count(*) FROM runs WHERE id = ?", (name,)).fetchone()[0]
@@ -1184,7 +1180,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
             change(db, "INSERT INTO runs (id, status) VALUES ('existing', 'running')")
             change(db, "UPDATE runs SET ci_ready_at = 1 WHERE id = 'existing'")  # active but not counted
             child = launch(task_run + words, env, folder / 'x')
-            code = child.wait(timeout=30)
+            code = wait_exit(child, 'child to exit')
             text = (folder / 'x.stderr').read_text() + (folder / 'x.stdout').read_text()
             assert code == 0 and 'pipeline-start admitted' not in text, (name, code, text)
             assert not list((folder / 'pool').glob('pipeline-waiter-*.lock')), name
@@ -1217,12 +1213,12 @@ if intent.startswith('reg'):
         log = folder / 'calls.log'
         return [line.split(' :: ')[1] for line in log.read_text().splitlines()] if log.exists() else []
 
-    def ended(child, folder, what, timeout=30):
+    def ended(child, folder, what):
         try:
-            return child.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
+            return wait_exit(child, what)
+        except AssertionError as hung:
             os.killpg(child.pid, signal.SIGKILL); child.wait()
-            raise AssertionError('%s hung: calls %r' % (what, calls(folder)))
+            raise AssertionError('%s; calls %r' % (hung, calls(folder)))
 
     def nested_second_client():
         # A second fresh client inside an admitted command is admitted on its own, whether the first client went
@@ -1385,8 +1381,8 @@ if intent.startswith('reg'):
         return holder, release
 
     def refuse(env, folder, extra=None):
-        gate = subprocess.run(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', '/bin/true'], env=dict(env, **(extra or {})),
-                              cwd=str(folder), stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
+        gate = run_to_exit(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', '/bin/true'], 'the unmapped launch-gate to exit',
+                           env=dict(env, **(extra or {})), cwd=str(folder), stdin=subprocess.DEVNULL, capture_output=True, text=True)
         assert gate.returncode == 75 and 'unmapped worktree' in gate.stderr, gate.stderr
         return gate
 
@@ -1411,7 +1407,7 @@ if intent.startswith('reg'):
         holder, release = wake_holder(env, folder)
         refuse(env, folder, dict(PATH=str(shim) + os.pathsep + env['PATH'], CASE_WAKE_LIB=str(repo / 'bin/fm-wake-lib.sh')))
         release.touch()
-        holder.wait(timeout=30)
+        wait_exit(holder, 'holder to exit')
         found = spills(folder)
         assert (folder / 'first-publication').exists() and not (folder / 'watcher-failed').exists(), 'the collision never happened'
         assert len(found) == 2 and sum('launch-gate-unmapped' in s for s in found) == 1 and sum('watcher-test-event' in s for s in found) == 1, found
@@ -1442,7 +1438,7 @@ exec /bin/ln "$@"
         (shim / 'ln').chmod(0o700)
         holder, release = wake_holder(env, folder)
         gate = refuse(env, folder, dict(PATH=str(shim) + os.pathsep + env['PATH'], CASE_WAKE_LIB=str(repo / 'bin/fm-wake-lib.sh')))
-        holder.wait(timeout=30)
+        wait_exit(holder, 'holder to exit')
         assert (folder / 'replayed').exists(), 'the collision and replay never happened'
         kept = wakes(folder) + ''.join(spills(folder))
         assert 'watcher-test-event' in kept and 'launch-gate-unmapped' in kept and 'durable line not recorded' not in gate.stderr, (kept, gate.stderr)
@@ -1460,9 +1456,9 @@ exec /bin/ln "$@"
         found = spills(folder)
         assert len(found) == 1 and 'launch-gate-unmapped' in found[0] and 'launch-gate-unmapped' not in wakes(folder), found
         release.touch()
-        holder.wait(timeout=30)
-        subprocess.run(['bash', '-c', '. "$1" && fm_wake_append check later-key later-event', 'bash', str(repo / 'bin/fm-wake-lib.sh')],
-                       env=env, check=True, timeout=60)
+        wait_exit(holder, 'holder to exit')
+        run_to_exit(['bash', '-c', '. "$1" && fm_wake_append check later-key later-event', 'bash', str(repo / 'bin/fm-wake-lib.sh')],
+                    'the later wake append to exit', env=env, check=True)
         queue = wakes(folder)
         assert not spills(folder) and 0 <= queue.index('launch-gate-unmapped') < queue.index('later-event'), queue
 
@@ -1483,7 +1479,7 @@ exec /bin/ln "$@"
                 wait_for(lambda: list((folder / 'pool').glob('pipeline-waiter-*.lock')), 'the gate queued')
                 time.sleep(hold)
                 fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
-            assert child.wait(timeout=30) == 0, log.with_suffix('.stderr').read_text()
+            assert wait_exit(child, 'child to exit') == 0, log.with_suffix('.stderr').read_text()
             queue = wakes(folder)
             if hold is None:
                 assert 'launch-gate' not in queue, queue
@@ -1852,9 +1848,12 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             (name + '-twin', words + client, None, 8, 'r18-wrapper-%s-not-followed' % name) for name, words in sorted(rows.items())] + [
             ('env-S-escape', ['env', '-S', ' '.join(client) + '\\_--launch-nonce=n1'], None, 11, 'r17-wrapper-env-S-escape-proven'),
             ('env-S-variable', ['env', '-S', ' '.join(client) + ' ${NONCE}'], None, 11, 'r17-wrapper-env-S-variable-proven'),
-            ('env-C', ['env', '-C', '{other}'] + client, 'start_repo=repo2 start_branch=main', 11, 'r17-wrapper-env-C-proven'),
-            ('env-chdir', ['env', '--chdir={other}'] + client, 'start_repo=repo2 start_branch=main', 11,
-             'r17-wrapper-env-chdir-proven')]
+            ('env-C', ['env', '-C', '{other}'] + client, 'start_repo=repo2 start_branch=main', 11, 'r17-wrapper-env-C-proven')]
+        # env --chdir is GNU env only (BSD env refuses it), so it is not run live: start_route itself gives the start its
+        # directory, in both the =value and the next-word forms, exactly as env -C does.
+        for chdir in (['--chdir=/other'], ['--chdir', '/other'], ['-C', '/other']):
+            route = engine.start_route(['env'] + chdir + client)
+            harm('r17-wrapper-env-chdir-proven', route is not None and route[0] == client[1:] and route[3] == '/other', chdir, route)
         for label, command, bound, expected, ident in cases:
             projected, text, first = covered_probe('wrap-' + label, [(command, False)], ('HEAD', None), None, wrappers=rows)
             harm(ident, projected == expected * GIB, label, projected, text)
@@ -2080,8 +2079,8 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
                 os.symlink(found, tools / tool)
         lean = dict(env, PATH=str(tools))
         lean.pop('FM_MEMORY_FIXTURE_DIR', None)
-        out = subprocess.run([str(tools / 'bash'), str(repo / 'bin/fm-mem-guard.sh'), 'run', '--', 'touch', str(folder / 'ran')],
-                             env=lean, capture_output=True, text=True, timeout=30)
+        out = run_to_exit([str(tools / 'bash'), str(repo / 'bin/fm-mem-guard.sh'), 'run', '--', 'touch', str(folder / 'ran')],
+                          'the lean fm-mem-guard.sh run to exit', env=lean, capture_output=True, text=True)
         assert out.returncode == 0 and (folder / 'ran').exists(), (out.returncode, out.stderr)
 
     def one_run_covers_branch():
@@ -2151,7 +2150,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             text = (folder / 'outer.stderr').read_text()
             assert text.count('pipeline-start admitted') == 2, (label, text)
             (folder / 'release-hold-own').touch()
-            assert outer.wait(timeout=30) == 0, (label, (folder / 'outer.stderr').read_text())
+            assert wait_exit(outer, 'outer to exit') == 0, (label, (folder / 'outer.stderr').read_text())
 
     def parked_run_covers_nothing():
         # Main 3852 (replaces "Main 1712 a stranger row never releases an admitted start"): A is admitted on repo/main and
