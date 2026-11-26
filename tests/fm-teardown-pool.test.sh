@@ -2157,8 +2157,8 @@ SH
 # the task record is never deleted while the enclosing slot is unproved and
 # still claimed, and the nested copy is removed only once its phase is reached.
 #   prove      the slot has uncommitted work before anything starts
-#   retire     a launch agent rooted in the slot will not unload
-#   pre-remove a dying process leaves work in the slot after the first proof
+#   retire     a launch agent is rooted in the slot (no record proves it the task's)
+#   pre-remove a run's abort leaves work in the slot after the first proof
 #   pre-copy   the same, but in the nested copy itself
 #   return     the nested copy is gone and treehouse refuses the return
 test_nested_rerun_matrix_refusal_at_each_phase() {
@@ -2170,13 +2170,13 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
     pid=
     case "$phase" in
       prove) printf 'slot scratch\n' > "$NESTED_SLOT/scratch.txt" ;;
-      retire|pre-remove|pre-copy)
+      retire)
         add_fake_launchctl "$case_dir"
         mkdir -p "$NESTED_SLOT/.claude/nm/h"
         teardown_fixture_start "$NESTED_SLOT/.claude/nm/h" KILL sleep 300
         pid=$TEARDOWN_FIXTURE_PID
         sleep 0.3
-        add_nm_launch_agent "$case_dir" "7a11e0${phase//-/}" "$NESTED_SLOT/.claude/nm/h" "$pid"
+        add_nm_launch_agent "$case_dir" "7a11e0retire" "$NESTED_SLOT/.claude/nm/h" "$pid"
         ;;
       return)
         fail_switch_treehouse "$case_dir"
@@ -2186,17 +2186,19 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
     rc=0
     case "$phase" in
       retire)
-        FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" FAKE_LAUNCHCTL_BOOTOUT_FAILS=1 \
+        FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
           run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         ;;
       pre-remove)
-        FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
-          FAKE_LAUNCHCTL_BOOTOUT_WRITES="$NESTED_SLOT/late.txt" \
+        FM_HOME="$case_dir/home" \
+          FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1-v2 "$(git -C "$NESTED_COPY" rev-parse HEAD)")" \
+          FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FM_FAKE_NM_ABORT_WRITES="$NESTED_SLOT/late.txt" \
           run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         ;;
       pre-copy)
-        FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
-          FAKE_LAUNCHCTL_BOOTOUT_WRITES="$NESTED_COPY/late.txt" \
+        FM_HOME="$case_dir/home" \
+          FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1-v2 "$(git -C "$NESTED_COPY" rev-parse HEAD)")" \
+          FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FM_FAKE_NM_ABORT_WRITES="$NESTED_COPY/late.txt" \
           run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         ;;
       *)
@@ -2223,7 +2225,14 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
         git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm "slot scratch"
         git -C "$NESTED_SLOT" push -q origin HEAD:main
         ;;
-      retire) assert_grep "still loaded" "$case_dir/stderr" "$label: the refusal did not name the unloaded agent" ;;
+      retire)
+        assert_grep "REFUSED: no-mistakes launch agent $NM_AGENT_PREFIX.7a11e0retire" "$case_dir/stderr" "$label: the refusal did not name the in-slot agent"
+        assert_no_grep bootout "$case_dir/launchctl-calls" "$label: the unproven agent was booted out"
+        # Its owner unloads it and moves its plist aside, then re-runs.
+        rm -f "$case_dir/launchagents/$NM_AGENT_PREFIX.7a11e0retire.plist" "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.7a11e0retire"
+        teardown_fixture_stop "$pid"
+        pid=
+        ;;
       pre-remove)
         assert_grep "claimed pool slot $NESTED_SLOT" "$case_dir/stderr" "$label: the refusal did not name the slot"
         assert_present "$NESTED_SLOT/late.txt" "$label: the refusal removed the slot's late work"
@@ -2253,9 +2262,10 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
 }
 
 # Returning the enclosing slot sweeps more than the nested current copy, so the
-# safety steps run on every copy swept: a run parked on the slot's own branch is
-# aborted and a task-private launch agent rooted in the slot is retired before
-# the return, not left holding a fleet slot or pointing into a reset copy.
+# safety steps run on every copy swept: a launch agent rooted in the slot, which
+# no record proves the task's, refuses before any run is aborted or process
+# signalled, and once its owner has removed it a re-run aborts the run parked on
+# the slot's own branch before the return.
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot() {
   local case_dir rc pid label agent_root slot_head
   make_nested_slot_case nested-slot-safety enclosing .claude/worktrees/x
@@ -2275,20 +2285,28 @@ test_nested_slot_return_concludes_runs_and_agents_on_the_slot() {
   FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$slot_head")" \
   FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  if kill -0 "$pid" 2>/dev/null; then
-    teardown_fixture_stop "$pid"
-    fail "nested-slot-safety: the launch agent rooted in the returned slot survived teardown"
-  fi
-  expect_code 0 "$rc" "nested-slot-safety: teardown must finish: $(cat "$case_dir/stderr")"
+  kill -0 "$pid" 2>/dev/null || fail "nested-slot-safety: the agent's daemon was signalled"
+  expect_code 1 "$rc" "nested-slot-safety: an in-slot agent must refuse: $(tail -3 "$case_dir/stderr")"
+  assert_grep "REFUSED: no-mistakes launch agent $label" "$case_dir/stderr" "nested-slot-safety: the refusal did not name the agent"
+  assert_absent "$case_dir/nm-abort.log" "nested-slot-safety: a run was aborted before the refusal"
+  assert_no_grep bootout "$case_dir/launchctl-calls" "nested-slot-safety: the unproven agent was booted out"
+  assert_present "$case_dir/launchagents/$label.plist" "nested-slot-safety: the plist was moved"
+  assert_present "$NESTED_COPY" "nested-slot-safety: the nested copy was removed"
+  [ ! -e "$case_dir/treehouse.log" ] || fail "nested-slot-safety: the slot was returned"
+  # The agent's owner unloads it and moves its plist aside.
+  rm -f "$case_dir/launchagents/$label.plist" "$case_dir/launchctl-loaded/$label"
+  teardown_fixture_stop "$pid"
+  rc=0
+  FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$slot_head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+    run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "nested-slot-safety: the re-run must finish: $(tail -3 "$case_dir/stderr2")"
   assert_grep "abort --run 01RUN" "$case_dir/nm-abort.log" \
     "nested-slot-safety: the run parked on the returned slot's branch was not aborted"
-  assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" \
-    "nested-slot-safety: the launch agent rooted in the returned slot was not booted out"
-  assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
-    "nested-slot-safety: the launch agent plist was not archived"
   assert_absent "$NESTED_COPY" "nested-slot-safety: the nested copy was not removed"
   assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "nested-slot-safety: the slot was not returned"
-  pass "returning the enclosing slot aborts its parked run and retires its launch agent before the return"
+  pass "an in-slot launch agent refuses before any abort or signal, and once removed the re-run aborts the slot's parked run and returns it"
 }
 
 # A forced teardown whose daemon is silent concludes two roots here, the nested copy
@@ -2316,7 +2334,7 @@ test_forced_nested_teardown_waits_one_stall_for_a_silent_daemon() {
 }
 
 test_shared_nested_copy_concludes_only_its_own_runtime() {
-  local ownership case_dir head rc own_pid worker_pid root_pid label root_label own_survived root_survived daemon_survived late
+  local ownership case_dir head rc worker_pid root_pid root_label own_survived root_survived late
   for ownership in duplicate own foreign late; do
     make_nested_slot_case "shared-nested-runtime-$ownership" enclosing .claude/worktrees/x
     case_dir=$NESTED_CASE
@@ -2324,16 +2342,12 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     fm_write_meta "$case_dir/state/parked.meta" "worktree=$NESTED_SLOT" "kind=ship"
     cp "$case_dir/state/parked.meta" "$case_dir/parked.before"
     add_fake_launchctl "$case_dir"
-    mkdir -p "$NESTED_COPY/.claude/nm/h" "$NESTED_SLOT/.claude/nm/h"
-    teardown_fixture_start "$NESTED_COPY/.claude/nm/h" KILL perl -e 'sleep'
-    own_pid=$TEARDOWN_FIXTURE_PID
+    mkdir -p "$NESTED_SLOT/.claude/nm/h"
     teardown_fixture_start "$NESTED_COPY" KILL perl -e 'sleep'
     worker_pid=$TEARDOWN_FIXTURE_PID
     teardown_fixture_start "$NESTED_SLOT/.claude/nm/h" KILL perl -e 'sleep'
     root_pid=$TEARDOWN_FIXTURE_PID
-    label="$NM_AGENT_PREFIX.5a11c001"
     root_label="$NM_AGENT_PREFIX.5a11c002"
-    add_nm_launch_agent "$case_dir" 5a11c001 "$NESTED_COPY/.claude/nm/h" "$own_pid"
     add_nm_launch_agent "$case_dir" 5a11c002 "$NESTED_SLOT/.claude/nm/h" "$root_pid"
     if [ "$ownership" = duplicate ]; then
       fm_write_meta "$case_dir/state/other-nested.meta" "worktree=$NESTED_COPY" "kind=ship"
@@ -2349,24 +2363,20 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     rc=0
     FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
       FM_FAKE_AXI_STATUS="$(parked_axi_status_toon "$([ "$ownership" = foreign ] && printf fm/foreign || printf fm/task-x1-v2)" "$head")" \
-      FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FAKE_LAUNCHCTL_BOOTOUT_WRITES="$late" \
+      FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FM_FAKE_NM_ABORT_WRITES="$late" \
       run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     own_survived=0
     root_survived=0
-    daemon_survived=0
     kill -0 "$worker_pid" 2>/dev/null && own_survived=1
     kill -0 "$root_pid" 2>/dev/null && root_survived=1
-    kill -0 "$own_pid" 2>/dev/null && daemon_survived=1
     teardown_fixture_stop "$worker_pid"
-    teardown_fixture_stop "$own_pid"
     teardown_fixture_stop "$root_pid"
     if [ "$ownership" = duplicate ]; then
       expect_code 1 "$rc" "duplicate nested custody must refuse before any runtime cleanup: $(cat "$case_dir/stderr")"
       assert_grep 'other-nested' "$case_dir/stderr" 'the refusal must name the other nested owner'
-      [ "$own_survived$root_survived$daemon_survived" = 111 ] || fail 'duplicate-copy refusal signalled a live process'
+      [ "$own_survived$root_survived" = 11 ] || fail 'duplicate-copy refusal signalled a live process'
       assert_absent "$case_dir/nm-abort.log" 'duplicate-copy refusal aborted the parked run'
       assert_absent "$case_dir/state/task-x1.teardown-processes" 'duplicate-copy refusal recorded signal targets'
-      assert_present "$case_dir/launchagents/$label.plist" 'duplicate-copy refusal removed the own launch agent'
       assert_present "$case_dir/launchagents/$root_label.plist" 'duplicate-copy refusal removed the root launch agent'
       assert_no_grep 'bootout' "$case_dir/launchctl-calls" 'duplicate-copy refusal unloaded a launch agent'
       cmp -s "$case_dir/own.before" "$case_dir/state/task-x1.meta" || fail 'duplicate-copy refusal changed its own record'
@@ -2395,8 +2405,6 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     else
       assert_absent "$case_dir/nm-abort.log" 'a foreign parked run was aborted'
     fi
-    assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" 'the own nested launch agent was not retired'
-    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" 'the own launch agent was not archived'
     assert_present "$case_dir/launchagents/$root_label.plist" 'the parked root launch agent was removed'
     assert_no_grep "bootout gui/$(id -u)/$root_label" "$case_dir/launchctl-calls" 'the parked root launch agent was unloaded'
     assert_present "$NESTED_COPY" 'shared cleanup removed the own nested copy'
@@ -2404,7 +2412,7 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     assert_absent "$case_dir/state/task-x1.meta" 'the finished task record survived'
     cmp -s "$case_dir/parked.before" "$case_dir/state/parked.meta" || fail 'shared cleanup changed the parked record'
   done
-  pass 'shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work'
+  pass 'shared nested cleanup concludes an owned run and reaps its process, preserving the parked root, its launch agent, foreign runs and late work'
 }
 
 test_other_record_copy_overlap_is_component_aware() {

@@ -48,7 +48,7 @@
 # counts merged) and a closeout driver's "exact tree not covered" for a nested
 # copy. Only then the fallback of bin/fm-merge-prune-lib.sh runs; every other
 # refusal, unknown text included, keeps the copy at once with one wake: a leaked
-# process, a launch agent still loaded, a process whose ownership is not proven,
+# process, a launch agent rooted in the copy, a process whose ownership is not proven,
 # a live pipeline, a captain call, and an orphan nested copy refused for a HEAD
 # that is not proved landed or for ignored files (teardown never prints that
 # text; it preserves such files itself, and it prints a second refusal with the

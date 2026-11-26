@@ -295,6 +295,8 @@ case "${1:-}" in
       abort)
         shift
         [ -z "${FM_FAKE_NM_ABORT_LOG:-}" ] || printf 'abort %s\n' "$*" >> "$FM_FAKE_NM_ABORT_LOG"
+        # A run whose abort leaves late work behind, as a dying step can.
+        [ -z "${FM_FAKE_NM_ABORT_WRITES:-}" ] || printf 'late work\n' > "$FM_FAKE_NM_ABORT_WRITES"
         exit 0 ;;
     esac
     ;;

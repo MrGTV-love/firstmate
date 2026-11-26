@@ -7788,6 +7788,7 @@ WT=$KC/wt; TEARDOWN_RETURN_SLOT=$KC/slot; TASK_TMP=$KC/tasktmp
 TEARDOWN_NESTED_COPIES=("$KC/slot/kept" "$KC/slot/other")
 conclude_task_no_mistakes_run() { printf "conclude %s\n" "$1" >> "$LOG"; }
 retire_task_private_nm_launch_agents() { printf "agents %s\n" "$1" >> "$LOG"; }
+task_reap_preflight() { printf "preflight %s\n" "$*" >> "$LOG"; }
 teardown_foreign_procs_retire() { printf "foreign-procs\n" >> "$LOG"; }
 reap_task_worktree_processes() { shift; printf "reap %s\n" "$*" >> "$LOG"; }
 teardown_retained_copy_held() { [ "$1" = "$KC/slot/kept" ]; }
@@ -7798,6 +7799,9 @@ teardown_nested_slot retire
   assert_grep "conclude $tmp/slot/other" "$log" "kept-helper-retire: another nested copy was not swept: $(cat "$log" "$tmp/stderr")"
   assert_grep "conclude $tmp/wt" "$log" "kept-helper-retire: the task's worktree was not swept"
   assert_grep "reap $tmp/wt $tmp/slot $tmp/slot/other $tmp/tasktmp" "$log" "kept-helper-retire: the reaper's roots are not the other roots"
+  assert_grep "preflight $tmp/wt $tmp/slot $tmp/slot/other $tmp/tasktmp" "$log" "kept-helper-retire: the preflight's roots are not the reaper's"
+  [ "$(grep -n '^preflight ' "$log" | cut -d: -f1)" -lt "$(grep -n '^conclude ' "$log" | head -n 1 | cut -d: -f1)" ] \
+    || fail "kept-helper-retire: the preflight did not run before the first run was concluded: $(cat "$log")"
   rm -rf "$tmp"
   pass "on a retry whose record matches, the retire step concludes, retires and reaps every root but the kept copy"
 }

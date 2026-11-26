@@ -4758,6 +4758,13 @@ task_pids_under_roots() {  # <dir>...
       for root in "${scan_roots[@]}"; do
         [ -z "$lane" ] || [ "$lane" != "$root" ] || continue 2
       done
+      # During the preflight, a process the nested-copy proof already queued for
+      # teardown_foreign_procs_retire is that step's to signal; the sweep after
+      # it still refuses one that survives.
+      if [ "${TASK_PREFLIGHT_QUEUED_OK:-0}" = 1 ] && [ "$path" != "$dir" ] \
+         && task_foreign_queue_contains "$pid"; then
+        continue
+      fi
       if [ -n "$lane" ]; then
         identity=$(task_process_identity "$pid") || identity="identity unavailable"
         echo "REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
@@ -4845,8 +4852,22 @@ task_record_process_signal() {  # <pid> <birth-identity> <signal>
 # refuse before anything is signalled, so a route that signals other processes
 # first (teardown_foreign_procs_retire) never signals while an unproven holder
 # would make the later reap refuse.
+task_foreign_queue_contains() {  # <pid>
+  local record qpid identity
+  for record in ${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]}"}; do
+    IFS=$'\t' read -r qpid identity _ <<< "$record"
+    [ "$qpid" = "$1" ] || continue
+    task_process_identity_matches "$qpid" "$identity" && return 0
+  done
+  return 1
+}
+
 task_reap_preflight() {  # <dir>...
-  if ! task_pids_under_roots "$@"; then
+  local rc=0
+  TASK_PREFLIGHT_QUEUED_OK=1
+  task_pids_under_roots "$@" || rc=$?
+  TASK_PREFLIGHT_QUEUED_OK=0
+  if [ "$rc" -ne 0 ]; then
     echo "REFUSED: cannot prove every process under ${TASK_PIDS_FAILED_DIR:-<missing>} belongs to $ID ($TASK_PIDS_ERROR); nothing was signalled and the worktree/tasktmp is preserved." >&2
     return 1
   fi

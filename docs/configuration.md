@@ -820,7 +820,7 @@ One wake is raised if the task is still not pruned after 24 attempts.
 The fallback handles only the two refusal classes that really reach it.
 Those are the ship deliverable reported as not landed (the case that matters is a squash merge, which `treehouse destroy` counts as merged) and a closeout driver that reports the exact tree of a nested copy as not covered.
 Every refusal line of the teardown output must be one of them.
-Every other refusal keeps the copy and raises one wake, with no fallback: a leaked process, a launch agent that is still loaded, a process whose ownership is not proven, a live pipeline, a captain call, an orphan nested copy refused for a HEAD that is not proved landed (teardown always prints a second refusal with it, that the pool slot contains a registered copy that is not the task's), and any refusal text that is not on that list.
+Every other refusal keeps the copy and raises one wake, with no fallback: a leaked process, a launch agent rooted in the copy, a process whose ownership is not proven, a live pipeline, a captain call, an orphan nested copy refused for a HEAD that is not proved landed (teardown always prints a second refusal with it, that the pool slot contains a registered copy that is not the task's), and any refusal text that is not on that list.
 Teardown preserves ignored files that exist nowhere else itself, so a refusal about them is not one of the two classes.
 Only a known landing refusal makes the fallback re-prove the copy from the live disk, by the criteria of the owner's `treehouse-reap-clean` reaper.
 The copy and every nested copy inside it, each checked one by one, must pass all of these:
