@@ -231,6 +231,35 @@ test_check_validates_without_starting_claude() {
   pass "--check validates the proxy without starting claude"
 }
 
+# The task Git hook rows a config-carrier launch exports reach claude byte for
+# byte through the launcher, including a hooks path with a space and a quote.
+test_task_git_hook_rows_reach_claude_unchanged() {
+  local dir out rc rows
+  dir=$(new_case hook-rows)
+  fm_test_fake_teamclaude "$dir/fakebin"
+  cat > "$dir/fakebin/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s' "${GIT_CONFIG_PARAMETERS-unset}" > "$FM_FAKE_CLAUDE_ENV_LOG.gcp"
+printf '%s' "${FM_GIT_HOOK_ROWS-unset}" > "$FM_FAKE_CLAUDE_ENV_LOG.rows"
+SH
+  chmod +x "$dir/fakebin/claude"
+  mkdir -p "$dir/repo" "$dir/task hooks's dir"
+  git init -q "$dir/repo"
+  GIT_CONFIG_GLOBAL=/dev/null "$ROOT/bin/fm-git-strip-ai-trailers.sh" install "$dir/task hooks's dir/h" "$dir/repo" 0 \
+    || fail "could not install the task hooks"
+  rows=$("$ROOT/bin/fm-git-strip-ai-trailers.sh" rows "$dir/task hooks's dir/h" 0) || fail "could not print the rows"
+  out=$(env -i HOME="$dir/home" PATH="$dir/fakebin:$BASH_DIR:/usr/bin:/bin" \
+    FM_FAKE_CLAUDE_ENV_LOG="$dir/claude-env" \
+    GIT_CONFIG_PARAMETERS="'user.name'='Op Erator' $rows" FM_GIT_HOOK_ROWS="$rows" \
+    "$LAUNCHER" --version </dev/null 2>&1); rc=$?
+  expect_code 0 "$rc" "a launch carrying the hook rows should start claude"$'\n'"$out"
+  assert_equals "'user.name'='Op Erator' $rows" "$(cat "$dir/claude-env.gcp")" \
+    "claude must receive GIT_CONFIG_PARAMETERS unchanged"
+  assert_equals "$rows" "$(cat "$dir/claude-env.rows")" "claude must receive FM_GIT_HOOK_ROWS unchanged"
+  chmod -R u+w "$dir/task hooks's dir"
+  pass "the task Git hook rows reach claude through the TeamClaude launcher unchanged"
+}
+
 test_claude_receives_the_teamclaude_client_environment
 test_stopped_proxy_refuses_without_starting_claude
 test_missing_teamclaude_refuses_without_starting_claude
@@ -240,5 +269,6 @@ test_check_validates_without_starting_claude
 test_exec_runs_the_given_command_with_the_proxy
 test_config_paths_reach_teamclaude_but_not_claude
 test_slow_status_still_starts_claude
+test_task_git_hook_rows_reach_claude_unchanged
 
 echo "# all fm-teamclaude-launch tests passed"

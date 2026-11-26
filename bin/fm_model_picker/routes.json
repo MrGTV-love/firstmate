@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "table_version": "2026-10-19.1",
+  "table_version": "2026-11-17.1",
   "comment": "Explicit route -> Artificial Analysis projection table for the shadow model picker. A route is a concrete harness:model from config/crew-dispatch.json. Every projection entry asserts the projection's own `name`; a mismatch refuses the entry and leaves the route a candidate with UNKNOWN facts. Effort keys select the measured variant closest to the route's configured effort; `default` is the fallback. Currency is the lane's real spend: subscription quota or API dollars.",
   "families": {
     "anthropic": {"creator": "Anthropic"},
@@ -13,7 +13,7 @@
       "currency": "subscription",
       "provider": "claude",
       "projections": {
-        "high": {"slug": "claude-sonnet-5-5-high", "name": "Claude Sonnet 5.5 (High, Default Fallback)"},
+        "high": {"family_page": "claude-sonnet-5-5", "slug": "claude-sonnet-5-5-high", "name": "Claude Sonnet 5.5 (High, Default Fallback)"},
         "max": {"slug": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5 (Max, Default Fallback)"},
         "default": {"slug": "claude-sonnet-5-5-high", "name": "Claude Sonnet 5.5 (High, Default Fallback)"}
       }
@@ -35,6 +35,14 @@
       "projections": {
         "max": {"slug": "claude-haiku-5-5", "name": "Claude Haiku 5.5 (Max)"},
         "default": {"slug": "claude-haiku-5-5", "name": "Claude Haiku 5.5 (Max)"}
+      }
+    },
+    "omp:openai-codex/gpt-6.2-sol": {
+      "family": "openai",
+      "currency": "subscription",
+      "provider": "codex",
+      "projections": {
+        "high": {"family_page": "gpt-6-2-sol", "slug": "gpt-6-2-sol-high", "name": "GPT-6.2 Sol (High)"}
       }
     },
     "omp:openai-codex/gpt-6.1-sol": {

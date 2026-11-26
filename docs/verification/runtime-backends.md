@@ -185,6 +185,37 @@ Trace probes observe enabled and reused carriers, disabled-relaunch clearing, cl
 The private Bash/ksh tmux fixture also proves the allowlisted strip-to-keep transition clears the persistent pane's obsolete task override while preserving unrelated Git entries and operator routing.
 The relaunch suite emitted two non-fatal BSD `sed` diagnostics in its Pi-session case; this run is focused local evidence, not a rerun of the entire portable CI shard.
 
+## Task Git hook carrier in the worker tool shell
+
+A harness joins `GIT_HOOKS_CONFIG_HARNESSES` in [`bin/fm-spawn.sh`](../../bin/fm-spawn.sh), and so runs the config carrier, only after `tests/fm-git-hook-carrier-live-e2e.test.sh` passes for it on that carrier.
+The guard replays the launch text `fm-spawn.sh` stages in a private tmux pane with the installed harness first on PATH; a private scripted provider on loopback (Anthropic Messages for Claude, OpenAI Responses for omp and codex) makes the harness run one shell tool call that commits and pushes in the task worktree.
+It checks each installed harness it can drive on the carrier `fm-spawn.sh` selects for it, and reads HEAD, the bare remote's refs, the commit body and git's `GIT_TRACE`, never the hooks' own status.
+Its control launches the same text through a fixture wrapper that removes the carrier's variables at the harness boundary, and must see the credential commit and the AI trailer land.
+No model tokens are spent and the harness stores are scratch directories with throwaway keys.
+
+Verified 2026-11-24 on Darwin arm64, Apple Git 2.54.0 and tmux; claude and omp ran under `seatbelt-v1` write confinement, codex unconfined as the fleet launches it:
+
+```sh
+FM_GIT_HOOK_CARRIER_LIVE=1 bash tests/fm-git-hook-carrier-live-e2e.test.sh
+```
+
+```text
+# live claude 2.1.332 (Claude Code)
+ok - claude 2.1.332 (Claude Code): the config carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control claude 2.1.332 (Claude Code): with the carrier removed at the harness boundary the credential commit and AI trailer land
+# live omp omp/19.1.1
+ok - omp omp/19.1.1: the legacy carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control omp omp/19.1.1: with the carrier removed at the harness boundary the credential commit and AI trailer land
+# live codex codex-cli 0.171.0
+ok - codex codex-cli 0.171.0: the legacy carrier survives into the harness's shell tool; credential commit and --no-verify push refused, clean commit and push land, AI trailer stripped
+ok - control codex codex-cli 0.171.0: with the carrier removed at the harness boundary the credential commit and AI trailer land
+# all fm-git-hook-carrier-live tests passed
+```
+
+The same claude result was also observed on Claude Code 2.1.331 the same day.
+Only `claude` is listed; omp and codex are proven on the legacy carrier only, and every other harness is unverified in its tool shell on either carrier.
+Inside `seatbelt-v1` confinement a process cannot execute the setuid `/bin/ps`, so a repository hook that identifies its calling git through `ps`, such as a `reference-transaction` guard, sees no caller there; `tests/fm-spawn-git-hook-carrier.test.sh` records that observation.
+
 ## Fleet model-index catalog discovery
 
 The [configuration contract](../configuration.md#fleet-model-index-configmodel-indexjson) owns role selection and retirement policy.
@@ -4014,6 +4045,47 @@ ok - PATH-selected DSH probes accept arbitrary releases and refuse failed comman
 ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic
 ```
 
+On 2026-11-23, on macOS arm64 with `dsh-tui` 0.16.1 (launcher and profile) and DSH CLI 0.2.1-rc.2, a fresh launch prepared by `bin/fm-dsh.py prepare` with `deepseek/deepseek-v4.1-flash-1017` at `xhigh` ran in a private tmux session with no opening prompt and spent no model tokens.
+After Escape dismissed the first-run guide and then the sessions view, `tmux capture-pane -e -p` showed no meter row and one status row without a `ctx` cell, flush under the frame: `deepseek-v4.1-flash-1017 · high · <directory>` at 200, 120, 80 and 60 columns (`plaindir` and `gitdir`, a fresh Git repository, which added no branch cell), and `deepseek-v4.1-flash-10… · hi…  · gitd…` at 45 columns.
+At 30 columns the row wrapped its separators onto a second line (`deepseek-v4.1…  h…  gi…` above the dots), and that screen stays refused.
+The configured `xhigh` effort rendered as `high` in that row and as `High effort` in the banner.
+The same day, two launches in the fm-spawn launch shape (the `prepare` runtime, `--patch`, and the one-line opening prompt `reply with the word ok` after `--`), one at `xhigh` and one with no effort, were captured with `tmux capture-pane -e -p` while `bin/fm-dsh.py state` reported `busy` and then `idle`.
+Both busy screens showed `deepseek-v4.1-flash-1017 · high · fmcapwt` flush under the frame and then exactly `esc to interrupt`; with no configured effort dsh still rendered `high`.
+The API rejected the model id in both turns (`The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek-v4.1-flash-1017.`), so each turn ended without usage and the idle screens kept the same status row under a turn-error notice.
+Before the pre-usage status row was recognized, `fm_composer_dsh_screen_check` refused all of these screens.
+It now accepts that row only for the launch identity the caller supplies (`bin/fm-dsh.py status-identity`, which fm-spawn passes), so they classify `empty`, and `pending` with an unsubmitted typed draft; without that identity they stay refused.
+The cwd cell is compared literally with the bound basename, as dsh-tui renders it, whole or cut by its `…`, so names with spaces, Unicode or middle dots match and another directory refuses.
+A dsh box is held to its whole screen: its busy hint is furniture only as the whole `esc to interrupt` row, and past its furniture any non-blank row further down, even after blank rows and even one that only looks like an edge, makes the frame stale; `tests/fm-dsh-harness.test.sh` refuses a shell prompt after a stale hint (alone and under the meter and ctx rows, with and without a launch identity), a shell row after blank rows, and `+ rm -rf x`-style rows, through the shared classifier. Other harnesses keep the first-row edge rule because some draw a legitimate footer after a blank row.
+Matching text cannot tell a live frame from one a dead launch left above an empty-prompt shell, so fm-spawn admits a screen only while this launch's own dsh-tui launcher is running: a process that is not stopped, whose argv is a dsh-tui launcher (`fm_dsh_args_are_dsh`) carrying this launch's unique `--patch <launch patch>`, checked after the capture (`fm_dsh_launch_alive` in `bin/fm-dsh-lib.sh`); otherwise the spawn refuses with `dsh: the launched dsh-tui process for <patch> is not running`.
+That check does not prove the pane's visible region is drawn by that process, and a hung but running dsh-tui still counts; the launcher argv shape is the one `bin/fm-dsh-lib.sh` already attributes, and the 2026-11-24 live run below observed it on real launches.
+The composer check proves a compatible composer, not a successful turn, so the start proof separately reads the first turn's outcome through `bin/fm-dsh.py start-state`, judged on the first turn that started beyond the launch position (`position` also records the committed byte offset), never a later one.
+A `turn/end` with reason `error` fails it whatever its attempts were, and the spawn refuses with `dsh: first turn failed: <provider text>`, or `dsh: first turn ended in error with no provider text` when the log carries none; the text has terminal escape sequences and control characters removed before it reaches stderr or the status file.
+In the real rejected log the turn was busy for 1.48 seconds from `turn/start` to `turn/end`, 0.85 seconds of it from `step/start`, so a busy turn alone does not prove a start: `start-state` reports a busy turn as `unaccepted` until its session log records an `assistant/message`, the step's committed response, and a first turn that ends any other way without one refuses with `dsh: first turn not accepted by the provider: it ended (<reason>) without a response`.
+A rejected request never writes one: its step holds `system/message`, `user/message`, `request/header`, `request/context` and `session/title`, then an `assistant/attempt` whose finish chunk is `error`, then `step/end` and an error `turn/end` (`tests/fixtures/dsh-session-turn-error.jsonl` lines 3-5).
+In a read-only survey of the operator's own DSH session logs on 2026-11-23, the first step of 43 depth-zero v4 sessions all wrote an `assistant/message` carrying `usage` and a `tool-calls` finish, after the same request events and with no `assistant/attempt`; across 26 of them the first `assistant/message` came 2.5 to 15.7 seconds after `step/start` (median 5.1 seconds).
+No earlier provider-written event exists in the durable log: dsh writes the streamed response only as that one event, and `session/title-llm-request` is a separate title request that the rejected log did not record.
+`tests/fixtures/dsh-session-accepted-busy.jsonl` is one such real first step, from `turn/start` through its `assistant/message`, keeping only event types, `seq` and `time`, and the message's usage and finish; it was served by another provider route, so it proves the event shape, not this model's acceptance.
+`tests/fixtures/dsh-session-completed-synthetic.jsonl` adds a synthetic `step/end` and completed `turn/end` to it, and `tests/fm-dsh-spawn.test.sh` refuses the real rejected log, polled busy before its `turn/end` lands, and launches the accepted and completed ones.
+The spawn polls an unaccepted turn again and, if it is still unaccepted when the start window ends, refuses with `dsh: first turn not accepted by the provider within <N>s`; a first step that takes longer than the window (60 seconds by default) is refused the same way.
+A turn that errs after the start proof has returned for an accepted first turn is outside it; supervision owns later turn failures.
+The trimmed captures are the `tests/fixtures/dsh-tui-0.16.1-fresh-*.ansi` and `tests/fixtures/dsh-tui-0.16.1-launch-*.ansi` regressions in `tests/fm-dsh-harness.test.sh`; no successful turn was captured on this version.
+On 2026-11-24, on macOS arm64 with `dsh-tui` 0.16.1 and DSH CLI 0.2.1-rc.2, one live run of the lifecycle guard on `deepseek/deepseek-flash` (from a scratch operator home whose `.dsh-tui/model.json` names it), against a disposable lab project and linked copy, passed:
+
+```sh
+FM_DSH_LIVE=1 FM_DSH_EVIDENCE_DIR=<scratch> FM_DSH_LAB_PROJECT=<scratch project> FM_DSH_LAB_COPY=<its linked copy> \
+  FM_DSH_OPERATOR_HOME=<scratch operator home> bin/fm-test-run.sh tests/fm-dsh-live-e2e.test.sh
+```
+
+```text
+ok - live dsh-tui ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+ok - live dsh-tui scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+cleanup_exit=0
+FM_TEST_END ... tests/fm-dsh-live-e2e.test.sh exit=0 duration_ms=228418
+```
+
+Both spawns and both same-endpoint relaunches passed the start proof, the launch-process check and the composer check through the Herdr visible read.
+A read-only `ps` sample every 2 seconds showed each launch as `node /opt/homebrew/bin/dsh-tui --patch <launch patch> -- <brief>`, its profile copy `node .../@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch <launch patch> ...` and `node /opt/homebrew/bin/dsh --profile dsh-tui --patch <launch patch> ...`; the first two are the launcher shape `fm_dsh_launch_alive` accepts.
+In each first turn the first `assistant/message` came 3.82 and 2.23 seconds after `turn/start` and the turn ended after about 51 and 55 seconds, and the guard read the turn busy right after the spawn returned, so the spawn admitted an accepted, still-busy first turn.
 The launcher and CLI must resolve and their version commands must exit successfully; no release string is compared.
 The actual frontend must then provide a recognizable DSH composer and a new durable turn, so a changed frontend refuses with a diagnostic naming the unreadable composer rather than being accepted because of its version.
 No screen-based DSH quota parser exists: dispatch quota uses structured snapshots and the DSH busy classifier reads its durable session log.
