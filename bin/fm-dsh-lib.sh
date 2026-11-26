@@ -97,6 +97,29 @@ fm_dsh_args_are_dsh() {  # <flattened-argv> [script-predicate]
   "$predicate" "$script"
 }
 
+# fm_dsh_launch_alive: 0 when a running, unstopped process is a dsh-tui
+# launcher (fm_dsh_args_are_dsh) whose argv carries this launch's own
+# `--patch <launch-patch>`. Each launch's patch path is unique to its task and
+# generation, so a frame left on screen by a launch that exited, or one parked
+# with job control, does not count as this launch's live composer. The patch
+# sits inside the pattern's double quotes, so glob characters in it match only
+# themselves.
+fm_dsh_launch_alive() {  # <launch-patch>
+  local patch=$1 line stat args
+  [ -n "$patch" ] || return 1
+  while IFS= read -r line; do
+    line=${line#"${line%%[![:space:]]*}"}
+    stat=${line%%[[:space:]]*}
+    args=${line#"$stat"}
+    case "$stat" in T* | Z* | '') continue ;; esac
+    case "$args " in *" --patch $patch "*) ;; *) continue ;; esac
+    fm_dsh_args_are_dsh "$args" fm_dsh_tui_script_path && return 0
+  done <<EOF
+$(ps -eww -o stat=,args= 2>/dev/null)
+EOF
+  return 1
+}
+
 fm_dsh_pid_is_dsh() {  # <pid>
   local args
   args=$(ps -o args= -p "$1" 2>/dev/null) || return 1

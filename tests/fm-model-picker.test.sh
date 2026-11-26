@@ -223,7 +223,11 @@ assert usd == {"priceper1mtokens": "quantity", "inputpriceper1mtokens": "quantit
 
 seed_discovery() {  # <data-dir>: a cached sitemap and selector catalog naming m-a and m-b
   mkdir -p "$1/raw"
-  printf '%s' '<urlset><url><loc>https://artificialanalysis.ai/models/m-a</loc></url><url><loc>https://artificialanalysis.ai/models/m-b</loc></url></urlset>' >"$1/raw/sitemap.xml.html"
+  PYTHONPATH="$ROOT/bin" PYTHONDONTWRITEBYTECODE=1 python3 -c '
+from fm_model_picker import collect
+paths = ["models/m-a", "models/m-b"] + ["evaluations/" + s for s in collect.EVAL_SLUGS]
+print("<urlset>" + "".join(f"<url><loc>{collect.BASE}/{p}</loc></url>" for p in paths) + "</urlset>")
+' >"$1/raw/sitemap.xml.html"
   printf '%s' '<html>{"slug":"m-a","name":"M-A","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}{"slug":"m-b","name":"M-B","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}</html>' >"$1/raw/models_comparisons.html"
 }
 
@@ -233,7 +237,7 @@ import sys
 from pathlib import Path
 from fm_model_picker import collect
 collect.configure(sys.argv[1])
-for path in ["/evaluations/" + s for s in collect.EVAL_SLUGS] + ["/models/" + s for s in collect.COHORT]:
+for path in ["/evaluations/" + s for s in collect.EVAL_SLUGS] + ["/models/" + s for s in collect.default_cohort()]:
     f = collect.cache_file(path)
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text("<html><table><tr><td>1</td><td>Acme</td><td>M-A</td><td>1500</td></tr></table></html>" if "/evaluations/" in path
@@ -292,7 +296,8 @@ test_coverage_follows_the_cache_not_the_database() {
   assert_grep "| gpqadiamond | embedded | 1 | captured |" "$data/coverage.md" "day 1 coverage counts the cached models"
   add_pair "$data" m-c m-d
   run "$data" --evals-only --replay
-  expect_code 0 "$CODE" "day 2: acquisition without a database rebuild"
+  expect_code 4 "$CODE" "day 2: absent sitemap is diagnostic, but configured acquisition continues"
+  assert_equals '[33,33,[],[]]' "$(jq -c '[(.evaluation_inventory.targets|length),(.evals|length),.evaluation_inventory.missing_pages,.evaluation_inventory.missing_from_sitemap]' "$data/snapshot.json")" "static fallback does not diagnose removed listings"
   assert_grep "| gpqadiamond | embedded | 3 | captured |" "$data/coverage.md" "an acquisition run recomputes coverage from the cache, not from the day-1 database"
   add_pair "$data" m-e m-f
   run "$data" --coverage-only
@@ -325,14 +330,37 @@ root, flags = sys.argv[1], sys.argv[2:]
 collect.configure(root)
 mode = os.environ.get("SITE", "")
 slugs = ["m-a", "m-b"] if mode == "maintenance" else ["m-a", "m-b", "m-new"] + ([f"x-{i:02d}" for i in range(17)] if mode in ("outage", "scattered") else [])
-SITEMAP = "<urlset>" + "".join(f"<url><loc>{collect.BASE}/models/{s}</loc></url>" for s in slugs) + "</urlset>"
+paths = ["models/" + s for s in slugs]
+if mode != "sitemap-models-only":
+    paths += ["evaluations/" + s for s in collect.EVAL_SLUGS]
+SITEMAP = "<urlset>" + "".join(f"<url><loc>{collect.BASE}/{p}</loc></url>" for p in paths) + "</urlset>"
+if mode == "retained-sitemap":
+    # Distinct evaluation locations retained 2026-10-16T06:28:54Z; no network or private cache required.
+    frozen = '''aa-3d aa-analyst-agent aa-briefcase aa-omniscience-decision aime-2025 apex-agents-aa
+    artificial-analysis-cyber-index artificial-analysis-decision-index artificial-analysis-intelligence-index
+    artificial-analysis-long-context-reasoning artificial-analysis-openness-index automationbench-aa critpt
+    cwe-bench-aa cybergym-e2e-aa deepsecbench-aa enterprise-ops-gym-aa frontiercode gdp-pdf gdpval-aa
+    global-mmlu-lite gpqa-diamond harvey-lab-aa hle-multichoice humanitys-last-exam ifbench itbench-aa
+    livecodebench math-500 mlcr-aa mmlu-pro mmmu-pro omniscience scicode tau2-bench tau3-banking
+    terminal-bench-science terminalbench-2-1 terminalbench-4-0 terminalbench-hard when2call wildguardtest'''.split()
+    SITEMAP = '<urlset>' + ''.join(f'<url><loc>{collect.BASE}/evaluations/{s}</loc></url>' for s in frozen) + '</urlset>'
+if mode.startswith("inventory-"):
+    urls = [collect.BASE + "/evaluations/" + x for x in collect.EVAL_SLUGS]
+    urls += [collect.BASE + "/evaluations/future-bench", collect.BASE + "/evaluations/../escape",
+             "https://example.org/evaluations/not-ours", collect.BASE + "/evaluations/not?canonical"]
+    if mode == "inventory-next":
+        urls.remove(collect.BASE + "/evaluations/aa-briefcase")
+        urls.append(collect.BASE + "/evaluations/newly-introduced")
+    SITEMAP = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join(
+        f"<url><loc>{url}</loc></url>" for url in urls) + "</urlset>"
 CATALOG = "<html>" + "".join(
     '{"slug":"%s","name":"%s","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}' % (s, s.upper())
     for s in ("m-a", "m-b")) + "</html>"
 
 
 DOWN = "<html><body>Down for maintenance</body></html>"
-EVAL_PAGE = "<html><table><tr><td>1</td><td>Acme</td><td>M-A</td><td>1500</td></tr></table></html>"
+EVAL_PAGE = ("<html><table><tr><th>Rank</th><th>Creator</th><th>Model</th><th>Score</th></tr>"
+             "<tr><td>1</td><td>Acme</td><td>M-A</td><td>1500</td></tr></table></html>")
 COHORT_PAGE = "<html>58 Artificial Analysis Intelligence Index 95 Output tokens per second $1.50 Cost per Intelligence Index task In $3.00Out $15.00</html>"
 
 
@@ -354,6 +382,12 @@ def site(path):
     if path.startswith("/models/comparisons/"):
         return collect._fake_page([collect._fake_obj(n, intelligenceIndex=30.0) for n in path[len("/models/comparisons/"):].split("-vs-")])
     if path.startswith("/evaluations/"):
+        if path in ("/evaluations/future-bench", "/evaluations/gpqa-diamond", "/evaluations/newly-introduced"):
+            method = "paired" if mode == "inventory-next" and path.endswith("/future-bench") else "single"
+            body = EVAL_PAGE + '<script type="application/ld+json">{"@type":"Dataset","measurementTechnique":"' + method + '"}</script>'
+            if mode == "inventory-first" and path.endswith("/future-bench"):
+                return body.encode("utf-8") + b"\r\n<!-- \xff -->\r\n"
+            return body
         return EVAL_PAGE
     return COHORT_PAGE
 
@@ -367,7 +401,7 @@ def put(path, text):
 
 for slug in collect.EVAL_SLUGS:
     put("/evaluations/" + slug, EVAL_PAGE)
-for slug in collect.COHORT:
+for slug in collect.default_cohort():
     put("/models/" + slug, COHORT_PAGE)
 put("/sitemap.xml", SITEMAP)
 put("/models/comparisons", CATALOG)
@@ -389,7 +423,7 @@ class Resp:
     def read(self):
         if isinstance(self.body, Exception):
             raise self.body
-        return self.body.encode("utf-8")
+        return self.body if isinstance(self.body, bytes) else self.body.encode("utf-8")
 
     def __enter__(self):
         return self
@@ -442,14 +476,45 @@ requests_matching() {  # <grep pattern>: how many requests of the last flag run 
   printf '%s\n' "$OUT" | grep -c -- "$1" || true
 }
 
+test_daily_evaluation_inventory() {
+  local root="$TMP_ROOT/daily-evaluations"
+  SITE=retained-sitemap flag_run --evals-only
+  assert_equals '[33,42,9,42]' "$(jq -c '[.evaluation_inventory.configured,.evaluation_inventory.advertised,.evaluation_inventory.newly_discovered,.evals] | map(length)' "$FLAG_DATA/snapshot.json")" "the retained 33 versus 42 gap now drives acquisition of all 42 fixture bodies"
+  FLAG_ROOT=$root SITE=inventory-first flag_run --evals-only --db
+  assert_equals '1500.0' "$(sql "$root/aa.sqlite" "SELECT o.value FROM observations o JOIN metrics m ON m.id = o.metric_id WHERE o.source = 'eval-leaderboard' AND m.label = 'eval-leaderboard:future-bench'")" "an advertised evaluation's actual score reaches SQLite"
+  assert_equals "EXIT 0" "$(printf '%s\n' "$OUT" | tail -1)" "first inventory run completed"
+  assert_equals "34" "$(requests_matching '^REQ /evaluations/')" "acquire configured pages and only safe new evaluation URLs"
+  assert_equals '["future-bench"]' "$(jq -c '.evaluation_inventory.newly_discovered' "$root/snapshot.json")" "new benchmark diagnosed"
+  assert_contains "$(cat "$root/coverage.md")" 'futurebench' "raw coverage includes discovered benchmark"
+  local raw_hash first_witness
+  raw_hash=$(python3 -B -c 'from pathlib import Path; import hashlib,sys; raw=Path(sys.argv[1]).read_bytes(); assert raw.endswith(b"\r\n<!-- \xff -->\r\n"); print(hashlib.sha256(raw).hexdigest())' "$root/raw/evaluations_future-bench.html") || fail 'evaluation cache did not keep the exact response bytes'
+  first_witness=$(jq -c '.evaluation_inventory.last_method_evidence["future-bench"]' "$root/snapshot.json")
+  assert_equals "$raw_hash" "$(jq -r '.page_sha256' <<< "$first_witness")" 'fresh evaluation witness hashes exact cached bytes'
+  FLAG_ROOT=$root SITE=inventory-first flag_run --evals-only --replay
+  assert_equals '0' "$(requests_matching '^REQ')" 'method witness replay makes no request'
+  assert_equals "$first_witness" "$(jq -c '.evaluation_inventory.last_method_evidence["future-bench"]' "$root/snapshot.json")" 'method witness preserves bytes, timestamp and declarations on replay'
+  FLAG_ROOT=$root SITE=sitemap-models-only flag_run --evals-only
+  assert_contains "$OUT" 'EXIT 4' 'model-only sitemap is not a successful evaluation discovery'
+  assert_equals '[[],[],true,true]' "$(jq -c '.evaluation_inventory | [.advertised,.missing_from_sitemap,(.last_advertised|index("future-bench") != null),(.targets|index("future-bench") != null)]' "$root/snapshot.json")" 'unusable discovery does not erase the last known evaluation list'
+  assert_equals '34' "$(requests_matching '^REQ /evaluations/')" 'previously discovered evaluations still refresh'
+  sed -i.bak 's/>1500</>1600</' "$root/raw/evaluations_future-bench.html"
+  FLAG_ROOT=$root SITE=sitemap-models-only flag_run --db --replay
+  assert_equals '0' "$(requests_matching '^REQ')" 'recovery rebuild makes no request'
+  assert_equals '1600.0' "$(sql "$root/aa.sqlite" "SELECT o.value FROM observations o JOIN metrics m ON m.id = o.metric_id WHERE o.source = 'eval-leaderboard' AND m.label = 'eval-leaderboard:future-bench'")" 'rebuild uses raw values, not old SQLite rows or snapshot scores'
+  assert_contains "$(cat "$root/coverage.md")" 'Evaluation discovery incomplete:' 'retained observations do not certify the current inventory'
+  FLAG_ROOT=$root SITE=inventory-next flag_run --evals-only
+  assert_equals '[["newly-introduced"],["aa-briefcase"],[],["future-bench"],"single","paired","single"]' "$(jq -c '.evaluation_inventory | [.newly_discovered,.missing_from_sitemap,.missing_pages,(.changed_method_evidence|keys),(.changed_method_evidence["future-bench"] | .before,.after | .datasets[0].measurementTechnique),.last_method_evidence["gpqa-diamond"].datasets[0].measurementTechnique]' "$root/snapshot.json")" "new, missing, changed and unchanged evaluation evidence remain distinct"
+  pass "model picker: daily evaluation discovery and method diagnostics"
+}
+
 test_flags_decide_which_requests_are_made() {
   flag_run
   assert_equals "33" "$(requests_matching '^REQ /evaluations/')" "no flags: every evaluation page is revalidated"
   assert_equals "0" "$(requests_matching '^REQ /models/')" "no flags: cached cohort model pages are not revalidated"
-  assert_equals "0" "$(requests_matching '^REQ /sitemap.xml')" "no flags: no sweep"
+  assert_equals "1" "$(requests_matching '^REQ /sitemap.xml')" "no flags: discover evaluations"
   flag_run --evals-only
   assert_equals "33" "$(requests_matching '^REQ /evaluations/')" "--evals-only revalidates the evaluation pages"
-  assert_equals "33" "$(requests_matching '^REQ')" "--evals-only skips the cohort and the sweep"
+  assert_equals "34" "$(requests_matching '^REQ')" "--evals-only discovers evaluations but skips the cohort and the sweep"
   flag_run --replay
   assert_equals "0" "$(requests_matching '^REQ')" "--replay: no revalidation"
   flag_run --evals-only --replay
@@ -583,7 +648,7 @@ test_unparseable_eval_page_and_sitemap_are_rejected() {
   assert_equals "2026-01-01T00:00:00Z" "$(cat "$FLAG_DATA/raw/evaluations_aa-3d.html.ts")" "and keeps its real fetch time"
   SITE=sitemap-blank flag_run --sweep
   assert_contains "$OUT" "EXIT 4" "a sitemap that does not parse does not exit 0"
-  assert_contains "$OUT" "ERR   /sitemap.xml: page rejected: no <loc> entries" "the rejected sitemap is named"
+  assert_contains "$OUT" "ERR   /sitemap.xml: page rejected: no valid sitemap urlset" "the rejected sitemap is named"
   assert_equals "0" "$(grep -c 'Down for maintenance' "$FLAG_DATA/raw/sitemap.xml.html" || true)" "the cached sitemap is still the last good copy"
   assert_equals "2026-01-01T00:00:00Z" "$(cat "$FLAG_DATA/raw/sitemap.xml.html.ts")" "and keeps its real fetch time"
   assert_contains "$(cat "$FLAG_DATA/snapshot.json")" '"m-new"' "the sweep went on with the last good sitemap"
@@ -593,8 +658,8 @@ test_unparseable_eval_page_and_sitemap_are_rejected() {
   assert_equals "0" "$(grep -c 'Down for maintenance' "$FLAG_DATA/raw/models_comparisons.html" || true)" "the cached catalog is still the last good copy"
   assert_equals "2026-01-01T00:00:00Z" "$(cat "$FLAG_DATA/raw/models_comparisons.html.ts")" "and keeps its real fetch time"
   DROP=/sitemap.xml SITE=sitemap-blank flag_run --sweep
-  assert_contains "$OUT" "EXIT 2" "with no good sitemap to fall back on the run ends"
-  assert_contains "$OUT" "ERR error: /sitemap.xml: page rejected: no <loc> entries" "and says why"
+  assert_contains "$OUT" "EXIT 4" "without a sitemap the static targets still run"
+  assert_contains "$OUT" "ERR   /sitemap.xml: page rejected: no valid sitemap urlset" "and says why"
   pass "model picker: an evaluation page, sitemap or catalog that does not parse is rejected and never replaces the cache"
 }
 
@@ -742,6 +807,7 @@ test_empty_compared_set_is_not_zero_disagreements
 test_network_off_is_a_clean_error
 test_unit_cells_are_stored_as_numbers
 test_rebuild_without_chartdiff_is_untrusted
+test_daily_evaluation_inventory
 test_flags_decide_which_requests_are_made
 test_coverage_follows_the_cache_not_the_database
 test_unsafe_payload_slug_is_rejected
