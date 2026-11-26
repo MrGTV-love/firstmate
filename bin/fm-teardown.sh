@@ -681,10 +681,13 @@
 #     read once and bound to its birth identity) or descends from it by parent
 #     chain in one process-table read, or descends from a process already
 #     proved, which keeps its proof by pid and birth identity after the reap
-#     ends the shell above it. An inherited environment or session cannot
-#     prove ownership: a daemon inherits its launcher's environment, and a
-#     harness tool shell can be its own session leader. Any other process at a
-#     root - a detached daemon, an orphan reparented to init, or every process
+#     ends the shell above it, or is still in the process group of a proved
+#     process (a child forked during the grace period keeps that group after
+#     its parent exits; a detaching daemon leaves it with setsid). An inherited
+#     environment or session cannot prove ownership: a daemon inherits its
+#     launcher's environment, and a harness tool shell can be its own session
+#     leader. Any other process at a root - a detached daemon, an orphan
+#     reparented to init outside every proved group, or every process
 #     when the endpoint is gone, windowless, unreadable, or not tmux or Herdr -
 #     refuses before any signal, even with --force, naming its pid, birth
 #     identity and command, and the copy and task stay. Proceeding would not
@@ -4424,12 +4427,14 @@ task_pid_list_contains() {  # <pid-list> <pid>
 # Fix 2 ownership proof (see script header). TASK_ANCHOR_PID/IDENTITY is the
 # endpoint's pane shell, read once per teardown; TASK_OWNED holds every
 # "pid<TAB>birth identity" already proved, so a proved process keeps its proof
-# after the reap ends the shell it descended from.
+# after the reap ends the shell it descended from, and TASK_OWNED_PGIDS the
+# process groups of proved processes.
 TASK_ANCHOR_READ=0
 TASK_ANCHOR_PID=
 TASK_ANCHOR_IDENTITY=
 TASK_ANCHOR_NOTE=
 TASK_OWNED=()
+TASK_OWNED_PGIDS=" "
 
 task_anchor_load() {
   [ "$TASK_ANCHOR_READ" = 0 ] || return 0
@@ -4441,7 +4446,7 @@ task_anchor_load() {
     TASK_ANCHOR_NOTE="the endpoint's pane shell $TASK_ANCHOR_PID has no readable birth identity"
     TASK_ANCHOR_PID=
   else
-    TASK_ANCHOR_NOTE="it does not descend from the task's pane shell $TASK_ANCHOR_PID ($TASK_ANCHOR_IDENTITY)"
+    TASK_ANCHOR_NOTE="it neither descends from the task's pane shell $TASK_ANCHOR_PID ($TASK_ANCHOR_IDENTITY) nor stays in a process group of a process proved the task's"
   fi
 }
 
@@ -4453,32 +4458,47 @@ task_owned_contains() {  # <pid> <identity>
   return 1
 }
 
+task_owned_record() {  # <pid> <identity> <pgid>
+  TASK_OWNED+=("$1"$'\t'"$2")
+  case "$3" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$3" -gt 1 ] || return 0
+  case "$TASK_OWNED_PGIDS" in *" $3 "*) ;; *) TASK_OWNED_PGIDS="$TASK_OWNED_PGIDS$3 " ;; esac
+}
+
 # Succeeds when the process <pid>, whose birth identity is <identity>, is the
-# task's own: already proved, or the anchor itself or a descendant of the anchor
-# or of a proved process by the parent chain in one process table read, where
-# that ancestor still has its recorded birth identity. A proof is recorded.
+# task's own, read from one process table: already proved; the anchor itself
+# or a descendant, by parent chain, of the anchor or of a proved process that
+# still has its recorded birth identity; or a member of the process group of a
+# proved process, which a child keeps after its parent exits unless it leaves
+# the group (setsid or setpgid, as a detaching daemon does). A proof is
+# recorded with the process's group.
 task_pid_proved_own() {  # <pid> <identity>
-  local pid=$1 identity=$2 table member entry
+  local pid=$1 identity=$2 table member entry pgid
   task_owned_contains "$pid" "$identity" && return 0
   task_anchor_load
-  table=$(ps -axo pid=,ppid= 2>/dev/null) || return 1
+  table=$(ps -axo pid=,ppid=,pgid= 2>/dev/null) || return 1
   [ -n "$table" ] || return 1
+  pgid=$(printf '%s\n' "$table" | awk -v p="$pid" '$1 == p { print $3; exit }')
   while IFS= read -r member; do
     [ -n "$member" ] || continue
     if [ -n "$TASK_ANCHOR_PID" ] && [ "$member" = "$TASK_ANCHOR_PID" ] \
        && task_process_identity_matches "$member" "$TASK_ANCHOR_IDENTITY"; then
-      TASK_OWNED+=("$pid"$'\t'"$identity")
+      task_owned_record "$pid" "$identity" "$pgid"
       return 0
     fi
     for entry in ${TASK_OWNED[@]+"${TASK_OWNED[@]}"}; do
       [ "${entry%%$'\t'*}" = "$member" ] || continue
       task_process_identity_matches "$member" "${entry#*$'\t'}" || continue
-      TASK_OWNED+=("$pid"$'\t'"$identity")
+      task_owned_record "$pid" "$identity" "$pgid"
       return 0
     done
   done < <(printf '%s\n' "$table" | awk -v p="$pid" '
     { parent[$1] = $2 }
     END { for (n = 0; p > 1 && n < 64 && (p in parent); n++) { print p; p = parent[p] } }')
+  case "$pgid" in ''|*[!0-9]*) return 1 ;; esac
+  case "$TASK_OWNED_PGIDS" in
+    *" $pgid "*) task_owned_record "$pid" "$identity" "$pgid"; return 0 ;;
+  esac
   return 1
 }
 

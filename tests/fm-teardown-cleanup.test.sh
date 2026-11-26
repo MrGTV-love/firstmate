@@ -1941,6 +1941,44 @@ test_teardown_proof_survives_the_parent_the_reap_ends() {
   pass "a proved leak keeps its proof after the reap ends its parent shell, and is force-killed"
 }
 
+# The process-group proof does not reach a process that leaves the group: a
+# child a proved process forks during the grace period and that calls setsid
+# before its parent exits (a daemon detaching) refuses unsignalled.
+test_teardown_grace_child_that_leaves_the_group_is_refused() {
+  local case_dir rc pid child i
+  case_dir=$(make_case ownership-grace-setsid)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  teardown_fixture_start "$case_dir/wt" KILL perl -MPOSIX -e '
+    my ($out) = @ARGV;
+    $SIG{TERM} = sub {
+      my $child = fork(); die "fork" unless defined $child;
+      if (!$child) {
+        POSIX::setsid();
+        open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+        exec "sleep", "300";
+      }
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$child\n"; close $fh; rename "$out.tmp", $out or die "rename";
+      POSIX::_exit(0);
+    };
+    sleep 300 while 1;' "$case_dir/child.pid"
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  for i in $(seq 50); do [ -s "$case_dir/child.pid" ] && break; sleep 0.1; done
+  child=$(cat "$case_dir/child.pid" 2>/dev/null) || fail "grace-setsid: the parent never forked its detaching child"
+  teardown_fixture_track "$child" KILL
+  ownership_alive "$child" || fail "grace-setsid: teardown killed a child that left the task's process group"
+  expect_code 1 "$rc" "grace-setsid: teardown must refuse: $(tail -3 "$case_dir/stderr")"
+  ownership_assert_unsignalled "$case_dir" "$child" grace-setsid
+  grep -Eq "REFUSED: process $child .*nothing proves it belongs to task-x1" "$case_dir/stderr" \
+    || fail "grace-setsid: the refusal did not name the detached child: $(tail -3 "$case_dir/stderr")"
+  teardown_fixture_stop "$child"
+  pass "a child forked during the grace period that leaves the task's process group refuses unsignalled"
+}
+
 # The narrowed claim: an orphan reparented to init that never left its session
 # is not provably the task's either, so it refuses unsignalled, as does an
 # unproven daemon at the task's tasktmp root.
@@ -9024,6 +9062,7 @@ test_teardown_mixed_copy_signals_nothing
 test_teardown_without_a_provable_pane_refuses_a_root_process
 test_teardown_proof_survives_the_parent_the_reap_ends
 test_teardown_refuses_an_orphan_it_cannot_prove
+test_teardown_grace_child_that_leaves_the_group_is_refused
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races
