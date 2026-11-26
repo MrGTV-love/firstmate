@@ -426,8 +426,30 @@ RELAUNCH_ACTIVE=0
 RELAUNCH_PHASE=start
 RELAUNCH_PAIR_DIR=
 
+# rerecord-slot write-mode exits after step 3 (every one names the step 3 entries; after this run's own publish it also
+# says what the record and the audit record hold):
+# - do_rerecord_slot step 3 rc 2: the restore's own error, then "error: before stopping, this run reconciled ...".
+# - rerecord_refuse (every proof, archive, rebind): "error: slot rerecord refused: <reason>: <detail>; before refusing, ...".
+# - rerecord_die (snapshot, stage, staged sha, note, audit body, failed publish): "error: <what failed>; before stopping, ...".
+# - do_rerecord_slot no-op exit 0: "already recorded", then "before finding it already recorded, ...".
+# - rerecord_die after a publish that reported failure but landed: "...; this run published ... and then restored ...".
+# - fm_slot_rerecord_refuse adopt_postcheck_failed: "...; this run published ... and then restored the prior record ...".
+# - rerecord_die after the audit record could not be closed as published: "...; this run published ... restored ...".
+# - rerecord_rollback when the restore fails: "error: this run published ... the prior record could not be restored ...".
+# - do_rerecord_slot success return: the summary line, then "before publishing, ...".
+# - control_cleanup discard (a signal or error before publish): the final block's "error: before stopping, ...".
+# - control_cleanup rollback, this run's publish: "this run published ... and then restored ..." or "could not be restored".
+# - control_cleanup rollback, a step 3 restore: closes that audit record into the entries, then the final block.
+# - control_cleanup keep (publishing, committing, restoring): "error: this run stopped while <stage> ... the record now holds
+#   ...; the audit record <file> is left <result> ...", for this run's rename or a step 3 restore rename.
+# - control_cleanup final block: after this run's own publish "error: this run stopped after publishing ...", otherwise
+#   "error: before stopping, ..." (a signal before publish, or an error no message above reports); none when nothing acted.
 control_cleanup() {
-  local status=$? extra_lock
+  local status=$? extra_lock published=0 whose="the earlier interrupted run's"
+  if [ -n "$RERECORD_SNAP" ]; then
+    whose="this run's"
+    if [ -n "${FM_RR_S:-}" ] && [ -z "${FM_RR_STAGED:-}" ]; then published=1; fi
+  fi
   if [ "$RELAUNCH_ACTIVE" = 1 ] \
      && declare -F relaunch_rollback >/dev/null 2>&1; then
     relaunch_rollback || true
@@ -453,10 +475,18 @@ control_cleanup() {
           echo "error: $(fm_slot_rerecord_restored unrestored)" >&2
         fi
         ;;
+      keep)
+        FM_RR_REPORTED=1
+        echo "error: $(fm_slot_rerecord_kept "$RERECORD_STAGE" "$whose")" >&2
+        ;;
     esac
   fi
-  if [ -n "${FM_RR_RECONCILED:-}" ] && [ "${FM_RR_REPORTED:-0}" != 1 ] && declare -F fm_slot_rerecord_changes >/dev/null 2>&1; then
-    echo "error: $(fm_slot_rerecord_changes stopping '')" >&2
+  if [ "${FM_RR_REPORTED:-0}" != 1 ] && declare -F fm_slot_rerecord_changes >/dev/null 2>&1; then
+    if [ "$published" = 1 ]; then
+      echo "error: $(fm_slot_rerecord_kept '' "$whose")" >&2
+    elif [ -n "${FM_RR_RECONCILED:-}" ]; then
+      echo "error: $(fm_slot_rerecord_changes stopping '')" >&2
+    fi
   fi
   [ -z "$RERECORD_SNAP" ] || rm -rf -- "$RERECORD_SNAP"
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"

@@ -1306,6 +1306,29 @@ fm_slot_rerecord_restored() { # [unrestored]
     "$FM_RR_ID" "$outcome" "$FM_RR_AUDIT" "$(fm_slot_rerecord_field "$FM_RR_AUDIT" result)" "$entries"
 }
 
+# What a run stopped while <stage> may still rename the task record or its audit record did, or with no <stage> what a run
+# stopped after its own publish did: what the record holds now (<whose> published record, the prior record, or neither),
+# the audit record and its result, and every step 3 entry.
+fm_slot_rerecord_kept() { # <stage-or-empty> <whose>
+  local sha what result audit when="after publishing task $FM_RR_ID's record"
+  [ -z "$1" ] || when="while $1 task $FM_RR_ID's record, so that rename may still land"
+  sha=$(fm_slot_rerecord_sha "$FM_RR_META") || sha=
+  if [ -n "$sha" ] && [ "$sha" = "$FM_RR_S" ]; then
+    what="$2 published record"
+  elif [ -n "$sha" ] && [ "$sha" = "$FM_RR_P" ]; then
+    what="the prior record"
+  else
+    what="bytes that are neither the prior nor the staged record"
+  fi
+  result=$(fm_slot_rerecord_field "$FM_RR_AUDIT" result 2>/dev/null) || result=
+  case "$result" in
+    pending|rolling-back) audit="is left $result for the next write run to reconcile" ;;
+    *) audit="is ${result:-unreadable}" ;;
+  esac
+  printf 'this run stopped %s; the record now holds %s; the audit record %s %s; %s\n' "$when" "$what" "$FM_RR_AUDIT" "$audit" \
+    "$(fm_slot_rerecord_changes stopping 'no manifest, copy or journal was changed')"
+}
+
 fm_slot_rerecord_refuse() { # <reason> <detail> [<tail>]
   FM_RR_REPORTED=1
   echo "error: slot rerecord refused: $1${2:+: $2}; ${3:-$(fm_slot_rerecord_changes refusing 'no record, manifest, copy or journal was changed')}" >&2

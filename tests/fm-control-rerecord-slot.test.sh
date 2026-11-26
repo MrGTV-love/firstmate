@@ -1573,6 +1573,8 @@ test_R9d_term_while_the_publish_is_pending() {
   [ "$(rr_sha "$RR_META")" = "$(rr_field "$a" staged_sha256)" ] || fail "R9d: the record does not hold the staged bytes"
   [ "$(rr_field "$a" result)" = pending ] || fail "R9d: audit is '$(rr_field "$a" result)'"
   [ "$(rr_count "$(rr_archives)")" = 1 ] || fail "R9d: a restore was attempted"
+  assert_contains "$RR_OUT" "error: this run stopped while publishing task $RR_ID's record, so that rename may still land; the record now holds " "R9d: the trap must name the stage"
+  assert_contains "$RR_OUT" "; the audit record $a is left pending for the next write run to reconcile; no manifest, copy or journal was changed" "R9d: the trap must name the kept audit record"
   out=$(rr_write); rc=$?
   expect_code 0 "$rc" "R9d second"$'\n'"$out"
   assert_contains "$out" 'already recorded' "R9d"
@@ -1581,6 +1583,21 @@ test_R9d_term_while_the_publish_is_pending() {
   rr_ok R9d "first run exit $RR_RC (TERM runs the trap at once: $RR_TERM_IMMEDIATE); staged bytes, pending, no restore; second run already recorded, published-recovered, one archive, audit_agrees"
 }
 
+# TERM during a step 3 restore rename: the trap keeps the restore in flight and names its audit record for the next run.
+test_L22_term_during_a_step_3_restore_rename_names_the_kept_audit() {
+  rr_setup_L13 L22
+  rr_term_runs_trap_with_child || true
+  rr_signal_run
+  if [ "$RR_TERM_IMMEDIATE" = 1 ]; then
+    expect_code 143 "$RR_RC" "L22"$'\n'"$RR_OUT"
+  fi
+  assert_contains "$RR_OUT" "error: this run stopped while restoring task $RR_ID's record, so that rename may still land; the record now holds " "L22"
+  assert_contains "$RR_OUT" "; the audit record $RR_L13_AUDIT is left rolling-back for the next write run to reconcile; no manifest, copy or journal was changed" "L22"
+  assert_not_contains "$RR_OUT" "this run's published record" "L22: a step 3 restore is not this run's publish"
+  [ "$(printf '%s\n' "$RR_OUT" | grep -c 'this run stopped')" = 1 ] || fail "L22: the trap line was not printed exactly once"$'\n'"$RR_OUT"
+  [ "$(rr_field "$RR_L13_AUDIT" result)" = rolling-back ] || fail "L22: the audit is '$(rr_field "$RR_L13_AUDIT" result)'"
+  rr_ok L22 "TERM during a step 3 restore rename (immediate trap: $RR_TERM_IMMEDIATE): the trap keeps it and names the rolling-back audit record once"
+}
 test_R9e_term_while_the_commit_rename_is_pending() {
   local out rc p a
   rr_make_f R9e
@@ -1594,6 +1611,7 @@ test_R9e_term_while_the_commit_rename_is_pending() {
   [ "$(rr_sha "$RR_META")" = "$(rr_field "$a" staged_sha256)" ] || fail "R9e: the record does not hold the staged bytes"
   [ "$(rr_field "$a" result)" = published ] || fail "R9e: audit is '$(rr_field "$a" result)'"
   rr_agrees "$a" || fail "R9e: audit disagrees"
+  assert_contains "$RR_OUT" "error: this run stopped while committing task $RR_ID's record, so that rename may still land; the record now holds this run's published record; the audit record $a " "R9e: the trap must say the run published and name the audit record"
   out=$(rr_write); rc=$?
   expect_code 0 "$rc" "R9e second"$'\n'"$out"
   assert_contains "$out" 'already recorded' "R9e"
@@ -2242,6 +2260,7 @@ test_R9b_hup_in_published_rolls_back
 test_R9c_int_in_published_rolls_back
 test_R9d_term_while_the_publish_is_pending
 test_R9e_term_while_the_commit_rename_is_pending
+test_L22_term_during_a_step_3_restore_rename_names_the_kept_audit
 test_R10_an_unverified_archive_refuses
 test_R11_an_unreadable_audit_record_refuses_until_moved_aside
 test_SF4_head_moved_after_the_rebind
