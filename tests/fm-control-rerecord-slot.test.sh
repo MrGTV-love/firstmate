@@ -34,9 +34,23 @@ rr_record() { # <id> <result> <observation>
 }
 
 rr_ok() { # <id> <observation>
+  [ ! -s "$TMP_ROOT/rr-once-violations" ] ||
+    fail "$1: a run named one outcome more than once"$'\n'"$(cat "$TMP_ROOT/rr-once-violations")"
   rr_record "$1" pass "$2"
   pass "$1: $2"
 }
+
+# Every run of the verb names each outcome at most once; rr_run records any output that repeats one, and rr_ok fails
+# the case that produced it.
+RR_ONCE_PHRASES=('this run stopped' 'reconciled earlier interrupted runs' 'could not be restored')
+rr_once_check() { # <output>
+  local phrase n
+  for phrase in "${RR_ONCE_PHRASES[@]}"; do
+    n=$(printf '%s\n' "$1" | grep -c -- "$phrase" || true)
+    [ "$n" -le 1 ] || printf '%s: "%s" printed %s times:\n%s\n' "${RR_DIR##*/}" "$phrase" "$n" "$1" >> "$TMP_ROOT/rr-once-violations"
+  done
+}
+fm_test_before_case() { rm -f "$TMP_ROOT/rr-once-violations"; }
 
 rr_commit() { # <dir> <message>
   git -C "$1" add -A
@@ -207,8 +221,9 @@ rr_journal() { # <phase-line-or-empty> [extra-line]...: state/<id>.control-relau
 
 rr_msha() { shasum -a 256 "$RR_MANIFEST" | awk '{print $1}'; }
 
-rr_run() { # <args...>: the verb, through the shim when RR_CONTROL is set
-  (
+rr_run() { # <args...>: the verb, through the shim when RR_CONTROL is set; its output is judged by rr_once_check
+  local out rc
+  out=$(
     unset FM_TASK_ID FM_SUPERVISION_ACTOR PI_CODING_AGENT CLAUDE_PID CLAUDE_CODE_SESSION_ID
     [ -z "$RR_TASK_ID" ] || export FM_TASK_ID="$RR_TASK_ID"
     [ -z "$RR_ACTOR" ] || export FM_SUPERVISION_ACTOR="$RR_ACTOR"
@@ -217,7 +232,10 @@ rr_run() { # <args...>: the verb, through the shim when RR_CONTROL is set
       CONTROL=$RR_CONTROL
     fi
     run_control "$RR_DIR" "$RR_ID" rerecord-slot "$@"
-  )
+  ); rc=$?
+  [ -z "$out" ] || printf '%s\n' "$out"
+  rr_once_check "$out"
+  return "$rc"
 }
 
 # shellcheck disable=SC2120 # most cases pass no extra arguments
@@ -1728,6 +1746,8 @@ test_SF4_head_with_a_failed_restore() {
   assert_contains "$out" "error: this run published task $RR_ID's record and the prior record could not be restored; it is archived at $(rr_field "$a" archive); the audit record $a is rolling-back; no manifest, copy or journal was changed" "SF4-head-unrestored"
   assert_not_contains "$out" "no record, manifest, copy or journal was changed" "SF4-head-unrestored"
   assert_not_contains "$out" "and then restored the prior record" "SF4-head-unrestored"
+  [ "$(printf '%s\n' "$out" | grep -c 'could not be restored')" = 1 ] || fail "SF4-head-unrestored: the could-not-restore line was not printed exactly once"$'\n'"$out"
+  [ "$(printf '%s\n' "$out" | grep -c 'this run stopped')" = 0 ] || fail "SF4-head-unrestored: the trap printed a kept-rename line after the run reported"$'\n'"$out"
   rr_ok SF4-head-unrestored "the restore after a failed post-publish check cannot stage: the run says it published, that the prior record could not be restored, and names the archive; the record holds the staged bytes"
 }
 
@@ -1744,6 +1764,8 @@ test_L20_a_failed_step_3_restore_names_the_audit_closed_before_it() {
   [ "$rc" != 0 ] || fail "L20: expected a failure"$'\n'"$out"
   assert_contains "$out" "error: could not stage the restore of task $RR_ID's record" "L20"
   assert_contains "$out" "error: before stopping, this run reconciled earlier interrupted runs: audit $first superseded-other (the audit was closed with the task record left unchanged); no manifest, copy or journal was changed" "L20"
+  [ "$(printf '%s\n' "$out" | grep -c 'reconciled earlier interrupted runs')" = 1 ] || fail "L20: the step 3 entries were not named exactly once"$'\n'"$out"
+  [ "$(printf '%s\n' "$out" | grep -c 'this run stopped')" = 0 ] || fail "L20: the trap printed a kept-rename line after the run reported"$'\n'"$out"
   [ "$(rr_field "$first" result)" = superseded-other ] || fail "L20: the first audit is '$(rr_field "$first" result)'"
   rr_ok L20 "step 3 closes a first audit as superseded-other, then the second's resumed restore fails: the stop names the first audit"
 }

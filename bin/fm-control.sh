@@ -428,6 +428,8 @@ RELAUNCH_PAIR_DIR=
 
 # rerecord-slot write-mode exits after step 3 (every one names the step 3 entries; after this run's own publish it also
 # says what the record and the audit record hold):
+# - do_rerecord_slot step 3 rc 1 (rerecord_audit_unreadable via rerecord_refuse): acts on no audit record first, so
+#   "error: slot rerecord refused: rerecord_audit_unreadable: ...; no record, manifest, copy or journal was changed".
 # - do_rerecord_slot step 3 rc 2: the restore's own error, then "error: before stopping, this run reconciled ...".
 # - rerecord_refuse (every proof, archive, rebind): "error: slot rerecord refused: <reason>: <detail>; before refusing, ...".
 # - rerecord_die (snapshot, stage, staged sha, note, audit body, failed publish): "error: <what failed>; before stopping, ...".
@@ -440,8 +442,9 @@ RELAUNCH_PAIR_DIR=
 # - control_cleanup discard (a signal or error before publish): the final block's "error: before stopping, ...".
 # - control_cleanup rollback, this run's publish: "this run published ... and then restored ..." or "could not be restored".
 # - control_cleanup rollback, a step 3 restore: closes that audit record into the entries, then the final block.
-# - control_cleanup keep (publishing, committing, restoring): "error: this run stopped while <stage> ... the record now holds
-#   ...; the audit record <file> is left <result> ...", for this run's rename or a step 3 restore rename.
+# - control_cleanup keep (publishing, committing, restoring), only for a signal during an in-flight rename: "error: this
+#   run stopped while <stage> ... the record now holds ...; the audit record <file> is left <result> ...". After a failed
+#   restore RERECORD_STAGE stays restoring, and the trap prints nothing because that exit already reported.
 # - control_cleanup final block: after this run's own publish "error: this run stopped after publishing ...", otherwise
 #   "error: before stopping, ..." (a signal before publish, or an error no message above reports); none when nothing acted.
 control_cleanup() {
@@ -476,8 +479,10 @@ control_cleanup() {
         fi
         ;;
       keep)
-        FM_RR_REPORTED=1
-        echo "error: $(fm_slot_rerecord_kept "$RERECORD_STAGE" "$whose")" >&2
+        if [ "${FM_RR_REPORTED:-0}" != 1 ]; then
+          FM_RR_REPORTED=1
+          echo "error: $(fm_slot_rerecord_kept "$RERECORD_STAGE" "$whose")" >&2
+        fi
         ;;
     esac
   fi
