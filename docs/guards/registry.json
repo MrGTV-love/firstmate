@@ -167,7 +167,9 @@
     "teardown-entry-preflight",
     "guard-lint-touched-registry",
     "home-state-write",
-    "tasks-axi-duplicate-close"
+    "tasks-axi-duplicate-close",
+    "spawn-reconciled-source",
+    "backpass-core-role-inputs"
   ],
   "guards": [
     {
@@ -5654,8 +5656,8 @@
       "id": "spawn-local-source-selection",
       "owner": "bin/fm-spawn.sh",
       "sites": [
-        {"file": "bin/fm-spawn.sh", "match": "local-only source selection refused"},
-        {"file": "bin/fm-spawn.sh", "match": "refusing the stale source plan", "count": 2}
+        {"file": "bin/fm-spawn.sh", "match": "local-only source selection refused", "count": 2},
+        {"file": "bin/fm-spawn.sh", "match": "refusing the stale source plan", "count": 3}
       ],
       "invariant": "a local-only spawn never starts from a qualified local default that diverged, moved or became ambiguous since its source plan",
       "layer": "runtime-block",
@@ -7708,6 +7710,64 @@
       "test": "tests/fm-tasks-axi.test.sh",
       "tier": "C",
       "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active"
+    },
+    {
+      "id": "spawn-reconciled-source",
+      "version": "1",
+      "owner": "bin/fm-spawn.sh",
+      "sites": [
+        {"file": "bin/fm-spawn.sh", "match": "reconciled source refused", "count": 15},
+        {"file": "bin/fm-spawn.sh", "match": "--reconciled-source is not supported on the orca backend"},
+        {"file": "bin/fm-reconciled-source-lib.sh", "match": "reconciled source refused", "count": 7},
+        {"file": "bin/fm-reconciled-source-lib.sh", "match": "refuse(", "count": 31}
+      ],
+      "invariant": "a fresh local-only ship starts from a declared reconciled successor only when that exact approved commit, on a direct non-default branch, contains both the named local default and this attempt's freshly discovered remote default, and every judged input is unchanged at both locked checkpoints",
+      "layer": "runtime-block",
+      "source": "the declaration, proposal and response bytes (bin/fm-reconciled-source-lib.sh), one ls-remote discovery of origin's default, origin's effective URL digest, and the PROJECT's local refs and objects",
+      "trigger": "a --reconciled-source declaration, its approval evidence, the actual invocation, the source branch, the named defaults, origin's identity or containment fails a check, or the backend cannot carry it",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "correct the named input (declaration, proposal or response bytes, source branch, or project state), re-scaffold with bin/fm-brief.sh <task> <repo> --mode local-only --reconciled-source <declaration>, then run bin/fm-spawn.sh <task> <project> --mode local-only --yolo <on|off> --reconciled-source <declaration> again; a refusal leaves no capture state, so the corrected attempt is judged afresh",
+      "budget": 1,
+      "telemetry": "stderr",
+      "test": "tests/fm-spawn-pool-base-freshen.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "layer_note": "Every refusal precedes copy assignment or, at the second locked checkpoint, copy preparation; the spawn's existing exit trap releases its own PROJECT lock and a dead holder is recovered by the existing lock owner."
+    },
+    {
+      "id": "backpass-core-role-inputs",
+      "version": "1",
+      "owner": "bin/fm-backpass.mjs",
+      "sites": [
+        {"file": "bin/fm-backpass.mjs", "match": "refusing an older core"}
+      ],
+      "invariant": "bin/fm-backpass.mjs launches an adopted Backpass core only when that core supports validated application role inputs, refusing older cores rather than silently dropping selected roles.",
+      "layer": "runtime-block",
+      "source": "the resolved Backpass core module exports and validated application role input arguments",
+      "trigger": "the resolved Backpass core module lacks validated application role input support when bin/fm-backpass.mjs invokes it",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "update or install a Backpass core that supports validated application role inputs before running bin/fm-backpass.mjs",
+      "budget": 1,
+      "budget_reason": "one preflight capability check per invocation",
+      "telemetry": "none; preflight refusal exits before launching Backpass",
+      "test": "tests/fm-dispatch-resolve.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
       "proxy": false,
       "proxy_reason": "",
       "precheck_gap": "",

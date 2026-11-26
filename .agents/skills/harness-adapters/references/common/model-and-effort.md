@@ -22,6 +22,11 @@ For other values, if requested effort is outside the adapter's accepted set, the
 This preserves launch success instead of passing a known-bad value.
 A harness with no verified interactive effort flag follows the same record-and-omit contract.
 
+A program that applies the effort itself, such as a role a command hands to its own model call, owns a different accepted set from the spawn flag above: establish it from that program's own help or transport surface rather than assuming the interactive flag's levels, and never hand it a value the program refuses.
+The fallback cap above is the only adaptation: a fallback `xhigh` becomes that boundary's highest supported non-`max` level, while an explicit per-task or standing `max` passes unchanged where the program accepts it.
+Every other value outside the accepted set is reported as unsupported for that boundary, never raised, lowered, or silently dropped, and record-and-omit does not apply to a program whose own default would then replace the selection.
+Record the requested value, the winning source, the transformation, and the value actually passed, because the program and its own logs then show only the effective value.
+
 ## Harness and provider identity
 
 Harness identity is independent of model provider.
@@ -37,6 +42,7 @@ Treat model and provider knowledge as current discovery, not a permanent namespa
 Use the selected tool reference's authoritative surface in the effective worker's authenticated environment because availability changes by version, account, and configuration.
 
 For an unfamiliar namespace, establish support and provider identity from that harness's CLI help, model listing, or current documentation.
+`bin/fm-model-index.sh catalog <harness>` prints the normalized catalog a program's own model role is judged from, and [Application model roles](../../../docs/configuration.md#application-model-roles) owns that handoff.
 Catalog verdicts follow the [fleet model-index evidence boundary](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson).
 An unreachable surface establishes nothing; report uncertainty instead of a verdict.
 

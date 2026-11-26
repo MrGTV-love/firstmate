@@ -24,6 +24,7 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 | Trust | No project-trust gate at all; a fresh profile shows a provider-login wizard instead, suppressed by `OMP_SKIP_SETUP=1`. |
 | Resume | `-c/--continue` and `-r/--resume` exist; the [native-restoration inspection contract](../../../docs/agent-control.md#inspecting-a-bare-native-restore) owns Firstmate's refusal boundary. |
 
+That effort row belongs to the interactive flag: a program that applies omp's thinking through its own ACP session accepts only the levels that program advertises, so take its accepted set from that program instead of copying this list ([accepted-set rule](references/common/model-and-effort.md)).
 Keep the instructions as one positional argument; a second positional never surfaced as a submitted message.
 The openai-codex models reach an extension-registered tool through omp's `xd://` virtual-file bridge: the model reads `xd://fm_watch_arm_omp` for the description and writes `xd://fm_watch_arm_omp` to invoke it, so a transcript or rpc stream shows a `write` to that path rather than a direct `fm_watch_arm_omp` call; both are the same invocation (verified 18.1.11).
 omp cold start is roughly twenty seconds to the first agent turn, paid once per worker.

@@ -221,7 +221,8 @@ fm_typesafe_brief_task() {
       fi
       ;;
     1)
-      if ! cp "$brief" "$output" 2>/dev/null; then
+      # Rewriting extracted sections must work with a read-only frozen brief.
+      if ! (cat "$brief" > "$output") 2>/dev/null; then
         FM_TYPESAFE_WITHHELD_REASON="could not read the brief"
         return 1
       fi
