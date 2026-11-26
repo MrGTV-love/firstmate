@@ -182,7 +182,7 @@ A merge the lane only observes after it queued the head names the carry as the b
 Any reviewed head that a rebase, amend or squash leaves off R's ancestry, PASS or FAIL, turns carry-over off, so the next base update needs a fresh read; this is a false refusal, never a bypass.
 A rewrite of R that keeps its tree, such as an amended message or a squash, carries from R.
 Once such a rewrite is itself read, an update of either one refuses: the rewrite and the head it replaced both have review rows and neither builds on the other, so whichever of the two is the newest reviewed head, the other fails the ancestry rule.
-A later reviewed head that builds on both carries again.
+A later reviewed head that builds on both carries again while it is the newest reviewed head; a later read of either sibling makes that sibling the newest reviewed head, and the next update refuses again.
 A clean merge of a branch that is not on the base is unread content and refuses.
 The residual risk is an interaction between R and newer base content that the reader never saw together; required checks at the exact live head, which `bin/fm-pr-merge.sh` still demands, are the guard for that, as they were for any two PRs reviewed separately.
 Accepted carry-overs are disclosed as the fact `review carried from <R>` in verify's text output and as `carried_from` in `--json`.
