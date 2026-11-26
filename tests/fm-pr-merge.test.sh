@@ -3109,6 +3109,74 @@ test_auto_review_three_prs_through_the_housekeeping_pass() {
   pass "three registered PRs run through the housekeeping pass: P1 merged, P2 FAIL not merged and owner told, P3 old PASS voided and new head merged once"
 }
 
+test_auto_review_carries_a_pass_across_a_clean_base_update() {
+  local scenario case_dir base2 merged h1 h2
+  for scenario in clean queued left unread; do
+    case_dir=$(auto_case "carry-$scenario")
+    case "$scenario" in queued | left) write_github_outcome "$case_dir" OPEN false true main ;; esac
+    # The read returns while the check runs again, so the PASS at h1 is recorded and nothing merges.
+    auto_step "$case_dir"; auto_wait "$case_dir"
+    jq '.statusCheckRollup[0].status = "IN_PROGRESS"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+    auto_step "$case_dir"
+    expect_code 1 "$(auto_reviews "$case_dir")" "carry-$scenario: the h1 PASS is recorded"
+    expect_code 0 "$(auto_merges "$case_dir")" "carry-$scenario: nothing merges while the check runs"
+    # The base branch moves, and the PR takes it in with a merge commit.
+    git -C "$case_dir/wt" checkout -q main
+    printf 'base moved\n' > "$case_dir/wt/base-moved.txt"
+    git -C "$case_dir/wt" add base-moved.txt
+    git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -q -m 'base moves'
+    base2=$(git -C "$case_dir/wt" rev-parse HEAD)
+    git -C "$case_dir/wt" push -q origin main
+    printf '%s\n' "$base2" > "$case_dir/github-base"
+    git -C "$case_dir/wt" checkout -q fm/fixture
+    if [ "$scenario" != unread ]; then
+      git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' merge -q --no-edit main
+    else
+      git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' merge -q --no-commit --no-ff main >/dev/null 2>&1
+      printf 'unread\n' >> "$case_dir/wt/changed.txt"
+      git -C "$case_dir/wt" add changed.txt
+      git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -q -m "Merge branch 'main' into fm/fixture"
+    fi
+    auto_publish_head "$case_dir" h2
+    auto_step "$case_dir"; auto_wait "$case_dir"; auto_step "$case_dir"
+    merged=$(sed -n 's/.*--match-head-commit \([0-9a-f]*\).*/\1/p' "$case_dir/gh.log")
+    expect_code 1 "$(auto_merges "$case_dir")" "carry-$scenario: h2 merges exactly once"
+    expect_code "$(auto_sha "$case_dir" h2)" "$merged" "carry-$scenario: the merge names the live head"
+    h1=$(auto_sha "$case_dir" h1 | cut -c1-12); h2=$(auto_sha "$case_dir" h2 | cut -c1-12)
+    if [ "$scenario" = clean ]; then
+      expect_code 1 "$(auto_calls "$case_dir")" "carry-clean: a clean base update requests no new read"
+      expect_code 1 "$(auto_reviews "$case_dir")" "carry-clean: no new verdict is needed"
+      assert_grep "merged: $AUTO_URL at $h2 on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-clean: the merged event names the carried head"
+    elif [ "$scenario" = queued ]; then
+      expect_code 1 "$(auto_calls "$case_dir")" "carry-queued: a clean base update requests no new read"
+      expect_code "queued $AUTO_URL" "$(auto_state "$case_dir")" "carry-queued: the carried PASS queues the live head"
+      assert_grep "queued: $AUTO_URL at $h2 is in the merge queue on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-queued: the queued event names the carried head"
+      jq '.state = "MERGED"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+      auto_step "$case_dir"
+      expect_code "merged $AUTO_URL" "$(auto_state "$case_dir")" "carry-queued: the forge's merged state resolves the queue"
+      assert_grep "merged: $AUTO_URL at $h2 on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-queued: the merged event names the carried head"
+      expect_code 1 "$(auto_merges "$case_dir")" "carry-queued: still one merge call"
+    elif [ "$scenario" = left ]; then
+      assert_grep "queued: $AUTO_URL at $h2 is in the merge queue on the PASS carried from $h1" "$(auto_event_file "$case_dir")" "carry-left: the queued event names the carried head"
+      write_github_outcome "$case_dir" OPEN false false main
+      auto_step "$case_dir"
+      expect_code "held: left the merge queue and is still open" "$(auto_state "$case_dir")" "carry-left: the head that left the queue is held for Main"
+      # Main merges the held head through its own fm-pr-merge.sh call, on its own basis.
+      jq '.state = "MERGED"' "$case_dir/github-view.json" > "$case_dir/v" && mv "$case_dir/v" "$case_dir/github-view.json"
+      auto_step "$case_dir"
+      expect_code "merged $AUTO_URL" "$(auto_state "$case_dir")" "carry-left: the forge's merged state ends the head merged"
+      assert_grep "merged: $AUTO_URL at $h2" "$(auto_event_file "$case_dir")" "carry-left: the merge is recorded"
+      assert_no_grep "merged: $AUTO_URL at $h2 on the PASS carried from" "$(auto_event_file "$case_dir")" "carry-left: Main's merge after the queue exit must not name a carry"
+      expect_code 1 "$(auto_merges "$case_dir")" "carry-left: the lane never merges again"
+    else
+      expect_code 2 "$(auto_calls "$case_dir")" "carry-unread: an update hiding an unread line is read again"
+      expect_code 2 "$(auto_reviews "$case_dir")" "carry-unread: the new head's own PASS is recorded"
+    fi
+    auto_dump "$case_dir" "carry-over $scenario"
+  done
+  pass "through the real pass and fm-pr-merge.sh, a clean base update merges on the carried PASS, directly or through a merge queue, a carry note never follows a head that left the queue to Main, while an update hiding an unread line is read again"
+}
+
 # Round 4 (Main 3137): behavior tests, each with a fail case and a pass case.
 
 auto_report() {  # <file> <head> <PASS|FAIL> [<protected line>]: a complete exact-head report that this lane did not write
@@ -3383,6 +3451,7 @@ test_auto_review_judges_each_check_before_spending_a_read
 test_auto_review_treats_a_failed_runner_exit_as_a_failed_read
 test_auto_review_retries_a_wake_that_failed_to_append
 test_auto_review_three_prs_through_the_housekeeping_pass
+test_auto_review_carries_a_pass_across_a_clean_base_update
 test_seeded_homes_cannot_create_a_second_landing_owner
 test_unreadable_landing_routing_refuses
 test_main_serializes_firstmate_landings
