@@ -1,0 +1,9 @@
+# diff 114a9cd5..0707ddde
+ .agents/skills/crew-brief-authoring/SKILL.md | 2 ++
+ 1 file changed, 2 insertions(+)
+2	0	.agents/skills/crew-brief-authoring/SKILL.md
+
+# runtime references to crew-brief-authoring in bin/ tests/ (comments only)
+bin/fm-project-mode.sh:17:# section 7 and the crew-brief-authoring skill; bin/fm-brief.sh's own header
+bin/fm-promote.sh:30:# read the scout's report (AGENTS.md section 7 and the crew-brief-authoring skill); data/projects.md holds the
+tests/fm-brief.test.sh:662:# Regression (issue #2575): the crew-brief-authoring skill and this script's own help tell
