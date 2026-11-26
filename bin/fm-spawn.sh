@@ -8545,8 +8545,10 @@ fm_launch_git_hooks() {
     while [ "$fm_i" -lt "$fm_out" ]; do
       eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
       if [ -n "$fm_key" ]; then
-        fm_key=$(printf '%s' "$fm_key" | sed "s/'/'\\\\''/g")
-        fm_value=$(printf '%s' "$fm_value" | sed "s/'/'\\\\''/g")
+        fm_key=$(printf '%sx' "$fm_key" | sed "s/'/'\\\\''/g")
+        fm_key=${fm_key%x}
+        fm_value=$(printf '%sx' "$fm_value" | sed "s/'/'\\\\''/g")
+        fm_value=${fm_value%x}
         fm_gcp="${fm_gcp:+$fm_gcp }'$fm_key'='$fm_value'"
       fi
       fm_i=$((fm_i + 1))
@@ -8617,6 +8619,16 @@ GIT_HOOKS_DSH=
 if [ "$HARNESS" = dsh ]; then
   GIT_HOOKS_CARRIER=config
   GIT_HOOKS_DSH=1
+fi
+# A raw launch is named by its first word, so one that wraps dsh (env FOO=1 dsh, sh -c 'dsh ...') reads as another
+# harness; any raw command naming dsh or dsh-tui as a word gets the same numbered-entry-free carrier.
+if [ "$RAW_LAUNCH" = 1 ] && [ -z "$GIT_HOOKS_DSH" ]; then
+  case " $RAW_COMMAND " in
+    *[[:space:]\'\"\;\&\|\(/]dsh[[:space:]\'\"\;\&\|\)]* | *[[:space:]\'\"\;\&\|\(/]dsh-tui[[:space:]\'\"\;\&\|\)]*)
+      GIT_HOOKS_CARRIER=config
+      GIT_HOOKS_DSH=1
+      ;;
+  esac
 fi
 # git_hooks_guard <inner|outer> <launch text>: the launch text, run only after
 # the selector chose a carrier. On refusal the selector's reason is printed,

@@ -23,8 +23,9 @@
 # Every candidate that passes that check, whatever its delivery mode, remote or
 # state, also gets maintenance.pack-refs.enabled=false in its own .git/config,
 # written right after the check and before the registry, local-only, origin and
-# fetch steps (see ensure_pack_refs_key); the whole-fleet form writes the home
-# repository the same way. This is the one writer of the key: git's own automatic
+# fetch steps (see ensure_pack_refs_key); the whole-fleet form writes every clone
+# root's key in one quick pass before any fetch (ensure_fleet_pack_refs_keys) and
+# writes the home repository the same way. This is the one writer of the key: git's own automatic
 # maintenance would otherwise pack the loose refs and delete the empty
 # refs/heads/<prefix> folder a confined worker's next commit has no grant to
 # create. A write that fails prints "<label>: warning: could not set
@@ -259,15 +260,40 @@ fetch_with_packed_refs_lock_guard() {
 # in the clone's own config (git config --local writes the common .git/config, never
 # a per-worktree file), touching nothing else and rewriting nothing when the single
 # value is already exactly "false". A different value, or several values, is replaced.
-# A failed write is reported on stdout and never stops the caller.
+# A failed write is reported on stdout and never stops the caller. When the file holds
+# false but git's effective answer is another value (a per-worktree config or an included
+# file outranks it), that is reported too, because packing would still run.
 ensure_pack_refs_key() {
-  local dir=$1 lbl=$2 current out
+  local dir=$1 lbl=$2 current out effective origin
   current=$(git -C "$dir" config --local --get-all maintenance.pack-refs.enabled 2>/dev/null) || current=
-  [ "$current" != false ] || return 0
-  if ! out=$(git -C "$dir" config --local --replace-all maintenance.pack-refs.enabled false 2>&1); then
-    echo "$lbl: warning: could not set maintenance.pack-refs.enabled=false: $(first_line "$out")"
+  if [ "$current" != false ]; then
+    if ! out=$(git -C "$dir" config --local --replace-all maintenance.pack-refs.enabled false 2>&1); then
+      echo "$lbl: warning: could not set maintenance.pack-refs.enabled=false: $(first_line "$out")"
+      return 0
+    fi
+  fi
+  effective=$(git -C "$dir" config --type=bool --get maintenance.pack-refs.enabled 2>/dev/null) || effective=unreadable
+  if [ "$effective" != false ]; then
+    origin=$(git -C "$dir" config --show-origin --get maintenance.pack-refs.enabled 2>/dev/null | cut -f1) || origin=
+    echo "$lbl: warning: maintenance.pack-refs.enabled is $effective in effect although .git/config sets false (outranked by ${origin:-another source})"
   fi
   return 0
+}
+
+# ensure_fleet_pack_refs_keys: the whole-fleet form writes every clone root's key in one
+# quick local pass before any fetch, so a slow fetch or a bootstrap timeout cannot leave
+# a later clone without it. sync_project then finds each key already in place.
+ensure_fleet_pack_refs_keys() {
+  local candidate top abs
+  for candidate in "$PROJECTS"/*; do
+    [ -d "$candidate" ] || continue
+    top=$(git -C "$candidate" rev-parse --show-toplevel 2>/dev/null) || continue
+    abs=$(cd "$candidate" && pwd -P) || continue
+    [ -n "$top" ] && [ "$top" -ef "$abs" ] || continue
+    PROJ=$candidate
+    ensure_pack_refs_key "$candidate" "$(project_label)"
+  done
+  PACK_REFS_KEYS_DONE=1
 }
 
 # ensure_home_pack_refs_key: the same key for the home repository, when $FM_HOME is
@@ -391,7 +417,7 @@ sync_project() {
     echo "$label: skipped: not a clone root (git would act on $proj_top)"
     return 0
   fi
-  ensure_pack_refs_key "$PROJ" "$label"
+  [ "${PACK_REFS_KEYS_DONE:-0}" = 1 ] || ensure_pack_refs_key "$PROJ" "$label"
   if ! mode_line=$("$FM_ROOT/bin/fm-project-mode.sh" "$label" 2>/dev/null); then
     echo "$label: skipped: registry entry does not resolve to a delivery posture (run bin/fm-project-mode.sh $label for the refusal)"
     return 0
@@ -518,6 +544,7 @@ fi
 
 ensure_home_pack_refs_key
 [ -d "$PROJECTS" ] || exit 0
+ensure_fleet_pack_refs_keys
 for proj in "$PROJECTS"/*; do
   [ -e "$proj" ] || continue
   [ -d "$proj" ] || continue

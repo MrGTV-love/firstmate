@@ -25,6 +25,8 @@ set -u
 
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+# shellcheck source=tests/git-config-env-helpers.sh
+. "$(dirname "${BASH_SOURCE[0]}")/git-config-env-helpers.sh"
 # shellcheck source=bin/fm-busy-lib.sh
 . "$ROOT/bin/fm-busy-lib.sh"
 # shellcheck source=bin/fm-session-lock-lib.sh
@@ -669,21 +671,45 @@ test_dsh_launch_survives_the_dsh_credential_scrub() {
         run_recorded_launch "$log" DEEPSEEK_API_KEY=fake-deepseek-sentinel || fail "$kind: the recorded dsh launch failed"
       else
         run_recorded_launch "$log" DEEPSEEK_API_KEY=fake-deepseek-sentinel \
-          GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=fetch.prune GIT_CONFIG_VALUE_0=false || fail "$kind: the recorded dsh launch with a pane entry failed"
+          GIT_CONFIG_COUNT=3 GIT_CONFIG_KEY_0=fetch.prune GIT_CONFIG_VALUE_0=false \
+          GIT_CONFIG_KEY_1=probe.quote GIT_CONFIG_VALUE_1="it's a \"test\" \\ \$HOME" \
+          GIT_CONFIG_KEY_2=probe.tail GIT_CONFIG_VALUE_2=$'ends with a newline\n' || fail "$kind: the recorded dsh launch with pane entries failed"
       fi
       assert_git_config_env "$log.env0.scrubbed" "$probe" "dsh $kind ($variant), after dsh's scrub"
       assert_git_config_env "$log.env0" "$probe" "dsh $kind ($variant), as launched"
       values=$(git_config_entries "$log.env0.scrubbed" maintenance.pack-refs.enabled)
       assert_equals false "$values" "dsh $kind ($variant): the scrubbed environment does not hold exactly one maintenance.pack-refs.enabled=false"
-      assert_contains "$(tr '\0' '\n' < "$log.env0.scrubbed" | sed -n 's/^GIT_CONFIG_PARAMETERS=//p')" "hook.fm-scan-commit.event" \
-        "dsh $kind ($variant): the task Git hook rows did not survive dsh's scrub"
+      python3 -I -c 'import sys; sys.exit(0 if b"GIT_CONFIG_PARAMETERS=" in open(sys.argv[1], "rb").read() and b"hook.fm-scan-commit.event" in open(sys.argv[1], "rb").read() else 1)' "$log.env0.scrubbed" \
+        || fail "dsh $kind ($variant): the task Git hook rows did not survive dsh's scrub"
       if [ "$variant" = pane-entry ] && [ "$kind" != scout-allowlist ]; then
+        assert_equals "'it\\'s a \"test\" \\\\ \$HOME'" "$(git_config_value_in_env "$log.env0.scrubbed" "$probe" probe.quote)" \
+          "dsh $kind: a pane entry with quotes, spaces and a backslash was altered on its way into a parameter row"
+        assert_equals "'ends with a newline\\n'" "$(git_config_value_in_env "$log.env0.scrubbed" "$probe" probe.tail)" \
+          "dsh $kind: a pane entry ending in a newline lost its newline"
         assert_equals false "$(git_config_entries "$log.env0.scrubbed" fetch.prune)" \
           "dsh $kind: the pane's numbered fetch.prune entry was lost instead of carried through the scrub"
       fi
     done
   done
   pass "a dsh worker and a dsh scout keep a consistent git config environment through dsh's credential scrub, carrying the maintenance key, the task hooks and a pane entry as parameter rows"
+}
+
+# A raw launch is named by its first word, so one that wraps dsh reads as another harness; it must still get the
+# numbered-entry-free carrier, because dsh's scrub orphans a numbered entry wherever dsh is launched from.
+test_a_raw_launch_wrapping_dsh_carries_no_numbered_entry() {
+  local id=dsh-raw out launch log
+  make_dsh_case raw "$id"
+  out=$(run_dsh_spawn "$id" "env FOO=1 dsh-tui --version" --scout 2>&1) || { printf 'note: %s\n' "$out"; }
+  launch=$(cat "$LAUNCH_LOG" 2>/dev/null)
+  [ -n "$launch" ] || fail "the raw dsh-wrapping spawn staged no launch text: $out"
+  assert_contains "$launch" "'hook.fm-scan-commit.event'" "a raw launch wrapping dsh did not carry the task hook rows"
+  assert_contains "$launch" "'maintenance.pack-refs.enabled'='false'" "a raw launch wrapping dsh did not carry the maintenance key as a row"
+  log="$CASE_DIR/dsh-raw.log"
+  run_recorded_launch "$log" PATH="$FAKEBIN_DIR:/usr/bin:/bin" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=fetch.prune GIT_CONFIG_VALUE_0=false || fail "the recorded raw launch failed"
+  assert_git_config_env "$log.env0.scrubbed" "$CASE_DIR/probe-repo" "raw launch wrapping dsh, after dsh's scrub"
+  assert_equals false "$(git_config_entries "$log.env0.scrubbed" maintenance.pack-refs.enabled)" "the raw launch's scrubbed environment does not hold exactly one maintenance key"
+  assert_equals false "$(git_config_entries "$log.env0.scrubbed" fetch.prune)" "the raw launch lost the pane's numbered entry instead of carrying it"
+  pass "a raw launch that wraps dsh carries the hook rows and the maintenance key as parameter rows, with no numbered entry"
 }
 
 # The scrub emulation above is only as good as its copy of dsh's rule: when the installed dsh package is
@@ -1144,6 +1170,7 @@ test_retired_deepseek_spelling_refuses_before_launch
 test_explicit_harness_is_not_rerouted
 test_launch_environment
 test_dsh_launch_survives_the_dsh_credential_scrub
+test_a_raw_launch_wrapping_dsh_carries_no_numbered_entry
 test_scrub_emulation_matches_the_installed_dsh
 test_launch_reads_xdg_only_git_config
 test_mirrored_dsh_primary_carries_its_bound_model

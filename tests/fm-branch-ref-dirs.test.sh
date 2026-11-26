@@ -58,7 +58,8 @@ test_the_default_prefix_is_used_when_nothing_is_registered() {
 
 test_an_empty_or_unsafe_prefix_restores_nothing() {
   local token
-  for token in "branch=" "branch=../x/" "branch=a/../b/" "branch=/abs/" "branch=./x/" "branch=a//b/" "branch=."; do
+  for token in "branch=" "branch=../x/" "branch=a/../b/" "branch=/abs/" "branch=./x/" "branch=a//b/" "branch=." \
+    "branch=fm-" "branch=fm///" "branch=x.lock/" "branch=*/" "branch=a:b/" "branch=.hidden/"; do
     new_clone "$token"
     restore
     assert_equals "main seed" "$(find "$CLONE/.git/refs/heads" -mindepth 1 -maxdepth 1 -exec basename {} \; | sort | tr '\n' ' ' | sed 's/ $//')" "prefix '$token' changed refs/heads"
@@ -66,7 +67,7 @@ test_an_empty_or_unsafe_prefix_restores_nothing() {
       || fail "prefix '$token' made a folder"
     [ ! -e "$CLONE/.git/abs" ] || fail "prefix '$token' made a folder outside refs"
   done
-  pass "an empty prefix and a prefix with a dot, dot-dot, empty or absolute component restore nothing"
+  pass "an empty prefix, one with no folder (fm-), and one with a dot, dot-dot, empty, absolute or invalid-ref component restore nothing"
 }
 
 test_an_unreadable_registry_restores_nothing() {
@@ -84,9 +85,18 @@ test_an_unreadable_registry_restores_nothing() {
   pass "an unreadable project lookup restores nothing and prints nothing"
 }
 
+test_a_prefix_without_a_trailing_slash_restores_only_its_folder() {
+  new_clone "branch=team/fm-"
+  restore
+  [ -d "$CLONE/.git/refs/heads/team" ] || fail "the folder team of prefix team/fm- was not made"
+  [ -d "$CLONE/.git/logs/refs/heads/team" ] || fail "the reflog folder team of prefix team/fm- was not made"
+  [ ! -e "$CLONE/.git/refs/heads/team/fm-" ] || fail "a folder named after the unfinished last segment was made"
+  pass "a prefix such as team/fm- restores only the folder team, never a folder named fm-"
+}
+
 test_links_and_files_at_any_component_are_never_followed_or_replaced() {
   local outside shape
-  for shape in first-link second-link dangling-link plain-file logs-link; do
+  for shape in first-link second-link dangling-link plain-file logs-link refs-parent-link logs-parent-link logs-refs-parent-link; do
     new_clone "branch=team/fm/"
     outside="$CLONE/../outside-$shape"
     mkdir -p "$outside"
@@ -96,16 +106,30 @@ test_links_and_files_at_any_component_are_never_followed_or_replaced() {
       dangling-link) ln -s "$outside/nowhere" "$CLONE/.git/refs/heads/team" ;;
       plain-file) printf 'x\n' > "$CLONE/.git/refs/heads/team" ;;
       logs-link) ln -s "$outside" "$CLONE/.git/logs/refs/heads/team" ;;
+      refs-parent-link) mv "$CLONE/.git/refs" "$outside/refs-real"; ln -s "$outside/refs-real" "$CLONE/.git/refs" ;;
+      logs-parent-link) mv "$CLONE/.git/logs" "$outside/logs-real"; ln -s "$outside/logs-real" "$CLONE/.git/logs" ;;
+      logs-refs-parent-link) mv "$CLONE/.git/logs/refs" "$outside/logsrefs-real"; ln -s "$outside/logsrefs-real" "$CLONE/.git/logs/refs" ;;
     esac
     restore
-    assert_equals "" "$(ls -A "$outside")" "$shape: something was made behind the link"
-    [ ! -e "$outside/nowhere" ] || fail "$shape: the dangling target was created"
+    case "$shape" in
+      *-parent-link)
+        # The moved real directory is the only thing behind the link; nothing may appear inside it.
+        [ ! -e "$outside/refs-real/heads/team" ] && [ ! -e "$outside/logs-real/refs/heads/team" ] && [ ! -e "$outside/logsrefs-real/heads/team" ] \
+          || fail "$shape: the restore followed the link and made team behind it"
+        ;;
+      *) assert_equals "" "$(ls -A "$outside")" "$shape: something was made behind the link"
+         [ ! -e "$outside/nowhere" ] || fail "$shape: the dangling target was created" ;;
+    esac
     case "$shape" in
       first-link|dangling-link) [ -L "$CLONE/.git/refs/heads/team" ] || fail "$shape: the link was replaced" ;;
       second-link) [ -L "$CLONE/.git/refs/heads/team/fm" ] || fail "$shape: the inner link was replaced" ;;
       plain-file) [ -f "$CLONE/.git/refs/heads/team" ] || fail "$shape: the file was replaced" ;;
       logs-link) [ -L "$CLONE/.git/logs/refs/heads/team" ] || fail "$shape: the logs link was replaced"
         [ -d "$CLONE/.git/refs/heads/team/fm" ] || fail "$shape: the refs side was not restored although only the logs side was blocked" ;;
+      refs-parent-link) [ -L "$CLONE/.git/refs" ] || fail "$shape: the link at refs was replaced" ;;
+      logs-parent-link) [ -L "$CLONE/.git/logs" ] || fail "$shape: the link at logs was replaced"
+        [ -d "$CLONE/.git/refs/heads/team/fm" ] || fail "$shape: the refs side was not restored although only the logs side was blocked" ;;
+      logs-refs-parent-link) [ -L "$CLONE/.git/logs/refs" ] || fail "$shape: the link at logs/refs was replaced" ;;
     esac
   done
   pass "a link, a dangling link or a file at any component is never followed or replaced"
@@ -161,6 +185,7 @@ test_several_segment_prefix_is_made_component_by_component
 test_the_default_prefix_is_used_when_nothing_is_registered
 test_an_empty_or_unsafe_prefix_restores_nothing
 test_an_unreadable_registry_restores_nothing
+test_a_prefix_without_a_trailing_slash_restores_only_its_folder
 test_links_and_files_at_any_component_are_never_followed_or_replaced
 test_a_link_at_refs_heads_itself_is_left_alone
 test_existing_folders_and_a_concurrent_mkdir_change_nothing

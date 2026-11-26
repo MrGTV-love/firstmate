@@ -40,15 +40,17 @@ set -u
 fm_git_identity fmtest fmtest@example.invalid
 
 TMP_ROOT=$(fm_test_tmproot fm-fleet-sync-tests)
-HOME_N=0
 
 # --- fixtures ---------------------------------------------------------------
 
 # new_home: fresh isolated FM_HOME with an empty projects/ dir. Each test gets its
 # own so the whole-fleet form never sees another test's clones.
 new_home() {
-  HOME_N=$((HOME_N + 1))
-  local h="$TMP_ROOT/home-$HOME_N"
+  # mktemp, not a counter: a counter incremented inside $(new_home) never reaches the caller,
+  # so every call would hand back the same directory and the whole-fleet form would see the
+  # clones of every earlier test.
+  local h
+  h=$(mktemp -d "$TMP_ROOT/home.XXXXXX")
   mkdir -p "$h/projects"
   printf '%s\n' "$h"
 }
@@ -939,8 +941,12 @@ test_key_write_is_idempotent_and_touches_only_the_key() {
   home=$(new_home)
   clone=$(build_pair "$home" kidem)
   git -C "$clone" config user.neighbour kept
+  cp "$clone/.git/config" "$home/config-before"
   run_sync "$home" kidem >/dev/null
   assert_equals false "$(pack_key "$clone")" "first run did not write the key"
+  # Every other byte of .git/config is untouched: with the two lines the key adds removed, the file is the one before.
+  assert_equals "$(cat "$home/config-before")" "$(grep -vxE '\[maintenance "pack-refs"\]|[[:space:]]enabled = false' "$clone/.git/config")" \
+    "the key write changed a byte of .git/config besides its own two lines"
   sum_before=$(cksum < "$clone/.git/config")
   run_sync "$home" kidem >/dev/null
   sum_after=$(cksum < "$clone/.git/config")
@@ -993,6 +999,52 @@ test_unwritable_config_warns_and_the_sync_continues() {
   out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "FLEET_SYNC: klock: warning: could not set maintenance.pack-refs.enabled=false: " "bootstrap did not relay the warning"
   pass "an unwritable .git/config warns on stdout, the sync continues, and bootstrap relays the warning"
+}
+
+test_an_outranking_per_worktree_value_is_reported() {
+  local home clone out
+  home=$(new_home)
+  clone=$(build_pair "$home" kworktree)
+  git -C "$clone" config extensions.worktreeConfig true
+  printf '[maintenance "pack-refs"]\n\tenabled = true\n' > "$clone/.git/config.worktree"
+  out=$(run_sync "$home" kworktree)
+  assert_equals false "$(pack_key "$clone")" "the repository's own file did not get the key"
+  assert_contains "$out" "kworktree: warning: maintenance.pack-refs.enabled is true in effect although .git/config sets false" \
+    "a per-worktree value that outranks the key was not reported"
+  out=$(run_sync "$home" kworktree)
+  assert_contains "$out" "in effect although" "the outranked key was reported only once"
+  pass "a per-worktree value that outranks the repository key is reported as a warning, because packing would still run"
+}
+
+test_the_whole_fleet_form_writes_every_key_before_the_first_fetch() {
+  local home first second fakebin log out
+  home=$(new_home)
+  first=$(build_pair "$home" kfirst)
+  second=$(build_pair "$home" ksecond)
+  fakebin="$home/fb-order"; mkdir -p "$fakebin"; log="$home/fetch-order.log"
+  cat > "$fakebin/git" <<'SH'
+#!/usr/bin/env bash
+# On every fetch, record which clones already carry the key.
+for a in "$@"; do
+  if [ "$a" = fetch ]; then
+    for c in "${FM_FAKE_PROJECTS:?}"/*; do
+      printf '%s=%s\n' "$(basename "$c")" "$("${REAL_GIT_FOR_TEST:?}" -C "$c" config --local --get maintenance.pack-refs.enabled 2>/dev/null)" >> "${FM_FAKE_ORDER_LOG:?}"
+    done
+    printf -- '--\n' >> "$FM_FAKE_ORDER_LOG"
+    break
+  fi
+done
+exec "${REAL_GIT_FOR_TEST:?}" "$@"
+SH
+  chmod +x "$fakebin/git"
+  out=$(PATH="$fakebin:$PATH" REAL_GIT_FOR_TEST="$(command -v git)" FM_FAKE_PROJECTS="$home/projects" FM_FAKE_ORDER_LOG="$log" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>/dev/null)
+  [ -s "$log" ] || fail "the fake git saw no fetch, so the case proves nothing: $out"
+  assert_equals "kfirst=false
+ksecond=false" "$(sed -n '1,2p' "$log")" "a clone still lacked the key when the first fetch began"
+  assert_equals false "$(pack_key "$first")" "first clone lost the key"
+  assert_equals false "$(pack_key "$second")" "second clone lost the key"
+  pass "the whole-fleet form writes every clone's key before the first fetch, so a slow fetch or a timeout cannot skip a later clone"
 }
 
 test_a_failing_git_root_lookup_skips_and_writes_nothing() {
@@ -1138,6 +1190,8 @@ test_key_write_is_idempotent_and_touches_only_the_key
 test_single_name_form_writes_the_key_and_a_non_root_is_untouched
 test_home_repository_gets_the_key_in_the_whole_fleet_form_only
 test_unwritable_config_warns_and_the_sync_continues
+test_an_outranking_per_worktree_value_is_reported
+test_the_whole_fleet_form_writes_every_key_before_the_first_fetch
 test_a_failing_git_root_lookup_skips_and_writes_nothing
 test_prune_restores_the_branch_ref_folder_after_the_last_ref
 test_prune_changes_nothing_when_other_refs_remain
