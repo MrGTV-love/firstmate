@@ -280,7 +280,7 @@ try:
         assert not live_entries(folder) and settled_held(folder, ['x', 'y']) == 0
         # The real bound, driven by the clock: the host's 240-minute budget with a completed CI-fix p99 of 152.45 min
         # (9147000 ms) gives 14400 - 9147 = 5253 s; the omitted budget (30 min default) with a p99 of 10 min gives 1200 s.
-        # Five seconds before the bound the gate still holds; a fit then is admitted; at the bound it refuses.
+        # Five seconds before the bound the gate still holds; a fit read before the bound is admitted; past it, it refuses.
         for label, timeout, ci_ms, bound, budget, p99 in (('override-240m', '240m', (9147000,), 5253, 14400, 9147),
                                                           ('default-30m', None, (600000,), 1200, 1800, 600)):
             for outcome in ('fits-before', 'refused-at'):
@@ -291,19 +291,20 @@ try:
                     # The key omitted from an existing config: the daemon's built-in 30 minutes apply.
                     (folder / 'home' / '.no-mistakes' / 'config.yaml').write_text('agent: [claude]\n')
                 clock = folder / 'clock'
-                clock.write_text('0')
+                drive(clock, 0)
                 child, log = gate(folder, dict(env, CASE_CLOCK_FILE=str(clock)), 'x')
                 pending(folder, 1)
-                clock.write_text(str(bound - 5))
+                drive(clock, bound - 5)
                 time.sleep(1.5)
                 assert child.poll() is None and not (folder / 'x.agent').exists(), (label, log.with_suffix('.stderr').read_text())
                 if outcome == 'fits-before':
                     facts(folder, available=40 * GIB)
+                    drive(clock, bound - 2)
                     wait_for(lambda: (folder / 'x.agent').exists(), label + ': admitted before the bound', log=log, child=child)
                     (folder / 'x.release').touch()
                     finish(child)
                 else:
-                    clock.write_text(str(bound + 1))
+                    drive(clock, bound + 1)
                     finish(child, 75)
                     text = log.with_suffix('.stderr').read_text()
                     assert re.search(r'launch-gate refused: hold bound reached: run x; hold_bound=(%d|%d)s budget=%ds round_elapsed=[01]s'
@@ -419,19 +420,30 @@ try:
                                     runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
         with sqlite3.connect(db) as connection:
             round_started = connection.execute("SELECT round_started_at FROM step_results WHERE run_id = 'x'").fetchone()[0]
-        child, log = gate(folder, env, 'x')
+        clock = folder / 'clock'
+        drive(clock, 0, wall=round_started + 3.5)
+        child, log = gate(folder, dict(env, CASE_CLOCK_FILE=str(clock)), 'x')
+        wait_for(lambda: 'held for capacity' in wakes(folder), 'held', log=log, child=child)
+        drive(clock, 2, wall=round_started + 5.5)
+        ended = round_started + 5.5
         finish(child, 75)
-        ended = time.time()
         text = stderr_of(log)
-        # round_started_at is whole seconds (the next second, less 4), so the round has run 3 to 4 s when the gate reads it.
+        # The gate reads the round 3.5 s old, so it holds 1.5 s; the clock then reads 5.5 s into the round.
         assert 'hold bound reached' in text and re.search(r'hold_bound=[012]s budget=6s round_elapsed=[34]s ci_fix_p99=1s', text), text
         assert ended < round_started + 6 and not (folder / 'x.agent').exists(), (ended - round_started, text)
         # An immediate launch with capacity arriving in time is admitted.
         folder, db, env = gate_case('gate-bound-round-fit', available=GIB, timeout='6s', ci_ms=(1000,), round_age=1,
                                     runs=[('x', 'ci', 'running', None), ('y', 'review', 'running', None)])
-        child, log = gate(folder, env, 'x')
-        wait_for(lambda: 'held for capacity' in wakes(folder), 'held')
+        with sqlite3.connect(db) as connection:
+            round_started = connection.execute("SELECT round_started_at FROM step_results WHERE run_id = 'x'").fetchone()[0]
+        clock = folder / 'clock'
+        drive(clock, 0, wall=round_started + 1.5)
+        child, log = gate(folder, dict(env, CASE_CLOCK_FILE=str(clock)), 'x')
+        wait_for(lambda: 'held for capacity' in wakes(folder), 'held', log=log, child=child)
+        assert 'hold_bound=3s budget=6s round_elapsed=1s ci_fix_p99=1s' in wakes(folder), wakes(folder)
+        drive(clock, 0)
         facts(folder, available=40 * GIB)
+        drive(clock, 2.5)
         wait_for(lambda: (folder / 'x.agent').exists(), 'admitted inside its bound', log=log, child=child)
         (folder / 'x.release').touch()
         finish(child)
@@ -697,9 +709,9 @@ os.waitpid(child, 0)
         change(db, "UPDATE runs SET status = 'completed' WHERE id = 'x'")
         facts(folder, available=10 * GIB)
         later = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'later')], env, folder / 'later')
-        time.sleep(3)
+        wait_for(lambda: (folder / 'later').exists() or "could be run x's attempt and its memory is not joined" in (folder / 'later.stderr').read_text(),
+                 'X held while its orphan lives', log=folder / 'later', child=later)
         harm('m1712-run-stopped', not (folder / 'later').exists(), 'a live attempt was dropped when its run stopped', (folder / 'later.stderr').read_text())
-        wait_for(lambda: "could be run x's attempt and its memory is not joined" in (folder / 'later.stderr').read_text(), 'X held while its orphan lives')
         (folder / 'x.escapee-release').touch()
         finish(later)
         wait_for(lambda: not [p for p in (folder / 'pool').glob('attempt-*.json') if 'proof' not in p.name], 'the ended record is removed')

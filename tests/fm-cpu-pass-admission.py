@@ -438,7 +438,8 @@ try:
         clients[priority] = launch(cli + ['pipeline-start', '--priority', priority, '--'] + client_start(folder, db, env, priority)[0],
             env, folder / priority, cwd=folder / ('wt-%s' % priority))
         pending(folder, len(clients))
-    time.sleep(0.6)
+    wait_for(lambda: (folder / 'order').exists() or all(held_decision(folder / (priority + '.stderr')) for priority in classes),
+             'every class-ordered start to print its waiting line')
     assert not (folder / 'order').exists()
     change(db, "UPDATE runs SET status='completed' WHERE id='baseline-0'")
     expected = list(reversed(classes))
@@ -644,6 +645,8 @@ if name == 'outer':
     duration = [str(proxy), str(repo / 'bin/fm-duration.py'), 'run', '--pipeline-priority', 'machinery', 'no-mistakes.run', '--', str(fake_nm)]
     child = launch(duration + ['axi', 'run', '--intent', 'outer'], env, folder / 'fresh')
     pending(folder, 1)
+    wait_for(lambda: (folder / 'outer.started').exists() or held_by_count(folder / 'fresh.stderr'),
+             'the measured fresh start to print its waiting line', log=folder / 'fresh', child=child)
     time.sleep(3.5)
     assert not (folder / 'outer.started').exists()
     change(db, "UPDATE runs SET status='completed'")
@@ -655,7 +658,8 @@ if name == 'outer':
         and samples()[0]['duration_ms'] < 3000, samples()
     wait_for(lambda: (folder / 'nested.pid').exists(), 'nested start launched')
     pending(folder, 1)
-    time.sleep(0.6)
+    wait_for(lambda: (folder / 'nested.started').exists() or held_by_count(folder / 'nested.stderr'),
+             'the nested start to print its waiting line', log=folder / 'nested')
     assert not (folder / 'nested.started').exists()
     change(db, "UPDATE runs SET status='completed' WHERE id='outer'")
     wait_for(lambda: len(samples('no-mistakes.nested')) == 1, 'nested start admitted and measured')
@@ -792,9 +796,6 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
     def started(folder):
         return sorted(p.name for p in folder.glob('*.started'))
 
-    def held_by_count(log):
-        return re.search(r'pipeline-start waiting: counted=\d+ limit=\d+ basis=fallback ', log.read_text()) is not None
-
     def nested_expanded():
         # F1: an outer measured start whose shell string runs the memory route with an expanded intent.
         folder, db, env = case('fix-f1', cores=3)
@@ -893,18 +894,19 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
 
     def late_grant():
         # F6: a fit reached only after a wait past the hold bound (budget 3 s - p99 0.8 s = 2.2 s) refuses;
-        # a fit after a short wait admits. The first queue sleep is held at a barrier while the lock is busy.
-        # The bound covers the gate's own start and two decisions; a 0.2 s bound refused the timely case
-        # on a host at load 55 of 18 cores, so the bound leaves room for that overhead.
+        # a fit after a short wait admits. The first queue sleep is held at a barrier while the lock is busy, and the
+        # wait is the gate's driven clock, so the host's own speed never decides which side of the bound it falls.
         import fcntl
         for label, pause, admitted in (('late', 2.6, False), ('timely', 0.05, True)):
-            folder, db, env = gate_case('fix-f6-' + label, timeout='3s', ci_ms=(800,))
+            folder, db, env = gate_case('fix-f6-' + label, timeout='3s', ci_ms=(800,), round_age=-HANG_BACKSTOP_SECS)
             (folder / 'pool').mkdir(exist_ok=True)
             lock = os.open(str(folder / 'pool' / 'pipeline-start.lock'), os.O_RDWR | os.O_CREAT, 0o600)
             fcntl.flock(lock, fcntl.LOCK_EX)
-            child, log = gate(folder, dict(env, CASE_SLEEP_BARRIER='1'), 'x', mode='exit-0')
+            clock = folder / 'clock'
+            drive(clock, 0)
+            child, log = gate(folder, dict(env, CASE_SLEEP_BARRIER='1', CASE_CLOCK_FILE=str(clock)), 'x', mode='exit-0')
             wait_for(lambda: (folder / 'sleeping').exists(), 'gate reached its first queue sleep', log=log, child=child)
-            time.sleep(pause)
+            drive(clock, pause)
             fcntl.flock(lock, fcntl.LOCK_UN); os.close(lock)
             (folder / 'release-sleep').touch()
             code = wait_exit(child, 'child to exit')
@@ -1039,7 +1041,8 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
                 env.update(PATH=str(nm_bin) + os.pathsep + env['PATH'], FM_DURATION_FILE='off', TMPDIR=str(folder / 'tmp'), CASE_NAME='xargs-' + label)
                 child = launch(fed(route), env, folder / 'x')
                 pending(folder, 1)
-                time.sleep(0.3)
+                wait_for(lambda: (folder / 'order').exists() or held_by_count(folder / 'x.stderr'),
+                         label + ': the start to print its waiting line', log=folder / 'x', child=child)
                 assert child.poll() is None and not (folder / 'order').exists(), (label, (folder / 'x.stderr').read_text())
                 if mode == 0o777:
                     assert 'exec interception is unavailable in this home' in (folder / 'x.stderr').read_text(), (folder / 'x.stderr').read_text()

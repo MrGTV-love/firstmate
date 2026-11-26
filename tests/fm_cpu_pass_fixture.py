@@ -177,17 +177,22 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
         _info = _u.module_from_spec(_spec); sys.modules['fm_proc_info'] = _info; _spec.loader.exec_module(_info)
         scope_coalition(_info, os.environ['CASE_COALITION_FILE'], int(os.environ['CASE_COALITION_ROOT']))
     if os.environ.get('CASE_CLOCK_FILE'):
-        # The engine's monotonic clock runs ahead by the seconds in this file, so a test drives a real constant
-        # (the production hold bound) to its boundary without shortening it.
+        # The engine's clocks read what the test wrote (fixture drive()), never the host's progress: time.monotonic is
+        # its value at start plus the file's seconds, and time.time is the file's wall time when it names one. A test
+        # drives a real constant (the production hold bound) to its boundary without shortening it, and host load
+        # cannot move a bound case's elapsed time.
         import time
-        real_monotonic = time.monotonic
-        def driven_monotonic():
+        real_time, started_at, driven = time.time, time.monotonic(), [0.0, None]
+        def read_clock():
             try:
                 with open(os.environ['CASE_CLOCK_FILE']) as handle:
-                    return real_monotonic() + float(handle.read() or 0)
-            except (OSError, ValueError):
-                return real_monotonic()
-        time.monotonic = driven_monotonic
+                    value = json.load(handle)
+                driven[:] = [float(value['seconds']), None if value.get('wall') is None else float(value['wall'])]
+            except (OSError, ValueError, KeyError, TypeError):
+                pass
+            return driven
+        time.monotonic = lambda: started_at + read_clock()[0]
+        time.time = lambda: real_time() if read_clock()[1] is None else driven[1]
     if os.environ.get('CASE_SWALLOW_INTERRUPT'):
         # A KeyboardInterrupt raised inside a callee is lost there (as one raised in an import's module-lock
         # callback is printed as ignored): the queue's sleep swallows it, so only a recorded signal can stop the wait.
@@ -258,12 +263,26 @@ def harm(ident, condition, *detail):
         raise HarmError(('harm:%s: %r' % (ident, detail))[:1200])
 
 
-def held_back(ident, marker, log, seconds=3.0):
-    """harm unless MARKER (a start's effect) stays absent for SECONDS: the start is held, not admitted."""
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline and not marker.exists():
-        time.sleep(0.05)
+def held_decision(log):
+    """True once LOG (a stderr file) shows a decision that held its start: any waiting reason but start-lock contention."""
+    return log.exists() and re.search(r'(?:pipeline-start|launch-gate) waiting: (?!another start is registering)',
+                                      log.read_text()) is not None
+
+
+def held_by_count(log):
+    """True once LOG (a stderr file) shows a count-fallback decision that held its start with the other starts counted."""
+    return log.exists() and re.search(r'pipeline-start waiting: counted=\d+ limit=\d+ basis=fallback ', log.read_text()) is not None
+
+
+def held_back(ident, marker, log):
+    """harm unless MARKER (a start's effect) is absent once LOG (its stderr) shows the decision that held it."""
+    wait_for(lambda: marker.exists() or held_decision(log), 'the decision on ' + marker.name, log=log.with_suffix(''))
     harm(ident, not marker.exists(), 'the start was admitted', log.read_text() if log.exists() else '')
+
+
+def drive(clock, seconds, wall=None):
+    """Set a CASE_CLOCK_FILE: the engine's monotonic clock reads its start plus SECONDS, and time.time reads WALL if given."""
+    write_json(clock, dict(seconds=seconds, wall=wall))
 
 
 def group_done(results):
