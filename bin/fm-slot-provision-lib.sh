@@ -1880,28 +1880,35 @@ PY
 # The one content-proof sequence of rerecord-slot, in two steps so the write path can run its copy proof between them:
 # identity, then base, the default-branch tip, the own-line and uncommitted sets, and scope. Each step writes its files
 # into <work> (identity; base, own-line, uncommitted, scope), returns 0 when every verdict passes, and otherwise loads
-# the refusal (fm_slot_rerecord_fail) and returns 1 for a named refusal or 2 when a read or verdict could not run.
+# the refusal (fm_slot_rerecord_fail) and returns 1 for a named refusal or 2 when a read or verdict could not run. A
+# verdict that exits non-zero could not run, whatever it printed.
+fm_slot_rerecord_step_refuse() { # <reason> <detail>
+  fm_slot_rerecord_fail "$1" "$2"
+  return 2
+}
+
 fm_slot_rerecord_identity_step() { # <work> <manifest> <copy> <branch> <task-id>
-  local rc=1
-  fm_slot_rerecord_identity_verdict "$2" "$3" "$4" "$5" > "$1/identity" || rc=2
-  fm_slot_rerecord_verdict_ok "$1/identity" manifest_unreadable || return "$rc"
+  fm_slot_rerecord_identity_verdict "$2" "$3" "$4" "$5" > "$1/identity" ||
+    { fm_slot_rerecord_step_refuse manifest_unreadable 'the verdict could not be computed'; return; }
+  fm_slot_rerecord_verdict_ok "$1/identity" manifest_unreadable
 }
 
 fm_slot_rerecord_history_step() { # <work> <manifest> <copy> <project> <recorded-base> <head> <prior-entry>...
-  local work=$1 manifest=$2 copy=$3 project=$4 recorded=$5 head=$6 default tip rc=1
+  local work=$1 manifest=$2 copy=$3 project=$4 recorded=$5 head=$6 default tip
   shift 6
-  fm_slot_rerecord_base_verdict "$manifest" "$copy" "$project" "$recorded" "$head" > "$work/base" || rc=2
-  fm_slot_rerecord_verdict_ok "$work/base" base_invalid || return "$rc"
+  fm_slot_rerecord_base_verdict "$manifest" "$copy" "$project" "$recorded" "$head" > "$work/base" ||
+    { fm_slot_rerecord_step_refuse base_invalid 'the verdict could not be computed'; return; }
+  fm_slot_rerecord_verdict_ok "$work/base" base_invalid || return
   default=$(fm_task_copy_default_branch "$project" 2>/dev/null) || default=
   tip=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --verify --quiet "refs/remotes/origin/$default^{commit}" 2>/dev/null) || tip=
   # Without these two reads every added entry would read as side-branch work and no stranded work would be proved absent.
   fm_slot_own_line_paths "$copy" "$tip" "$head" > "$work/own-line" 2>"$work/own-line.err" ||
-    { fm_slot_rerecord_fail scope_entry_not_own_work "the task's own first-parent line could not be read from the copy, so no entry can be attributed"; return 2; }
+    { fm_slot_rerecord_step_refuse scope_entry_not_own_work "the task's own first-parent line could not be read from the copy, so no entry can be attributed"; return; }
   fm_slot_rerecord_uncommitted_paths "$copy" > "$work/uncommitted" 2>"$work/uncommitted.err" ||
-    { fm_slot_rerecord_fail scope_release_strands_work "the copy's uncommitted set could not be read, so no stranded work is proved absent"; return 2; }
-  rc=1
-  fm_slot_rerecord_scope_verdict "$manifest" "$copy" "$head" "$work/own-line" "$work/uncommitted" ${1+"$@"} > "$work/scope" || rc=2
-  fm_slot_rerecord_verdict_ok "$work/scope" scope_invalid || return "$rc"
+    { fm_slot_rerecord_step_refuse scope_release_strands_work "the copy's uncommitted set could not be read, so no stranded work is proved absent"; return; }
+  fm_slot_rerecord_scope_verdict "$manifest" "$copy" "$head" "$work/own-line" "$work/uncommitted" ${1+"$@"} > "$work/scope" ||
+    { fm_slot_rerecord_step_refuse scope_invalid 'the verdict could not be computed'; return; }
+  fm_slot_rerecord_verdict_ok "$work/scope" scope_invalid
 }
 
 # The read-only replay of that sequence against a recorded manifest, as a relaunch's adoption can be replayed. It omits

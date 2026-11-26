@@ -940,16 +940,20 @@ test_E2_relaunch_without_rerecord_refuses_base_mismatch() {
   rr_ok E2 "relaunch on F refuses base_mismatch; record unchanged; sentinel empty"
 }
 
-# rr_replay_before_write <id>: fm_slot_rerecord_verdict on the case's live manifest, judged against the record as it is
-# before the write (its base and scope), as RR_REPLAY.
-rr_replay_before_write() {
-  local base line rc
+# rr_replay <root>: fm_slot_rerecord_verdict from <root>/bin on the case's live manifest, judged against the record as it
+# is before the write (its base and scope), as RR_REPLAY and its exit status as RR_REPLAY_RC.
+rr_replay() {
+  local base line
   local -a prior=()
   base=$(rr_field "$RR_META" slot_base_sha)
   while IFS= read -r line; do prior+=("$line"); done < <(sed -n 's/^slot_owned_path=//p' "$RR_META")
   RR_REPLAY=$(bash -c '. "$1/bin/fm-task-copy-lib.sh" && . "$1/bin/fm-slot-provision-lib.sh" && shift && fm_slot_rerecord_verdict "$@"' \
-    _ "$ROOT" "$RR_MANIFEST" "$RR_DIR/wt" "$RR_DIR/proj" "$RR_ID" "fm/$RR_ID" "$base" ${prior[@]+"${prior[@]}"}); rc=$?
-  [ "$rc" = 0 ] || fail "$1: the replay could not run (exit $rc): $RR_REPLAY"
+    _ "$1" "$RR_MANIFEST" "$RR_DIR/wt" "$RR_DIR/proj" "$RR_ID" "fm/$RR_ID" "$base" ${prior[@]+"${prior[@]}"}); RR_REPLAY_RC=$?
+}
+
+rr_replay_before_write() { # <id>: rr_replay of the shipped bin/, which must run
+  rr_replay "$ROOT"
+  [ "$RR_REPLAY_RC" = 0 ] || fail "$1: the replay could not run (exit $RR_REPLAY_RC): $RR_REPLAY"
 }
 
 # The replay and the write run one content-proof sequence: on the same renewed manifest, the replay against the
@@ -972,6 +976,19 @@ test_RP1_the_replay_and_the_write_give_one_content_verdict() {
   [ "$(printf '%s\n' "$RR_REPLAY" | wc -l | tr -d ' ')" = 1 ] || fail "RP1: the replay refusal is not one line: $RR_REPLAY"
   rr_expect_refusal RP1-refused "$reason: ${RR_REPLAY#*$'\t'};"
   rr_ok RP1 "on one renewed manifest the replay gives the write's verdict: ok with the write's report lines, and the write's refusal reason and detail"
+}
+
+# A content verdict that exits non-zero could not run, so it refuses whatever it printed, on the write path and the
+# replay alike: a stand-in identity verdict that prints ok and exits 2 is refused by both.
+test_RP2_a_verdict_that_exits_non_zero_is_refused_on_both_paths() {
+  rr_make_f RP2
+  rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_identity_verdict() { printf 'ok\\n'; return 2; }"
+  rr_replay "$RR_DIR/shim-root"
+  [ "$RR_REPLAY_RC" = 1 ] || fail "RP2: the replay of a verdict that exited 2 did not exit 1 (exit $RR_REPLAY_RC): $RR_REPLAY"
+  [ "$RR_REPLAY" = "manifest_unreadable"$'\t'"the verdict could not be computed" ] ||
+    fail "RP2: the replay did not refuse a verdict that printed ok and exited 2: $RR_REPLAY"
+  rr_expect_refusal RP2-write 'manifest_unreadable: the verdict could not be computed;'
+  rr_ok RP2 "a stand-in identity verdict that prints ok and exits 2 is refused manifest_unreadable by the replay (exit 1) and by the write, which changes nothing"
 }
 
 
@@ -2270,6 +2287,7 @@ test_L19_an_already_recorded_run_names_the_audit_it_reconciled
 test_E1_relaunch_after_rerecord_adopts
 test_E2_relaunch_without_rerecord_refuses_base_mismatch
 test_RP1_the_replay_and_the_write_give_one_content_verdict
+test_RP2_a_verdict_that_exits_non_zero_is_refused_on_both_paths
 test_H1_owner_mismatch
 test_H2_worktree_path_mismatch
 test_H3_base_not_forward

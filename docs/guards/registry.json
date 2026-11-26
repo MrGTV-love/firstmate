@@ -5658,10 +5658,10 @@
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refuse(\"", "count": 10},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "could not be closed as refused"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "adoption refuses the published record"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "fm_slot_rerecord_step_refuse ", "count": 5},
         {"file": "bin/fm-control.sh", "match": "fm_slot_rerecord_refuse ", "count": 2},
-        {"file": "bin/fm-control.sh", "match": "|| rerecord_refuse", "count": 19},
+        {"file": "bin/fm-control.sh", "match": "|| rerecord_refuse", "count": 18},
         {"file": "bin/fm-control.sh", "match": "*) rerecord_refuse ;;"},
-        {"file": "bin/fm-control.sh", "match": "{ fm_slot_rerecord_fail scope_", "count": 2},
         {"file": "bin/fm-control.sh", "match": "would=\"refuse:", "count": 4},
         {"file": "bin/fm-control.sh", "match": "rerecord-slot refuses to race it"}
       ],
