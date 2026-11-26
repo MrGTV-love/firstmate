@@ -2618,7 +2618,7 @@ if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_REUSED_PID:-}" ] \
   [ ! -f "$FM_FAKE_PS_COUNT" ] || count=$(cat "$FM_FAKE_PS_COUNT")
   count=$((count + 1))
   printf '%s\n' "$count" > "$FM_FAKE_PS_COUNT"
-  if [ "$count" -le 4 ]; then printf 'Tue Aug  4 10:00:00 2026\n'
+  if [ "$count" -le 8 ]; then printf 'Tue Aug  4 10:00:00 2026\n'
   else printf 'Tue Aug  4 10:00:01 2026\n'; fi
   exit 0
 fi
@@ -2626,6 +2626,11 @@ exec "$REAL_PS_FOR_TEST" "$@"
 SH
   chmod +x "$case_dir/fakebin/lsof" "$case_dir/fakebin/ps"
 
+  # The original identity answers every read up to the TERM: the first scan's
+  # identity and ownership-proof recheck (2), the reaper's own read (1), the
+  # pre-signal scan's read and recheck (2), the pre-signal match (1), the audit's
+  # start-time read (1) and the match before kill (1). The pid then reads as a
+  # replacement during the grace period.
   rc=0
   FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
   FM_FAKE_REUSED_PID="$pid" FM_FAKE_PS_COUNT="$case_dir/ps-count" \
