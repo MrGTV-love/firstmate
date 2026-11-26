@@ -1,0 +1,2 @@
+ok - through the real pass and fm-pr-merge.sh, a clean base update merges on the carried PASS, directly or through a merge queue, a carry note names only the basis the merge call or the lane's queueing used and never follows a head that left the queue to Main, while an update hiding an unread line is read again
+bash tests/fm-pr-merge.test.sh   18.31s user 28.99s system 35% cpu 2:13.69 total

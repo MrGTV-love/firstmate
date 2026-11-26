@@ -87,4 +87,4 @@ ok - default captain-word/FAIL precedence holds
 ok - a legacy record without report_sha256 omits the digest instead of fabricating it
 ok - plan names the owed author families from the exact head, ignores a FAIL and a captain-word, and writes nothing
 ok - plan applies the one-reader relief for an unrecorded pipeline family and the two-reader rule for any other unknown group exactly as verify does, names the families a reader must lie outside, and verify keeps its disclosure
-exit=0
+bash tests/fm-review-record.test.sh  19.57s user 26.14s system 25% cpu 2:58.85 total

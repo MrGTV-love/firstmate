@@ -1,0 +1,80 @@
+== Scenario A: clean merge of base into reviewed PR carries (R=PASS) ==
+R=9d1ca550bd3f43ba6d0cf7fae9346ae93cd90c3f LIVE=37327c9112f746d85e4198587d6037f83602f339
+### clean merge
+NEW: rc=0 {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"37327c9112f746d85e4198587d6037f83602f339","at":1795712510,"reader_model":"sonnet","reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"report":"/tmp/fm-live-carry.VQRD3q/a/report-9d1ca550bd3f43ba6d0cf7fae9346ae93cd90c3f.md","report_sha256":"1b44254dc11927da02ea9ce7fa54fbd71bdb0f9df83b27a3c5e54072205ff4fd","carried_from":"9d1ca550bd3f43ba6d0cf7fae9346ae93cd90c3f","facts":["review carried from 9d1ca550bd3f43ba6d0cf7fae9346ae93cd90c3f: the live head is that reviewed change merged cleanly with its base"]}
+OLD: rc=0 {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"37327c9112f746d85e4198587d6037f83602f339","at":1795712510,"reader_model":"sonnet","reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"report":"/tmp/fm-live-carry.VQRD3q/a/report-9d1ca550bd3f43ba6d0cf7fae9346ae93cd90c3f.md","report_sha256":"1b44254dc11927da02ea9ce7fa54fbd71bdb0f9df83b27a3c5e54072205ff4fd","carried_from":"9d1ca550bd3f43ba6d0cf7fae9346ae93cd90c3f","facts":["review carried from 9d1ca550bd3f43ba6d0cf7fae9346ae93cd90c3f: the live head is that reviewed change merged cleanly with its base"]}
+
+== Scenario B: merge that hides one unread line refuses ==
+### unread merge
+NEW: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 8faef0f453ae90dbc1907ab573095dcd907ff0a4, live head is 4545633bb6cd2f9c53291e8ec064211bfbead2ae; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read)"}}
+OLD: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 8faef0f453ae90dbc1907ab573095dcd907ff0a4, live head is 4545633bb6cd2f9c53291e8ec064211bfbead2ae; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read)"}}
+
+== Scenario C: same-tree rewrite (amend) unread, then base merge: carries from R ==
+R=10c3e15299e407daddf89fc35abfccbf1c9bb997 RW=7995d321b664b90369872e45f59df9861b4c3ea6
+### rewrite unread
+NEW: rc=0 {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"2bbea0d35d29c53f7a7ba4586db58656df4767c3","at":1795712515,"reader_model":"sonnet","reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"report":"/tmp/fm-live-carry.VQRD3q/c/report-10c3e15299e407daddf89fc35abfccbf1c9bb997.md","report_sha256":"1974a429326250efbea0003a5f05c76784c53f9e4ab384dc34ea6de4fcdd7d7c","carried_from":"10c3e15299e407daddf89fc35abfccbf1c9bb997","facts":["review carried from 10c3e15299e407daddf89fc35abfccbf1c9bb997: the live head is that reviewed change merged cleanly with its base"]}
+OLD: rc=0 {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"2bbea0d35d29c53f7a7ba4586db58656df4767c3","at":1795712515,"reader_model":"sonnet","reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"report":"/tmp/fm-live-carry.VQRD3q/c/report-10c3e15299e407daddf89fc35abfccbf1c9bb997.md","report_sha256":"1974a429326250efbea0003a5f05c76784c53f9e4ab384dc34ea6de4fcdd7d7c","carried_from":"10c3e15299e407daddf89fc35abfccbf1c9bb997","facts":["review carried from 10c3e15299e407daddf89fc35abfccbf1c9bb997: the live head is that reviewed change merged cleanly with its base"]}
+
+== Scenario D: rewrite itself read (rewrite row last), then base merge: refuses ==
+### rewrite read, rewrite last
+NEW: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 1797258c9f6d5e854cb554458be5a66868dab28a, live head is 1aebb4fb48373e7df881b42e33010964a5238736; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head d39c351ac698aad07eacecca049e79241c909565, which the reviewed head does not build on, so its reads may judge this change)"}}
+OLD: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 1797258c9f6d5e854cb554458be5a66868dab28a, live head is 1aebb4fb48373e7df881b42e33010964a5238736; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head d39c351ac698aad07eacecca049e79241c909565, which the reviewed head does not build on, so its reads may judge this change)"}}
+
+== Scenario E: rewrite read, then a late re-read of R (R row last): refuses ==
+### rewrite read, original last
+NEW: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names d54a43ad935e2de8b971cc4ecf934d29f706e49a, live head is 84b254d551c4a2c6ce794dab9e1e9426d49fa85b; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 2691c98cfbefefd7b693a2c61c53f60ea3ed16cd, which the reviewed head does not build on, so its reads may judge this change)"}}
+OLD: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names d54a43ad935e2de8b971cc4ecf934d29f706e49a, live head is 84b254d551c4a2c6ce794dab9e1e9426d49fa85b; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 2691c98cfbefefd7b693a2c61c53f60ea3ed16cd, which the reviewed head does not build on, so its reads may judge this change)"}}
+
+== Scenario F: reviewed head merging both siblings carries while newest; refuses after re-read of R ==
+M=4284230e8bf501dd6d4295c74e777f9ad7847644
+### both-merged newest
+NEW: rc=0 {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"26efff87b4ca6932f9271f4ded75b439ca357287","at":1795712524,"reader_model":"gemini-3-pro","reader_family":"google","author_groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"report":"/tmp/fm-live-carry.VQRD3q/f/report-4284230e8bf501dd6d4295c74e777f9ad7847644.md","report_sha256":"e3ec796ff725b4860b9c58ce12e4b065f4f708f31d9c0acec4a4d109f4f07f4a","carried_from":"4284230e8bf501dd6d4295c74e777f9ad7847644","facts":["review carried from 4284230e8bf501dd6d4295c74e777f9ad7847644: the live head is that reviewed change merged cleanly with its base"]}
+OLD: rc=0 {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"26efff87b4ca6932f9271f4ded75b439ca357287","at":1795712524,"reader_model":"gemini-3-pro","reader_family":"google","author_groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"report":"/tmp/fm-live-carry.VQRD3q/f/report-4284230e8bf501dd6d4295c74e777f9ad7847644.md","report_sha256":"e3ec796ff725b4860b9c58ce12e4b065f4f708f31d9c0acec4a4d109f4f07f4a","carried_from":"4284230e8bf501dd6d4295c74e777f9ad7847644","facts":["review carried from 4284230e8bf501dd6d4295c74e777f9ad7847644: the live head is that reviewed change merged cleanly with its base"]}
+
+### both-merged after re-read of R
+NEW: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 6eb0693d66bffbf32b191feff4f06e0253d33ccc, live head is 26efff87b4ca6932f9271f4ded75b439ca357287; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 4284230e8bf501dd6d4295c74e777f9ad7847644, which the reviewed head does not build on, so its reads may judge this change)"}}
+OLD: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 6eb0693d66bffbf32b191feff4f06e0253d33ccc, live head is 26efff87b4ca6932f9271f4ded75b439ca357287; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: a review row names head 4284230e8bf501dd6d4295c74e777f9ad7847644, which the reviewed head does not build on, so its reads may judge this change)"}}
+
+== Scenario G: scratch placement - git shim logs git init path; shared TMPDIR watched ==
+NEW verify rc=0:
+  review: PASS
+  review: review carried from 35939245dd520bb72b6a94d7131791a30c6d2789: the live head is that reviewed change merged cleanly with its base
+  git init at: /tmp/fm-live-carry.VQRD3q/g/home/state/.review-carry-rj27kfm5/proof.git
+    state entry during proof: .
+    state entry during proof: ..
+    state entry during proof: .review-carry-rj27kfm5
+    state entry during proof: review-records.jsonl
+    state entry during proof: task-x1.meta
+  leftover .review-carry-* in state after run: 0
+  leftover entries in shared TMPDIR after run: 0
+OLD verify rc=0:
+  review: PASS
+  review: review carried from 35939245dd520bb72b6a94d7131791a30c6d2789: the live head is that reviewed change merged cleanly with its base
+  git init at: /tmp/fm-live-carry.VQRD3q/g/shared-tmp/fm-review-carry-v1y6is_l/proof.git
+    state entry during proof: .
+    state entry during proof: ..
+    state entry during proof: review-records.jsonl
+    state entry during proof: task-x1.meta
+  leftover .review-carry-* in state after run: 0
+  leftover entries in shared TMPDIR after run: 0
+
+== Scenario H: unwritable state directory (chmod 500) ==
+uid=501
+### unwritable state dir
+NEW: rc=1 {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 069cb847c02ad520573c849cb8d8ca897fee06ec, live head is 333ade16db87c49bad64424dcedbbaf6905d4e36; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: cannot make the proof's scratch repository in the state directory: Permission denied)"}}
+OLD: rc=0 {"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"333ade16db87c49bad64424dcedbbaf6905d4e36","at":1795712533,"reader_model":"sonnet","reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-5.1","family":"openai"}]},"report":"/tmp/fm-live-carry.VQRD3q/h/report-069cb847c02ad520573c849cb8d8ca897fee06ec.md","report_sha256":"db1b1963335e56637e8d5d4aab7f7cb0e22fae209363829f40fc950e66a80324","carried_from":"069cb847c02ad520573c849cb8d8ca897fee06ec","facts":["review carried from 069cb847c02ad520573c849cb8d8ca897fee06ec: the live head is that reviewed change merged cleanly with its base"]}
+
+== Scenario I: merge driver + attributes in caller's global config (~/.gitconfig + core.attributesFile, and XDG) ==
+Auto-merging app.txt
+fixture merge resolved by global driver
+### global ~/.gitconfig driver (caller env has the global config)
+NEW: {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 97f6d127576a8bb8fd1347c705a0e83952577009, live head is f06f7e8a009f0fefdcda78ade4fcd9c45113568f; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains)"}}
+ rc=1
+OLD: {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 97f6d127576a8bb8fd1347c705a0e83952577009, live head is f06f7e8a009f0fefdcda78ade4fcd9c45113568f; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains)"}}
+ rc=1
+### XDG git/config + git/attributes driver
+NEW: {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 97f6d127576a8bb8fd1347c705a0e83952577009, live head is f06f7e8a009f0fefdcda78ade4fcd9c45113568f; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains)"}}
+ rc=1
+OLD: {"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 97f6d127576a8bb8fd1347c705a0e83952577009, live head is f06f7e8a009f0fefdcda78ade4fcd9c45113568f; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reviewed head does not merge cleanly with the base content the live head contains)"}}
+ rc=1
+fixture root: /tmp/fm-live-carry.VQRD3q

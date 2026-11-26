@@ -1,38 +1,38 @@
-  step -> state=[reading b4ad387e4c50 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 19c26dfaa2b9 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
   step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
   step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
   step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
 ## carry-over clean
   fake runner argv:
-    argv: <tmp>/auto-carry-clean/state/.pr-auto-review/task-x1.d/b4ad387e4c50-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|b4ad387e4c50e9574d3c3fe18f27f1417df911bb|pr.diff|<tmp>/auto-carry-clean/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+    argv: <tmp>/auto-carry-clean/state/.pr-auto-review/task-x1.d/19c26dfaa2b9-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|19c26dfaa2b9dd4413eb5727636cbc1f8ed441c3|pr.diff|<tmp>/auto-carry-clean/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
   review-lane events (fm-pr-auto-review.py events task-x1):
-    1795645927 b4ad387e4c50 reading b4ad387e4c50 by claude-sonnet-5-5[1m] for openai
-    1795645964 b4ad387e4c50 verdict recorded: PASS for b4ad387e4c50 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-clean/state/.pr-auto-review/task-x1.d/b4ad387e4c50-claude-sonnet-5-5_1m_/review.md
-    1795646048 e73c0c32eef4 merged: https://github.com/example/repo/pull/9 at e73c0c32eef4 on the PASS carried from b4ad387e4c50
+    1795712590 19c26dfaa2b9 reading 19c26dfaa2b9 by claude-sonnet-5-5[1m] for openai
+    1795712593 19c26dfaa2b9 verdict recorded: PASS for 19c26dfaa2b9 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-clean/state/.pr-auto-review/task-x1.d/19c26dfaa2b9-claude-sonnet-5-5_1m_/review.md
+    1795712606 fe0b4cdfcfa9 merged: https://github.com/example/repo/pull/9 at fe0b4cdfcfa9 on the PASS carried from 19c26dfaa2b9
   review records (state/review-records.jsonl):
-    {"verdict":"PASS","head":"b4ad387e4c50","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"19c26dfaa2b9","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
   forge merge calls (fake gh log):
-    pr merge 9 --repo example/repo --match-head-commit e73c0c32eef46d29409f8853a748bff5a2ad9708 --squash
+    pr merge 9 --repo example/repo --match-head-commit fe0b4cdfcfa9f6cfd9462505123d68fab545d166 --squash
   current state: merged https://github.com/example/repo/pull/9
-  step -> state=[reading 371411b6e2e1 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 005a081eff90 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
   step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
   step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
   step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
   step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
 ## carry-over queued
   fake runner argv:
-    argv: <tmp>/auto-carry-queued/state/.pr-auto-review/task-x1.d/371411b6e2e1-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|371411b6e2e11f22c63705f161115c8e62ce3159|pr.diff|<tmp>/auto-carry-queued/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+    argv: <tmp>/auto-carry-queued/state/.pr-auto-review/task-x1.d/005a081eff90-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|005a081eff90c8f7cfc17651c4c997f9fb1ecd90|pr.diff|<tmp>/auto-carry-queued/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
   review-lane events (fm-pr-auto-review.py events task-x1):
-    1795646072 371411b6e2e1 reading 371411b6e2e1 by claude-sonnet-5-5[1m] for openai
-    1795646073 371411b6e2e1 verdict recorded: PASS for 371411b6e2e1 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-queued/state/.pr-auto-review/task-x1.d/371411b6e2e1-claude-sonnet-5-5_1m_/review.md
-    1795646083 0a810fa9fe04 queued: https://github.com/example/repo/pull/9 at 0a810fa9fe04 is in the merge queue on the PASS carried from 371411b6e2e1
-    1795646089 0a810fa9fe04 merged: https://github.com/example/repo/pull/9 at 0a810fa9fe04; this lane queued it on the PASS carried from 371411b6e2e1
+    1795712614 005a081eff90 reading 005a081eff90 by claude-sonnet-5-5[1m] for openai
+    1795712617 005a081eff90 verdict recorded: PASS for 005a081eff90 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-queued/state/.pr-auto-review/task-x1.d/005a081eff90-claude-sonnet-5-5_1m_/review.md
+    1795712629 86916d30ef40 queued: https://github.com/example/repo/pull/9 at 86916d30ef40 is in the merge queue on the PASS carried from 005a081eff90
+    1795712632 86916d30ef40 merged: https://github.com/example/repo/pull/9 at 86916d30ef40; this lane queued it on the PASS carried from 005a081eff90
   review records (state/review-records.jsonl):
-    {"verdict":"PASS","head":"371411b6e2e1","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"005a081eff90","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
   forge merge calls (fake gh log):
-    pr merge 9 --repo example/repo --match-head-commit 0a810fa9fe04707f8cb8968c7fc12f5cbaaabf64 --squash
+    pr merge 9 --repo example/repo --match-head-commit 86916d30ef4036dd5035d865ad624c57d0d54aab --squash
   current state: merged https://github.com/example/repo/pull/9
-  step -> state=[reading 10dc0f1b669b by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 64e042fdd9d7 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
   step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
   step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
   step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
@@ -40,72 +40,72 @@
   step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
 ## carry-over left
   fake runner argv:
-    argv: <tmp>/auto-carry-left/state/.pr-auto-review/task-x1.d/10dc0f1b669b-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|10dc0f1b669bab5bf6f639bfc5a54b0f5b9a2e3d|pr.diff|<tmp>/auto-carry-left/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+    argv: <tmp>/auto-carry-left/state/.pr-auto-review/task-x1.d/64e042fdd9d7-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|64e042fdd9d72b03af804e15a33e57e884190381|pr.diff|<tmp>/auto-carry-left/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
   review-lane events (fm-pr-auto-review.py events task-x1):
-    1795646096 10dc0f1b669b reading 10dc0f1b669b by claude-sonnet-5-5[1m] for openai
-    1795646098 10dc0f1b669b verdict recorded: PASS for 10dc0f1b669b by claude-sonnet-5-5[1m], report <tmp>/auto-carry-left/state/.pr-auto-review/task-x1.d/10dc0f1b669b-claude-sonnet-5-5_1m_/review.md
-    1795646141 849398471ba6 queued: https://github.com/example/repo/pull/9 at 849398471ba6 is in the merge queue on the PASS carried from 10dc0f1b669b
-    1795646145 849398471ba6 held: https://github.com/example/repo/pull/9 at 849398471ba6 left the merge queue and is still open; the merge is Main's
-    1795646147 849398471ba6 merged: https://github.com/example/repo/pull/9 at 849398471ba6
+    1795712640 64e042fdd9d7 reading 64e042fdd9d7 by claude-sonnet-5-5[1m] for openai
+    1795712643 64e042fdd9d7 verdict recorded: PASS for 64e042fdd9d7 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-left/state/.pr-auto-review/task-x1.d/64e042fdd9d7-claude-sonnet-5-5_1m_/review.md
+    1795712658 652b4a17e471 queued: https://github.com/example/repo/pull/9 at 652b4a17e471 is in the merge queue on the PASS carried from 64e042fdd9d7
+    1795712662 652b4a17e471 held: https://github.com/example/repo/pull/9 at 652b4a17e471 left the merge queue and is still open; the merge is Main's
+    1795712665 652b4a17e471 merged: https://github.com/example/repo/pull/9 at 652b4a17e471
   review records (state/review-records.jsonl):
-    {"verdict":"PASS","head":"10dc0f1b669b","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"64e042fdd9d7","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
   forge merge calls (fake gh log):
-    pr merge 9 --repo example/repo --match-head-commit 849398471ba6dca1444c9070caf67e576d2f1e95 --squash
+    pr merge 9 --repo example/repo --match-head-commit 652b4a17e4711cc90fe11df2244f0522b1343943 --squash
   current state: merged https://github.com/example/repo/pull/9
-  step -> state=[reading 9b6986c39152 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 12aca408dbf8 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
   step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
   step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
   step -> state=[queued https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
   step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
 ## carry-over word
   fake runner argv:
-    argv: <tmp>/auto-carry-word/state/.pr-auto-review/task-x1.d/9b6986c39152-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|9b6986c39152a86f8906e8f49cba1cfa5ac1b55b|pr.diff|<tmp>/auto-carry-word/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+    argv: <tmp>/auto-carry-word/state/.pr-auto-review/task-x1.d/12aca408dbf8-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|12aca408dbf8b58c019ac2233fd498e4dc72d6b9|pr.diff|<tmp>/auto-carry-word/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
   review-lane events (fm-pr-auto-review.py events task-x1):
-    1795646154 9b6986c39152 reading 9b6986c39152 by claude-sonnet-5-5[1m] for openai
-    1795646158 9b6986c39152 verdict recorded: PASS for 9b6986c39152 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-word/state/.pr-auto-review/task-x1.d/9b6986c39152-claude-sonnet-5-5_1m_/review.md
-    1795646193 3d441bde5074 queued: https://github.com/example/repo/pull/9 at 3d441bde5074 is in the merge queue
-    1795646197 3d441bde5074 merged: https://github.com/example/repo/pull/9 at 3d441bde5074
+    1795712672 12aca408dbf8 reading 12aca408dbf8 by claude-sonnet-5-5[1m] for openai
+    1795712673 12aca408dbf8 verdict recorded: PASS for 12aca408dbf8 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-word/state/.pr-auto-review/task-x1.d/12aca408dbf8-claude-sonnet-5-5_1m_/review.md
+    1795712683 6eecaa4ce19b queued: https://github.com/example/repo/pull/9 at 6eecaa4ce19b is in the merge queue
+    1795712685 6eecaa4ce19b merged: https://github.com/example/repo/pull/9 at 6eecaa4ce19b
   review records (state/review-records.jsonl):
-    {"verdict":"PASS","head":"9b6986c39152","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
-    {"verdict":null,"head":"3d441bde5074","reader_model":null,"reader_family":null,"covered_groups":null,"loosens":null,"widens":null,"data":null}
+    {"verdict":"PASS","head":"12aca408dbf8","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":null,"head":"6eecaa4ce19b","reader_model":null,"reader_family":null,"covered_groups":null,"loosens":null,"widens":null,"data":null}
   forge merge calls (fake gh log):
-    pr merge 9 --repo example/repo --match-head-commit 3d441bde5074131ef0b76493e2d8a651dc6b38be --squash
+    pr merge 9 --repo example/repo --match-head-commit 6eecaa4ce19bbf614ae8cb91881650574dae453e --squash
   current state: merged https://github.com/example/repo/pull/9
-  step -> state=[reading 2439a559e4a8 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 8f478b4f2e18 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
   step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
   step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
   step -> state=[merged https://github.com/example/repo/pull/9] reads=1 reviews=1 merges=1
 ## carry-over word-direct
   fake runner argv:
-    argv: <tmp>/auto-carry-word-direct/state/.pr-auto-review/task-x1.d/2439a559e4a8-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|2439a559e4a8356f845b730a47a018553f22c21b|pr.diff|<tmp>/auto-carry-word-direct/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+    argv: <tmp>/auto-carry-word-direct/state/.pr-auto-review/task-x1.d/8f478b4f2e18-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|8f478b4f2e18722c8e2a697066286edb93000e21|pr.diff|<tmp>/auto-carry-word-direct/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
   review-lane events (fm-pr-auto-review.py events task-x1):
-    1795646218 2439a559e4a8 reading 2439a559e4a8 by claude-sonnet-5-5[1m] for openai
-    1795646242 2439a559e4a8 verdict recorded: PASS for 2439a559e4a8 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-word-direct/state/.pr-auto-review/task-x1.d/2439a559e4a8-claude-sonnet-5-5_1m_/review.md
-    1795646278 830bf93c704b merged: https://github.com/example/repo/pull/9 at 830bf93c704b
+    1795712689 8f478b4f2e18 reading 8f478b4f2e18 by claude-sonnet-5-5[1m] for openai
+    1795712690 8f478b4f2e18 verdict recorded: PASS for 8f478b4f2e18 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-word-direct/state/.pr-auto-review/task-x1.d/8f478b4f2e18-claude-sonnet-5-5_1m_/review.md
+    1795712700 3c6084f9070a merged: https://github.com/example/repo/pull/9 at 3c6084f9070a
   review records (state/review-records.jsonl):
-    {"verdict":"PASS","head":"2439a559e4a8","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
-    {"verdict":null,"head":"830bf93c704b","reader_model":null,"reader_family":null,"covered_groups":null,"loosens":null,"widens":null,"data":null}
+    {"verdict":"PASS","head":"8f478b4f2e18","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":null,"head":"3c6084f9070a","reader_model":null,"reader_family":null,"covered_groups":null,"loosens":null,"widens":null,"data":null}
   forge merge calls (fake gh log):
-    pr merge 9 --repo example/repo --match-head-commit 830bf93c704bf0deb0592e0c9c3086699db35bbe --squash
+    pr merge 9 --repo example/repo --match-head-commit 3c6084f9070ae02cdbadf3e268528e56e0782e58 --squash
   current state: merged https://github.com/example/repo/pull/9
-  step -> state=[reading e00d01132583 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
+  step -> state=[reading 658609de7975 by claude-sonnet-5-5[1m]] reads=1 reviews=0 merges=0
   step -> state=[waiting: a check is still pending: ci] reads=1 reviews=1 merges=0
-  step -> state=[reading 9109943bf630 by claude-sonnet-5-5[1m]] reads=2 reviews=1 merges=0
+  step -> state=[reading 788b910a4c5e by claude-sonnet-5-5[1m]] reads=2 reviews=1 merges=0
   step -> state=[merged https://github.com/example/repo/pull/9] reads=2 reviews=2 merges=1
 ## carry-over unread
   fake runner argv:
-    argv: <tmp>/auto-carry-unread/state/.pr-auto-review/task-x1.d/e00d01132583-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|e00d0113258387c062506fc8c7248be86a1a87ad|pr.diff|<tmp>/auto-carry-unread/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
-    argv: <tmp>/auto-carry-unread/state/.pr-auto-review/task-x1.d/9109943bf630-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|9109943bf6306d830b93aee41456cae773db6dc1|pr.diff|<tmp>/auto-carry-unread/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=217
+    argv: <tmp>/auto-carry-unread/state/.pr-auto-review/task-x1.d/658609de7975-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|658609de7975a0a72866eca0dd37a6a9883c3404|pr.diff|<tmp>/auto-carry-unread/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=205
+    argv: <tmp>/auto-carry-unread/state/.pr-auto-review/task-x1.d/788b910a4c5e-claude-sonnet-5-5_1m_|https://github.com/example/repo/pull/9|788b910a4c5e5a05386ac00939cd09c09316ed8e|pr.diff|<tmp>/auto-carry-unread/project|claude-sonnet-5-5[1m] contract=200 ci=117 diff=217
   review-lane events (fm-pr-auto-review.py events task-x1):
-    1795646286 e00d01132583 reading e00d01132583 by claude-sonnet-5-5[1m] for openai
-    1795646288 e00d01132583 verdict recorded: PASS for e00d01132583 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-unread/state/.pr-auto-review/task-x1.d/e00d01132583-claude-sonnet-5-5_1m_/review.md
-    1795646304 9109943bf630 reading 9109943bf630 by claude-sonnet-5-5[1m] for openai
-    1795646329 9109943bf630 verdict recorded: PASS for 9109943bf630 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-unread/state/.pr-auto-review/task-x1.d/9109943bf630-claude-sonnet-5-5_1m_/review.md
-    1795646351 9109943bf630 merged: https://github.com/example/repo/pull/9 at 9109943bf630
+    1795712707 658609de7975 reading 658609de7975 by claude-sonnet-5-5[1m] for openai
+    1795712709 658609de7975 verdict recorded: PASS for 658609de7975 by claude-sonnet-5-5[1m], report <tmp>/auto-carry-unread/state/.pr-auto-review/task-x1.d/658609de7975-claude-sonnet-5-5_1m_/review.md
+    1795712713 788b910a4c5e reading 788b910a4c5e by claude-sonnet-5-5[1m] for openai
+    1795712714 788b910a4c5e verdict recorded: PASS for 788b910a4c5e by claude-sonnet-5-5[1m], report <tmp>/auto-carry-unread/state/.pr-auto-review/task-x1.d/788b910a4c5e-claude-sonnet-5-5_1m_/review.md
+    1795712721 788b910a4c5e merged: https://github.com/example/repo/pull/9 at 788b910a4c5e
   review records (state/review-records.jsonl):
-    {"verdict":"PASS","head":"e00d01132583","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
-    {"verdict":"PASS","head":"9109943bf630","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"658609de7975","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
+    {"verdict":"PASS","head":"788b910a4c5e","reader_model":"claude-sonnet-5-5[1m]","reader_family":"anthropic","covered_groups":["ship"],"loosens":"no","widens":"no","data":"no"}
   forge merge calls (fake gh log):
-    pr merge 9 --repo example/repo --match-head-commit 9109943bf6306d830b93aee41456cae773db6dc1 --squash
+    pr merge 9 --repo example/repo --match-head-commit 788b910a4c5e5a05386ac00939cd09c09316ed8e --squash
   current state: merged https://github.com/example/repo/pull/9
 ok - through the real pass and fm-pr-merge.sh, a clean base update merges on the carried PASS, directly or through a merge queue, a carry note names only the basis the merge call or the lane's queueing used and never follows a head that left the queue to Main, while an update hiding an unread line is read again
