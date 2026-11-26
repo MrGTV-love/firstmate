@@ -24,6 +24,15 @@
 #   - state/<id>.control-exit does not name this busy generation
 #   - no control lock is held, and no in-progress control-relaunch journal
 #
+# A refusal whose cause is deterministic until a recorded input changes (a slot refusal by name, or a
+# refusal-shaped outcome the scan cannot classify) is reported once and not retried by the scan: the cause
+# fingerprint it recorded (state/.session-end-refusal-<id>, durable across scanner processes) must change
+# before one new attempt is allowed, and the operator's own `bin/fm-control.sh <task> relaunch` is the way to try
+# again. Any other failed outcome keeps the caps and wakes below. A relaunch that starts with, or refuses
+# because of, the task's own out-of-scope work carries the drift report in its wake line and in
+# state/<id>.relaunch-drift, so the observer sees every path or, for a long `uncertain,ignored` group, its count and the
+# file that lists every path (bin/fm-slot-provision-lib.sh owns the report).
+#
 # A completed fm-control exit retires the busy record, so its session-end
 # is never seen here. The control-exit marker covers the exit whose command
 # was delivered but whose agent did not stop within the exit wait: that
@@ -169,6 +178,131 @@ fm_session_end_first_line() {  # <text>
   printf '%s' "${line:0:180}"
 }
 
+fm_session_end_refusal_path() {  # <state-dir> <id>
+  printf '%s/.session-end-refusal-%s' "$1" "$2"
+}
+
+# A successful relaunch of the task ends the earlier refusal episode (D6(d)): its own refusal memory goes, and no other
+# task's file is named by the id check. bin/fm-control.sh relaunch calls this once the replacement agent is confirmed.
+fm_session_end_refusal_clear() {  # <state-dir> <id>
+  case "$2" in ''|*[!A-Za-z0-9._-]*) return 0 ;; esac
+  rm -f -- "$(fm_session_end_refusal_path "$1" "$2")"
+}
+
+# The reason name of a refusal-shaped relaunch outcome, or nothing for an outcome that is not a refusal.
+# A refusal whose reason cannot be named is "unclassified": it is still treated as unchanged.
+fm_session_end_refusal_reason() {  # <control-output>
+  local text=$1 reason
+  reason=$(printf '%s\n' "$text" | sed -n -e 's/.*slot adoption refused: \([a-z_]*\).*/\1/p' \
+    -e 's/.*slot provisioning refused: \([a-z_]*\).*/\1/p' -e 's/.*"reason": "\([a-z_]*\)".*/\1/p' | head -n 1)
+  if [ -z "$reason" ]; then
+    case "$text" in
+      *'slot provisioner refused'*|*'slot adoption refused'*|*'slot provisioning refused'*|*'refused relaunch of governed task'*|*'slot provisioner is missing'*|*'slot provisioner source is not'*)
+        reason=unclassified ;;
+    esac
+  fi
+  printf '%s' "$reason"
+}
+
+# The collision file a refusal names in the provisioner's own "manifest_path" form, empty when it names none.
+fm_session_end_refusal_obstruction() {  # <control-output>
+  printf '%s\n' "$1" | sed -n 's/.*"manifest_path": "\([^"]*\)".*/\1/p' | head -n 1
+}
+
+# A digest of what the named refusal's arm reads: the task record's worktree, branch, project and slot lines, the
+# manifest's bytes, and the named obstruction file when one is named. A scope refusal adds the uncovered paths and the
+# tracked count of each scope path at the base; dirty_worktree and operation_in_progress add the copy's status and its
+# operation markers; every other reason adds the copy's HEAD, origin/main and status. The branch, repository, custody and
+# manifest refusals read nothing beyond the record, the manifest and the obstruction, so the copy's checked-out branch,
+# the pool-slot claim files and other task records are not inputs. A real change to a digested input changes the digest
+# and permits one new attempt. A refusal that depends on an undigested input is retried only by a manual fm-control
+# relaunch, which the D6(b) fallback accepts.
+fm_session_end_cause_fingerprint() {  # <state-dir> <id> <reason> [<obstruction-path>]
+  local state=$1 id=$2 reason=$3 obstruction=${4:-} meta wt manifest base path scope marker inside
+  local -a scopes=()
+  meta="$state/$id.meta"
+  wt=$(fm_meta_get "$meta" worktree 2>/dev/null || true)
+  manifest=$(fm_meta_get "$meta" slot_manifest 2>/dev/null || true)
+  while IFS= read -r scope; do scopes+=("$scope"); done < <(sed -n 's/^slot_owned_path=//p' "$meta" 2>/dev/null)
+  {
+    printf 'reason=%s\n' "$reason"
+    grep -e '^worktree=' -e '^branch=' -e '^project=' -e '^slot_' "$meta" 2>/dev/null || true
+    if [ -n "$manifest" ] && [ -f "$manifest" ]; then shasum -a 256 < "$manifest"; else printf 'no-manifest-file\n'; fi
+    if [ -n "$obstruction" ]; then
+      if [ -e "$obstruction" ]; then printf 'obstruction=%s\n' "$obstruction"; shasum -a 256 < "$obstruction" 2>/dev/null || true; else printf 'obstruction-gone\n'; fi
+    fi
+    case "$reason" in
+      scope_mismatch|scope_not_tracked|scope_*)
+        base=$(git -C "$wt" merge-base origin/main HEAD 2>/dev/null || true)
+        printf 'base=%s\n' "$base"
+        git -C "$wt" diff --name-only --no-renames -z "${base:-HEAD}" HEAD 2>/dev/null | tr '\0' '\n' | while IFS= read -r path; do
+          [ -n "$path" ] || continue
+          inside=0
+          for scope in ${scopes[@]+"${scopes[@]}"}; do case "$path" in "${scope%/}"|"${scope%/}"/*) inside=1 ;; esac; done
+          [ "$inside" = 1 ] || printf 'uncovered=%s\n' "$path"
+        done | sort
+        for scope in ${scopes[@]+"${scopes[@]}"}; do
+          printf 'tracked-at-base=%s:%s\n' "$scope" "$(git -C "$wt" ls-tree -r --name-only "${base:-HEAD}" -- ":(literal)${scope%/}" 2>/dev/null | wc -l | tr -d ' ')"
+        done ;;
+      manifest_exists|repository_mismatch|manifest_*|worktree_path_mismatch|lifecycle_state_mismatch|branch_*|base_mismatch|custody_*) ;;
+      dirty_worktree|operation_in_progress)
+        git -C "$wt" status --porcelain=v1 -z --untracked-files=all 2>/dev/null | shasum -a 256
+        for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply sequencer; do
+          if [ -e "$(git -C "$wt" rev-parse --path-format=absolute --git-path "$marker" 2>/dev/null)" ]; then printf 'op=%s\n' "$marker"; fi
+        done ;;
+      *)
+        git -C "$wt" rev-parse --verify HEAD 2>/dev/null || true
+        git -C "$wt" rev-parse --verify --quiet 'origin/main^{commit}' 2>/dev/null || true
+        git -C "$wt" status --porcelain=v1 -z --untracked-files=all 2>/dev/null | shasum -a 256 ;;
+    esac
+  } | shasum -a 256 | awk '{print $1}'
+}
+
+# The first drift report inside a control output: from its header to its closing line, before any later report.
+fm_session_end_first_drift_report() {  # <control-output>
+  printf '%s\n' "$1" | awk '/^relaunch drift report for /{ if (seen) exit; seen = 1 } seen { print } seen && /^  a relaunch is not a new scope declaration|^relaunch drift report for .*could not be produced/ { exit }'
+}
+
+# "printed" when the first drift report in a control output has its own sample line, which names the file that lists
+# every path; "complete" otherwise. The sample line is a line of its own, and the report escapes a newline in a path,
+# so no path text on an entry line can stand for it.
+fm_session_end_drift_kind() {  # <control-output>
+  local sampled
+  sampled=$(fm_session_end_first_drift_report "$1" | sed -n '/^  sampled: /p')
+  if [ -n "$sampled" ]; then printf printed; else printf complete; fi
+}
+
+# The sentence that follows a quoted sample line: the file it names holds the latest report written for the task, which
+# need not be this one.
+fm_session_end_drift_file_note() {
+  printf '%s' "That file holds the most recent drift report written for this task, which a later report can replace, so its list can differ from this count."
+}
+
+# Write the printed drift report from a control output to its stable durable path and print that path.
+fm_session_end_write_drift() {  # <state-dir> <id> <control-output>
+  local file="$1/$2.relaunch-drift"
+  fm_session_end_first_drift_report "$3" | awk -v note="$(fm_session_end_drift_file_note)" '{ print } /^  sampled: / { print "  " note }' > "$file" 2>/dev/null || true
+  printf '%s' "$file"
+}
+
+# The drift report inside a control output, on one line: "header: [sampled: ... | ]entry | entry ...". Empty when the
+# output carries no report or the report found nothing out of scope.
+fm_session_end_drift_summary() {  # <control-output>
+  local text header entries sampled limits
+  text=$(fm_session_end_first_drift_report "$1")
+  header=$(printf '%s\n' "$text" | sed -n 's/^relaunch drift report for \(.*\)$/\1/p')
+  case "$header" in ''|*'no out-of-scope path'*|*'could not be produced'*) ;; *)
+    entries=$(printf '%s\n' "$text" | sed -n 's/^  drift: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
+    sampled=$(printf '%s\n' "$text" | sed -n 's/^  sampled: //p')
+    limits=$(printf '%s\n' "$text" | sed -n 's/^  limitation: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
+    # A sampled report's pointer to the file listing every path comes before the entries, so the wake's length cap can
+    # only cut the entries after it.
+    printf '%s' "drift report: ${header#*: }: ${sampled:+sampled: $sampled | $(fm_session_end_drift_file_note) | }$entries${limits:+ | limitation: $limits}"
+    return 0 ;;
+  esac
+  case "$header" in *'could not be produced'*) printf '%s' "drift report: ${header#*: }" ;; esac
+}
+
 fm_session_end_queue_wake() {  # <key> <reason>
   local queued
   [ -n "${FM_WAKE_QUEUE:-}" ] || FM_WAKE_QUEUE="$STATE/.wake-queue"
@@ -189,6 +323,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
   local bin out rc=0 reason key which quota_event busy_record
+  local refusal_file r_gen r_seq r_reason r_fp r_obstruction cause drift drift_file
   FM_SESSION_END_ACTION=skip
   FM_SESSION_END_REASON=
   case "$id" in
@@ -218,6 +353,18 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   if [ -f "$marker" ] && [ ! -L "$marker" ]; then
     marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
     [ "$marker_gen" != "$gen" ] || return 0
+  fi
+  # A refusal this episode already reported is not retried while its cause is unchanged (Main 115): no attempt, no
+  # ledger row, no blocked line and no wake. The record outlives this process, so a successor scanner sees it.
+  refusal_file=$(fm_session_end_refusal_path "$state" "$id")
+  if [ -f "$refusal_file" ] && [ ! -L "$refusal_file" ]; then
+    r_gen='' r_seq='' r_reason='' r_fp='' r_obstruction=''
+    IFS=$'\t' read -r r_gen r_seq r_reason r_fp r_obstruction < "$refusal_file" || true
+    if [ -n "$r_reason" ] && [ -n "$r_fp" ]; then
+      cause=$(fm_session_end_cause_fingerprint "$state" "$id" "$r_reason" "$r_obstruction") || cause=
+      [ -n "$cause" ] && [ "$cause" != "$r_fp" ] || return 0
+    fi
+    rm -f "$refusal_file"
   fi
   recent=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_MIN_SECS") || return 1
   day=$(fm_session_end_count_attempts "$state" "$id" "$FM_SESSION_END_DAY_SECS") || return 1
@@ -316,6 +463,13 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
       reason="check: $id auto-relaunched after session-end"
     fi
     key="session-end-relaunch-$id-$gen-$seq"
+    rm -f "$refusal_file"
+    drift=$(fm_session_end_drift_summary "$out")
+    if [ -n "$drift" ]; then
+      # The stable durable reference comes first, so the wake's length cap can only ever cut the repeated content after it.
+      drift_file=$(fm_session_end_write_drift "$state" "$id" "$out")
+      reason="$reason (the $(fm_session_end_drift_kind "$out") drift report is in $drift_file); $drift"
+    fi
     fm_session_end_queue_wake "$key" "$reason" || return 1
     printf '%s\t%s\trelaunched\n' "$gen" "$seq" > "$handled" || return 1
     FM_SESSION_END_ACTION=relaunch
@@ -323,7 +477,23 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     return 0
   fi
   fm_session_end_ledger_add "$state" "$id" failed || return 1
-  reason="check: $id auto-relaunch failed after $(if [ "$quota_event" = 1 ]; then printf 'quota exhaustion'; else printf 'session-end'; fi): $(fm_session_end_first_line "$out")"
+  reason="check: $id auto-relaunch failed after $(if [ "$quota_event" = 1 ]; then printf 'quota exhaustion'; else printf 'session-end'; fi)"
+  drift=$(fm_session_end_drift_summary "$out")
+  if [ -n "$drift" ]; then
+    drift_file=$(fm_session_end_write_drift "$state" "$id" "$out")
+    reason="$reason (the $(fm_session_end_drift_kind "$out") drift report is in $drift_file)"
+  fi
+  reason="$reason: $(fm_session_end_first_line "$out")"
+  cause=$(fm_session_end_refusal_reason "$out")
+  if [ -n "$cause" ]; then
+    r_obstruction=$(fm_session_end_refusal_obstruction "$out")
+    r_fp=$(fm_session_end_cause_fingerprint "$state" "$id" "$cause" "$r_obstruction") || r_fp=
+    if [ -n "$r_fp" ]; then
+      printf '%s\t%s\t%s\t%s\t%s\n' "$gen" "$seq" "$cause" "$r_fp" "$r_obstruction" > "$refusal_file" || return 1
+      reason="$reason [refused: $cause: $(fm_session_end_first_line "$(printf '%s\n' "$out" | grep -m 1 -e 'refused')"); not retried by the scan until its cause changes; bin/fm-control.sh $id relaunch tries again]"
+    fi
+  fi
+  [ -z "$drift" ] || reason="$reason; $drift"
   key="session-end-relaunch-failed-$id-$gen-$seq"
   fm_session_end_queue_wake "$key" "$reason" || return 1
   printf '%s\t%s\tfailed\n' "$gen" "$seq" > "$handled" || return 1

@@ -94,7 +94,7 @@ export async function apply(ctx, config) {
     releasing = releasing.then(async () => {
       const result = await runCommand(resolve(config.root), resolve(config.home),
         environment(resolve(config.home), agent), releases, 'fm-lock.sh', ['release']);
-      if (result.code !== 0 && result.code !== 1) throw new Error(`Firstmate native lock release failed: ${result.stderr || result.code}`);
+      if (result.code !== 0) throw new Error(`Firstmate native lock release failed: ${result.stderr || result.code}`);
     }).catch(error => {
       try { record(join(resolve(config.home), 'state', '.dsh-primary-events.jsonl'), 'release-error', {detail: String(error)}); } catch {}
     });
