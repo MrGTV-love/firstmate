@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Behavioral observer regressions with labeled local process/quota inputs only."""
 import fcntl
+import io
 import json
 import os
 from pathlib import Path
+import runpy
 import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 
 OWNER = Path(__file__).resolve().parents[1] / "bin/fm-github-accounting.py"
@@ -75,11 +78,58 @@ owner["run"](owner["private_root"](),duration={duration},process_source={source}
         self.assertEqual(reply.returncode, 0, reply.stderr)
         return json.loads(reply.stdout)["removed"]
 
+    def run_until_recorded(self, window, *kinds):
+        # records needs the owner stopped, so the poll reads the persisted
+        # observations table; the owner stops once every kind has a row.
+        root = self.state / "github-accounting"
+        owner = subprocess.Popen([sys.executable, str(OWNER), "run"], env=self.env, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True)
+        startup = time.monotonic() + 60
+        deadline = None
+        stopping = False
+        try:
+            while True:
+                found, started_at = set(), None
+                try:
+                    db = sqlite3.connect(f"file:{root / 'observations.sqlite'}?mode=ro", uri=True, timeout=0)
+                    try:
+                        found = {kind for (kind,) in db.execute("SELECT DISTINCT kind FROM observations")}
+                        started_at = db.execute("SELECT json_extract(payload,'$.started_at') FROM observations "
+                                                "WHERE kind='owner' AND json_extract(payload,'$.action')='start'"
+                                                ).fetchone()
+                    finally:
+                        db.close()
+                except sqlite3.Error:
+                    pass
+                if deadline is None and started_at is not None:
+                    deadline = time.monotonic() + window - (time.time() - started_at[0])
+                if found >= set(kinds):
+                    break
+                if deadline is None and time.monotonic() >= startup:
+                    self.fail("owner recorded no start row within 60 s")
+                if deadline is not None and time.monotonic() >= deadline:
+                    self.fail(f"owner recorded no {sorted(set(kinds) - found)} row within {window} s of its start")
+                try:
+                    owner.wait(timeout=0.05)
+                except subprocess.TimeoutExpired:
+                    continue
+                self.fail(f"owner exited {owner.returncode} before recording {sorted(set(kinds) - found)}")
+            (root / "stop").write_text(json.loads(self.cli("status").stdout)["run_id"])
+            stopping = True
+        finally:
+            if not stopping and owner.poll() is None:
+                owner.terminate()
+            try:
+                stdout, stderr = owner.communicate(timeout=60)
+            except subprocess.TimeoutExpired:
+                owner.kill()
+                owner.communicate()
+                self.fail("owner did not stop within 60 s")
+        return subprocess.CompletedProcess(owner.args, owner.returncode, stdout, stderr)
+
     def assertProcessGone(self, pid):
         # A killed orphan can briefly remain a zombie; /proc on Linux or the
         # existing native identity table on Darwin distinguishes it from live.
-        import runpy
-        from types import SimpleNamespace
         shared = SimpleNamespace(**runpy.run_path(str(OWNER.with_name("fm-proc-budget-tree.py"))))
         rows = shared.Table().read()
         self.assertTrue(pid not in rows or rows[pid][3], f"process {pid} survived")
@@ -93,7 +143,8 @@ printf '%s\n' "201 100 Sun Nov  1 13:00:$born 2026 /fixture/gh pr checks --body 
 '202 999 Sun Nov  1 13:00:03 2026 /fixture/gh-axi api rate_limit --field payload=fixture-secret-three' \
 '100 0 Sun Nov  1 13:00:00 2026 /bin/sh /fixture/caller.sh -c fixture-secret-four'
 ''')
-        self.cli("run", "--duration", "1.8")
+        reply = self.run_until_recorded(1.8, "quota", "process_end")
+        self.assertEqual(reply.returncode, 0, (reply.stdout, reply.stderr))
         rows = self.records("process")
         self.assertEqual([(row["pid"], row["start"]) for row in rows], [
             (201, "Sun Nov 1 13:00:01 2026"), (202, "Sun Nov 1 13:00:03 2026"),
@@ -604,9 +655,12 @@ exec sleep 600
 
     def test_ps_hung_for_the_cpu_sampler_too_leaves_quota_and_stop_working(self):
         self.hung_ps_fixture()
-        reply = subprocess.run([sys.executable, str(OWNER), "run", "--duration", "3"], env=self.env,
-                               capture_output=True, text=True, timeout=60)
+        self.tool("gh-axi", ''': > "$FIXTURE_ROOT/quota-asked"
+printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=4977\\n'
+''')
+        reply = self.run_until_recorded(3, "quota")
         self.assertEqual(reply.returncode, 0, reply.stderr)
+        self.assertTrue((self.root / "quota-asked").exists(), "the hung ps blocked the quota stream")
         self.assertIn("observed", [row["status"] for row in self.records("quota")])
         self.assertHungPsEnded()
 
@@ -625,12 +679,33 @@ printf 'api_response:\\n  body: used=23 reset=1794000000 limit=5000 remaining=49
         self.assertGreaterEqual([row["status"] for row in rows].count("observed"), 3, rows)
         self.assertEqual(len(self.assertHungPsEnded()), 1, f"{requests} requests")
 
+    def completed_quota(self, projection):
+        # Parsing requires a completed response, not a short observation window
+        # that can end before the owner collects any request. Inject only the
+        # completed child's metadata/body; persist and read the actual records.
+        owner = runpy.run_path(str(OWNER))
+        root = self.state / "github-accounting"
+        root.mkdir(mode=0o700)
+        db = owner["database"](root)
+        try:
+            owner["quota_result"](db, SimpleNamespace(pid=123, returncode=0),
+                                  io.BytesIO(f"api_response:\n  body: {projection}\n".encode()),
+                                  1794000000, "fixture-completed-request", False)
+            db.commit()
+        finally:
+            db.close()
+        return self.records("quota")[0]
+
     def test_malformed_quota_is_unavailable_not_zero(self):
-        self.tool("gh-axi", "printf 'api_response:\\n  body: used=null reset=null limit=5000 remaining=0\\n'\n")
-        self.cli("run", "--duration", "0.8")
-        row = self.records("quota")[0]
+        row = self.completed_quota("used=null reset=null limit=5000 remaining=0")
         self.assertEqual(row["status"], "unavailable")
         self.assertEqual(row["graphql"], {})
+        self.assertEqual(row["source"], "REST rate_limit resources.graphql")
+
+    def test_zero_quota_is_observed_not_unavailable(self):
+        row = self.completed_quota("used=0 reset=1794000000 limit=5000 remaining=0")
+        self.assertEqual(row["status"], "observed")
+        self.assertEqual(row["graphql"], {"used": 0, "reset": 1794000000, "limit": 5000, "remaining": 0})
         self.assertEqual(row["source"], "REST rate_limit resources.graphql")
 
     def test_retention_exact_boundary_and_unrelated_state(self):
