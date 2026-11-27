@@ -24,11 +24,13 @@ merge gate or weakening any guard:
        - mode=no-mistakes: launches `python3 bin/fm-duration.py run --pipeline-priority merge-train
          fm-landing-update-<task> -- no-mistakes rerun` detached in the task worktree, only when
          `no-mistakes axi status` shows no run active there. Never passes --yes.
-       - mode=direct-PR: merges origin/<base> cleanly and pushes HEAD:<branch> only when the
-         worktree is clean and merge-tree proved conflict-free.
+       - mode=direct-PR: invokes GitHub's server-side `PUT /repos/{owner}/{repo}/pulls/{number}/update-branch`
+         bound to `expected_head_sha=<head>` so the task worktree is never mutated, unpushed local commits
+         can never be published, and ignored local files can never be overwritten.
   4. Every merge still goes through bin/fm-pr-merge.sh (never gh pr merge directly, never
-     --attended-override). Main is woken via a deduplicated `check: landing-loop <task>: ...` wake
-     only on actionable failures (conflicts, dirty worktrees, failed updates), never on routine
+     --attended-override). Main is woken via a `check: landing-loop <task>: ...` wake only on
+     actionable failures (conflicts, dirty no-mistakes worktrees, failed updates), with normal-case
+     deduplication per (task, full head SHA) and at-least-once crash recovery, never on routine
      updates or landings.
 
 Durable state lives under <state>/.landing-loop/: lock, state.json, events.jsonl, inflight.json,
@@ -147,9 +149,12 @@ def emit_wake_once(home, state_doc, task, pr, head, key, text, state_path=None):
         return False
     marker_file = home.root / "emitted-wakes.log"
     marker_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    # Commit the wake row and durable marker atomically under FM_WAKE_QUEUE_LOCK
-    # (the exact pattern documented in bin/fm-wake-lib.sh:fm_wake_append_locked)
-    # so neither a lost wake nor a duplicate wake can occur across a crash.
+    # Hold FM_WAKE_QUEUE_LOCK across the dedup check, append, and marker write
+    # (bin/fm-wake-lib.sh:fm_wake_append_locked). This guarantees normal-case
+    # deduplication per (task, full head SHA) and deduplication while the wake
+    # remains queued, with at-least-once recovery (matching bin/fm-pr-merge.sh
+    # and bin/fm-pr-auto-review.py) if killed between queue append and marker
+    # write so an actionable wake is never silently lost.
     script = r'''
 . "$1/fm-wake-lib.sh"
 dedup=$2
@@ -352,20 +357,16 @@ TERMINAL_NM_STATUSES = frozenset({
 
 
 def no_mistakes_run_state(worktree):
-    """Return (busy_or_unreadable, reason). Mirrors bin/fm-nm-run-lib.sh:fm_nm_run_is_active and fails closed."""
+    """Return (busy_or_unreadable, reason). Requires explicit terminal status; fails closed otherwise."""
     res = run(["no-mistakes", "axi", "status"], cwd=worktree, timeout=GH_TIMEOUT)
     if res.returncode != 0:
         return True, f"no-mistakes axi status unreadable or timed out (exit {res.returncode})"
     seen_status = None
-    seen_outcome = None
     for line in res.stdout.splitlines():
         stripped = line.strip()
         if seen_status is None and stripped.startswith("status:"):
             seen_status = stripped.split(":", 1)[1].strip().strip('"').lower()
-        elif seen_outcome is None and stripped.startswith("outcome:"):
-            seen_outcome = stripped.split(":", 1)[1].strip().strip('"').lower()
-    if seen_outcome:
-        return False, f"terminal outcome ({seen_outcome})"
+            break
     if seen_status is None:
         return True, "no-mistakes axi status returned no run status"
     if seen_status in TERMINAL_NM_STATUSES:
@@ -452,9 +453,13 @@ def launch_update(home, item, base_name, base_tip, expected_tree, state_doc, sta
     run_id = f"{task}-{head[:10]}-{int(time.time())}"
     run_dir = home.root / "runs" / run_id
     run_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    pr_match = PR_URL.fullmatch(item["pr"])
     request = {
         "task": task,
         "pr": item["pr"],
+        "owner": pr_match.group(1) if pr_match else "",
+        "repo": pr_match.group(2) if pr_match else "",
+        "number": int(pr_match.group(3)) if pr_match else item.get("number", 0),
         "mode": mode,
         "worktree": worktree,
         "branch": branch,
@@ -586,100 +591,26 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
             else:
                 detail = "no-mistakes rerun completed" if rc == 0 else (tail[-1][:200] if tail else f"no-mistakes rerun exited {rc}")
         elif mode == "direct-PR":
-            # Perform the real git merge inside a temporary shared clone with the
-            # worktree's hook and identity settings so project pre-merge-commit /
-            # commit-msg hooks run normally while the task worktree is never mutated
-            # or reset. Push the exact verified commit SHA (never mutable HEAD), then
-            # fast-forward the clean task worktree if it is still at expected_head.
-            logs = []
-            local_head = run(["git", "-C", worktree, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT)
-            if local_head.returncode != 0 or local_head.stdout.strip() != expected_head:
-                rc = 1
-                detail = f"direct-PR update stopped: local HEAD {(local_head.stdout.strip() or '(unreadable)')[:12]} differs from proved forge head {expected_head[:12]}"
-            elif not worktree_is_clean(worktree):
-                rc = 1
-                detail = "direct-PR update stopped: worktree has uncommitted changes"
+            # Use GitHub's server-side update-branch API bound to expected_head_sha
+            # so the local task worktree is never mutated, ignored local files cannot
+            # be overwritten, and unpushed local commits can never be published.
+            owner = req.get("owner") or ""
+            repo_name = req.get("repo") or ""
+            number = req.get("number") or 0
+            if not (owner and repo_name and number and SHA.fullmatch(expected_head)):
+                rc = 2
+                detail = "direct-PR update missing canonical owner/repo/number or head SHA"
+                log_path.write_text(detail + "\n", encoding="utf-8")
             else:
-                if run(["git", "-C", worktree, "cat-file", "-e", f"{base_tip}^{{commit}}"], timeout=GIT_TIMEOUT).returncode != 0:
-                    ft = run(["git", "-C", worktree, "fetch", "origin", base_tip], timeout=GIT_TIMEOUT)
-                    logs.append(f"$ git -C {worktree} fetch origin {base_tip}\n{ft.stdout}{ft.stderr}\n")
-                    if run(["git", "-C", worktree, "cat-file", "-e", f"{base_tip}^{{commit}}"], timeout=GIT_TIMEOUT).returncode != 0:
-                        ft2 = run(["git", "-C", worktree, "fetch", "origin", base_name], timeout=GIT_TIMEOUT)
-                        logs.append(f"$ git -C {worktree} fetch origin {base_name}\n{ft2.stdout}{ft2.stderr}\n")
-                if run(["git", "-C", worktree, "cat-file", "-e", f"{base_tip}^{{commit}}"], timeout=GIT_TIMEOUT).returncode != 0:
-                    rc = 1
-                    detail = f"proved base commit {base_tip[:12]} unavailable after fetch"
+                endpoint = f"repos/{owner}/{repo_name}/pulls/{number}/update-branch"
+                cmd = ["gh", "api", "-X", "PUT", endpoint, "-f", f"expected_head_sha={expected_head}"]
+                done = run(cmd, timeout=GH_TIMEOUT)
+                log_path.write_text(f"$ {' '.join(cmd)}\n{done.stdout}{done.stderr}\n", encoding="utf-8")
+                rc = done.returncode
+                if rc == 0:
+                    detail = f"requested server-side update-branch on {owner}/{repo_name}#{number} from {expected_head[:10]}"
                 else:
-                    author_name = run(["git", "-C", worktree, "config", "user.name"], timeout=GIT_TIMEOUT).stdout.strip() or "Firstmate Landing Loop"
-                    author_email = run(["git", "-C", worktree, "config", "user.email"], timeout=GIT_TIMEOUT).stdout.strip() or "landing-loop@local.invalid"
-                    hooks_cfg = run(["git", "-C", worktree, "config", "core.hooksPath"], timeout=GIT_TIMEOUT)
-                    if hooks_cfg.returncode == 0 and hooks_cfg.stdout.strip():
-                        hooks_path = hooks_cfg.stdout.strip()
-                        if not os.path.isabs(hooks_path):
-                            hooks_path = str((Path(worktree) / hooks_path).resolve())
-                    else:
-                        hooks_dir_res = run(["git", "-C", worktree, "rev-parse", "--path-format=absolute", "--git-path", "hooks"], timeout=GIT_TIMEOUT)
-                        hooks_path = hooks_dir_res.stdout.strip() if hooks_dir_res.returncode == 0 else ""
-                    with tempfile.TemporaryDirectory(prefix="fm-direct-merge-") as scratch:
-                        scratch_wt = os.path.join(scratch, "wt")
-                        cl = run(["git", "clone", "--quiet", "--shared", "--no-checkout", worktree, scratch_wt], timeout=GIT_TIMEOUT)
-                        logs.append(f"$ git clone --quiet --shared --no-checkout {worktree} {scratch_wt}\n{cl.stdout}{cl.stderr}\n")
-                        if cl.returncode != 0:
-                            rc = cl.returncode
-                            detail = f"could not clone shared scratch worktree (exit {rc})"
-                        else:
-                            run(["git", "-C", scratch_wt, "config", "user.name", author_name], timeout=GIT_TIMEOUT)
-                            run(["git", "-C", scratch_wt, "config", "user.email", author_email], timeout=GIT_TIMEOUT)
-                            if hooks_path:
-                                run(["git", "-C", scratch_wt, "config", "core.hooksPath", hooks_path], timeout=GIT_TIMEOUT)
-                            co = run(["git", "-C", scratch_wt, "checkout", "--quiet", "--detach", expected_head], timeout=GIT_TIMEOUT)
-                            logs.append(f"$ git -C {scratch_wt} checkout --quiet --detach {expected_head}\n{co.stdout}{co.stderr}\n")
-                            if co.returncode != 0:
-                                rc = co.returncode
-                                detail = f"could not checkout {expected_head[:12]} in scratch worktree"
-                            else:
-                                mg = run(
-                                    ["git", "-C", scratch_wt, "-c", "merge.ff=false", "merge", "--no-ff", "--no-edit",
-                                     "-m", f"Merge {base_name} ({base_tip[:10]}) into {branch}", base_tip],
-                                    timeout=GIT_TIMEOUT,
-                                )
-                                logs.append(f"$ git -C {scratch_wt} merge --no-ff --no-edit {base_tip}\n{mg.stdout}{mg.stderr}\n")
-                                if mg.returncode != 0:
-                                    rc = mg.returncode
-                                    detail = f"merge failed (exit {rc}): {(mg.stderr or mg.stdout).strip()[:160]}"
-                                else:
-                                    merged_sha = run(["git", "-C", scratch_wt, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT).stdout.strip()
-                                    merged_tree = run(["git", "-C", scratch_wt, "rev-parse", "HEAD^{tree}"], timeout=GIT_TIMEOUT).stdout.strip()
-                                    if not SHA.fullmatch(merged_sha):
-                                        rc = 1
-                                        detail = "could not read merged commit SHA from scratch worktree"
-                                    elif expected_tree and merged_tree != expected_tree:
-                                        rc = 1
-                                        detail = f"merged tree {merged_tree[:12]} diverged from proved tree {expected_tree[:12]}"
-                                    else:
-                                        ur = run(["git", "-C", scratch_wt, "update-ref", "refs/heads/fm-landing-merge", merged_sha], timeout=GIT_TIMEOUT)
-                                        if ur.returncode != 0:
-                                            rc = ur.returncode
-                                            detail = f"failed to stage scratch ref for {merged_sha[:12]}"
-                                        else:
-                                            imp = run(["git", "-C", worktree, "fetch", "--no-tags", scratch_wt, "refs/heads/fm-landing-merge"], timeout=GIT_TIMEOUT)
-                                            logs.append(f"$ git -C {worktree} fetch --no-tags {scratch_wt} refs/heads/fm-landing-merge\n{imp.stdout}{imp.stderr}\n")
-                                            if imp.returncode != 0:
-                                                rc = imp.returncode
-                                                detail = f"failed to import scratch merge commit {merged_sha[:12]}"
-                                            else:
-                                                ps = run(["git", "-C", worktree, "push", "origin", f"{merged_sha}:refs/heads/{branch}"], timeout=GIT_TIMEOUT)
-                                                logs.append(f"$ git -C {worktree} push origin {merged_sha}:refs/heads/{branch}\n{ps.stdout}{ps.stderr}\n")
-                                                rc = ps.returncode
-                                                if rc == 0:
-                                                    # Advance clean task worktree via safe fast-forward only if still at expected_head.
-                                                    cur_head = run(["git", "-C", worktree, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT).stdout.strip()
-                                                    if cur_head == expected_head and worktree_is_clean(worktree):
-                                                        run(["git", "-C", worktree, "merge", "--ff-only", "--quiet", merged_sha], timeout=GIT_TIMEOUT)
-                                                    detail = f"merged {base_name} ({base_tip[:10]}) into {merged_sha[:10]} and pushed {branch}"
-                                                else:
-                                                    detail = f"push failed (exit {rc}): {(ps.stderr or ps.stdout).strip()[:160]}"
-            log_path.write_text("".join(logs), encoding="utf-8")
+                    detail = f"update-branch failed (exit {rc}): {(done.stderr or done.stdout).strip()[:160]}"
         else:
             detail = f"unsupported delivery mode: {mode}"
             rc = 2
@@ -796,38 +727,33 @@ def assess_candidates(home, include_stale_red=False, inflight=None, backoff=None
             rows.append(entry)
             continue
         worktree = meta.get("worktree", "")
-        if not worktree or not os.path.isdir(worktree):
-            entry["action"] = "held"
-            entry["reason"] = f"worktree missing: {worktree or '(unset)'}"
-            rows.append(entry)
-            continue
-        if not worktree_is_clean(worktree):
-            entry["action"] = "held"
-            entry["reason"] = "worktree has uncommitted changes"
-            rows.append(entry)
-            continue
-        if meta["mode"] == "direct-PR":
-            lh = run(["git", "-C", worktree, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT)
-            local_head = lh.stdout.strip() if lh.returncode == 0 else ""
-            if local_head != head:
+        if meta["mode"] == "no-mistakes":
+            if not worktree or not os.path.isdir(worktree):
                 entry["action"] = "held"
-                entry["reason"] = f"local HEAD {(local_head or '(unreadable)')[:12]} differs from forge head {head[:12]}; reconcile custody"
+                entry["reason"] = f"worktree missing: {worktree or '(unset)'}"
                 rows.append(entry)
                 continue
-        if meta["mode"] == "no-mistakes":
+            if not worktree_is_clean(worktree):
+                entry["action"] = "held"
+                entry["reason"] = "worktree has uncommitted changes"
+                rows.append(entry)
+                continue
             nm_busy, nm_reason = no_mistakes_run_state(worktree)
             if nm_busy:
                 entry["action"] = "busy"
                 entry["reason"] = nm_reason
                 rows.append(entry)
                 continue
-        clean, detail, expected_tree = check_clean_merge_tree(worktree, cmp["base_tip"], head)
-        if not clean:
-            entry["action"] = "conflict" if "conflict" in detail else "held"
-            entry["reason"] = detail
-            rows.append(entry)
-            continue
-        entry["expected_tree"] = expected_tree
+        if worktree and os.path.isdir(worktree):
+            clean, detail, expected_tree = check_clean_merge_tree(worktree, cmp["base_tip"], head)
+            if not clean:
+                entry["action"] = "conflict" if "conflict" in detail else "held"
+                entry["reason"] = detail
+                rows.append(entry)
+                continue
+            entry["expected_tree"] = expected_tree
+        else:
+            entry["expected_tree"] = ""
         entry["action"] = "update"
         entry["reason"] = f"behind {base_name} by {cmp['behind_by']} ({'PASS verified' if has_pass else 'checks green' if not failed else 'stale-red opt-in'})"
         rows.append(entry)

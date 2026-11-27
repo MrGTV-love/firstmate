@@ -71,6 +71,13 @@ if len(args) >= 2 and args[0] == "api" and "/compare/" in args[1]:
             print(json.dumps(v))
             sys.exit(0)
     sys.exit(1)
+if len(args) >= 4 and args[0] == "api" and args[1] == "-X" and args[2] == "PUT" and args[3].endswith("/update-branch"):
+    log_path = data.get("update_log")
+    if log_path:
+        with open(log_path, "a", encoding="utf-8") as fh:
+            fh.write(" ".join(args) + "\n")
+    print(json.dumps({"message": "Updating pull request branch."}))
+    sys.exit(0)
 sys.exit(1)
 SH
   chmod +x "$shim/gh"
@@ -193,16 +200,26 @@ JSON
   pass "conflicting stale-base PR is held without launching a rerun and wakes Main once"
 }
 
-test_direct_pr_merges_base_and_pushes_cleanly() {
+test_direct_pr_updates_server_side_without_mutating_worktree() {
   local dir="$TMP_ROOT/direct" home="$TMP_ROOT/direct/home" shim="$TMP_ROOT/direct/shim"
   mkdir -p "$home/state" "$home/config" "$home/data"
   local info wt head tip
   info=$(make_git_pair "$dir/repo" "fm/direct-a" "direct.txt" "main-direct.txt" 0)
   read -r wt head tip <<< "$info"
+  # Place both an ignored local file and an unpushed local commit in the task worktree:
+  # server-side update-branch bound to expected_head_sha must leave both untouched and never publish the local commit.
+  printf 'ignored-secret\n' > "$wt/.gitignore"
+  printf 'local ignored value\n' > "$wt/ignored-secret"
+  printf 'local unpushed work\n' > "$wt/unpushed.txt"
+  git -C "$wt" add .gitignore unpushed.txt
+  git -C "$wt" commit -q -m 'local unpushed commit'
+  local local_head
+  local_head=$(git -C "$wt" rev-parse HEAD)
   local url="https://github.com/example/repo/pull/104"
   fm_write_meta "$home/state/direct-a.meta" "kind=ship" "mode=direct-PR" "branch=fm/direct-a" "worktree=$wt" "pr=$url"
   cat > "$dir/gh.json" <<JSON
 {
+  "update_log": "$dir/update.log",
   "prs": {
     "$url": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/direct-a", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
   },
@@ -212,26 +229,14 @@ test_direct_pr_merges_base_and_pushes_cleanly() {
 }
 JSON
   write_fake_gh "$shim" "$dir/gh.json"
-  local hooks_dir="$dir/hooks" hook_ran="$dir/hook-ran"
-  mkdir -p "$hooks_dir"
-  cat > "$hooks_dir/commit-msg" <<SH
-#!/usr/bin/env bash
-printf 'ran\n' >> "$hook_ran"
-exit 0
-SH
-  chmod +x "$hooks_dir/commit-msg"
-  git -C "$wt" config core.hooksPath "$hooks_dir"
   PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "direct-PR step must exit 0"
   PATH="$shim:$PATH" wait_for_inflight_done "$home" || fail "direct-PR update must finish"
-  local new_remote wt_head
-  new_remote=$(git --git-dir="$dir/repo/origin.git" rev-parse refs/heads/fm/direct-a)
-  wt_head=$(git -C "$wt" rev-parse HEAD)
-  [ "$new_remote" != "$head" ] || fail "direct-PR update must push a new head to origin"
-  [ -f "$hook_ran" ] || fail "direct-PR merge must run the worktree's commit-msg hook"
-  assert_equals "$new_remote" "$wt_head" "clean task worktree HEAD must fast-forward to the pushed merge commit"
-  git --git-dir="$dir/repo/origin.git" merge-base --is-ancestor "$tip" "$new_remote" \
-    || fail "pushed direct-PR head must contain the base tip"
-  pass "direct-PR clean stale-base update honors hooks in scratch, pushes exact commit, and fast-forwards clean worktree"
+  grep -Fq "api -X PUT repos/example/repo/pulls/104/update-branch -f expected_head_sha=$head" "$dir/update.log" \
+    || fail "direct-PR must call GitHub server-side update-branch bound to expected_head_sha=$head"
+  assert_equals "$local_head" "$(git -C "$wt" rev-parse HEAD)" "direct-PR server-side update must never mutate local worktree HEAD"
+  assert_equals "local ignored value" "$(cat "$wt/ignored-secret")" "direct-PR update must never overwrite ignored local files"
+  assert_equals "$head" "$(git --git-dir="$dir/repo/origin.git" rev-parse refs/heads/fm/direct-a)" "unpushed local commit must never be pushed to origin"
+  pass "direct-PR updates server-side via expected_head_sha without mutating worktree, ignored files, or publishing unpushed commits"
 }
 
 test_failed_update_backs_off_and_wakes_main_once() {
@@ -307,21 +312,19 @@ SH
   pass "launchd installer renders valid plist, installs, reports status, enforces test-seam overrides, and uninstalls cleanly"
 }
 
-test_direct_pr_refuses_unpushed_local_commits_and_wakes_once() {
-  local dir="$TMP_ROOT/unpushed" home="$TMP_ROOT/unpushed/home" shim="$TMP_ROOT/unpushed/shim"
+test_dirty_no_mistakes_worktree_held_and_wakes_once() {
+  local dir="$TMP_ROOT/dirty" home="$TMP_ROOT/dirty/home" shim="$TMP_ROOT/dirty/shim"
   mkdir -p "$home/state" "$home/config" "$home/data"
   local info wt head tip
-  info=$(make_git_pair "$dir/repo" "fm/unpushed-a" "u.txt" "main-u.txt" 0)
+  info=$(make_git_pair "$dir/repo" "fm/dirty-a" "u.txt" "main-u.txt" 0)
   read -r wt head tip <<< "$info"
-  printf 'local unpushed work\n' > "$wt/unpushed.txt"
-  git -C "$wt" add unpushed.txt
-  git -C "$wt" commit -q -m 'local unpushed commit'
+  printf 'dirty uncommitted\n' > "$wt/dirty.txt"
   local url="https://github.com/example/repo/pull/106"
-  fm_write_meta "$home/state/unpushed-a.meta" "kind=ship" "mode=direct-PR" "branch=fm/unpushed-a" "worktree=$wt" "pr=$url"
+  fm_write_meta "$home/state/dirty-a.meta" "kind=ship" "mode=no-mistakes" "branch=fm/dirty-a" "worktree=$wt" "pr=$url"
   cat > "$dir/gh.json" <<JSON
 {
   "prs": {
-    "$url": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/unpushed-a", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
+    "$url": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/dirty-a", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
   },
   "compares": {
     "$head": {"base_commit": {"sha": "$tip"}, "behind_by": 1}
@@ -329,17 +332,16 @@ test_direct_pr_refuses_unpushed_local_commits_and_wakes_once() {
 }
 JSON
   write_fake_gh "$shim" "$dir/gh.json"
-  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "unpushed step must exit 0"
-  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "repeat unpushed step must exit 0"
-  "$JQ_BIN" -e '.tasks["unpushed-a"].action == "held"' "$home/state/.landing-loop/state.json" >/dev/null \
-    || fail "direct-PR with unpushed local commit must be held"
-  local remote_head
-  remote_head=$(git --git-dir="$dir/repo/origin.git" rev-parse refs/heads/fm/unpushed-a)
-  assert_equals "$head" "$remote_head" "unpushed local commit must never be published"
+  write_fake_nm "$shim" "$dir/nm.log" 0
+  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "dirty step must exit 0"
+  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "repeat dirty step must exit 0"
+  "$JQ_BIN" -e '.tasks["dirty-a"].action == "held"' "$home/state/.landing-loop/state.json" >/dev/null \
+    || fail "dirty no-mistakes worktree must be held"
+  [ ! -e "$dir/nm.log" ] || fail "dirty worktree must never launch no-mistakes rerun"
   local wakes
-  wakes=$(grep -c "landing-loop unpushed-a:" "$home/state/.wake-queue" 2>/dev/null || echo 0)
-  assert_equals "1" "$wakes" "held unpushed checkout must emit exactly one wake"
-  pass "direct-PR refuses to publish unpushed local commits and wakes Main once"
+  wakes=$(grep -c "landing-loop dirty-a:" "$home/state/.wake-queue" 2>/dev/null || echo 0)
+  assert_equals "1" "$wakes" "held dirty checkout must emit exactly one wake"
+  pass "dirty no-mistakes worktree is held without launching rerun and wakes Main once"
 }
 
 test_train_plans_and_builds_conflict_free_batch_excluding_conflicts() {
@@ -477,6 +479,23 @@ SH
   "$JQ_BIN" -e '.tasks["status-fail"].action == "busy"' "$home/state/.landing-loop/state.json" >/dev/null \
     || fail "zero-exit status response without status: field must fail closed as busy"
   [ ! -e "$dir/nm.log" ] || fail "must not launch rerun on zero-exit error status response"
+  # outcome: passed without status:, or alongside status: running, must stay busy.
+  for payload in $'outcome: passed\n' $'status: running\noutcome: passed\n'; do
+    cat > "$shim/no-mistakes" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = axi ] && [ "\$2" = status ]; then
+  printf '%s' "$payload"
+  exit 0
+fi
+printf 'unexpected rerun\n' >> "$dir/nm.log"
+exit 0
+SH
+    chmod +x "$shim/no-mistakes"
+    PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "outcome-only step must exit 0"
+    "$JQ_BIN" -e '.tasks["status-fail"].action == "busy"' "$home/state/.landing-loop/state.json" >/dev/null \
+      || fail "outcome without terminal status must fail closed as busy"
+  done
+  [ ! -e "$dir/nm.log" ] || fail "must not launch rerun when status is missing or running"
   # Terminal status ci_monitor_interrupted must be recognized as idle (eligible for update).
   cat > "$shim/no-mistakes" <<SH
 #!/usr/bin/env bash
@@ -557,8 +576,8 @@ PY
 fm_test_run_cases \
   test_serial_admission_updates_one_clean_stale_pr_at_a_time \
   test_conflict_holds_and_emits_single_wake \
-  test_direct_pr_merges_base_and_pushes_cleanly \
-  test_direct_pr_refuses_unpushed_local_commits_and_wakes_once \
+  test_direct_pr_updates_server_side_without_mutating_worktree \
+  test_dirty_no_mistakes_worktree_held_and_wakes_once \
   test_unreadable_nm_status_fails_closed \
   test_detached_update_timeout_terminates_nested_child \
   test_failed_update_backs_off_and_wakes_main_once \
