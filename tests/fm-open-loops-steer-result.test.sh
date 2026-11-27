@@ -36,6 +36,9 @@ snapshot.chmod(0o755)
 peek = code / 'bin/fm-peek.sh'
 peek.write_text('#!/bin/sh\nprintf "waiting for validation\\n"\n')
 peek.chmod(0o755)
+send = code / 'bin/fm-send.sh'
+send.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$FM_HOME/sent"\n')
+send.chmod(0o755)
 base = int(time.time())
 iso = lambda stamp: dt.datetime.fromtimestamp(stamp, dt.timezone.utc).isoformat()
 
@@ -267,22 +270,45 @@ c.now = base + 900
 c.actionable(False)
 print('PASS: a typed report after an acknowledgement and a plain working line still settles a silence steer', flush=True)
 
-# A typed failed status from any report, and a typed done from a secondmate, are results that settle the steer.
+# A typed failed status, or a secondmate typed done status, keeps the ordinary silence cadence and check-in.
 for kind, verb in (('ship', 'failed'), ('secondmate', 'done')):
-    c = Case('typed-' + verb + '-' + kind, category='silent_report', kind=kind)
+    c = Case('cadence-' + verb + '-' + kind, category='silent_report', kind=kind)
+    with c.status.open('a') as stream:
+        stream.write(f'{verb} [at={base}]: reported the validation outcome\n')
+    c.now = base + 899
+    c.collect()
+    assert not c.current()['overdue'], (c.home.name, c.current())
+    c.now = base + 900
+    c.collect()
+    row = c.current()
+    assert row['overdue'] and not row.get('informational'), (c.home.name, row)
+    assert c.ident in c.cli('--present-overdue').stdout, c.home.name
+    assert json.loads(c.cli('--check-in', 'worker', '--json').stdout).get('check_in') == 'sent', c.home.name
+    assert (c.home / 'sent').read_text().startswith('worker --answers-none '), c.home.name
+print('PASS: a typed failed or secondmate done status keeps the silence row visible and allows a check-in', flush=True)
+
+# A typed failed or secondmate done line settles a silence steer only in a later second than the delivery.
+for kind, verb, same in (('ship', 'failed', False), ('secondmate', 'done', False), ('ship', 'failed', True)):
+    c = Case('typed-' + verb + '-' + kind + ('-same-second' if same else ''), category='silent_report', kind=kind)
+    if same:
+        with c.status.open('a') as stream:
+            stream.write(f'{verb} [at={base}]: status written in the second the steer is delivered\n')
     message = c.delivery(); c.steer()
     c.now = base + 800
     handled = c.home / 'state/worker.inbox/handled'
     handled.mkdir()
     message.rename(handled / '001.msg')
     os.utime(handled, (c.now, c.now))
-    with c.status.open('a') as stream:
-        stream.write(f'{verb} [at={c.now}]: reported the validation outcome\n')
+    if not same:
+        with c.status.open('a') as stream:
+            stream.write(f'{verb} [at={c.now}]: reported the validation outcome\n')
     c.now = base + 899
     c.actionable(False)
     c.now = base + 900
-    c.actionable(False)
-print('PASS: a typed failed report or a secondmate typed done report settles a silence steer', flush=True)
+    c.actionable(same, refresh=False)
+    c.actionable(same)
+print('PASS: a later-second typed failed or secondmate done line settles a silence steer; a same-second one does not',
+      flush=True)
 
 # A reply resolved in the delivery's own second cannot be ordered after it; only a later-second reply settles.
 for mode in ('reply-same-second', 'reply-later-second'):

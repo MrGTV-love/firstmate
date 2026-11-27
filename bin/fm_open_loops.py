@@ -429,8 +429,6 @@ class Collector:
         long_wait = False
         if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") == "done"):
             excluded = "excluded: done/ready task is covered by PR or completion handoff"
-        elif verb == "failed" or (task["kind"] == "secondmate" and verb == "done"):
-            excluded = "excluded: typed " + verb + " status reports the result"
         elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
             excluded = "excluded: idle secondmate has no routed work in flight"
         elif open_decision or self.gate_awaits_human(task):
@@ -453,8 +451,11 @@ class Collector:
         if not excluded:
             # A status or acknowledgement may reset the ordinary check-in cadence, but a plain status line is
             # never a result and a second-resolution stamp cannot order it against the delivery. Only a resolved
-            # reply provably after the delivery or a typed status (excluded above) settles a recorded steer.
-            self.silence_transport[row["id"]] = resolved
+            # reply or typed failed/secondmate done line provably after the delivery, or a typed status
+            # excluded above, settles a recorded steer.
+            typed = verb == "failed" or (task["kind"] == "secondmate" and verb == "done")
+            self.silence_transport[row["id"]] = resolved + (
+                [(verb, status_at)] if typed and status_at is not None and status_at <= self.now else [])
         if long_wait:
             row["limit_seconds"] = pause_limit
             row["overdue"] = not informational and (row["age_seconds"] is None or row["age_seconds"] >= pause_limit)
