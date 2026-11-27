@@ -1,0 +1,11 @@
+head=07842e61d5fb8d4ee6428e86077058842b0f7968
+$ tests/fm-unbuilt-prune-claims.test.sh
+ok - the check excludes exactly its own file
+ok - no text of the repository names a timed or scheduled treehouse prune without saying it is not built
+ok - the three base members are reported as file:line, and only those
+ok - the same fixture with the corrected sentences passes
+ok - the matching rule reports each unbuilt-prune shape and spares the true neighbouring texts
+ok - every listed path is scanned; data/ and the check's own file are not
+ok - a copy without the matching rule passes the old texts, so the cases above fail for that reason
+ok - an allowance widened to any 'not' lets the old header sentence through, so the real allowance is tight
+rc=0

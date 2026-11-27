@@ -1,0 +1,26 @@
+head=07842e61d5fb8d4ee6428e86077058842b0f7968 (read-only; treehouse never run)
+$ git grep -n -E "treehouse prune|prune --all" -- bin tests .agents docs skills .github README.md AGENTS.md
+bin/fm-copy-sweep.sh:23:# never asks Treehouse to change it. The whole-slot reaper (`treehouse prune`)
+bin/fm-merge-prune.sh:139:# hours in case the cause cleared. No hourly `treehouse prune --all --yes`
+docs/configuration.md:899:No hourly `treehouse prune --all --yes` net is built in this repository: the owner's manual reaper `~/.local/bin/treehouse-reap-clean`, run by hand on named paths, is the only net until the task `fm-pool-prune-gated-removal` lands.
+docs/configuration.md:2592:`treehouse prune` works on whole pool slots and does not see these copies, and a teardown only removes its own task's.
+tests/fm-unbuilt-prune-claims.test.sh:3:# `treehouse prune` exists, unless the same sentence says it is not built.
+tests/fm-unbuilt-prune-claims.test.sh:6:# scheduled bulk treehouse prune net existed and was unchanged. No commit ever
+tests/fm-unbuilt-prune-claims.test.sh:218:  pass "no text of the repository names a timed or scheduled treehouse prune without saying it is not built"
+tests/fm-unbuilt-prune-claims.test.sh:249:A nightly treehouse prune frees pool copies.
+tests/fm-unbuilt-prune-claims.test.sh:250:A cron job runs treehouse prune every night.
+tests/fm-unbuilt-prune-claims.test.sh:255:The safety net for pool copies is the treehouse prune.
+tests/fm-unbuilt-prune-claims.test.sh:268:The whole-slot reaper (`treehouse prune`) works on slots and cannot see these copies; this script does not touch slots.
+tests/fm-unbuilt-prune-claims.test.sh:272:`treehouse prune` works on whole pool slots and does not see these copies, and a teardown only removes its own task's.
+rc=0
+$ git cat-file -e HEAD:bin/fm-pool-hygiene.sh
+fatal: path 'bin/fm-pool-hygiene.sh' does not exist in 'HEAD'
+rc=128 (nonzero = absent)
+$ git grep -n -E "(\"|'|\s)prune(\s|\"|$)" -- bin | grep -v "^bin/[^:]*:[0-9]*:\s*#"  (non-comment prune words in bin)
+rc=1 (1 = no non-comment treehouse prune caller)
+$ crontab -l | grep -ciE "treehouse|prune"
+0
+$ grep -l -iE "treehouse.*prune|prune.*treehouse" ~/Library/LaunchAgents/*.plist
+rc=1 (1 = none)
+$ grep -c "treehouse prune" ~/.local/bin/treehouse-reap-clean
+0

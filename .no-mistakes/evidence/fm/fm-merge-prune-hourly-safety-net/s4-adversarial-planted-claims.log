@@ -1,0 +1,10 @@
+head=07842e61d5fb8d4ee6428e86077058842b0f7968 root=git-archive-of-head plus planted sentences
+--- planted: 3 false claims (bin comment, README "not duplicated", 2-line docs paragraph "unchanged") + 1 true neighbour
+$ tests/fm-unbuilt-prune-claims.test.sh --scan <planted head copy>
+bin/fm-copy-sweep.sh:2438: A launchd job runs treehouse prune every night to clean the pool.
+docs/configuration.md:5240: A cron entry removes returned slots with a periodic treehouse prune pass, and that is unchanged.
+README.md:278: The hourly treehouse prune safety net is not duplicated here.
+rc=1
+--- planted claim in data/ (out of scope) must not trip
+fm-unbuilt-prune-claims: ok files=1136
+rc=0

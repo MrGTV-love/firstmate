@@ -1,0 +1,22 @@
+head=07842e61d5fb8d4ee6428e86077058842b0f7968
+$ bash -n bin/fm-merge-prune.sh
+rc=0
+$ bin/fm-merge-prune.sh   (no args)
+rc=2
+fm-merge-prune: usage: fm-merge-prune.sh arm|run|sweep
+$ git diff -U0 c89e6a597 HEAD -- bin/fm-merge-prune.sh
+diff --git a/bin/fm-merge-prune.sh b/bin/fm-merge-prune.sh
+index 543e8189e..e39c2bb37 100755
+--- a/bin/fm-merge-prune.sh
++++ b/bin/fm-merge-prune.sh
+@@ -9 +9,2 @@
+-# A merged task's pool copy used to stay until an hourly safety net or a human
++# A merged task's pool copy used to stay until a human or the owner's manual
++# reaper (~/.local/bin/treehouse-reap-clean)
+@@ -138,2 +139,4 @@
+-# hours in case the cause cleared. The hourly `treehouse prune --all --yes`
+-# safety net is not duplicated.
++# hours in case the cause cleared. No hourly `treehouse prune --all --yes`
++# net is built in this repository: the owner's manual reaper,
++# ~/.local/bin/treehouse-reap-clean, run by hand on named paths, is the
++# only net until the task fm-pool-prune-gated-removal lands.

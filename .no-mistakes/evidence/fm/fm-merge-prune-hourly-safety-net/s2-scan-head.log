@@ -1,0 +1,4 @@
+head=07842e61d5fb8d4ee6428e86077058842b0f7968
+$ tests/fm-unbuilt-prune-claims.test.sh --scan  (head repo)
+fm-unbuilt-prune-claims: ok files=1136
+rc=0

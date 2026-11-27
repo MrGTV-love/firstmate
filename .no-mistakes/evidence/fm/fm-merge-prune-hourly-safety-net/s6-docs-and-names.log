@@ -1,0 +1,22 @@
+head=07842e61d5fb8d4ee6428e86077058842b0f7968
+$ git grep -n fm-arm-prune-and-copy-sweep
+rc=1 (1 = zero hits)
+$ git grep -n fm-pool-prune-gated-removal
+bin/fm-merge-prune.sh:142:# only net until the task fm-pool-prune-gated-removal lands.
+docs/configuration.md:899:No hourly `treehouse prune --all --yes` net is built in this repository: the owner's manual reaper `~/.local/bin/treehouse-reap-clean`, run by hand on named paths, is the only net until the task `fm-pool-prune-gated-removal` lands.
+tests/fm-unbuilt-prune-claims.test.sh:179:    '# only net until the task fm-pool-prune-gated-removal lands.'
+tests/fm-unbuilt-prune-claims.test.sh:181:    "$(expand 'No ~H~ `treehouse ~PAY~` net is built in this repository:')"' the owner'"'"'s manual reaper `~/.local/bin/treehouse-reap-clean`, run by hand on named paths, is the only net until the task `fm-pool-prune-gated-removal` lands.' \
+rc=0
+$ bin/fm-doc-audience-check.sh --root .
+fm-doc-audience-check: ok surfaces=158 local_links=1831
+rc=0
+$ tests/fm-documentation-audiences.test.sh
+ok - documentation inventory classifies every maintained prose surface exactly once
+ok - classification, setup routing, and maintained-prose scope fail safely
+ok - required documentation owner pointers cannot silently disappear
+ok - local links resolve while dates, versions, commands, and incident prose remain semantically reviewed
+ok - nested skill references use their owner while ordinary links, anchors, and path boundaries remain enforced
+rc=0
+$ bin/fm-test-run.sh --list --family unclassified (new file line)
+rc=0
+105:tests/fm-unbuilt-prune-claims.test.sh
