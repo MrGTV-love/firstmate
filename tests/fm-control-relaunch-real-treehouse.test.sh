@@ -2,13 +2,13 @@
 # The real-Treehouse case of the Herdr spawn path behind bin/fm-control.sh relaunch: a Herdr pass-over abort (the spawn
 # passed over a copy it cannot take, then gave up) is never reported clean. Copy A is a real pool slot whose state shows
 # another holder's lease, made by the installed treehouse binary; Herdr is the stub of tests/fm-control-relaunch-helpers.sh.
-# With no treehouse that has `lease --path` and `get --lease` (or no jq), the first output line is the runner's gate skip
-# and the script exits 0. The other Herdr relaunch cases live in tests/fm-control-relaunch-backends.test.sh.
+# The case needs only `get --lease` (and jq), as it did before it moved here; without them the first output line is the
+# runner's gate skip and the script exits 0. The other Herdr relaunch cases live in tests/fm-control-relaunch-backends.test.sh.
 # Shared fixtures: tests/fm-control-relaunch-helpers.sh.
 
 # shellcheck source=tests/fm-control-relaunch-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-control-relaunch-helpers.sh"
-fm_test_require_real_treehouse
+fm_test_require_real_treehouse get-lease
 
 # A Herdr spawn that passes over a copy and then aborts must never report the abort as clean: Herdr pass-over settlement and
 # the Herdr projection branch are untested, so fm-spawn reads no Herdr foreground and the outcome is always unobservable.

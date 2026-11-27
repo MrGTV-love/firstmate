@@ -623,7 +623,36 @@ test_spawn_tree_follows_untracked_content() (
   pass "the private spawn tree changes when an untracked file with a non-ASCII name changes content"
 )
 
+# fm_test_require_real_treehouse skips a script only for a capability that script names. A host treehouse whose
+# `lease --help` has no --path still runs a get-only gate, and the skip line names exactly what is missing.
+test_real_treehouse_gate_skips_only_for_a_named_capability() (
+  local dir="$TMP_ROOT/real-treehouse-gate" caps out want
+  mkdir -p "$dir/fakebin"
+  command -v jq >/dev/null 2>&1 || fail "jq is not installed, so this case cannot exercise the gate"
+  cat >"$dir/fakebin/treehouse" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  'lease --help') printf 'usage: treehouse lease [--lease-holder <name>]\n' ;;
+  'get --help') printf 'usage: treehouse get [--lease] [--lease-holder <name>]\n' ;;
+esac
+exit 0
+SH
+  chmod +x "$dir/fakebin/treehouse"
+  for caps in get-lease lease-path '' 'lease-path get-lease'; do
+    printf '#!/usr/bin/env bash\n. %q\nfm_test_require_real_treehouse %s\necho ran\n' "$ROOT/tests/lib.sh" "$caps" >"$dir/gate.sh"
+    out=$(PATH="$dir/fakebin:$PATH" bash "$dir/gate.sh" 2>&1) || fail "the gate script for '$caps' failed: $out"
+    case "$caps" in
+      get-lease) want=ran ;;
+      lease-path) want='skip: no Treehouse with lease --path on this host' ;;
+      *) want='skip: no Treehouse with lease --path and get --lease on this host' ;;
+    esac
+    [ "$out" = "$want" ] || fail "the gate for '$caps' printed '$out', not '$want'"
+  done
+  pass "the real-treehouse gate skips only for a capability the script names, and names it"
+)
+
 test_duration_fixture_isolation || fail "Fixture duration isolation"
+test_real_treehouse_gate_skips_only_for_a_named_capability || fail "Real-treehouse gate"
 test_spawn_tree_follows_untracked_content || fail "Spawn tree cache key"
 test_git_config_isolation || fail "Git fixture config isolation"
 test_inherited_git_location_isolation || fail "Git fixture location isolation"

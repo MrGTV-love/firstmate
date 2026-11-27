@@ -1022,18 +1022,40 @@ SH
   done
 }
 
-# real_treehouse_ready: the installed treehouse has `lease --path` and `get --lease`, and jq is installed, which every
-# case that drives the real treehouse binary on a scratch pool needs.
-real_treehouse_ready() {
-  local th
-  th=$(command -v treehouse 2>/dev/null) && command -v jq >/dev/null 2>&1 \
-    && "$th" lease --help 2>&1 | grep -Eq -- '--path' && "$th" get --help 2>&1 | grep -q -- '--lease'
+# real_treehouse_has <capability>...: jq is installed and the installed treehouse has every named capability:
+# lease-path (`treehouse lease --path`) or get-lease (`treehouse get --lease`).
+real_treehouse_has() {
+  local th cap
+  th=$(command -v treehouse 2>/dev/null) && command -v jq >/dev/null 2>&1 || return 1
+  for cap in "$@"; do
+    case "$cap" in
+      lease-path) "$th" lease --help 2>&1 | grep -Eq -- '--path' || return 1 ;;
+      get-lease) "$th" get --help 2>&1 | grep -q -- '--lease' || return 1 ;;
+      *) return 1 ;;
+    esac
+  done
 }
 
-# fm_test_require_real_treehouse: the gate of a script whose every case drives the real treehouse. With none here it
-# prints the runner's gate-skip line as the script's first output and exits 0, so bin/fm-test-run.sh counts it skipped.
+# real_treehouse_ready: both capabilities, which a case that leases a copy in place and gets slots needs.
+real_treehouse_ready() {
+  real_treehouse_has lease-path get-lease
+}
+
+# fm_test_require_real_treehouse [<capability>...]: the gate of a script whose every case drives the real treehouse and
+# needs the named capabilities (default: both). Without them here it prints the runner's gate-skip line, naming what is
+# missing, as the script's first output and exits 0, so bin/fm-test-run.sh counts it skipped.
 fm_test_require_real_treehouse() {
-  real_treehouse_ready || { echo 'skip: no Treehouse with lease --path and get --lease on this host'; exit 0; }
+  local text
+  [ "$#" -gt 0 ] || set -- lease-path get-lease
+  real_treehouse_has "$@" && return 0
+  case "$*" in
+    'lease-path get-lease') text='lease --path and get --lease' ;;
+    lease-path) text='lease --path' ;;
+    get-lease) text='get --lease' ;;
+    *) text="$*" ;;
+  esac
+  echo "skip: no Treehouse with $text on this host"
+  exit 0
 }
 
 # fm_fake_docker <fakebin>

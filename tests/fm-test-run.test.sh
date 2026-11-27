@@ -396,6 +396,75 @@ test_changed_owners_of_the_moved_real_treehouse_cases_select_them() {
   pass "every owner change that selected a moved real-Treehouse case still selects it, and an unrelated change does not"
 }
 
+# A case moved out of a script into the real-treehouse family is selected wherever that former host script is: by the
+# host's --family, by a change to the host itself, and by a path that selects the host. A reference that moved from the
+# host into a helper the host sources still selects the host (the reference scan follows sourced helpers).
+test_moved_real_treehouse_cases_follow_their_former_host() {
+  local tmp repo listed entry host moved family trigger
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-moved-host.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  mkdir -p "$repo/bin/backends"
+  local -a pairs=(
+    'fm-spawn-pool-base-freshen fm-spawn-real-treehouse standalone tests/skip-clock.sh'
+    'fm-spawn-acquisition-cleanup fm-spawn-acquisition-real-treehouse backend-dispatch bin/backends/tmux.sh'
+    'fm-control-relaunch-backends fm-control-relaunch-real-treehouse backend-dispatch bin/fm-model-index.sh'
+    'fm-teardown-pool fm-teardown-pool-real-treehouse pr-forge bin/fm-teardown-nested-lib.sh'
+  )
+  for entry in "${pairs[@]}"; do
+    read -r host moved family trigger <<<"$entry"
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$host.test.sh"
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$moved.test.sh"
+    chmod +x "$repo/tests/$host.test.sh" "$repo/tests/$moved.test.sh"
+  done
+  # The freshen host names the clock only through the helper it sources, as at the moved head.
+  printf '. "$(dirname "${BASH_SOURCE[0]}")/fm-spawn-pool-helpers.sh"\n' >>"$repo/tests/fm-spawn-pool-base-freshen.test.sh"
+  printf '# shared pool helpers\nSKIP_CLOCK="$ROOT/tests/skip-clock.sh"\n' >"$repo/tests/fm-spawn-pool-helpers.sh"
+  printf '# a clock\n' >"$repo/tests/skip-clock.sh"
+  for trigger in backends/tmux.sh fm-model-index.sh fm-teardown-nested-lib.sh fm-watch.sh; do : >"$repo/bin/$trigger"; done
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm moved-host-fixture
+
+  for entry in "${pairs[@]}"; do
+    read -r host moved family trigger <<<"$entry"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --family "$family") || fail "--family $family listing failed"
+    assert_contains "$listed" "tests/$host.test.sh" "--family $family lists the host $host"
+    assert_contains "$listed" "tests/$moved.test.sh" "--family $family lists $moved, whose cases came from $host"
+    printf '\n' >>"$repo/tests/$host.test.sh"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) || fail "$host changed selection failed"
+    assert_contains "$listed" "tests/$moved.test.sh" "a change to $host selects $moved"
+    git -C "$repo" checkout -q -- "tests/$host.test.sh"
+    printf '\n' >>"$repo/$trigger"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) || fail "$trigger changed selection failed"
+    assert_contains "$listed" "tests/$host.test.sh" "a change to $trigger selects $host"
+    assert_contains "$listed" "tests/$moved.test.sh" "a change to $trigger selects $moved, as it selects $host"
+    git -C "$repo" checkout -q -- "$trigger"
+  done
+  printf '\n' >>"$repo/bin/fm-watch.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) || fail "fm-watch.sh changed selection failed"
+  for entry in "${pairs[@]}"; do
+    read -r host moved family trigger <<<"$entry"
+    assert_not_contains "$listed" "tests/$moved.test.sh" "an unrelated change does not select $moved"
+  done
+  git -C "$repo" checkout -q -- bin/fm-watch.sh
+
+  # The base library is not followed: a script named only in tests/lib.sh's code, which every test sources, selects
+  # the test that names it, not every test.
+  printf '. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\n' | tee -a "$repo/tests/fm-teardown-pool.test.sh" >>"$repo/tests/fm-spawn-acquisition-cleanup.test.sh"
+  printf 'BASE_TOOL="$ROOT/bin/fm-base-only.sh"\n' >"$repo/tests/lib.sh"
+  printf '#!/usr/bin/env bash\n"$ROOT/bin/fm-base-only.sh"\n' >"$repo/tests/fm-base-only.test.sh"
+  : >"$repo/bin/fm-base-only.sh"
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm base-library-fixture
+  printf '\n' >>"$repo/bin/fm-base-only.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) || fail "fm-base-only.sh changed selection failed"
+  assert_contains "$listed" "tests/fm-base-only.test.sh" "a change to a script selects the test that names it"
+  assert_not_contains "$listed" "tests/fm-teardown-pool.test.sh" "a script named only in tests/lib.sh does not select every test"
+
+  rm -rf "$tmp"
+  pass "a moved real-Treehouse case is selected by its former host's family, its host's change and its host's triggers"
+}
+
 test_changed_spawn_selects_picker_without_broadening_siblings() {
   local tmp repo listed source
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-spawn-selection.XXXXXX")
@@ -3424,6 +3493,7 @@ test_teardown_groups_share_helper_and_stay_selectable
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_watch_helpers_select_runnable_consumers
 test_changed_owners_of_the_moved_real_treehouse_cases_select_them
+test_moved_real_treehouse_cases_follow_their_former_host
 test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family

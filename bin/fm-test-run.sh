@@ -1746,6 +1746,27 @@ select_all() {
   done < <(all_repo_tests)
 }
 
+# moved_cases_script <basename>: the script that holds cases moved out of <basename> into the real-treehouse family,
+# where only an installed Treehouse runs them. The one owner of that pairing: --family and --changed select the moved
+# script wherever they select the script its cases came from, so a selection that ran a case before the move still runs
+# it. Lanes keep each script in its own family's lane only, so CI still runs every script once.
+moved_cases_script() {  # <basename>
+  case "$1" in
+    fm-spawn-pool-base-freshen.test.sh) printf '%s\n' fm-spawn-real-treehouse.test.sh ;;
+    fm-spawn-acquisition-cleanup.test.sh) printf '%s\n' fm-spawn-acquisition-real-treehouse.test.sh ;;
+    fm-control-relaunch-backends.test.sh) printf '%s\n' fm-control-relaunch-real-treehouse.test.sh ;;
+    fm-teardown-pool.test.sh) printf '%s\n' fm-teardown-pool-real-treehouse.test.sh ;;
+  esac
+}
+
+# add_script_with_moved_cases <path>: add_script, plus the script holding any cases moved out of <path>.
+add_script_with_moved_cases() {  # <path>
+  local moved
+  add_script "$1"
+  moved=$(moved_cases_script "$(basename "$1")")
+  [ -z "$moved" ] || [ ! -f "tests/$moved" ] || add_script "tests/$moved"
+}
+
 select_family() {
   local want=$1 s base fam found=0
   [ -n "$want" ] || die "--family requires a name"
@@ -1754,25 +1775,75 @@ select_family() {
     base=$(basename "$s")
     fam=$(family_for_basename "$base")
     if [ "$fam" = "$want" ]; then
-      add_script "$s"
+      add_script_with_moved_cases "$s"
       found=1
     fi
   done < <(all_repo_tests)
   [ "$found" -eq 1 ] || die "no tests mapped to family '$want'"
 }
 
-families_for_test_reference() {  # <needle>...
-  local s needle
-  local found=0
-  local -a needles=()
+# tests_naming <needle>...: the tests/*.test.sh scripts that name a needle, either in their own text or in the code of
+# a tests/*.sh helper they source, followed through helpers that source further helpers. A helper is a sourced file
+# (a `.` or `source` line naming <name>.sh) for which tests/<name>.sh exists; one rule for every helper, so a
+# reference that moves from a test into a helper it sources still selects that test. A helper's comment lines are not
+# read. The base library - tests/lib.sh and every helper it sources - is not followed: every test loads it, so a
+# reference there would select the complete suite, which this map never does; a change to a base file itself is
+# selected by its own arm below.
+tests_naming() {  # <needle>...
+  local needle f
+  local -a needles=() helpers=()
   for needle in "$@"; do needles+=(-e "$needle"); done
+  # shellcheck disable=SC2035
+  for f in tests/*.sh; do
+    case "$f" in *.test.sh) ;; *) [ -f "$f" ] && helpers+=("$f") ;; esac
+  done
+  {
+    # shellcheck disable=SC2035
+    for f in tests/*.sh; do [ -f "$f" ] && printf 'F\t%s\n' "$f"; done
+    # shellcheck disable=SC2035
+    grep -lF "${needles[@]}" tests/*.test.sh 2>/dev/null | awk '{ print "M\t" $0 }'
+    if [ "${#helpers[@]}" -gt 0 ]; then
+      FM_TESTS_NAMING_NEEDLES=$(printf '%s\n' "$@") awk '
+        BEGIN { count = split(ENVIRON["FM_TESTS_NAMING_NEEDLES"], needle, "\n") }
+        /^[[:space:]]*#/ { next }
+        { for (i = 1; i <= count; i++) if (needle[i] != "" && index($0, needle[i])) { print "M\t" FILENAME; nextfile } }
+      ' "${helpers[@]}" 2>/dev/null
+    fi
+    # shellcheck disable=SC2035
+    grep -HE '^[[:space:]]*(\.|source)[[:space:]]' tests/*.sh 2>/dev/null | awk '{ print "E\t" $0 }'
+  } | awk -F'\t' '
+    $1 == "F" { exists[$2] = 1; next }
+    $1 == "M" { named[$2] = 1; next }
+    $1 == "E" {
+      line = $2; file = substr(line, 1, index(line, ":") - 1); rest = substr(line, index(line, ":") + 1)
+      name = ""
+      while (match(rest, /[A-Za-z0-9._-]+\.sh/)) { name = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH) }
+      if (name != "") { from[++edges] = file; to[edges] = "tests/" name }
+    }
+    END {
+      base["tests/lib.sh"] = 1
+      changed = 1
+      while (changed) {
+        changed = 0
+        for (i = 1; i <= edges; i++) if (base[from[i]] && exists[to[i]] && !base[to[i]]) { base[to[i]] = 1; changed = 1 }
+      }
+      changed = 1
+      while (changed) {
+        changed = 0
+        for (i = 1; i <= edges; i++) if (exists[to[i]] && !base[to[i]] && named[to[i]] && !named[from[i]]) { named[from[i]] = 1; changed = 1 }
+      }
+      for (f in named) if (f ~ /\.test\.sh$/) print f
+    }' | LC_ALL=C sort
+}
+
+families_for_test_reference() {  # <needle>...
+  local s
+  local found=0
   while IFS= read -r s; do
     [ -n "$s" ] || continue
-    if grep -Fq "${needles[@]}" "$s"; then
-      family_for_basename "$(basename "$s")"
-      found=1
-    fi
-  done < <(all_repo_tests)
+    family_for_basename "$(basename "$s")"
+    found=1
+  done < <(tests_naming "$@")
   [ "$found" -eq 1 ]
 }
 
@@ -1785,11 +1856,9 @@ scripts_for_test_reference() {
   local found=0
   while IFS= read -r s; do
     [ -n "$s" ] || continue
-    if grep -Fq "$needle" "$s"; then
-      printf '__script__:%s\n' "$(basename "$s")"
-      found=1
-    fi
-  done < <(all_repo_tests)
+    printf '__script__:%s\n' "$(basename "$s")"
+    found=1
+  done < <(tests_naming "$needle")
   [ "$found" -eq 1 ]
 }
 
@@ -2355,8 +2424,9 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       ;;
     tests/git-config-helpers.sh)
-      # The reference scan is not transitive, so match the two helpers that
-      # source this one as well: most suites inherit it only through them.
+      # The reference scan does not follow the base library (tests/lib.sh and
+      # what it sources), so match the two helpers that source this one as
+      # well: most suites inherit it only through them.
       families_for_test_reference git-config-helpers.sh lib.sh herdr-test-safety.sh \
         || printf '%s\n' "__unmapped__:$path"
       ;;
@@ -2385,8 +2455,8 @@ families_for_changed_path() {
         || printf '%s\n' "__unmapped__:$path"
       ;;
     tests/git-lock-helpers.sh)
-      # tests/fm-teardown-helpers.sh sources this helper.
-      # The reference scan reads only tests/*.test.sh, so name the module too.
+      # tests/fm-teardown-helpers.sh sources this helper; the reference scan
+      # follows that, and naming the module keeps the selection explicit.
       families_for_test_reference git-lock-helpers.sh fm-teardown-helpers.sh \
         || printf '%s\n' "__unmapped__:$path"
       ;;
@@ -2469,14 +2539,14 @@ select_changed() {
     while IFS= read -r s; do
       [ -n "$s" ] || continue
       if [ "$(family_for_basename "$(basename "$s")")" = "$f" ]; then
-        add_script "$s"
+        add_script_with_moved_cases "$s"
       fi
     done < <(all_repo_tests)
   done
 
   for script_name in "${wanted_scripts[@]+"${wanted_scripts[@]}"}"; do
     if [ -f "tests/$script_name" ]; then
-      add_script "tests/$script_name"
+      add_script_with_moved_cases "tests/$script_name"
     fi
   done
 

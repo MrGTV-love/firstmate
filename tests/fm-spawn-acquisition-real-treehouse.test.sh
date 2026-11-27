@@ -2,12 +2,12 @@
 # The real-Treehouse case of fm-spawn's acquisition cleanup: a `treehouse get` still in flight when the spawn gives up after
 # a pass-over (the spawn passes over a copy it cannot take). Copy A is a real pool slot whose state shows another holder's
 # lease, made by the installed treehouse binary; the terminal is the private tmux of tests/fm-spawn-acquisition-helpers.sh.
-# With no treehouse that has `lease --path` and `get --lease` (or no jq), the first output line is the runner's gate skip
-# and the script exits 0. The acquisition cases that need no Treehouse stay in tests/fm-spawn-acquisition-cleanup.test.sh.
+# The case needs only `get --lease` (and jq), as it did before it moved here; without them the first output line is the
+# runner's gate skip and the script exits 0. The acquisition cases that need no Treehouse stay in tests/fm-spawn-acquisition-cleanup.test.sh.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
-fm_test_require_real_treehouse
+fm_test_require_real_treehouse get-lease
 BACKEND=tmux
 command -v "$BACKEND" >/dev/null 2>&1 || { echo "skip: $BACKEND not found"; exit 0; }
 # shellcheck source=tests/fm-spawn-acquisition-helpers.sh
