@@ -1,0 +1,122 @@
+
+### A6b data/backlog-review.tsv with tabs shown (^I) and line ends ($)
+$ cat -et <lab>/data/backlog-review.tsv 
+ob-1^I^IO7^I$
+ob-2^I^Inone^Ihousehold chore, no objective$
+dup-a^I^IO7^I$
+dup-b^I^IO7^I$
+dup-c^I^IO7^I$
+dup-d^I^IO7^I$
+ob-3^I^IO7^I$
+tk-1^I^IO7^I$
+tk-2^I^IO7^I$
+tk-3^I^IO7^I$
+[exit 0]
+
+### A15 every add spelling needs an objective: create, task add, --title, --mint
+$ bin/fm-tasks-axi.sh create sp-1 Tune\ the\ foghorn\ reed\ pitch 
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+$ bin/fm-tasks-axi.sh task add sp-1 Tune\ the\ foghorn\ reed\ pitch 
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+$ bin/fm-tasks-axi.sh add --title Tune\ the\ foghorn\ reed\ pitch 
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+$ bin/fm-tasks-axi.sh add --mint Tune\ the\ foghorn\ reed\ pitch 
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+
+### A16 the = form of --objective is checked the same way
+$ bin/fm-tasks-axi.sh add sp-1 Tune\ the\ foghorn\ reed\ pitch --objective=O9 
+REFUSED: guard=backlog-intake-objective rule=objective-unknown missing=an objective docs/objectives.md lists
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: unknown objective 'O9'; use one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why>"
+[exit 2]
+
+### A17 every add spelling meets the duplicate check
+$ bin/fm-tasks-axi.sh create sp-2 Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as ob-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  ob-1 (Queued, overlap 0.80) Rotate the harbour lamp batteries
+  ob-3 (Queued, overlap 0.67) Rotate the harbour lamp batteries again
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to ob-1 and file nothing:
+    bin/fm-tasks-axi.sh create sp-2 Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 --dup-of ob-1
+  the work is different from ob-1 - file it:
+    bin/fm-tasks-axi.sh create sp-2 Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 --not-dup ob-1
+[exit 2]
+$ bin/fm-tasks-axi.sh task add sp-2 Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective=O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as ob-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  ob-1 (Queued, overlap 0.80) Rotate the harbour lamp batteries
+  ob-3 (Queued, overlap 0.67) Rotate the harbour lamp batteries again
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to ob-1 and file nothing:
+    bin/fm-tasks-axi.sh task add sp-2 Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective=O7 --dup-of ob-1
+  the work is different from ob-1 - file it:
+    bin/fm-tasks-axi.sh task add sp-2 Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective=O7 --not-dup ob-1
+[exit 2]
+$ bin/fm-tasks-axi.sh add --title Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as ob-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  ob-1 (Queued, overlap 0.80) Rotate the harbour lamp batteries
+  ob-3 (Queued, overlap 0.67) Rotate the harbour lamp batteries again
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to ob-1 and file nothing:
+    bin/fm-tasks-axi.sh add --title Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 --dup-of ob-1
+  the work is different from ob-1 - file it:
+    bin/fm-tasks-axi.sh add --title Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 --not-dup ob-1
+[exit 2]
+$ bin/fm-tasks-axi.sh add --mint Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as ob-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  ob-1 (Queued, overlap 0.80) Rotate the harbour lamp batteries
+  ob-3 (Queued, overlap 0.67) Rotate the harbour lamp batteries again
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to ob-1 and file nothing:
+    bin/fm-tasks-axi.sh add --mint Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 --dup-of ob-1
+  the work is different from ob-1 - file it:
+    bin/fm-tasks-axi.sh add --mint Rotate\ the\ harbour\ lamp\ batteries\ weekly --objective O7 --not-dup ob-1
+[exit 2]
+
+### A18 the --mint spelling files and records its minted id
+$ bin/fm-tasks-axi.sh add --mint Tune\ the\ foghorn\ reed\ pitch --objective O6 
+ok: added tune-the-foghorn-reed-pitch-4a -> Queued
+task:
+  id: tune-the-foghorn-reed-pitch-4a
+  title: Tune the foghorn reed pitch
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start tune-the-foghorn-reed-pitch-4a` to move it to in flight
+  - Run `tasks-axi block tune-the-foghorn-reed-pitch-4a --by <other>` to record a dependency
+[exit 0]
+$ tail -1 <lab>/data/backlog-review.tsv 
+tune-the-foghorn-reed-pitch-4a		O6	
+[exit 0]

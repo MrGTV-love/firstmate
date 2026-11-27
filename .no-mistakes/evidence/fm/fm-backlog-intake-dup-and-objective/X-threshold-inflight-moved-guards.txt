@@ -1,0 +1,77 @@
+
+### X1 the documented worked pairs (docs/configuration.md): base 'Lock holder crash'
+$ bin/fm-tasks-axi.sh add lk-base Lock\ holder\ crash --objective O7 
+ok: added lk-base -> Queued
+[exit 0]
+
+### X2 below the threshold (1/6 = 0.17): 'Lock timeout retry loop' is filed with no prompt
+$ bin/fm-tasks-axi.sh add lk-below Lock\ timeout\ retry\ loop --objective O7 
+ok: added lk-below -> Queued
+[exit 0]
+
+### X3 at the threshold: 'Lock timeout' vs 'Lock holder crash' is refused (overlap 0.25 shown); lk-below also overlaps it
+$ bin/fm-tasks-axi.sh add lk-at Lock\ timeout --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as lk-below?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  lk-below (Queued, overlap 0.50) Lock timeout retry loop
+  lk-base (Queued, overlap 0.25) Lock holder crash
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to lk-below and file nothing:
+    bin/fm-tasks-axi.sh add lk-at Lock\ timeout --objective O7 --dup-of lk-below
+  the work is different from lk-below - file it:
+    bin/fm-tasks-axi.sh add lk-at Lock\ timeout --objective O7 --not-dup lk-below
+[exit 2]
+
+### X4 an In flight item is a neighbour and is listed as In flight
+$ bin/fm-tasks-axi.sh add fl-1 Rebuild\ the\ engine\ raw\ water\ pump --objective O7 
+ok: added fl-1 -> Queued
+[exit 0]
+$ bin/fm-tasks-axi.sh start fl-1 
+ok: start fl-1 -> In flight
+[exit 0]
+$ bin/fm-tasks-axi.sh add fl-2 Rebuild\ the\ engine\ raw\ water\ pump\ impeller --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as fl-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  fl-1 (In flight, overlap 0.83) Rebuild the engine raw water pump
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to fl-1 and file nothing:
+    bin/fm-tasks-axi.sh add fl-2 Rebuild\ the\ engine\ raw\ water\ pump\ impeller --objective O7 --dup-of fl-1
+  the work is different from fl-1 - file it:
+    bin/fm-tasks-axi.sh add fl-2 Rebuild\ the\ engine\ raw\ water\ pump\ impeller --objective O7 --not-dup fl-1
+[exit 2]
+
+### X5 --duplicate-of an In flight kept item closes the duplicate
+$ bin/fm-tasks-axi.sh add fl-3 Flush\ the\ outboard\ cooling\ passages --objective O7 
+ok: added fl-3 -> Queued
+[exit 0]
+$ bin/fm-tasks-axi.sh done fl-3 --duplicate-of fl-1 
+ok: done fl-3 -> Done
+[exit 0]
+fl-3  state: done
+
+### X6 --moved-to refuses an open owner call (a real captain hold)
+$ bin/fm-tasks-axi.sh add mo-1 Select\ the\ cockpit\ cushion\ fabric --objective O7 
+ok: added mo-1 -> Queued
+[exit 0]
+$ bin/fm-captain-hold.sh hold mo-1 --reason which\ fabric --boundary owner-rule-change --if-no keep\ the\ old\ fabric 
+mo-1
+[exit 0]
+$ bin/fm-tasks-axi.sh done mo-1 --moved-to sm-peer pe-open 
+REFUSED: guard=backlog-close-item-eligible rule=open-owner-call missing=the owner's answer to this call
+human-only-exit: what is the owner's answer to the call mo-1?
+fm-tasks-axi: mo-1 is an open owner call; answer it with bin/fm-captain-hold.sh answer mo-1 --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close mo-1
+[exit 2]
+mo-1  state: queued
+
+### X7 --moved-to refuses an item with a live task record
+$ bin/fm-tasks-axi.sh add mo-2 Seal\ the\ chainplate\ deck\ penetrations --objective O7 --kind ship 
+ok: added mo-2 (ship) -> Queued
+[exit 0]
+$ bin/fm-tasks-axi.sh done mo-2 --moved-to sm-peer pe-open 
+REFUSED: guard=backlog-close-item-eligible rule=live-task missing=an item with no live task record
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-teardown.sh mo-2
+fm-tasks-axi: mo-2 has a live task record; complete it with bin/fm-teardown.sh mo-2, which owns the landing proof
+[exit 2]
+mo-2  state: queued

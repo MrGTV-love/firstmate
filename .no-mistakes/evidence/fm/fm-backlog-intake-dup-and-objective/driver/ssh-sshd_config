@@ -1,0 +1,13 @@
+Port 22922
+ListenAddress 127.0.0.1
+HostKey ~/tmp/fm-drv/ssh/host_key
+PidFile ~/tmp/fm-drv/ssh/sshd.pid
+AuthorizedKeysFile ~/tmp/fm-drv/ssh/authorized_keys
+UsePAM no
+StrictModes no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+ForceCommand ~/tmp/fm-drv/ssh/force.sh
+Banner ~/tmp/fm-drv/ssh/banner
+LogLevel VERBOSE

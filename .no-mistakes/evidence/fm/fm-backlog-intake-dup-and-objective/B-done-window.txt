@@ -1,0 +1,119 @@
+
+### B0 seed: 60 Done rows written newest first (done-1 newest); the real tasks-axi prune then moves all but the newest 10 to the archive
+$ bin/fm-tasks-axi.sh prune 
+ok: prune done -> archived 50 (kept 10)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ grep -c \^-\ \\\[x\\\] <lab>/data/backlog.md 
+10
+[exit 0]
+$ grep -c \^-\ \\\[x\\\] <lab>/data/done-archive.md 
+50
+[exit 0]
+$ grep -n done-3\ \\\|done-30\ \\\|done-50\ \\\|done-51\  <lab>/data/backlog.md <lab>/data/done-archive.md 
+<lab>/data/backlog.md:8:- [x] done-3 - Calibrate the sextant mirror alignment (done 2026-11-01)
+<lab>/data/done-archive.md:22:- [x] done-30 - Varnish the tiller handle grip (done 2026-11-01)
+<lab>/data/done-archive.md:42:- [x] done-50 - Splice the mooring line eyes (done 2026-11-01)
+<lab>/data/done-archive.md:43:- [x] done-51 - Tar the keel seam caulking (done 2026-11-01)
+[exit 0]
+
+### B1 a title that overlaps a Done row still in the backlog (done-3) is refused
+$ bin/fm-tasks-axi.sh add w-1 Calibrate\ the\ sextant\ mirror\ alignment\ again --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as done-3?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  done-3 (Done, overlap 0.80) Calibrate the sextant mirror alignment
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to done-3 and file nothing:
+    bin/fm-tasks-axi.sh add w-1 Calibrate\ the\ sextant\ mirror\ alignment\ again --objective O7 --dup-of done-3
+  the work is different from done-3 - file it:
+    bin/fm-tasks-axi.sh add w-1 Calibrate\ the\ sextant\ mirror\ alignment\ again --objective O7 --not-dup done-3
+[exit 2]
+
+### B2 a title that overlaps a Done row pruned to the archive (done-30) is refused
+$ bin/fm-tasks-axi.sh add w-2 Varnish\ the\ tiller\ handle\ grip\ again --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as done-30?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  done-30 (Done, archived, overlap 0.80) Varnish the tiller handle grip
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  (every neighbour is Done and archived, so --dup-of has no item to append to)
+  the work is different from done-30 - file it:
+    bin/fm-tasks-axi.sh add w-2 Varnish\ the\ tiller\ handle\ grip\ again --objective O7 --not-dup done-30
+[exit 2]
+
+### B3 edge: done-50, the 50th newest Done row (in the archive), still stops the add
+$ bin/fm-tasks-axi.sh add w-3 Splice\ the\ mooring\ line\ eyes\ again --objective O7 
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as done-50?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  done-50 (Done, archived, overlap 0.80) Splice the mooring line eyes
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  (every neighbour is Done and archived, so --dup-of has no item to append to)
+  the work is different from done-50 - file it:
+    bin/fm-tasks-axi.sh add w-3 Splice\ the\ mooring\ line\ eyes\ again --objective O7 --not-dup done-50
+[exit 2]
+
+### B4 edge: done-51, the 51st newest Done row, does not stop the add
+$ bin/fm-tasks-axi.sh add w-4 Tar\ the\ keel\ seam\ caulking\ again --objective O7 
+ok: added w-4 -> Queued
+task:
+  id: w-4
+  title: Tar the keel seam caulking again
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start w-4` to move it to in flight
+  - Run `tasks-axi block w-4 --by <other>` to record a dependency
+[exit 0]
+
+### B5 --dup-of an item that is only in the done archive is refused with a pointer to --not-dup
+$ bin/fm-tasks-axi.sh add w-2 Varnish\ the\ tiller\ handle\ grip\ again --objective O7 --dup-of done-30 
+REFUSED: guard=backlog-intake-dup-of rule=kept-archived missing=a kept item in the active backlog
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup done-30
+fm-tasks-axi: the kept item done-30 is Done and archived, and an archived item cannot take an appended note; nothing was filed or appended. If the new item is the same work, nothing needs filing; if it is different work, file it with --not-dup done-30
+[exit 2]
+
+### B6 --not-dup naming the archived neighbour files the item
+$ bin/fm-tasks-axi.sh add w-2 Varnish\ the\ tiller\ handle\ grip\ again --objective O7 --not-dup done-30 
+ok: added w-2 -> Queued
+task:
+  id: w-2
+  title: Varnish the tiller handle grip again
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start w-2` to move it to in flight
+  - Run `tasks-axi block w-2 --by <other>` to record a dependency
+[exit 0]
+$ cat -et <lab>/data/backlog-review.tsv 
+w-4^I^IO7^I$
+w-2^I^IO7^I$
+[exit 0]

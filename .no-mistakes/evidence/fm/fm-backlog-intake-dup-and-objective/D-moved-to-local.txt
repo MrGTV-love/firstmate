@@ -1,0 +1,105 @@
+
+### D1 refused: the home is not registered
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-none pe-open 
+REFUSED: guard=backlog-close-moved-to rule=home-not-registered missing=one registered home
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done mv-1 --moved-to <home> <item-id>
+fm-tasks-axi: sm-none is not one registered home in <lab>/data/secondmates.md
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ mv-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### D2 refused: the home is registered twice
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-twice pe-open 
+REFUSED: guard=backlog-close-moved-to rule=home-not-registered missing=one registered home
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done mv-1 --moved-to <home> <item-id>
+fm-tasks-axi: sm-twice is not one registered home in <lab>/data/secondmates.md
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ mv-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### D3 refused: the peer home has no such item
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-peer pe-absent 
+REFUSED: guard=backlog-close-moved-to rule=item-missing missing=the item in the new home
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done mv-1 --moved-to sm-peer <item-id>
+fm-tasks-axi: sm-peer's backlog has no item pe-absent
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ mv-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### D4 refused: the peer item is closed
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-peer pe-done 
+REFUSED: guard=backlog-close-moved-to rule=item-not-open missing=an open item in the new home
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done mv-1 --moved-to sm-peer <item-id>
+fm-tasks-axi: sm-peer's item pe-done is not open (Queued or In flight); moved work must be open in the new home
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ mv-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### D5 refused: the destination is this same home
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-self mv-2 
+REFUSED: guard=backlog-close-moved-to rule=same-backlog missing=a different backlog
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done mv-1 --moved-to <home> <item-id>
+fm-tasks-axi: sm-self is this backlog itself; a moved item must live in a different backlog
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ mv-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### D6 refused: the destination is a symlink to this home
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-link mv-2 
+REFUSED: guard=backlog-close-moved-to rule=same-backlog missing=a different backlog
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done mv-1 --moved-to <home> <item-id>
+fm-tasks-axi: sm-link is this backlog itself; a moved item must live in a different backlog
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ mv-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### D7 refused: the remote host cannot be reached (real ssh, name does not resolve)
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-gone pe-open 
+fm-tasks-axi: cannot prove sm-gone is a different backlog, so nothing was closed: cannot read sm-gone's backlog identity: ssh: Could not resolve hostname fm-nohost.invalid: nodename nor servname provided, or not known
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ mv-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### D8 refused: an owner-filed item cannot close by --moved-to
+$ bin/fm-tasks-axi.sh done own-1 --moved-to sm-peer pe-open 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-1, and in what words?
+fm-tasks-axi: own-1 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done own-1 --note "<the owner's words>"
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ own-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### D9 refused: the one-value form
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-peer 
+fm-tasks-axi: --moved-to takes two values: --moved-to <home> <item-id>
+[exit 2]
+
+### D10 accepted: the peer home holds the item open; the closing note records the proof
+$ bin/fm-tasks-axi.sh done mv-1 --moved-to sm-peer pe-open 
+ok: done mv-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ sh -c bin/fm-tasks-axi.sh\ show\ mv-1\ \|\ grep\ -E\ \'state:\' 
+  state: done
+[exit 0]
+$ grep -n -A2 \^-\ \\\[x\\\]\ mv-1 <lab>/data/backlog.md 
+82:- [x] mv-1 - Rewire the masthead tricolour lamp (kind: ship) (done 2026-11-27)
+83-  <!-- fm-add:35902fd3385a489899c8c00d -->
+84-  moved to sm-peer as pe-open
+[exit 0]
+
+### D11 the peer home's backlog was not changed
+peer backlog unchanged
+$ grep mv-1 <lab>/state/fleet-ledger.jsonl 
+{"v":1,"ts":1795769073,"at":"2026-11-27T08:44:33Z","event":"task.filed","task":"mv-1","repo":null,"kind":"ship","priority":null}
+{"v":1,"ts":1795769109,"at":"2026-11-27T08:45:09Z","event":"task.closed","task":"mv-1","evidence":"none","pr":null}
+[exit 0]

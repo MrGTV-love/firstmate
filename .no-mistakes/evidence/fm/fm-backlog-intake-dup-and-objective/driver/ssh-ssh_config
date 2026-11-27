@@ -1,0 +1,11 @@
+Host fm-far
+  HostName 127.0.0.1
+  Port 22922
+  User <user>
+Host *
+  GlobalKnownHostsFile /dev/null
+  UserKnownHostsFile ~/tmp/fm-drv/ssh/known_hosts
+  StrictHostKeyChecking yes
+  BatchMode yes
+  IdentitiesOnly yes
+  IdentityFile ~/tmp/fm-drv/ssh/client_key

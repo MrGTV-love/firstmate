@@ -1,0 +1,296 @@
+
+### A1 add with no --objective is refused
+$ bin/fm-tasks-axi.sh add ob-1 Rotate the harbour lamp batteries --kind ship
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+
+### A2 unknown objective O9 is refused
+$ bin/fm-tasks-axi.sh add ob-1 Rotate the harbour lamp batteries --objective O9
+REFUSED: guard=backlog-intake-objective rule=objective-unknown missing=an objective docs/objectives.md lists
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: unknown objective 'O9'; use one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why>"
+[exit 2]
+
+### A3 objective none with no reason is refused
+$ bin/fm-tasks-axi.sh add ob-1 Rotate the harbour lamp batteries --objective none
+REFUSED: guard=backlog-intake-objective rule=reason-missing missing=a reason for no objective
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective none --objective-reason <why>
+fm-tasks-axi: --objective none needs --objective-reason "<why no objective applies>"
+[exit 2]
+
+### A4 objective O7 files the item (unrelated title, no prompt)
+$ bin/fm-tasks-axi.sh add ob-1 Rotate the harbour lamp batteries --objective O7 --kind ship
+ok: added ob-1 (ship) -> Queued
+task:
+  id: ob-1
+  title: Rotate the harbour lamp batteries
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start ob-1` to move it to in flight
+  - Run `tasks-axi block ob-1 --by <other>` to record a dependency
+[exit 0]
+
+### A5 objective none with a reason files the item
+$ bin/fm-tasks-axi.sh add ob-2 Catalogue the pantry spice jars --objective none --objective-reason household chore, no objective
+ok: added ob-2 -> Queued
+task:
+  id: ob-2
+  title: Catalogue the pantry spice jars
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start ob-2` to move it to in flight
+  - Run `tasks-axi block ob-2 --by <other>` to record a dependency
+[exit 0]
+
+### A6 data/backlog-review.tsv holds one line per filed item
+$ cat -A <lab>/data/backlog-review.tsv
+cat: illegal option -- A
+usage: cat [-belnstuv] [file ...]
+[exit 1]
+
+### A7 overlapping title is refused, neighbours and both overrides printed
+$ bin/fm-tasks-axi.sh add ob-3 Rotate the harbour lamp batteries again --objective O7
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as ob-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  ob-1 (Queued, overlap 0.80) Rotate the harbour lamp batteries
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to ob-1 and file nothing:
+    bin/fm-tasks-axi.sh add ob-3 Rotate\ the\ harbour\ lamp\ batteries\ again --objective O7 --dup-of ob-1
+  the work is different from ob-1 - file it:
+    bin/fm-tasks-axi.sh add ob-3 Rotate\ the\ harbour\ lamp\ batteries\ again --objective O7 --not-dup ob-1
+[exit 2]
+
+### A8 four neighbours exist; the refusal lists only the best three
+$ bin/fm-tasks-axi.sh add dup-e Index fleet ledger rows by kind --objective O7
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as dup-a?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  dup-a (Queued, overlap 0.67) Index fleet ledger rows by host
+  dup-b (Queued, overlap 0.67) Index fleet ledger rows by repo
+  dup-c (Queued, overlap 0.67) Index fleet ledger rows by task
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to dup-a and file nothing:
+    bin/fm-tasks-axi.sh add dup-e Index\ fleet\ ledger\ rows\ by\ kind --objective O7 --dup-of dup-a
+  the work is different from dup-a - file it:
+    bin/fm-tasks-axi.sh add dup-e Index\ fleet\ ledger\ rows\ by\ kind --objective O7 --not-dup dup-a
+[exit 2]
+
+### A9 --not-dup naming an item that is not a neighbour is refused
+$ bin/fm-tasks-axi.sh add ob-3 Rotate the harbour lamp batteries again --objective O7 --not-dup ob-2
+REFUSED: guard=backlog-intake-not-dup rule=not-a-neighbour missing=a neighbour of this title
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id> --not-dup <neighbour-id>
+fm-tasks-axi: --not-dup ob-2 names an item whose title does not overlap this one enough to be a neighbour; nothing was filed
+[exit 2]
+
+### A10 --not-dup with a real neighbour files the item
+$ bin/fm-tasks-axi.sh add ob-3 Rotate the harbour lamp batteries again --objective O7 --not-dup ob-1
+ok: added ob-3 -> Queued
+task:
+  id: ob-3
+  title: Rotate the harbour lamp batteries again
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start ob-3` to move it to in flight
+  - Run `tasks-axi block ob-3 --by <other>` to record a dependency
+[exit 0]
+
+### A11 --dup-of appends to the kept item and files nothing
+$ bin/fm-tasks-axi.sh add ob-4 Rotate harbour lamp batteries monthly --objective O7 --body monthly cadence note --dup-of ob-1
+ok: merged into ob-1 (nothing filed)
+[exit 0]
+$ bin/fm-tasks-axi.sh show ob-4
+error: "Task \"ob-4\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+$ bin/fm-tasks-axi.sh show ob-1 --full
+task:
+  id: ob-1
+  title: Rotate the harbour lamp batteries
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: "<!-- fm-add:2b6d6e876f6bbf5594793151 -->\n\n---\nMerged from a duplicate filing: Rotate harbour lamp batteries monthly\nmonthly cadence note"
+[exit 0]
+
+### A12 no flag or env bypass: --force, FM_SKIP_INTAKE=1, TASKS_AXI_FILE
+$ bin/fm-tasks-axi.sh add ob-5 Rotate the harbour lamp batteries twice --objective O7 --force
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as ob-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  ob-1 (Queued, overlap 0.80) Rotate the harbour lamp batteries
+  ob-3 (Queued, overlap 0.67) Rotate the harbour lamp batteries again
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to ob-1 and file nothing:
+    bin/fm-tasks-axi.sh add ob-5 Rotate\ the\ harbour\ lamp\ batteries\ twice --objective O7 --force --dup-of ob-1
+  the work is different from ob-1 - file it:
+    bin/fm-tasks-axi.sh add ob-5 Rotate\ the\ harbour\ lamp\ batteries\ twice --objective O7 --force --not-dup ob-1
+[exit 2]
+$ env FM_SKIP_INTAKE=1 FM_BACKLOG_INTAKE=off bin/fm-tasks-axi.sh add ob-5 Rotate the harbour lamp batteries twice
+REFUSED: guard=backlog-intake-objective rule=objective-missing missing=an objective
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh add <id> <title> --objective <objective-id>
+fm-tasks-axi: add needs the objective the item serves: --objective <id> with one of O1 O2 O3 O4 O5 O6 O7 (docs/objectives.md), or --objective none --objective-reason "<why no objective applies>"
+[exit 2]
+$ env TASKS_AXI_FILE=/dev/null bin/fm-tasks-axi.sh add ob-5 Rotate the harbour lamp batteries twice --objective O7
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as ob-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  ob-1 (Queued, overlap 0.80) Rotate the harbour lamp batteries
+  ob-3 (Queued, overlap 0.67) Rotate the harbour lamp batteries again
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to ob-1 and file nothing:
+    bin/fm-tasks-axi.sh add ob-5 Rotate\ the\ harbour\ lamp\ batteries\ twice --objective O7 --dup-of ob-1
+  the work is different from ob-1 - file it:
+    bin/fm-tasks-axi.sh add ob-5 Rotate\ the\ harbour\ lamp\ batteries\ twice --objective O7 --not-dup ob-1
+[exit 2]
+
+### A13 add answer hides the attribution token; stored body keeps it
+$ bin/fm-tasks-axi.sh add tk-1 Polish the brass compass housing --objective O7 --json
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "tk-1",
+    "title": "Polish the brass compass housing",
+    "state": "queued",
+    "kind": null,
+    "repo": null,
+    "priority": null,
+    "created": "2026-11-27",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+[exit 0]
+$ bin/fm-tasks-axi.sh add tk-2 Sweep the chart room floorboards --objective O7
+ok: added tk-2 -> Queued
+task:
+  id: tk-2
+  title: Sweep the chart room floorboards
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start tk-2` to move it to in flight
+  - Run `tasks-axi block tk-2 --by <other>` to record a dependency
+[exit 0]
+$ bin/fm-tasks-axi.sh add tk-3 Oil the anchor winch gears --objective O7 --body hello --json
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "tk-3",
+    "title": "Oil the anchor winch gears",
+    "state": "queued",
+    "kind": null,
+    "repo": null,
+    "priority": null,
+    "created": "2026-11-27",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": "hello",
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+[exit 0]
+$ grep -n -A2 tk-1\|tk-3 <lab>/data/backlog.md
+29:- [ ] tk-1 - Polish the brass compass housing (since 2026-11-27)
+30-  <!-- fm-add:8f3bac6340c05fc2f20b14ed -->
+31-
+--
+35:- [ ] tk-3 - Oil the anchor winch gears (since 2026-11-27)
+36-  hello
+37-  <!-- fm-add:b8016172b748a898141ab65f -->
+[exit 0]
+
+### A14 final review file
+$ cat <lab>/data/backlog-review.tsv
+ob-1		O7	
+ob-2		none	household chore, no objective
+dup-a		O7	
+dup-b		O7	
+dup-c		O7	
+dup-d		O7	
+ob-3		O7	
+tk-1		O7	
+tk-2		O7	
+tk-3		O7	
+[exit 0]

@@ -1,0 +1,21 @@
+
+### F6b a scout with a written report closes (report given relative to the backlog root, data/<id>/report.md)
+$ bin/fm-tasks-axi.sh done pf-scout --report data/pf-scout/report.md 
+ok: done pf-scout -> Done (report data/pf-scout/report.md)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-scout\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: done
+  links: "report:data/pf-scout/report.md"
+[exit 0]
+$ grep pf-scout <lab>/state/fleet-ledger.jsonl 
+{"v":1,"ts":1795769137,"at":"2026-11-27T08:45:37Z","event":"task.filed","task":"pf-scout","repo":null,"kind":"scout","priority":null}
+{"v":1,"ts":1795769171,"at":"2026-11-27T08:46:11Z","event":"task.closed","task":"pf-scout","evidence":"report","pr":null}
+[exit 0]
+
+### F6c comparison: the BASE wrapper (commit d25e907c1) with an absolute report path gives the same tasks-axi refusal
+$ ~/tmp/fm-drv/base/bin/fm-tasks-axi.sh done bs-1 --report ~/tmp/fm-base.5btoAu/data/bs-1/report.md 
+error: Task report link must be a data/<id>/report.md path
+code: VALIDATION_ERROR
+[exit 2]

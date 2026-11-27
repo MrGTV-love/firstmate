@@ -1,0 +1,108 @@
+
+### F1 a ship with no proof is refused (as before)
+$ bin/fm-tasks-axi.sh done pf-ship 
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-ship\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: queued
+  links: none
+[exit 0]
+
+### F2 a ship with an open (unmerged) pull request is refused; real GitHub read
+$ bin/fm-tasks-axi.sh done pf-ship --pr https://github.com/MrGTV-love/firstmate/pull/460 
+fm-tasks-axi: the pull request has not merged: https://github.com/MrGTV-love/firstmate/pull/460
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-ship\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: queued
+  links: none
+[exit 0]
+
+### F3 a report is not a ship's deliverable
+$ bin/fm-tasks-axi.sh done pf-ship --report <lab>/data/nothing.md 
+fm-tasks-axi: a report is not a ship's deliverable; land its pull request or record the captain's drop
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-ship\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: queued
+  links: none
+[exit 0]
+
+### F4 a ship with a merged pull request closes; real GitHub read
+$ bin/fm-tasks-axi.sh done pf-ship --pr https://github.com/MrGTV-love/firstmate/pull/451 
+ok: done pf-ship -> Done (pr https://github.com/MrGTV-love/firstmate/pull/451)
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-ship\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: done
+  links: "pr:https://github.com/MrGTV-love/firstmate/pull/451"
+[exit 0]
+
+### F5 a scout with a missing report is refused; a pull request is not a scout's deliverable
+$ bin/fm-tasks-axi.sh done pf-scout --report <lab>/data/pf-scout/report.md 
+fm-tasks-axi: the report has not been written: <lab>/data/pf-scout/report.md
+[exit 2]
+$ bin/fm-tasks-axi.sh done pf-scout --pr https://github.com/MrGTV-love/firstmate/pull/451 
+fm-tasks-axi: a scout's deliverable is its written report
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-scout\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: queued
+  links: none
+[exit 0]
+
+### F6 a scout with a written report closes
+$ bin/fm-tasks-axi.sh done pf-scout --report <lab>/data/pf-scout/report.md 
+error: Task report link must be a data/<id>/report.md path
+code: VALIDATION_ERROR
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-scout\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: queued
+  links: none
+[exit 0]
+
+### F7 --drop-file combined with --note is refused
+$ bin/fm-tasks-axi.sh done pf-drop --drop-file ~/tmp/fm-drv/drop.txt --note x 
+fm-tasks-axi: a captain's drop is its own completion; do not combine --drop-file with --pr, --report, or --note
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-drop\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: queued
+  links: none
+[exit 0]
+
+### F8 --drop-file with the owner's words closes; words kept in data/<id>/captain-drop.md, note 'dropped'
+$ bin/fm-tasks-axi.sh done pf-drop --drop-file ~/tmp/fm-drv/drop.txt 
+ok: done pf-drop -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-drop\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: done
+  links: none
+[exit 0]
+$ cat <lab>/data/pf-drop/captain-drop.md 
+Drop it, the bracket is gone already.
+[exit 0]
+$ grep -n -A2 \^-\ \\\[x\\\]\ pf-drop <lab>/data/backlog.md 
+91:- [x] pf-drop - Retire the old radar dome bracket (kind: ship) (done 2026-11-27)
+92-  <!-- fm-add:c1611d3c0a26d9baf59b58a1 -->
+93-  dropped
+[exit 0]
+
+### F9 a plain task closes with no proof (as before)
+$ bin/fm-tasks-axi.sh done pf-task 
+ok: done pf-task -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ sh -c bin/fm-tasks-axi.sh\ show\ pf-task\ \|\ grep\ -E\ \'state:\|links:\' 
+  state: done
+  links: none
+[exit 0]
+$ grep -E pf-\(ship\|scout\|drop\|task\) <lab>/state/fleet-ledger.jsonl 
+{"v":1,"ts":1795769131,"at":"2026-11-27T08:45:31Z","event":"task.filed","task":"pf-ship","repo":null,"kind":"ship","priority":null}
+{"v":1,"ts":1795769135,"at":"2026-11-27T08:45:35Z","event":"task.filed","task":"pf-ship2","repo":null,"kind":"ship","priority":null}
+{"v":1,"ts":1795769137,"at":"2026-11-27T08:45:37Z","event":"task.filed","task":"pf-scout","repo":null,"kind":"scout","priority":null}
+{"v":1,"ts":1795769139,"at":"2026-11-27T08:45:39Z","event":"task.filed","task":"pf-drop","repo":null,"kind":"ship","priority":null}
+{"v":1,"ts":1795769142,"at":"2026-11-27T08:45:42Z","event":"task.filed","task":"pf-task","repo":null,"kind":"task","priority":null}
+{"v":1,"ts":1795769148,"at":"2026-11-27T08:45:48Z","event":"task.closed","task":"pf-ship","evidence":"merged_pr","pr":"https://github.com/MrGTV-love/firstmate/pull/451"}
+{"v":1,"ts":1795769153,"at":"2026-11-27T08:45:53Z","event":"task.closed","task":"pf-drop","evidence":"drop_file","pr":null}
+[exit 0]

@@ -1,0 +1,41 @@
+
+### H1 the second timeout for a key files one ship item that names objective O7
+$ (in <work-repo>) fm-duration.py timeout dr.lint 1200000 --event-id e1
+[exit 0]
+$ (in <work-repo>) fm-duration.py timeout dr.lint 1200000 --event-id e2
+timeout_work: "fm-timeout-9ada6a83d40f2d8c"
+[exit 0]
+$ (in <work-repo>) fm-duration.py timeout dr.lint 1200000 --event-id e3
+[exit 0]
+- [ ] fm-timeout-9ada6a83d40f2d8c - Measure and repair repeated timeout: acme/widgets dr.lint (repo: firstmate) (kind: ship) (since 2026-11-27)
+fm-timeout-9ada6a83d40f2d8c^I^IO7^I$
+
+### H2 after that item closes, a recurrence files the next item (its title overlaps the closed one, so the filer overrides with --not-dup)
+$ (in <work-repo>) fm-duration.py timeout dr.lint 1300000 --event-id e4
+timeout_work: "fm-timeout-9ada6a83d40f2d8c-2"
+[exit 0]
+$ (in <work-repo>) fm-duration.py timeout dr.lint 1300000 --event-id e5
+[exit 0]
+- [ ] fm-timeout-9ada6a83d40f2d8c-2 - Measure and repair repeated timeout: acme/widgets dr.lint (repo: firstmate) (kind: ship) (since 2026-11-27)
+  Repeated timeout for command key dr.lint in repository acme/widgets on host <host>. Observed lower bounds (ms): 1200000, 1200000, 1200000, 1300000. The timeout recurred after fm-timeout-9ada6a83d40f2d8c was closed. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.
+  <!-- fm-add:90ac20ff1a37cfb536f46113 -->
+fm-timeout-9ada6a83d40f2d8c-2^I^IO7^I$
+
+### H3 an open fm-timeout- item under the same title (filed from another host) takes the occurrence through --dup-of; nothing new is filed
+$ (in <work-repo>) fm-duration.py timeout dr.shared 1200000 --event-id s1
+[exit 0]
+$ (in <work-repo>) fm-duration.py timeout dr.shared 1200000 --event-id s2
+timeout_work: "fm-timeout-otherhost"
+[exit 0]
+open items before: 2, after: 2
+  body: "---\nMerged from a duplicate filing: Measure and repair repeated timeout: acme/widgets dr.shared\nRepeated timeout for command key dr.shared in repository acme/widgets on host <host>. Observed lower bounds (ms): 1200000, 1200000. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+{"host":"<host>","repo":"acme/widgets","key":"dr.shared","event":"filed","task":"fm-timeout-otherhost","previous":null,"recorded_at":"2026-11-27T08:47:31.275613+00:00"}
+
+### H4 a hand-filed neighbour for the same work goes to the operator; nothing is filed
+$ (in <work-repo>) fm-duration.py timeout dr.hand 1200000 --event-id h1
+[exit 0]
+$ (in <work-repo>) fm-duration.py timeout dr.hand 1200000 --event-id h2
+error: "timeout work could not be filed: hand-filed-timeout may be the same work filed by hand; REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours\nhuman-only-exit: is this add the same work as hand-filed-timeout?\nfm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:\n  hand-filed-timeout (Queued, overlap 1.00) Measure and repair repeated timeout: acme/widgets dr.hand\n  fm-timeout-9ada6a83d40f2d8c-2 (Queued, overlap 0.75) Measure and repair repeated timeout: acme/widgets dr.lint\n  fm-timeout-otherhost (Queued, overlap 0.75) Measure and repair repeated timeout: acme/widgets dr.shared\nJudge them, then run the add again with one of these two overrides (each still needs --objective):\n  the work is the same - append this title and body to hand-filed-timeout and file nothing:\n    <duration-home>/bin/fm-tasks-axi.sh add fm-timeout-fec705f808d67649 Measure\\ and\\ repair\\ repeated\\ timeout:\\ acme/widgets\\ dr.hand --kind ship --repo firstmate --body Repeated\\ timeout\\ for\\ command\\ key\\ dr.hand\\ in\\ repository\\ acme/widgets\\ on\\ host\\ <host>.\\ Observed\\ lower\\ bounds\\ \\(ms\\):\\ 1200000\\,\\ 1200000.\\ Measure\\ completion\\ latency\\ across\\ host\\ load\\,\\ then\\ repair\\ the\\ limit\\ with\\ an\\ explicit\\ margin.\\ A\\ read\\ wait\\ ending\\ is\\ not\\ command\\ failure. --objective O7 --dup-of hand-filed-timeout\n  the work is different from hand-filed-timeout - file it:\n    <duration-home>/bin/fm-tasks-axi.sh add fm-timeout-fec705f808d67649 Measure\\ and\\ repair\\ repeated\\ timeout:\\ acme/widgets\\ dr.hand --kind ship --repo firstmate --body Repeated\\ timeout\\ for\\ command\\ key\\ dr.hand\\ in\\ repository\\ acme/widgets\\ on\\ host\\ <host>.\\ Observed\\ lower\\ bounds\\ \\(ms\\):\\ 1200000\\,\\ 1200000.\\ Measure\\ completion\\ latency\\ across\\ host\\ load\\,\\ then\\ repair\\ the\\ limit\\ with\\ an\\ explicit\\ margin.\\ A\\ read\\ wait\\ ending\\ is\\ not\\ command\\ failure. --objective O7 --not-dup hand-filed-timeout"
+[exit 1]
+open items before: 3, after: 3
+filed ledger rows for dr.hand: 0

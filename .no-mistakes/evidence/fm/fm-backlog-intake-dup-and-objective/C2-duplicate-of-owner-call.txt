@@ -1,0 +1,50 @@
+
+### C1b the closed duplicate records its proof as the closing note
+$ grep -n -A3 \^-\ \\\[x\\\]\ dc-dup <lab>/data/backlog.md 
+78:- [x] dc-dup - Scrub galley copper pots and pans (done 2026-11-27)
+79-  use lemon and salt
+80-  <!-- fm-add:4ef930b2fbc816f20df9b168 -->
+81-  duplicate of dc-keep
+[exit 0]
+
+### C5 (redo) refused: an open owner call (a real captain hold with a valid boundary)
+$ bin/fm-tasks-axi.sh add oc-3 Pick\ the\ anchor\ chain\ gauge --objective O7 
+ok: added oc-3 -> Queued
+task:
+  id: oc-3
+  title: Pick the anchor chain gauge
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start oc-3` to move it to in flight
+  - Run `tasks-axi block oc-3 --by <other>` to record a dependency
+[exit 0]
+$ bin/fm-captain-hold.sh hold oc-3 --reason which\ chain\ gauge\ does\ the\ owner\ want --boundary owner-rule-change --if-no keep\ the\ 8mm\ chain 
+oc-3
+[exit 0]
+$ bin/fm-captain-hold.sh open oc-3 
+
+[exit 0]
+$ bin/fm-tasks-axi.sh done oc-3 --duplicate-of dc-keep 
+REFUSED: guard=backlog-close-item-eligible rule=open-owner-call missing=the owner's answer to this call
+human-only-exit: what is the owner's answer to the call oc-3?
+fm-tasks-axi: oc-3 is an open owner call; answer it with bin/fm-captain-hold.sh answer oc-3 --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close oc-3
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ oc-3\ \|\ grep\ -E\ \'state:\|held:\|hold_kind:\' 
+  state: queued
+  held: yes
+  hold_kind: captain
+[exit 0]

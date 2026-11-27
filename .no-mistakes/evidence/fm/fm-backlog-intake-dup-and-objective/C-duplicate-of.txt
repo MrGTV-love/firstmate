@@ -1,0 +1,156 @@
+
+### C0 setup: a kept item and its duplicate (filed with --not-dup)
+$ grep -A3 \^-\ \\\[\ \\\]\ dc- <lab>/data/backlog.md 
+- [ ] dc-keep - Scrub galley copper pots (since 2026-11-27)
+  kept body line
+  <!-- fm-add:c75668eb77e2e358a3181c4e -->
+
+- [ ] dc-dup - Scrub galley copper pots and pans (since 2026-11-27)
+  use lemon and salt
+  <!-- fm-add:4ef930b2fbc816f20df9b168 -->
+[exit 0]
+
+### C1 done --duplicate-of closes the duplicate on checked proof, no owner words
+$ bin/fm-tasks-axi.sh done dc-dup --duplicate-of dc-keep 
+ok: done dc-dup -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ bin/fm-tasks-axi.sh show dc-keep --full 
+task:
+  id: dc-keep
+  title: Scrub galley copper pots
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-27
+  closed: "-"
+  deps: none
+  links: none
+  body: "kept body line\n<!-- fm-add:c75668eb77e2e358a3181c4e -->\n\n---\nMerged from duplicate dc-dup: Scrub galley copper pots and pans\nuse lemon and salt"
+[exit 0]
+$ grep -c fm-add: /dev/fd/63 
+grep: /dev/fd/63: Bad file descriptor
+[exit 2]
+$ grep -n dc-dup <lab>/data/backlog.md 
+47:  Merged from duplicate dc-dup: Scrub galley copper pots and pans
+51:- [x] dc-dup - Scrub galley copper pots and pans (done 2026-11-27)
+[exit 0]
+$ grep dc-dup <lab>/state/fleet-ledger.jsonl 
+{"v":1,"ts":1795768948,"at":"2026-11-27T08:42:28Z","event":"task.filed","task":"dc-dup","repo":null,"kind":"task","priority":null}
+{"v":1,"ts":1795768954,"at":"2026-11-27T08:42:34Z","event":"task.closed","task":"dc-dup","evidence":"none","pr":null}
+[exit 0]
+
+### C2 refused: the item is already closed
+$ bin/fm-tasks-axi.sh done dc-dup --duplicate-of dc-keep 
+REFUSED: guard=backlog-close-item-eligible rule=item-closed missing=an open item to close
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh show dc-dup
+fm-tasks-axi: dc-dup is already closed
+[exit 2]
+
+### C3 refused: an owner-filed item (Captain 2027-01-06 asked, no colon)
+$ bin/fm-tasks-axi.sh done own-1 --duplicate-of dc-keep 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-1, and in what words?
+fm-tasks-axi: own-1 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done own-1 --note "<the owner's words>"
+[exit 2]
+$ bin/fm-tasks-axi.sh show own-1 
+  state: queued
+[exit 0]
+
+### C4 refused: an owner-filed item (Owner: in the body)
+$ bin/fm-tasks-axi.sh done own-2 --duplicate-of dc-keep 
+REFUSED: guard=backlog-close-item-eligible rule=owner-filed missing=the owner's words
+human-only-exit: does the owner close own-2, and in what words?
+fm-tasks-axi: own-2 quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then record them with bin/fm-tasks-axi.sh done own-2 --note "<the owner's words>"
+[exit 2]
+$ bin/fm-tasks-axi.sh show own-2 
+  state: queued
+[exit 0]
+
+### C5 refused: an open owner call (a real captain hold)
+$ bin/fm-captain-hold.sh hold oc-1 --reason which\ colour\ does\ the\ owner\ want --boundary dinghy-colour --if-no keep\ white 
+fm-captain-hold: Main decides: a new captain hold requires --boundary credential, spend, destructive, irreversible, tool-denial, or owner-rule-change
+[exit 1]
+$ bin/fm-tasks-axi.sh done oc-1 --duplicate-of dc-keep 
+ok: done oc-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ bin/fm-tasks-axi.sh show oc-1 
+  state: done
+[exit 0]
+
+### C6 refused: an item with a live task record (state/<id>.meta)
+$ touch <lab>/state/lt-1.meta 
+
+[exit 0]
+$ bin/fm-tasks-axi.sh done lt-1 --duplicate-of dc-keep 
+REFUSED: guard=backlog-close-item-eligible rule=live-task missing=an item with no live task record
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-teardown.sh lt-1
+fm-tasks-axi: lt-1 has a live task record; complete it with bin/fm-teardown.sh lt-1, which owns the landing proof
+[exit 2]
+$ bin/fm-tasks-axi.sh show lt-1 
+  state: queued
+[exit 0]
+$ rm <lab>/state/lt-1.meta 
+
+[exit 0]
+
+### C7 refused: the kept item is closed
+$ bin/fm-tasks-axi.sh done ck-2 --duplicate-of ck-1 
+REFUSED: guard=backlog-close-duplicate-of rule=kept-not-open missing=a Queued or In flight kept item
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done ck-2 --duplicate-of <kept-id>
+fm-tasks-axi: the kept item ck-1 is not Queued or In flight; a duplicate closes into open work only
+[exit 2]
+$ bin/fm-tasks-axi.sh show ck-2 
+  state: queued
+[exit 0]
+
+### C8 refused: the kept item does not exist
+$ bin/fm-tasks-axi.sh done ck-2 --duplicate-of no-such-item 
+REFUSED: guard=backlog-close-duplicate-of rule=kept-missing missing=a kept item in this backlog
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done ck-2 --duplicate-of <kept-id>
+fm-tasks-axi: the kept item no-such-item does not exist in this backlog
+[exit 2]
+$ bin/fm-tasks-axi.sh show ck-2 
+  state: queued
+[exit 0]
+
+### C9 refused: the item names itself as the kept item
+$ bin/fm-tasks-axi.sh done ck-2 --duplicate-of ck-2 
+REFUSED: guard=backlog-close-duplicate-of rule=kept-is-self missing=a kept item other than this one
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done ck-2 --duplicate-of <kept-id>
+fm-tasks-axi: an item cannot be a duplicate of itself
+[exit 2]
+$ bin/fm-tasks-axi.sh show ck-2 
+  state: queued
+[exit 0]
+
+### C10 refused: the item still blocks open work
+$ bin/fm-tasks-axi.sh done bl-1 --duplicate-of dc-keep 
+REFUSED: guard=backlog-close-item-eligible rule=open-dependents missing=no open item blocked by this one
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh unblock <dependent> --by bl-1
+fm-tasks-axi: bl-1 still blocks open items: bl-2. Closing it would release them while its work is still open, so nothing was closed. Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by dc-keep, then bin/fm-tasks-axi.sh unblock <dependent> --by bl-1 (the kept item dc-keep itself needs only the unblock step).
+[exit 2]
+$ bin/fm-tasks-axi.sh show bl-1 
+  state: queued
+[exit 0]
+
+### C11 refused: --duplicate-of combined with --pr, --report, --drop-file or --note
+$ bin/fm-tasks-axi.sh done ck-2 --duplicate-of dc-keep --pr https://github.com/o/r/pull/1 
+fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+[exit 2]
+$ bin/fm-tasks-axi.sh done ck-2 --duplicate-of dc-keep --note dup 
+fm-tasks-axi: a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note
+[exit 2]
+$ bin/fm-tasks-axi.sh show ck-2 
+  state: queued
+[exit 0]

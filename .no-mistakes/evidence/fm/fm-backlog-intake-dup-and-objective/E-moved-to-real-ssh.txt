@@ -1,0 +1,75 @@
+
+### E0 backlog identity is the same with and without /usr/sbin on PATH (machine= line)
+$ env PATH=/usr/bin:/bin bin/fm-backlog-identity.sh 
+machine=<this-machine-uuid>
+data=<lab>/data
+dev_ino=16777233:2349190011
+[exit 0]
+$ bin/fm-backlog-identity.sh 
+machine=<this-machine-uuid>
+data=<lab>/data
+dev_ino=16777233:2349190011
+[exit 0]
+
+### E1 smoke: the real ssh client reaches the throwaway sshd on 127.0.0.1:22922 (banner on stderr)
+$ ~/tmp/fm-drv/ssh/ssh-bin fm-far echo connected-through-real-sshd 
+Lab sshd banner: authorised test use only
+connected-through-real-sshd
+[exit 0]
+
+### E2 the remote side answers fm-backlog-identity.sh through bin/fm-on.sh and real ssh
+$ bin/fm-on.sh sm-far fm-backlog-identity.sh 
+Lab sshd banner: authorised test use only
+machine=<this-machine-uuid>
+data=~/tmp/fm-remote.Jpu7Tq/data
+dev_ino=16777233:2349503721
+[exit 0]
+
+### E3 refused: a remote record that reaches this same home (sshd banner on stderr must not count as a different backlog)
+$ bin/fm-tasks-axi.sh done rm-2 --moved-to sm-loop rm-1 
+REFUSED: guard=backlog-close-moved-to rule=same-backlog missing=a different backlog
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done rm-2 --moved-to <home> <item-id>
+fm-tasks-axi: sm-loop reaches this backlog itself (the same machine, data directory and inode); a moved item must live in a different backlog
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ rm-2\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### E4 refused: the remote home has no such item
+$ bin/fm-tasks-axi.sh done rm-1 --moved-to sm-far rf-absent 
+REFUSED: guard=backlog-close-moved-to rule=item-missing missing=the item in the new home
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done rm-1 --moved-to sm-far <item-id>
+fm-tasks-axi: sm-far's backlog has no item rf-absent
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ rm-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### E5 refused: the remote item is closed
+$ bin/fm-tasks-axi.sh done rm-1 --moved-to sm-far rf-done 
+REFUSED: guard=backlog-close-moved-to rule=item-not-open missing=an open item in the new home
+completing-command: FM_FRICTION_OPERATION_ID=<op> FM_FRICTION_EPISODE_ID=<op> bin/fm-tasks-axi.sh done rm-1 --moved-to sm-far <item-id>
+fm-tasks-axi: sm-far's item rf-done is not open (Queued or In flight); moved work must be open in the new home
+[exit 2]
+$ sh -c bin/fm-tasks-axi.sh\ show\ rm-1\ \|\ grep\ -E\ \'state:\' 
+  state: queued
+[exit 0]
+
+### E6 accepted: the remote home holds the item open; read over real ssh
+$ bin/fm-tasks-axi.sh done rm-1 --moved-to sm-far rf-open 
+ok: done rm-1 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ sh -c bin/fm-tasks-axi.sh\ show\ rm-1\ \|\ grep\ -E\ \'state:\' 
+  state: done
+[exit 0]
+$ grep -n -A2 \^-\ \\\[x\\\]\ rm-1 <lab>/data/backlog.md 
+100:- [x] rm-1 - Refit the forward cabin bunk slats (kind: ship) (done 2026-11-27)
+101-  <!-- fm-add:8649882f159e26527ac8ebca -->
+102-  moved to sm-far as rf-open
+[exit 0]
+remote backlog unchanged
+
+### E7 sshd log: the sessions really went through the throwaway sshd
+accepted publickey sessions: 9

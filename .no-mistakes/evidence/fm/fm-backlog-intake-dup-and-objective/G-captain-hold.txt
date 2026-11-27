@@ -1,0 +1,69 @@
+
+### G1 a hold that creates a new row records objective none with the fixed reason
+$ bin/fm-captain-hold.sh hold ch-1 --title Decide\ the\ spinnaker\ storage\ locker --repo firstmate --reason where\ should\ the\ spinnaker\ live --boundary owner-rule-change --if-no keep\ it\ in\ the\ forepeak 
+ch-1
+[exit 0]
+$ bin/fm-captain-hold.sh open ch-1 
+
+[exit 0]
+$ sh -c bin/fm-tasks-axi.sh\ show\ ch-1\ \|\ grep\ -E\ \'state:\|held:\|hold_kind:\|kind:\' 
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: captain
+[exit 0]
+$ grep ch-1 <lab>/data/backlog-review.tsv 
+ch-1		none	captain hold record: tracks a captain decision, not a work item
+[exit 0]
+
+### G2 a hold whose new title overlaps ch-1 stops with guidance and holds nothing
+$ bin/fm-captain-hold.sh hold ch-2 --title "Decide the spinnaker storage locker size" --repo firstmate --reason "how big should the locker be" --boundary owner-rule-change --if-no "keep the current size"
+REFUSED: guard=backlog-intake-duplicate rule=title-overlap missing=a judgment of the listed neighbours
+human-only-exit: is this add the same work as ch-1?
+fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:
+  ch-1 (Queued, overlap 0.80) Decide the spinnaker storage locker
+Judge them, then run the add again with one of these two overrides (each still needs --objective):
+  the work is the same - append this title and body to ch-1 and file nothing:
+    <worktree>/bin/fm-tasks-axi.sh add ch-2 Decide\ the\ spinnaker\ storage\ locker\ size --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --dup-of ch-1
+  the work is different from ch-1 - file it:
+    <worktree>/bin/fm-tasks-axi.sh add ch-2 Decide\ the\ spinnaker\ storage\ locker\ size --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --not-dup ch-1
+fm-captain-hold: the duplicate check stopped task ch-2, so nothing was held. Do not run the --dup-of command above: it would append this captain call to a work item, file nothing, and record no hold. To file it anyway, run the --not-dup command above naming the neighbour you checked, prefixed with BD_DUE_REQUIRED=false (a captain call has no due date), then run this same hold command again.
+fm-captain-hold: could not create task ch-2
+[exit 1]
+$ bin/fm-captain-hold.sh open ch-2 
+
+[exit 1]
+$ bin/fm-tasks-axi.sh show ch-2 
+error: "Task \"ch-2\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+$ grep -c ch-2 <lab>/data/backlog-review.tsv 
+0
+[exit 1]
+neighbour ch-1 unchanged
+
+### G3 the printed recovery works: the --not-dup command with BD_DUE_REQUIRED=false, then the same hold again
+recovery command taken from the refusal: BD_DUE_REQUIRED=false <worktree>/bin/fm-tasks-axi.sh add ch-2 Decide\ the\ spinnaker\ storage\ locker\ size --kind captain --repo firstmate --objective none --objective-reason captain\ hold\ record:\ tracks\ a\ captain\ decision\,\ not\ a\ work\ item --not-dup ch-1
+[exit 0]
+$ bin/fm-captain-hold.sh hold ch-2 --title Decide\ the\ spinnaker\ storage\ locker\ size --repo firstmate --reason how\ big\ should\ the\ locker\ be --boundary owner-rule-change --if-no keep\ the\ current\ size 
+ch-2
+[exit 0]
+$ bin/fm-captain-hold.sh open ch-2 
+
+[exit 0]
+$ sh -c bin/fm-tasks-axi.sh\ show\ ch-2\ \|\ grep\ -E\ \'state:\|held:\|hold_kind:\|kind:\' 
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: captain
+[exit 0]
+$ grep ch- <lab>/data/backlog-review.tsv 
+tune-the-foghorn-reed-pitch-4a		O6	
+ch-1		none	captain hold record: tracks a captain decision, not a work item
+ch-2		none	captain hold record: tracks a captain decision, not a work item
+[exit 0]
+$ grep \"ch- <lab>/state/fleet-ledger.jsonl 
+{"v":1,"ts":1795769193,"at":"2026-11-27T08:46:33Z","event":"task.filed","task":"ch-1","repo":"firstmate","kind":"captain","priority":null}
+{"v":1,"ts":1795769204,"at":"2026-11-27T08:46:44Z","event":"task.filed","task":"ch-2","repo":"firstmate","kind":"captain","priority":null}
+[exit 0]
