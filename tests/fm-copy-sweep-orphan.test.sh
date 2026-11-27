@@ -611,7 +611,7 @@ SH
 # clone's registration list cannot be read at the reclassification; head moves
 # the copy's head with a new local commit.
 make_reclassify_world() {  # <shape>
-  local real_cp target
+  local real_cp real_git fail_n target
   W="$TMP_ROOT/reclassify-$1"
   HOMED="$W/home"
   CLONE="$HOMED/projects/example"
@@ -649,8 +649,29 @@ case "\$2" in
 esac
 SH
       ;;
+    read-before|read-after)
+      # The cp stand-in is the real cp; a git stand-in fails one of the apply's two
+      # plain `git -C <copy> rev-parse HEAD` reads of the copy (the first one
+      # before preservation, the second one after it) and counts them in
+      # head-reads, so the head itself never changes.
+      real_git=$(command -v git)
+      fail_n=1
+      [ "$1" = read-after ] && fail_n=2
+      cat > "$W/bin/git" <<SH
+#!/usr/bin/env bash
+if [ "\$#" = 4 ] && [ "\$1" = -C ] && [ "\$2" = "$target" ] && [ "\$3" = rev-parse ] && [ "\$4" = HEAD ]; then
+  n=\$(cat "$W/head-reads" 2>/dev/null || printf 0)
+  n=\$((n + 1))
+  printf '%s\\n' "\$n" > "$W/head-reads"
+  [ "\$n" != "$fail_n" ] || { echo 'fatal: injected HEAD read failure' >&2; exit 128; }
+fi
+exec "$real_git" "\$@"
+SH
+      chmod +x "$W/bin/git"
+      ;;
   esac
-  chmod +x "$W/bin/lsof" "$W/bin/cp"
+  chmod +x "$W/bin/lsof"
+  [ ! -f "$W/bin/cp" ] || chmod +x "$W/bin/cp"
   RECLASSIFY_TARGET=$target
 }
 
@@ -658,11 +679,13 @@ SH
 # reclassification is not REAPABLE-PROVEN the FAILED line gives classify's own
 # class and reason: a registration list that cannot be read is reported as that,
 # naming the registration the scan found, not as a copy that changed. A head that
-# moves after preservation is still reported as a copy that changed. Either way
-# the copy and its original bytes stay.
+# moves after preservation is still reported as a copy that changed, but only a
+# read that worked can name that cause: a HEAD read that fails, before or after
+# preservation, is named as the failed read and makes no claim that the copy
+# changed. In every shape the copy and its original bytes stay.
 test_a_reclassification_after_preservation_reports_its_own_reason() {
   local shape row
-  for shape in listing head; do
+  for shape in listing head read-after read-before; do
     make_reclassify_world "$shape"
     sweep_status --apply
     assert_equals 1 "$SWEEP_RC" "$shape: a copy left after preservation must fail the run"
@@ -674,6 +697,10 @@ test_a_reclassification_after_preservation_reports_its_own_reason() {
         assert_not_contains "$row" 'copy changed after preservation' "$shape: a listing that could not be read was reported as a changed copy" ;;
       head)
         assert_contains "$row" 'copy changed after preservation' "$shape: a head that moved after preservation was not reported as a changed copy" ;;
+      read-after|read-before)
+        assert_equals 2 "$(cat "$W/head-reads")" "$shape: the apply did not make both HEAD reads of the copy"
+        assert_contains "$row" "the copy's HEAD could not be read ${shape#read-} preservation" "$shape: the FAILED line does not name the HEAD read that failed"
+        assert_not_contains "$row" 'copy changed after preservation' "$shape: an unreadable HEAD was reported as a changed copy" ;;
     esac
     assert_equals 'original target bytes' "$(cat "$RECLASSIFY_TARGET/.claude/keep.txt")" "$shape: the copy lost its original bytes"
   done

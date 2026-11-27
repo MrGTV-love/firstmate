@@ -1749,7 +1749,7 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
-  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity moved why
+  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity moved why head_read after after_read unread
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1775,7 +1775,8 @@ apply_removals() {
         continue
         ;;
     esac
-    head=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || head=unknown
+    head_read=1
+    head=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || { head=unknown; head_read=0; }
     branch=$(git -C "$copy" symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=detached
     preserve_dir=
     earlier=0
@@ -1842,15 +1843,25 @@ apply_removals() {
       # before the last source/preserve comparison and non-force removal.
       scan_processes
       classify "$copy" "$clone" "$pool" "$container"
+      # A report names a cause only from a read that worked: "changed after
+      # preservation" needs both HEAD reads to have succeeded and differ; a read
+      # that failed is named instead, with no claim about the copy.
+      unread=
+      after=
+      after_read=1
+      after=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || after_read=0
+      [ "$head_read" = 1 ] || unread="the copy's HEAD could not be read before preservation"
+      [ "$after_read" = 1 ] || unread="${unread:+$unread, and }the copy's HEAD could not be read after preservation"
       moved=0
-      [ "$(git -C "$copy" rev-parse HEAD 2>/dev/null)" = "$head" ] || moved=1
-      if [ "$CLASS" != REAPABLE-PROVEN ] || [ "$moved" = 1 ]; then
+      [ -n "$unread" ] || [ "$after" = "$head" ] || moved=1
+      if [ "$CLASS" != REAPABLE-PROVEN ] || [ "$moved" = 1 ] || [ -n "$unread" ]; then
         discard_unlocked_preserve "$copy" "$identity" "$release_id"
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        # The report gives classify's own class and reason; "changed after
-        # preservation" is said only when the head moved.
+        # The report also gives classify's own class and reason when the
+        # reclassification is not REAPABLE-PROVEN.
         why=
         [ "$moved" = 0 ] || why="copy changed after preservation"
+        [ -z "$unread" ] || why="${why:+$why; }$unread"
         [ "$CLASS" = REAPABLE-PROVEN ] || why="${why:+$why; }it is now $CLASS: $REASON"
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"$(printf '%s' "$why" | tr '\n\t' '  '); the copy was left"$'\n'
         continue
