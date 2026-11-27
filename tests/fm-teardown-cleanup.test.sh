@@ -4447,7 +4447,7 @@ SH
 }
 
 test_typed_preservation_exit_completes_cleanup() {
-  local rc exclude route line preserved ownership operation
+  local rc exclude route line preserved ownership operation root want
   # A foreign copy that holds ignored bytes is held and never reaches preservation
   # (test_a_foreign_copy_with_only_unique_ignored_files_is_held_and_the_slot_is_not_returned)
   # unless the hold cannot apply to it, as inside the task's own nested copy.
@@ -4482,6 +4482,12 @@ test_typed_preservation_exit_completes_cleanup() {
     "FM_FRICTION_OPERATION_ID=$operation FM_FRICTION_EPISODE_ID=$operation "*) ;;
     *) fail "printed route does not carry the refusal's operation and episode: $route" ;;
   esac
+  # The route is run as printed from a shell with none of the root overrides, so it must carry the
+  # state, data and config folders this run used (the fixture sets all three, none the home default).
+  for root in state data config; do
+    printf -v want ' FM_%s_OVERRIDE=%q ' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$FOREIGN_CASE/$root"
+    case "$route" in *"$want"*) ;; *) fail "printed route does not carry$want: $route" ;; esac
+  done
   # While storage is still broken the route is refused again, as another
   # attempt of the same operation that prints the same route.
   run_printed_route "$route" rc
@@ -4497,6 +4503,7 @@ test_typed_preservation_exit_completes_cleanup() {
   assert_absent "$FOREIGN_CASE/state/task-x1.meta" 'printed route did not close task'
   preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f)
   assert_equals 'unique retained bytes' "$(cat "$preserved")" 'completing route lost ignored bytes'
+  assert_absent "$FOREIGN_CASE/home/data" 'the printed route wrote under the home data folder, not the one the run used'
   jq -es --arg op "$operation" '
       map(.outcome) == ["blocked", "retried", "blocked", "retried", "retry-succeeded", "completed"]
       and (map(.operation_id) | unique == [$op]) and (map(.episode_id) | unique == [$op])
@@ -4507,6 +4514,49 @@ test_typed_preservation_exit_completes_cleanup() {
     || fail "a refusal and its successful retry must be one operation ending in retry-succeeded and completed: $(cat "$FOREIGN_CASE/home/state/friction.jsonl")"
   done
   pass 'the typed preservation refusal of an own copy and of a foreign copy inside it retains unique bytes, and its printed command completes cleanup after storage repair as one operation'
+}
+
+# A recorded task closed in a home whose state, data and config folders are the home's own defaults
+# prints the completing command it always printed, with no root override on it, and that text run
+# as printed from a shell with none of the overrides completes the close. The fixture's roots are
+# moved into the home so the run's overrides are the defaults; the typed case above runs the same
+# refusal with roots that differ and shows each one printed.
+test_the_completing_command_of_a_default_home_close_carries_no_root_override() {
+  local rc exclude route line root preserved want
+  dead_launcher_pid
+  make_own_locked_copy_case default-roots-route enclosing "$FOREIGN_DEAD_PID"
+  for root in state data config; do
+    mkdir -p "$FOREIGN_CASE/home/$root"
+    cp -R "$FOREIGN_CASE/$root/." "$FOREIGN_CASE/home/$root/"
+    rm -rf "${FOREIGN_CASE:?}/$root"
+  done
+  FOREIGN_ROOTS_BASE=$FOREIGN_CASE/home
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'unique retained bytes\n' > "$FOREIGN_COPY/unique.dat"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FOREIGN_CASE/fakebin/cp"
+  chmod +x "$FOREIGN_CASE/fakebin/cp"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "default-roots: failed preservation must keep refusing: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_COPY/unique.dat" 'default-roots: the ignored file was lost'
+  route=
+  while IFS= read -r line; do
+    case "$line" in 'completing-command: '*) route=${line#completing-command: } ;; esac
+  done < "$FOREIGN_CASE/stderr"
+  [ -n "$route" ] || fail 'default-roots: the refusal omitted its completing command'
+  route=$(printf '%s\n' "$route" | sed 's/^FM_FRICTION_OPERATION_ID=[^ ]* FM_FRICTION_EPISODE_ID=[^ ]* //')
+  printf -v want 'FM_HOME=%q bash %q task-x1' "$FOREIGN_CASE/home" "$ROOT/bin/fm-teardown.sh"
+  assert_equals "$want" "$route" 'default-roots: the printed command is not the one printed before roots were carried'
+  case "$route" in *OVERRIDE*) fail "default-roots: a default root was printed as an override: $route" ;; esac
+  rm "$FOREIGN_CASE/fakebin/cp"
+  run_printed_route "$route" rc
+  expect_code 0 "$rc" "default-roots: the printed command failed after storage was restored: $(cat "$FOREIGN_CASE/completed.stderr")"
+  assert_absent "$FOREIGN_COPY" 'default-roots: the printed command did not retire the copy'
+  assert_absent "$FOREIGN_CASE/home/state/task-x1.meta" 'default-roots: the printed command did not close the task'
+  preserved=$(find "$FOREIGN_CASE/home/data/task-x1/nested-copy-preserved" -name unique.dat -type f)
+  assert_equals 'unique retained bytes' "$(cat "$preserved")" 'default-roots: the printed command lost the ignored bytes'
+  unset FOREIGN_ROOTS_BASE
+  pass 'the completing command of a default-home close carries no root override and completes the close when run as printed'
 }
 
 test_forced_preservation_refusal_prints_no_completing_command() {
@@ -8838,6 +8888,7 @@ test_foreign_copy_regenerable_ignored_files_need_no_preservation
 test_a_foreign_copy_with_durable_tac_state_is_held_and_tac_tmp_is_not_the_reason
 test_a_foreign_copy_whose_ignored_files_cannot_be_listed_is_refused_not_held
 test_typed_preservation_exit_completes_cleanup
+test_the_completing_command_of_a_default_home_close_carries_no_root_override
 test_forced_preservation_refusal_prints_no_completing_command
 test_legacy_preservation_refusal_prints_no_completing_command
 test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal

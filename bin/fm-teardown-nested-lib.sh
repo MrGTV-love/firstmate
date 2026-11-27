@@ -162,9 +162,11 @@ teardown_copy_question() {  # <rule> <copy>
 # wrapper that repeats it. The command re-enters the existing proof/preservation
 # owner without force, so a forced or legacy-record run, which it could not
 # complete, gets a human-only exit instead. A new custody/disposition decision is
-# asked explicitly.
+# asked explicitly. The command carries the state, data and config roots the run
+# used whenever one differs from its FM_HOME default, so running it as printed,
+# from a shell that sets none of the overrides, reaches the same folders.
 teardown_refuse_copy() {  # <rule> <missing> <copy>
-  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh}
+  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh} roots=
   # An unavailable inspection is not a policy judgment. The later custody
   # wrapper repeats this diagnostic without manufacturing a policy event.
   if [ "$1" = inspection-unavailable ]; then
@@ -175,10 +177,13 @@ teardown_refuse_copy() {  # <rule> <missing> <copy>
   exit_text=$(teardown_copy_question "$1" "$3")
   if [ "$1" = ignored-bytes-preserved ] && [ "${FORCE:-}" != --force ] && [ "${LEGACY_RECORD_GIVEN:-0}" != 1 ]; then
     kind=machine
+    [ "${STATE:-$FM_HOME/state}" = "$FM_HOME/state" ] || roots="$roots FM_STATE_OVERRIDE=$(printf '%q' "$STATE")"
+    [ "${DATA:-$FM_HOME/data}" = "$FM_HOME/data" ] || roots="$roots FM_DATA_OVERRIDE=$(printf '%q' "$DATA")"
+    [ "${CONFIG:-$FM_HOME/config}" = "$FM_HOME/config" ] || roots="$roots FM_CONFIG_OVERRIDE=$(printf '%q' "$CONFIG")"
     if [ "${TEARDOWN_BY_PATH:-}" = 1 ]; then
-      printf -v command 'FM_HOME=%q bash %q --copy %q --record-id %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$TEARDOWN_BY_PATH_COPY" "$ID"
+      printf -v command 'FM_HOME=%q%s bash %q --copy %q --record-id %q' "$FM_HOME" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$TEARDOWN_BY_PATH_COPY" "$ID"
     else
-      printf -v command 'FM_HOME=%q bash %q %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
+      printf -v command 'FM_HOME=%q%s bash %q %q' "$FM_HOME" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
     fi
     exit_text=$command
     missing="$missing Restore readable source and writable preservation storage, then run the completing command."

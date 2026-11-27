@@ -4179,6 +4179,15 @@ run_by_path() {  # <case> <teardown --copy arguments...>
     PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$@"
 }
 
+# Runs a printed completing command exactly as printed, from a shell that sets none of the three root
+# overrides: only the fixture's code root, nm home and fake tools are supplied, so a root the command
+# does not carry is a root the run does not reach.
+by_path_run_printed() {  # <case> <command text>
+  env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
+    FM_ROOT_OVERRIDE="$1/code-root" NM_HOME="$1/nm" \
+    PATH="$1/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" bash -c "$2"
+}
+
 by_path_registered() {  # <clone> <copy>
   git -C "$1" worktree list --porcelain | grep -Fqx "worktree $2"
 }
@@ -5442,7 +5451,7 @@ test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude()
 # One that git does not ignore is untracked content and stops git's own non-forced removal, and a preserve
 # that cannot publish leaves the copy where it is.
 test_by_path_preserves_claude_whole_and_removes_the_copy() {
-  local shape case_dir rc kept
+  local shape case_dir rc kept command root want
   for shape in ignored not-ignored preserve-cannot-publish; do
     make_by_path_case "by-path-claude-$shape"
     case_dir=$BP_CASE
@@ -5479,14 +5488,59 @@ test_by_path_preserves_claude_whole_and_removes_the_copy() {
         assert_present "$BP_COPY/.claude/settings.local.json" "by-path-claude-$shape: the settings file is gone"
         by_path_registered "$BP_CLONE" "$BP_COPY" || fail "by-path-claude-$shape: the copy is no longer registered"
         assert_absent "$case_dir/git-remove.log" "by-path-claude-$shape: git worktree remove was called"
+        # The printed command is the whole retry: it is run as printed, from a shell with none of the
+        # three root overrides, so it must carry the roots this run used (the fixture sets all three).
+        command=$(sed -n 's/^completing-command: //p' "$case_dir/stderr")
+        [ -n "$command" ] || fail "by-path-claude-$shape: no completing command was printed"
+        for root in state data config; do
+          printf -v want 'FM_%s_OVERRIDE=%q' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$case_dir/$root"
+          [[ "$command" == *" $want "* ]] || fail "by-path-claude-$shape: the completing command does not carry $want: $command"
+        done
         rm -f "$case_dir/data/pres-1/nested-copy-preserved"
         rc=0
-        run_by_path "$case_dir" "$BP_COPY" --record-id pres-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-        expect_code 0 "$rc" "by-path-claude-$shape: with the obstacle gone the copy goes: $(cat "$case_dir/stderr")"
-        assert_absent "$BP_COPY" "by-path-claude-$shape: the copy was not removed" ;;
+        by_path_run_printed "$case_dir" "$command" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        expect_code 0 "$rc" "by-path-claude-$shape: with the obstacle gone the printed command completes the copy: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "by-path-claude-$shape: the copy was not removed"
+        kept=$(find "$case_dir/data/pres-1/nested-copy-preserved" -type d -name files -print -quit 2>/dev/null)
+        [ -n "$kept" ] || fail "by-path-claude-$shape: the printed command did not preserve under the data folder the refused run used"
+        assert_equals 'unique settings' "$(cat "$kept/.claude/settings.local.json")" "by-path-claude-$shape: the retried preserve lost .claude/settings.local.json"
+        assert_absent "$BP_HOME/data" "by-path-claude-$shape: the printed command wrote under the home's own data folder, not the run's" ;;
     esac
   done
   pass 'teardown --copy preserves .claude and .opencode whole and removes the copy, refuses when git does not ignore them, and keeps the copy when the preserve cannot publish'
+}
+
+# A run whose state, data and config folders are the home's own defaults prints the completing command
+# it always printed, with no root override on it; the same refusal under a home whose roots differ
+# prints each differing root (test_by_path_preserves_claude_whole_and_removes_the_copy runs that text).
+test_by_path_completing_command_prints_a_root_only_when_it_differs_from_the_home_default() {
+  local case_dir rc command want
+  make_by_path_case by-path-default-roots
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  mkdir -p "$BP_COPY/.claude" "$BP_HOME/data/pres-1" "$BP_HOME/config"
+  printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+  printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'a file where the preserve parent must be a directory\n' > "$BP_HOME/data/pres-1/nested-copy-preserved"
+  rc=0
+  env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
+    FM_HOME="$BP_HOME" FM_ROOT_OVERRIDE="$case_dir/code-root" NM_HOME="$case_dir/nm" \
+    PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-default-roots: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be preserved' "$case_dir/stderr" 'by-path-default-roots: no named reason'
+  command=$(sed -n 's/^completing-command: FM_FRICTION_OPERATION_ID=[^ ]* FM_FRICTION_EPISODE_ID=[^ ]* //p' "$case_dir/stderr")
+  [ -n "$command" ] || fail "by-path-default-roots: no completing command: $(cat "$case_dir/stderr")"
+  printf -v want 'FM_HOME=%q bash %q --copy %q --record-id %q' "$BP_HOME" "$ROOT/bin/fm-teardown.sh" "$BP_COPY" pres-1
+  assert_equals "$want" "$command" 'by-path-default-roots: the printed command is not the one printed before roots were carried'
+  case "$command" in *OVERRIDE*) fail "by-path-default-roots: a default root was printed as an override: $command" ;; esac
+  rm -f "$BP_HOME/data/pres-1/nested-copy-preserved"
+  rc=0
+  by_path_run_printed "$case_dir" "$command" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-default-roots: the printed command completes the copy: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-default-roots: the copy was not removed'
+  assert_present "$BP_HOME/data/pres-1/nested-copy-preserved" 'by-path-default-roots: nothing was preserved under the home data folder'
+  pass 'a teardown --copy completing command prints a state, data or config root only when it differs from the home default'
 }
 
 # An unreadable projects folder is not an empty one: a gone copy with an audit line is not reported done
@@ -5802,6 +5856,7 @@ test_by_path_exception_refusal_keeps_its_own_reason
 test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude
 test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
 test_by_path_preserves_claude_whole_and_removes_the_copy
+test_by_path_completing_command_prints_a_root_only_when_it_differs_from_the_home_default
 test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read
 test_by_path_refuses_a_holder_that_starts_after_the_first_scan
 )
