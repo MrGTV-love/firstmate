@@ -335,6 +335,7 @@ The skill owns the guarded fleet update and restart procedure; it never touches 
 ## 13. Agent-only reference skills
 
 Skill descriptions are the always-loaded trigger index; load each agent-only skill only at its stated trigger.
+Before writing or changing a hook, guard, or automated test, apply the [contract validation guide](.agents/skills/firstmate-coding-guidelines/SKILL.md#contract-validation).
 Load `agent-skill-trigger-index` only when auditing or maintaining the complete trigger index.
 
 ## 14. Relay

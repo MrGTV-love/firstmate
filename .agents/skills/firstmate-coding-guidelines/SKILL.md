@@ -84,7 +84,64 @@ Mark an axis not applicable only after inspecting its integration surface, and u
 For critical safety, routing, startup, and supervision infrastructure, prefer deterministic and idempotent enforcement over relying on agent memory alone.
 Keep instructions as the authority and discovery layer, but make repeated execution converge safely and make invalid or unsafe states fail closed wherever the runtime can enforce them.
 
-For work that adds or changes tests, hooks or validators, apply the [existing intent-to-test criteria](../../../docs/review-rubric.md#intent-to-test-alignment) at the relevant behavior or scenario.
+For work that adds or changes hooks, guards, validators, or tests, apply the [intent-to-test review criteria](../../../docs/review-rubric.md#intent-to-test-alignment) at the relevant behavior or scenario.
+
+### Contract validation
+
+Validate at the layer where the contract is defined: a check must survive changes that preserve the contract and fail when the contract is violated.
+Before writing or changing a hook, guard, or automated test, state three things in the existing change or test record:
+
+1. **Invariant:** What must remain true, including the closest legitimate behavior that must still work?
+2. **Authority:** Which requirement, approved policy, specification, or independent registry defines the expected result?
+3. **Boundary:** Where can the result actually be observed or enforced?
+
+Derive expectations from the authority, never from the implementation under test.
+Source-analysis rows and examples apply to linters and guards whose checked input is source; automated tests still exercise behavior and never assert implementation-source bytes, as the [repo style rules](#repo-style-rules) require.
+Use `hook-design` for harness lifecycle proof, `guard-design` for protection proof, and `hook-audit` when assessing an existing control's operational value.
+This guide does not replace those proof requirements.
+
+#### Choose the simplest faithful check
+
+| Contract layer | Use |
+| --- | --- |
+| Exact text, prefix, suffix, or membership | Plain string operations or a set; match a router namespace with a prefix if that is all the policy requires. |
+| Flat lexical shape | Regex on a token or a parsed field, such as a ticket ID, SemVer syntax, or a single `argv` element. |
+| Structured input | The format's parser and schema for JSON, YAML, TOML, XML, HTML, CSV, or Markdown structure; express policy such as “deny X unless Y” in control flow over parsed values. |
+| Code identity, syntax, or semantics | A language-aware linter or AST with the name resolution or data-flow analysis the claim needs; use a maintained rule when it fits. |
+| Security enforcement | Runtime sandbox, OS permissions, or a service boundary outside the caller's control; treat shell-text scans and argv checks as defense in depth, not enforcement. |
+
+**Regex decision:** Judge the predicate and the consequence of being wrong, not the tool.
+Use the parser when a text approximation could silently miss a violation or reject valid structure.
+Regex fits when surface text itself is the contract (license headers, banned strings, secret patterns, TODO markers), when a grammar is unavailable (logs, partial diffs, mixed or templated input), or when it is a tokenizer, cheap pre-filter before a real validator, or documented best-effort tripwire.
+State what an approximation can miss or reject; if there is no reliable representation for a required guarantee, choose a stronger boundary rather than claiming the tripwire proves it.
+
+#### Replace brittle assertions
+
+| Instead of pinning | Observe or enforce |
+| --- | --- |
+| Absolute workspace paths | Resolve the root dynamically; keep exact repo-relative paths only where the contract requires them. |
+| Volatile model or version IDs | Test wiring with an injected value and validate active config against its authoritative registry; pin an exact ID only for an approved deployment requirement. |
+| Exact stdout, prose snapshots, or timestamps | Assert typed errors, exit codes, parsed fields, or time relationships; keep exact text only when the text itself is promised. |
+| Private internals or incidental mock call counts | Use the public interface and observable state or effects; assert a count only when the count is the behavior promised. |
+| Fixed sleeps and shared mutable fixtures | Poll observable readiness to an explicit deadline; isolate temporary state per case and exercise idempotency where relevant. |
+
+**Code example:** For a Python source policy against `subprocess` with `shell=True`, prefer a semantic rule such as Ruff S602 or a Semgrep rule fitted to that policy.
+A custom check must resolve imports, aliases, and shadowing for the claimed scope, cover non-constant and unresolved shell arguments according to policy, and refuse unparseable source if it is a blocking check.
+A single-file analysis cannot prove runtime containment.
+
+**Config example:** Test the adapter with an injected model `test-model-id` and assert the emitted request's `model` equals that fixture value.
+Separately, assert that the real configured model is allowed by the authoritative registry for the selected provider, not a list generated from the active config or by the adapter under test.
+
+#### Preflight before committing
+
+- **Pair cases:** Show that at least one contract-preserving change passes and a real violation fails for the intended reason.
+  For a semantic Python check, an unrelated callee with `shell=True` should pass, while a multiline call through a `subprocess` import alias with `shell=True` should fail.
+  Include a non-constant flag case when the policy requires a provably false flag.
+- **Observe the boundary:** Assert the promised effect through the real public entry point or installed hook runner and downstream consumer where applicable; a handler call or its log alone proves neither wiring nor protection.
+- **Exercise failure paths:** Drive malformed input, missing policy data, and timeouts through the real runner where applicable.
+  A blocking guard fails closed if it cannot establish permission; an advisory hook may proceed only as an explicit, observable choice.
+- **Bound cost:** Scope the matcher, set deadlines, cap retries and output, and check that execution and late effects stay within the declared bounds.
+- **Check diagnostics:** Require a stable reason code and actionable context, with file and line when attributable, and no secret payloads.
 
 ### Harness-dependent checks
 

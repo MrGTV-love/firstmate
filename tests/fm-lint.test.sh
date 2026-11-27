@@ -100,10 +100,16 @@ SH
       for attempt in 1 2; do
         out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
           "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $root check failed: $out"
-        if [ "$attempt" -eq 1 ]; then
-          assert_not_contains "$out" "cache hit $root" "$state child import reused stale analysis"
+        if [ "$root" = bin/child.sh ] || [ "$root" = bin/child-caller.sh ]; then
+          if [ "$state" = unchanged ] && [ "$attempt" -eq 1 ]; then
+            assert_not_contains "$out" "cache hit $root" "initial $root check must run cold"
+          else
+            assert_contains "$out" "cache hit $root" "child-shell string import must stay out of ShellCheck cache inputs for $root"
+          fi
+        elif [ "$attempt" -eq 1 ]; then
+          assert_not_contains "$out" "cache hit $root" "$state import reused stale analysis"
         else
-          assert_contains "$out" "cache hit $root" "resolved $state child import was not reusable"
+          assert_contains "$out" "cache hit $root" "resolved $state import was not reusable"
         fi
       done
     done
@@ -121,13 +127,17 @@ SH
   for attempt in 1 2; do
     out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
       "$repo/bin/fm-lint.sh" --jobs 1 bin/unresolved-child.sh 2>&1) || fail "unresolved child lint failed: $out"
-    assert_not_contains "$out" 'cache hit bin/unresolved-child.sh' "unresolved child import authorized reuse"
+    if [ "$attempt" -eq 1 ]; then
+      assert_not_contains "$out" 'cache hit bin/unresolved-child.sh' "first unresolved child lint must run cold"
+    else
+      assert_contains "$out" 'cache hit bin/unresolved-child.sh' "child-shell -c string must not disable ShellCheck cache reuse"
+    fi
   done
   fm_lint_write_diff_file "$diff_file" bin/library.sh
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --list-files) || fail "unresolved child selection failed"
-  assert_contains "$listed" bin/unresolved-child.sh "unresolved child import lost conservative selection"
-  pass "child-shell positional imports and executable substitutions govern selection and cache inputs"
+  assert_not_contains "$listed" bin/unresolved-child.sh "unresolved child-shell -c string must not mark root unknown on unrelated .sh edits"
+  pass "child-shell imports select callers while staying outside ShellCheck cache inputs and unknown-source fan-out"
 }
 
 test_stdin_heredoc_imports_select_and_invalidate_callers() {
@@ -201,10 +211,10 @@ SH
       for attempt in 1 2; do
         out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
           "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $root check failed: $out"
-        if [ "$attempt" -eq 1 ]; then
-          assert_not_contains "$out" "cache hit $root" "$state stdin import reused stale analysis"
+        if [ "$state" = unchanged ] && [ "$attempt" -eq 1 ]; then
+          assert_not_contains "$out" "cache hit $root" "initial $root check must run cold"
         else
-          assert_contains "$out" "cache hit $root" "resolved $state stdin import was not reusable"
+          assert_contains "$out" "cache hit $root" "shell-fed heredoc must stay outside ShellCheck cache inputs for $root"
         fi
       done
     done
@@ -232,14 +242,18 @@ SH
   listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
     "$repo/bin/fm-lint.sh" --list-files) || fail "unknown stdin selection failed"
   for root in bin/unknown-stdin.sh bin/expanded-stdin.sh; do
-    assert_contains "$listed" "$root" "unknown child stdin lost conservative selection"
+    assert_not_contains "$listed" "$root" "unresolved child stdin heredoc must not mark root unknown on unrelated .sh edits"
     for attempt in 1 2; do
       out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
         "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "unknown stdin lint failed: $out"
-      assert_not_contains "$out" "cache hit $root" "unknown child stdin authorized reuse"
+      if [ "$attempt" -eq 1 ]; then
+        assert_not_contains "$out" "cache hit $root" "initial $root check must run cold"
+      else
+        assert_contains "$out" "cache hit $root" "child stdin heredoc must not disable ShellCheck cache reuse for $root"
+      fi
     done
   done
-  pass "executable stdin imports select direct and transitive callers and invalidate reusable closures"
+  pass "executable stdin imports select callers while staying outside ShellCheck cache inputs and unknown-source fan-out"
 }
 
 test_nonprogram_heredocs_remain_inert() {
@@ -296,25 +310,42 @@ test_production_fixture_stdin_imports_invalidate_cache() {
   fm_lint_stub_shellcheck "$fakebin" "$tmp/checks"
   diff_file="$tmp/diff.nul"
   root=tests/fm-test-fixtures.test.sh
-  for helper in secondmate-helpers wake-helpers herdr-test-safety; do
-    for state in unchanged changed deleted; do
-      if [ "$state" = changed ]; then printf '\n' >> "$repo/tests/$helper.sh"; fi
-      if [ "$state" = deleted ]; then rm "$repo/tests/$helper.sh"; fi
-      fm_lint_write_diff_file "$diff_file" "tests/$helper.sh"
-      listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
-        "$repo/bin/fm-lint.sh" --list-files) || fail "$state $helper selection failed"
-      assert_contains "$listed" "$root" "$state $helper did not select its production stdin consumer"
-      for attempt in 1 2; do
-        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
-          "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state $helper lint failed: $out"
-        if [ "$attempt" -eq 1 ] || [ "$helper" != herdr-test-safety ]; then
-          assert_not_contains "$out" "cache hit $root" "$state $helper authorized stale or unknown reuse"
-        fi
-      done
+  # Static child-heredoc helper reference selects the fixture root without
+  # invalidating its ShellCheck cache (ShellCheck never reads the heredoc).
+  for state in unchanged changed deleted; do
+    if [ "$state" = changed ]; then printf '\n' >> "$repo/tests/herdr-test-safety.sh"; fi
+    if [ "$state" = deleted ]; then rm "$repo/tests/herdr-test-safety.sh"; fi
+    fm_lint_write_diff_file "$diff_file" tests/herdr-test-safety.sh
+    listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+      "$repo/bin/fm-lint.sh" --list-files) || fail "$state herdr-test-safety selection failed"
+    assert_contains "$listed" "$root" "$state herdr-test-safety did not select its static production stdin consumer"
+    for attempt in 1 2; do
+      out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+        "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$state herdr-test-safety lint failed: $out"
+      if [ "$state" = unchanged ] && [ "$attempt" -eq 1 ]; then
+        assert_not_contains "$out" "cache hit $root" "initial $root check must run cold"
+      else
+        assert_contains "$out" "cache hit $root" "production fixture stdin consumer should reuse its ShellCheck cache across child-shell helper edits"
+      fi
     done
+  done
+  cp "$ROOT/tests/herdr-test-safety.sh" "$repo/tests/herdr-test-safety.sh"
+  # Dynamic function-arg child-heredoc helpers ($ROOT/tests/$1.sh) are outside
+  # ShellCheck's read set: edits select their real static callers and the helper
+  # itself without poisoning tests/fm-test-fixtures.test.sh into unknown fan-out.
+  for helper in secondmate-helpers wake-helpers; do
+    printf '\n' >> "$repo/tests/$helper.sh"
+    fm_lint_write_diff_file "$diff_file" "tests/$helper.sh"
+    listed=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_GIT_DIFF_FILE="$diff_file" \
+      "$repo/bin/fm-lint.sh" --list-files) || fail "changed $helper selection failed"
+    assert_contains "$listed" "tests/$helper.sh" "changed $helper must select itself"
+    assert_not_contains "$listed" "$root" "dynamic child-heredoc helper $helper must not poison $root into unknown fan-out"
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$helper cache reuse failed: $out"
+    assert_contains "$out" "cache hit $root" "$root must stay cacheable after editing dynamic child-heredoc helper $helper"
     cp "$ROOT/tests/$helper.sh" "$repo/tests/$helper.sh"
   done
-  pass "production fixture stdin helper imports select callers and never authorize stale reuse"
+  pass "production fixture stdin helper imports select static callers without unknown fan-out or cache loss"
 }
 
 test_production_nested_sources_and_pending_reply_cache() {
@@ -1060,6 +1091,227 @@ PY
   pass "canonical partitions balance measured analysis cost rather than equal direct bytes"
 }
 
+test_child_shell_strings_stay_outside_shellcheck_read_set() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): real ShellCheck child-shell read-set proof"; return; }
+  local tmp repo out rc
+  tmp=$(fm_test_tmproot fm-lint-sc-read-set)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+library_value() {
+  printf 'ok\n'
+}
+SH
+  cat > "$repo/bin/top-caller.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/library.sh
+. bin/library.sh
+library_value
+SH
+  cat > "$repo/bin/child-only.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
+bash -c '. "$1/bin/library.sh"; library_value' _ "$PWD"
+SH
+  cat > "$repo/bin/dynamic-child.sh" <<'SH'
+#!/usr/bin/env bash
+launch=':'
+/bin/sh -c "$launch"
+SH
+  cat > "$repo/bin/unquoted-heredoc-sub.sh" <<'SH'
+#!/usr/bin/env bash
+bash <<EOF
+$(
+# shellcheck source=bin/library.sh
+. bin/library.sh
+library_value
+)
+EOF
+SH
+  cat > "$repo/bin/unquoted-heredoc-arith.sh" <<'SH'
+#!/usr/bin/env bash
+bash <<EOF
+$(( $(
+# shellcheck source=bin/library.sh
+. bin/library.sh
+library_value
+printf '0\n'
+) + 1 ))
+EOF
+SH
+  cat > "$repo/bin/unquoted-heredoc-param-arith.sh" <<'SH'
+#!/usr/bin/env bash
+bash <<EOF
+: ${VALUE:-$(( $(
+# shellcheck source=bin/library.sh
+. bin/library.sh
+library_value
+printf '0\n'
+) + 1 ))}
+EOF
+SH
+  cat > "$repo/bin/unquoted-heredoc-case-arith.sh" <<'SH'
+#!/usr/bin/env bash
+bash <<EOF
+: ${VALUE:-$(( $(case "${1:-x}" in x)
+. bin/library.sh
+library_value
+printf '0\n'
+;; esac) + 1 ))}
+EOF
+SH
+  cat > "$repo/bin/unquoted-heredoc-extglob-case.sh" <<'SH'
+#!/usr/bin/env bash
+shopt -s extglob
+bash <<EOF
+: ${VALUE:-$(( $(case "${1:-x}" in (@(x|case))
+. bin/library.sh
+library_value
+printf '0\n'
+;; esac) + 1 ))}
+EOF
+SH
+  cat > "$repo/bin/unquoted-heredoc-case-pattern-keyword.sh" <<'SH'
+#!/usr/bin/env bash
+cat <<EOF
+${VALUE:-$(case "${1:-x}" in (case) :;; (*) :;; esac
+. bin/library.sh
+library_value)}
+EOF
+SH
+  cat > "$repo/bin/unquoted-heredoc-arith-vars.sh" <<'SH'
+#!/usr/bin/env bash
+case=1
+in=2
+bash <<EOF
+: ${VALUE:-$(( case + in ))} # $(. bin/library.sh; library_value; printf '0\n')
+EOF
+SH
+  cat > "$repo/bin/unquoted-heredoc-empty-case.sh" <<'SH'
+#!/usr/bin/env bash
+bash <<EOF
+: ${VALUE:-$(( $(case "${1:-x}" in esac; printf '0\n') + 1 ))} # $(. bin/library.sh; library_value)
+EOF
+SH
+  cat > "$repo/bin/unknown-lib.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=/dev/null
+. "$1"
+SH
+  cat > "$repo/bin/mixed-child.sh" <<'SH'
+#!/usr/bin/env bash
+message=${1:-hello}
+# shellcheck disable=SC2016
+bash -c ". bin/library.sh; echo $message"
+SH
+  cat > "$repo/bin/mixed-unknown-child.sh" <<'SH'
+#!/usr/bin/env bash
+message=${1:-hello}
+# shellcheck disable=SC2016
+bash -c ". bin/unknown-lib.sh; echo $message"
+SH
+  cat > "$repo/bin/parent-unknown-caller.sh" <<'SH'
+#!/usr/bin/env bash
+# shellcheck source=bin/unknown-lib.sh
+. bin/unknown-lib.sh /dev/null
+SH
+  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/unquoted-heredoc-arith.sh bin/unquoted-heredoc-param-arith.sh bin/unquoted-heredoc-case-arith.sh bin/unquoted-heredoc-extglob-case.sh bin/unquoted-heredoc-case-pattern-keyword.sh bin/unquoted-heredoc-arith-vars.sh bin/unquoted-heredoc-empty-case.sh bin/child-only.sh bin/dynamic-child.sh bin/mixed-child.sh; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "baseline $root failed: $out"
+    assert_not_contains "$out" "cache hit $root" "baseline $root must run cold"
+  done
+  # Mixed dynamic/static -c string must still select on its literal target and stay off unrelated edits,
+  # even when the child-only target itself has an unknown runtime source (while a parent-shell caller still fans out).
+  local diff_file="$tmp/mixed.diff" sel="$tmp/mixed.sel" listed
+  fm_lint_write_diff_file "$diff_file" bin/library.sh
+  perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$sel" || fail "mixed-child select failed"
+  listed=$'\n'
+  while IFS= read -r -d '' root; do listed+="$root"$'\n'; done < "$sel"
+  assert_contains "$listed" $'\n''bin/mixed-child.sh'$'\n' "mixed dynamic+static -c string omitted static caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-sub.sh'$'\n' "unquoted heredoc parent-shell sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-arith.sh'$'\n' "unquoted heredoc arithmetic-nested sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-param-arith.sh'$'\n' "unquoted heredoc parameter-expansion arithmetic-nested sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-case-arith.sh'$'\n' "unquoted heredoc case-in-arithmetic sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-extglob-case.sh'$'\n' "unquoted heredoc extglob-case sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-case-pattern-keyword.sh'$'\n' "unquoted heredoc literal (case) pattern sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-arith-vars.sh'$'\n' "unquoted heredoc arith-vars sub omitted caller selection"
+  assert_contains "$listed" $'\n''bin/unquoted-heredoc-empty-case.sh'$'\n' "unquoted heredoc empty-case sub omitted caller selection"
+  fm_lint_write_diff_file "$diff_file" bin/unknown-lib.sh
+  perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$sel" || fail "unknown-lib direct select failed"
+  listed=$'\n'
+  while IFS= read -r -d '' root; do listed+="$root"$'\n'; done < "$sel"
+  assert_contains "$listed" $'\n''bin/mixed-unknown-child.sh'$'\n' "direct edit of child-only unknown lib omitted mixed-unknown-child"
+  fm_lint_write_diff_file "$diff_file" bin/dynamic-child.sh
+  perl "$repo/bin/fm-lint-cache.pl" select "$repo" < "$diff_file" > "$sel" || fail "unrelated mixed-child select failed"
+  listed=$'\n'
+  while IFS= read -r -d '' root; do listed+="$root"$'\n'; done < "$sel"
+  assert_not_contains "$listed" $'\n''bin/mixed-child.sh'$'\n' "unrelated edit fanned out to mixed dynamic+static -c caller"
+  assert_not_contains "$listed" $'\n''bin/mixed-unknown-child.sh'$'\n' "child-only edge propagated %unknown fan-out on unrelated edit"
+  assert_contains "$listed" $'\n''bin/parent-unknown-caller.sh'$'\n' "control: parent-shell caller of unknown-lib must still fan out on unrelated edit"
+  # Mutate bin/library.sh so library_value requires $1, triggering cross-file SC2119.
+  cat > "$repo/bin/library.sh" <<'SH'
+#!/usr/bin/env bash
+library_value() {
+  printf '%s\n' "$1"
+}
+SH
+  # Sensitivity controls: top-level source AND parent-shell unquoted heredoc substitutions
+  # (direct, arithmetic, param-arith, case, extglob-case, arith-vars, empty-case)
+  # MUST invalidate cache and fail real ShellCheck with SC2119.
+  for root in bin/top-caller.sh bin/unquoted-heredoc-sub.sh bin/unquoted-heredoc-arith.sh bin/unquoted-heredoc-param-arith.sh bin/unquoted-heredoc-case-arith.sh bin/unquoted-heredoc-extglob-case.sh bin/unquoted-heredoc-case-pattern-keyword.sh bin/unquoted-heredoc-arith-vars.sh bin/unquoted-heredoc-empty-case.sh; do
+    rc=0
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || rc=$?
+    [ "$rc" -ne 0 ] || fail "control: mutating sourced library must fail $root under real ShellCheck: $out"
+    assert_contains "$out" SC2119 "control: mutated sourced library did not surface cross-file SC2119 for $root"
+    assert_not_contains "$out" "cache hit $root" "control: mutated sourced library reused stale cache for $root"
+  done
+  # Child-shell string roots are not read by ShellCheck: real ShellCheck still passes and cache hits.
+  for root in bin/child-only.sh bin/dynamic-child.sh bin/mixed-child.sh; do
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "$root failed after library mutation: $out"
+    assert_contains "$out" "cache hit $root" "$root must reuse cache when only a child-shell string target changes"
+    out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR=off \
+      "$repo/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "uncached real ShellCheck on $root must agree with cache: $out"
+  done
+  pass "real ShellCheck confirms child-shell strings stay outside its read set while top-level and unquoted-heredoc parent sources invalidate"
+}
+
+test_relative_root_and_production_child_shell_helpers_stay_cacheable() {
+  local tmp fakebin diff_file sel_rel sel_abs listed_rel listed_abs out root
+  tmp=$(fm_test_tmproot fm-lint-rel-root)
+  diff_file="$tmp/diff.nul"
+  sel_rel="$tmp/sel-rel.nul"
+  sel_abs="$tmp/sel-abs.nul"
+  fm_lint_write_diff_file "$diff_file" tests/fm-review-record.test.sh
+  (cd "$ROOT" && perl bin/fm-lint-cache.pl select . < "$diff_file" > "$sel_rel") \
+    || fail "relative-root select failed"
+  perl "$ROOT/bin/fm-lint-cache.pl" select "$ROOT" < "$diff_file" > "$sel_abs" \
+    || fail "absolute-root select failed"
+  listed_rel=$'\n'
+  while IFS= read -r -d '' root; do listed_rel+="$root"$'\n'; done < "$sel_rel"
+  listed_abs=$'\n'
+  while IFS= read -r -d '' root; do listed_abs+="$root"$'\n'; done < "$sel_abs"
+  assert_equals "$listed_abs" "$listed_rel" "relative root '.' must produce identical selection to canonical root"
+  assert_contains "$listed_abs" $'\n''tests/fm-review-record.test.sh'$'\n' "changed test root must be selected"
+  for root in bin/fm-backend.sh tests/fixtures.sh tests/wake-helpers.sh tests/fm-teardown-helpers.sh tests/fm-watch-triage-helpers.sh; do
+    assert_not_contains "$listed_abs" $'\n'"$root"$'\n' \
+      "unrelated test edit must not fan out to $root via child-shell or relative-root unknown poisoning"
+  done
+  fakebin=$(fm_fakebin "$tmp/fake")
+  fm_lint_stub_shellcheck "$fakebin" "$tmp/checks"
+  for root in tests/fixtures.sh tests/wake-helpers.sh; do
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$ROOT/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "first lint of $root failed: $out"
+    assert_not_contains "$out" "cache hit $root" "first lint of $root must run cold"
+    out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+      "$ROOT/bin/fm-lint.sh" --jobs 1 "$root" 2>&1) || fail "second lint of $root failed: $out"
+    assert_contains "$out" "cache hit $root" "$root must be cacheable after removing child-shell unknown poisoning"
+  done
+  pass "relative root canonicalizes and production child-shell test helpers stay cacheable without fan-out"
+}
+
 fm_lint_test_cases=(
 test_command_words_exclude_inert_source_text
 test_child_shell_imports_select_and_invalidate_callers
@@ -1082,5 +1334,7 @@ test_shared_cache_reuses_only_identical_successful_inputs
 test_list_files_reports_the_shell_inventory
 test_canonical_partitions_preserve_full_lint
 test_canonical_partitions_balance_measured_cost
+test_child_shell_strings_stay_outside_shellcheck_read_set
+test_relative_root_and_production_child_shell_helpers_stay_cacheable
 )
 fm_lint_run "$@"
