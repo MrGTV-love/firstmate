@@ -1,0 +1,6 @@
+135-Model families are rederived from ids into anthropic, openai, google, deepseek,
+136:xai, moonshot, meta, zhipu (aliases claude, gpt, chatgpt, codex, oN, gemini,
+137-gemma, grok, kimi, llama, glm, and the exact native Claude names opus,
+138-sonnet, haiku, which are deliberately anthropic because Claude records bare
+139-model names); route prefixes ending in / are dropped, and zai/z-ai are
+140-recognized only as Zhipu pipeline provider names, never as bare model ids.

@@ -1,0 +1,67 @@
+=== HEAD 39eec0bbf: bin/fm-review-record.py
+--- S1 GLM reader zai/glm-5.4 covers anthropic author claude-opus-5-5
+  verify exit=0
+{"ok":true,"reader_family":"zhipu","author_groups":{"ship":[{"model":"claude-opus-5-5","family":"anthropic"}]},"error":null}
+  plan: {"groups":{"ship":[{"model":"claude-opus-5-5","family":"anthropic"}]},"uncovered":[]}
+--- S1b GLM reader zai/glm-5.4 covers openai author gpt-6.1-terra
+  verify exit=0
+{"ok":true,"reader_family":"zhipu","author_groups":{"ship":[{"model":"gpt-6.1-terra","family":"openai"}]},"error":null}
+--- S1c anthropic reader covers GLM author openrouter/z-ai/glm-5.4
+  verify exit=0
+{"ok":true,"reader_family":"anthropic","author_groups":{"ship":[{"model":"openrouter/z-ai/glm-5.4","family":"zhipu"}]},"error":null}
+--- S2 same-family: zai/glm-5.4 reader vs openrouter/z-ai/glm-5.4 author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"uncovered commit group ship, family zhipu; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (see --help f..."}}
+  plan: {"groups":{"ship":[{"model":"openrouter/z-ai/glm-5.4","family":"zhipu"}]},"uncovered":[{"group":"ship","families":["zhipu"]}]}
+--- S2b same-family across case spelling: Zhipu/GLM-4.6 reader vs zai/glm-5.4 author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"uncovered commit group ship, family zhipu; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (see --help f..."}}
+--- S3 bad reader id 'glm!!!' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader glm!!!; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose reader_..."}}
+--- S3 bad reader id 'glm---' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader glm---; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose reader_..."}}
+--- S3 bad reader id 'glm-5.4---' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader glm-5.4---; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose rea..."}}
+--- S3 bad reader id 'zai???' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader zai???; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose reader_..."}}
+--- S3 bad reader id 'zai' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader zai; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose reader_fam..."}}
+--- S3 bad reader id 'z-ai' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader z-ai; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose reader_fa..."}}
+--- S3 bad reader id 'glimpse-1' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader glimpse-1; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose read..."}}
+--- S3 bad reader id 'z-ai/mystery-1' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader z-ai/mystery-1; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose..."}}
+--- S3 bad reader id 'zai/glm!!!' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader zai/glm!!!; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose rea..."}}
+--- S3 bad reader id 'glm..5' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader glm..5; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose reader_..."}}
+--- S3 bad reader id 'glm-5.4.' vs anthropic author
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"model family unknown for newest reader glm-5.4.; uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose reade..."}}
+--- S3p canonical family name parity: bare 'zhipu' reader vs anthropic author
+  verify exit=0
+{"ok":true,"reader_family":"zhipu","author_groups":{"ship":[{"model":"claude-opus-5-5","family":"anthropic"}]},"error":null}
+--- S3p canonical family name parity: bare 'openai' reader vs anthropic author
+  verify exit=0
+{"ok":true,"reader_family":"openai","author_groups":{"ship":[{"model":"claude-opus-5-5","family":"anthropic"}]},"error":null}
+--- S4 pipeline DB providers: zai, z-ai, ZAI, gpt, OpenAI, moonſhot, openai, zai+gpt-5 conflict
+  plan: {"groups":{"ship":[{"model":"claude-opus-5-5","family":"anthropic"}],"no-mistakes:zhipu":[{"model":"mystery-1","family":"zhipu"},{"model":"mystery-2","family":"zhipu"}],"no-mistakes:unknown":[{"model":"mystery-3","family":"unknown"},{"model":"mystery-4","family":"unknown"},{"model":"mystery-5","family":"unknown"},{"model":"mystery-6","family":"unknown"},{"model":"gpt-5","family":"unknown"}],"no-mistakes:openai":[{"model":"mystery-7","family":"openai"}]},"uncovered":[{"group":"no-mistakes:unknown","families":["unknown"],"reader_outside":[]},{"group":"no-mistakes:openai","families":["openai"]},{"group":"no-mistakes:zhipu","families":["zhipu"]}]}
+--- S5 pipeline DB zai/z-ai rows form no-mistakes:zhipu; GLM reader claiming it must be refused, Claude reader accepted
+  plan: {"groups":{"ship":[{"model":"gpt-6.1-terra","family":"openai"}],"no-mistakes:zhipu":[{"model":"mystery-1","family":"zhipu"},{"model":"glm-5.4","family":"zhipu"}]},"uncovered":[{"group":"no-mistakes:zhipu","families":["zhipu"]},{"group":"ship","families":["openai"]}]}
+  S5a reader zai/glm-5.4 claims ship + no-mistakes:zhipu
+  verify exit=1
+{"ok":false,"reader_family":null,"author_groups":null,"error":{"kind":"not-qualified","message":"uncovered commit group no-mistakes:zhipu, family zhipu; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it ..."}}
+  S5b reader claude-opus-5-5 claims ship + no-mistakes:zhipu
+  verify exit=0
+{"ok":true,"reader_family":"anthropic","author_groups":{"ship":[{"model":"gpt-6.1-terra","family":"openai"}],"no-mistakes:zhipu":[{"model":"glm-5.4","family":"zhipu"},{"model":"mystery-1","family":"unknown"}]},"error":null}
