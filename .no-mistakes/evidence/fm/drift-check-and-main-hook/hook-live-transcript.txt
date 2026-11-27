@@ -1,0 +1,150 @@
+
+==== H0 install from a linked worktree whose primary is bare (this gate worktree) is refused ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-main-checkout-hook.sh install --repo /private/tmp/fmlive-hook.1UM6ZX/repo0
+fm-main-checkout-hook: refused: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-main-checkout-hook.sh is in a linked worktree and the primary checkout has no executable copy; run bin/fm-main-checkout-hook.sh install from the primary checkout.
+[exit=1]
+(nothing written)
+primary checkout at 787874457
+
+==== H1 install, then real git commit in primary checkout is refused ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh install --repo /private/tmp/fmlive-hook.1UM6ZX/repo
+fm-main-checkout-hook: installed pre-commit and pre-merge-commit hooks in /private/tmp/fmlive-hook.1UM6ZX/repo/.git/hooks
+[exit=0]
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh status --repo /private/tmp/fmlive-hook.1UM6ZX/repo
+pre-commit: installed (/private/tmp/fmlive-hook.1UM6ZX/repo/.git/hooks/pre-commit)
+pre-merge-commit: installed (/private/tmp/fmlive-hook.1UM6ZX/repo/.git/hooks/pre-merge-commit)
+[exit=0]
+
+$ git commit -q -m direct
+fm-main-checkout-hook: refused: direct commit or merge in primary checkout (/private/tmp/fmlive-hook.1UM6ZX/repo); use treehouse get --base main -b fm/<topic> or bin/fm-spawn.sh (emergency override: FM_ALLOW_MAIN_COMMIT=1).
+[exit=1]
+HEAD unchanged: yes
+last guard event:
+{"ts":"2026-11-27T21:16:50Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/private/tmp/fmlive-hook.1UM6ZX/fm-primary:8c592e08-ede8-4307-9b4b-cbba865cb81d","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+
+==== H2 commit inside a linked worktree is allowed ====
+
+$ git commit -q -m linked commit
+[exit=0]
+a8d7acb linked commit
+last guard event:
+{"ts":"2026-11-27T21:16:50Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/private/tmp/fmlive-hook.1UM6ZX/fm-primary:8c592e08-ede8-4307-9b4b-cbba865cb81d","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+
+==== H3 merge in primary checkout is refused (pre-merge-commit) ====
+
+$ git merge --no-ff -m merge topic fm/topic
+fm-main-checkout-hook: refused: direct commit or merge in primary checkout (/private/tmp/fmlive-hook.1UM6ZX/repo); use treehouse get --base main -b fm/<topic> or bin/fm-spawn.sh (emergency override: FM_ALLOW_MAIN_COMMIT=1).
+Not committing merge; use 'git commit' to complete the merge.
+[exit=1]
+HEAD unchanged: yes
+
+==== H4 merge inside a linked worktree is allowed ====
+
+$ git merge --no-ff -q -m merge topic in linked fm/topic
+[exit=0]
+5c9f010 merge topic in linked
+
+==== H5 FM_ALLOW_MAIN_COMMIT=1 emergency override lets primary commit land ====
+
+$ git commit -q -m emergency
+[exit=0]
+8dc4855 emergency
+last guard event:
+{"ts":"2026-11-27T21:16:52Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/private/tmp/fmlive-hook.1UM6ZX/fm-primary:8c592e08-ede8-4307-9b4b-cbba865cb81d","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"env","repeat":1,"override":true,"head":"","base":"","actor":"main","opportunity":true}
+
+==== H6 fail closed: check cannot resolve worktree identity ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh check
+fm-main-checkout-hook: refused: cannot resolve git worktree identity; commit from an isolated worktree created by bin/fm-spawn.sh or treehouse get --base main -b fm/<topic>.
+[exit=1]
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh check --repo /private/tmp/fmlive-hook.1UM6ZX/does-not-exist
+fm-main-checkout-hook: refused: cannot resolve git worktree identity; commit from an isolated worktree created by bin/fm-spawn.sh or treehouse get --base main -b fm/<topic>.
+[exit=1]
+last guard event:
+{"ts":"2026-11-27T21:16:53Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/private/tmp/fmlive-hook.1UM6ZX/fm-primary:8c592e08-ede8-4307-9b4b-cbba865cb81d","decision":"deny","source_ok":false,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+
+==== H6b fail closed: installed hook whose guard script vanished ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/volatile-bin/fm-main-checkout-hook.sh install --repo /private/tmp/fmlive-hook.1UM6ZX/repo2
+fm-main-checkout-hook: installed pre-commit and pre-merge-commit hooks in /private/tmp/fmlive-hook.1UM6ZX/repo2/.git/hooks
+[exit=0]
+
+$ git commit -q -m after guard removed
+fm-main-checkout-hook: refused: guard script /private/tmp/fmlive-hook.1UM6ZX/volatile-bin/fm-main-checkout-hook.sh is missing or not executable; reinstall with bin/fm-main-checkout-hook.sh install or remove with bin/fm-main-checkout-hook.sh remove.
+[exit=1]
+commits in repo2:        1
+
+==== H7 remove deletes managed hooks; primary commit then works ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh remove --repo /private/tmp/fmlive-hook.1UM6ZX/repo
+fm-main-checkout-hook: removed managed hooks in /private/tmp/fmlive-hook.1UM6ZX/repo/.git/hooks
+[exit=0]
+(no managed hooks left)
+
+$ git commit -q -m after remove
+[exit=0]
+
+==== H8 unmanaged existing hook: install and remove refuse, file preserved ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh install --repo /private/tmp/fmlive-hook.1UM6ZX/repo3
+fm-main-checkout-hook: refused: existing pre-commit hook at /private/tmp/fmlive-hook.1UM6ZX/repo3/.git/hooks/pre-commit is unmanaged; remove or integrate it manually before running bin/fm-main-checkout-hook.sh install.
+[exit=1]
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh remove --repo /private/tmp/fmlive-hook.1UM6ZX/repo3
+fm-main-checkout-hook: refused: hook at /private/tmp/fmlive-hook.1UM6ZX/repo3/.git/hooks/pre-commit is unmanaged and not managed by Firstmate.
+[exit=1]
+user hook preserved: yes
+(no pre-merge-commit written)
+
+==== H9 symlinked individual hook file: install and remove refuse, symlink preserved ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh install --repo /private/tmp/fmlive-hook.1UM6ZX/repo4
+fm-main-checkout-hook: refused: existing pre-merge-commit hook at /private/tmp/fmlive-hook.1UM6ZX/repo4/.git/hooks/pre-merge-commit is symlink; remove or integrate it manually before running bin/fm-main-checkout-hook.sh install.
+[exit=1]
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh remove --repo /private/tmp/fmlive-hook.1UM6ZX/repo4
+fm-main-checkout-hook: refused: hook at /private/tmp/fmlive-hook.1UM6ZX/repo4/.git/hooks/pre-merge-commit is symlink and not managed by Firstmate.
+[exit=1]
+symlink preserved: yes
+
+==== H9b symlinked hooks directory: install refuses ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh install --repo /private/tmp/fmlive-hook.1UM6ZX/repo5
+fm-main-checkout-hook: refused: core.hooksPath makes Git run hooks from /private/tmp/fmlive-hook.1UM6ZX/realhooks, not /private/tmp/fmlive-hook.1UM6ZX/repo5/.git/hooks; unset core.hooksPath or integrate the guard there manually.
+[exit=1]
+files written into symlink target:        0
+
+==== H10 core.hooksPath redirect: install refuses, status reports inactive ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh install --repo /private/tmp/fmlive-hook.1UM6ZX/repo6
+fm-main-checkout-hook: refused: core.hooksPath makes Git run hooks from /private/tmp/fmlive-hook.1UM6ZX/repo6/.husky, not /private/tmp/fmlive-hook.1UM6ZX/repo6/.git/hooks; unset core.hooksPath or integrate the guard there manually.
+[exit=1]
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh status --repo /private/tmp/fmlive-hook.1UM6ZX/repo6
+hooks: inactive (core.hooksPath makes Git run hooks from /private/tmp/fmlive-hook.1UM6ZX/repo6/.husky, not /private/tmp/fmlive-hook.1UM6ZX/repo6/.git/hooks)
+[exit=1]
+(nothing written to .git/hooks)
+
+==== H11 install from a linked worktree of the Firstmate repo pins the primary checkout copy ====
+
+$ /private/tmp/fmlive-hook.1UM6ZX/fm-slot/bin/fm-main-checkout-hook.sh install --repo /private/tmp/fmlive-hook.1UM6ZX/repo7
+fm-main-checkout-hook: installed pre-commit and pre-merge-commit hooks in /private/tmp/fmlive-hook.1UM6ZX/repo7/.git/hooks
+[exit=0]
+guard='/private/tmp/fmlive-hook.1UM6ZX/fm-primary/bin/fm-main-checkout-hook.sh'
+
+$ git commit -q -m after slot recycled
+fm-main-checkout-hook: refused: direct commit or merge in primary checkout (/private/tmp/fmlive-hook.1UM6ZX/repo7); use treehouse get --base main -b fm/<topic> or bin/fm-spawn.sh (emergency override: FM_ALLOW_MAIN_COMMIT=1).
+[exit=1]
+(expected: refused by guard, not exit 127)
+
+==== H12 help text ends with full Safety sentence ====
+  - `check` fails closed if Git worktree identity cannot be resolved.
+  - `install` and `remove` only manage files carrying the Firstmate marker and
+    never overwrite or delete unmanaged hooks or symbolic links.
+
+lab dir: /private/tmp/fmlive-hook.1UM6ZX
+lab removed

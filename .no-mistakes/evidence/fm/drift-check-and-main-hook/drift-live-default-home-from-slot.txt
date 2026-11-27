@@ -1,0 +1,5 @@
+==== D6b primary on branch 'main', run from a copy of bin/ inside the Treehouse slot with no --repo ====
+$ /private/tmp/fmlive-d6-lab/.treehouse/pool/s1/bin/fm-drift-check.sh
+DRIFT: primary checkout is on branch 'main' (expected detached origin/main)
+[exit=1]
+(expected: reports primary branch 'main', not slot branch fm/slot; slot not listed as non-Treehouse; primary not listed)

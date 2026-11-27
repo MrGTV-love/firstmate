@@ -1,0 +1,104 @@
+
+==== D1 clean primary detached at origin/main ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary
+OK: primary checkout clean at origin/main (ed7d1dd5b), no stale branches or stray worktrees.
+[exit=0]
+
+==== D2 primary on a branch with modified tracked file ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary
+DRIFT: primary checkout is on branch 'main' (expected detached origin/main)
+DRIFT: primary checkout has modified tracked files:
+  t
+[exit=1]
+
+==== D3 branch ahead > --max-ahead flagged; within threshold not ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary --max-ahead 3
+DRIFT: 1 local branch(es) exceed >3 commits ahead or >7d unpushed:
+  big (+4 vs origin/main, 0d old, on_origin=0)
+[exit=1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary --max-ahead 4
+OK: primary checkout clean at origin/main (9256820ba), no stale branches or stray worktrees.
+[exit=0]
+
+==== D4 old unpushed branch flagged by --max-age-days; same branch once pushed is not ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary --max-age-days 7
+DRIFT: 1 local branch(es) exceed >10 commits ahead or >7d unpushed:
+  old (+1 vs origin/main, 30d old, on_origin=0)
+[exit=1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary --max-age-days 7
+OK: primary checkout clean at origin/main (9256820ba), no stale branches or stray worktrees.
+[exit=0]
+
+==== D5 prunable and non-Treehouse worktrees flagged; .treehouse slot not flagged ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary
+DRIFT: 1 prunable worktree(s) (run 'git worktree prune'):
+  /private/tmp/fmlive-drift.EecE1l/gone
+DRIFT: 1 non-Treehouse worktree(s):
+  /private/tmp/fmlive-drift.EecE1l/stray
+[exit=1]
+
+==== D6 run against the Treehouse slot (linked worktree): primary is still the main checkout ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/.treehouse/pool/slot1
+DRIFT: 1 prunable worktree(s) (run 'git worktree prune'):
+  /private/tmp/fmlive-drift.EecE1l/gone
+DRIFT: 1 non-Treehouse worktree(s):
+  /private/tmp/fmlive-drift.EecE1l/stray
+[exit=1]
+
+==== D7 --warn-only exits 0 even with drift ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary --warn-only
+DRIFT: primary checkout is on branch 'main' (expected detached origin/main)
+[exit=0]
+
+==== D8 bare main worktree is not misreported ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/.treehouse/pool/bslot --base main
+NOTE: primary worktree /private/tmp/fmlive-drift.EecE1l/bare.git is a bare repository; skipping primary checkout checks.
+OK: primary checkout clean at main (9256820ba), no stale branches or stray worktrees.
+[exit=0]
+
+==== D9 usage and git errors exit 2 ====
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary --max-ahead abc
+fm-drift-check: error: --max-ahead must be a non-negative integer (got 'abc')
+[exit=2]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/primary --base no/such-ref
+fm-drift-check: error: cannot resolve base ref 'no/such-ref' in /private/tmp/fmlive-drift.EecE1l/primary
+[exit=2]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/missing
+fm-drift-check: error: repository directory does not exist: /private/tmp/fmlive-drift.EecE1l/missing
+[exit=2]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --repo /private/tmp/fmlive-drift.EecE1l/plain
+fm-drift-check: error: not a git repository: /private/tmp/fmlive-drift.EecE1l/plain
+[exit=2]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FCMWE0VR0W4K84RKZVGEFS/bin/fm-drift-check.sh --bogus
+Read-only repository drift auditor for a Firstmate home or Git checkout.
+Flags:
+  1. Primary checkout not detached at the base ref or having tracked changes.
+  2. Local branches ahead of the base ref by > --max-ahead commits or older
+     than --max-age-days days without an origin/<branch> ref.
+  3. Prunable worktrees or linked worktrees outside Treehouse pools.
+Usage: fm-drift-check.sh [--repo DIR] [--base REF] [--warn-only] [--max-ahead N] [--max-age-days N]
+Exit: 0 when clean (or with --warn-only); 1 when drift is found; 2 on usage or git error.
+[exit=2]
+
+==== D10 read-only: repo state identical before and after an audit with drift ====
+[exit=1]
+refs/status/worktrees unchanged: yes
+index file unchanged: yes
+
+lab dir: /private/tmp/fmlive-drift.EecE1l
+lab removed
