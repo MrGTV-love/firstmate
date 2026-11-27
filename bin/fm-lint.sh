@@ -35,11 +35,16 @@
 #     a separate root; its callers analyze it through their sources. Runtime
 #     backend imports participate in selection and cache invalidation even when
 #     their static source annotations intentionally isolate adapter analysis.
-#     Unresolved runtime imports select possible callers on changed/deleted shell
-#     or known source inputs and disable cache reuse, regardless of annotations.
+#     Unresolved top-level runtime imports select possible callers on
+#     changed/deleted shell or known source inputs and disable cache reuse,
+#     regardless of annotations.
 #     Discovery recognizes source/. command words, balanced substitutions, and
-#     executable bash/sh -c and program-stdin heredocs. Source annotations remain
-#     inputs; ordinary comments, inert quoted programs, and heredoc data do not.
+#     executable bash/sh -c and program-stdin heredocs. Source targets inside
+#     child bash/sh -c strings or shell-fed heredocs select the root as a
+#     possible caller, but because ShellCheck never reads child-shell strings
+#     they stay out of cache inputs and never mark the root unknown.
+#     Source annotations remain inputs; ordinary comments, inert quoted
+#     programs, and heredoc data do not.
 #     Quoted child positional arguments are resolved; <<- strips leading tabs.
 #     Changes to bin/fm-lint.sh or bin/fm-lint-cache.pl select all. An empty
 #     set skips ShellCheck but still checks backend purity and workflows. A
