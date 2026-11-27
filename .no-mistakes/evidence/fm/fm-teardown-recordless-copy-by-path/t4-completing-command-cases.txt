@@ -1,0 +1,7 @@
+ok - a teardown --copy completing command prints a state, data or config root only when it differs from the home default
+ok - a teardown --copy completing command names absolute folders for relative roots and completes from another directory
+ok - a teardown --copy completing command carries a root byte-exact, a final newline included, or prints none and names why
+ok - a teardown --copy completing command prints no override for any spelling of a default home
+EXIT 0
+ok - the typed preservation refusal of an own copy and of a foreign copy inside it retains unique bytes, and its printed command completes cleanup after storage repair as one operation
+EXIT 0

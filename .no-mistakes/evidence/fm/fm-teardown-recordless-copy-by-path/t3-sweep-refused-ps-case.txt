@@ -1,0 +1,2 @@
+ok - a refused ps holds a Vernant-locked copy even when the confined table cannot see its launcher, and a readable ps that shows the launcher gone still reaches the driver
+EXIT 0

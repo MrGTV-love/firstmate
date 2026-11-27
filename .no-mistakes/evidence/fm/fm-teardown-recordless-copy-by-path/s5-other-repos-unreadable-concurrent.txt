@@ -1,0 +1,63 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Li4zGh
+CLONE=/Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray
+
+### S9a: a bare repository with an unpushed commit under copy/.claude
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Li4zGh
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray holds Git repository /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray/.claude/backup.git that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- bare repo still holds 606245fc4b843e6649d39290e6b17b02141e07a9: yes
+
+### S9b: a nested clone in an ignored folder (.claude/sub-clone)
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Li4zGh
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray holds Git repository /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray/.claude/sub-clone that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+
+### S9c: another registered worktree inside the copy
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Li4zGh
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray holds registered worktree /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray/.claude/inner, which removing it would delete; remove or prove that worktree first; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+
+### S12: a clone registration list that cannot be read
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Li4zGh
+REFUSED: the clone /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj's worktree registration list could not be read (registration /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.git/worktrees cannot be read), so whether it registers /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray is unknown; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+
+### S13: two simultaneous runs on one copy (git worktree remove stalled 4s by a PATH shim so they overlap)
+- first run reached git worktree remove: no
+second exit 1
+--- second run stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Li4zGh
+REFUSED: another teardown --copy run holds /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray (/Users/charlesabrooker/tmp/fm-lab.Li4zGh/state/.teardown-copy-4cbbe652076f3491.lock); nothing was removed.
+first exit 0
+--- first run stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Li4zGh
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray in /Users/charlesabrooker/tmp/fm-lab.Li4zGh/data/copy-4cbbe652076f3491/nested-copy-preserved/4cbbe652076f3491e650fac009adaacefadc05fe30571a8bbd48fc9a1e1158cb
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.Li4zGh/projects/proj/.claude/worktrees/stray (HEAD 81b29e04ea53a36cf143c9917cbc38fad7524e0f, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.Li4zGh/data/record-less-copy-removals.log
+- git worktree remove calls: 1
+- copy dir present: no
+- registered in clone: no
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+lab removed

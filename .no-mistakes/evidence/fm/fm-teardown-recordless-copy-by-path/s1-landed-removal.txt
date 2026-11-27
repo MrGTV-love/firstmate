@@ -1,0 +1,36 @@
+
+### S1+S2: landed record-less copy; ordinary teardown by id refuses; --copy removes it
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.pajkGR
+CLONE=/Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj/.claude/worktrees/stray
+
+### S2: ordinary teardown by id (no record) still refuses as before
+$ td stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pajkGR
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.pajkGR/state/stray.meta
+[exit 1]
+
+### S1: teardown --copy on the landed copy
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pajkGR
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj/.claude/worktrees/stray (HEAD 5e2dbe523e5e6d6499ae18fc5f264718ca1533ad, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.pajkGR/data/record-less-copy-removals.log
+[exit 0]
+- copy dir present: no
+- registered in clone: no
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+- clone HEAD still: 5e2dbe523e5e6d6499ae18fc5f264718ca1533ad (copy HEAD was 5e2dbe523e5e6d6499ae18fc5f264718ca1533ad)
+--- audit log:
+2026-11-27T20:26:16Z	copy-20adaff4d3a33425	/Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj	/Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj/.claude/worktrees/stray	5e2dbe523e5e6d6499ae18fc5f264718ca1533ad	landed
+
+### S11: rerun on the removed copy converges
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pajkGR
+teardown: /Users/charlesabrooker/tmp/fm-lab.pajkGR/projects/proj/.claude/worktrees/stray is already gone, and this run removed nothing: the audit record in /Users/charlesabrooker/tmp/fm-lab.pajkGR/data/record-less-copy-removals.log shows its removal was authorized at 2026-11-27T20:26:16Z for HEAD 5e2dbe523e5e6d6499ae18fc5f264718ca1533ad (proof: landed).
+[exit 0]
+- copy dir present: no
+- registered in clone: no
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+lab removed

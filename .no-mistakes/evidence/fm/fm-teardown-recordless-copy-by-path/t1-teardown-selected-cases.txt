@@ -1,0 +1,15 @@
+ok - teardown --copy removes a landed record-less nested copy, in a project clone or a pool slot, with one audit record and no slot return
+ok - teardown --copy refuses a pool slot claimed by a live task or by an unreadable claim, and removes the copy under a stale claim without touching it
+ok - teardown --copy refuses a recorded bundle whose bytes changed or that lacks a tip the copy holds
+ok - an ordinary teardown of an id with no record still refuses with the old record error
+ok - teardown --copy hands a Vernant-locked copy to the closeout driver once, plan first, from its clone, and removes it
+ok - teardown --copy leaves a Vernant-locked copy untouched when its launcher is live, the driver refuses its plan or the driver is missing
+ok - teardown --copy keeps a Vernant-locked copy when ps cannot prove its launcher gone, even when a confined table read cannot see it, and releases it when ps proves the launcher absent
+ok - teardown --copy resolves a slot claim that names its own record id against the live records of every local home, and passes it only when no home holds one
+ok - the by-path exception to the held-task rule itself refuses each harm row made after every earlier check, names that row in the final REFUSED line, and removes the bundle-held copy while every row is clear
+ok - an exception row that only could not read its input refuses with rule inspection-unavailable and records no policy refusal
+ok - a refusal by the by-path exception keeps the exception own reason as the final REFUSED text
+ok - teardown --copy ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object, a modified file or an unreadable status
+ok - teardown --copy does not report a gone copy done while the projects folder cannot be read
+ok - teardown --copy refuses a holder that starts after the first scan: a late cwd by the reused proof, a late open file by the scan repeated before the removal
+EXIT 0

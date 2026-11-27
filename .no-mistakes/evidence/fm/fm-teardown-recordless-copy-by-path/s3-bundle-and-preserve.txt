@@ -1,0 +1,82 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.0EmaoZ
+CLONE=/Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj/.claude/worktrees/stray
+
+### S4 setup: an unlanded commit, held in a verified bundle recorded under data/rec-1/
+bundle verifies
+/Users/charlesabrooker/tmp/fm-live-origin.AubCyj/bundles/work.bundle	e5ed3d531174727809616610d061b365e6a61dfc4866423d7e07762eacfc6389	41cbd4574680f1e284bef13ff92720c6f154aba8 e525b340b63fe84b828a0a067cb6fb13fd775f1e
+
+### S4a: no captain-held row yet -> refuse and print the hold command
+[exit 1]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0EmaoZ
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-live-origin.AubCyj/bundles/work.bundle: task rec-1 has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip.
+File the land-or-drop call as its row, then run the same teardown --copy command again: bin/fm-captain-hold.sh hold rec-1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-1 --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-1\,\ tips\ e525b340b63fe84b828a0a067cb6fb13fd775f1e:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-live-origin.AubCyj/bundles/work.bundle\,\ whose\ record\ lists\ advertised\ tips\ 41cbd4574680f1e284bef13ff92720c6f154aba8\ e525b340b63fe84b828a0a067cb6fb13fd775f1e\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj/.claude/worktrees/stray is not removed: its HEAD e525b340b63f is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj/.claude/worktrees/stray (its HEAD e525b340b63f is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj/.claude/worktrees/stray did not pass every proof (rule=copy-landed): its HEAD e525b340b63f is not proved landed; nothing was removed.
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+
+### S4b: run the printed hold command exactly as printed (from the worktree)
+$ bin/fm-captain-hold.sh hold rec-1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-1 --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-1\,\ tips\ e525b340b63fe84b828a0a067cb6fb13fd775f1e:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-live-origin.AubCyj/bundles/work.bundle\,\ whose\ record\ lists\ advertised\ tips\ 41cbd4574680f1e284bef13ff92720c6f154aba8\ e525b340b63fe84b828a0a067cb6fb13fd775f1e\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
+rec-1
+[exit 0]
+
+### S4c: rerun the same teardown --copy -> removed
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj/.claude/worktrees/stray --record-id rec-1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0EmaoZ
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-origin.AubCyj/bundles/work.bundle is held on task rec-1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/data/rec-1/preserved-bundles/e5ed3d531174727809616610d061b365e6a61dfc4866423d7e07762eacfc6389.bundle sha256=e5ed3d531174727809616610d061b365e6a61dfc4866423d7e07762eacfc6389 tips=41cbd4574680f1e284bef13ff92720c6f154aba8 e525b340b63fe84b828a0a067cb6fb13fd775f1e (source /Users/charlesabrooker/tmp/fm-live-origin.AubCyj/bundles/work.bundle)
+teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-live-origin.AubCyj/bundles/work.bundle is held on task rec-1
+teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/data/rec-1/preserved-bundles/e5ed3d531174727809616610d061b365e6a61dfc4866423d7e07762eacfc6389.bundle sha256=e5ed3d531174727809616610d061b365e6a61dfc4866423d7e07762eacfc6389 tips=41cbd4574680f1e284bef13ff92720c6f154aba8 e525b340b63fe84b828a0a067cb6fb13fd775f1e (source /Users/charlesabrooker/tmp/fm-live-origin.AubCyj/bundles/work.bundle)
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj/.claude/worktrees/stray (HEAD e525b340b63fe84b828a0a067cb6fb13fd775f1e, proof: bundle /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/data/rec-1/preserved-bundles/e5ed3d531174727809616610d061b365e6a61dfc4866423d7e07762eacfc6389.bundle); audit record: /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/data/record-less-copy-removals.log
+[exit 0]
+- copy dir present: no
+- registered in clone: no
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+- stored bundle present: yes
+- stored bundle restores HEAD e525b340b63fe84b828a0a067cb6fb13fd775f1e: e525b340b63fe84b828a0a067cb6fb13fd775f1e
+--- audit log:
+2026-11-27T20:30:25Z	rec-1	/Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj	/Users/charlesabrooker/tmp/fm-lab.0EmaoZ/projects/proj/.claude/worktrees/stray	e525b340b63fe84b828a0a067cb6fb13fd775f1e	bundle /Users/charlesabrooker/tmp/fm-lab.0EmaoZ/data/rec-1/preserved-bundles/e5ed3d531174727809616610d061b365e6a61dfc4866423d7e07762eacfc6389.bundle
+lab removed
+
+### S10: .claude and .opencode ignored content preserved whole, then copy removed
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.bXyIWu
+CLONE=/Users/charlesabrooker/tmp/fm-lab.bXyIWu/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.bXyIWu/projects/proj/.claude/worktrees/stray
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.bXyIWu/projects/proj/.claude/worktrees/stray --record-id pres-1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.bXyIWu
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-lab.bXyIWu/projects/proj/.claude/worktrees/stray in /Users/charlesabrooker/tmp/fm-lab.bXyIWu/data/pres-1/nested-copy-preserved/8a59ff6a89e6672f6546675a69f0441898a40fd68312b3e1d3df053797c72103
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.bXyIWu/projects/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.bXyIWu/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.bXyIWu/projects/proj/.claude/worktrees/stray (HEAD 837aadfdea807ecbed00cdefbab93bee6c360d3b, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.bXyIWu/data/record-less-copy-removals.log
+[exit 0]
+- copy dir present: no
+- registered in clone: no
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+- preserved tree: /Users/charlesabrooker/tmp/fm-lab.bXyIWu/data/pres-1/nested-copy-preserved/8a59ff6a89e6672f6546675a69f0441898a40fd68312b3e1d3df053797c72103/files
+  ./.opencode/state.json: unique opencode
+  ./.claude/settings.local.json: unique settings
+  ./.claude/sub/note.txt: unique note
+lab removed
+
+### S10b: preserve that cannot publish keeps the copy
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.bqGa8D
+CLONE=/Users/charlesabrooker/tmp/fm-lab.bqGa8D/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.bqGa8D/projects/proj/.claude/worktrees/stray
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.bqGa8D/projects/proj/.claude/worktrees/stray --record-id pres-2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.bqGa8D
+error: preservation directory /Users/charlesabrooker/tmp/fm-lab.bqGa8D/data/pres-2/nested-copy-preserved is not a real directory
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of foreign copy /Users/charlesabrooker/tmp/fm-lab.bqGa8D/projects/proj/.claude/worktrees/stray could not be preserved in /Users/charlesabrooker/tmp/fm-lab.bqGa8D/data/pres-2/nested-copy-preserved; it was not removed. Restore readable source and writable preservation storage, then run the completing command.
+completing-command: FM_FRICTION_OPERATION_ID=9d4df599-7b9f-4400-959d-9880cbd1151b FM_FRICTION_EPISODE_ID=9d4df599-7b9f-4400-959d-9880cbd1151b FM_HOME=/Users/charlesabrooker/tmp/fm-lab.bqGa8D bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8F9ZDETMYPV12JGCSC46PSM/bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.bqGa8D/projects/proj/.claude/worktrees/stray --record-id pres-2
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+- .claude file still there: unique settings
+lab removed

@@ -1,0 +1,27 @@
+
+### S10c: preserve cannot publish -> copy kept; then the printed completing command finishes it
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.UGXnWZ
+CLONE=/Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj/.claude/worktrees/stray
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+--- audit log after the refused run:
+2026-11-27T20:31:32Z	pres-2	/Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj	/Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj/.claude/worktrees/stray	ff193d61e4081a70705c4143606c1b6503680c15	landed
+
+### run the printed completing command from / with no overrides
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UGXnWZ
+teardown: the audit record for this copy and HEAD is already in /Users/charlesabrooker/tmp/fm-lab.UGXnWZ/data/record-less-copy-removals.log
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj/.claude/worktrees/stray in /Users/charlesabrooker/tmp/fm-lab.UGXnWZ/data/pres-2/nested-copy-preserved/64de285bb3ca3e0e5ca2591aa3cc27db825dc813c3c7138c97613f69a031ed20
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj/.claude/worktrees/stray (HEAD ff193d61e4081a70705c4143606c1b6503680c15, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.UGXnWZ/data/record-less-copy-removals.log
+[exit 0]
+- copy dir present: no
+- registered in clone: no
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+--- audit log:
+2026-11-27T20:31:32Z	pres-2	/Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj	/Users/charlesabrooker/tmp/fm-lab.UGXnWZ/projects/proj/.claude/worktrees/stray	ff193d61e4081a70705c4143606c1b6503680c15	landed
+lab removed

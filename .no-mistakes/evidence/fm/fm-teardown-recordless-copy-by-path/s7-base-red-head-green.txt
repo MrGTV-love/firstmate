@@ -1,0 +1,28 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.cggl3x
+CLONE=/Users/charlesabrooker/tmp/fm-lab.cggl3x/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.cggl3x/projects/proj/.claude/worktrees/stray
+
+### S16 (red on base f5236ce68): the base teardown has no by-path entry
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.cggl3x/projects/proj/.claude/worktrees/stray
+error: invalid teardown request
+[exit 2]
+$ td stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.cggl3x
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.cggl3x/state/stray.meta
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+
+### S16 (green on head 30fa8cfa6): the same copy, same home
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.cggl3x/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.cggl3x
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.cggl3x/projects/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.cggl3x/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.cggl3x/projects/proj/.claude/worktrees/stray (HEAD 4717209311973494eab25416ecefa7bbf23132ff, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.cggl3x/data/record-less-copy-removals.log
+[exit 0]
+- copy dir present: no
+- registered in clone: no
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+lab removed

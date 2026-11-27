@@ -1,0 +1,50 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.9EaKAy
+CLONE=/Users/charlesabrooker/tmp/fm-lab.9EaKAy/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.9EaKAy/projects/proj/.claude/worktrees/stray
+
+### S15 (tracked-clean): bare fixture at copy/.claude/fixtures/repo.git, force-added, committed and pushed to origin main
+- git sees a repository there: true
+- git status of the copy: []
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.9EaKAy/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.9EaKAy
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-lab.9EaKAy/projects/proj/.claude/worktrees/stray in /Users/charlesabrooker/tmp/fm-lab.9EaKAy/data/copy-0eb8a57ddd0e846a/nested-copy-preserved/0eb8a57ddd0e846a81da7138ab092fc7d2091591d6240bca91d097fd2035fa40
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.9EaKAy/projects/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.9EaKAy/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.9EaKAy/projects/proj/.claude/worktrees/stray (HEAD 11a35eab06efef2cb7a05bae61ef598caf7af11c, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.9EaKAy/data/record-less-copy-removals.log
+[exit 0]
+- copy dir present: no
+- registered in clone: no
+- audit lines: 1
+- external calls (treehouse/gh/no-mistakes): none
+lab removed
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.fixOLu
+CLONE=/Users/charlesabrooker/tmp/fm-lab.fixOLu/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.fixOLu/projects/proj/.claude/worktrees/stray
+
+### S15 (assume-unchanged-edit): bare fixture at copy/.claude/fixtures/repo.git, force-added, committed and pushed to origin main
+- git sees a repository there: true
+- git status of the copy: []
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.fixOLu/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fixOLu
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.fixOLu/projects/proj/.claude/worktrees/stray holds Git repository /Users/charlesabrooker/tmp/fm-lab.fixOLu/projects/proj/.claude/worktrees/stray/.claude/fixtures/repo.git that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+lab removed
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.qSGYjU
+CLONE=/Users/charlesabrooker/tmp/fm-lab.qSGYjU/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.qSGYjU/projects/proj/.claude/worktrees/stray
+
+### S15 (skip-worktree-edit): bare fixture at copy/.claude/fixtures/repo.git, force-added, committed and pushed to origin main
+- git sees a repository there: true
+- git status of the copy: []
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.qSGYjU/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.qSGYjU
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.qSGYjU/projects/proj/.claude/worktrees/stray holds Git repository /Users/charlesabrooker/tmp/fm-lab.qSGYjU/projects/proj/.claude/worktrees/stray/.claude/fixtures/repo.git that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+lab removed

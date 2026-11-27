@@ -1,0 +1,138 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.32dsdH
+CLONE=/Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj
+COPY=/Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray
+
+### S7: --force / --drop-file / --legacy-record are refused by name
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray --force
+error: teardown --copy takes no --force: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+[exit 2]
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray --drop-file /tmp/x
+error: teardown --copy takes no --drop-file: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+[exit 2]
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray --legacy-record
+error: teardown --copy takes no --legacy-record: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+[exit 2]
+
+### S14: relative path, symlink, unregistered dir, the clone itself
+$ td --copy .claude/worktrees/stray
+error: teardown --copy needs an absolute path, not .claude/worktrees/stray
+[exit 2]
+$ td --copy /Users/charlesabrooker/tmp/fm-live-origin.uReJ2R/link
+error: teardown --copy takes the copy's own path, and /Users/charlesabrooker/tmp/fm-live-origin.uReJ2R/link is a symbolic link
+[exit 2]
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/plain
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/plain is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.32dsdH/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
+[exit 1]
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.32dsdH/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: d090f305d27a66c7c696f9a6aad346ae98d13348
+
+### S5a: tracked edit (dirty tree)
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray is not removed: it has uncommitted or untracked-unignored changes.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray did not pass every proof (rule=copy-preserved): it has uncommitted or untracked-unignored changes; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: d090f305d27a66c7c696f9a6aad346ae98d13348
+
+### S5b: untracked, not-ignored file
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray is not removed: it has uncommitted or untracked-unignored changes.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray did not pass every proof (rule=copy-preserved): it has uncommitted or untracked-unignored changes; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: d090f305d27a66c7c696f9a6aad346ae98d13348
+
+### S5c: ignored file that exists nowhere else, outside .claude
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-ignored-files missing=copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray is not removed: it holds ignored files that exist nowhere else: secret.local.
+human-only-exit: What owner-approved disposition covers the ignored files only /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray holds (it holds ignored files that exist nowhere else: secret.local)? Keep the copy; no removal or discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray did not pass every proof (rule=copy-ignored-files): it holds ignored files that exist nowhere else: secret.local; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: d090f305d27a66c7c696f9a6aad346ae98d13348
+
+### S6a: a process has the copy as cwd
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray is in use: process 26240 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray through cwd (processes holding it: 26240); nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: d090f305d27a66c7c696f9a6aad346ae98d13348
+- holder pid 26240 still alive (never signalled): yes
+
+### S6b: a process holds a file open in the copy
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray is in use: process 42400 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray/README.md through 3 (processes holding it: 42400); nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: d090f305d27a66c7c696f9a6aad346ae98d13348
+- holder pid 42400 still alive (never signalled): yes
+
+### S8: a live task record names the copy as worktree=
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=active-record-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray is not removed: task task-x1's active record names it as its worktree.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray (task task-x1's active record names it as its worktree)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray did not pass every proof (rule=active-record-owner): task task-x1's active record names it as its worktree; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: d090f305d27a66c7c696f9a6aad346ae98d13348
+
+### S8b: a --record-id that is a live task id
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray --record-id task-x1
+error: record id task-x1 names a live task record in /Users/charlesabrooker/tmp/fm-lab.32dsdH/state, so teardown --copy never takes it as a bundle record id; give --record-id another id, or run bin/fm-teardown.sh task-x1 for that task
+[exit 2]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: d090f305d27a66c7c696f9a6aad346ae98d13348
+
+### S3: unlanded commit, no bundle recorded
+$ td --copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.32dsdH
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.32dsdH/data/copy-18ea841ac28a6c3c/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.32dsdH/data/copy-18ea841ac28a6c3c/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; run the same teardown --copy command again.
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray is not removed: its HEAD 778de72b4b51 is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray (its HEAD 778de72b4b51 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.32dsdH/projects/proj/.claude/worktrees/stray did not pass every proof (rule=copy-landed): its HEAD 778de72b4b51 is not proved landed; nothing was removed.
+[exit 1]
+- copy dir present: yes
+- registered in clone: yes
+- audit lines: 0
+- external calls (treehouse/gh/no-mistakes): none
+- copy HEAD: 778de72b4b51042e249e9cbf2c03e6d7de2488f9
+- unlanded commit still on fm/stray: unpublished
+lab removed
