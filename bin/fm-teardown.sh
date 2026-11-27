@@ -4492,13 +4492,6 @@ task_process_identity_matches() {  # <pid> <identity>
   [ "$current" = "$2" ]
 }
 
-# --copy dispatch: every landed-work and process helper the by-path mode reuses
-# is defined above, and the record-driven teardown was skipped at its guard.
-if [ -n "$TEARDOWN_BY_PATH" ]; then
-  teardown_by_path_main
-  exit $?
-fi
-
 task_pid_list_contains() {  # <pid-list> <pid>
   printf '%s\n' "$1" | grep -Fxq "$2"
 }
@@ -4818,6 +4811,13 @@ EOF
   echo "REFUSED: leaked $label processes for $ID remain after $max_passes reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2
   return 1
 }
+
+# --copy dispatch: every landed-work and process helper the by-path mode reuses
+# is defined above, and the record-driven teardown was skipped at its guard.
+if [ -n "$TEARDOWN_BY_PATH" ]; then
+  teardown_by_path_main
+  exit $?
+fi
 
 # A Docker compose working directory inside a nested lane (a linked worktree
 # under the task's root) belongs to that lane's task, not to this one. A path
