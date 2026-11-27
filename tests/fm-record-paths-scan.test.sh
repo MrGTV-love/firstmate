@@ -89,6 +89,22 @@ assert_fd_grows() {  # <log> <min-calls> <label>
   [ "$FD_LAST" -gt "$FD_FIRST" ] || fail "$3: the mutant did not grow the fd count (first $FD_FIRST last $FD_LAST); the case cannot see the leak"
 }
 
+# Bash 3.2 keeps the pipe fd of every `done < <(cmd)` open until the enclosing
+# function returns, which is the leak the mutants reproduce. Newer Bash releases
+# (such as Bash 5 on Linux CI) close loop process-substitution pipes per
+# iteration, so restoring `< <(...)` cannot grow the fd count there. Probe this
+# shell's actual behavior instead of assuming Bash 3.2.
+bash_leaks_procsub_fd() {
+  local before after i
+  local -a fds
+  fds=(/dev/fd/*); before=${#fds[@]}
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    while IFS= read -r _; do :; done < <(printf '%s\n' "$i")
+  done
+  fds=(/dev/fd/*); after=${#fds[@]}
+  [ $((after - before)) -ge 8 ]
+}
+
 # --- mutants: an isolated copy of bin/ with one site's process substitution restored --------------------------
 
 # make_mutant_bin <dir> <site>: <dir>/bin holds symlinks to every real bin file except the one the mutant edits.
@@ -263,6 +279,10 @@ test_other_record_scan_keeps_the_fd_count_flat() {
 test_mutant_other_record_with_a_process_substitution_grows_the_fd_count() {
   local dir="$TMP_ROOT/other-mutant"
   make_mutant_bin "$dir/m" lib
+  if ! bash_leaks_procsub_fd; then
+    pass "fm_task_copy_other_record mutant built and parsed ($BASH_VERSION closes loop process-substitution pipes without the Bash 3.2 leak)"
+    return 0
+  fi
   make_records_state "$dir" 40
   other_record_fd_log "$dir/m/bin" "$dir" "$dir/fd.log"
   assert_fd_grows "$dir/fd.log" 40 "other_record mutant"
@@ -330,6 +350,10 @@ test_reassociate_group_check_keeps_the_fd_count_flat() {
 test_mutant_group_check_with_a_process_substitution_grows_the_fd_count() {
   local dir="$TMP_ROOT/group-mutant"
   make_mutant_bin "$dir/m" control
+  if ! bash_leaks_procsub_fd; then
+    pass "reassociate_group_check mutant built and parsed ($BASH_VERSION closes loop process-substitution pipes without the Bash 3.2 leak)"
+    return 0
+  fi
   group_fd_log "$dir/m/bin" "$dir" 3 "$dir/fd.log"
   assert_fd_grows "$dir/fd.log" 18 "reassociate_group_check mutant"
   pass "restoring the process substitution in reassociate_group_check makes its fd case fail"
@@ -378,6 +402,10 @@ test_copy_sweep_check_keeps_the_fd_count_flat() {
 test_mutant_copy_sweep_with_a_process_substitution_grows_the_fd_count() {
   local dir="$TMP_ROOT/sweep-mutant"
   make_mutant_bin "$dir/m" sweep
+  if ! bash_leaks_procsub_fd; then
+    pass "fm-copy-sweep.sh mutant built and parsed ($BASH_VERSION closes loop process-substitution pipes without the Bash 3.2 leak)"
+    return 0
+  fi
   sweep_fd_log "$dir/m/bin" "$dir" 40 "$dir/fd.log"
   assert_fd_grows "$dir/fd.log" 40 "copy-sweep mutant"
   pass "restoring the process substitution in fm-copy-sweep.sh makes its fd case fail"
@@ -420,6 +448,10 @@ test_mutant_teardown_with_the_old_per_record_reads_grows_the_fd_count() {
   case_dir=$(make_scan_case scan-mutant 40)
   add_fd_git_shim "$case_dir"
   make_mutant_bin "$case_dir/m" teardown
+  if ! bash_leaks_procsub_fd; then
+    pass "teardown scan mutant built and parsed ($BASH_VERSION closes loop process-substitution pipes without the Bash 3.2 leak)"
+    return 0
+  fi
   run_scan_teardown "$case_dir" "$case_dir/m/bin"
   assert_fd_grows "$case_dir/fd.log" 39 "teardown mutant"
   pass "restoring the old per-record reads (process substitution and command substitution) in the teardown scan makes its fd case fail"
@@ -495,6 +527,10 @@ test_mutant_teardown_with_the_old_per_record_reads_cannot_finish_with_a_full_fil
   case_dir=$(make_scan_case nofile-mutant 80)
   add_fd_git_shim "$case_dir"
   make_mutant_bin "$case_dir/m" teardown
+  if ! bash_leaks_procsub_fd; then
+    pass "teardown full-table mutant built and parsed ($BASH_VERSION closes loop process-substitution pipes without the Bash 3.2 leak)"
+    return 0
+  fi
   run_scan_teardown_guarded "$case_dir" "$case_dir/m/bin" 64
   fd_log_report "$case_dir/fd.log"
   [ "$FD_MAX" -ge 60 ] || fail "the mutant never filled the table (max $FD_MAX of 64): the case cannot see the leak"
