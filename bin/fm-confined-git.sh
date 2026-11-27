@@ -21,23 +21,23 @@
 # file nor another copy of this wrapper, so it never calls itself. Arguments,
 # standard input, standard output, standard error and the exit status stay
 # git's own; the wrapper never retries and never rewrites an argument. It reads
-# git's trace2 error events through GIT_TRACE2_EVENT, pointed at a temporary
-# file under TMPDIR, only when FM_WRITE_CONFINEMENT=seatbelt-v1,
-# GIT_TRACE2_EVENT is not already set, the config is readable and the
-# temporary file can be made; otherwise it execs the real git untouched. When
-# git exits nonzero and an error event says a path under refs/heads/archive/ or
-# logs/refs/heads/archive/ in the task's own shared Git directory was refused
-# with "Operation not permitted", it appends one stderr line naming each
-# refused ref and the two archive shapes the profile allows, with the task id
-# spelled out. bin/fm-write-confinement.py owns those shapes; this line only
-# restates them, and tests/fm-confined-git.test.sh checks the profile accepts
-# both.
+# git's trace2 error events through GIT_TRACE2_EVENT, pointed at
+# TMPDIR/fm-confined-git.<wrapper pid>, only when FM_WRITE_CONFINEMENT=seatbelt-v1,
+# GIT_TRACE2_EVENT is not already set, the config is readable and that file
+# can be emptied or made; otherwise it execs the real git untouched. When git
+# exits nonzero and an error event says a path under refs/heads/archive/ in the
+# task's own shared Git directory was refused with "Operation not permitted",
+# it appends one stderr line naming each refused ref and the two archive shapes
+# the profile allows, with the task id spelled out. bin/fm-write-confinement.py
+# owns those shapes; this line only restates them, and
+# tests/fm-confined-git.test.sh checks the profile accepts both.
 #
 # Limits: the line needs the English "Operation not permitted" text in a trace2
 # error event, so a refusal Git reports another way gets no line: a nested name
 # such as archive/<task>-x/y, whose folder Git reports only as "unable to
-# create directory", and receive-pack's text for a push into the task's own
-# clone. A refused path that holds a quote or a backslash gets no line. The
+# create directory", a branch rename, whose refused reflog move Git reports
+# without quoting the path, and receive-pack's text for a push into the task's
+# own clone. A refused path that holds a quote or a backslash gets no line. The
 # wrapper is git's parent, so a signal sent only to the wrapper's pid stops the
 # wrapper and leaves git to finish, and a git killed by a signal is reported as
 # exit 128+n, the status a shell shows for it. For these calls
@@ -58,7 +58,6 @@ fm_confined_git_note() {  # <task> <common> <trace>
     path=${msg%%"': Operation not permitted"*}
     path=${path##*"'"}
     case $path in
-      /*/logs/refs/heads/archive/?*) dir=${path%/logs/refs/heads/archive/*} name=${path##*/logs/refs/heads/archive/} ;;
       /*/refs/heads/archive/?*) dir=${path%/refs/heads/archive/*} name=${path##*/refs/heads/archive/} ;;
       *) continue ;;
     esac
@@ -92,16 +91,17 @@ fm_confined_git_run() {
     printf 'git: command not found\n' >&2
     exit 127
   fi
+  trace=${TMPDIR%/}/fm-confined-git.$$
   if [ "${FM_WRITE_CONFINEMENT-}" != seatbelt-v1 ] || [ -n "${GIT_TRACE2_EVENT+set}" ] || [ -z "${TMPDIR-}" ] \
     || ! [ -f "${self%/*}/config" ] || ! { IFS= read -r task && IFS= read -r common; } 2>/dev/null <"${self%/*}/config" \
     || [ -z "$task" ] || [ -z "$common" ] \
-    || ! trace=$(/usr/bin/mktemp "${TMPDIR%/}/fm-confined-git.XXXXXX" 2>/dev/null); then
+    || ! { : >"$trace"; } 2>/dev/null; then
     exec "$real" "$@"
   fi
   GIT_TRACE2_EVENT=$trace GIT_TRACE2_EVENT_BRIEF=true "$real" "$@"
   status=$?
   [ "$status" -eq 0 ] || fm_confined_git_note "$task" "$common" "$trace"
-  /bin/rm -f -- "$trace"
+  [ ! -e "$trace" ] || /bin/rm -f -- "$trace"
   exit "$status"
 }
 

@@ -120,13 +120,6 @@ test_refused_archive_name_gets_one_line_naming_it_and_both_shapes() {
     assert_same_run "$label-plain" "$label-wrapped" 1 "refused $REFUSED through $gitdir"
     assert_names_shapes "$label-wrapped" "$REFUSED"
   done
-  # Git writes the reflog after the ref's lock; its refusal names logs/.
-  FAKE_GIT_MSG="unable to append to '$COMMON/logs/refs/heads/$REFUSED': Operation not permitted" FAKE_GIT_STATUS=128 \
-    run_git reflog-plain "$FAKEBIN" seatbelt-v1 branch "$REFUSED"
-  FAKE_GIT_MSG="unable to append to '$COMMON/logs/refs/heads/$REFUSED': Operation not permitted" FAKE_GIT_STATUS=128 \
-    run_git reflog-wrapped "$WRAP_DIR:$FAKEBIN" seatbelt-v1 branch "$REFUSED"
-  assert_same_run reflog-plain reflog-wrapped 1 "refused reflog of $REFUSED"
-  assert_names_shapes reflog-wrapped "$REFUSED"
   [ -z "$(ls "$TMP_ROOT/tmp")" ] || fail "the wrapper left its trace file behind: $(ls "$TMP_ROOT/tmp")"
   pass "a refused archive name gets one extra stderr line naming it and both allowed shapes, with git's status, stdout and stderr unchanged"
 }
@@ -168,6 +161,16 @@ test_refusals_outside_the_task_archive_get_no_line() {
     FAKE_GIT_MSG=$msg FAKE_GIT_STATUS=128 run_git "$label-wrapped" "$WRAP_DIR:$FAKEBIN" seatbelt-v1 branch x
     assert_same_run "$label-plain" "$label-wrapped" 0 "a refusal that is not this task's archive ($label)"
   done
+  # A trace file a stopped wrapper left at a reused pid adds nothing to a later
+  # unrelated failure; exec keeps the pid the wrapper names its file from.
+  msg=$(refusal_message "$REFUSED" "$COMMON")
+  # shellcheck disable=SC2016 # The inner shell expands its own arguments.
+  FAKE_GIT_STATUS=1 PATH="$WRAP_DIR:$FAKEBIN:$PATH" FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR="$TMP_ROOT/tmp" \
+    /bin/bash -c 'printf "{\"event\":\"error\",\"msg\":\"%s\",\"fmt\":\"%%s\"}\n" "$1" >"$TMPDIR/fm-confined-git.$$"; exec git status' \
+    stale "$msg" >"$TMP_ROOT/stale.out" 2>"$TMP_ROOT/stale.err"
+  expect_code 1 "$?" "the stale-trace call changed git's exit status"
+  [ ! -s "$TMP_ROOT/stale.err" ] || fail "a stale trace file produced a line: $(cat "$TMP_ROOT/stale.err")"
+  [ -z "$(ls "$TMP_ROOT/tmp")" ] || fail "the wrapper left a trace file behind: $(ls "$TMP_ROOT/tmp")"
   # Real Git refusing an archive name for another reason.
   git -C "$WT" branch "$REFUSED" HEAD || fail "could not create the existing-name fixture"
   run_git exists-plain /nonexistent seatbelt-v1 -C "$WT" branch "$REFUSED" HEAD
