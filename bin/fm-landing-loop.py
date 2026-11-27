@@ -245,9 +245,9 @@ def ship_tasks(home, repo_filter=None):
     return found
 
 
-def gh_pr_view(url):
+def gh_pr_view(url, timeout=GH_TIMEOUT):
     fields = "state,isDraft,mergeable,mergeStateStatus,headRefOid,headRefName,baseRefName,baseRefOid,statusCheckRollup"
-    res = run(["gh", "pr", "view", url, "--json", fields], timeout=GH_TIMEOUT)
+    res = run(["gh", "pr", "view", url, "--json", fields], timeout=timeout)
     if res.returncode != 0:
         return None
     try:
@@ -610,10 +610,20 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                 log_path.write_text(detail + "\n", encoding="utf-8")
             else:
                 logs = []
-                live_cmp = gh_compare(owner, repo_name, base_name, expected_head)
-                if not live_cmp:
+                pre_view = gh_pr_view(pr_url)
+                live_cmp = gh_compare(owner, repo_name, base_name, expected_head) if pre_view else None
+                if not pre_view or not live_cmp:
                     rc = 1
-                    detail = f"could not re-verify live {base_name} tip before update-branch"
+                    detail = f"could not re-verify live PR state and {base_name} tip before update-branch"
+                elif str(pre_view.get("state", "")).upper() != "OPEN" or pre_view.get("isDraft") is not False:
+                    rc = 1
+                    detail = f"PR is no longer open/non-draft before update-branch (state={pre_view.get('state')})"
+                elif pre_view.get("baseRefName") != base_name:
+                    rc = 1
+                    detail = f"PR retargeted ({pre_view.get('baseRefName')} != proved {base_name}) before update-branch"
+                elif pre_view.get("headRefOid") != expected_head:
+                    rc = 1
+                    detail = f"PR head moved ({str(pre_view.get('headRefOid', ''))[:10]} != proved {expected_head[:10]}) before update-branch"
                 elif live_cmp["base_tip"] != base_tip:
                     rc = 1
                     detail = f"live {base_name} advanced ({live_cmp['base_tip'][:10]} != proved {base_tip[:10]}) before update-branch"
@@ -629,14 +639,20 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                         deadline = time.monotonic() + max(1, UPDATE_POLL_SECS)
                         advanced_to = ""
                         while True:
-                            live_view = gh_pr_view(pr_url)
+                            rem = deadline - time.monotonic()
+                            if rem <= 0:
+                                break
+                            live_view = gh_pr_view(pr_url, timeout=min(GH_TIMEOUT, max(0.5, rem)))
+                            if time.monotonic() > deadline:
+                                break
                             live_head = live_view.get("headRefOid", "") if live_view else ""
                             if live_head and live_head != expected_head:
                                 advanced_to = live_head
                                 break
-                            if time.monotonic() >= deadline:
+                            rem_after = deadline - time.monotonic()
+                            if rem_after <= 0:
                                 break
-                            time.sleep(min(2.0, max(0.1, deadline - time.monotonic())))
+                            time.sleep(min(2.0, rem_after))
                         if advanced_to:
                             rc = 0
                             detail = f"updated {owner}/{repo_name}#{number} server-side from {expected_head[:10]} to {advanced_to[:10]}"
