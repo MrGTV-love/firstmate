@@ -1,11 +1,19 @@
 // Firstmate dispatch policy. CLI: validate <rules> <registry> (exit 65 for a
 // malformed schema); prepare <rules> <task> <project> <ship|scout> <registry>;
-// call (request on stdin, key on fd 3); apply <rules> <response> <request>
+// call [--attempt-journal <new-file> --launch-binding <plan> <pinned-sha256>]
+// (request on stdin, key on fd 3); apply <rules> <response> <request>
 // <ship|scout> <allowed-harnesses-json> <cheap-class-re> <max-effort-re> <registry>.
 // The frozen registry contains ids and clone locations. Kind stays in code.
 // FM_DISPATCH_INHERITED_POLICY=1 marks rules a secondmate home inherited: their
 // project selectors may name fleet projects absent from this registry.
+// The opt-in v4 journal binds to a private plan {version: 1, assignment,
+// execution, adapter_input_sha256} for the exact bytes on stdin. Retain the
+// plan digest before the call and retain process closeout separately.
+// Start records are fsynced before transport; response metadata is minimized.
+// The journal is not a provider settlement, and payloads, raw IDs, and keys stay out.
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { openAttemptJournal, requestIdDigest } from "./fm-jev-attempt-journal.mjs";
 import { JevClient, ContractError, validateResponse } from "./ten-levels/src/core/client.ts";
 import { noul } from "./ten-levels/src/core/helpers.ts";
 import { validateRequest } from "./ten-levels/src/core/types.ts";
@@ -106,14 +114,55 @@ try {
     const [rulesPath, taskPath, project, kind, registryPath] = args;
     console.log(JSON.stringify(prepare(config(rulesPath, registryPath), readFileSync(taskPath, "utf8"), project, kind)));
   } else if (action === "call") {
-    const request: unknown = JSON.parse(readFileSync(0, "utf8"));
-    validateRequest(request);
-    const apiKey = readFileSync(3, "utf8").trim();
-    const client = new JevClient({ provider: "typesafe", apiKey, timeoutMs: 5000,
-      pricing: { inputPerMillion: 0.042, outputPerMillion: 0 },
-      ...(process.env.FM_TEST_SEAM === "1" && process.env.FM_TYPESAFE_TEST_ENDPOINT
-        ? { baseUrl: process.env.FM_TYPESAFE_TEST_ENDPOINT } : {}) });
-    console.log(JSON.stringify(await client.systemOne(request.state, request.questions, { model: request.model })));
+    let journal: ReturnType<typeof openAttemptJournal> | undefined;
+    let validResponse = false;
+    try {
+      const input = readFileSync(0);
+      if (args.length) {
+        const [journalFlag, journalPath, bindingFlag, bindingPath, pinnedDigest] = args;
+        if (args.length !== 5 || journalFlag !== "--attempt-journal" || !journalPath ||
+            bindingFlag !== "--launch-binding" || !bindingPath || !/^[a-f0-9]{64}$/.test(pinnedDigest)) {
+          throw new Error("call arguments");
+        }
+        const bindingBytes = readFileSync(bindingPath);
+        if (createHash("sha256").update(bindingBytes).digest("hex") !== pinnedDigest) throw new Error("launch binding digest");
+        const binding: unknown = JSON.parse(bindingBytes.toString("utf8"));
+        if (!object(binding) || Object.keys(binding).length !== 4 || binding.version !== 1 ||
+            ![binding.assignment, binding.execution].every(id =>
+              typeof id === "string" && /^[A-Za-z0-9_.:/-]{1,128}$/.test(id)) ||
+            binding.adapter_input_sha256 !== createHash("sha256").update(input).digest("hex")) {
+          throw new Error("launch binding or adapter input mismatch");
+        }
+        journal = openAttemptJournal(journalPath);
+        journal.append({ kind: "opened", version: 4, launch_binding_sha256: pinnedDigest });
+      }
+      const request: unknown = JSON.parse(input.toString("utf8"));
+      validateRequest(request);
+      const apiKey = readFileSync(3, "utf8").trim();
+      const client = new JevClient({ provider: "typesafe", apiKey, timeoutMs: 5000,
+        pricing: { inputPerMillion: 0.042, outputPerMillion: 0 },
+        ...(process.env.FM_TEST_SEAM === "1" && process.env.FM_TYPESAFE_TEST_ENDPOINT
+          ? { baseUrl: process.env.FM_TYPESAFE_TEST_ENDPOINT } : {}) });
+      const response = await client.systemOne(request.state, request.questions, {
+        model: request.model,
+        ...(journal ? {
+          beforeTransportAttempt: (attempt: number) => journal!.append({ kind: "attempt_started", attempt }),
+          observeTransportResponse: (attempt: number, status: number, requestId: string | null) => {
+            journal!.observe({ kind: "response_observed", attempt, http_status: status, request_id_sha256: requestIdDigest(requestId) });
+          },
+        } : {}),
+      });
+      journal?.observe({ kind: "reported_usage", attempt: response.meta.attempts,
+        served_model: /^jev-[0-9]+(?:\.[0-9]+)*$/.test(response.model) && response.model.length <= 80 ? response.model : null,
+        input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens });
+      validResponse = true;
+      console.log(JSON.stringify(response));
+    } finally {
+      // An accounting failure after send does not replace the resolver result.
+      if (journal && !journal.close({ kind: "closed", valid_response: validResponse })) {
+        console.error("dispatch-level5: attempt journal closeout unverified");
+      }
+    }
   } else if (action === "apply") {
     const [rulesPath, responsePath, requestPath, kind, allowedJson, cheapPattern, maxEffortPattern, registryPath] = args;
     if (!cheapPattern || !maxEffortPattern) throw new Error("classes");
