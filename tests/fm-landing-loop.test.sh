@@ -76,6 +76,12 @@ if len(args) >= 4 and args[0] == "api" and args[1] == "-X" and args[2] == "PUT" 
     if log_path:
         with open(log_path, "a", encoding="utf-8") as fh:
             fh.write(" ".join(args) + "\n")
+    advance = data.get("update_advance_head")
+    if advance:
+        for entry in data.get("prs", {}).values():
+            entry["view"]["headRefOid"] = advance
+        with open("$data", "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
     print(json.dumps({"message": "Updating pull request branch."}))
     sys.exit(0)
 sys.exit(1)
@@ -220,6 +226,7 @@ test_direct_pr_updates_server_side_without_mutating_worktree() {
   cat > "$dir/gh.json" <<JSON
 {
   "update_log": "$dir/update.log",
+  "update_advance_head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "prs": {
     "$url": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/direct-a", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
   },
@@ -229,14 +236,39 @@ test_direct_pr_updates_server_side_without_mutating_worktree() {
 }
 JSON
   write_fake_gh "$shim" "$dir/gh.json"
-  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "direct-PR step must exit 0"
-  PATH="$shim:$PATH" wait_for_inflight_done "$home" || fail "direct-PR update must finish"
+  PATH="$shim:$PATH" FM_LANDING_LOOP_UPDATE_POLL_SECS=3 FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "direct-PR step must exit 0"
+  PATH="$shim:$PATH" FM_LANDING_LOOP_UPDATE_POLL_SECS=3 wait_for_inflight_done "$home" || fail "direct-PR update must finish"
   grep -Fq "api -X PUT repos/example/repo/pulls/104/update-branch -f expected_head_sha=$head" "$dir/update.log" \
     || fail "direct-PR must call GitHub server-side update-branch bound to expected_head_sha=$head"
   assert_equals "$local_head" "$(git -C "$wt" rev-parse HEAD)" "direct-PR server-side update must never mutate local worktree HEAD"
   assert_equals "local ignored value" "$(cat "$wt/ignored-secret")" "direct-PR update must never overwrite ignored local files"
   assert_equals "$head" "$(git --git-dir="$dir/repo/origin.git" rev-parse refs/heads/fm/direct-a)" "unpushed local commit must never be pushed to origin"
-  pass "direct-PR updates server-side via expected_head_sha without mutating worktree, ignored files, or publishing unpushed commits"
+  # Also verify that if update-branch returns 202 but the forge head never advances, the worker fails into backoff and wakes Main once.
+  local dir2="$TMP_ROOT/direct-stall" home2="$TMP_ROOT/direct-stall/home" shim2="$TMP_ROOT/direct-stall/shim"
+  mkdir -p "$home2/state" "$home2/config" "$home2/data"
+  local url2="https://github.com/example/repo/pull/109"
+  fm_write_meta "$home2/state/direct-stall.meta" "kind=ship" "mode=direct-PR" "branch=fm/direct-a" "worktree=$wt" "pr=$url2"
+  cat > "$dir2/gh.json" <<JSON
+{
+  "update_log": "$dir2/update.log",
+  "prs": {
+    "$url2": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/direct-a", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
+  },
+  "compares": {
+    "$head": {"base_commit": {"sha": "$tip"}, "behind_by": 1}
+  }
+}
+JSON
+  write_fake_gh "$shim2" "$dir2/gh.json"
+  PATH="$shim2:$PATH" FM_LANDING_LOOP_UPDATE_POLL_SECS=1 FM_HOME="$home2" python3 "$LOOP" step --no-reconcile || fail "stalled direct-PR step must exit 0"
+  PATH="$shim2:$PATH" FM_LANDING_LOOP_UPDATE_POLL_SECS=1 wait_for_inflight_done "$home2" || fail "stalled direct-PR update must finish"
+  PATH="$shim2:$PATH" FM_LANDING_LOOP_UPDATE_POLL_SECS=1 FM_HOME="$home2" python3 "$LOOP" step --no-reconcile || fail "post-stall step must exit 0"
+  "$JQ_BIN" -e '.tasks["direct-stall"].action == "backoff"' "$home2/state/.landing-loop/state.json" >/dev/null \
+    || fail "direct-PR update whose head never advances must enter backoff"
+  local stall_wakes
+  stall_wakes=$(grep -c "landing-loop direct-stall:" "$home2/state/.wake-queue" 2>/dev/null || echo 0)
+  assert_equals "1" "$stall_wakes" "stalled direct-PR update must wake Main once"
+  pass "direct-PR proves merge-tree, updates server-side via expected_head_sha, waits for head advance, and fails into backoff + wake if stalled"
 }
 
 test_failed_update_backs_off_and_wakes_main_once() {

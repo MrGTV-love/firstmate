@@ -24,9 +24,11 @@ merge gate or weakening any guard:
        - mode=no-mistakes: launches `python3 bin/fm-duration.py run --pipeline-priority merge-train
          fm-landing-update-<task> -- no-mistakes rerun` detached in the task worktree, only when
          `no-mistakes axi status` shows no run active there. Never passes --yes.
-       - mode=direct-PR: invokes GitHub's server-side `PUT /repos/{owner}/{repo}/pulls/{number}/update-branch`
-         bound to `expected_head_sha=<head>` so the task worktree is never mutated, unpushed local commits
-         can never be published, and ignored local files can never be overwritten.
+       - mode=direct-PR: verifies the worktree exists and merge-tree proves the exact base tip + head
+         conflict-free, re-reads the live base tip immediately before calling GitHub's server-side
+         `PUT /repos/{owner}/{repo}/pulls/{number}/update-branch` bound to `expected_head_sha=<head>`
+         (matching bin/fm-pr-merge.sh's pre-call base-tip check residual), and polls until the forge
+         PR head advances before releasing the serial slot (failing into backoff + wake if it does not).
   4. Every merge still goes through bin/fm-pr-merge.sh (never gh pr merge directly, never
      --attended-override). Main is woken via a `check: landing-loop <task>: ...` wake only on
      actionable failures (conflicts, dirty no-mistakes worktrees, failed updates), with normal-case
@@ -62,6 +64,7 @@ GIT_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_GIT_TIMEOUT", "120") or 120)
 RECONCILE_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_RECONCILE_TIMEOUT", "300") or 300)
 DEFAULT_CMD_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_CMD_TIMEOUT", "120") or 120)
 UPDATE_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_UPDATE_TIMEOUT", "7200") or 7200)
+UPDATE_POLL_SECS = int(os.environ.get("FM_LANDING_LOOP_UPDATE_POLL_SECS", "120") or 120)
 
 _AUTO_REVIEW_MOD = []
 
@@ -594,23 +597,53 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
             # Use GitHub's server-side update-branch API bound to expected_head_sha
             # so the local task worktree is never mutated, ignored local files cannot
             # be overwritten, and unpushed local commits can never be published.
+            # Re-check the live base tip immediately before the call (matching
+            # bin/fm-pr-merge.sh's pre-call base-tip check) and poll after HTTP 202
+            # until the PR head actually advances before reporting completion.
             owner = req.get("owner") or ""
             repo_name = req.get("repo") or ""
             number = req.get("number") or 0
-            if not (owner and repo_name and number and SHA.fullmatch(expected_head)):
+            pr_url = req.get("pr") or ""
+            if not (owner and repo_name and number and pr_url and SHA.fullmatch(expected_head) and SHA.fullmatch(base_tip)):
                 rc = 2
-                detail = "direct-PR update missing canonical owner/repo/number or head SHA"
+                detail = "direct-PR update missing canonical owner/repo/number, pr URL, head SHA, or base tip"
                 log_path.write_text(detail + "\n", encoding="utf-8")
             else:
-                endpoint = f"repos/{owner}/{repo_name}/pulls/{number}/update-branch"
-                cmd = ["gh", "api", "-X", "PUT", endpoint, "-f", f"expected_head_sha={expected_head}"]
-                done = run(cmd, timeout=GH_TIMEOUT)
-                log_path.write_text(f"$ {' '.join(cmd)}\n{done.stdout}{done.stderr}\n", encoding="utf-8")
-                rc = done.returncode
-                if rc == 0:
-                    detail = f"requested server-side update-branch on {owner}/{repo_name}#{number} from {expected_head[:10]}"
+                logs = []
+                live_cmp = gh_compare(owner, repo_name, base_name, expected_head)
+                if not live_cmp:
+                    rc = 1
+                    detail = f"could not re-verify live {base_name} tip before update-branch"
+                elif live_cmp["base_tip"] != base_tip:
+                    rc = 1
+                    detail = f"live {base_name} advanced ({live_cmp['base_tip'][:10]} != proved {base_tip[:10]}) before update-branch"
                 else:
-                    detail = f"update-branch failed (exit {rc}): {(done.stderr or done.stdout).strip()[:160]}"
+                    endpoint = f"repos/{owner}/{repo_name}/pulls/{number}/update-branch"
+                    cmd = ["gh", "api", "-X", "PUT", endpoint, "-f", f"expected_head_sha={expected_head}"]
+                    done = run(cmd, timeout=GH_TIMEOUT)
+                    logs.append(f"$ {' '.join(cmd)}\n{done.stdout}{done.stderr}\n")
+                    if done.returncode != 0:
+                        rc = done.returncode
+                        detail = f"update-branch failed (exit {rc}): {(done.stderr or done.stdout).strip()[:160]}"
+                    else:
+                        deadline = time.monotonic() + max(1, UPDATE_POLL_SECS)
+                        advanced_to = ""
+                        while True:
+                            live_view = gh_pr_view(pr_url)
+                            live_head = live_view.get("headRefOid", "") if live_view else ""
+                            if live_head and live_head != expected_head:
+                                advanced_to = live_head
+                                break
+                            if time.monotonic() >= deadline:
+                                break
+                            time.sleep(min(2.0, max(0.1, deadline - time.monotonic())))
+                        if advanced_to:
+                            rc = 0
+                            detail = f"updated {owner}/{repo_name}#{number} server-side from {expected_head[:10]} to {advanced_to[:10]}"
+                        else:
+                            rc = 1
+                            detail = f"update-branch accepted for {expected_head[:10]} but PR head did not advance within {UPDATE_POLL_SECS}s"
+                log_path.write_text("".join(logs), encoding="utf-8")
         else:
             detail = f"unsupported delivery mode: {mode}"
             rc = 2
@@ -727,12 +760,12 @@ def assess_candidates(home, include_stale_red=False, inflight=None, backoff=None
             rows.append(entry)
             continue
         worktree = meta.get("worktree", "")
+        if not worktree or not os.path.isdir(worktree):
+            entry["action"] = "held"
+            entry["reason"] = f"worktree missing: {worktree or '(unset)'}"
+            rows.append(entry)
+            continue
         if meta["mode"] == "no-mistakes":
-            if not worktree or not os.path.isdir(worktree):
-                entry["action"] = "held"
-                entry["reason"] = f"worktree missing: {worktree or '(unset)'}"
-                rows.append(entry)
-                continue
             if not worktree_is_clean(worktree):
                 entry["action"] = "held"
                 entry["reason"] = "worktree has uncommitted changes"
@@ -744,16 +777,13 @@ def assess_candidates(home, include_stale_red=False, inflight=None, backoff=None
                 entry["reason"] = nm_reason
                 rows.append(entry)
                 continue
-        if worktree and os.path.isdir(worktree):
-            clean, detail, expected_tree = check_clean_merge_tree(worktree, cmp["base_tip"], head)
-            if not clean:
-                entry["action"] = "conflict" if "conflict" in detail else "held"
-                entry["reason"] = detail
-                rows.append(entry)
-                continue
-            entry["expected_tree"] = expected_tree
-        else:
-            entry["expected_tree"] = ""
+        clean, detail, expected_tree = check_clean_merge_tree(worktree, cmp["base_tip"], head)
+        if not clean:
+            entry["action"] = "conflict" if "conflict" in detail else "held"
+            entry["reason"] = detail
+            rows.append(entry)
+            continue
+        entry["expected_tree"] = expected_tree
         entry["action"] = "update"
         entry["reason"] = f"behind {base_name} by {cmp['behind_by']} ({'PASS verified' if has_pass else 'checks green' if not failed else 'stale-red opt-in'})"
         rows.append(entry)
