@@ -277,6 +277,13 @@ test_strict_version_refuses_wrong_shellcheck() {
           "$LINT" "$tmp/root.sh" 2>&1) || rc=$?
         ;;
     esac
+    # Off macOS, --strict-version refuses before the version probe (exit 2): the
+    # per-root resident cap cannot be enforced there.
+    if [ "$mode" = strict ] && [ "$(uname)" != Darwin ]; then
+      expect_code 2 "$rc" "strict off macOS must refuse before the version probe: $out"
+      assert_contains "$out" "strict mode refuses on $(uname)" "the off-macOS strict refusal did not say why"
+      continue
+    fi
     expect_code 1 "$rc" "$mode must refuse a non-pinned ShellCheck: $out"
     assert_contains "$out" "$REQUIRED" "$mode refusal did not name the pin"
     assert_contains "$out" "0.9.9" "$mode refusal did not name the resolved version"
@@ -404,6 +411,7 @@ test_rejects_direct_beads_cli_invocations() {
   lint_copy="$tmp/repo/bin/fm-lint.sh"
   cp "$LINT" "$lint_copy"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/repo/bin/"
   cat > "$tmp/repo/bin/fm-lint-workflows.sh" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -457,6 +465,7 @@ test_rejects_direct_beads_cli_in_explicit_core_path() {
   target="$tmp/repo/bin/direct-beads.sh"
   cp "$LINT" "$lint_copy"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/repo/bin/"
   printf '#!/usr/bin/env bash\nbd close fm-example\n' > "$target"
   chmod +x "$lint_copy"
   fm_lint_stub_shellcheck "$fakebin" "$log"

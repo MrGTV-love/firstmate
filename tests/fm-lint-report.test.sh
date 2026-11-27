@@ -44,6 +44,7 @@ sleep 60
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
+  fm_lint_hide_outside_shellcheck "$fakebin"
 
   # A 3s first attempt leaves about 3s of the 6s deadline, so the retry is
   # killed there; a fresh deadline would let the root run for about 9s.
@@ -183,6 +184,7 @@ test_require_bounds_refuses_when_enforcement_is_missing() {
   mkdir -p "$lone_dir"
   cp "$LINT" "$lone_dir/fm-lint.sh"
   cp "$ROOT/bin/fm-lint-cache.pl" "$lone_dir/"
+  cp "$ROOT/bin/fm-proc-info.py" "$lone_dir/"
   chmod +x "$lone_dir/fm-lint.sh"
   rc=0
   out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
@@ -226,7 +228,7 @@ test_pinned_shellcheck_memory_limit() {
     pass "SKIP (host cannot enforce the bounded envelope): pinned memory-envelope check"
     return
   fi
-  local tmp telemetry roots_log out rc fixture
+  local tmp telemetry roots_log out rc fixture fakebin real_shellcheck real_log
   tmp=$(fm_test_tmproot fm-lint-pinned-memory)
   telemetry="$tmp/lint.tsv"
   roots_log="$tmp/lint.roots.tsv"
@@ -247,18 +249,56 @@ test_pinned_shellcheck_memory_limit() {
   awk -F '\t' '$1 == "end" && $3 ~ /small\.sh$/ && $10 == "ok" { found=1 } END { exit !found }' \
     "$roots_log" || fail "the pinned root did not complete ok under the memory limit"
 
-  # A limit below the pinned binary's own mapped size must bind the same
-  # pinned root: it is refused or killed and named, never silently uncapped.
-  # GHC shrinks its heap reservation to fit a larger cap, so a small file can
-  # still lint under a few hundred MiB; only a cap under the binary itself
-  # binds on every Linux architecture.
+  # A limit below the pinned binary's own mapped size must bind the pinned
+  # ShellCheck: it is killed and named, never silently uncapped. GHC shrinks its
+  # heap reservation to fit a larger cap, so a small file can still lint under a
+  # few hundred MiB; only a cap under the binary itself binds on every Linux
+  # architecture. The version probe runs under the same address-space limit and
+  # is the run's first ShellCheck start, so the limit binds there: the run names
+  # the probe and the limit and starts no root.
   rc=0
   out=$(FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_MEMORY_KIB=8192 \
     "$LINT" --telemetry "$tmp/tiny.tsv" "$fixture" 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "pinned ShellCheck ignored an 8 MiB address-space limit"
+  [ "$rc" -eq 2 ] || fail "pinned ShellCheck under an 8 MiB address-space limit exited $rc, expected 2"$'\n'"$out"
+  assert_contains "$out" "version probe exited with status" "the memory-bound version probe was not named"
+  assert_contains "$out" "under the 8192 KiB address-space limit" "the binding limit was not named"
+  if [ -e "$tmp/tiny.roots.tsv" ] && grep -q 'small\.sh' "$tmp/tiny.roots.tsv"; then
+    fail "a root started after the version probe failed under the limit: $(cat "$tmp/tiny.roots.tsv")"
+  fi
+
+  # The same limit must bind a root, not only the probe. A shellcheck on PATH
+  # answers the version probe itself, with the pin, and runs the real pinned
+  # ShellCheck for every root, so the root is the first real ShellCheck under
+  # the limit: it is refused or killed and named, never silently uncapped.
+  fakebin=$(fm_fakebin "$tmp")
+  real_shellcheck=$(command -v shellcheck)
+  real_log="$tmp/real-roots.log"
+  cat > "$fakebin/shellcheck" <<SH
+#!/bin/sh
+if [ "\$*" = --version ]; then
+  printf 'version: %s\n' '$REQUIRED'
+  exit 0
+fi
+printf '%s\n' "\$*" >> '$real_log'
+exec '$real_shellcheck' "\$@"
+SH
+  chmod +x "$fakebin/shellcheck"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
+    "$LINT" --telemetry "$tmp/control.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "the pinned root through the probe stand-in did not lint under the default limit"$'\n'"$out"
+  awk -F '\t' '$1 == "end" && $3 ~ /small\.sh$/ && $10 == "ok" { found=1 } END { exit !found }' \
+    "$tmp/control.roots.tsv" || fail "the pinned root through the probe stand-in did not complete ok"$'\n'"$out"
+  : > "$real_log"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_MEMORY_KIB=8192 \
+    "$LINT" --telemetry "$tmp/root.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "pinned ShellCheck root ignored an 8 MiB address-space limit"$'\n'"$out"
+  grep -q 'small\.sh' "$real_log" 2>/dev/null \
+    || fail "the real pinned ShellCheck never started for the root under the limit"$'\n'"$out"
   assert_contains "$out" "small.sh" "the memory-bound pinned root was not named"
   awk -F '\t' '$1 == "end" && $3 ~ /small\.sh$/ && $10 != "ok" && $10 != "findings" { found=1 } END { exit !found }' \
-    "$tmp/tiny.roots.tsv" || fail "the over-limit pinned root was not recorded as an abnormal end"$'\n'"$out"
+    "$tmp/root.roots.tsv" || fail "the over-limit pinned root was not recorded as an abnormal end"$'\n'"$out"
   pass "the pinned ShellCheck both respects and survives under the memory envelope"
 }
 
@@ -272,6 +312,7 @@ test_sidecar_result_exit_reflects_final_status() {
   mkdir -p "$tmp/repo/bin/backends" "$tmp/repo/tests" "$tmp/repo/.github/workflows"
   cp "$LINT" "$tmp/repo/bin/fm-lint.sh"
   cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  cp "$ROOT/bin/fm-proc-info.py" "$tmp/repo/bin/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$tmp/repo/bin/fm-timeout-lib.sh"
   cat > "$tmp/repo/bin/fm-lint-workflows.sh" <<'SH'
 #!/usr/bin/env bash
@@ -426,19 +467,18 @@ test_ci_forces_full_lint_even_with_empty_diff() {
     "$repo/bin/fm-lint.sh" --list-files)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "CI=true did not force the full canonical file set"
-  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' \
     "$repo/bin/fm-lint.sh" --jobs 1 bin/consumer.sh 2>&1) \
-    || fail "local cache warm-up failed: $out"
+    || fail "local run before the CI runs failed: $out"
   for run in 1 2; do
     : > "$log"
-    out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS='' \
       FM_TEST_GIT_DIFF_FILE="$diff_file" \
       "$repo/bin/fm-lint.sh" --jobs 1 2>&1) || fail "CI inventory lint failed: $out"
     [ "$(LC_ALL=C sort "$log")" = "$expected" ] \
-      || fail "CI run $run did not analyze the complete uncached inventory: $(cat "$log")"
-    assert_not_contains "$out" 'cache hit ' "CI reused local lint successes"
+      || fail "CI run $run did not analyze the complete inventory: $(cat "$log")"
   done
-  pass "CI=true checks the complete uncached inventory even with an empty diff"
+  pass "CI=true checks the complete inventory even with an empty diff"
 }
 
 test_main_branch_forces_full_lint() {
