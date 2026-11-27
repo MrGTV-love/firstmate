@@ -164,7 +164,7 @@ scout_report_handoff_case() {
       profile_args=(--claude-session 11111111-2222-4333-8444-555555555555)
     fi
     HOME="$home/user-home" OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp \
-      python3 "$ROOT/bin/fm-write-confinement.py" --worktree "$wt" --home "$home" \
+      python3 "$ROOT/bin/fm-write-confinement.py" --worktree "$wt" --project "$primary" --home "$home" \
       --config "$home/config" --projects "$home/projects" --data "$home/data/$id" \
       --state "$home/state" --task "$id" --harness "$boundary" \
       --agent-dir "$home/user-home/agent" --profile "$home/worker.sb" \

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build a macOS Seatbelt profile for one isolated ship/scout worker.
 
-Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
-       --projects DIR --data DIR --state DIR --task ID
+Usage: fm-write-confinement.py --worktree DIR --project DIR --home DIR
+       --config DIR --projects DIR --data DIR --state DIR --task ID
        --harness {omp,claude} --profile FILE
        [--agent-dir DIR] [--branch NAME] [--protect DIR ...]
        [--claude-session UUID]
@@ -32,7 +32,12 @@ deletion among them, so no prepared folder holding a repointed .git file or
 commondir can take their place. For a project whose
 checked-out tree holds scripts/git_management/worktree_lifecycle.py the build
 first creates an absent vernant-worktree-lifecycle folder. --data is this
-task's directory below the home data root. The build refuses while a protected ref
+task's directory below the home data root. --project is the task's project
+checkout; the build refuses, naming what it found, unless the shared Git
+directory the worktree resolves is the one that checkout resolves and the
+worktree's own Git directory sits in that directory's worktrees folder, so a
+repointed .git file or commondir cannot move the protected records to a
+repository the worker made; a missing --project refuses too. The build refuses while a protected ref
 path in this repository's shared Git directory (packed-refs, HEAD, index,
 commondir, other tasks' branch refs and reflogs, replace refs, other
 worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
@@ -212,7 +217,8 @@ def lifecycle_links(common, worktree, gitdir):
     symbolic link at the lifecycle folder, at a record folder or at any entry
     inside one. The same holds for the worker's own .git file and its
     commondir, which name the shared Git directory that lifecycle readers of
-    the worktree resolve. Such a name made before the build can sit anywhere
+    the worktree resolve; project_repository checks that they name the
+    project's. Such a name made before the build can sit anywhere
     the worker writes, so the build stops while one exists, as for the shared
     refs above.
     """
@@ -237,6 +243,22 @@ def lifecycle_links(common, worktree, gitdir):
         elif stat.S_ISREG(info.st_mode) and info.st_nlink > 1:
             found.append((path, f"{info.st_nlink} links"))
     return found
+
+
+def project_repository(project, common, gitdir):
+    """Refuse unless the worktree's repository is the project's own.
+
+    The worker's own .git file and commondir decide which shared Git directory
+    the build protects, so the project checkout, never the worktree, names it.
+    """
+    if not project:
+        raise ValueError("no --project checkout was given, so the worker's repository cannot be proved to be the project's")
+    expected = canonical(subprocess.check_output(
+        ["git", "-C", project, "rev-parse", "--path-format=absolute", "--git-common-dir"], text=True).strip())
+    if common != expected:
+        raise ValueError(f"the worktree's shared Git directory is {common}, not the project's {expected}")
+    if Path(gitdir).parent != Path(common) / "worktrees":
+        raise ValueError(f"the worktree's Git directory {gitdir} is not in {common}/worktrees")
 
 
 def vernant_lifecycle(worktree, common):
@@ -272,6 +294,7 @@ def build(args):
         ["git", "-C", worktree, "rev-parse", "--path-format=absolute", "--git-common-dir"], text=True).strip())
     if gitdir == common:
         raise ValueError("worker must use an isolated linked worktree")
+    project_repository(args.project, common, gitdir)
     if (Path(common) / "reftable").exists():
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
@@ -504,6 +527,7 @@ def main():
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--harness", choices=("omp", "claude"), required=True)
     parser.add_argument("--agent-dir")
+    parser.add_argument("--project")
     parser.add_argument("--branch", default="")
     parser.add_argument("--claude-session")
     parser.add_argument("--protect", action="append", default=[])

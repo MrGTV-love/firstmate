@@ -995,9 +995,10 @@ def launch_git_env(env):
     return dict(env, GIT_CONFIG_COUNT=str(count + 1), **{f"GIT_CONFIG_KEY_{count}": "fetch.prune", f"GIT_CONFIG_VALUE_{count}": "false"})
 
 
-def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktree=None):
+def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktree=None, project=None):
     home = Path(manifest["home"])
     command = [sys.executable, str(repo / "bin/fm-write-confinement.py"), "--worktree", worktree or manifest["worktree"],
+               "--project", project or str(home / "projects/project"),
                "--home", str(home), "--config", str(home / "config"), "--projects", str(home / "projects"),
                "--data", str(home / "data/task"), "--state", str(home / "state"), "--task", "task", "--branch", "fm/task",
                "--harness", harness, "--protect", manifest["other_home"], "--profile", str(profile)]
@@ -1104,7 +1105,7 @@ def reftable_source(repo, manifest, base, env):
         assert result.returncode == 0, (args, result.stderr)
     profile = base / "rs.sb"
     try:
-        build_profile(repo, manifest, "claude", profile, env, worktree=str(linked))
+        build_profile(repo, manifest, "claude", profile, env, worktree=str(linked), project=str(source))
     except subprocess.CalledProcessError as error:
         assert error.returncode == 1 and "reftable ref storage cannot be confined" in error.stderr, error.stderr
         assert not profile.exists(), "reftable repository published a confinement profile"
@@ -1341,6 +1342,9 @@ LIFECYCLE_MUTANTS = (("approvals",), ("drop",), ("lifecycle",), ("lifecycle", "a
 # another spelling holds record folders whose path the record denies may not
 # name; no measurement covers that cell, so it is reported, not judged.
 LIFECYCLE_UNJUDGED = {("absent-upper-lifecycle", ("lifecycle",)), ("absent-kelvin-lifecycle", ("lifecycle",))}
+# A worktree whose .git file or commondir names a repository other than the
+# project's, and a build given no project checkout, each stopping the build.
+LIFECYCLE_REPOINTS = ("git-file-fake-repository", "commondir-fake-repository", "gitdir-outside-worktrees", "project-missing")
 # Names a worker could make, or an unconfined process could leave, as a
 # second name for a record or for the worker's own .git file or commondir,
 # each stopping the build.
@@ -1606,19 +1610,20 @@ def lifecycle_fixture(base):
         gitdir = Path(git("-C", str(worktree), "rev-parse", "--absolute-git-dir").stdout.strip())
         workers[name] = {"worktree": worktree, "gitdir": gitdir, "branch": branch}
     originals = {path: path.read_bytes() for worker in workers.values() for path in (worker["worktree"] / ".git", worker["gitdir"] / "commondir")}
-    return {"home": home, "common": project / ".git", "workers": workers, "originals": originals}
+    return {"home": home, "project": project, "common": project / ".git", "workers": workers, "originals": originals}
 
 
-def build_lifecycle(repo, lc, worker, harness, profile, env, manifest, replaced=None):
+def build_lifecycle(repo, lc, worker, harness, profile, env, manifest, replaced=None, project=True):
     """Build the profile for a fixture worker, or, for a mutant, run the builder in this process with some of its own steps replaced."""
-    args = {"worktree": str(worker["worktree"]), "home": str(lc["home"]), "config": str(lc["home"] / "config"),
+    args = {"worktree": str(worker["worktree"]), "project": str(lc["project"]) if project else None, "home": str(lc["home"]), "config": str(lc["home"] / "config"),
             "projects": str(lc["home"] / "projects"), "data": str(lc["home"] / "data/task"), "state": str(lc["home"] / "state"),
             "task": "task", "branch": worker["branch"], "harness": harness, "profile": str(profile)}
     run_env = dict(env, NM_HOME=manifest["nm"])
     if replaced is None:
         command = [sys.executable, str(repo / "bin/fm-write-confinement.py")]
         for name, value in args.items():
-            command += ["--" + name, value]
+            if value is not None:
+                command += ["--" + name, value]
         command += ["--protect", manifest["other_home"]] + (["--claude-session", OWN_SESSION] if harness == "claude" else [])
         return subprocess.run(command, env=run_env, capture_output=True, text=True)
     spec = importlib.util.spec_from_file_location("fm_write_confinement_fixture", repo / "bin/fm-write-confinement.py")
@@ -1693,6 +1698,37 @@ def lifecycle_alias(p, name):
         target.mkdir()
     folder.symlink_to(target)
     return folder, f"symbolic link to {target}"
+
+
+def fake_repository(scratch):
+    """A repository the worker made in its own scratch folder, with a linked worktree on the task's branch."""
+    fake, fake_wt = scratch / "fake-repo", scratch / "fake-wt"
+    commit = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "init"]
+    for args in (["init", "-q", "-b", "main", str(fake)], ["-C", str(fake), *commit],
+                 ["-C", str(fake), "worktree", "add", "-q", "-b", "fm/task-v", str(fake_wt)]):
+        result = git(*args)
+        assert result.returncode == 0, (args, result.stderr)
+    return fake / ".git", fake / ".git/worktrees" / fake_wt.name
+
+
+def lifecycle_repoint(p, name):
+    """Point the worker's repository away from the project's; return the words the refusal must hold and whether the build gets --project."""
+    s, common = p["scratch"], p["common"]
+    if name == "git-file-fake-repository":
+        fake_common, fake_gitdir = fake_repository(s)
+        (p["worktree"] / ".git").write_text(f"gitdir: {fake_gitdir}\n")
+        return f"the worktree's shared Git directory is {fake_common}, not the project's {common}", True
+    if name == "commondir-fake-repository":
+        fake_common, _ = fake_repository(s)
+        (p["gitdir"] / "commondir").write_text(f"{fake_common}\n")
+        return f"the worktree's shared Git directory is {fake_common}, not the project's {common}", True
+    if name == "gitdir-outside-worktrees":
+        outside = s / "outside-gitdir"
+        shutil.copytree(p["gitdir"], outside)
+        (outside / "commondir").write_text(f"{common}\n")
+        (p["worktree"] / ".git").write_text(f"gitdir: {outside}\n")
+        return f"the worktree's Git directory {outside} is not in {common}/worktrees", True
+    return "no --project checkout was given", False
 
 
 def lifecycle_records(repo, manifest, base, harness, mode, env):
@@ -1775,6 +1811,20 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
             if not (built.returncode == 1 and "another hard link or is a symbolic link" in built.stderr
                     and f"{path} ({why})" in built.stderr and not profile.exists()):
                 failures.append(f"alias {alias}: expected the build to stop naming {path} ({why}), got exit {built.returncode}: {built.stderr}")
+        # A worktree whose repository is not the project's, or a build with no
+        # project to compare against, stops the build and publishes no
+        # profile; the same worktree put back builds again.
+        for repoint in LIFECYCLE_REPOINTS:
+            lay_out_lifecycle(p, "records", lc["originals"])
+            words, given = lifecycle_repoint(p, repoint)
+            profile = base / f"lifecycle-repoint-{repoint}.sb"
+            built = build_lifecycle(repo, lc, workers["vernant"], harness, profile, env, manifest, project=given)
+            if not (built.returncode == 1 and words in built.stderr and not profile.exists()):
+                failures.append(f"repoint {repoint}: expected the build to stop with {words!r} and no profile, got exit {built.returncode}: {built.stderr}")
+            lay_out_lifecycle(p, "records", lc["originals"])
+            built = build_lifecycle(repo, lc, workers["vernant"], harness, profile, env, manifest)
+            if built.returncode or not profile.exists():
+                failures.append(f"repoint {repoint}: the put-back worktree did not build: exit {built.returncode}: {built.stderr}")
         for case in LIFECYCLE_CASES:
             profile = profiles.get(LIFECYCLE_CASES[case][0])
             if profile:
@@ -1824,6 +1874,18 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
                 failures.append(f"alias {alias} without the alias check: {error}")
             if not profile.exists():
                 failures.append(f"alias {alias} without the alias check: no profile was built")
+        # Without the project check, each repointed worktree builds a profile.
+        for repoint in LIFECYCLE_REPOINTS:
+            lay_out_lifecycle(p, "records", lc["originals"])
+            _, given = lifecycle_repoint(p, repoint)
+            profile = base / f"lifecycle-repoint-{repoint}-without-check.sb"
+            try:
+                build_lifecycle(repo, lc, workers["vernant"], harness, profile, env, manifest, project=given,
+                                replaced={"project_repository": lambda project, common, gitdir: None})
+            except (OSError, ValueError, subprocess.CalledProcessError) as error:
+                failures.append(f"repoint {repoint} without the project check: {error}")
+            if not profile.exists():
+                failures.append(f"repoint {repoint} without the project check: no profile was built")
         return report, failures
     finally:
         for name in paths:

@@ -7634,7 +7634,7 @@ if [ "$KIND" != secondmate ]; then
       for confinement_home_state in "${FM_LOCAL_FIRSTMATE_STATES[@]:1}"; do
         confinement_args+=(--protect "${confinement_home_state%/state}")
       done
-      python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" --home "$FM_HOME" \
+      python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" --project "$PROJ_ABS" --home "$FM_HOME" \
         --config "$CONFIG" --projects "$PROJECTS" \
         --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" \
         --harness "$HARNESS" --profile "$WRITE_CONFINEMENT_PROFILE" \
