@@ -1740,10 +1740,16 @@ test_R8_a_failed_publish_leaves_the_record() {
 rr_signal_in_postcheck() { # <SIG>
   rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_postcheck() { kill -$1 \$\$; }"
 }
-rr_expect_signal_rollback() { # <id> <SIG> <rc>
+# A signal from inside the adoption check that the real post-publish check runs under "2> <snapshot>/adopt-err": the
+# trap must still print its outcome to the verb's own stderr, not into that snapshot file, which it then deletes.
+rr_signal_in_adopt_check() { # <SIG>
+  rr_wrap fm-slot-provision-lib.sh fm_slot_adopt_check
+  rr_shim fm-slot-provision-lib.sh "fm_slot_adopt_check() { local rc=0; real_fm_slot_adopt_check \"\$@\" || rc=\$?; [ \"\$RERECORD_STAGE\" != published ] || kill -$1 \$\$; return \$rc; }"
+}
+rr_expect_signal_rollback() { # <id> <SIG> <rc> [signal installer, default rr_signal_in_postcheck]
   local id=$1 out rc
   rr_make_f "$id"
-  rr_signal_in_postcheck "$2"
+  "${4:-rr_signal_in_postcheck}" "$2"
   if [ "${RR_SIGINT_DEFAULT:-0}" = 1 ]; then
     printf '#!/bin/sh\nexec perl -e %s /bin/bash %s "$@"\n' "'\$SIG{INT} = \"DEFAULT\"; exec @ARGV or die'" "'$RR_CONTROL'" > "$RR_DIR/sigint-default.sh"
     chmod +x "$RR_DIR/sigint-default.sh"
@@ -1790,6 +1796,7 @@ test_R9b_hup_in_published_rolls_back() { rr_expect_signal_rollback R9b HUP 129; 
 # neither trap nor be stopped by SIGINT, so R9c launches the verb through a wrapper that resets SIGINT to its default
 # before exec; the verb then sees SIGINT as an interactive operator's shell would deliver it.
 test_R9c_int_in_published_rolls_back() { RR_SIGINT_DEFAULT=1 rr_expect_signal_rollback R9c INT 130; }
+test_R9f_term_inside_the_adoption_check_redirect_rolls_back() { rr_expect_signal_rollback R9f TERM 143 rr_signal_in_adopt_check; }
 
 # rr_signal_run [match-line]: TERM sent by the mv stub to the verb while its publish mv (or, with a match line, the mv
 # whose source holds that line) is still to land; the stub waits for the verb to exit before its mv lands.
@@ -2580,6 +2587,7 @@ test_R9b_hup_in_published_rolls_back
 test_R9c_int_in_published_rolls_back
 test_R9d_term_while_the_publish_is_pending
 test_R9e_term_while_the_commit_rename_is_pending
+test_R9f_term_inside_the_adoption_check_redirect_rolls_back
 test_L22_term_during_a_step_3_restore_rename_names_the_kept_audit
 test_R10_an_unverified_archive_refuses
 test_R11_an_unreadable_audit_record_refuses_until_moved_aside
