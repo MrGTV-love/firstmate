@@ -128,7 +128,7 @@
 # is logged with its reason and recorded in the timing artifact.
 #
 # expected_gate_skip classes name why a family is allowed to skip: herdr (the
-# pinned real-Herdr lane), optional-binary (a backend whose binary is optional),
+# pinned real-Herdr lane), optional-binary (a backend or tool whose binary is optional, such as the real treehouse),
 # live-capability (a live-harness guard governed by fm_live_gate, which records
 # unavailable tools and explicit policy skips; see tests/lib.sh), or none.
 #
@@ -598,6 +598,10 @@ family_for_basename() {
     fm-backend-orca.test.sh)
       printf '%s\n' orca
       ;;
+    fm-spawn-real-treehouse.test.sh|fm-spawn-acquisition-real-treehouse.test.sh|\
+    fm-control-relaunch-real-treehouse.test.sh|fm-teardown-pool-real-treehouse.test.sh)
+      printf '%s\n' real-treehouse
+      ;;
     fm-branch-supervision.test.sh|fm-busy-adapter-wiring.test.sh|\
     fm-busy-state.test.sh|fm-classify-corr-token.test.sh|\
     fm-claude-stop-autoarm.test.sh|fm-cursor-harness.test.sh|\
@@ -627,6 +631,7 @@ expected_gate_skip_for_family() {
     live-harness-optin) printf '%s\n' live-capability ;;
     cmux|zellij|orca) printf '%s\n' optional-binary ;;
     snapshot-bearings) printf '%s\n' optional-binary ;;
+    real-treehouse) printf '%s\n' optional-binary ;;
     *) printf '%s\n' none ;;
   esac
 }
@@ -646,6 +651,7 @@ snapshot-bearings
 cmux
 zellij
 orca
+real-treehouse
 standalone
 unclassified
 EOF
@@ -947,6 +953,7 @@ tests/fm-contributions-read-saved.test.sh 2081
 tests/fm-contributions.test.sh 200949
 tests/fm-control-reassociate.test.sh 395783
 tests/fm-control-relaunch-backends.test.sh 681931
+tests/fm-control-relaunch-real-treehouse.test.sh 5000
 tests/fm-control-relaunch-recovery.test.sh 550782
 tests/fm-control-relaunch.test.sh 340032
 tests/fm-control.test.sh 186185
@@ -1152,6 +1159,7 @@ tests/fm-slack-intake-unchanged.test.sh 4517
 tests/fm-slack-secret-scan.test.sh 25525
 tests/fm-slack-watch.test.sh 696773
 tests/fm-spawn-acquisition-cleanup.test.sh 37389
+tests/fm-spawn-acquisition-real-treehouse.test.sh 15000
 tests/fm-spawn-claude-api-key-guard.test.sh 93245
 tests/fm-spawn-claude-start-confirm.test.sh 63776
 tests/fm-spawn-compact-adviser-disable-remote.test.sh 455824
@@ -1160,7 +1168,8 @@ tests/fm-spawn-dispatch-profile.test.sh 495961
 tests/fm-spawn-herdr-launch-shell.test.sh 12222
 tests/fm-spawn-model-pin.test.sh 42939
 tests/fm-spawn-orca-worktree.test.sh 3763
-tests/fm-spawn-pool-base-freshen.test.sh 114254
+tests/fm-spawn-pool-base-freshen.test.sh 57254
+tests/fm-spawn-real-treehouse.test.sh 57000
 tests/fm-spawn-retained-copy.test.sh 38842
 tests/fm-spawn-worktree-settle.test.sh 39374
 tests/fm-startup-growth-check.test.sh 9250
@@ -1184,6 +1193,7 @@ tests/fm-teamclaude-launch-live-e2e.test.sh 842
 tests/fm-teamclaude-launch.test.sh 13609
 tests/fm-teardown-cleanup.test.sh 1005601
 tests/fm-teardown-endpoint-safety.test.sh 89444
+tests/fm-teardown-pool-real-treehouse.test.sh 3000
 tests/fm-teardown-pool.test.sh 520244
 tests/fm-teardown.test.sh 321463
 tests/fm-test-fixture-cleanup.test.sh 4736
@@ -2198,6 +2208,7 @@ families_for_changed_path() {
     bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-teardown-nested-lib.sh|bin/fm-idle-session-reap.sh|bin/fm-review-diff.sh|\
     bin/fm-x-*|bin/fm-check*|bin/fm-pipeline-spend.sh)
       printf '%s\n' pr-forge
+      [ "$path" != bin/fm-teardown.sh ] || printf '%s\n' real-treehouse
       ;;
     bin/fm-task-docker-lib.sh)
       # The task-owned Docker ownership rules, sourced by bin/fm-teardown.sh
@@ -2219,6 +2230,7 @@ families_for_changed_path() {
       printf '%s\n' pr-forge
       printf '%s\n' session-bootstrap
       printf '%s\n' secondmate
+      printf '%s\n' real-treehouse
       ;;
     bin/fm-control-lib.sh)
       printf '%s\n' backend-dispatch
@@ -2248,6 +2260,7 @@ families_for_changed_path() {
     bin/fm-spawn.sh)
       printf '%s\n' backend-dispatch
       printf '%s\n' pure-contract-unit
+      printf '%s\n' real-treehouse
       printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
     bin/fm-send.sh|bin/fm-harness.sh|bin/fm-peek.sh|bin/fm-composer*)

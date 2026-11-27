@@ -804,7 +804,7 @@ test_partition_checks_judge_loss_and_duplication() {
 # The teardown groups partition one suite: every case a group file
 # defines is registered by that file, and no case is registered by two groups.
 test_teardown_groups_register_each_case_once() {
-  assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse
+  assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse fm-teardown-pool-real-treehouse
   pass "the teardown groups are a duplicate-free cover, each case registered by the file that defines it"
 }
 
@@ -3436,7 +3436,7 @@ test_aggregate_json
 # group file defines is registered by that file or run as a command from another
 # line of it (the omp adoption cases), and no case is registered by two groups.
 test_control_relaunch_groups_partition_one_inventory() {
-  assert_partition_exact control-relaunch array-nested control_relaunch_test_cases '' fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends fm-control-relaunch-adopt fm-control-relaunch-provision
+  assert_partition_exact control-relaunch array-nested control_relaunch_test_cases '' fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends fm-control-relaunch-adopt fm-control-relaunch-provision fm-control-relaunch-real-treehouse
   pass "the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it"
 }
 

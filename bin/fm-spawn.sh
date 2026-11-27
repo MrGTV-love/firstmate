@@ -580,6 +580,8 @@
 #   the pane later (teardown closes the worker's window, which is this pane) does not release or reset a passed-over
 #   copy: Treehouse never prunes or resets a leased worktree, an ordinary or a recovered lease (`treehouse capabilities`
 #   reports persistent_recovered_leases), even with no process inside, until `treehouse return <path>` releases it.
+#   Slot 124 was handed out while it carried a recovered lease, so these callers still never prune, reset or return a
+#   held slot, and spawn checks every copy it is handed (the pass-over).
 #   An abort after a pass-over, before launch, instead interrupts any `treehouse get` in the pane's foreground and
 #   proves from the process table that those processes are gone and that the pane rests in a copy this spawn passed
 #   over or leased in place; anything else (a get still alive, a pane resting in another copy, a foreground the

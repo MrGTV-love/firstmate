@@ -530,10 +530,10 @@ fm_task_copy_enclosing_pool_slot() {  # <project> <canonical-path>
 }
 
 # The lease holder Treehouse writes on every entry it rebuilds from a corrupt
-# or truncated state file. Treehouse 3.1.0 and later free such an entry on their
-# own, under the state lock of whichever pool command runs next (treehouse get
-# included), once the slot is idle, tracked-clean, and landed; an ordinary lease
-# is released only by treehouse return.
+# or truncated state file. Treehouse never frees a recovered lease by itself
+# (`treehouse return --all` skips it); it stays until it is returned by name or
+# acknowledged with `treehouse lease --recover`. An ordinary lease is released
+# only by treehouse return.
 FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or truncated; verify before reuse'
 
 # Whether Treehouse's own pool state durably holds pool slot <slot>, so that
@@ -541,7 +541,10 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # file records as not leased (`treehouse get --help`: a leased worktree is never
 # handed out by a later get until treehouse return releases it); a live owner
 # process, dirt, or an unmerged HEAD also make a get skip a slot, but each of
-# those can change before the get runs, so none of them counts here. Every
+# those can change before the get runs, so none of them counts here. Slot 124
+# was handed out while it carried a recovered lease, so these callers still
+# never prune, reset or return a held slot, and spawn checks every copy it is
+# handed (the pass-over). Every
 # entry naming <slot>'s directory, however its path is spelled, must be leased:
 # an ordinary lease holds; a
 # recovered lease (FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER) holds only when
@@ -685,7 +688,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   fi
   if [ "$has_recovered" = 1 ]; then
     FM_TASK_COPY_SLOT_STATE=recovered
-    FM_TASK_COPY_SLOT_REASON="is not a Firstmate home and carries Treehouse's recovered-state lease in $state, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed"
+    FM_TASK_COPY_SLOT_REASON="is not a Firstmate home and carries Treehouse's recovered-state lease in $state, which Treehouse never frees by itself (treehouse return --all skips it): it stays until it is returned by name or acknowledged with treehouse lease --recover"
     return 1
   fi
   if [ "$matched" -gt 0 ]; then
@@ -973,8 +976,11 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
 # nor is an unleased slot in a superseded pool folder
 # (fm_task_copy_slot_in_current_pool), which is judged again at each call, and a
 # slot a task merely left is not a record's current copy, so none of them
-# stops the allocation. A uniquely recorded unleased slot names the treehouse
-# lease command that holds it in place without touching it; teardown's
+# stops the allocation. Slot 124 was handed out while it carried a recovered
+# lease, so these callers still never prune, reset or return a held slot, and
+# spawn checks every copy it is handed (the pass-over). A uniquely recorded
+# unleased slot names the treehouse lease command that holds it in place
+# without touching it; teardown's
 # treehouse return releases that lease with the slot. Conflicting records
 # instead need inspection and repair: lease selects only the first matching
 # name, so it cannot reliably clear that refusal. No other refusal names a

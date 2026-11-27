@@ -1022,6 +1022,20 @@ SH
   done
 }
 
+# real_treehouse_ready: the installed treehouse has `lease --path` and `get --lease`, and jq is installed, which every
+# case that drives the real treehouse binary on a scratch pool needs.
+real_treehouse_ready() {
+  local th
+  th=$(command -v treehouse 2>/dev/null) && command -v jq >/dev/null 2>&1 \
+    && "$th" lease --help 2>&1 | grep -Eq -- '--path' && "$th" get --help 2>&1 | grep -q -- '--lease'
+}
+
+# fm_test_require_real_treehouse: the gate of a script whose every case drives the real treehouse. With none here it
+# prints the runner's gate-skip line as the script's first output and exits 0, so bin/fm-test-run.sh counts it skipped.
+fm_test_require_real_treehouse() {
+  real_treehouse_ready || { echo 'skip: no Treehouse with lease --path and get --lease on this host'; exit 0; }
+}
+
 # fm_fake_docker <fakebin>
 # Drops a `docker` stub that answers the read/remove subset bin/fm-task-docker-lib.sh
 # uses (ps, rm, network ls/rm, volume ls/rm) from a flat fixture store, and that
