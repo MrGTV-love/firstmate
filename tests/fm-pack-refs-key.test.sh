@@ -217,7 +217,11 @@ test_object_gc_stays_available_with_the_key() {
   read -r home clone wt origin pusher <<EOF
 $fx
 EOF
+  # Lower the loose-object trigger of both object tasks git's default automatic
+  # maintenance may run: gc, and geometric-repack, whose default rose from 100 to
+  # 6700 in git 2.56.
   git -C "$clone" config gc.auto 100
+  git -C "$clone" config maintenance.geometric-repack.auto 100
   i=1
   while { [ "$i" -le 600 ] || [ ! -d "$clone/.git/objects/17" ]; } && [ "$i" -lt 4000 ]; do
     printf 'obj %s\n' "$i" | git -C "$clone" hash-object -w --stdin >/dev/null
