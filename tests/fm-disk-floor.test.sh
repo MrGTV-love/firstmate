@@ -326,6 +326,7 @@ test_the_stack_start_refuses_below_and_admits_above() {
   assert_absent "$marker" "a deferred stack start still ran its command"
   [ -n "$(guard_events "$case_dir" deny)" ] || fail "the stack refusal wrote no deny guard event"
   rc=0
+  # shellcheck disable=SC2016
   out=$(cd "$case_dir" && FM_HOME="$case_dir/home" FM_FAKE_DF_AVAIL_KB="$(kb 20)" "$STACK" -- bash -c 'touch "$1"; exit 7' _ "$marker" 2>&1) || rc=$?
   expect_code 7 "$rc" "the stack command's own exit status was not passed through: $out"
   assert_present "$marker" "an admitted stack start did not run its command"
