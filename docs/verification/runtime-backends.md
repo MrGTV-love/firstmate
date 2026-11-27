@@ -166,6 +166,7 @@ The relaunch suite emitted two non-fatal BSD `sed` diagnostics in its Pi-session
 ## Task Git hook carrier in the worker tool shell
 
 A harness joins `GIT_HOOKS_CONFIG_HARNESSES` in [`bin/fm-spawn.sh`](../../bin/fm-spawn.sh), and so runs the config carrier, only after `tests/fm-git-hook-carrier-live-e2e.test.sh` passes for it on that carrier.
+dsh is the one exception: it runs the config carrier outside that list, with no live proof yet, because it cannot use the legacy carrier at all; the [launch contract](../configuration.md#commit-attribution) owns the reason.
 The guard replays the launch text `fm-spawn.sh` stages in a private tmux pane with the installed harness first on PATH; a private scripted provider on loopback (Anthropic Messages for Claude, OpenAI Responses for omp and codex) makes the harness run one shell tool call that commits and pushes in the task worktree.
 It checks each installed harness it can drive on the carrier `fm-spawn.sh` selects for it, and reads HEAD, the bare remote's refs, the commit body and git's `GIT_TRACE`, never the hooks' own status.
 Its control launches the same text through a fixture wrapper that removes the carrier's variables at the harness boundary, and must see the credential commit and the AI trailer land.
