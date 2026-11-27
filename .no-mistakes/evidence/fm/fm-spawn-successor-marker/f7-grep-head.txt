@@ -1,0 +1,13 @@
+$ git diff d25e907c1..HEAD -- bin/ | grep -E '^[+-].*(worktree-supersedence|CODEX_HOOK_STATE_DIR)'
+exit=1 (1 = this change adds or removes no such line)
+
+$ git grep -cE ... at base d25e907c1 and at head (pre-existing manifest-store reads only, unchanged counts)
+d25e907c1:bin/fm-slot-manifest-retire.py:1
+d25e907c1:bin/fm-slot-provision-lib.sh:2
+d25e907c1:bin/fm-teardown.sh:1
+HEAD:bin/fm-slot-manifest-retire.py:1
+HEAD:bin/fm-slot-provision-lib.sh:2
+HEAD:bin/fm-teardown.sh:1
+
+$ git grep -n worktree-supersedence HEAD -- bin/
+exit=1 (1 = firstmate never names the marker dir)

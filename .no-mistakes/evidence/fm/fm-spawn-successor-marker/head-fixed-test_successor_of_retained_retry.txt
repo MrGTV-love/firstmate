@@ -1,0 +1,1 @@
+ok - a refused declaration is kept and retried with --supersedes; an admitted successor relaunches ordinarily

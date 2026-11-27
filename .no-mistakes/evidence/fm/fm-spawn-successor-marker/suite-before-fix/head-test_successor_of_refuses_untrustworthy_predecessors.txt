@@ -1,0 +1,1 @@
+ok - --successor-of refuses every untrustworthy predecessor before any resource is used and admits a helper that lists --supersedes alone

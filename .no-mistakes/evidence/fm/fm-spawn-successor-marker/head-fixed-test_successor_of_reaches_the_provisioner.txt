@@ -1,0 +1,1 @@
+ok - --successor-of hands one resolved --supersedes to the provisioner and records successor_of; no flag changes nothing

@@ -1,0 +1,1 @@
+ok - a fresh spawn that does not name a kept successor declaration refuses and points to --relaunch

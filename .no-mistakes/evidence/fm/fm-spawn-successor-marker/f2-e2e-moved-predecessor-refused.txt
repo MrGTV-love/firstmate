@@ -1,0 +1,41 @@
+== predecessor copy moved to fm/e2e-pred-moved-44283-elsewhere
+== vernant sha: 8deb75e115b12460f5f081f5658ed7310d85cf9e (origin/main 8deb75e115b12460f5f081f5658ed7310d85cf9e)
+== provisioner --help lists --supersedes: 2
+== fm-spawn.sh e2e-succ-moved-44283 /private/tmp/fm-e2e.tjW3Sj/moved/project --mode local-only --yolo off --owned-path README.md --successor-of e2e-pred-moved-44283
+error: --successor-of e2e-pred-moved-44283 copy /private/tmp/fm-e2e.tjW3Sj/moved/pred is on fm/e2e-pred-moved-44283-elsewhere, not its recorded branch fm/e2e-pred-moved-44283
+== spawn exit: 1
+== home state/data unchanged by the spawn
+== successor copy HEAD still base: yes
+== lifecycle store entries: 0
+== task record successor_of: (none)
+== task record slot_manifest: (none)
+== successor copy branch: 
+== markers in $CODEX_HOOK_STATE_DIR/worktree-supersedence:
+(none)
+== carried predecessor 5bad202b3e48fada6a05b4dab55747c4828c09ac onto  (tip 5bad202b3e48fada6a05b4dab55747c4828c09ac)
+  `8deb75e1` and are not this task's own: an unrecorded ref reaches
+  them too (for example `refs/heads/fm/e2e-pred-moved-44283`). GitHub diffs a PR from its merge base with main,
+  so these commits would show in the PR as if they were YOUR work. This is
+  the PR #61 (2026-05-03) contamination pattern (a branch cut from a stale
+  LOCAL main). RCA: `docs/reviews/pr-61-contamination-rca-2026-05-03.md`
+
+  Foreign commits (newest first):
+    5bad202b3 predecessor work
+
+**How to proceed:**
+  Move only your own commits onto current `origin/main`:
+    git fetch origin
+    git rebase --onto origin/main 5bad202b3e48 
+  (When your commits are not all on top of the foreign ones, cut a fresh
+   branch from `origin/main` and cherry-pick only your own commits.)
+  If these commits ARE yours and a second ref of yours (a backup branch)
+  is what reaches them, that ref is why they read as foreign.
+
+  Single-session escape (use sparingly): set
+  `CLAUDE_ALLOW_STALE_BASE=1` in your environment for this push.
+
+  Preservation-only push (no PR intended): push a non-branch ref
+  instead — e.g. `git push origin <sha>:refs/preserve/<name>` — which
+  this gate does not block, because a non-branch ref cannot become a
+  PR and so cannot reproduce the contamination pattern.
+== R-13 exit: 1

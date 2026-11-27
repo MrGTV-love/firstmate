@@ -1,0 +1,1 @@
+ok - a predecessor that leaves its recorded branch after preflight is refused before the provisioner and mints nothing

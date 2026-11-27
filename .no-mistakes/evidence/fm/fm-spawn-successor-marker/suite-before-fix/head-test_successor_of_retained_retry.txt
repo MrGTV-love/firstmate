@@ -1,0 +1,5 @@
+not ok - the relaunch of an admitted successor failed: warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.VnFjGb/succ-retry-1-55073/home/data/succ-retry-1-55073/launch-brief.md records no ship branch; defaulting to legacy branch fm/succ-retry-1-55073
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.VnFjGb/succ-retry-1-55073/home/data/succ-retry-1-55073/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: succ-retry-1-55073 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: slot adoption refused: repo_root_missing: the manifest names no repository root; no manifest, scope, record or copy was changed
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.VnFjGb/succ-retry-1-55073/pool and endpoint firstmate:fm-succ-retry-1-55073 retained; no worker admitted: expected exit 0, got 1

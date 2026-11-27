@@ -1,0 +1,4 @@
+real default Vernant state dir: /tmp/vernant-codex-hooks-501
+files naming the e2e tasks (expect none):
+(none)
+real Vernant worktrees naming fm-e2e: 0

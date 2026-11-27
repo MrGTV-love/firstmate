@@ -1,47 +1,57 @@
-# Live validation: fm-spawn --successor-of (head e2b25eab5)
+# Test-phase evidence: fm-spawn --successor-of (target fd80ebc90, base d25e907c1)
 
-Lab: a marked fm-lab home (`bin/fm-lab-home.sh env`), a real tmux server on the
-lab's private socket (`tmux -L fm-lab`), a real treehouse pool under a lab
-`TREEHOUSE_ROOT`, and a lab clone of Vernant whose origin is a lab bare repo
-holding Vernant main `06a1855330d36d23d236f4ee2a62710b04ed4bae` (PR 3607, the
-landed `--supersedes` verb). The provisioner and the R-13 hook are Vernant's
-REAL scripts at that commit, run with the Vernant venv, with
-`CODEX_HOOK_STATE_DIR` and `WORKTREE_LIFECYCLE_STORE_DIR` pointed into the lab.
-The worker agent is an inert raw launch command (`sleep 86400`); this change
-never touches the agent path. Every spawn ran from a shell inside the lab
-tmux server. The lab was torn down after the run; `~/.treehouse` is unchanged
-(treehouse-before.txt / treehouse-after.txt).
+## Live end to end (real bin/fm-spawn.sh + REAL Vernant provision_existing_slot.py + REAL R-13 hook)
+Vernant: a throwaway clone of the local Vernant main at 8deb75e11 (contains the landed --supersedes verb, added in 06a185533).
+Temp bare origin, temp CODEX_HOOK_STATE_DIR and WORKTREE_LIFECYCLE_STORE_DIR, disposable .venv with pydantic.
+Backend (tmux, treehouse, agent) is the suite's fakebin stub. Round-1 driver: replaced in round 2 (see below).
+- f6-e2e-with-flag.txt: spawn with --successor-of exits 0; the record holds successor_of=; Vernant's own writer put a
+  schema 1.1.0 marker (carry_status resolved) in the temp worktree-supersedence dir; after carrying the predecessor
+  commit, the real R-13 pre-push hook exits 0 (local origin/main fallback, since the temp origin is not GitHub).
+- f6-e2e-without-flag-control.txt: same spawn without the flag: no successor_of, no marker, R-13 exits 1 (foreign commit).
+- f2-e2e-moved-predecessor-refused.txt: predecessor copy left its recorded branch: spawn exits 1 with the branch error;
+  home state/data unchanged, pool copy unmoved, lifecycle store empty, no marker.
+- f2-e2e-primary-without-verb-refused.txt: primary checkout at 06a185533^ (no verb): spawn exits 1 naming the primary
+  checkout and the Vernant verb; nothing changed, no marker. (Its "origin/main" label prints the reset primary sha.)
+- l1-real-state-untouched.txt: the real default Vernant state dir has no e2e record; no real Vernant worktree added.
 
-Helpers: lab-lib.sh (spawn/relaunch/refusal/snapshot), lab-run.sh, r13.sh,
-steps/*.sh (the exact commands of later steps). Snapshots exclude
-state/guard-events.jsonl and state/.guard-watcher-stale-banner, the two entry
-telemetry files every fm-spawn call touches before its own checks (the lab
-runs no watcher).
+## Suite (stubbed provisioner, real fm-spawn.sh)
+- suite-before-fix/: the 11 test_successor_of_* rows on target: 10 pass, test_successor_of_retained_retry fails.
+  Cause: the merge of origin/main brought #427 (342ac52b2), so a relaunch of an admitted governed task now adopts its
+  recorded manifest instead of calling the provisioner; the fixture manifest had no repo_root, so adoption refused.
+- test-fix.diff: fixture manifest gains repo_root; the tail rows now assert the base behaviour: the admitted successor
+  relaunch adopts (no new provisioner call, so no --supersedes, successor_of kept once) and a manifest that disagrees
+  refuses as for any task (slot adoption refused: branch_mismatch, no provisioner call).
+- head-fixed-*.txt: all 11 rows pass with the fix.
 
-| File | What it shows |
-|---|---|
-| 01-pred1-spawn.txt | real predecessor spawn, no flag (real pool, tmux, Vernant PASS) |
-| 02-pred1-commit.txt | predecessor carries one commit 3f1c0151d |
-| 03-advertise-refusal.txt | primary checkout at pre-verb 1cf0e36: refusal names the checkout and says to update it; nothing changed |
-| 04-pred2-spawn.txt | primary fast-forwarded to 06a185533; second predecessor |
-| 05-predecessor-refusals.txt | unsafe id, itself, no record, other branch, detached HEAD: refused, nothing changed. Its last row was a quoting slip on my side (copy not removed), so the spawn found a LIVE predecessor and was admitted: labsucc2, successor_of=labpred2, marker written by Vernant |
-| 06-gone-refusal.txt | predecessor copy removed: refused, nothing changed |
-| 07-scope-refusals.txt | --scout, --secondmate, --relaunch, id=repo batch, flag twice: refused, nothing changed |
-| 08-positive-successor.txt, 08-marker-labsucc1.json | labsucc1 --successor-of labpred1 admitted; successor_of=labpred1; Vernant marker (unmerged_count 1) |
-| 09-control-no-flag.txt | labsucc0 without the flag: no successor_of, no marker |
-| 10-r13.txt | real R-13: labsucc1 carrying 3f1c0151d accepts (exit 0); labsucc0 carrying it blocks (exit 1) |
-| 11-provisioner-refusal.txt | real Vernant refusal (supersedes_state_dir_refused): recovery=slot-provision-refused plus successor_of kept, no agent, task stays Queued |
-| 12-respawn-drop-guard.txt | window closed; fresh spawn without the flag, or naming another predecessor, refuses and points to --relaunch; record byte-identical |
-| 13-relaunch-retry.txt / 13a | on tmux with the window gone, --relaunch refuses (pre-existing proven-gone tmux endpoint policy) |
-| 14-same-flag-respawn.txt | fresh spawn naming the SAME predecessor recovers it: admitted on the same copy, successor_of kept, marker re-recorded (Vernant keys markers by predecessor path, so it replaced labsucc1's) |
-| 15..17 | labsucc4: refused (window kept); --relaunch with the predecessor detached refuses naming it and keeps the record; --relaunch while Vernant still refuses carries --supersedes (supersedes-only reason); --relaunch after the fix is admitted and Vernant writes the marker owner=labsucc4 |
-| 18-later-relaunch-and-r13.txt | later relaunch of admitted labsucc4 with the predecessor detached reaches the provisioner (no successor checks, marker unchanged); Vernant refuses manifest_exists. Its R-13 block is from my earlier rows leaving other branches on the commit |
-| 19-control-relaunch-no-successor.txt | the same manifest_exists refusal for a NON-successor relaunch: Vernant behaviour, same for any task |
-| 20-r13-retried-successor.txt | after resetting those extra branches, real R-13 accepts labsucc4 (exit 0) |
-| 21-successor-suite.txt | the ten test_successor_of_* rows of tests/fm-spawn-pool-base-freshen.test.sh (stub provisioner; not live) |
-| final-state/ | task records, markers and backlog before teardown |
+## Notes
+- Vernant sha: 8deb75e11 is an ancestor of the local Vernant checkout's recorded origin/main (c9a3a86f8; 0 commits in
+  main not in origin/main, 11 the other way), and 06a185533 (the verb) is an ancestor of it. So the run used a landed
+  Vernant main commit that carries the verb, not the newest origin/main tip. The Vernant checkout was not fetched.
+- R-13 ran on its documented fallback path (local origin/main plus base-equality), because the temp origin is not the
+  canonical GitHub URL. The canonical-remote proof path was not driven.
+- No real tmux or treehouse backend was driven; spawn ran with the suite's fakebin and FM_SPAWN_NO_GUARD=1.
+- The round-1 driver could not be rerun (it sourced a defs.sh and /tmp/fm-e2e-path, deleted at teardown). Round 2
+  overwrote f6-e2e-driver.sh with a self-contained driver; it produced only the round-2 f6 files below.
 
-Named limits (not driven live): the handover window (the pane runner can wait
-up to SPAWN_ACQUIRE_STALL=600 s before the provisioner reads the branch); the
-copy-base case (the advertise probe reads the primary checkout's script; a copy
-whose base lacks the verb makes the provisioner refuse on every retry).
+## Test round 2 (target f5c2c5563; product code identical to fd80ebc90, only the test file changed)
+- successor-suite-head.txt: the 11 test_successor_of_* rows plus 4 no-flag governed spawn rows
+  (test_freshness_introduces_slot_owner, test_freshness_absent_slot_owner_launches, test_local_only_source_binding,
+  test_legacy_relaunch_scope_adoption) all pass at f5c2c5563. Provisioner and tmux/treehouse are stubs there.
+- f6-e2e-head-f5c2c55.txt: real fm-spawn.sh + REAL Vernant provision_existing_slot.py + REAL R-13, Vernant pinned at
+  c9a3a86f8 (the local Vernant checkout's recorded origin/main; not fetched; the verb landed in 06a185533, an ancestor).
+  Control spawn without the flag: no marker, R-13 exit 1 listing the 2 predecessor commits as foreign.
+  Successor spawn with --successor-of: successor_of= recorded, Vernant's writer put a schema 1.1.0 marker
+  (carry_status resolved, predecessor_branch fm/<pred>, superseded_by_branch fm/<succ>) in the temp state dir;
+  after a same-sha carry, R-13 exit 0 with no foreign commits.
+  R-13 ran its PROVEN-remote path this time: harness change, CANONICAL_ORIGIN_URLS pointed at the temp origin URL
+  (as Vernant's own _successor_decision test does); bypass env unset. All Vernant state stayed under the temp case dir.
+- f6-e2e-unrelated-lane-not-laundered.txt: first attempt, where the control branch still held the same predecessor
+  commits. R-13 kept blocking the successor and named the control branch as the foreign holder: the marker does not
+  launder an unrelated lane. The driver then drops the control lane before the successor check.
+- f6-e2e-driver.sh was rewritten in round 2 (the round-1 driver it replaced could not be rerun, as noted above).
+  Python came from the operator Vernant checkout's .venv with PYTHONDONTWRITEBYTECODE=1. After the run: no file under
+  that .venv is newer than successor-suite-head.txt, the checkout has no new worktree and no fm/f6* ref.
+- f7-grep-head.txt: the change adds no line naming worktree-supersedence or CODEX_HOOK_STATE_DIR under bin/; the
+  CODEX_HOOK_STATE_DIR reads that exist are pre-existing manifest-store reads, same count at base and head.
+- /tmp/vernant-codex-hooks-501 (the real default Vernant state dir) is unchanged: last modified Nov 26, no
+  worktree-supersedence directory.

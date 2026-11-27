@@ -1,0 +1,1 @@
+ok - --successor-of refuses scouts, secondmates, relaunches and a second predecessor, changing nothing

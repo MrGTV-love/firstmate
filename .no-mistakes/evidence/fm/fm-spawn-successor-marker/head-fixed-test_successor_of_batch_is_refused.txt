@@ -1,0 +1,1 @@
+ok - an id=repo batch refuses --successor-of instead of dropping it

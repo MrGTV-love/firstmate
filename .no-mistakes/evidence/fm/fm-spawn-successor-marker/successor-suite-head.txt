@@ -1,5 +1,6 @@
+f5c2c5563d92be5fde4dee09622a7f581bcc7e5f
 ok - --successor-of hands one resolved --supersedes to the provisioner and records successor_of; no flag changes nothing
-ok - --successor-of refuses every untrustworthy predecessor before any resource is used
+ok - --successor-of refuses every untrustworthy predecessor before any resource is used and admits a helper that lists --supersedes alone
 ok - --successor-of refuses scouts, secondmates, relaunches and a second predecessor, changing nothing
 ok - a refused declaration is kept and retried with --supersedes; an admitted successor relaunches ordinarily
 ok - removing the predecessor-branch check or the advertise check makes its refusal row stop refusing
@@ -9,3 +10,29 @@ ok - an id=repo batch refuses --successor-of instead of dropping it
 ok - a refused declaration leaves a pre-existing stale lock and every state file untouched
 ok - a fresh spawn that does not name a kept successor declaration refuses and points to --relaunch
 ok - with the window gone, the printed same-flag respawn recovers and --relaunch refuses
+case=introduced kind=ship task=pool-owner-introduced-ship-1795781876-99657 root=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-introduced-ship-1795781876-99657 before=a93081f705c121ab0c9e68da9ae48e92fd7b75ee advanced=9edad149e5efffe50eb1b189a410a2d2e509c65c temp=/tmp/fm-pool-owner-introduced-ship-1795781876-99657 staging=/tmp/fm-pool-owner-introduced-ship-1795781876-99657+5ed467b0ca1bd6b496646cdb2fdeb2b401932c7c15dd52a4baaa873216a0bbd4
+spawn_exit=1 after=9edad149e5efffe50eb1b189a410a2d2e509c65c
+warning: task pool-owner-introduced-ship-1795781876-99657: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-introduced-ship-1795781876-99657/home/data/pool-owner-introduced-ship-1795781876-99657/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-introduced-ship-1795781876-99657/home/data/pool-owner-introduced-ship-1795781876-99657/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-introduced-ship-1795781876-99657
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-introduced-ship-1795781876-99657/home/data/pool-owner-introduced-ship-1795781876-99657/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-introduced-ship-1795781876-99657 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@a93081f705c121ab0c9e68da9ae48e92fd7b75ee origin=main@9edad149e5efffe50eb1b189a410a2d2e509c65c selected=origin/main@9edad149e5efffe50eb1b189a410a2d2e509c65c
+{"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}
+error: slot provisioner refused task pool-owner-introduced-ship-1795781876-99657 (exit 2); no agent or ship transition admitted; the copy is left exactly where it is (refs/heads/fm/pool-owner-introduced-ship-1795781876-99657 at 9edad149e5efffe50eb1b189a410a2d2e509c65c); report: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-introduced-ship-1795781876-99657/home/data/pool-owner-introduced-ship-1795781876-99657/slot-provision-spawn.85193.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-introduced-ship-1795781876-99657/pool and endpoint firstmate:fm-pool-owner-introduced-ship-1795781876-99657 retained; no worker admitted
+ok - final revision governance: introduced ship
+case=absent kind=ship task=pool-owner-absent-ship-1795781889-99657 root=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-absent-ship-1795781889-99657 before=b65a6d3bc0d93fe01c3c2e341a5bccb0ed22f308 advanced=771348f76cbdbd6bc72fe43440b33edf163f6e88 temp=/tmp/fm-pool-owner-absent-ship-1795781889-99657 staging=/tmp/fm-pool-owner-absent-ship-1795781889-99657+d378632addaffc641001c6c161b8cfd41e8872d55e7b2f42263a7dba784277f1
+spawn_exit=0 after=771348f76cbdbd6bc72fe43440b33edf163f6e88
+warning: task pool-owner-absent-ship-1795781889-99657: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-absent-ship-1795781889-99657/home/data/pool-owner-absent-ship-1795781889-99657/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-absent-ship-1795781889-99657/home/data/pool-owner-absent-ship-1795781889-99657/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-absent-ship-1795781889-99657
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-absent-ship-1795781889-99657/home/data/pool-owner-absent-ship-1795781889-99657/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-absent-ship-1795781889-99657 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@b65a6d3bc0d93fe01c3c2e341a5bccb0ed22f308 origin=main@771348f76cbdbd6bc72fe43440b33edf163f6e88 selected=origin/main@771348f76cbdbd6bc72fe43440b33edf163f6e88
+skill selection for pool-owner-absent-ship-1795781889-99657: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned pool-owner-absent-ship-1795781889-99657 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-pool-owner-absent-ship-1795781889-99657 worktree=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.hElTb0/pool-owner-absent-ship-1795781889-99657/pool
+ok - final revision governance: absent ship
+ok - qualified local source is bound to provisioner arguments, refusal metadata and relaunch
+ok - legacy relaunch refuses inferred scope, retains refused explicit scope, adopts it, and never overrides it
+bash tests/fm-spawn-pool-base-freshen.test.sh   test_successor_of_scope        49.81s user 88.40s system 39% cpu 5:45.88 total
+exit=0

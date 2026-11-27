@@ -1,0 +1,41 @@
+== primary checkout reset to 1cf0e36bb docs(product-definition): full rule-7 START-HERE steward refresh (#3601)
+== vernant sha: 1cf0e36bbbb1537c166c2809cda9f60b9f5a826c (origin/main 1cf0e36bbbb1537c166c2809cda9f60b9f5a826c)
+== provisioner --help lists --supersedes: 0
+== fm-spawn.sh e2e-succ-noverb-97788 /private/tmp/fm-e2e.tjW3Sj/noverb/project --mode local-only --yolo off --owned-path README.md --successor-of e2e-pred-noverb-97788
+error: --successor-of needs the project's primary checkout /private/tmp/fm-e2e.tjW3Sj/noverb/project to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; update that checkout, since the successor record needs the Vernant verb
+== spawn exit: 1
+== home state/data unchanged by the spawn
+== successor copy HEAD still base: yes
+== lifecycle store entries: 0
+== task record successor_of: (none)
+== task record slot_manifest: (none)
+== successor copy branch: 
+== markers in $CODEX_HOOK_STATE_DIR/worktree-supersedence:
+(none)
+== carried predecessor 37357a8fd4c45c243e3143c82baace3d87cc8e5e onto  (tip 37357a8fd4c45c243e3143c82baace3d87cc8e5e)
+  `8deb75e1` and are not this task's own: an unrecorded ref reaches
+  them too (for example `refs/heads/fm/e2e-pred-noverb-97788`). GitHub diffs a PR from its merge base with main,
+  so these commits would show in the PR as if they were YOUR work. This is
+  the PR #61 (2026-05-03) contamination pattern (a branch cut from a stale
+  LOCAL main). RCA: `docs/reviews/pr-61-contamination-rca-2026-05-03.md`
+
+  Foreign commits (newest first):
+    37357a8fd predecessor work
+
+**How to proceed:**
+  Move only your own commits onto current `origin/main`:
+    git fetch origin
+    git rebase --onto origin/main 37357a8fd4c4 
+  (When your commits are not all on top of the foreign ones, cut a fresh
+   branch from `origin/main` and cherry-pick only your own commits.)
+  If these commits ARE yours and a second ref of yours (a backup branch)
+  is what reaches them, that ref is why they read as foreign.
+
+  Single-session escape (use sparingly): set
+  `CLAUDE_ALLOW_STALE_BASE=1` in your environment for this push.
+
+  Preservation-only push (no PR intended): push a non-branch ref
+  instead — e.g. `git push origin <sha>:refs/preserve/<name>` — which
+  this gate does not block, because a non-branch ref cannot become a
+  PR and so cannot reproduce the contamination pattern.
+== R-13 exit: 1

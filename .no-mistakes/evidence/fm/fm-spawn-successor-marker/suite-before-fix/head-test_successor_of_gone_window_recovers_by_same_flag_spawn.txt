@@ -1,0 +1,1 @@
+ok - with the window gone, the printed same-flag respawn recovers and --relaunch refuses

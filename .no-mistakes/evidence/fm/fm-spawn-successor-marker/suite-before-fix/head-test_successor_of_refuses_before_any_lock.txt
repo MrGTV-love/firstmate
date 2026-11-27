@@ -1,0 +1,1 @@
+ok - a refused declaration leaves a pre-existing stale lock and every state file untouched

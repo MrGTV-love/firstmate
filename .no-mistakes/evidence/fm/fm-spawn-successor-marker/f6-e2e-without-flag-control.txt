@@ -1,0 +1,51 @@
+== vernant sha: 8deb75e115b12460f5f081f5658ed7310d85cf9e (origin/main 8deb75e115b12460f5f081f5658ed7310d85cf9e)
+== provisioner --help lists --supersedes: 2
+== fm-spawn.sh e2e-succ-noflag-91397 /private/tmp/fm-e2e.tjW3Sj/noflag/project --mode local-only --yolo off --owned-path README.md 
+local-only source: local=main@8deb75e115b12460f5f081f5658ed7310d85cf9e origin=main@8deb75e115b12460f5f081f5658ed7310d85cf9e selected=origin/main@8deb75e115b12460f5f081f5658ed7310d85cf9e
+{
+  "base_sha": "8deb75e115b12460f5f081f5658ed7310d85cf9e",
+  "branch": "fm/e2e-succ-noflag-91397",
+  "manifest_path": "/private/tmp/fm-e2e.tjW3Sj/noflag/lifecycle/f6c7974eb62e5f98.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "e2e-succ-noflag-91397",
+  "state": "PASS",
+  "worktree_path": "/private/tmp/fm-e2e.tjW3Sj/noflag/pool"
+}
+skill selection for e2e-succ-noflag-91397: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned e2e-succ-noflag-91397 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-e2e-succ-noflag-91397 worktree=/private/tmp/fm-e2e.tjW3Sj/noflag/pool
+== spawn exit: 0
+== task record successor_of: (none)
+== task record slot_manifest: slot_manifest=/private/tmp/fm-e2e.tjW3Sj/noflag/lifecycle/f6c7974eb62e5f98.json
+== successor copy branch: fm/e2e-succ-noflag-91397
+== markers in $CODEX_HOOK_STATE_DIR/worktree-supersedence:
+(none)
+== carried predecessor 21b3dcbcb4bc0564deaf4d41536491ac18520cbd onto fm/e2e-succ-noflag-91397 (tip 21b3dcbcb4bc0564deaf4d41536491ac18520cbd)
+  `8deb75e1` and are not this task's own: an unrecorded ref reaches
+  them too (for example `refs/heads/fm/e2e-pred-noflag-91397`). GitHub diffs a PR from its merge base with main,
+  so these commits would show in the PR as if they were YOUR work. This is
+  the PR #61 (2026-05-03) contamination pattern (a branch cut from a stale
+  LOCAL main). RCA: `docs/reviews/pr-61-contamination-rca-2026-05-03.md`
+
+  Foreign commits (newest first):
+    21b3dcbcb predecessor work
+
+**How to proceed:**
+  Move only your own commits onto current `origin/main`:
+    git fetch origin
+    git rebase --onto origin/main 21b3dcbcb4bc fm/e2e-succ-noflag-91397
+  (When your commits are not all on top of the foreign ones, cut a fresh
+   branch from `origin/main` and cherry-pick only your own commits.)
+  If these commits ARE yours and a second ref of yours (a backup branch)
+  is what reaches them, that ref is why they read as foreign.
+
+  Single-session escape (use sparingly): set
+  `CLAUDE_ALLOW_STALE_BASE=1` in your environment for this push.
+
+  Preservation-only push (no PR intended): push a non-branch ref
+  instead — e.g. `git push origin <sha>:refs/preserve/<name>` — which
+  this gate does not block, because a non-branch ref cannot become a
+  PR and so cannot reproduce the contamination pattern.
+== R-13 exit: 1

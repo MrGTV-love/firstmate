@@ -1,0 +1,152 @@
+
+=== temp origin + project from pinned Vernant c9a3a86f816dbc2d221c64ddd46efc106f8917de (objects borrowed read-only)
+project HEAD=c9a3a86f816dbc2d221c64ddd46efc106f8917de status=[]
+
+=== advertise probe by hand (stderr visible), same form as fm_slot_advertises_supersedes
+5:                                  [--supersedes SUPERSEDES]
+32:  --supersedes SUPERSEDES
+
+=== live predecessor task copy with two commits, pushed
+predecessor commits to carry:
+cb97ed17717cdac1efe21f5210da77a897cd2692
+d2c76f7aa0ea306f3c9d4acbc7d4fedbf1d200e2
+
+=== CONTROL: spawn WITHOUT --successor-of
+warning: task f6ctrl-28753: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/home/data/f6ctrl-28753/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/home/data/f6ctrl-28753/launch-brief.md records no ship branch; defaulting to legacy branch fm/f6ctrl-28753
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/home/data/f6ctrl-28753/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: f6ctrl-28753 ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@c9a3a86f816dbc2d221c64ddd46efc106f8917de origin=main@c9a3a86f816dbc2d221c64ddd46efc106f8917de selected=origin/main@c9a3a86f816dbc2d221c64ddd46efc106f8917de
+{
+  "base_sha": "c9a3a86f816dbc2d221c64ddd46efc106f8917de",
+  "branch": "fm/f6ctrl-28753",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/durable/ea52b9b4ae4fd85c.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "f6ctrl-28753",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/pool-ctrl"
+}
+skill selection for f6ctrl-28753: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned f6ctrl-28753 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-f6ctrl-28753 worktree=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/pool-ctrl
+spawn exit=0
+--- control meta:
+worktree=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/pool-ctrl
+branch=fm/f6ctrl-28753
+slot_manifest=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/durable/ea52b9b4ae4fd85c.json
+--- markers after control spawn:
+(none)
+pushing branch=fm/f6ctrl-28753 tip=63c0dbc46d96df388c73d4c1963d2a910a441333
+**R-13 BLOCK** — branch `refs/heads/fm/f6ctrl-28753` (local_sha 63c0dbc4) carries commits that are not its own.
+**Why this fails (R-13 base-ref contamination gate):**
+  2 commit(s) in this branch's ancestry are not on the remote's main
+  `c9a3a86f` and are not this task's own: an unrecorded ref reaches
+  them too (for example `refs/heads/fm/f6pred-28753`). GitHub diffs a PR from its merge base with main,
+  so these commits would show in the PR as if they were YOUR work. This is
+  the PR #61 (2026-05-03) contamination pattern (a branch cut from a stale
+  LOCAL main). RCA: `docs/reviews/pr-61-contamination-rca-2026-05-03.md`
+
+  Foreign commits (newest first):
+    cb97ed177 predecessor 1
+    d2c76f7aa predecessor 0
+
+**How to proceed:**
+  Move only your own commits onto current `origin/main`:
+    git fetch origin
+    git rebase --onto origin/main cb97ed17717c fm/f6ctrl-28753
+  (When your commits are not all on top of the foreign ones, cut a fresh
+   branch from `origin/main` and cherry-pick only your own commits.)
+  If these commits ARE yours and a second ref of yours (a backup branch)
+  is what reaches them, that ref is why they read as foreign.
+
+  Single-session escape (use sparingly): set
+  `CLAUDE_ALLOW_STALE_BASE=1` in your environment for this push.
+
+  Preservation-only push (no PR intended): push a non-branch ref
+  instead — e.g. `git push origin <sha>:refs/preserve/<name>` — which
+  this gate does not block, because a non-branch ref cannot become a
+  PR and so cannot reproduce the contamination pattern.
+
+
+R-13 foreign commits: ['cb97ed17717cdac1efe21f5210da77a897cd2692', 'd2c76f7aa0ea306f3c9d4acbc7d4fedbf1d200e2']
+R-13 exit: 1 (1 = push blocked, 0 = push accepted)
+
+=== SUCCESSOR: spawn WITH --successor-of f6pred-28753
+warning: task f6succ-28753: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/home/data/f6succ-28753/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/home/data/f6succ-28753/launch-brief.md records no ship branch; defaulting to legacy branch fm/f6succ-28753
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/home/data/f6succ-28753/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: f6succ-28753 ships mode=local-only while the standing posture for vernant is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@c9a3a86f816dbc2d221c64ddd46efc106f8917de origin=main@c9a3a86f816dbc2d221c64ddd46efc106f8917de selected=origin/main@c9a3a86f816dbc2d221c64ddd46efc106f8917de
+{
+  "base_sha": "c9a3a86f816dbc2d221c64ddd46efc106f8917de",
+  "branch": "fm/f6succ-28753",
+  "manifest_path": "/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/durable/b3cb1e7ace9239b7.json",
+  "owned_paths": [
+    "README.md"
+  ],
+  "owner_id": "f6succ-28753",
+  "state": "PASS",
+  "worktree_path": "/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/pool-succ"
+}
+skill selection for f6succ-28753: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned f6succ-28753 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-f6succ-28753 worktree=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/pool-succ
+spawn exit=0
+--- successor meta:
+worktree=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/pool-succ
+branch=fm/f6succ-28753
+slot_manifest=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/durable/b3cb1e7ace9239b7.json
+successor_of=f6pred-28753
+--- provisioner report(s):
+/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/home/data/f6succ-28753/slot-provision-spawn.34653.json
+{'state': 'PASS', 'reason': None, 'manifest_path': '/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.Ff8c4n/f6/durable/b3cb1e7ace9239b7.json', 'supersedence_marker': None, 'marker_path': None}
+--- markers (Vernant writer):
+total 8
+drwx------@ 3 charlesabrooker  staff    96 Nov 27 06:26 .
+drwx------@ 4 charlesabrooker  staff   128 Nov 27 06:26 ..
+-rw-------@ 1 charlesabrooker  staff  1342 Nov 27 06:26 227b10424ced8e5d.json
+{'schema_version': '1.1.0', 'carry_status': 'resolved', 'predecessor_branch': 'fm/f6pred-28753', 'superseded_by_branch': 'fm/f6succ-28753', 'predecessor_unmerged_count': 2}
+pushing branch=fm/f6succ-28753 tip=647b40537bb3e033752ad6a127fb0342a0242674
+**R-13 BLOCK** — branch `refs/heads/fm/f6succ-28753` (local_sha 647b4053) carries commits that are not its own.
+**Why this fails (R-13 base-ref contamination gate):**
+  2 commit(s) in this branch's ancestry are not on the remote's main
+  `c9a3a86f` and are not this task's own: an unrecorded ref reaches
+  them too (for example `refs/heads/fm/f6ctrl-28753`). GitHub diffs a PR from its merge base with main,
+  so these commits would show in the PR as if they were YOUR work. This is
+  the PR #61 (2026-05-03) contamination pattern (a branch cut from a stale
+  LOCAL main). RCA: `docs/reviews/pr-61-contamination-rca-2026-05-03.md`
+
+  Foreign commits (newest first):
+    cb97ed177 predecessor 1
+    d2c76f7aa predecessor 0
+
+**How to proceed:**
+  Move only your own commits onto current `origin/main`:
+    git fetch origin
+    git rebase --onto origin/main cb97ed17717c fm/f6succ-28753
+  (When your commits are not all on top of the foreign ones, cut a fresh
+   branch from `origin/main` and cherry-pick only your own commits.)
+  If these commits ARE yours and a second ref of yours (a backup branch)
+  is what reaches them, that ref is why they read as foreign.
+
+  Single-session escape (use sparingly): set
+  `CLAUDE_ALLOW_STALE_BASE=1` in your environment for this push.
+
+  Preservation-only push (no PR intended): push a non-branch ref
+  instead — e.g. `git push origin <sha>:refs/preserve/<name>` — which
+  this gate does not block, because a non-branch ref cannot become a
+  PR and so cannot reproduce the contamination pattern.
+
+
+R-13 foreign commits: ['cb97ed17717cdac1efe21f5210da77a897cd2692', 'd2c76f7aa0ea306f3c9d4acbc7d4fedbf1d200e2']
+R-13 exit: 1 (1 = push blocked, 0 = push accepted)
+
+=== where did Vernant write state? (must be under the temp case dir)
+<case>/hookstate/worktree-lifecycle/b3cb1e7ace9239b7.json
+<case>/hookstate/worktree-lifecycle/ea52b9b4ae4fd85c.json
+<case>/hookstate/worktree-supersedence/227b10424ced8e5d.json
+<case>/durable/b3cb1e7ace9239b7.json
+<case>/durable/ea52b9b4ae4fd85c.json
+(launch log dump trimmed)

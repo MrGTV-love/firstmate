@@ -1,0 +1,1 @@
+ok - removing the predecessor-branch check or the advertise check makes its refusal row stop refusing
