@@ -3675,9 +3675,8 @@ test_bundle_route_requires_the_captains_call() {
     fi
     (
       cd "$ROOT"
-      export FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
-        FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH"
-      eval "$command"
+      FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+        FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" eval "$command"
     ) > "$case_dir/hold.out" 2>&1 || fail "bundle-call-$shape: the printed command failed: $command: $(cat "$case_dir/hold.out")"
     decoded_backlog "$case_dir" > "$case_dir/backlog.decoded" || fail "bundle-call-$shape: cannot decode the hold reason"
     assert_grep "unlanded commits of task-x1, tips $head:" "$case_dir/backlog.decoded" \
@@ -4267,7 +4266,7 @@ test_by_path_removes_a_bundle_held_copy_only_when_the_captains_call_is_filed() {
   git -C "$BP_COPY" update-ref refs/heads/fm/second "$(git -C "$BP_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'second unpublished tip')"
   by_path_record_bundle "$case_dir" "$BP_COPY" rec-1 "$case_dir/bundles/work.bundle" --all || fail 'cannot create the bundle fixture'
   tips=$(cut -f3 "$case_dir/data/rec-1/preservation-bundles.tsv")
-  [ "$(printf '%s\n' $tips | wc -l | tr -d ' ')" -ge 2 ] || fail "by-path-bundle: the fixture does not record at least two tips: $tips"
+  [ "$(printf '%s\n' "$tips" | wc -w | tr -d ' ')" -ge 2 ] || fail "by-path-bundle: the fixture does not record at least two tips: $tips"
   by_path_seed_backlog "$case_dir"
   # An open captain-held row that names the bundle but only one recorded tip is not the call.
   run_captain_hold "$case_dir" hold partial-call --owner captain --title 'partial call' --repo project \
@@ -4291,9 +4290,8 @@ test_by_path_removes_a_bundle_held_copy_only_when_the_captains_call_is_filed() {
   [[ "$command" == 'bin/fm-captain-hold.sh hold rec-1 --title '* ]] || fail "by-path-bundle: the command holds the wrong row: $command"
   (
     cd "$ROOT"
-    export FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
-      FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH"
-    eval "$command"
+    FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+      FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" eval "$command"
   ) > "$case_dir/hold.out" 2>&1 || fail "by-path-bundle: the printed command failed: $command: $(cat "$case_dir/hold.out")"
   decoded_backlog "$case_dir" > "$case_dir/backlog.decoded" || fail 'by-path-bundle: cannot decode the hold reason'
   for tip in $tips; do
@@ -4403,6 +4401,7 @@ test_by_path_refuses_a_copy_a_process_holds() {
       by_path_wait_holder "$pid" "$BP_COPY"
     else
       # The copy's own .git file is no change to the tree, so only the open handle holds the copy.
+      # shellcheck disable=SC2016 # The child bash expands its own "$1".
       teardown_fixture_start "$case_dir" KILL bash -c 'exec 3< "$1"; exec sleep 300' bash "$BP_COPY/.git"
       pid=$TEARDOWN_FIXTURE_PID
       by_path_wait_holder "$pid" "$BP_COPY/.git"
@@ -5174,6 +5173,7 @@ SH
 # <case>/planted.pid, which it does once it holds the copy.
 by_path_plant_process() {  # <case> <command>
   printf '%s &\n' "$2"
+  # shellcheck disable=SC2016 # plant.sh, not this shell, expands $(seq 100).
   printf 'for _ in $(seq 100); do [ -s %q ] && break; sleep 0.05; done\n' "$1/planted.pid"
 }
 
@@ -5344,6 +5344,7 @@ test_by_path_exception_gives_an_unreadable_input_no_policy_row() {
     case "$shape" in
       lsof-failed)
         reason='the process scan failed'
+        # shellcheck disable=SC2016 # The fake lsof, not this shell, expands its own arguments.
         printf '#!/usr/bin/env bash\n[ "${1:-}" != -nP ] || [ ! -e %q ] || exit 1\nexec %q "$@"\n' "$case_dir/planted" "$REAL_LSOF_FOR_TEST" > "$case_dir/fakebin/lsof"
         chmod +x "$case_dir/fakebin/lsof" ;;
       claim-unreadable)
