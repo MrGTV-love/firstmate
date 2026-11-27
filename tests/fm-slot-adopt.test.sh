@@ -888,10 +888,12 @@ PY2
   # A copy whose own line or uncommitted set cannot be read is refused by name, never reported ok with every added entry
   # labelled side-branch. The copy is made unreadable to git only for the one read under test.
   renew "$m1" src lib
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
   out=$(fm_slot_own_line_paths() { return 1; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src); rc=$?
   [ "$rc" -ne 0 ] || fail "an unreadable own line still exited 0: $out"
   [ "$out" = "scope_entry_not_own_work"$'\t'"the task's own first-parent line could not be read from the copy, so no entry can be attributed" ] \
     || fail "an unreadable own line was not refused by name: $out"
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
   out=$(fm_slot_rerecord_uncommitted_paths() { return 1; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src); rc=$?
   [ "$rc" -ne 0 ] || fail "an unreadable uncommitted set still exited 0: $out"
   [ "${out%%$'\t'*}" = scope_release_strands_work ] || fail "an unreadable uncommitted set was not refused by name: $out"
