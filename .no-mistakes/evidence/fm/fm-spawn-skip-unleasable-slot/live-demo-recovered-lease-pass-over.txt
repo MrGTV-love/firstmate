@@ -1,0 +1,28 @@
+### pool before the spawn (real treehouse state file)
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/1/project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/2/project","leased":null,"lease_holder":null}
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/3/project","leased":null,"lease_holder":null}
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/4/project","leased":null,"lease_holder":null}
+### bin/fm-spawn.sh output
+warning: task demo-recovered-lease: /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/home/data/demo-recovered-lease/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/home/data/demo-recovered-lease/launch-brief.md records no ship branch; defaulting to legacy branch fm/demo-recovered-lease
+warning: /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/home/data/demo-recovered-lease/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skipped: copy /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/1/project already carries another holder's lease in the pool state (holder: recovered: state file was corrupt or truncated; verify before reuse); this spawn wrote nothing to it; taking another copy
+skill selection for demo-recovered-lease: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+copies left untouched (each already carries another holder's lease, so this home holds no lease on it and wrote nothing to it; record: /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/home/data/demo-recovered-lease/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/1/project (already carries another holder's lease in the pool state (holder: recovered: state file was corrupt or truncated; verify before reuse); this spawn wrote nothing to it)
+spawned demo-recovered-lease harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-demo-recovered-lease worktree=/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/2/project
+### spawn exit=0
+### task meta
+worktree=/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/2/project
+### skipped-copies.tsv
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/1/project	already carries another holder's lease in the pool state (holder: recovered: state file was corrupt or truncated; verify before reuse); this spawn wrote nothing to it	recovered: state file was corrupt or truncated; verify before reuse	1795745816	firstmate:fm-demo-recovered-lease
+### treehouse calls made
+### pool after the spawn
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/1/project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/2/project","leased":null,"lease_holder":null}
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/3/project","leased":null,"lease_holder":null}
+{"path":"/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/4/project","leased":null,"lease_holder":null}
+### refused slot unchanged check (work, git, raw state entry, slot folder)
+refused slot /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.C1rcRY/demo/th-root/.treehouse/project-416731/1/project: UNCHANGED

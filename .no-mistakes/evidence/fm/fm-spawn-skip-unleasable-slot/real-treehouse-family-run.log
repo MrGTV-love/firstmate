@@ -1,0 +1,86 @@
+FM_TEST_BEGIN 2026-11-27T02:13:30Z tests/fm-control-relaunch-real-treehouse.test.sh family=real-treehouse expected_gate_skip=optional-binary
+ok - a herdr abort after a pass-over interrupts the pane, records it as unobservable and is never reported as clean
+FM_TEST_END 2026-11-27T02:13:56Z tests/fm-control-relaunch-real-treehouse.test.sh exit=0 duration_ms=25618 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8D0DF22PJ2RHMK29BTJY1SQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-27T02:13:56Z tests/fm-spawn-acquisition-real-treehouse.test.sh family=real-treehouse expected_gate_skip=optional-binary
+ok - tmux an abort after a pass-over interrupts the in-flight get, keeps the pane in the passed-over copy and leaves that copy untouched
+ok - tmux the pass-over in-flight case rejects an abort that leaves the second get running
+ok - tmux an abort after a pass-over whose get survives the interrupt says the pane is not settled and records it
+FM_TEST_END 2026-11-27T02:14:44Z tests/fm-spawn-acquisition-real-treehouse.test.sh exit=0 duration_ms=47833 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8D0DF22PJ2RHMK29BTJY1SQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-27T02:14:45Z tests/fm-spawn-real-treehouse.test.sh family=real-treehouse expected_gate_skip=optional-binary
+ok - a recovered-lease copy is passed over untouched and the task runs in the next clean copy
+ok - a copy leased by another holder is passed over untouched too
+ok - a foreign marker beside a passed-over copy keeps its bytes; the claim trace and the rm and mv log never name it, and the next clean copy is claimed
+ok - with no immutable flags, the unchanged marker case rejects a direct overwrite that restores the marker's bytes and mode, on its untouched oracle
+ok - a known-doubt copy nobody leased is still leased to this task, as before
+ok - a second row for one copy - same name or path, or a symlink alias under another name, with either holder in either order - refuses the whole spawn before any claim
+ok - an unreadable state (clean or dirty copy), two rows by name, an own-and-other pair and a symlink alias each refuse before any claim
+ok - a clean copy whose one pool row is positively unleased is claimed and used, as before
+ok - a row whose leased value is the JSON false is unleased and its copy is claimed and used
+note: the proof refuses row|0|name|null, which the real treehouse reads
+note: the proof refuses row|0|created_at|null, which the real treehouse reads
+note: the proof refuses row|0|created_at|"2026-11-18T06:38:47,5Z", which the real treehouse reads
+note: the proof refuses row|0|created_at|"0000-01-01T00:00:00Z", which the real treehouse reads
+note: the proof refuses row|0|leased|null, which the real treehouse reads
+note: the proof refuses row|0|lease_id|null, which the real treehouse reads
+note: the proof refuses row|0|lease_holder|null, which the real treehouse reads
+note: the proof refuses row|0|leased_at|null, which the real treehouse reads
+note: the proof refuses row|0|owner_pid|null, which the real treehouse reads
+note: the proof refuses row|0|owner_started_at|null, which the real treehouse reads
+note: the proof refuses row|0|destroying|null, which the real treehouse reads
+note: the proof refuses row|0|seed_auth_identity|null, which the real treehouse reads
+note: the proof refuses row|0|seed_backend|null, which the real treehouse reads
+note: the proof refuses row|0|seeded_paths|[null], which the real treehouse reads
+note: the proof refuses row|0|seeded_paths|null, which the real treehouse reads
+note: the proof refuses row|0|base_branch|null, which the real treehouse reads
+note: the proof refuses row|0|seed_inventory_known|null, which the real treehouse reads
+note: the proof refuses row|0|seed_inventory_digest|null, which the real treehouse reads
+note: the proof refuses row|0|Leased|true, which the real treehouse reads
+note: the proof refuses row|0|Lease_Holder|"x", which the real treehouse reads
+note: the proof refuses row|0|CREATED_AT|"2026-11-18T06:38:47Z", which the real treehouse reads
+note: the proof refuses row|0|ſeed_inventory_digest|"d", which the real treehouse reads
+note: the proof refuses row|0|zé|1, which the real treehouse reads
+note: the proof refuses top|version|null, which the real treehouse reads
+note: the proof refuses rowdel|0|created_at, which the real treehouse reads
+note: the proof refuses rowdel|0|name, which the real treehouse reads
+note: the proof refuses dupafter|0|lease_holder|"y", which the real treehouse reads
+note: the proof refuses raw|badutf8, which the real treehouse reads
+ok - of 270 state cases (151 asked of the real treehouse, 90 of them states it cannot read as written), the proof gives each its expected verdict and accepts none the CLI cannot read (28 refused where the CLI is more lenient); a missing file, a symlink and a folder are refused
+ok - a copy with another holder's lease in a state that fails the strict proof (18 forms: wrong types in its row or another, 1.0 or 1e3 for a whole number, a number past its range, a key twice, a key in another case, an unread version, text after the document, a byte-order mark) is never passed over: the whole spawn is refused before any claim
+ok - a clean, unleased copy in a state that fails the strict proof (7 forms, in its own row, in another row or in the document) is not claimed: the whole spawn is refused before any claim
+ok - a pool copy whose state is missing or a symlink is refused before any claim when Treehouse names no pool directory (it fails, answers a relative path or nothing) and when the pool directory it names holds the copy
+ok - a pool slot whose state passes the strict proof is classified from it when treehouse pool-dir fails: another holder's copy is passed over, a clean unleased copy is claimed
+ok - the acceptance assertion rejects a CRLF-only change of the raw state entry and accepts the untouched one
+ok - own_digest and assert_untouched fail when git cannot be read, and when the copy's work changed
+ok - the acceptance assertion rejects a raw index change that git reads the same, and an index that cannot be read
+ok - the acceptance assertion accepts the untouched copy and rejects each of: a direct overwrite that restores bytes and mode, a chmod only, a restore that also resets the mtime, a replacement by rename, a restored file in the checkout, a rewritten HEAD (no chflags involved)
+ok - a failed raw-index checksum fails own_digest and assert_untouched, with or without the index change
+ok - the acceptance assertion accepts the untouched copy and rejects a rewrite of the pool state file that restores its bytes and mtime
+ok - the acceptance assertion accepts the untouched copy and rejects a rewrite of a loose ref file that restores its bytes and mtime
+ok - a state that fails the proof after the first reading - a number holder that stays or is undone at the next get, or a number created_at in another row - is refused before any claim
+ok - a change made after the first proved reading and undone before the second never classifies the copy: it is passed over under the holder the proof read
+ok - a valid lease of another copy between the two readings leaves the classification as it was and the spawn goes on
+ok - text that says 'already leased', with no such lease in the pool state, does not skip the copy
+ok - when every copy carries another holder's lease the spawn ends in one refusal that names each copy and its reason
+ok - a refused copy handed out again is not taken, tried again or looped on, and the spawn ends within its bound
+ok - an abort leaves a pane in a passed-over copy open, and an abort before any copy closes the pane it created
+ok - a governed refusal after a pass-over names its recovery record and the abort stays not clean
+ok - an abort after a passed-over copy and a clean copy was reached leaves the pane open at the claim, the base check and the hold
+ok - the after-clean-copy case rejects a spawn that restores the close
+# all fm-spawn-real-treehouse tests passed
+FM_TEST_END 2026-11-27T02:30:43Z tests/fm-spawn-real-treehouse.test.sh exit=0 duration_ms=958219 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8D0DF22PJ2RHMK29BTJY1SQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-27T02:30:44Z tests/fm-teardown-pool-real-treehouse.test.sh family=real-treehouse expected_gate_skip=optional-binary
+ok - teardown returns a skipped copy only under the exact holder this task leased it with, never a lookalike holder, with the real treehouse
+FM_TEST_END 2026-11-27T02:31:01Z tests/fm-teardown-pool-real-treehouse.test.sh exit=0 duration_ms=17212 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8D0DF22PJ2RHMK29BTJY1SQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=1060516
+FM_TEST_SUMMARY_FAMILY family=real-treehouse count=4 duration_ms=1048882 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-real-treehouse.test.sh duration_ms=958219
+FM_TEST_SLOWEST rank=2 script=tests/fm-spawn-acquisition-real-treehouse.test.sh duration_ms=47833
+FM_TEST_SLOWEST rank=3 script=tests/fm-control-relaunch-real-treehouse.test.sh duration_ms=25618
+FM_TEST_SLOWEST rank=4 script=tests/fm-teardown-pool-real-treehouse.test.sh duration_ms=17212
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8D0DF22PJ2RHMK29BTJY1SQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u  -u      188.10s user 439.83s system 59% cpu 17:41.02 total
+rc=0
