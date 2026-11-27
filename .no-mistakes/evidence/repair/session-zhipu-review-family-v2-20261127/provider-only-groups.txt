@@ -1,0 +1,7 @@
+provider=z-ai (empty model) plan rc=0 groups=["no-mistakes:zhipu","ship"]
+provider=zai (empty model) plan rc=0 groups=["no-mistakes:zhipu","ship"]
+provider=ZAI (empty model) plan rc=0 groups=["no-mistakes:unknown","ship"]
+provider=Zai (empty model) plan rc=0 groups=["no-mistakes:unknown","ship"]
+provider=Z-AI (empty model) plan rc=0 groups=["no-mistakes:unknown","ship"]
+provider=gpt (empty model) plan rc=0 groups=["no-mistakes:unknown","ship"]
+provider=openai (empty model) plan rc=0 groups=["no-mistakes:openai","ship"]
