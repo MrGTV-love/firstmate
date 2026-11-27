@@ -2111,30 +2111,34 @@ test_memory_admission_defers_before_dispatch_then_admits_recovery() {
   write_live "$home" running "$case_dir/project"
   cp "$home/state/running.meta" "$case_dir/running.before"
   before=$(call_count "$case_dir"); worktrees=$(worktree_list "$case_dir")
-  printf '34359738368\n2\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  # The kernel pressure level is telemetry: level 4 with no growing swap admits.
+  # The harm decides: swap used grew since the last probe reading.
+  printf '34359738368\n4\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  fm_test_memory_record "$home/state" growing
   rc=0
   out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
     run_spawn "$case_dir" "$home" "$case_dir/no-new-copy" later "$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
-  expect_code 75 "$rc" "native pressure must defer actual spawn: $out"
+  expect_code 75 "$rc" "growing swap must defer actual spawn: $out"
+  assert_contains "$out" 'swap used grew by 104857600 bytes (0.098 GiB)' "the deferral did not name the measured harm"
   assert_nothing_created "$case_dir" "$home" later "$before" "$worktrees"
   cmp -s "$case_dir/running.before" "$home/state/running.meta" || fail 'memory deferral changed running work'
-  jq -es '.[-1].pressure_level == 2 and .[-1].admission == "defer" and .[-1].source == "admit"' \
-    "$home/state/memory-readings.jsonl" >/dev/null || fail 'actual spawn did not retain its pressured observation'
+  jq -es '.[-1].pressure_level == 4 and .[-1].admission == "defer" and .[-1].source == "admit" and .[-1].harm.swap_delta_bytes > 0' \
+    "$home/state/memory-readings.jsonl" >/dev/null || fail 'actual spawn did not retain its measured observation'
   rc=0
   out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
     run_spawn "$case_dir" "$home" "$case_dir/no-new-copy" "later=$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
-  expect_code 75 "$rc" "native pressure must defer a batch pair: $out"
+  expect_code 75 "$rc" "growing swap must defer a batch pair: $out"
   batch_line=$(grep '^batch: DEFERRED' <<<"$out")
   assert_equals "batch: DEFERRED later ($case_dir/project) - the spawn was deferred and stays queued" "$batch_line" \
     "the batch line named a cause for a memory refusal"
-  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  fm_test_memory_record "$home/state" steady
   rc=0
   out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
     spawn_ship "$case_dir" later) || rc=$?
-  expect_code 0 "$rc" "healthy memory must admit the same queued task: $out"
+  expect_code 0 "$rc" "steady memory must admit the same queued task: $out"
   assert_present "$home/state/later.meta" 'healthy memory failed to publish its worker'
   cmp -s "$case_dir/running.before" "$home/state/running.meta" || fail 'healthy admission changed existing work'
-  pass 'actual spawn reads memory before dispatch, leaves pressure-deferred work queued, and admits it after pressure recovers'
+  pass 'actual spawn reads memory before dispatch, leaves work queued while swap is growing, and admits it once swap is steady even at pressure level 4'
 }
 
 # Healthy host memory admits a fresh spawn into a free declared place, and the
@@ -2151,6 +2155,8 @@ test_healthy_memory_admits_within_declared_capacity() {
   printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
   printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 500000.\nPages purgeable: 1000.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
   printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  # The harm test admits nothing on a host with no recorded run peak, so the home holds a complete record.
+  mkdir -p "$home/state"; fm_test_memory_record "$home/state" steady
   declare_capacity "$home" "project 2"
   write_live "$home" live-a "$case_dir/project"
   rc=0
