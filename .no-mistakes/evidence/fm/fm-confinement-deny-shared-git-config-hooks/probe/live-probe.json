@@ -1,0 +1,579 @@
+{
+ "root": "/private/tmp/nmlive-058szza1",
+ "git": "git version 2.54.0 (Apple Git-157)",
+ "system_config": "/etc/gitconfig",
+ "build_head": {
+  "exit": 0,
+  "stderr": ""
+ },
+ "build_base": {
+  "exit": 0,
+  "stderr": ""
+ },
+ "policy_unconfined": {
+  "shared config": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared config.worktree": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared hooks/post-checkout (existing)": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared hooks/pre-push (new)": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "succeeded"
+  },
+  "shared modules/sub/config": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared remotes/old": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared branches/old": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "own worktree config.worktree": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "file the shared config includes": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "absolute core.hooksPath folder file": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "user ~/.gitconfig": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "user ~/.config/git/config": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-protected packed-refs": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-protected HEAD": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-allowed worktree file": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-allowed own branch ref": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-allowed shared objects folder file": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "succeeded"
+  }
+ },
+ "policy_base": {
+  "shared config": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared config.worktree": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared hooks/post-checkout (existing)": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared hooks/pre-push (new)": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "succeeded"
+  },
+  "shared modules/sub/config": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared remotes/old": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "shared branches/old": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "own worktree config.worktree": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "file the shared config includes": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "absolute core.hooksPath folder file": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "user ~/.gitconfig": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "user ~/.config/git/config": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-protected packed-refs": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "control-protected HEAD": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "control-allowed worktree file": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-allowed own branch ref": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-allowed shared objects folder file": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "succeeded"
+  }
+ },
+ "policy_head": {
+  "shared config": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "shared config.worktree": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "shared hooks/post-checkout (existing)": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "shared hooks/pre-push (new)": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "shared modules/sub/config": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "shared remotes/old": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "shared branches/old": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "own worktree config.worktree": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "file the shared config includes": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "absolute core.hooksPath folder file": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "user ~/.gitconfig": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "user ~/.config/git/config": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "control-protected packed-refs": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "control-protected HEAD": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "refused: Operation not permitted"
+  },
+  "control-allowed worktree file": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-allowed own branch ref": {
+   "file-write-data": 0,
+   "file-write-create": 0,
+   "file-write-unlink": 0,
+   "write": "succeeded"
+  },
+  "control-allowed shared objects folder file": {
+   "file-write-data": 1,
+   "file-write-create": 1,
+   "file-write-unlink": 1,
+   "write": "succeeded"
+  }
+ },
+ "harm_unconfined": {
+  "plant_fsmonitor_exit": 0,
+  "plant_stderr": "",
+  "plant_hook_exit": 0,
+  "plant_hook_stderr": "",
+  "supervisor_status_exit": 0,
+  "fsmonitor_program_ran": true,
+  "primary_status_exit": 0
+ },
+ "harm_base": {
+  "plant_fsmonitor_exit": 0,
+  "plant_stderr": "",
+  "plant_hook_exit": 0,
+  "plant_hook_stderr": "",
+  "supervisor_status_exit": 0,
+  "fsmonitor_program_ran": true,
+  "primary_status_exit": 0
+ },
+ "harm_head": {
+  "plant_fsmonitor_exit": 4,
+  "plant_stderr": "error: could not write config file /private/tmp/nmlive-058szza1/fmhome/projects/proj/.git/config: Operation not permitted",
+  "plant_hook_exit": 1,
+  "plant_hook_stderr": "/bin/sh: /private/tmp/nmlive-058szza1/fmhome/projects/proj/.git/hooks/post-index-change: Operation not permitted",
+  "supervisor_status_exit": 0,
+  "fsmonitor_program_ran": false,
+  "primary_status_exit": 0
+ },
+ "ordinary_base": [
+  {
+   "command": "git status --porcelain",
+   "label": "status",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git add live-file",
+   "label": "add",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git commit -q -m live ordinary",
+   "label": "commit (task hook via GIT_CONFIG_COUNT core.hooksPath)",
+   "exit": 0,
+   "stderr": [],
+   "task_hook_ran": true
+  },
+  {
+   "command": "git checkout -q --detach",
+   "label": "checkout --detach",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git branch -D fm/task",
+   "label": "branch -D own branch",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git checkout -q -b fm/task",
+   "label": "checkout -b own branch",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git branch --list",
+   "label": "branch --list",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git fetch -q origin",
+   "label": "fetch origin (remote has a new commit)",
+   "exit": 0,
+   "stderr": [],
+   "origin_main_is_new_tip": true
+  },
+  {
+   "command": "git checkout -q -B fm/task origin/main",
+   "label": "checkout -B own branch from remote-tracking ref (launch autoSetupMerge=false)",
+   "exit": 0,
+   "stderr": [],
+   "upstream_recorded": ""
+  },
+  {
+   "command": "git -c branch.autoSetupMerge=true checkout -q -B fm/task origin/main",
+   "label": "checkout -B own branch from remote-tracking ref (Git default autoSetupMerge=true)",
+   "exit": 0,
+   "stderr": [],
+   "upstream_recorded": "origin"
+  },
+  {
+   "command": "git checkout -q -B fm/task 59bf99388fbc033ab3c132608d30b8bd2e8267a7",
+   "label": "checkout -B own branch back to tip",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git config --local --get remote.origin.url",
+   "label": "config --local read",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git config --worktree --get live.wt",
+   "label": "config --worktree read (own config.worktree key, extensions.worktreeConfig=true)",
+   "exit": 0,
+   "stderr": [],
+   "value": "own"
+  },
+  {
+   "command": "git log -1 --format=%s",
+   "label": "log",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git diff HEAD~1 --stat",
+   "label": "diff",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git stash list",
+   "label": "stash list",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git config --local live.probe 1",
+   "label": "config --local write (shared config write)",
+   "exit": 0,
+   "stderr": []
+  }
+ ],
+ "ordinary_head": [
+  {
+   "command": "git status --porcelain",
+   "label": "status",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git add live-file",
+   "label": "add",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git commit -q -m live ordinary",
+   "label": "commit (task hook via GIT_CONFIG_COUNT core.hooksPath)",
+   "exit": 0,
+   "stderr": [],
+   "task_hook_ran": true
+  },
+  {
+   "command": "git checkout -q --detach",
+   "label": "checkout --detach",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git branch -D fm/task",
+   "label": "branch -D own branch",
+   "exit": 0,
+   "stderr": [
+    "error: could not write config file /private/tmp/nmlive-058szza1/fmhome/projects/proj/.git/config: Operation not permitted",
+    "warning: update of config-file failed"
+   ]
+  },
+  {
+   "command": "git checkout -q -b fm/task",
+   "label": "checkout -b own branch",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git branch --list",
+   "label": "branch --list",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git fetch -q origin",
+   "label": "fetch origin (remote has a new commit)",
+   "exit": 0,
+   "stderr": [],
+   "origin_main_is_new_tip": true
+  },
+  {
+   "command": "git checkout -q -B fm/task origin/main",
+   "label": "checkout -B own branch from remote-tracking ref (launch autoSetupMerge=false)",
+   "exit": 0,
+   "stderr": [],
+   "upstream_recorded": ""
+  },
+  {
+   "command": "git -c branch.autoSetupMerge=true checkout -q -B fm/task origin/main",
+   "label": "checkout -B own branch from remote-tracking ref (Git default autoSetupMerge=true)",
+   "exit": 0,
+   "stderr": [
+    "error: could not write config file /private/tmp/nmlive-058szza1/fmhome/projects/proj/.git/config: Operation not permitted",
+    "error: could not write config file /private/tmp/nmlive-058szza1/fmhome/projects/proj/.git/config: Operation not permitted"
+   ],
+   "upstream_recorded": ""
+  },
+  {
+   "command": "git checkout -q -B fm/task b0e8f07b692913eae5fa22c9dc89e24531e76f93",
+   "label": "checkout -B own branch back to tip",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git config --local --get remote.origin.url",
+   "label": "config --local read",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git config --worktree --get live.wt",
+   "label": "config --worktree read (own config.worktree key, extensions.worktreeConfig=true)",
+   "exit": 0,
+   "stderr": [],
+   "value": "own"
+  },
+  {
+   "command": "git log -1 --format=%s",
+   "label": "log",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git diff HEAD~1 --stat",
+   "label": "diff",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git stash list",
+   "label": "stash list",
+   "exit": 0,
+   "stderr": []
+  },
+  {
+   "command": "git config --local live.probe 1",
+   "label": "config --local write (shared config write)",
+   "exit": 4,
+   "stderr": [
+    "error: could not write config file /private/tmp/nmlive-058szza1/fmhome/projects/proj/.git/config: Operation not permitted"
+   ]
+  }
+ ],
+ "shared_config_after": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tignorecase = true\n\tprecomposeunicode = true\n[remote \"origin\"]\n\turl = /private/tmp/nmlive-058szza1/remote.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n[include]\n\tpath = /private/tmp/nmlive-058szza1/inc.cfg\n[extensions]\n\tworktreeConfig = true\n"
+}

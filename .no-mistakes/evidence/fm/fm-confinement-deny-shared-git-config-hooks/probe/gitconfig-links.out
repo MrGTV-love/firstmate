@@ -1,0 +1,13 @@
+== hard-linked ~/.gitconfig (2 links):
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /private/tmp/nmlinks-Uo9kER/uhome/.gitconfig (2 links); remove the extra link or symbolic link and launch again
+build exit=1
+== symlinked ~/.gitconfig -> dotfiles/gitconfig:
+build exit=0
+/bin/sh: /private/tmp/nmlinks-Uo9kER/uhome/.gitconfig: Operation not permitted
+confined append via /private/tmp/nmlinks-Uo9kER/uhome/.gitconfig: refused
+/bin/sh: /private/tmp/nmlinks-Uo9kER/dotfiles/gitconfig: Operation not permitted
+confined append via /private/tmp/nmlinks-Uo9kER/dotfiles/gitconfig: refused
+rm: /private/tmp/nmlinks-Uo9kER/uhome/.gitconfig: Operation not permitted
+confined unlink of the link: refused
+control: confined write of an unrelated file in dotfiles: succeeded
+unconfined control append: succeeded
