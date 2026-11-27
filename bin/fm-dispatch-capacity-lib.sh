@@ -41,7 +41,9 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
   if [ -z "$usage" ]; then
-    usage=$(fm_run_timed 20 omp usage --provider openai-codex --json 2>/dev/null </dev/null) || usage='{}'
+    # Run from a Firstmate checkout, a usage read would otherwise load the
+    # primary session's .omp/extensions and write their home state markers.
+    usage=$(fm_run_timed 20 omp usage --provider openai-codex --json --no-extensions 2>/dev/null </dev/null) || usage='{}'
   fi
   now=$(date +%s)
   printf '%s\n' "$usage" | jq -sc --arg model "${model#*/}" --argjson now "$now" '
