@@ -57,6 +57,7 @@ SH
 chmod +x "$FAKEBIN/quota-axi" "$FAKEBIN/omp"
 cat > "$TMP_ROOT/provider.mjs" <<'JS'
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, appendFileSync, copyFileSync } from 'node:fs';
 const [settingsPath, callsPath, portPath, headersPath] = process.argv.slice(2);
 // patch deep-merges into the answer envelope; a null value deletes the key.
@@ -73,6 +74,7 @@ const server = http.createServer(async (req, res) => {
   let body = ''; for await (const chunk of req) body += chunk;
   const request = JSON.parse(body), settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
   appendFileSync(callsPath, JSON.stringify(request) + '\n');
+  appendFileSync(callsPath + '.sha256', createHash('sha256').update(body).digest('hex') + '\n');
   appendFileSync(headersPath, JSON.stringify(req.headers) + '\n');
   if (settings.mutate) copyFileSync(settings.mutate[0], settings.mutate[1]);
   if (settings.delay) await new Promise(resolve => setTimeout(resolve, settings.delay));
@@ -101,6 +103,7 @@ const server = http.createServer(async (req, res) => {
   const response = { model: 'jev-1.13.0', answers, usage: { input_tokens: 100, output_tokens: 20 } };
   if (settings.patch) merge(response, settings.patch);
   res.setHeader('content-type', 'application/json');
+  res.setHeader('x-typesafe-request-id', 'synthetic-resolution-id');
   res.end(JSON.stringify(response));
 });
 server.listen(0, '127.0.0.1', () => writeFileSync(portPath, String(server.address().port)));
@@ -146,6 +149,95 @@ binding_resolve() {
 }
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 structure_rules "$RULES"
+bind_brief "$BRIEF" "$HOME_DIR"
+chmod 400 "$RULES" "$TMP_ROOT/bound-brief.md"
+before=$(count)
+quota_count() { if [ -f "$QUOTA_AXI_CALLS" ]; then wc -l < "$QUOTA_AXI_CALLS" | tr -d ' '; else echo 0; fi; }
+quota_before=$(quota_count)
+DIGEST=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY='' bash "$ROOT/bin/fm-dispatch-resolve.sh" \
+  --print-request-digest "$TMP_ROOT/bound-brief.md" 2> "$TMP_ROOT/digest.err") || fail "no-send request digest failed: $(cat "$TMP_ROOT/digest.err")"
+[[ "$DIGEST" =~ ^[a-f0-9]{64}$ ]] || fail 'expected just a SHA-256 digest on stdout'
+assert_equals "$before" "$(count)" 'the digest path does not send to the provider'
+assert_equals "$quota_before" "$(quota_count)" 'the digest path never asks for quota'
+binding_resolve "$TMP_ROOT/bound-brief.md"
+assert_equals "$((before+1))" "$(count)" 'the ordinary fixture resolve sends one request'
+assert_equals "$DIGEST" "$(tail -n 1 "$CALLS.sha256")" 'the digest matches the exact request the local provider received from a read-only brief and policy'
+chmod 600 "$RULES" "$TMP_ROOT/bound-brief.md"
+PRIVATE_CONFIG="$TMP_ROOT/digest-private-config"
+mkdir -p "$PRIVATE_CONFIG"
+cp "$RULES" "$PRIVATE_CONFIG/crew-dispatch.json"
+printf '%s\n' 'Fix a bounded bug' > "$PRIVATE_CONFIG/dispatch-never-send"
+before=$(count)
+FM_CONFIG_OVERRIDE="$PRIVATE_CONFIG" binding_resolve "$TMP_ROOT/bound-brief.md" --print-request-digest
+assert_equals '' "$OUT" 'never-send refusal emits no commitment'
+assert_equals "$before" "$(count)" 'the refused digest never sends'
+pass 'no-send request digest preserves the exact bound request and privacy gate'
+
+LAUNCH="$TMP_ROOT/route-launch.json"
+JOURNAL="$TMP_ROOT/route-attempts.jsonl"
+launch_plan() {
+  jq -cn --arg digest "$1" --arg execution "${2:-fixture-execution}" \
+    '{version:1,assignment:"fixture-assignment",execution:$execution,adapter_input_sha256:$digest}' > "$LAUNCH"
+  PLAN_SHA=$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$LAUNCH")
+}
+launch_plan "$DIGEST"
+before=$(count)
+FM_MODEL_PICKER_SHADOW=0 binding_resolve "$TMP_ROOT/bound-brief.md" --attempt-journal "$JOURNAL" --launch-binding "$LAUNCH" "$PLAN_SHA"
+expect_code 0 "$CODE" 'a pinned journal uses the normal resolver'
+[ -s "$JOURNAL" ] || fail "route journal was not opened: $(cat "$TMP_ROOT/error")"
+assert_equals "$((before+1))" "$(count)" 'journal runs one normal route attempt'
+request_sha=$(printf '%s' 'synthetic-resolution-id' | shasum -a 256 | cut -d ' ' -f 1)
+jq -es --arg plan "$PLAN_SHA" --arg request "$request_sha" '
+  map(.kind)==["opened","attempt_started","response_observed","reported_usage","closed"] and
+  .[0].launch_binding_sha256==$plan and .[2].request_id_sha256==$request and .[2].http_status==200 and
+  .[3].input_tokens==100 and .[3].output_tokens==20 and .[4].valid_response' "$JOURNAL" >/dev/null || fail 'journal did not bind the route response'
+before=$(count)
+FM_MODEL_PICKER_SHADOW=0 binding_resolve "$TMP_ROOT/bound-brief.md" --attempt-journal "$JOURNAL" --launch-binding "$LAUNCH" "$PLAN_SHA"
+assert_equals "$before" "$(count)" 'an occupied journal cannot issue a duplicate request'
+launch_plan "$(printf '%064d' 0)"
+FM_MODEL_PICKER_SHADOW=0 binding_resolve "$TMP_ROOT/bound-brief.md" --attempt-journal "$TMP_ROOT/wrong-plan.jsonl" --launch-binding "$LAUNCH" "$PLAN_SHA"
+assert_equals "$before" "$(count)" 'request digest mismatch sends nothing'
+assert_absent "$TMP_ROOT/wrong-plan.jsonl" 'request digest mismatch does not open a journal'
+pass 'ordinary route writes its pinned attempt journal and refuses unsafe reuse'
+
+launch_plan "$DIGEST" fixture-registry-missing
+registry_journal="$TMP_ROOT/registry-route.jsonl"
+registry_data="$TMP_ROOT/registry-observer"
+mkdir -p "$registry_data"
+printf '%s\n' '{"verdict":"TRUSTED"}' > "$registry_data/verdict.json"
+before=$(count)
+FM_MODEL_PICKER_SHADOW=1 FM_MODEL_PICKER_REGISTRY='' binding_resolve "$TMP_ROOT/bound-brief.md" \
+  --attempt-journal "$registry_journal" --launch-binding "$LAUNCH" "$PLAN_SHA"
+expect_code 2 "$CODE" 'the model-using shadow picker cannot share the router journal'
+assert_equals "$before" "$(count)" 'legacy shadow is refused before either call'
+assert_absent "$registry_journal" 'legacy shadow refusal does not open a journal'
+FM_MODEL_PICKER_SHADOW=1 FM_MODEL_PICKER_REGISTRY="$TMP_ROOT/missing-catalog.json" FM_MODEL_PICKER_DATA="$registry_data" \
+  binding_resolve "$TMP_ROOT/bound-brief.md" --attempt-journal "$registry_journal" --launch-binding "$LAUNCH" "$PLAN_SHA"
+expect_code 0 "$CODE" 'the offline registry observer can share the journal-enabled resolver'
+assert_equals "$((before+1))" "$(count)" 'registry mode adds no request even when its catalog is absent'
+jq -es '.[-1] == {kind:"closed",valid_response:true}' "$registry_journal" >/dev/null || fail 'journalized registry route did not close'
+registry_status=$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("SELECT picker_status FROM dispatch_log").fetchone()[0])' "$registry_data/aa.sqlite")
+assert_equals 'registry-unavailable' "$registry_status" 'the actual registry observer fails closed rather than using the legacy picker'
+
+launch_plan "$DIGEST" fixture-registry-bound
+registry_journal="$TMP_ROOT/registry-route-bound.jsonl"
+task_digest=$(tail -n 1 "$CALLS" | jq -j '.state.task' | shasum -a 256 | cut -d ' ' -f 1)
+registry_acceptance="$TMP_ROOT/registry-acceptance.json"
+jq -cn --arg digest "$task_digest" '{task_sha256:$digest,authorized_safe_scope:true,binding_kind:"repo-contract",tags:["repository_patch","blocking_maintainer_checks"]}' > "$registry_acceptance"
+FM_MODEL_PICKER_SHADOW=1 FM_MODEL_PICKER_REGISTRY="$ROOT/tests/fixtures/model-picker-shadow/registry-eight/catalog.json" \
+  FM_MODEL_PICKER_DATA="$registry_data" FM_MODEL_PICKER_ACCEPTANCE="$registry_acceptance" \
+  binding_resolve "$TMP_ROOT/bound-brief.md" --attempt-journal "$registry_journal" --launch-binding "$LAUNCH" "$PLAN_SHA"
+expect_code 0 "$CODE" 'the registry and router receipts can be retained on the same launch'
+assert_not_contains "$OUT" "$PLAN_SHA" 'the local launch digest is not part of dispatch stdout'
+assert_equals "$((before+2))" "$(count)" 'the valid registry also adds no provider call'
+registry_gates=$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("SELECT gates FROM dispatch_log ORDER BY id DESC LIMIT 1").fetchone()[0])' "$registry_data/aa.sqlite")
+jq -e --arg plan "$PLAN_SHA" --arg task "$task_digest" '
+  .registry.task_sha256 == $task and .registry.route_launch_binding_sha256 == $plan and (.registry | has("offline_request") | not)
+' <<< "$registry_gates" >/dev/null || fail 'the private registry receipt does not bind to the measured routing launch'
+jq -es --arg plan "$PLAN_SHA" '.[0].launch_binding_sha256 == $plan and .[-1] == {kind:"closed",valid_response:true}' \
+  "$registry_journal" >/dev/null || fail 'the journal did not bind the same launch digest'
+pass 'router journaling preserves the no-send registry observer and binds the registry receipt'
+
 for spelling in Vernant ' vernant'; do
   before=$(count)
   binding_resolve "$BRIEF" --project "$spelling"
