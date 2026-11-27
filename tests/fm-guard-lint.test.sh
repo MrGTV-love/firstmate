@@ -160,6 +160,13 @@ MISSINGTEST=$(fixture missingtest)
 rm -f "$MISSINGTEST/tests/gguard.test.sh"
 assert_fails_with "R7 fails a nonexistent test file" "$MISSINGTEST" R7
 
+TWOTESTS=$(fixture twotests)
+: >"$TWOTESTS/tests/gguard-real.test.sh"
+mutate "$TWOTESTS" '.guards[0].test = "tests/gguard.test.sh, tests/gguard-real.test.sh"'
+assert_clean "R7 accepts a test list whose every file resolves" "$TWOTESTS"
+rm -f "$TWOTESTS/tests/gguard-real.test.sh"
+assert_fails_with "R7 fails a test list with one nonexistent file" "$TWOTESTS" R7
+
 # --- R8 telemetry -----------------------------------------------------------
 NOTEL=$(fixture notel)
 mutate "$NOTEL" '.guards[0].telemetry = ""'

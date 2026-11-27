@@ -105,6 +105,16 @@ REGTEST=$(fixture regtest)
 rm -f "$REGTEST/tests/gguard.test.sh"
 assert_fails_with "a missing registry test path fails" "$REGTEST" "registration=registry:gguard"
 
+REGTESTS=$(fixture regtests)
+: >"$REGTESTS/tests/gguard-real.test.sh"
+jq '.guards[0].test = "tests/gguard.test.sh, tests/gguard-real.test.sh"' "$REGTESTS/docs/guards/registry.json" >"$REGTESTS/registry.tmp"
+mv "$REGTESTS/registry.tmp" "$REGTESTS/docs/guards/registry.json"
+$GIT "$REGTESTS" add -A
+$GIT "$REGTESTS" -c user.email=t@example.invalid -c user.name=t commit -qm two-tests
+assert_clean "a registry test list whose every path resolves is clean" "$REGTESTS"
+rm -f "$REGTESTS/tests/gguard-real.test.sh"
+assert_fails_with "a registry test list with one missing path fails" "$REGTESTS" "MISSING tests/gguard-real.test.sh registration=registry:gguard"
+
 REGSPEC=$(fixture regspec)
 jq '.spec = "docs/guard-spec.md"' "$REGSPEC/docs/guards/registry.json" >"$REGSPEC/registry.tmp"
 mv "$REGSPEC/registry.tmp" "$REGSPEC/docs/guards/registry.json"

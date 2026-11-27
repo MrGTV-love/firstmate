@@ -261,7 +261,11 @@ while IFS= read -r entry; do
   if [ -z "$test" ]; then
     violation R7 "$id" "test is empty"
   else
-    [ -e "$ROOT/$test" ] || violation R7 "$id" "nonexistent test file $test"
+    printf '%s\n' "$test" | tr ',' '\n' | while IFS= read -r f; do
+      f=$(printf '%s' "$f" | tr -d ' \t')
+      [ -n "$f" ] || continue
+      [ -e "$ROOT/$f" ] || printf 'R7\t%s\tnonexistent test file %s\n' "$id" "$f" >>"$VIOLATIONS"
+    done
   fi
 
   if [ -z "$telemetry" ]; then

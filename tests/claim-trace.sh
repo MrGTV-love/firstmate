@@ -1,5 +1,6 @@
 # shellcheck shell=bash
-# BASH_ENV file for the spawn cases that must see every call of the slot-owner claim and release (tests/fm-spawn-pool-base-freshen.test.sh).
+# BASH_ENV file for the spawn cases that must see every call of the slot-owner claim and release (tests/fm-spawn-pool-base-freshen.test.sh
+# and tests/fm-spawn-real-treehouse.test.sh).
 # With FM_TEST_CLAIM_TRACE=<file>, each call of fm_treehouse_slot_owner_claim or fm_treehouse_slot_owner_release is appended to
 # that file as one tab-separated line: the function, then its arguments as the call expanded them. Nothing in the spawn is
 # changed. The trace names what the spawn asked those two functions to do, whatever the functions then do to the marker.

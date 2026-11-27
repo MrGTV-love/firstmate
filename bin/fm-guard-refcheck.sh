@@ -133,11 +133,15 @@ if [ -f "$REGISTRY" ]; then
         printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
       fi
     done
-    if [ -n "$test" ] && [ ! -e "$ROOT/$test" ]; then
-      registry_missing=$((registry_missing + 1))
-      [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$test" "$id"
-      printf 'MISSING\t%s\tregistry:%s\n' "$test" "$id" >>"$FINDINGS"
-    fi
+    for f in $(printf '%s\n' "$test" | tr ',' '\n'); do
+      f=$(printf '%s' "$f" | tr -d ' \t')
+      [ -n "$f" ] || continue
+      if [ ! -e "$ROOT/$f" ]; then
+        registry_missing=$((registry_missing + 1))
+        [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"
+        printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
+      fi
+    done
   done <<EOF
 $(jq -r '.guards[] | [.id, (.owner // ""), (.test // "")] | @tsv' "$REGISTRY")
 EOF

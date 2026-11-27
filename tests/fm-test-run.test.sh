@@ -356,6 +356,43 @@ test_changed_wake_classifier_selects_both_consumers() {
   pass "wake classifier changes select both consuming suites without broadening coverage"
 }
 
+# The real-Treehouse cases were moved out of backend-dispatch and pr-forge scripts, so every owner change that selected
+# them there must still select them; a change no moved case ever depended on must not.
+test_changed_owners_of_the_moved_real_treehouse_cases_select_them() {
+  local tmp repo listed source script
+  local -a scripts=(fm-spawn-real-treehouse fm-spawn-acquisition-real-treehouse fm-control-relaunch-real-treehouse fm-teardown-pool-real-treehouse)
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-real-treehouse-selection.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  mkdir -p "$repo/bin/backends"
+  for script in "${scripts[@]}"; do
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$script.test.sh"
+    chmod +x "$repo/tests/$script.test.sh"
+  done
+  for source in backends/tmux.sh backends/herdr.sh fm-control-lib.sh fm-teardown-nested-lib.sh fm-teardown.sh fm-spawn.sh fm-watch.sh; do
+    : >"$repo/bin/$source"
+  done
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm real-treehouse-selection-fixture
+
+  for source in backends/tmux.sh backends/herdr.sh fm-control-lib.sh fm-teardown-nested-lib.sh fm-teardown.sh fm-spawn.sh fm-watch.sh; do
+    printf '\n' >"$repo/bin/$source"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$source changed selection failed"
+    for script in "${scripts[@]}"; do
+      if [ "$source" = fm-watch.sh ]; then
+        assert_not_contains "$listed" "tests/$script.test.sh" "$source does not select $script"
+      else
+        assert_contains "$listed" "tests/$script.test.sh" "$source selects $script"
+      fi
+    done
+    : >"$repo/bin/$source"
+  done
+
+  rm -rf "$tmp"
+  pass "every owner change that selected a moved real-Treehouse case still selects it, and an unrelated change does not"
+}
+
 test_changed_spawn_selects_picker_without_broadening_siblings() {
   local tmp repo listed source
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-spawn-selection.XXXXXX")
@@ -1219,7 +1256,7 @@ test_changed_status_owners_select_all_consuming_tests() {
       || fail "$owner owner-only change failed selection"
     expected=$(
       {
-        for family in pure-contract-unit standalone secondmate session-bootstrap afk watcher-wake-lock backend-dispatch pr-forge snapshot-bearings; do
+        for family in pure-contract-unit standalone secondmate session-bootstrap afk watcher-wake-lock backend-dispatch pr-forge snapshot-bearings real-treehouse; do
           "$repo/bin/fm-test-run.sh" --list --family "$family"
         done
         printf '%s\n' \
@@ -1233,7 +1270,7 @@ test_changed_status_owners_select_all_consuming_tests() {
       } | LC_ALL=C sort -u
     )
     [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
-      || fail "$owner change must select exactly its nine consuming families and owner-specific scripts: $listed"
+      || fail "$owner change must select exactly its ten consuming families and owner-specific scripts: $listed"
     for script in \
       fm-classify-corr-token.test.sh \
       fm-pending-reply.test.sh \
@@ -3383,6 +3420,7 @@ test_teardown_groups_register_each_case_once
 test_teardown_groups_share_helper_and_stay_selectable
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_watch_helpers_select_runnable_consumers
+test_changed_owners_of_the_moved_real_treehouse_cases_select_them
 test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family

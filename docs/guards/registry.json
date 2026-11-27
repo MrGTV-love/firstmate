@@ -1084,7 +1084,7 @@
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
-      "test": "tests/fm-spawn-pool-base-freshen.test.sh",
+      "test": "tests/fm-spawn-pool-base-freshen.test.sh, tests/fm-spawn-real-treehouse.test.sh",
       "tier": "B",
       "harm": "irreversible",
       "proxy": false,

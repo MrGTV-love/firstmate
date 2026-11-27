@@ -1855,6 +1855,7 @@ families_for_changed_path() {
     tests/fm-backend-herdr-eventwait.test.py)
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       ;;
     tests/omp_wake_turns.py)
       printf '%s\n' "__script__:fm-omp-wake-turns.test.sh"
@@ -1918,33 +1919,40 @@ families_for_changed_path() {
     bin/backends/herdr*|bin/fm-herdr-lab.sh|tests/herdr-test-safety.sh|tests/herdr-client-pair-fixture.sh)
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' pure-contract-unit
       ;;
     bin/fm-herdr-session-cleanup.sh)
       printf '%s\n' session-bootstrap
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       ;;
     bin/backends/zellij*|tests/zellij-test-safety.sh)
       printf '%s\n' zellij
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       ;;
     bin/backends/cmux*|tests/cmux-test-safety.sh)
       printf '%s\n' cmux
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       ;;
     bin/backends/orca*|bin/backends/tmux.sh)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' orca
       ;;
     bin/fm-backend.sh|bin/fm-backend-hometag-lib.sh)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' real-herdr-gated
       ;;
     bin/fm-agent-process-lib.sh)
       # The shared harness-process classifier feeds both the tmux and Herdr
       # liveness verdicts, so a change to it is proven by both backends' suites.
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' real-herdr-gated
       printf '%s\n' pure-contract-unit
       ;;
@@ -1958,6 +1966,7 @@ families_for_changed_path() {
       printf '%s\n' afk
       printf '%s\n' watcher-wake-lock
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' pr-forge
       printf '%s\n' snapshot-bearings
       printf '%s\n' "__script__:fm-afk-pi-herdr-return-e2e.test.sh"
@@ -2106,6 +2115,7 @@ families_for_changed_path() {
       # The one .env accessor, sourced by bin/fm-x-lib.sh (Relay token) and
       # bin/fm-typesafe-lib.sh (dispatch and skill-pick TypeSafe and OpenRouter keys).
       printf '%s\n' pr-forge
+      printf '%s\n' real-treehouse
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
@@ -2208,12 +2218,13 @@ families_for_changed_path() {
     bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-teardown-nested-lib.sh|bin/fm-idle-session-reap.sh|bin/fm-review-diff.sh|\
     bin/fm-x-*|bin/fm-check*|bin/fm-pipeline-spend.sh)
       printf '%s\n' pr-forge
-      [ "$path" != bin/fm-teardown.sh ] || printf '%s\n' real-treehouse
+      printf '%s\n' real-treehouse
       ;;
     bin/fm-task-docker-lib.sh)
       # The task-owned Docker ownership rules, sourced by bin/fm-teardown.sh
       # (pr-forge) and proven against a real Docker by its live guard.
       printf '%s\n' pr-forge
+      printf '%s\n' real-treehouse
       printf '%s\n' live-harness-optin
       ;;
     bin/fm-nm-run-lib.sh)
@@ -2222,6 +2233,7 @@ families_for_changed_path() {
       # pre-teardown run abort (pr-forge).
       printf '%s\n' pure-contract-unit
       printf '%s\n' pr-forge
+      printf '%s\n' real-treehouse
       ;;
     bin/fm-task-copy-lib.sh)
       # Which local copy a task record may name: fm-spawn's isolation guard
@@ -2234,11 +2246,13 @@ families_for_changed_path() {
       ;;
     bin/fm-control-lib.sh)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       ;;
     bin/fm-launch-proof-lib.sh|bin/fm-reboot-recover.sh)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-supervision-events.test.sh"
       printf '%s\n' "__script__:fm-omp-reboot-live-e2e.test.sh"
@@ -2249,6 +2263,7 @@ families_for_changed_path() {
       # re-selects the live guard (fm-composer-matrix-live-e2e) alongside the
       # portable families.
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' pure-contract-unit
       printf '%s\n' live-harness-optin
       printf '%s\n' "__script__:fm-composer-native-band.test.sh"
@@ -2265,12 +2280,14 @@ families_for_changed_path() {
       ;;
     bin/fm-send.sh|bin/fm-harness.sh|bin/fm-peek.sh|bin/fm-composer*)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' pure-contract-unit
       ;;
     bin/fm-teamclaude-launch.sh)
       # The TeamClaude launcher reads the installed TeamClaude CLI's exports, so
       # a change re-selects its live guard alongside the launch-path suites.
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' live-harness-optin
       ;;
     bin/fm-task-inbox-lib.sh)
@@ -2278,6 +2295,7 @@ families_for_changed_path() {
       # (backend-dispatch), the watcher's re-ring check (watcher-wake-lock),
       # and the live doorbell guard against real harnesses.
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' watcher-wake-lock
       printf '%s\n' live-harness-optin
       retirement_tests_for_reference "$path" || true
