@@ -29,8 +29,9 @@
 # fingerprint it recorded (state/.session-end-refusal-<id>, durable across scanner processes) must change
 # before one new attempt is allowed, and the operator's own `bin/fm-control.sh <task> relaunch` is the way to try
 # again. Any other failed outcome keeps the caps and wakes below. A relaunch that starts with, or refuses
-# because of, the task's own out-of-scope work carries the complete drift report in its wake line and in
-# state/<id>.relaunch-drift, so the observer sees every path (bin/fm-slot-provision-lib.sh owns the report).
+# because of, the task's own out-of-scope work carries the drift report in its wake line and in
+# state/<id>.relaunch-drift, so the observer sees every path or, for a long `uncertain,ignored` group, its count and the
+# file that lists every path (bin/fm-slot-provision-lib.sh owns the report).
 #
 # A completed fm-control exit retires the busy record, so its session-end
 # is never seen here. The control-exit marker covers the exit whose command
@@ -262,23 +263,41 @@ fm_session_end_first_drift_report() {  # <control-output>
   printf '%s\n' "$1" | awk '/^relaunch drift report for /{ if (seen) exit; seen = 1 } seen { print } seen && /^  a relaunch is not a new scope declaration|^relaunch drift report for .*could not be produced/ { exit }'
 }
 
-# Write the complete drift report from a control output to its stable durable path and print that path.
+# "printed" when the first drift report in a control output has its own sample line, which names the file that lists
+# every path; "complete" otherwise. The sample line is a line of its own, and the report escapes a newline in a path,
+# so no path text on an entry line can stand for it.
+fm_session_end_drift_kind() {  # <control-output>
+  local sampled
+  sampled=$(fm_session_end_first_drift_report "$1" | sed -n '/^  sampled: /p')
+  if [ -n "$sampled" ]; then printf printed; else printf complete; fi
+}
+
+# The sentence that follows a quoted sample line: the file it names holds the latest report written for the task, which
+# need not be this one.
+fm_session_end_drift_file_note() {
+  printf '%s' "That file holds the most recent drift report written for this task, which a later report can replace, so its list can differ from this count."
+}
+
+# Write the printed drift report from a control output to its stable durable path and print that path.
 fm_session_end_write_drift() {  # <state-dir> <id> <control-output>
   local file="$1/$2.relaunch-drift"
-  fm_session_end_first_drift_report "$3" > "$file" 2>/dev/null || true
+  fm_session_end_first_drift_report "$3" | awk -v note="$(fm_session_end_drift_file_note)" '{ print } /^  sampled: / { print "  " note }' > "$file" 2>/dev/null || true
   printf '%s' "$file"
 }
 
-# The complete drift report inside a control output, on one line: "header | entry | entry ...". Empty when the
+# The drift report inside a control output, on one line: "header: [sampled: ... | ]entry | entry ...". Empty when the
 # output carries no report or the report found nothing out of scope.
 fm_session_end_drift_summary() {  # <control-output>
-  local text header entries limits
+  local text header entries sampled limits
   text=$(fm_session_end_first_drift_report "$1")
   header=$(printf '%s\n' "$text" | sed -n 's/^relaunch drift report for \(.*\)$/\1/p')
   case "$header" in ''|*'no out-of-scope path'*|*'could not be produced'*) ;; *)
     entries=$(printf '%s\n' "$text" | sed -n 's/^  drift: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
+    sampled=$(printf '%s\n' "$text" | sed -n 's/^  sampled: //p')
     limits=$(printf '%s\n' "$text" | sed -n 's/^  limitation: //p' | tr '\n' '|' | sed -e 's/|$//' -e 's/|/ | /g')
-    printf '%s' "drift report: ${header#*: }: $entries${limits:+ | limitation: $limits}"
+    # A sampled report's pointer to the file listing every path comes before the entries, so the wake's length cap can
+    # only cut the entries after it.
+    printf '%s' "drift report: ${header#*: }: ${sampled:+sampled: $sampled | $(fm_session_end_drift_file_note) | }$entries${limits:+ | limitation: $limits}"
     return 0 ;;
   esac
   case "$header" in *'could not be produced'*) printf '%s' "drift report: ${header#*: }" ;; esac
@@ -449,7 +468,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     if [ -n "$drift" ]; then
       # The stable durable reference comes first, so the wake's length cap can only ever cut the repeated content after it.
       drift_file=$(fm_session_end_write_drift "$state" "$id" "$out")
-      reason="$reason (the complete drift report is in $drift_file); $drift"
+      reason="$reason (the $(fm_session_end_drift_kind "$out") drift report is in $drift_file); $drift"
     fi
     fm_session_end_queue_wake "$key" "$reason" || return 1
     printf '%s\t%s\trelaunched\n' "$gen" "$seq" > "$handled" || return 1
@@ -462,7 +481,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   drift=$(fm_session_end_drift_summary "$out")
   if [ -n "$drift" ]; then
     drift_file=$(fm_session_end_write_drift "$state" "$id" "$out")
-    reason="$reason (the complete drift report is in $drift_file)"
+    reason="$reason (the $(fm_session_end_drift_kind "$out") drift report is in $drift_file)"
   fi
   reason="$reason: $(fm_session_end_first_line "$out")"
   cause=$(fm_session_end_refusal_reason "$out")

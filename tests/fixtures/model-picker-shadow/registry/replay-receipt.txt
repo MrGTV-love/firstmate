@@ -1,0 +1,12 @@
+{"metric": "aa-lcr", "rows": {"candidate_1": {"observed_at": "2026-10-16T02:58:33Z", "slug": "claude-opus-5-5-high", "source": "embedded", "value": 0.826666666666667}, "candidate_2": {"observed_at": "2026-10-16T03:01:09Z", "slug": "gpt-6-1-sol-high", "source": "embedded", "value": 0.823333333333333}}, "scope": "historical-proxy", "series": 5, "status": "registry-proxy-only", "task_tag": "long_document_synthesis"}
+{"metric": "terminal-bench-4-0", "rows": {"candidate_1": {"observed_at": "2026-10-16T02:58:33Z", "slug": "claude-opus-5-5-high", "source": "embedded", "value": 0.565656565656566}, "candidate_2": {"observed_at": "2026-10-16T03:01:09Z", "slug": "gpt-6-1-sol-high", "source": "embedded", "value": 0.515151515151515}}, "scope": "historical-proxy", "series": 61, "status": "registry-proxy-only", "task_tag": "verified_terminal_execution"}
+{"id": "aa-lcr", "positive": "historical-proxy", "negative": "acceptance tags incompatible"}
+{"id": "frontiercode", "positive": "no unique revision-bound label", "negative": "acceptance tags incompatible"}
+{"id": "ifbench", "positive": "no unique revision-bound label", "negative": "acceptance tags incompatible"}
+{"id": "omniscience-accuracy", "positive": "no unique revision-bound label", "negative": "acceptance tags incompatible"}
+{"id": "omniscience-hallucination-rate", "positive": "no unique revision-bound label", "negative": "acceptance tags incompatible"}
+{"id": "scicode", "positive": "no unique revision-bound label", "negative": "acceptance tags incompatible"}
+{"id": "terminal-bench-4-0", "positive": "historical-proxy", "negative": "acceptance tags incompatible"}
+{"id": "terminalbench21", "positive": "incompatible or missing comparable observations", "negative": "acceptance tags incompatible"}
+Real archived pins: Terminal-Bench newly discovered/missing/persistent declaration change held; AA-LCR unchanged, proxy-only; zero chooser calls
+PASS: synthetic mock-only pair, missing review, changed method, substituted task, exact effort, eligibility and privacy; no routing nominations

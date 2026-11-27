@@ -154,7 +154,12 @@ export class JevClient {
   async systemOne(
     state: State,
     questions: Questions,
-    opts: { model?: string; signal?: AbortSignal } = {}
+    opts: {
+      model?: string;
+      signal?: AbortSignal;
+      beforeTransportAttempt?: (attempt: number) => void;
+      observeTransportResponse?: (attempt: number, status: number, requestId: string | null) => void;
+    } = {}
   ): Promise<SystemOneResult> {
     opts.signal?.throwIfAborted();
     const requestedModel = opts.model ?? this.model ??
@@ -191,6 +196,8 @@ export class JevClient {
     try {
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         signal.throwIfAborted();
+        // A caller requesting durable attempt capture must record it before send.
+        opts.beforeTransportAttempt?.(attempt);
         const res = await fetch(this.endpoint!, {
           method: "POST",
           headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
@@ -198,6 +205,9 @@ export class JevClient {
           signal,
           redirect: "error",
         });
+        // Observe response headers before retry handling can discard the response.
+        opts.observeTransportResponse?.(attempt, res.status,
+          this.provider === "typesafe" ? res.headers.get("x-typesafe-request-id") : null);
         signal.throwIfAborted();
         if (RETRY_STATUSES.has(res.status) && attempt < MAX_ATTEMPTS) {
           const backoff = this.retryDelayMs * 2 ** (attempt - 1) * (1 + Math.random() * 0.2);
