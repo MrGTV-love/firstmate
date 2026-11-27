@@ -465,6 +465,61 @@ test_moved_real_treehouse_cases_follow_their_former_host() {
   pass "a moved real-Treehouse case is selected by its former host's family, its host's change and its host's triggers"
 }
 
+# A concurrency-safe family run under an explicit --jobs still runs the script that holds cases moved out of one of its
+# members: that script entered only through the moved-case mapping, so it is not refused for lacking a concurrency
+# proof; it runs in the serial phase after every concurrent phase, and the output names it. Named directly, the same
+# unproven script keeps the explicit --jobs refusal.
+test_inherited_moved_script_runs_serially_under_explicit_jobs() {
+  local tmp repo entry family host moved rc out
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-inherited-jobs.XXXXXX")
+  repo="$tmp/repo"
+  mkdir -p "$repo/bin" "$repo/tests"
+  cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/"
+  cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  chmod +x "$repo/bin/fm-test-run.sh"
+  for entry in 'standalone fm-spawn-pool-base-freshen fm-spawn-real-treehouse' \
+    'pr-forge fm-teardown-pool fm-teardown-pool-real-treehouse'; do
+    read -r family host moved <<<"$entry"
+    for s in "$host" "$moved" fm-teardown; do
+      printf '#!/usr/bin/env bash\necho "ok - %s ran"\n' "$s" >"$repo/tests/$s.test.sh"
+      chmod +x "$repo/tests/$s.test.sh"
+    done
+  done
+  for entry in 'standalone fm-spawn-pool-base-freshen fm-spawn-real-treehouse' \
+    'pr-forge fm-teardown-pool fm-teardown-pool-real-treehouse'; do
+    read -r family host moved <<<"$entry"
+    rc=0
+    (cd "$repo" && bin/fm-test-run.sh --family "$family" --jobs 2) >"$tmp/out" 2>"$tmp/err" || rc=$?
+    [ "$rc" -eq 0 ] || fail "--family $family --jobs 2 refused or failed: $(cat "$tmp/err")"
+    assert_grep "ok - $host ran" "$tmp/out" "--family $family --jobs 2 did not run $host"
+    assert_grep "ok - $moved ran" "$tmp/out" "--family $family --jobs 2 did not run the inherited $moved"
+    assert_grep "tests/$moved.test.sh entered this selection only as the holder of cases moved out of a selected script" \
+      "$tmp/err" "--family $family --jobs 2 did not name the inherited $moved as serial"
+    python3 - "$tmp/out" "tests/$moved.test.sh" <<'PY' || fail "--family $family --jobs 2 ran $moved beside another script: $(cat "$tmp/out")"
+import sys
+active, moved, beside = set(), sys.argv[2], False
+for line in open(sys.argv[1], encoding="utf-8"):
+    parts = line.split()
+    if line.startswith("FM_TEST_BEGIN "):
+        path = parts[2]
+        if active and (path == moved or moved in active):
+            beside = True
+        active.add(path)
+    elif line.startswith("FM_TEST_END "):
+        active.discard(parts[2])
+sys.exit(1 if beside else 0)
+PY
+    rc=0
+    (cd "$repo" && bin/fm-test-run.sh "tests/$moved.test.sh" "tests/$host.test.sh" --jobs 2) >"$tmp/out" 2>"$tmp/err" || rc=$?
+    [ "$rc" -ne 0 ] || fail "naming the unproven $moved directly under --jobs 2 was not refused"
+    assert_grep "--jobs 2 refused: tests/$moved.test.sh is not in the proven-isolated set" "$tmp/err" \
+      "naming $moved directly did not keep the explicit --jobs refusal"
+  done
+  rm -rf "$tmp"
+  pass "an inherited moved-case script runs in the serial phase under an explicit --jobs, and a directly named one is still refused"
+}
+
 test_changed_spawn_selects_picker_without_broadening_siblings() {
   local tmp repo listed source
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-spawn-selection.XXXXXX")
@@ -3494,6 +3549,7 @@ test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_watch_helpers_select_runnable_consumers
 test_changed_owners_of_the_moved_real_treehouse_cases_select_them
 test_moved_real_treehouse_cases_follow_their_former_host
+test_inherited_moved_script_runs_serially_under_explicit_jobs
 test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family

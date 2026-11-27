@@ -69,7 +69,10 @@
 #                   safe to run concurrently: individually in the proven-isolated
 #                   set (bin/fm-test-isolation-proof.sh --list), or in a family
 #                   carrying a recorded concurrent proof
-#                   (list_concurrent_safe_families below). Overall cap is 8;
+#                   (list_concurrent_safe_families below). A script that
+#                   entered only as the holder of cases moved out of a
+#                   selected script (moved_cases_script) is not refused; it
+#                   runs in the serial phase. Overall cap is 8;
 #                   family proofs may impose a lower cap. Individually proven
 #                   scripts share one phase; scripts admitted only by a family
 #                   proof run in a separate phase for each family. Concurrent
@@ -269,6 +272,7 @@ LANE=
 BASE_REF=origin/main
 JSON_PATH=
 SCRIPTS=()
+INHERITED_SCRIPTS=()
 EXCLUDE_FAMILIES=()
 FAIL_ON_GATE_SKIP=()
 JOBS=1
@@ -1728,14 +1732,29 @@ normalize_script_path() {
   esac
 }
 
-# Append unique relative-or-absolute script paths to SCRIPTS.
+# Append unique relative-or-absolute script paths to SCRIPTS. A script added here is named directly, so it is no
+# longer one that entered only through the moved-case mapping (INHERITED_SCRIPTS, below).
 add_script() {
   local p existing
+  local -a kept=()
   p=$(normalize_script_path "$1")
+  for existing in "${INHERITED_SCRIPTS[@]+"${INHERITED_SCRIPTS[@]}"}"; do
+    [ "$existing" = "$p" ] || kept+=("$existing")
+  done
+  INHERITED_SCRIPTS=("${kept[@]+"${kept[@]}"}")
   for existing in "${SCRIPTS[@]+"${SCRIPTS[@]}"}"; do
     [ "$existing" = "$p" ] && return 0
   done
   SCRIPTS+=("$p")
+}
+
+# script_is_inherited_only <path>: <path> entered the selection only through the moved-case mapping.
+script_is_inherited_only() {  # <path>
+  local existing
+  for existing in "${INHERITED_SCRIPTS[@]+"${INHERITED_SCRIPTS[@]}"}"; do
+    [ "$existing" = "$1" ] && return 0
+  done
+  return 1
 }
 
 select_all() {
@@ -1759,12 +1778,20 @@ moved_cases_script() {  # <basename>
   esac
 }
 
-# add_script_with_moved_cases <path>: add_script, plus the script holding any cases moved out of <path>.
+# add_script_with_moved_cases <path>: add_script, plus the script holding any cases moved out of <path>. A moved script
+# not otherwise selected is recorded in INHERITED_SCRIPTS: under an explicit --jobs it is not refused for lacking a
+# concurrency proof, because the caller did not name it; it runs in the serial phase after every concurrent phase.
 add_script_with_moved_cases() {  # <path>
-  local moved
+  local moved p existing
   add_script "$1"
   moved=$(moved_cases_script "$(basename "$1")")
-  [ -z "$moved" ] || [ ! -f "tests/$moved" ] || add_script "tests/$moved"
+  [ -n "$moved" ] && [ -f "tests/$moved" ] || return 0
+  p=$(normalize_script_path "tests/$moved")
+  for existing in "${SCRIPTS[@]+"${SCRIPTS[@]}"}"; do
+    [ "$existing" = "$p" ] && return 0
+  done
+  SCRIPTS+=("$p")
+  INHERITED_SCRIPTS+=("$p")
 }
 
 select_family() {
@@ -3050,6 +3077,8 @@ fi
 
 # An explicit --jobs names a concurrency for exactly the selection given, so an
 # unproven script in it is a refusal rather than something to schedule around.
+# The one exception is a script that entered only through the moved-case mapping
+# (add_script_with_moved_cases): the caller never named it, so it runs serially.
 if [ "$JOBS" -gt 1 ] && [ "$AUTO_CONCURRENCY" -eq 0 ]; then
   # A single heavy suite can occupy a whole serial shard. Its family may have
   # a separate concurrency proof, but that never changes this lane's contract.
@@ -3059,6 +3088,10 @@ if [ "$JOBS" -gt 1 ] && [ "$AUTO_CONCURRENCY" -eq 0 ]; then
     esac
   fi
   for s in "${SCRIPTS[@]}"; do
+    if ! script_allows_concurrency "$s" && script_is_inherited_only "$s"; then
+      log "$s entered this selection only as the holder of cases moved out of a selected script and has no concurrency proof, so it runs in the serial phase after every concurrent phase"
+      continue
+    fi
     if ! script_allows_concurrency "$s"; then
       die "--jobs $JOBS refused: $s is not in the proven-isolated set (see bin/fm-test-isolation-proof.sh --list) and its family has no recorded concurrent proof. Unproven stateful scripts stay serial."
     fi
