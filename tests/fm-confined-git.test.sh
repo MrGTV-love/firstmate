@@ -69,6 +69,13 @@ refusal_message() {
   printf "cannot lock ref 'refs/heads/%s': Unable to create '%s/refs/heads/%s.lock': Operation not permitted" "$1" "$2" "$1"
 }
 
+# rename_message <name under refs/heads/> <git dir as Git prints it>: the text
+# Git reports, without quoting either path, when the kernel refuses the reflog
+# move of a branch rename or copy into the name.
+rename_message() {
+  printf 'unable to move logfile %s/logs/refs/.tmp-renamed-log to %s/logs/refs/heads/%s: Operation not permitted' "$2" "$2" "$1"
+}
+
 # run_git <label> <path-lead> <confinement> <git argument...>: one git run with
 # <path-lead> first on PATH, its stdout, stderr and status kept under <label>.
 # A run that loops is stopped after 20 seconds.
@@ -119,7 +126,21 @@ test_refused_archive_name_gets_one_line_naming_it_and_both_shapes() {
       run_git "$label-wrapped" "$WRAP_DIR:$FAKEBIN" seatbelt-v1 branch "$REFUSED" 07526ab01
     assert_same_run "$label-plain" "$label-wrapped" 1 "refused $REFUSED through $gitdir"
     assert_names_shapes "$label-wrapped" "$REFUSED"
+    # A rename into the name: Git's refused reflog move names logs/, unquoted.
+    FAKE_GIT_MSG=$(rename_message "$REFUSED" "$gitdir") FAKE_GIT_STATUS=128 \
+      run_git "$label-rename-plain" "$FAKEBIN" seatbelt-v1 branch -m "fm/$TASK" "$REFUSED"
+    FAKE_GIT_MSG=$(rename_message "$REFUSED" "$gitdir") FAKE_GIT_STATUS=128 \
+      run_git "$label-rename-wrapped" "$WRAP_DIR:$FAKEBIN" seatbelt-v1 branch -m "fm/$TASK" "$REFUSED"
+    assert_same_run "$label-rename-plain" "$label-rename-wrapped" 1 "refused rename into $REFUSED through $gitdir"
+    assert_names_shapes "$label-rename-wrapped" "$REFUSED"
   done
+  # A delete of the name: Git's refused ref lock follows its own prefix.
+  FAKE_GIT_MSG="could not delete reference refs/heads/$REFUSED: $(refusal_message "$REFUSED" "$COMMON")" FAKE_GIT_STATUS=1 \
+    run_git delete-plain "$FAKEBIN" seatbelt-v1 branch -D "$REFUSED"
+  FAKE_GIT_MSG="could not delete reference refs/heads/$REFUSED: $(refusal_message "$REFUSED" "$COMMON")" FAKE_GIT_STATUS=1 \
+    run_git delete-wrapped "$WRAP_DIR:$FAKEBIN" seatbelt-v1 branch -D "$REFUSED"
+  assert_same_run delete-plain delete-wrapped 1 "refused delete of $REFUSED"
+  assert_names_shapes delete-wrapped "$REFUSED"
   [ -z "$(ls "$TMP_ROOT/tmp")" ] || fail "the wrapper left its trace file behind: $(ls "$TMP_ROOT/tmp")"
   pass "a refused archive name gets one extra stderr line naming it and both allowed shapes, with git's status, stdout and stderr unchanged"
 }
@@ -152,10 +173,12 @@ test_refusals_outside_the_task_archive_get_no_line() {
   mkdir -p "$other/.git/refs/heads/archive"
   # The same refusal outside refs/heads/archive/, and under another
   # repository's archive folder.
-  for label in outside other-repo; do
+  for label in outside other-repo rename-outside rename-other-repo; do
     case $label in
       outside) msg=$(refusal_message "fm/$TASK-other" "$COMMON") ;;
       other-repo) msg=$(refusal_message "$REFUSED" "$other/.git") ;;
+      rename-outside) msg=$(rename_message "fm/$TASK-other" "$COMMON") ;;
+      rename-other-repo) msg=$(rename_message "$REFUSED" "$other/.git") ;;
     esac
     FAKE_GIT_MSG=$msg FAKE_GIT_STATUS=128 run_git "$label-plain" "$FAKEBIN" seatbelt-v1 branch x
     FAKE_GIT_MSG=$msg FAKE_GIT_STATUS=128 run_git "$label-wrapped" "$WRAP_DIR:$FAKEBIN" seatbelt-v1 branch x
@@ -324,6 +347,21 @@ test_real_sandbox_refusal_names_the_shapes_the_profile_accepts() {
   assert_contains "$(cat "$TMP_ROOT/sandbox-refused-plain.err")" 'Operation not permitted' "the profile did not refuse $REFUSED"
   assert_same_run sandbox-refused-plain sandbox-refused-wrapped 1 "a confined refusal of $REFUSED"
   assert_names_shapes sandbox-refused-wrapped "$REFUSED"
+  # A rename into the name, refused at its reflog move.
+  sandbox_git sandbox-rename-plain /nonexistent branch -m "fm/$TASK" "$REFUSED"
+  sandbox_git sandbox-rename-wrapped "$wrap" branch -m "fm/$TASK" "$REFUSED"
+  assert_contains "$(cat "$TMP_ROOT/sandbox-rename-plain.err")" "logs/refs/heads/$REFUSED: Operation not permitted" "the profile did not refuse a rename into $REFUSED"
+  assert_same_run sandbox-rename-plain sandbox-rename-wrapped 1 "a confined rename into $REFUSED"
+  assert_names_shapes sandbox-rename-wrapped "$REFUSED"
+  git -C "$WT" rev-parse -q --verify "refs/heads/fm/$TASK" >/dev/null || fail "the refused rename lost fm/$TASK"
+  # A delete of the name, made outside the sandbox.
+  git -C "$WT" branch "$REFUSED" HEAD || fail "could not create the delete fixture"
+  sandbox_git sandbox-delete-plain /nonexistent branch -D "$REFUSED"
+  sandbox_git sandbox-delete-wrapped "$wrap" branch -D "$REFUSED"
+  assert_contains "$(cat "$TMP_ROOT/sandbox-delete-plain.err")" 'Operation not permitted' "the profile did not refuse deleting $REFUSED"
+  assert_same_run sandbox-delete-plain sandbox-delete-wrapped 1 "a confined delete of $REFUSED"
+  assert_names_shapes sandbox-delete-wrapped "$REFUSED"
+  git -C "$WT" branch -q -D "$REFUSED" || fail "the refused delete removed $REFUSED"
   # Both names the line offers are names the profile accepts.
   line=$(tail -n 1 "$TMP_ROOT/sandbox-refused-wrapped.err")
   for shape in "$SUBMITTED_SHAPE" "$PIPELINE_SHAPE"; do
@@ -351,7 +389,7 @@ test_real_sandbox_refusal_names_the_shapes_the_profile_accepts() {
     true' tamper "$wrap" >"$TMP_ROOT/tamper.out" 2>&1
   [ ! -s "$TMP_ROOT/tamper.out" ] || fail "a confined process changed the wrapper folder: $(cat "$TMP_ROOT/tamper.out")"
   cmp -s "$TMP_ROOT/wrapper-before" "$wrap/git" || fail "a confined process changed the wrapper"
-  pass "inside the real profile a refused archive name gets the line, both names it offers are accepted, and the wrapper cannot be changed"
+  pass "inside the real profile a refused create, rename into or delete of an archive name gets the line, both names it offers are accepted, and the wrapper cannot be changed"
 }
 
 fm_test_run_cases \

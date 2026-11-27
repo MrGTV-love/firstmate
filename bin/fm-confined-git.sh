@@ -25,19 +25,22 @@
 # TMPDIR/fm-confined-git.<wrapper pid>, only when FM_WRITE_CONFINEMENT=seatbelt-v1,
 # GIT_TRACE2_EVENT is not already set, the config is readable and that file
 # can be emptied or made; otherwise it execs the real git untouched. When git
-# exits nonzero and an error event says a path under refs/heads/archive/ in the
-# task's own shared Git directory was refused with "Operation not permitted",
-# it appends one stderr line naming each refused ref and the two archive shapes
-# the profile allows, with the task id spelled out. bin/fm-write-confinement.py
+# exits nonzero and an error event says a path under refs/heads/archive/ or
+# logs/refs/heads/archive/ in the task's own shared Git directory was refused
+# with "Operation not permitted", it appends one stderr line naming each
+# refused ref and the two archive shapes the profile allows, with the task id
+# spelled out. Git quotes the refused path, except for a branch rename or copy,
+# whose refused reflog move it reports as "unable to move logfile
+# <dir>/logs/refs/.tmp-renamed-log to <path>". bin/fm-write-confinement.py
 # owns those shapes; this line only restates them, and
 # tests/fm-confined-git.test.sh checks the profile accepts both.
 #
 # Limits: the line needs the English "Operation not permitted" text in a trace2
 # error event, so a refusal Git reports another way gets no line: a nested name
 # such as archive/<task>-x/y, whose folder Git reports only as "unable to
-# create directory", a branch rename, whose refused reflog move Git reports
-# without quoting the path, and receive-pack's text for a push into the task's
-# own clone. A refused path that holds a quote or a backslash gets no line. The
+# create directory", and receive-pack's text for a push into the task's own
+# clone. A refused path that holds a backslash gets no line, and one that holds a
+# quote may get none. The
 # wrapper is git's parent, so a signal sent only to the wrapper's pid stops the
 # wrapper and leaves git to finish, and a git killed by a signal is reported as
 # exit 128+n, the status a shell shows for it. For these calls
@@ -51,13 +54,18 @@ FM_CONFINED_GIT_MARKER='# fm-confined-git wrapper: explains a confined Git write
 fm_confined_git_note() {  # <task> <common> <trace>
   local task=$1 common=$2 trace=$3 line msg path dir name names='' seen='' nl=$'\n' resolved
   while IFS= read -r line || [ -n "$line" ]; do
-    case $line in *'"event":"error"'*"': Operation not permitted"*) ;; *) continue ;; esac
+    case $line in *'"event":"error"'*': Operation not permitted'*) ;; *) continue ;; esac
     msg=${line#*'"msg":"'}
     msg=${msg%'","fmt":"'*}
     case $msg in *\\*) continue ;; esac
-    path=${msg%%"': Operation not permitted"*}
-    path=${path##*"'"}
+    path=${msg%%': Operation not permitted'*}
     case $path in
+      *"'") path=${path%"'"} path=${path##*"'"} ;;
+      *'/logs/refs/.tmp-renamed-log to '*) path=${path#*'/logs/refs/.tmp-renamed-log to '} ;;
+      *) continue ;;
+    esac
+    case $path in
+      /*/logs/refs/heads/archive/?*) dir=${path%/logs/refs/heads/archive/*} name=${path##*/logs/refs/heads/archive/} ;;
       /*/refs/heads/archive/?*) dir=${path%/refs/heads/archive/*} name=${path##*/refs/heads/archive/} ;;
       *) continue ;;
     esac
