@@ -1,0 +1,70 @@
+
+### H1 manifest owner is another task -> refuses
+$ fm-control rrt rerecord-slot --check
+error: slot rerecord refused: owner_mismatch: manifest owner is 'other-task', the task is 'rrt'; no record, manifest, copy or journal was changed
+exit=1
+$ fm-control rrt rerecord-slot --manifest-sha 1ee7133f1ce680a91597e70dab2618018b05402e693f6213362093706077a645 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: owner_mismatch: manifest owner is 'other-task', the task is 'rrt'; no record, manifest, copy or journal was changed
+exit=1
+H1_WROTE_NOTHING=yes
+
+### H2 manifest base is the branch HEAD, not merge-base(origin/main, HEAD) -> refuses
+$ fm-control rrt rerecord-slot --manifest-sha b334325da5f6178521468b3e791034e461158f465e7c362c59acf09870916f48 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: base_not_on_default: the manifest base 04dbb6b69795a9f489fb2aa3e36722c24cca8d36 is not on origin/main (574146556bacaa7b66025ab06904615c55f99638); no record, manifest, copy or journal was changed
+exit=1
+H2_WROTE_NOTHING=yes
+
+### H3 renewed scope drops a changed path (tools/x.sh) -> refuses naming it
+$ fm-control rrt rerecord-slot --manifest-sha 79b2d4fb466c2999df85de8dcdab4a0714ee8705632daeebcd2b292fbd32d7de --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: scope_uncovered_change: tools/x.sh; no record, manifest, copy or journal was changed
+exit=1
+H3_WROTE_NOTHING=yes
+
+### H4 renewed scope grabs a path the branch never changed (docs.txt) -> refuses
+$ fm-control rrt rerecord-slot --manifest-sha 0d97f670630d0ab0c899a5d6e53ee898fcb080c96321d7548e30da7d99427a15 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: scope_entry_not_own_work: docs.txt is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added; no record, manifest, copy or journal was changed
+exit=1
+H4_WROTE_NOTHING=yes
+
+### H5 renewed scope grabs a whole tracked dir wider than the change (tools) -> refuses
+$ fm-control rrt rerecord-slot --manifest-sha 63a5bea5ca2c4cf90fd709a1cfd1dc4a5f0777f90e6ec466de83490df7d0a99c --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: scope_entry_not_own_work: tools is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added; no record, manifest, copy or journal was changed
+exit=1
+H5_WROTE_NOTHING=yes
+
+### H6 manifest names another copy path -> refuses
+$ fm-control rrt rerecord-slot --manifest-sha f028043763a643e7a92305d17ef8945c553e0ca20733184673dfbcbc52815300 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: worktree_path_mismatch: manifest names '/Users/charlesabrooker/tmp/fm-rr-fx.0Lp3z4/elsewhere', the task copy is '/Users/charlesabrooker/tmp/fm-rr-fx.0Lp3z4/wt'; no record, manifest, copy or journal was changed
+exit=1
+H6_WROTE_NOTHING=yes
+
+### H7 manifest names another branch -> refuses
+$ fm-control rrt rerecord-slot --manifest-sha 5ad3cd6e4478f1a7c291bc802ad95829f647cdd8f4237ac2d50fb96a113a4475 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: branch_mismatch: manifest branch is 'fm/other', the task branch is 'fm/rrt'; no record, manifest, copy or journal was changed
+exit=1
+H7_WROTE_NOTHING=yes
+
+### H9 a worker (FM_TASK_ID set) -> refuses actor_not_main
+error: slot rerecord refused: actor_not_main: a worker (FM_TASK_ID is set) never re-records slot identity; no record, manifest, copy or journal was changed
+exit=1
+H9_WROTE_NOTHING=yes
+
+### H10 the supervision branch (FM_SUPERVISION_ACTOR=branch) -> refuses actor_not_main
+error: slot rerecord refused: actor_not_main: the supervision branch never re-records slot identity; leave it to main (role partition: docs/pi-supervision-branch.md); no record, manifest, copy or journal was changed
+exit=1
+H10_WROTE_NOTHING=yes
+
+### H11 the home's session lock is held by another live process -> refuses session_lock_not_owned
+$ fm-control rrt rerecord-slot --manifest-sha 7c28def398655f4054c5b19f241211104bdc61953636d5f5fbb1d5eb0ebddd2a --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: session_lock_not_owned: re-recording slot identity requires the actual lock-owning main Firstmate; no record, manifest, copy or journal was changed
+exit=1
+H11_WROTE_NOTHING=yes
+
+### H12 a live launch owner holds the task's spawn lock -> --check reports it, write refuses launch_in_progress
+launch_proof=launch_in_progress
+write_would=refuse:launch_in_progress
+exit=0
+$ fm-control rrt rerecord-slot --manifest-sha 7c28def398655f4054c5b19f241211104bdc61953636d5f5fbb1d5eb0ebddd2a --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: launch_in_progress: the holder of the task's spawn lock /Users/charlesabrooker/tmp/fm-lab.heLVTQ/state/.spawn-rrt.lock (pid 5232) is still running; the refusal ends when that holder exits, and a holder that never exits belongs to the stuck-worker recovery path; no record, manifest, copy or journal was changed
+exit=1
+H12_WROTE_NOTHING=yes

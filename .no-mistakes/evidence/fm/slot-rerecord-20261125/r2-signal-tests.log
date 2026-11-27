@@ -1,0 +1,9 @@
+ok - R3: adopt_postcheck_failed; rolled back to P; archive kept; audit rolled-back
+ok - R9a: exit 143 under TERM in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - R9b: exit 129 under HUP in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - R9c: exit 130 under INT in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - R9d: first run exit 143 (TERM runs the trap at once: 1); staged bytes, pending, no restore; second run already recorded, published-recovered, one archive, audit_agrees
+ok - R9e: first run exit 143; staged bytes, audit published by the late rename, no restore, audit_agrees; second run unchanged, one archive
+ok - R9f: exit 143 under TERM in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - L22: TERM during a step 3 restore rename (immediate trap: 1): the trap keeps it and names the rolling-back audit record once
+ok - TS4: a TERM right after L20's rc 2 outcome is stored, while the closing marker names the second audit: the printed stop names both audits, each once

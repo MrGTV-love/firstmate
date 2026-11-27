@@ -1,0 +1,85 @@
+
+### R1 the project renewed the durable record; relaunch WITHOUT rerecord-slot (the reported problem)
+$ fm-control rrt relaunch --note 'resume after the slot renewal'
+error: slot adoption refused: base_mismatch: manifest base is 'db683393add7c6d14d42cc965a3417a794503ae3', the recorded base is '2025281b3d18111e28215ad6a769418b91ffcb29'; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task rrt: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fm-rr-fx.mnWTdU/wt; preserve and reconcile it first (a base_mismatch or scope_mismatch after the durable slot record was renewed is re-recorded with fm-control.sh rrt rerecord-slot --check, then without --check); the running agent was not stopped
+exit=1
+record_unchanged=yes
+pane: fmses:fm-rrt cmd=zsh
+
+### R2 rerecord-slot, then the ordinary relaunch
+$ fm-control rrt rerecord-slot --manifest-sha d80aefea3587e3f129013a702c7176d55bd63e76cfb50bb5cf865535e918b976 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base 2025281b3d18111e28215ad6a769418b91ffcb29 -> db683393add7c6d14d42cc965a3417a794503ae3; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.0tHwFz/data/rrt/slot-rerecord/prior-meta.20261127T192335Z.c6161a19c814.0
+exit=0
+$ fm-control rrt relaunch --note 'resume after the slot renewal'
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/tmp/fm-lab.0tHwFz/data/rrt/launch-brief.md records no ship branch; defaulting to legacy branch fm/rrt
+warning: /Users/charlesabrooker/tmp/fm-lab.0tHwFz/data/rrt/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: rrt ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for rrt: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched rrt harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-rrt worktree=/Users/charlesabrooker/tmp/fm-rr-fx.mnWTdU/wt
+exit=0
+pane: fmses:fm-rrt cmd=2.1.332
+
+### H14 the relaunched real Claude agent is running in the task window -> a check reports it is not stopped
+backend agent state: alive
+stopped_proof=agent_not_proven_stopped
+write_would=already recorded
+rerecord-slot rrt: already recorded
+exit=0
+journal:
+v1
+task=rrt
+phase=complete
+ts=2026-11-27T19:24:13Z
+backend=tmux
+endpoint=fmses:fm-rrt
+worktree=/Users/charlesabrooker/tmp/fm-rr-fx.mnWTdU/wt
+kind=ship
+from_harness=claude
+from_model=default
+from_effort=default
+to_harness=claude
+to_model=default
+to_effort=default
+worktree_head=ecfbf8a40d455c217cc9e35bd279d885bcf4d26e
+worktree_dirty=no
+note_file=/Users/charlesabrooker/tmp/fm-lab.0tHwFz/state/rrt.control-relaunch.note
+exit_result=already-stopped
+slot lines after relaunch:
+slot_base_sha=db683393add7c6d14d42cc965a3417a794503ae3
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+--- pane capture:
+e10e533869a/launch.s1795807424.40080.1701.sh'
+Welcome to Claude Code v2.1.332
+ Let's get started.
+ Choose the text style that looks best with your terminal
+ To change this later, run /theme
+ ❯ ✔ Auto (match terminal)
+     Dark mode
+     Light mode
+     Dark mode (colorblind-friendly)
+     Light mode (colorblind-friendly)
+     Dark mode (ANSI colors only)
+     Light mode (ANSI colors only)
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  1  function greet() {
+  2 -  console.log("Hello, World!");
+  2 +  console.log("Hello, Claude!");
+  3  }
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  Syntax theme: Monokai Extended (ctrl+t to disable)
+FX=/Users/charlesabrooker/tmp/fm-rr-fx.mnWTdU

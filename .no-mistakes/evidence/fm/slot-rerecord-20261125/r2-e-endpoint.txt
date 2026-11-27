@@ -1,0 +1,44 @@
+
+### E0 tmux server for this lab is /tmp/fml.2uRYAN (private); no server running -> endpoint missing, absence proven
+error connecting to /private/tmp/fml.2uRYAN/tmux-501/default (No such file or directory)
+stopped_proof=ok
+write_would=pass
+exit=0
+
+### H13 the task window holds a live process -> refuses agent_not_proven_stopped
+fmses:fm-rrt cmd=zsh dead=0
+stopped_proof=agent_not_proven_stopped
+write_would=refuse:agent_not_proven_stopped
+exit=0
+$ fm-control rrt rerecord-slot --manifest-sha 80ba021110a8008200f566de9fbe4993e623f2d80cc76700af48d53917209839 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: agent_not_proven_stopped: the endpoint fmses:fm-rrt reads 'ambiguous'; stop it with fm-control.sh <id> exit, then re-record; no record, manifest, copy or journal was changed
+exit=1
+H13_WROTE_NOTHING=yes
+
+### E1 the agent exited and the task window holds only its idle shell (reads dead) -> stopped proof passes and the write publishes
+fmses:fm-rrt cmd=zsh dead=0
+backend agent state: dead
+stopped_proof=ok
+write_would=pass
+exit=0
+$ fm-control rrt rerecord-slot --manifest-sha 80ba021110a8008200f566de9fbe4993e623f2d80cc76700af48d53917209839 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base 2eb8eb7087e608a8a520a647195ff60e13fb33d3 -> db664b226cf655e0da5260c46d82347bf956de7d; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.heLVTQ/data/rrt/slot-rerecord/prior-meta.20261127T202211Z.b381d430196b.0
+exit=0
+slot_base_sha=db664b226cf655e0da5260c46d82347bf956de7d
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+audit result: published
+after: fmses:fm-rrt cmd=zsh dead=0
+keys typed into the pane by the verb (pane history):
+Mac-Studio%

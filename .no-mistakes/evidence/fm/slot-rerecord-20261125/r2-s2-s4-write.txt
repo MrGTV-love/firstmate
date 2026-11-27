@@ -1,0 +1,93 @@
+
+### S2 write preconditions refuse and write nothing
+record_sha256=0afd5cae9ad422fd7ff59aacf32b63e393c217b39877882a1e6cdc5710572a8a
+manifest_sha256=c3e6bfd087eab98ecf3df71573821e39ed654d1fc6fb28e0c5e2d07691fa645b
+copy_head=16d532031eebf03dcb1af0e199aa9fb768e9db6c
+copy_status=
+audit_dir_entries=
+$ fm-control rrt rerecord-slot --manifest-sha c3e6bfd087eab98ecf3df71573821e39ed654d1fc6fb28e0c5e2d07691fa645b
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: note_required: a write needs --note (or --note-file) naming the ruling it carries out; no record, manifest, copy or journal was changed
+exit=1
+NO_NOTE_WROTE_NOTHING=yes
+$ fm-control rrt rerecord-slot --manifest-sha 0000000000000000000000000000000000000000000000000000000000000000 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: manifest_sha_mismatch: the manifest sha256 is c3e6bfd087eab98ecf3df71573821e39ed654d1fc6fb28e0c5e2d07691fa645b, but --manifest-sha names 0000000000000000000000000000000000000000000000000000000000000000; review the manifest again and bind the digest fm-control.sh <id> rerecord-slot --check prints; no record, manifest, copy or journal was changed
+exit=1
+WRONG_SHA_WROTE_NOTHING=yes
+
+### S3 write with the reviewed digest and a note
+$ fm-control rrt rerecord-slot --manifest-sha c3e6bfd087eab98ecf3df71573821e39ed654d1fc6fb28e0c5e2d07691fa645b --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base 8b27d4f5866368a11ca586a4dc0f2ca1e48261ea -> 8d0d0f6c180fddebafde6eec7a0c19b155dcb1a8; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.heLVTQ/data/rrt/slot-rerecord/prior-meta.20261127T201942Z.0afd5cae9ad4.0
+exit=0
+--- slot lines after:
+slot_base_sha=8d0d0f6c180fddebafde6eec7a0c19b155dcb1a8
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+OTHER_RECORD_LINES_UNCHANGED=yes
+--- audit dir:
+total 16
+-rw-------@ 1 charlesabrooker  staff  1155 Nov 27 14:19 20261127T201942Z.0afd5cae9ad4.0.record
+-rw-------@ 1 charlesabrooker  staff   421 Nov 27 14:19 prior-meta.20261127T201942Z.0afd5cae9ad4.0
+700 /Users/charlesabrooker/tmp/fm-lab.heLVTQ/data/rrt/slot-rerecord
+--- /Users/charlesabrooker/tmp/fm-lab.heLVTQ/data/rrt/slot-rerecord/20261127T201942Z.0afd5cae9ad4.0.record
+v1
+result=published
+archive=/Users/charlesabrooker/tmp/fm-lab.heLVTQ/data/rrt/slot-rerecord/prior-meta.20261127T201942Z.0afd5cae9ad4.0
+task=rrt
+prior_sha256=0afd5cae9ad422fd7ff59aacf32b63e393c217b39877882a1e6cdc5710572a8a
+staged=/Users/charlesabrooker/tmp/fm-lab.heLVTQ/state/.rrt.meta.rerecord.CeGMbn
+staged_sha256=aaa9d69093f4ab15e2709efdc3585eb7420e061c734ae2bfeee7f6f937a331d1
+prior_block_sha256=686d981a9859a85ed2ed22f2d2da922a21c81cefd6603426b59ef84de713d677
+staged_block_sha256=e0daf392d9980b08bc606f28ba8eb801152a8adb81ab19ab05975bceeb365705
+manifest=/Users/charlesabrooker/tmp/fm-rr-fx.Vd1CGU/manifests/manifest.json
+manifest_sha256=c3e6bfd087eab98ecf3df71573821e39ed654d1fc6fb28e0c5e2d07691fa645b
+old_base=8b27d4f5866368a11ca586a4dc0f2ca1e48261ea
+new_base=8d0d0f6c180fddebafde6eec7a0c19b155dcb1a8
+head=16d532031eebf03dcb1af0e199aa9fb768e9db6c
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+note="Lab ruling L-1: re-record the renewed slot after the authorized forward merge"
+ARCHIVE_EQUALS_PRIOR_RECORD=yes (/Users/charlesabrooker/tmp/fm-lab.heLVTQ/data/rrt/slot-rerecord/prior-meta.20261127T201942Z.0afd5cae9ad4.0)
+manifest_unchanged=yes
+
+### S4 a second write finds it already recorded and writes nothing
+$ fm-control rrt rerecord-slot --manifest-sha c3e6bfd087eab98ecf3df71573821e39ed654d1fc6fb28e0c5e2d07691fa645b --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+rerecord-slot rrt: already recorded
+exit=0
+REPEAT_WROTE_NOTHING=yes
+
+### S4b --check after the write
+$ fm-control rrt rerecord-slot --check
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=already recorded
+rerecord-slot rrt: already recorded
+exit=0
