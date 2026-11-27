@@ -784,7 +784,7 @@
 #     The shared daemon's agent (root ~/.no-mistakes), another task's agent, and
 #     regular plists that cannot be parsed are left as found; teardown never
 #     runs `no-mistakes daemon stop`, which targets the shared daemon.
-#     tests/fm-teardown-cleanup.test.sh's private, foreign, nested, and
+#     tests/fm-teardown-cleanup.test.sh's in-copy, foreign, nested, and
 #     absent-copy launch-agent cases exercise this boundary with a fake launchctl.
 #   Fix 4 - remove the task's own Docker stacks. Docker resources survive process
 #     exit, so after the process reap teardown calls bin/fm-task-docker-lib.sh,
