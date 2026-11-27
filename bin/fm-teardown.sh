@@ -3844,13 +3844,16 @@ teardown_home_runner_member() {  # <home> <pid>
       fm_procevent_claim_owned_by_state "$1/state" "$1" 2>/dev/null || continue
       case "$FM_PROCEVENT_CLAIM_PID" in (''|*[!0123456789]*) continue ;; esac
       # The runner writes its pid with printf '%s\n' "$$", so the file counts only
-      # when its bytes are exactly the claim's pid and that newline. The bytes are
-      # compared, never read into the shell; a compare that cannot run (cmp exit
-      # 2, a failed substitution) is not a match. The file must be a non-empty
-      # regular file first, so an expected-bytes producer that wrote nothing
-      # cannot make an empty file compare equal.
+      # when its bytes are exactly the claim's pid and that newline. The file must
+      # be a non-empty regular file, and its bytes are compared, never read into
+      # the shell: the expected line is piped into cmp, and both statuses of that
+      # pipeline are read before the verdict. Only a producer that succeeded and a
+      # cmp that found the bytes equal (exit 0) prove the record; a failed
+      # producer, a difference (cmp 1) or a compare error (cmp 2) do not.
       [ -f "$runner_file" ] && [ -s "$runner_file" ] || continue
-      cmp -s -- "$runner_file" <(printf '%s\n' "$FM_PROCEVENT_CLAIM_PID") 2>/dev/null || continue
+      printf '%s\n' "$FM_PROCEVENT_CLAIM_PID" | cmp -s -- "$runner_file" - 2>/dev/null
+      runner_cmp_status=("${PIPESTATUS[@]}")
+      [ "${runner_cmp_status[0]}" = 0 ] && [ "${runner_cmp_status[1]}" = 0 ] || continue
       fm_procevent_runner_leader_proved "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY" 2>/dev/null || continue
       printf '%s\n' "$FM_PROCEVENT_CLAIM_PID"
     done
