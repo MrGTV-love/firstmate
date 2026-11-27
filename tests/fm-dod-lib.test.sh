@@ -21,6 +21,12 @@ write_merge_marker() {  # <state> <id> <provider> <host> <path> <number>
   chmod 600 "$1/$2.pr-poll-merge-notified"
 }
 
+# Append a minimal inline criteria block to a fixture whose subject is another
+# part of the plan: a brief without criteria is refused outright.
+append_criteria() {  # <brief> <item>
+  printf '\n## Definition Of Done (task)\n### Mandatory items\n%s\n## How You'"'"'s Graded\nMandatory items pass or fail.\n' "$2" >> "$1"
+}
+
 test_dod_file_examples_are_not_directives() {
   local brief="$TMP_ROOT/fenced-dod.md" fence out rc item
   mkdir -p "$TMP_ROOT"
@@ -97,7 +103,7 @@ The badge updates after a refresh.
 ### Mandatory items
 $item
 ## How You're Graded
-This grading prose is not a criterion.
+The refresh is accepted only with the exact recorded result.
 EOF
   plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
     || fail "could not build verification plan"
@@ -106,7 +112,7 @@ EOF
   assert_contains "$plan" 'Do not redesign the dashboard.' 'plan lost the exclusions'
   assert_not_contains "$plan" 'Keep the existing renderer.' 'plan included unrelated build instructions'
   assert_not_contains "$plan" 'Firstmate-only build constraints' 'plan included mixed Firstmate specification'
-  assert_not_contains "$plan" 'This grading prose' 'plan included the grading section'
+  assert_contains "$plan" 'The refresh is accepted only with the exact recorded result.' 'plan dropped the grading section'
   assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'plan lost the shared claim check'
   assert_contains "$plan" 'Grade every DoD mandatory item by its id as pass, fail, or unresolved, with the evidence' 'plan lost per-item grading'
   assert_contains "$plan" 'A failed DoD mandatory item: block.' 'plan lost the failed-item outcome'
@@ -118,9 +124,26 @@ EOF
   assert_contains "$plan" '## Re-reviews (closure checks)' 'plan lost closure-check guidance'
   assert_not_contains "$plan" 'scout-time context' 'an unpromoted plan was labeled as scout context'
 
+  # A brief with no task Definition Of Done is refused: nothing would grade it.
   printf '# Task\nLegacy task.\n' > "$brief"
-  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy plan crashed'
-  assert_contains "$plan" 'Task Definition Of Done: absent' 'legacy plan concealed absent criteria'
+  if plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'a legacy brief with no task Definition Of Done was planned'
+  fi
+  assert_contains "$plan" 'it has no ## Definition Of Done (task) section, so nothing grades this task' \
+    'the refusal of a brief without criteria did not say why'
+
+  # A legacy brief that carries criteria still reports its unrecognized exclusions.
+  cat > "$brief" <<EOF
+# Task
+Legacy task.
+
+## Definition Of Done (task)
+### Mandatory items
+$item
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy plan with criteria crashed'
   assert_contains "$plan" 'Out-of-scope list: no recognized' 'legacy plan concealed unrecognized exclusions'
   assert_contains "$plan" 'check the Firstmate spec for inline exclusions' 'legacy plan did not send the reviewer to the spec'
 
@@ -135,13 +158,15 @@ Out of scope: Do not redesign the dashboard.
 
 Other build constraints must not become exclusions.
 ### Out of scope
-# Setup
+None.
 EOF
+  append_criteria "$brief" "$item"
+  printf '# Setup\n' >> "$brief"
   plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy exclusion paragraph failed'
   assert_contains "$plan" 'Do not redesign the dashboard.' 'legacy scope paragraph was dropped'
   assert_contains "$plan" 'Do not change billing.' 'legacy scope list was dropped'
   assert_not_contains "$plan" 'Other build constraints' 'legacy scope paragraph consumed unrelated build constraints'
-  assert_contains "$plan" 'Task Definition Of Done: absent' 'missing DoD with exclusions was concealed'
+  assert_not_contains "$plan" 'Task Definition Of Done: absent' 'a brief that carries criteria was reported as having none'
 
   cat > "$brief" <<'EOF'
 # Task
@@ -151,6 +176,7 @@ Fix the badge refresh.
 Keep the existing renderer.
 - Out of scope: Jev skill picking (separate task), any other Jev call site.
 EOF
+  append_criteria "$brief" "$item"
   plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'inline exclusion list item failed'
   assert_not_contains "$plan" 'Out-of-scope list: absent' 'an inline exclusion list item was reported absent'
   assert_contains "$plan" 'Out-of-scope list: no recognized' 'an unrecognized inline exclusion was not flagged'
@@ -168,6 +194,7 @@ Out of scope: Do not rename the badge.
 - Do not redesign the dashboard.
 Out of scope: Do not change the dashboard layout.
 EOF
+  append_criteria "$brief" "$item"
   plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'multi-source exclusions failed'
   assert_contains "$plan" 'Do not touch the billing page.' "exclusions under Captain's intent were reported absent"
   assert_contains "$plan" 'Do not rename the badge.' 'a legacy spec paragraph was dropped beside the subsection'
@@ -191,6 +218,7 @@ Keep the existing renderer.
 ### Implementation
 Build notes are not exclusions.
 EOF
+  append_criteria "$brief" "$item"
   plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'multi-subsection exclusions failed'
   assert_contains "$plan" 'Captain exclusion A.' 'the first Out of scope subsection was dropped'
   assert_contains "$plan" 'Spec exclusion B.' 'a later Out of scope subsection was dropped'
@@ -215,6 +243,7 @@ Keep the existing renderer.
 #1 priority is B.
 - Keep C.
 EOF
+  append_criteria "$brief" "$item"
   out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'hash-led exclusion lines failed'
   assert_contains "$out" '#12 legacy list item two.' 'a hash-led line ended a legacy exclusion paragraph'
   assert_contains "$out" '#1 priority is B.' 'a hash-led line ended an Out of scope subsection'
@@ -271,7 +300,7 @@ test_verification_plan_preserves_crlf_criteria_and_refuses_nul() {
   assert_contains "$out" "$first" 'CRLF criteria were lost'
   assert_contains "$out" 'Out of scope: Keep billing.' 'CRLF legacy exclusions were lost'
   assert_contains "$out" '- Keep layout.' 'CRLF subsection exclusions were lost'
-  assert_not_contains "$out" 'Not a criterion.' 'CRLF grading boundary was lost'
+  assert_contains "$out" 'Not a criterion.' 'CRLF grading was lost'
   assert_not_contains "$out" 'absent' 'CRLF criteria were misreported as absent'
   printf '%s\r\n' "$second" > "$criteria"
   printf '## Definition Of Done (task)\r\nDoD file: %s\r\n{DOD_MANDATORY_ITEMS}\r\n## How You'\''re Graded\r\n' "$criteria" > "$brief"
@@ -1171,6 +1200,7 @@ test_verification_plan_carries_the_stated_exclusions() {
   local brief plan
   brief="$TMP_ROOT/plan-exclusions.md"
   write_exclusion_brief "$brief" '- Do not change the public flag spelling.'
+  append_criteria "$brief" "$(fm_test_dod_item M1)"
   fm_brief_verification_plan "$brief" > "$TMP_ROOT/plan-exclusions.out" \
     || fail "verification plan construction failed for a brief with exclusions"
   plan=$(cat "$TMP_ROOT/plan-exclusions.out")
@@ -1408,8 +1438,15 @@ EOF
 # Arbitrary text is not criteria, and semantic adequacy is still the grader's job.
 test_mandatory_items_require_the_objective_contract() {
   local brief="$TMP_ROOT/criteria-contract.md" criteria_file="$TMP_ROOT/criteria-contract.txt" out rc valid case_text
-  local authority_field no_item fenced_verify
+  local authority_field no_item fenced_verify shape_rule alternate_order
   valid=$(fm_test_dod_item C1) || fail 'the item shape could not be read'
+  alternate_order='C2 Source: The request.
+Expected: A current report.
+Edge/negative: Missing reports fail.
+Evidence place: The report.
+Authority: grader
+Verify: Inspect the recorded result.'
+  shape_rule=$(fm_dod_item_shape rule) || fail 'the scaffold rule could not be read'
   authority_field=$(bash "$ROOT/bin/fm-dod-lib.sh" --shape | sed -n 's/^authority_field=//p')
   no_item="no mandatory item in the shape $(bash "$ROOT/bin/fm-dod-lib.sh" --shape | sed -n 's/^item=//p')"
   mkdir -p "$TMP_ROOT"
@@ -1442,6 +1479,16 @@ EOF
     "$(fm_test_dod_item C1 "-$authority_field")" \
     "$(fm_test_dod_item C1 "$authority_field=captain")" \
     "$valid
+bad id Source: scope. Expected: preserve data. Verify: check. Edge/negative: fail. Evidence place: output. Authority: grader" \
+    "$valid
+bad id Source: scope. Expected: preserve data. Verify: check. Edge/negative: fail. Evidence  place: output. Authority: grader" \
+    "$valid
+- bad id Source: scope." \
+    "$valid
+- \`bad id\` Source: scope." \
+    "$alternate_order
+bad id Source: scope. Expected: preserve data. Verify: check. Edge/negative: fail. Evidence place: output. Authority: grader" \
+    "$valid
 $(fm_test_dod_item C1)"; do
     printf '%s\n' "$case_text" > "$criteria_file"
     cat > "$brief" <<EOF
@@ -1453,6 +1500,9 @@ EOF
     [ "$rc" -eq 0 ] || fail "an invalid external criteria set was accepted: $case_text"
     out=$(fm_brief_dispatch_problems "$brief"); rc=$?
     [ "$rc" -eq 0 ] || fail "an invalid external criteria set passed the dispatch verdict: $case_text"
+    case "$case_text" in
+      *'bad id'*) assert_contains "$out" 'indent an example beneath the item or fence it' 'ambiguous legacy item lacked a repair';;
+    esac
   done
 
   printf '%s\n' "$valid" > "$criteria_file"
@@ -1467,6 +1517,7 @@ EOF
   cat > "$brief" <<EOF
 ## Definition Of Done (task)
 ### Mandatory items
+$shape_rule
 $valid
 ## How You're Graded
 EOF
@@ -1474,6 +1525,37 @@ EOF
   [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a structured inline criteria set was refused: $out"
   out=$(fm_brief_dispatch_problems "$brief"); rc=$?
   [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a structured inline criteria set failed the dispatch verdict: $out"
+
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+$alternate_order
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "valid legacy field order was rejected: $out"
+
+  cat > "$brief" <<'EOF'
+## Definition Of Done (task)
+### Mandatory items
+C1 Source: The request.
+Expected: A current report.
+Verify: Inspect the recorded result.
+  - Example: the release note prints *(mandatory)*.
+  - Example Source: a cited sample, not another criterion.
+  bad id Source: scope. Expected: preserve data. Verify: check. Edge/negative: fail. Evidence place: output. Authority: grader
+The report contains Source: pipeline, Expected: green, Verify: final head.
+Edge/negative: Missing reports fail.
+Evidence place: The report.
+Authority: grader
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "ordinary multiline verification prose was mistaken for an item: $out"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail 'ordinary multiline verification prose prevented plan construction'
 
   # Fenced examples are not criteria, and a fenced field label inside a real
   # Verify value is not a new criterion.
@@ -1533,6 +1615,312 @@ EOF
   pass 'mandatory items require unique ids, every --shape field nonempty, and a known Authority; fences and empty sections are refused'
 }
 
+# Exercise the actual defining skill's tiered, multi-group output rather than a
+# fixture derived from Firstmate's own legacy --shape producer.
+write_canonical_contract() {  # <path>
+  cat > "$1" <<'EOF'
+## Definition Of Done
+
+### User Outcome Achieved
+
+- **U1** The command reports a successful result.
+  *(mandatory)*
+  - Basis: The request requires the result.
+  - Expected: The command prints READY.
+  - Verify: Run the command and inspect the output.
+    - **Setup:** Create the input.
+    - **Run:** Execute the command.
+    ```text
+    - **FAKE** A fenced example is not a criterion. *(mandatory)*
+    ```
+  - Edge/negative: ERROR does not pass.
+  - Evidence: first result record.
+  - Authority: grader
+
+### Further outcome
+
+- **S1** Supporting output is readable. *(supporting)*
+  - Basis: The request values readability.
+  - Expected: Output is legible.
+  - Verify: Inspect the output.
+  - Edge/negative: Unreadable output is not complete.
+  - Evidence: supporting record.
+  - Authority: agent
+
+### Verification Complete
+
+- **V1** Required results are current. *(mandatory)*
+  - Basis: Current evidence is necessary.
+  - Expected: U1 has a current disposition.
+  - Verify: Inspect the result record for the reviewed revision.
+  - Edge/negative: Missing results are unverified.
+  - Evidence: later result record.
+  - Authority: gate
+
+## How You're Graded
+All mandatory items must pass, and S1 cannot offset a failure.
+
+## Contract Review
+- Revision: fixture-r1
+- Exit and basis: hypothetical fixture only, not a real review.
+EOF
+}
+
+test_canonical_contract_reaches_plan_with_grading() {
+  local criteria="$TMP_ROOT/canonical-contract.md" brief="$TMP_ROOT/canonical-brief.md" plan out rc id variant
+  write_canonical_contract "$criteria"
+  cat > "$brief" <<EOF
+# Task
+## Firstmate spec
+Deliver the result.
+### Out of scope
+None.
+## Definition Of Done (task)
+DoD file: $criteria
+## How You're Graded
+The task brief says U1 may fail and the task can still pass.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a canonical contract failed dispatch validation: $out"
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a canonical contract failed the completion check: $out"
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail 'the real plan interface refused a canonical contract'
+  assert_contains "$plan" "$brief" 'plan lost the task brief identity'
+  assert_contains "$plan" "$criteria" 'plan lost the external contract identity'
+  assert_contains "$plan" '**U1**' 'plan lost the first mandatory item'
+  assert_contains "$plan" '**S1**' 'plan lost the supporting item'
+  assert_contains "$plan" '**V1**' 'plan lost the later mandatory group'
+  assert_contains "$plan" 'S1 cannot offset a failure.' 'plan lost the contract grading'
+  assert_contains "$plan" 'The task brief says U1 may fail and the task can still pass.' 'plan lost the conflicting brief grading'
+  assert_contains "$plan" 'resolve conflicting sources or grading with the task owner' 'plan did not route conflicting grading'
+  assert_contains "$plan" '## Task brief grading' 'plan did not distinguish grading sources'
+
+  # Canonical IDs are unique labels, not the legacy parser's restricted token.
+  for id in '1.1' 'release/readiness' 'Release readiness'; do
+    variant="$TMP_ROOT/canonical-other-id.md"
+    awk -v replacement="**$id**" '{ sub(/\*\*V1\*\*/, replacement); print }' "$criteria" > "$variant"
+    printf '## Definition Of Done (task)\nDoD file: %s\n## How You\047re Graded\nAll mandatory items pass.\n' "$variant" > "$brief"
+    plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+      || fail "a unique canonical id was rejected: $id"
+    assert_contains "$plan" "**$id**" "plan lost canonical id $id"
+  done
+
+  {
+    printf '# Task\n## Firstmate spec\nDeliver the result.\n### Out of scope\nNone.\n## Definition Of Done (task)\n'
+    awk '/^## Definition Of Done$/ { next } /^## How You\047re Graded$/ { exit } { print }' "$criteria"
+    printf '## How You\047re Graded\nInline task grading must survive.\n'
+  } > "$brief"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "an inline canonical contract failed dispatch validation: $out"
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail 'the real plan interface refused an inline canonical contract'
+  assert_contains "$plan" '**V1**' 'inline plan lost the later mandatory group'
+  assert_contains "$plan" 'Inline task grading must survive.' 'inline plan lost task grading'
+  pass 'canonical external and inline contracts retain tiers, groups, source and grading'
+}
+
+test_canonical_contract_refuses_incomplete_or_ambiguous_items() {
+  local good="$TMP_ROOT/canonical-good.md" criteria="$TMP_ROOT/canonical-variant.md"
+  local brief="$TMP_ROOT/canonical-invalid-brief.md" out variant field mode rc
+  write_canonical_contract "$good"
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+DoD file: $criteria
+## How You're Graded
+All mandatory items must pass.
+EOF
+  for variant in missing-later missing-support duplicate-id invalid-id missing-id-criterion wrapped-missing-id missing-tier ambiguous-tier invalid-authority supporting-only; do
+    case "$variant" in
+      missing-later) sed '/  - Evidence: later result record\./d' "$good" > "$criteria" ;;
+      missing-support) sed '/  - Evidence: supporting record\./d' "$good" > "$criteria" ;;
+      duplicate-id) sed 's/\*\*S1\*\*/**U1**/' "$good" > "$criteria" ;;
+      invalid-id) sed 's/\*\*V1\*\*/****/' "$good" > "$criteria" ;;
+      missing-id-criterion) awk '/^### Verification Complete$/ { print; print "- M2 Required checks run. *(mandatory)*"; next } { print }' "$good" > "$criteria" ;;
+      wrapped-missing-id) awk '/^### Verification Complete$/ { print; print "- M2 Required checks run."; print "  *(mandatory)*"; next } { print }' "$good" > "$criteria" ;;
+      missing-tier) sed 's/(mandatory)/(unknown)/g' "$good" > "$criteria" ;;
+      ambiguous-tier) sed 's/(mandatory)/(mandatory) *(supporting)*/g' "$good" > "$criteria" ;;
+      invalid-authority) sed 's/Authority: gate/Authority: unknown/' "$good" > "$criteria" ;;
+      supporting-only) sed 's/(mandatory)/(supporting)/g' "$good" > "$criteria" ;;
+    esac
+    if out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+      fail "canonical $variant unexpectedly produced a plan"
+    fi
+    assert_contains "$out" 'verification plan refuses' "canonical $variant did not identify the refusal"
+  done
+  for field in Basis Expected Verify Edge/negative Evidence Authority; do
+    for mode in missing empty; do
+      awk -v wanted="$field" -v mode="$mode" '
+        /^- \*\*V1\*\*/ { item = 1 }
+        item && index($0, "  - " wanted ":") == 1 {
+          if (mode == "missing") next
+          sub(/:.*/, ":")
+        }
+        { print }
+      ' "$good" > "$criteria"
+      if out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+        fail "canonical later item with $mode $field unexpectedly produced a plan"
+      fi
+      assert_contains "$out" "$field" "canonical $mode field refusal did not identify $field"
+      out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+      [ "$rc" -eq 0 ] || fail "canonical $mode $field passed dispatch validation"
+      out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+      [ "$rc" -eq 0 ] || fail "canonical $mode $field passed the completion check"
+    done
+  done
+  pass 'canonical malformed items, duplicate ids and ambiguous tiers are refused'
+}
+
+test_conflicting_contract_directives_are_not_guessed() {
+  local brief="$TMP_ROOT/conflicting-contracts.md" first="$TMP_ROOT/first-criteria.md"
+  local second="$TMP_ROOT/second-criteria.md" third="$TMP_ROOT/third-criteria.md" item out rc
+  item=$(fm_test_dod_item M1) || fail 'the item shape could not be read'
+  printf '%s\n' "$item" > "$first"
+  printf '%s\n' "$item" > "$second"
+  printf '%s\n' "$item" > "$third"
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+DoD file: $first
+DoD file: $second
+DoD file: $third
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'conflicting contract directives passed dispatch validation'
+  assert_contains "$out" "$first" 'dispatch did not identify the first contract'
+  assert_contains "$out" "$second" 'dispatch did not identify the second contract'
+  assert_contains "$out" "$third" 'dispatch did not identify the third contract'
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'conflicting contract directives passed the completion check'
+  if out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'conflicting contract directives silently produced a plan'
+  fi
+  assert_contains "$out" "$first" 'plan refusal did not identify the first contract'
+  assert_contains "$out" "$second" 'plan refusal did not identify the second contract'
+  assert_contains "$out" "$third" 'plan refusal did not identify the third contract'
+
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+DoD file: $first
+DoD file: relative-contract.md
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'a malformed second contract reference passed dispatch validation'
+  assert_contains "$out" 'relative-contract.md' 'dispatch did not identify the malformed reference'
+  if out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'a malformed second contract reference silently produced a plan'
+  fi
+  assert_contains "$out" 'relative-contract.md' 'plan did not identify the malformed reference'
+
+  mkdir -p "$TMP_ROOT/failing-awk"
+  printf '#!/bin/sh\nexit 37\n' > "$TMP_ROOT/failing-awk/awk"
+  chmod +x "$TMP_ROOT/failing-awk/awk"
+  out=$(PATH="$TMP_ROOT/failing-awk:$PATH" bash -c '. "$1"; fm_brief_task_dod_file_problem "$2"' \
+    bash "$ROOT/bin/fm-dod-lib.sh" "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'a failed reference reader was treated as an unambiguous contract'
+  assert_contains "$out" 'unable to inspect DoD file references' 'reference reader failure was not reported'
+  pass 'conflicting, malformed or unreadable contract references require resolution'
+}
+
+test_legacy_supporting_prose_remains_valid() {
+  local brief="$TMP_ROOT/legacy-supporting-prose.md" criteria="$TMP_ROOT/legacy-supporting-file.md" item out rc
+  item=$(fm_test_dod_item M1) || fail 'the item shape could not be read'
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Supporting items
+- **Documentation quality** helps a maintainer understand the result. *(supporting)*
+  - Verify: A reviewer can navigate the result.
+### Mandatory items
+$item
+### Hard gates
+- **Credentials:** Do not disclose secrets.
+  - Verify: Inspect output for sensitive material.
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "legacy supporting prose was mistaken for a canonical item: $out"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail 'legacy supporting prose prevented plan construction'
+  assert_contains "$out" '**Documentation quality**' 'legacy supporting prose was lost'
+
+  cat > "$criteria" <<EOF
+$item
+### Supporting items
+- **Documentation quality** remains useful. *(supporting)*
+  - Verify: A reviewer can navigate the result.
+### Hard gates
+- **Credentials:** Do not disclose secrets.
+  - Verify: Inspect output for sensitive material.
+EOF
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+DoD file: $criteria
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail 'criteria-only legacy file with supporting prose was refused'
+  assert_contains "$out" '**Documentation quality**' 'legacy external supporting prose was lost'
+
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+$item
+- **M2** The other required result is present. *(mandatory)*
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  if out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'mixed legacy and canonical mandatory items unexpectedly produced a plan'
+  fi
+  assert_contains "$out" 'cannot be mixed' 'mixed mandatory items did not identify the incompatible formats'
+
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+$item
+### Verification Complete
+- M2 Required checks run.
+  *(mandatory)*
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  if out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'a wrapped malformed mandatory item outside the legacy group was ignored'
+  fi
+  pass 'legacy supporting prose remains valid while mixed mandatory formats are refused'
+}
+
+test_relative_brief_source_is_resolvable_from_a_different_directory() {
+  local dir="$TMP_ROOT/source directory" brief item plan locator
+  mkdir -p "$dir"
+  brief="$dir/brief file.md"
+  item=$(fm_test_dod_item M1) || fail 'the item shape could not be read'
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+$item
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  plan=$(cd "$TMP_ROOT" && bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan 'source directory/brief file.md') \
+    || fail 'plan construction failed for a relative brief path'
+  locator=$(printf '%s\n' "$plan" | awk '/^Source task brief: / { sub(/^Source task brief: /, ""); print; exit }')
+  case "$locator" in /*) ;; *) fail "plan recorded a non-absolute source: $locator" ;; esac
+  (cd / && [ -r "$locator" ] && [ "$locator" -ef "$brief" ]) \
+    || fail "plan source is not the original brief from another directory: $locator"
+  pass 'relative brief inputs yield an absolute, independently resolvable source'
+}
+
+test_canonical_contract_reaches_plan_with_grading
+test_canonical_contract_refuses_incomplete_or_ambiguous_items
+test_conflicting_contract_directives_are_not_guessed
+test_legacy_supporting_prose_remains_valid
+test_relative_brief_source_is_resolvable_from_a_different_directory
 test_dod_file_examples_are_not_directives
 test_unfenced_dod_file_is_still_honored
 test_mandatory_items_require_the_objective_contract
@@ -1650,5 +2038,212 @@ test_worker_role_renders_shared_rubric() {
 }
 
 test_worker_role_renders_shared_rubric
+
+# An independent review reader is told where the official contract record lives,
+# to grade against it rather than a snapshot, how the assignment hands it over,
+# and to leave the outcome ungraded when the assignment hands over nothing.
+test_worker_role_sends_a_reviewer_to_the_official_record() {
+  local role_file
+  role_file="$TMP_ROOT/worker-role-record.txt"
+  fm_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$ROOT" >"$role_file" \
+    || fail "worker role render failed"
+  assert_grep "official record of a task's adopted Definition Of Done and grading" "$role_file" \
+    "worker role did not name the official contract record"
+  assert_grep "\`data/<task-id>/brief.md\`" "$role_file" \
+    "worker role did not say where the official record is stored"
+  assert_grep 'where it differs from that record, the record governs and the difference is reported' "$role_file" \
+    "worker role let a snapshot outrank the record"
+  assert_grep 'An independent review begins by opening the record of the adopted Definition Of Done and grading' "$role_file" \
+    "worker role did not put opening the record first"
+  assert_grep "it names the path of that record (for a task, its durable brief, including any \`DoD file:\` it names; any other path is a copy)" "$role_file" \
+    "worker role did not say how a reviewer obtains the record, or trusted a copy as the record"
+  assert_grep 'or it states that the work has no task record' "$role_file" \
+    "worker role stopped a review of work that has no task record, or let silence pass for it"
+  assert_grep "and carries the criteria in its own \`## Definition Of Done (task)\` and \`## How You're Graded\` sections" "$role_file" \
+    "worker role let a review brief's own sections stand in for a task's record, or did not say which sections"
+  assert_grep 'Open that record and no other candidate record' "$role_file" \
+    "worker role let a reviewer read records the assignment does not name"
+  assert_grep 'An inline copy of criteria, including the sections of your own brief, is not the record unless the brief states that the work has no task record' "$role_file" \
+    "worker role let a review brief's own sections pass for the record without the no-record statement"
+  assert_grep 'If you cannot, the review stops there: your report names the gap and what firstmate must supply, and it is your whole report' "$role_file" \
+    "worker role let a reviewer go on after failing to open the record"
+  assert_grep 'You do not read, run, or judge the work' "$role_file" \
+    "worker role let a reviewer inspect the work it has no criteria for"
+  assert_grep 'a comment, a note, or the look of the work is not a requirement' "$role_file" \
+    "worker role let a reviewer take requirements from the work instead of the record"
+  assert_grep "The gap is an assignment that does neither of the two things, a record or \`DoD file:\` that does not open" "$role_file" \
+    "worker role did not make an assignment that names no record, or a file it names that does not open, a reportable gap"
+  assert_grep "that does not open, a record that has neither both sections nor a \`# Current ship Firstmate spec\` or whose Definition Of Done holds no items, or more than one candidate record" "$role_file" \
+    "worker role let a reviewer grade against a record with no criteria, stop a promoted task for lacking scout-time sections, or pick between records"
+  assert_grep 'a copy that differs from the record is not a gap: the record governs and the difference is reported' "$role_file" \
+    "worker role let a reviewer stop on a differing copy instead of grading against the record"
+  assert_grep "those sections are scout-time context, and its \`# Current ship Firstmate spec\` governs where they conflict" "$role_file" \
+    "worker role let scout-time criteria outrank a promoted task's ship spec"
+  assert_grep "With the record open, apply the rubric below to that record's items, stated intent, and exclusions" "$role_file" \
+    "worker role let the rubric be applied to anything but the record"
+  # Regression lock on the wording this change replaced; the behavior is pinned above.
+  assert_no_grep 'from its authorized task record or firstmate' "$role_file" \
+    "worker role still sends the reviewer to an unnamed source"
+  pass "worker role sends a reviewer to the official record and leaves an unrecorded outcome ungraded"
+}
+
+# The plan a reviewer receives is a snapshot; it must name the record that
+# governs when the two differ.
+test_verification_plan_names_the_record_that_governs() {
+  local brief plan
+  brief="$TMP_ROOT/plan-record-brief.md"
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+$(fm_test_dod_item M1)
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail "plan construction failed for the record notice"
+  assert_contains "$plan" 'This plan is a snapshot of what was supplied.' \
+    "plan did not label itself a snapshot"
+  assert_contains "$plan" 'The record of what this home adopted for the task is its durable brief, data/<task-id>/brief.md' \
+    "plan did not name the record a reviewer grades against"
+  assert_contains "$plan" 'the source task brief above is that record only when it is that file, and otherwise a copy' \
+    "plan named whatever brief it was built from as the adopted record"
+  assert_contains "$plan" 'Where this plan or a copy differs from that record, the record governs' \
+    "plan did not say the record outranks the snapshot"
+  assert_contains "$plan" 'resolve conflicting sources or grading with the task owner; a crewmate reports it to firstmate' \
+    "plan did not route a conflict to a reachable owner"
+  assert_contains "$plan" "$(fm_test_dod_item M1)" \
+    "plan dropped the criteria it was built from"
+  assert_not_contains "$plan" 'Task Definition Of Done: absent' \
+    "plan reported the criteria absent for a brief that has them"
+
+  # promoted from a scout: a plan built from it would grade nothing.
+  cat > "$brief" <<'EOF'
+# Task
+
+## Captain's intent
+An older brief that carries no task Definition Of Done.
+
+## Firstmate spec
+Do the work.
+EOF
+  if plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail "a plan was built for a brief without a Definition Of Done"
+  fi
+  assert_contains "$plan" "verification plan refuses $brief: it has no ## Definition Of Done (task) section, so nothing grades this task; add the section with at least one mandatory item and its grading" \
+    "the refusal did not name the brief, the missing section, and the repair"
+
+  # A grading section alone is the same refusal.
+  cat > "$brief" <<'EOF'
+# Task
+
+## Captain's intent
+An older brief that carries grading but no task Definition Of Done.
+
+## Firstmate spec
+Do the work.
+
+## How You're Graded
+Mandatory items pass or fail.
+EOF
+  if plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail "a plan was built for a brief with grading but no Definition Of Done"
+  fi
+  assert_contains "$plan" 'it has no ## Definition Of Done (task) section, so nothing grades this task' \
+    "the refusal for a grading-only brief did not name the missing section"
+
+  # A promoted task's criteria are its ship spec, so the plain line stays.
+  cat > "$brief" <<'EOF'
+# Task
+
+## Captain's intent
+Plan the work, then build it.
+
+## Firstmate spec
+Report, then build.
+
+# Current ship Firstmate spec
+Build the tool.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail "plan construction failed for a promoted brief without a Definition Of Done"
+  assert_contains "$plan" 'scout-time context' \
+    "promoted plan did not label its sections as scout-time context"
+  assert_contains "$plan" 'the promoted ship intent governs' \
+    "promoted plan did not name the ship intent as governing"
+  assert_contains "$plan" 'Task Definition Of Done: absent from this brief.' \
+    "promoted plan hid its absent scout-time section"
+  assert_contains "$plan" 'Task brief grading: absent from this brief.' \
+    "promoted plan hid its absent grading section"
+  assert_contains "$plan" 'A record that does not hold both a Definition Of Done and grading sections, and no # Current ship Firstmate spec, leaves the dependent outcome ungraded until the task owner supplies them or names the adopted record.' \
+    "plan did not state the rule for a record with no criteria or with rival records"
+  pass "verification plan names the record that governs over the snapshot"
+}
+
+# A finished review brief whose ## Firstmate spec starts with <spec-lines>.
+fm_test_review_brief() {  # <file> <spec-lines>
+  printf '# Task\n\n## Captain'"'"'s intent\nHave the work reviewed.\n\n## Firstmate spec\n%sReport to firstmate.\n\n### Out of scope\nNone.\n\n## Definition Of Done (task)\n### Mandatory items\n%s\n## How You'"'"'s Graded\nMandatory items pass or fail.\n' \
+    "$2" "$(fm_test_dod_item M1)" > "$1"
+}
+
+# A Reviewed task record line makes a brief a review assignment. The dispatch
+# verdict refuses one that names a file which cannot be opened, is not an
+# absolute path, or disagrees with a second such line; it accepts an openable
+# record or none, and does not check a brief that carries no such line.
+test_review_record_line_is_refused_unless_it_opens() {
+  local brief record out rc
+  brief="$TMP_ROOT/review-record-brief.md"
+  record="$TMP_ROOT/review-record.md"
+  rm -f "$record"
+  fm_test_review_brief "$brief" "Reviewed task record: $record
+"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a review naming a missing record was not refused"
+  assert_contains "$out" "Reviewed task record $record is not a readable file" \
+    "the refusal did not name the missing record"
+  : > "$record"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a review naming an empty record was not refused"
+  assert_contains "$out" "Reviewed task record $record is empty" \
+    "the refusal did not name the empty record"
+  printf 'Reviewed work.\n' > "$record"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a review naming an openable record was refused: $out"
+
+  fm_test_review_brief "$brief" "Reviewed task record: none
+"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a review of work with no task record was refused: $out"
+
+  fm_test_review_brief "$brief" "Reviewed task record: data/x/brief.md
+"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a relative record path was not refused"
+  assert_contains "$out" "invalid Reviewed task record: data/x/brief.md; it requires an absolute path or none" \
+    "the refusal did not name the relative path and what it needs"
+
+  fm_test_review_brief "$brief" "Reviewed task record: $record
+Reviewed task record: none
+"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "two disagreeing record lines were not refused"
+  assert_contains "$out" "conflicting Reviewed task record lines; name one adopted record or none" \
+    "the refusal did not name the conflict"
+
+  fm_test_review_brief "$brief" '```
+Reviewed task record: data/x/brief.md
+```
+'
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a fenced example of a record line was read as a directive: $out"
+
+  fm_test_review_brief "$brief" ''
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a brief with no record line was treated as a review: $out"
+  pass "a Reviewed task record line is refused unless it opens or says none"
+}
+
+test_worker_role_sends_a_reviewer_to_the_official_record
+test_verification_plan_names_the_record_that_governs
+test_review_record_line_is_refused_unless_it_opens
 
 echo "all fm-dod-lib tests passed"

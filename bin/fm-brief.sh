@@ -83,6 +83,17 @@
 # Definition of done then targets that branch with its pull request.
 # bin/fm-dod-lib.sh's fm_base_branch_valid owns which deliveries accept one.
 # Refused on --secondmate.
+# --review-of <task-id> scaffolds a scout brief that assigns an independent
+# review of another task's delivered work. It writes "Reviewed task record:
+# <absolute path>" as the first line under `## Firstmate spec`, naming that
+# task's durable brief, which is the record of its adopted Definition Of Done
+# and grading; the reviewed task's brief must exist when this runs.
+# `--review-of none` writes "Reviewed task record: none" for work that has no
+# task record, in which case the review's criteria are this brief's own task
+# Definition Of Done sections. bin/fm-spawn.sh refuses a dispatch while the line
+# names a file that cannot be read. Refused on ship and secondmate briefs: an
+# independent review delivers a report, not a PR, so it is not a ship task, and
+# a charter is not a review assignment.
 # --forge names the project's forge, defaults to none, and is orthogonal to --mode
 # exactly as the registry's `forge=` token is. It is the captain's confirmed
 # registry binding, read from data/projects.md at intake and passed here; this
@@ -254,6 +265,9 @@ BRANCH_PREFIX=fm/
 BRANCH_PREFIX_SET=0
 BASE_BRANCH=
 BASE_BRANCH_SET=0
+REVIEW_OF=
+REVIEW_OF_SET=0
+REVIEW_RECORD=
 FORGE=none
 FORGE_SET=0
 SHAPE=
@@ -275,6 +289,7 @@ for a in "$@"; do
       mode) MODE=$a; MODE_SET=1 ;;
       branch-prefix) BRANCH_PREFIX=$a; BRANCH_PREFIX_SET=1 ;;
       base-branch) BASE_BRANCH=$a; BASE_BRANCH_SET=1 ;;
+      review-of) REVIEW_OF=$a; REVIEW_OF_SET=1 ;;
       forge) FORGE=$a; FORGE_SET=1 ;;
       shape) SHAPE=$a; SHAPE_SET=1 ;;
       upstream-consent) UPSTREAM_CONSENT=$a; UPSTREAM_CONSENT_SET=1 ;;
@@ -296,6 +311,8 @@ for a in "$@"; do
     --branch-prefix=*) BRANCH_PREFIX=${a#--branch-prefix=}; BRANCH_PREFIX_SET=1 ;;
     --base-branch) want_value="base-branch" ;;
     --base-branch=*) BASE_BRANCH=${a#--base-branch=}; BASE_BRANCH_SET=1 ;;
+    --review-of) want_value=review-of ;;
+    --review-of=*) REVIEW_OF=${a#--review-of=}; REVIEW_OF_SET=1 ;;
     --forge) want_value=forge ;;
     --forge=*) FORGE=${a#--forge=}; FORGE_SET=1 ;;
     --shape) want_value=shape ;;
@@ -446,6 +463,32 @@ if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
   exit 1
 fi
 printf -v BRANCH_Q '%q' "$BRANCH"
+
+# A review brief names the record of the reviewed work by the absolute path of
+# that task's durable brief, so the reviewer never has to locate or guess it.
+# The record is checked here, before anything is written, and again by the
+# dispatch verdict in bin/fm-dod-lib.sh, which owns what a sound line is.
+if [ "$REVIEW_OF_SET" -eq 1 ]; then
+  if [ "$KIND" != scout ]; then
+    echo "error: --review-of applies only to scout briefs; an independent review delivers a report, not a PR, so scaffold it with --scout" >&2
+    exit 1
+  fi
+  if [ "$REVIEW_OF" != none ]; then
+    if [ -z "$REVIEW_OF" ] || ! git check-ref-format --branch "fm/$REVIEW_OF" >/dev/null 2>&1; then
+      echo "error: --review-of takes a task id of this home or none (got '$REVIEW_OF')" >&2
+      exit 1
+    fi
+    REVIEW_RECORD="$DATA/$REVIEW_OF/brief.md"
+    if [ ! -f "$REVIEW_RECORD" ] || [ ! -r "$REVIEW_RECORD" ]; then
+      echo "error: --review-of: no brief for task $REVIEW_OF at $REVIEW_RECORD; pass the id of a task whose brief exists in this home, or none when the reviewed work has no task record" >&2
+      exit 1
+    fi
+    if [ -z "$(tr -d '[:space:]' < "$REVIEW_RECORD")" ]; then
+      echo "error: --review-of: the brief for task $REVIEW_OF is empty: $REVIEW_RECORD; a review grades against that record, so it cannot be blank" >&2
+      exit 1
+    fi
+  fi
+fi
 
 if [ "$KIND" = secondmate ] && [ "$HERDR_LAB" -eq 1 ]; then
   echo "error: --herdr-lab applies only to crewmate ship or scout briefs" >&2
@@ -698,13 +741,20 @@ fi
 
 DOD_TASK=$(fm_task_dod_block)
 
-IFS= read -r -d '' TASK_SECTION <<'EOF' || true
+REVIEW_RECORD_LINE=
+if [ "$REVIEW_OF_SET" -eq 1 ]; then
+  if [ "$REVIEW_OF" = none ]; then REVIEW_RECORD_LINE="Reviewed task record: none"
+  else REVIEW_RECORD_LINE="Reviewed task record: $REVIEW_RECORD"; fi
+  REVIEW_RECORD_LINE=$REVIEW_RECORD_LINE$'\n'
+fi
+
+IFS= read -r -d '' TASK_SECTION <<EOF || true
 # Task
 ## Captain's intent
 {TASK}
 
 ## Firstmate spec
-{FIRSTMATE_SPEC}
+${REVIEW_RECORD_LINE}{FIRSTMATE_SPEC}
 
 Egress needs: []
 

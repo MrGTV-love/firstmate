@@ -1377,6 +1377,64 @@ test_base_branch_is_rendered_and_bounded() {
   pass "fm-brief.sh: --base-branch records the base, targets the PR at it, and is refused where no PR carries it"
 }
 
+# A brief that assigns an independent review records the reviewed work's record
+# on one line under ## Firstmate spec: the absolute path of the named task's
+# brief, or none. The task's brief must exist when the scaffold runs, a charter
+# is not a review, and a brief scaffolded without the flag carries no line.
+test_review_of_records_the_record_path() {
+  local home out rc brief reviewed record count id
+  home="$TMP_ROOT/review-of-home"
+  mkdir -p "$home/data"
+  # shellcheck source=bin/fm-dod-lib.sh
+  . "$ROOT/bin/fm-dod-lib.sh"
+  reviewed="$home/data/reviewed-work"
+  mkdir -p "$reviewed"
+  printf 'Reviewed work.\n' > "$reviewed/brief.md"
+  record="$reviewed/brief.md"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" review-scout some-proj --scout --review-of reviewed-work >/dev/null 2>&1 \
+    || fail "scout --review-of should scaffold"
+  brief="$home/data/review-scout/brief.md"
+  assert_grep "Reviewed task record: $record" "$brief" \
+    "the review brief did not record the reviewed task's brief by absolute path"
+  count=$(fm_brief_heading_parse "$brief" "## Firstmate spec" unfenced-body "### Out of scope" | grep -c '^Reviewed task record:') || count=0
+  [ "$count" -eq 1 ] || fail "the spec of the review brief holds $count Reviewed task record lines, not one"
+  assert_grep "{FIRSTMATE_SPEC}" "$brief" "the record line replaced the Firstmate spec placeholder"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" review-none some-proj --scout --review-of=none >/dev/null 2>&1 \
+    || fail "scout --review-of=none should scaffold"
+  assert_grep "Reviewed task record: none" "$home/data/review-none/brief.md" \
+    "a review of work with no task record did not say so"
+
+  # A review delivers a report, not a PR, so it is not a ship task.
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" review-ship some-proj --mode direct-PR --review-of reviewed-work 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "a ship brief should refuse --review-of"
+  assert_contains "$out" "applies only to scout briefs" "the ship --review-of refusal did not say which kind of brief carries one"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" review-plain some-proj --scout >/dev/null 2>&1
+  assert_no_grep "Reviewed task record:" "$home/data/review-plain/brief.md" \
+    "a brief scaffolded without --review-of carries a record line"
+
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" review-missing some-proj --scout --review-of no-such-task 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "--review-of a task without a brief should be refused"
+  assert_contains "$out" "brief for task no-such-task" "the missing-brief refusal did not name the task"
+  mkdir -p "$home/data/empty-work"
+  : > "$home/data/empty-work/brief.md"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" review-empty some-proj --scout --review-of empty-work 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "--review-of a task with an empty brief should be refused"
+  assert_contains "$out" "brief for task empty-work is empty" "the empty-brief refusal did not name the task"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" review-slash some-proj --scout --review-of '../elsewhere' 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "--review-of a value that is not a task id should be refused"
+  out=$(FM_HOME="$home" FM_SECONDMATE_CHARTER=charter "$ROOT/bin/fm-brief.sh" review-charter --secondmate --no-projects --review-of reviewed-work 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "a secondmate charter should refuse --review-of"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" review-blank some-proj --scout --review-of '' 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "an empty --review-of value should be refused"
+  for id in review-missing review-empty review-slash review-charter review-blank review-ship; do
+    [ ! -e "$home/data/$id/brief.md" ] || fail "a refused --review-of scaffold wrote $id"
+  done
+  pass "fm-brief.sh: --review-of records the reviewed record's absolute path or none, and is refused where it cannot"
+}
+
 # (a) An unregistered/default project - no --branch-prefix passed at all - must
 # keep every generated ship mode's branch on the legacy "fm/<task-id>" name, byte
 # for byte, so every existing firstmate installation is unaffected.
@@ -2102,6 +2160,7 @@ test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief
 test_home_brief_include_is_appended_last
 test_base_branch_is_rendered_and_bounded
+test_review_of_records_the_record_path
 test_ship_branch_prefix_defaults_to_legacy_fm
 test_ship_branch_prefix_override_is_consistent_across_modes
 test_ship_branch_prefix_empty_override_yields_bare_task_id

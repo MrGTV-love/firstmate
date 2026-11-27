@@ -109,22 +109,25 @@
 # restating the rule.
 # Executable interface: bash bin/fm-dod-lib.sh --verification-plan <brief>
 # prints a verification plan for no-mistakes' --verification-plan FILE input.
-# It keeps task criteria and scope evidence separate from --intent and renders
-# docs/review-rubric.md, the one rubric owner also used by independent readers.
+# It keeps task criteria, grading, source references and scope evidence separate
+# from --intent and renders docs/review-rubric.md for independent readers.
 # Task DoD content includes nested headings up to ## How You're Graded; an
 # unfenced DoD file directive selects that file's contents instead of the inline
 # scaffold, matching the criteria check, and never passes only its path.
+# Distinct directives refuse rather than guessing. The separately labeled brief
+# grading is retained; a source or snapshot is not proof of adoption or currency.
 # Exclusions are gathered from the unfenced lines of every ### Out of scope
 # subsection and every legacy column-0 Out of scope: paragraph in # Task
 # (including its following list until a blank line), each printed once in order.
 # Other spellings, such as a `- Out of scope:` list item, are not extracted.
 # A promoted brief, marked by its # Current ship Firstmate spec heading, labels
-# that DoD and those exclusions as scout-time context; the promoted ship intent
-# governs where they conflict.
-# Absent criteria are explicit; an unrecognized exclusion list never claims none
-# exist and sends the reviewer to the Firstmate spec. Unreadable briefs, criteria
-# files or the shared rubric refuse construction rather than silently dropping
-# evidence.
+# that DoD, brief grading and those exclusions as scout-time context; the promoted
+# ship intent governs where they conflict, and such a brief is planned even
+# without a task Definition Of Done. Any other brief without one is refused
+# rather than planned: nothing would grade the task. An unrecognized exclusion
+# list never claims none exist and sends the reviewer to the Firstmate spec.
+# Unreadable briefs, criteria files or the shared rubric refuse construction
+# rather than silently dropping evidence.
 # CRLF briefs and criteria are accepted; NUL-bearing input is refused by path.
 # Every heredoc here stays outside a command substitution: `VAR=$(cat <<EOF ...)`
 # breaks parsing of the whole file on Bash 3.2 (tests/fm-brief.test.sh).
@@ -144,6 +147,22 @@
 # It renders docs/review-rubric.md for independent review readers rather than
 # pointing at it, because that file is outside the Claude and Rovo read grants;
 # a missing rubric fails the role render instead of dropping the criteria.
+# For an independent review the role names the reviewed task's durable brief
+# (data/<task-id>/brief.md under the home) as the official record of its adopted
+# Definition Of Done and grading, with a promoted task's scout-time sections as
+# context under its ship spec, which governs where they conflict; it sends the
+# reader to the record the assignment names (the assignment's own criteria
+# sections for work with no task record) and has it report a missing record
+# path, a record that does not open or holds none of those sections, or
+# candidate records that disagree to firstmate instead of grading against a
+# guess. A differing copy is not such a conflict: the record governs.
+# A task id without the path is that gap: in a cold trial a reviewer given only
+# the id graded its own brief's sections and a generic code read, never the task's
+# record, so the role also states that the work has no criteria to grade against
+# until the record is open. "No task record" must be stated by the assignment,
+# never inferred from silence, and nothing outside the record is a requirement:
+# in a later cold trial a reviewer handed neither treated its own brief as the
+# record and blocked the work on something it read in the code.
 # The task-specific Definition of Done is the second half of a ship or scout
 # brief's completion contract: fm_task_dod_block prints the two sections
 # bin/fm-brief.sh scaffolds after the delivery contract above ("## Definition Of
@@ -200,7 +219,11 @@ Project instructions still govern the work wherever they do not conflict with th
 EOF
   printf "If the \`firstmate-coding-guidelines\` skill name does not resolve in this session, read \`%s/.agents/skills/firstmate-coding-guidelines/SKILL.md\` instead.\n" "$root"
   printf '%s\n' "For work that adds or changes tests, hooks or validators, use the existing Intent-to-test alignment criteria in the shared review rubric below during implementation and verification; it does not change the task's scope or delivery contract."
-  printf '%s\n\n' "When assigned an independent review, apply the shared review rubric below, rendered from \`$root/docs/review-rubric.md\`, against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate if it was not supplied."
+  printf '%s\n\n' "When assigned an independent review, apply the shared review rubric below, rendered from \`$root/docs/review-rubric.md\`, against the reviewed task's DoD and exclusions.
+The official record of a task's adopted Definition Of Done and grading in the supervising firstmate home is that task's durable brief, \`data/<task-id>/brief.md\`: its \`## Definition Of Done (task)\` and \`## How You're Graded\` sections and any \`DoD file:\` they name. For a task promoted from a scout those sections are scout-time context, and its \`# Current ship Firstmate spec\` governs where they conflict. A verification plan, a pasted copy, or a summary is a snapshot of what was supplied; where it differs from that record, the record governs and the difference is reported.
+An independent review begins by opening the record of the adopted Definition Of Done and grading. Your assignment does one of two things: it names the path of that record (for a task, its durable brief, including any \`DoD file:\` it names; any other path is a copy), or it states that the work has no task record, as with an external pull request or a document, and carries the criteria in its own \`## Definition Of Done (task)\` and \`## How You're Graded\` sections. Open that record and no other candidate record. An inline copy of criteria, including the sections of your own brief, is not the record unless the brief states that the work has no task record.
+If you cannot, the review stops there: your report names the gap and what firstmate must supply, and it is your whole report. You do not read, run, or judge the work, because until the record is open the work has no criteria, no stated intent, and no exclusions, and a comment, a note, or the look of the work is not a requirement. The gap is an assignment that does neither of the two things, a record or \`DoD file:\` that does not open, a record that has neither both sections nor a \`# Current ship Firstmate spec\` or whose Definition Of Done holds no items, or more than one candidate record; a copy that differs from the record is not a gap: the record governs and the difference is reported.
+With the record open, apply the rubric below to that record's items, stated intent, and exclusions."
   cat "$root/docs/review-rubric.md"
 }
 
@@ -573,6 +596,7 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
       sub(/\r$/, "", line)
       if (line ~ /^[ \t]*$/) next
       s = trim(line)
+      line_indent = match(line, /[^ \t]/) - 1
 
       # A fenced example is never parsed as an item, a field label, or a
       # heading. Its nonblank content still belongs to the current field, so a
@@ -608,14 +632,37 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
       # An item header carries its id and the lead field on one line.
       p = index(s, lead ":")
       if (p > 1 && substr(s, p - 1, 1) ~ /[ \t]/) {
+        # A deeper line in a current field is an example or continuation, not a
+        # sibling item, even when its text resembles an item header.
+        if (id != "" && field != "" && field != authority_field && line_indent > item_indent) {
+          value[field] = value[field] " " s
+          next
+        }
+        is_bullet = s ~ /^[-*+][ \t]+/
         prefix = trim(substr(s, 1, p - 1))
         sub(/^[-*+][ \t]+/, "", prefix)
         candidate = trim(prefix)
         sub(/[.:)]+$/, "", candidate)
-        # The scaffold instruction line mentions the lead field too; only a
-        # lone id token starts an item, and other prose is ignored.
-        if (candidate !~ idre) next
+        # A full item-shaped line or bullet at sibling indentation is ambiguous
+        # when its id is malformed; ordinary continuation prose stays content.
+        if (candidate !~ idre) {
+          n_fields = split(fields, required_fields, "|")
+          full_item = 1
+          for (j = 1; j <= n_fields; j++) {
+            label_pattern = required_fields[j]
+            gsub(/ /, "[ \t]+", label_pattern)
+            if (s !~ (label_pattern ":")) full_item = 0
+          }
+          if ((is_bullet || (full_item && candidate !~ /[`<>]/)) && (id == "" || line_indent <= item_indent)) {
+            print "mandatory item has an invalid id: " candidate "; indent an example beneath the item or fence it"
+            bad = 1
+          } else if (id != "" && field != "" && field != authority_field) {
+            value[field] = value[field] " " s
+          }
+          next
+        }
         finish()
+        item_indent = line_indent
         id = candidate
         field = lead
         seen[field] = 1
@@ -658,32 +705,64 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
   return 0
 }
 
-# Print the first structural mandatory-items problem in <text> and return 0;
-# return 1 when the items are well formed. <require-heading> is `inline` for a
-# Definition of Done section, which must carry the `### Mandatory items`
-# heading, and `file` for a separate criteria file, which may hold only items.
+# Print the first structural criteria problem; return 1 when none exists.
 fm_dod_criteria_text_problem() {  # <text> <inline|file>
-  local text=$1 scope=$2 body first
-  if [ "$scope" = inline ] \
-    && ! printf '%s\n' "$text" | fm_brief_heading_parse - "### Mandatory items" present >/dev/null; then
-    printf '### Mandatory items is missing\n'
-    return 0
-  fi
-  body=$(fm_dod_mandatory_body "$text" "$scope")
-  first=$(fm_dod_criteria_problem "$body") || return 1
-  printf '%s\n' "${first%%$'\n'*}"
+  local problems
+  problems=$(fm_dod_criteria_text_problem_list "$1" "$2") || return 1
+  printf '%s\n' "${problems%%$'\n'*}"
 }
 
-# Print every structural mandatory-items problem in <text>, one line each, and
-# return 0 when at least one exists; return 1 when the items are well formed.
+# Validate the defining skill's tiered criteria or the existing Firstmate shape.
+# Canonical groups are checked together, including supporting items; legacy
+# supporting prose remains outside the legacy mandatory-item check.
 fm_dod_criteria_text_problem_list() {  # <text> <inline|file>
-  local text=$1 scope=$2 body
-  if [ "$scope" = inline ] \
-    && ! printf '%s\n' "$text" | fm_brief_heading_parse - "### Mandatory items" present >/dev/null; then
+  local text=$1 scope=$2 body parser out rc legacy_mode=0 legacy_prose_start=0 mandatory_heading=0
+  parser="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-dod-canonical.awk"
+  if [ ! -f "$parser" ] || [ ! -r "$parser" ]; then
+    printf 'canonical criteria parser is not a readable file: %s\n' "$parser"
+    return 0
+  fi
+  if printf '%s\n' "$text" | fm_brief_heading_parse - '## Definition Of Done' present >/dev/null; then
+    text=$(printf '%s\n' "$text" | fm_brief_heading_parse - '## Definition Of Done' body "$FM_TASK_DOD_GRADED_TITLE")
+  fi
+  if printf '%s\n' "$text" | fm_brief_heading_parse - '### Mandatory items' present >/dev/null; then
+    mandatory_heading=1
+  fi
+  body=$(fm_dod_mandatory_body "$text" "$scope")
+  if [ "$mandatory_heading" -eq 1 ] || [ "$scope" = file ]; then
+    rc=0
+    printf '%s\n' "$body" | awk -v action=legacy -v legacy_id_pattern="$FM_DOD_ITEM_ID_PATTERN" \
+      -v legacy_lead="$FM_DOD_ITEM_LEAD" -f "$parser" || rc=$?
+    case "$rc" in
+      0) legacy_mode=1; [ "$mandatory_heading" -eq 0 ] || legacy_prose_start=1 ;;
+      1) ;;
+      *) printf 'legacy criteria detection failed with exit %s\n' "$rc"; return 0 ;;
+    esac
+  fi
+  rc=0
+  printf '%s\n' "$text" | awk -v action=detect -v legacy_id_pattern="$FM_DOD_ITEM_ID_PATTERN" \
+    -v legacy_lead="$FM_DOD_ITEM_LEAD" -v legacy_mode="$legacy_mode" \
+    -v legacy_prose_start="$legacy_prose_start" -f "$parser" || rc=$?
+  case "$rc" in
+    0)
+      rc=0
+      out=$(printf '%s\n' "$text" | awk -v action=check -v legacy_id_pattern="$FM_DOD_ITEM_ID_PATTERN" \
+        -v legacy_lead="$FM_DOD_ITEM_LEAD" -v authorities="$FM_DOD_AUTHORITIES" -f "$parser") || rc=$?
+      if [ "$rc" -gt 1 ]; then
+        printf 'canonical criteria parser failed with exit %s\n' "$rc"
+        return 0
+      fi
+      [ "$rc" -eq 0 ] || return 1
+      printf '%s\n' "$out"
+      return 0
+      ;;
+    1) ;;
+    *) printf 'canonical criteria detection failed with exit %s\n' "$rc"; return 0 ;;
+  esac
+  if [ "$scope" = inline ] && [ "$mandatory_heading" -eq 0 ]; then
     printf '### Mandatory items is missing\n'
     return 0
   fi
-  body=$(fm_dod_mandatory_body "$text" "$scope")
   fm_dod_criteria_problem "$body"
 }
 
@@ -691,6 +770,9 @@ fm_dod_criteria_text_problem_list() {  # <text> <inline|file>
 # problem, and return 0 when at least one exists; return 1 when none does.
 # Covers, in the order an operator fills them, unfenced standalone {TASK} and
 # {FIRSTMATE_SPEC} lines in their respective Task subsections,
+# a `Reviewed task record:` line that is not an absolute path or `none`, that
+# disagrees with a second such line, or that names a missing, unreadable, or
+# empty file (fm_brief_review_record_problem owns what a sound line is),
 # every DoD token from FM_TASK_DOD_PLACEHOLDERS still standing in its section,
 # and an unfenced `DoD file:` line naming a missing, unreadable, or empty file,
 # or one that still holds a token. Each file problem names the path to edit.
@@ -721,10 +803,18 @@ $(fm_brief_task_heading_body "$brief" "## Firstmate spec")")
     problems=0
   fi
   [ "$scope" != task-only ] || return "$problems"
+  if more=$(fm_brief_review_record_problem "$brief"); then
+    printf '%s\n' "$more"
+    problems=0
+  fi
   fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return "$problems"
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   # Keep examples in span for criteria checks, but never activate a fenced
   # DoD-file directive. The heading reader owns the fence boundaries.
+  if more=$(fm_brief_task_dod_file_problem "$brief"); then
+    printf '%s\n' "$more"
+    return 0
+  fi
   dod_file=$(fm_brief_task_dod_file "$brief")
   if [ -n "$dod_file" ]; then
     if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
@@ -767,10 +857,108 @@ EOF
   return "$problems"
 }
 
-# The directive selector is shared by launch validation and plan construction.
+# Distinct unfenced references do not establish which contract was adopted.
+fm_brief_task_dod_file_problem() {  # <brief>
+  local lines report rc=0
+  lines=$(fm_brief_heading_parse "$1" "$FM_TASK_DOD_SECTION_TITLE" unfenced-body "$FM_TASK_DOD_GRADED_TITLE") || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    printf 'unable to inspect DoD file references in %s (exit %s)\n' "$1" "$rc"
+    return 0
+  fi
+  rc=0
+  report=$(printf '%s\n' "$lines" | awk '/^DoD file:/ {
+        if ($0 !~ /^DoD file: \//) {
+          printf "invalid %s; a DoD file requires an absolute path\n", $0
+          bad = 1
+          next
+        }
+        path = $0
+        sub(/^DoD file: /, "", path)
+        if (!(path in seen)) {
+          seen[path] = 1
+          files[++count] = path
+        }
+      }
+      END {
+        if (count > 1) {
+          printf "conflicting DoD files:"
+          for (i = 1; i <= count; i++) printf " %s%s", files[i], (i < count ? ";" : "")
+          printf "; resolve the adopted source\n"
+          bad = 1
+        }
+        exit !bad
+      }') || rc=$?
+  case "$rc" in
+    0) printf '%s\n' "$report"; return 0 ;;
+    1) return 1 ;;
+    *) printf 'unable to inspect DoD file references in %s (exit %s)\n' "$1" "$rc"; return 0 ;;
+  esac
+}
+
+# The selector is shared by launch validation and plan construction.
 fm_brief_task_dod_file() {  # <brief>
+  if fm_brief_task_dod_file_problem "$1" >/dev/null; then return 1; fi
   fm_brief_heading_parse "$1" "$FM_TASK_DOD_SECTION_TITLE" unfenced-body "$FM_TASK_DOD_GRADED_TITLE" \
     | awk '/^DoD file: \// { sub(/^DoD file: /, ""); print; exit }'
+}
+
+# A brief that assigns an independent review names the record of the reviewed
+# work's adopted Definition Of Done and grading on one unfenced
+# `Reviewed task record:` line inside # Task, where bin/fm-brief.sh --review-of
+# writes it: an absolute path that opens to a nonempty file, or `none` when the
+# reviewed work has no task record and the brief carries the criteria itself.
+# A reviewer handed no such line stops and reports the gap (fm_brief_worker_role),
+# so this check turns the common case, a record Firstmate meant to name, into a
+# refusal at dispatch instead of a review that cannot begin. It does not detect
+# a review brief written without the line: only the scaffolded line is checked.
+# Print every reason the line cannot be trusted and return 0 when one exists;
+# return 1 and print nothing when the line is sound or absent.
+fm_brief_review_record_problem() {  # <brief>
+  local value rc=0
+  value=$(fm_brief_heading_parse - "# Task" unfenced-body <<<"# Task
+$(fm_brief_heading_body "$1" "# Task")" | awk '
+    /^[ \t]*Reviewed task record:/ {
+      n++
+      v = $0
+      sub(/^[ \t]*Reviewed task record:[ \t]*/, "", v)
+      sub(/[ \t]+$/, "", v)
+      if (n == 1) first = v
+      else if (v != first) conflict = 1
+      next
+    }
+    END {
+      if (conflict) { print "conflicting Reviewed task record lines; name one adopted record or none"; exit 0 }
+      if (!n || first == "none") exit 1
+      if (first !~ /^\//) { printf "invalid Reviewed task record: %s; it requires an absolute path or none\n", first; exit 0 }
+      print first
+      exit 2
+    }') || rc=$?
+  case "$rc" in
+    0) printf '%s\n' "$value"; return 0 ;;
+    1) return 1 ;;
+    2)
+      if [ ! -f "$value" ] || [ ! -r "$value" ]; then
+        printf 'Reviewed task record %s is not a readable file\n' "$value"
+        return 0
+      fi
+      if [ -z "$(tr -d '[:space:]' < "$value")" ]; then
+        printf 'Reviewed task record %s is empty\n' "$value"
+        return 0
+      fi
+      return 1
+      ;;
+    *) printf 'unable to inspect the reviewed task record in %s (exit %s)\n' "$1" "$rc"; return 0 ;;
+  esac
+}
+
+# The value of a sound `Reviewed task record:` line: a path, or `none`. Prints
+# nothing for a brief that carries no such line; returns 1 while the line has a
+# problem, so a caller never reads a value the dispatch verdict would refuse.
+fm_brief_review_record() {  # <brief>
+  if fm_brief_review_record_problem "$1" >/dev/null; then return 1; fi
+  fm_brief_heading_parse - "# Task" unfenced-body <<<"# Task
+$(fm_brief_heading_body "$1" "# Task")" \
+    | awk '/^[ \t]*Reviewed task record:/ { sub(/^[ \t]*Reviewed task record:[ \t]*/, ""); sub(/[ \t]+$/, ""); print; exit }'
 }
 
 fm_brief_out_of_scope() {  # <brief>
@@ -797,7 +985,7 @@ $task" | awk '
 }
 
 fm_brief_verification_plan() {  # <brief>
-  local brief=$1 rubric dod scope dod_file problem context='' promoted=0
+  local brief=$1 brief_locator rubric dod grading scope dod_file problem context='' promoted=0
   rubric="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)/docs/review-rubric.md"
   [ -f "$brief" ] && [ -r "$brief" ] || {
     printf 'error: verification-plan brief is not a readable file: %s\n' "$brief" >&2
@@ -811,12 +999,36 @@ fm_brief_verification_plan() {  # <brief>
     printf 'error: %s\n' "$problem" >&2
     return 1
   fi
+  case "$brief" in
+    /*) brief_locator=$brief ;;
+    *)
+      if ! brief_locator=$(pwd -P); then
+        printf 'error: cannot resolve the directory containing brief %s\n' "$brief" >&2
+        return 1
+      fi
+      brief_locator="${brief_locator%/}/$brief"
+      ;;
+  esac
   dod=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
+  grading=$(fm_brief_heading_body "$brief" "$FM_TASK_DOD_GRADED_TITLE")
+  if problem=$(fm_brief_task_dod_file_problem "$brief"); then
+    printf 'error: verification plan refuses %s\n' "$problem" >&2
+    return 1
+  fi
   dod_file=$(fm_brief_task_dod_file "$brief")
   # A promoted scout's Definition Of Done is scout-time context, not current
   # ship acceptance criteria. Its shape is owned by the scout brief/promotion,
   # and the plan labels it as context, so do not re-read it as ship criteria.
   fm_brief_heading_present "$brief" "# Current ship Firstmate spec" && promoted=1
+  # A plan with no criteria would let a run finish with nothing graded, and the
+  # reader who needs the rule most, a worker validating its own legacy brief,
+  # is bound by no worker-role paragraph. So a brief with no task Definition Of
+  # Done is refused rather than planned, unless the task was promoted from a
+  # scout, whose criteria are its ship spec.
+  if [ "$promoted" = 0 ] && ! fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE"; then
+    printf 'error: verification plan refuses %s: it has no %s section, so nothing grades this task; add the section with at least one mandatory item and its grading\n' "$brief" "$FM_TASK_DOD_SECTION_TITLE" >&2
+    return 1
+  fi
   if [ -n "$dod_file" ]; then
     [ -f "$dod_file" ] && [ -r "$dod_file" ] || {
       printf 'error: verification-plan DoD file is not a readable file: %s\n' "$dod_file" >&2
@@ -828,29 +1040,40 @@ fm_brief_verification_plan() {  # <brief>
     fi
     dod=$(awk '{ sub(/\r$/, ""); print }' "$dod_file")
     if [ "$promoted" = 0 ] && problem=$(fm_dod_criteria_text_problem "$dod" file); then
-      printf 'error: verification plan refuses %s: %s\n%s\n' "$dod_file" "$problem" "$(fm_dod_item_shape rule)" >&2
+      printf 'error: verification plan refuses %s: %s\nUse the defining skill tiered schema or the Firstmate shape below.\n%s\n' "$dod_file" "$problem" "$(fm_dod_item_shape rule)" >&2
       return 1
     fi
   elif [ "$promoted" = 0 ] && fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE"; then
     # A present but empty section is not the intentional legacy absence: it is
     # an unfinished DoD and must refuse rather than emit a plan with no items.
     if problem=$(fm_dod_criteria_text_problem "$dod" inline); then
-      printf 'error: verification plan refuses the task Definition Of Done: %s\n%s\n' "$problem" "$(fm_dod_item_shape rule)" >&2
+      printf 'error: verification plan refuses the task Definition Of Done: %s\nUse the defining skill tiered schema or the Firstmate shape below.\n%s\n' "$problem" "$(fm_dod_item_shape rule)" >&2
       return 1
     fi
   fi
   scope=$(fm_brief_out_of_scope "$brief")
-  printf '# Verification plan\nAuthor-supplied verification evidence, not captain intent or authorization to broaden scope.\n\n'
+  printf '# Verification plan\nAuthor-supplied verification evidence, not captain intent or authorization to broaden scope.\n'
+  printf 'Source task brief: %s\n' "$brief_locator"
+  [ -z "$dod_file" ] || printf 'Source DoD file: %s\n' "$dod_file"
+  printf 'This plan is a snapshot of what was supplied. The record of what this home adopted for the task is its durable brief, data/<task-id>/brief.md, with any DoD file it names; the source task brief above is that record only when it is that file, and otherwise a copy. Where this plan or a copy differs from that record, the record governs. A source or snapshot alone does not establish adoption or currency; resolve conflicting sources or grading with the task owner; a crewmate reports it to firstmate. A record that does not hold both a Definition Of Done and grading sections, and no # Current ship Firstmate spec, leaves the dependent outcome ungraded until the task owner supplies them or names the adopted record.\n\n'
   if fm_brief_heading_present "$brief" "# Current ship Firstmate spec"; then
     context=' (scout-time context)'
-    printf 'This task was promoted from a scout: the Task Definition Of Done and Out-of-scope list below are scout-time context from the original scout brief, not ship criteria.\n'
+    printf 'This task was promoted from a scout: the Task Definition Of Done, brief grading, and Out-of-scope list below are scout-time context from the original scout brief, not ship criteria.\n'
     printf 'Where they conflict with the promoted ship intent, the promoted ship intent governs.\n\n'
   fi
   printf '## Task Definition Of Done%s\n' "$context"
+  # Only a promoted task reaches the absent line: an unpromoted brief with no
+  # section was refused above, and its criteria are the ship spec instead.
   if [ -n "$(printf '%s' "$dod" | tr -d '[:space:]')" ]; then
     printf '%s\n' "$dod"
   else
     printf 'Task Definition Of Done: absent from this brief.\n'
+  fi
+  printf '\n## Task brief grading%s\n' "$context"
+  if [ -n "$(printf '%s' "$grading" | tr -d '[:space:]')" ]; then
+    printf '%s\n' "$grading"
+  else
+    printf 'Task brief grading: absent from this brief.\n'
   fi
   printf '\n## Out-of-scope list%s\n' "$context"
   if [ -n "$(printf '%s' "$scope" | tr -d '[:space:]')" ]; then
@@ -878,6 +1101,10 @@ fm_brief_task_dod_problem() {  # <brief>
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   # Keep examples in span for criteria checks, but never activate a fenced
   # DoD-file directive. The heading reader owns the fence boundaries.
+  if found=$(fm_brief_task_dod_file_problem "$brief"); then
+    printf '%s\n' "$found"
+    return 0
+  fi
   dod_file=$(fm_brief_task_dod_file "$brief")
   if [ -n "$dod_file" ]; then
     if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
@@ -1725,8 +1952,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     -h|--help)
       printf '%s\n' 'Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>' \
         '       bash bin/fm-dod-lib.sh --shape' \
-        'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
-        'CRLF input is accepted; unreadable or NUL-bearing input stops construction with an error; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exclusions.' \
+        'Render task DoD, grading, sources, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
+        'CRLF input is accepted; unreadable or NUL-bearing input stops construction with an error; a present DoD must carry complete mandatory items in the tiered defining-skill format or the --shape format; a brief with no task DoD is not planned unless the task was promoted from a scout, whose plan states absent criteria and unrecognized exclusions.' \
         '--shape prints the mandatory item shape as key=value lines: id, lead, fields, authority_field, authorities, item, rule.'
       ;;
     *) echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief>, --shape (or --help)' >&2; exit 2 ;;
