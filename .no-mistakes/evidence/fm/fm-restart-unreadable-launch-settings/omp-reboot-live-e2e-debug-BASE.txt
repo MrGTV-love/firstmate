@@ -1,0 +1,20 @@
+installed omp integration to /Users/charlesabrooker/tmp/fm-omp-reboot.biXKEW/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+native child captured: pid=43365 start=Fri Nov 27 03:24:55 2026    
+DEBUG action=relaunch
+== /Users/charlesabrooker/tmp/fm-omp-reboot.biXKEW/home/state/.omp-turnend-extension-loaded
+sha256:bd09afef9f872f5dd956463dadc566a631a50a58e276ef3b67840b8f1b892ec5
+77719
+
+== /Users/charlesabrooker/tmp/fm-omp-reboot.biXKEW/home/state/.omp-watch-extension-loaded
+sha256:ea0c2470261d20b5441096b2509558d72375b0f83319404f22bd731320d7fc4d
+77719
+
+== /Users/charlesabrooker/tmp/fm-omp-reboot.biXKEW/home/state/extensions/omp-primary-watch/lifecycle.log
+2026-11-27T09:25:08.550Z pid=77719 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-11-27T09:25:08.550Z pid=77719 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-11-27T09:25:08.550Z pid=77719 instance=1 event=factory-bind generation=1
+
+not ok - inspection or refusal created lifecycle state
+guarded teardown completed for session 'fm-lab-omp-reboot-38748-16096'; waiting for native child exit
+native child exit confirmed: pid=43365 start=Fri Nov 27 03:24:55 2026    
+private fixture tree removed: /Users/charlesabrooker/tmp/fm-omp-reboot.biXKEW

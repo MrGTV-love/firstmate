@@ -1,0 +1,11 @@
+head=597680ef9efeeef238c7bbd722dfed6d3ab65639
+== markers before: []
+== fm_omp_codex_capacity (head code, worktree cwd): rc=0 type=object keys=["accounts","bestAccountHeadroom","status"]
+== markers after head probe: []
+== raw with flag: rc=0 bytes=3639 path_shapes=57
+== raw no flag (empty cwd): rc=0 bytes=3639 path_shapes=57
+== same JSON key shape: yes
+== RED control: base form (no flag) from the worktree cwd
+rc=0
+== markers after base-form probe: [<labhome>/state/.omp-watch-extension-loaded <labhome>/state/extensions/omp-primary-watch/lifecycle.log <labhome>/state/.omp-turnend-extension-loaded ]
+labhome-teardown=0

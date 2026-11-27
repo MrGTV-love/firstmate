@@ -1,0 +1,84 @@
+agent_state=unreadable
+verdict=unmanaged
+judged=unmanaged|
+--- [b-unpinned] BASE reboot sweep: recover
+$ /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-reboot-recover.sh recover
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+REBOOT_RECOVERY: labmate: live launch settings are unreadable; no lifecycle action taken
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [b-unpinned] BASE relaunch --recover-launch
+$ /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-control.sh labmate relaunch --recover-launch
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: launch recovery for labmate cannot prove its live launch settings; no lifecycle action taken
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [b-unpinned] BASE interrupt
+$ env FM_CONTROL_SETTLE_WAIT=.5 /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-control.sh labmate interrupt
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [b-unpinned] BASE exit
+$ env FM_CONTROL_SETTLE_WAIT=.5 FM_CONTROL_EXIT_WAIT=2 /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-control.sh labmate exit
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [b-unpinned] BASE relaunch
+$ /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-control.sh labmate relaunch --note keep the lane
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [b-unpinned] BASE secondmate restart
+$ env FM_SECONDMATE_PERSIST_WAIT=0 /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-secondmate-restart.sh labmate
+rc=3
+nudged: labmate: it did not confirm within 0s that its open work is written down, so its conversation was not spent
+summary: 0 of 1 restarted, 1 nudged, 0 unreached
+keylog_bytes=0 state_changed=yes screen_changed=no
+guard-events.jsonl
+labmate.inbox
+labmate.meta
+pending-replies
+agent_state=unreadable
+verdict=unknown
+judged=unknown|
+--- [b-unreadable] BASE reboot sweep: recover
+$ /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-reboot-recover.sh recover
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+REBOOT_RECOVERY: labmate: agent state is unreadable; no lifecycle action taken
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [b-unreadable] BASE interrupt
+$ env FM_CONTROL_SETTLE_WAIT=.5 /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-control.sh labmate interrupt
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+keylog_bytes=0 state_changed=no screen_changed=no
+agent_state=unreadable
+verdict=managed
+judged=managed|
+--- [b-pinned] BASE interrupt (pinned control)
+$ env FM_CONTROL_SETTLE_WAIT=.5 /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-control.sh labmate interrupt
+rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+interrupt-delivered labmate harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+keylog_bytes=1 hex=1b state_changed=no screen_changed=no
+--- [b-pinned] BASE reboot sweep (pinned control)
+$ /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-reboot-recover.sh recover
+rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+keylog_bytes=1 hex=1b state_changed=no screen_changed=no
+--- [b-legacy] BASE interrupt (legacy)
+$ env FM_CONTROL_SETTLE_WAIT=.5 /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-control.sh labmate interrupt
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate's endpoint reads 'unreadable' rather than a positively classified state; refusing to send a lifecycle key into an unattributed endpoint
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [b-shell] BASE exit (shell-only)
+$ env FM_CONTROL_SETTLE_WAIT=.5 FM_CONTROL_EXIT_WAIT=2 /Users/charlesabrooker/tmp/fm-nmt.4qgu63/base/bin/fm-control.sh labmate exit
+rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+already-stopped labmate harness=claude backend=herdr endpoint=fm-lab-rattr-83412-12978:wC:p1 worktree=/Users/charlesabrooker/tmp/fm-nmt.4qgu63/wt
+keylog_bytes=0 state_changed=no screen_changed=no

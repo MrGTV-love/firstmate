@@ -1,0 +1,16 @@
+head=597680ef9efeeef238c7bbd722dfed6d3ab65639 base=d25e907c1
+settled=alive
+BASE unpinned --one: lines=1 notice=present
+settled=alive
+verdict=managed
+BASE managed --one tick1: lines=0 notice=absent cursor=labmate 
+BASE managed --one tick2: lines=0 notice=absent cursor=labmate 
+BASE managed full: lines=0 notice=absent
+settled=alive
+HEAD unpinned --one: lines=1 notice=present
+settled=alive
+verdict=managed
+HEAD managed --one tick1: lines=0 notice=absent cursor=labmate 
+HEAD managed --one tick2: lines=0 notice=absent cursor=labmate 
+HEAD managed full: lines=0 notice=absent
+herdr-teardown=0 labhome-teardown=0

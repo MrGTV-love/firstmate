@@ -1,0 +1,8 @@
+195c195
+<   [ "$(find "$FM_STATE_OVERRIDE" -type f -print | LC_ALL=C sort)" = "$STATE_FILES" ] \
+---
+>   [ "$(find "$FM_STATE_OVERRIDE" -type f ! -name guard-events.jsonl -print | LC_ALL=C sort)" = "$STATE_FILES" ] \
+321c321
+<   STATE_FILES=$(find "$FM_STATE_OVERRIDE" -type f -print | LC_ALL=C sort)
+---
+>   STATE_FILES=$(find "$FM_STATE_OVERRIDE" -type f ! -name guard-events.jsonl -print | LC_ALL=C sort)

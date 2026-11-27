@@ -1,0 +1,35 @@
+agent_state=unreadable
+verdict=unknown
+judged=unknown|
+0
+--- [r-legacy] reboot sweep: recover (legacy)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-reboot-recover.sh recover
+rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [r-legacy] interrupt (legacy)
+$ env FM_CONTROL_SETTLE_WAIT=.5 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate interrupt
+rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+interrupt-delivered labmate harness=claude backend=herdr verified=agent-alive cancel=unconfirmed
+keylog_bytes=1 hex=1b state_changed=no screen_changed=no
+agent_state=dead
+verdict=unknown
+judged=unknown|
+--- [r-shell] reboot sweep: recover (shell-only)
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-reboot-recover.sh recover
+rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [r-shell] exit (shell-only)
+$ env FM_CONTROL_SETTLE_WAIT=.5 FM_CONTROL_EXIT_WAIT=2 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate exit
+rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+already-stopped labmate harness=claude backend=herdr endpoint=fm-lab-rattr-83412-12978:w7:p1 worktree=/Users/charlesabrooker/tmp/fm-nmt.4qgu63/wt
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [r-shell] interrupt (shell-only)
+$ env FM_CONTROL_SETTLE_WAIT=.5 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate interrupt
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: no agent is running at task labmate's recorded endpoint (state: dead); there is nothing to interrupt
+keylog_bytes=0 state_changed=no screen_changed=no

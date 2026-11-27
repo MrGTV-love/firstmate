@@ -1,0 +1,18 @@
+settled=alive
+{"fg_group":2507,"fg":[{"pid":2507,"name":"2.1.332","argv0":"claude"}]}
+attributed=2507
+  PID  PPID  PGID COMM
+ 2507 99099  2507 /Users/charlesabrooker/.local/bin/claude
+attributed_pid=2507
+env_read=ok has_PATH=1 has_HOME=1 has_FM_SPAWN_GEN=1
+agent_state=alive
+verdict=managed
+judged=managed|
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+ Claude Code'll be able to read, edit, and execute files here.
+ Trusting this folder loads .mcp.json here or above (MCP servers).
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel

@@ -1,0 +1,33 @@
+agent_state=alive
+verdict=managed
+judged=managed|
+--- [r-contested] secondmate restart (pinned control)
+$ env FM_SECONDMATE_PERSIST_WAIT=0 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-secondmate-restart.sh labmate
+rc=3
+nudged: labmate: it did not confirm within 0s that its open work is written down, so its conversation was not spent
+summary: 0 of 1 restarted, 1 nudged, 0 unreached
+keylog_bytes=0 state_changed=yes screen_changed=no
+/Users/charlesabrooker/tmp/fm-lab.C3YGW9/state:
+guard-events.jsonl
+labmate.inbox
+labmate.meta
+labmate.reboot-notice
+pending-replies
+
+/Users/charlesabrooker/tmp/fm-lab.C3YGW9/state/labmate.inbox:
+001.msg
+002.msg
+handled
+
+/Users/charlesabrooker/tmp/fm-lab.C3YGW9/state/labmate.inbox/handled:
+
+/Users/charlesabrooker/tmp/fm-lab.C3YGW9/state/pending-replies:
+1324c7a4ae47335c
+673dcfb63581251b
+
+/Users/charlesabrooker/tmp/fm-nmt.4qgu63/wt/state:
+--- screen tail
+charlesabrooker@Mac-Studio wt % cd /Users/charlesabrooker/tmp/fm-nmt.4qgu63/wt && env FM_SPAWN_GEN=g-lab-1 KEYLOG=/User
+s/charlesabrooker/tmp/fm-nmt.4qgu63/keys-r-contested.log /Users/charlesabrooker/tmp/fm-nmt.4qgu63/bin/claude --resume 5
+a3eec19-de12-4999-bed2-bbd561089154
+fake-claude ready pid=8488 args: --resume 5a3eec19-de12-4999-bed2-bbd561089154

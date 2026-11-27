@@ -1,0 +1,10 @@
+195,196c195,196
+<   [ "$(find "$FM_STATE_OVERRIDE" -type f -print | LC_ALL=C sort)" = "$STATE_FILES" ] \
+<     || fail 'inspection or refusal created lifecycle state'
+---
+>   [ "$(find "$FM_STATE_OVERRIDE" -type f ! -name guard-events.jsonl ! -name ".omp-*-extension-loaded" ! -path "*/state/extensions/*" -print | LC_ALL=C sort)" = "$STATE_FILES" ] \
+>     || { echo "DEBUG action=$action"; comm -3 <(printf '%s\n' "$STATE_FILES") <(find "$FM_STATE_OVERRIDE" -type f -print | LC_ALL=C sort); for f in $(comm -13 <(printf '%s\n' "$STATE_FILES") <(find "$FM_STATE_OVERRIDE" -type f ! -name guard-events.jsonl ! -name ".omp-*-extension-loaded" ! -path "*/state/extensions/*" -print | LC_ALL=C sort)); do echo "== $f"; head -c 600 "$f"; echo; done; fail 'inspection or refusal created lifecycle state'; }
+321c321
+<   STATE_FILES=$(find "$FM_STATE_OVERRIDE" -type f -print | LC_ALL=C sort)
+---
+>   STATE_FILES=$(find "$FM_STATE_OVERRIDE" -type f ! -name guard-events.jsonl ! -name ".omp-*-extension-loaded" ! -path "*/state/extensions/*" -print | LC_ALL=C sort)

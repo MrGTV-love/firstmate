@@ -1,0 +1,70 @@
+=== row r1-unpinned: pane fm-lab-rattr-83412-12978:w2:p1
+agent_state=unreadable
+verdict=unmanaged
+judged=unmanaged|
+--- [r1-unpinned] reboot sweep: recover
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-reboot-recover.sh recover
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+REBOOT_RECOVERY: labmate: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labmate relaunch", or decide the lane by hand
+keylog_bytes=0 state_changed=yes screen_changed=no
+--- [r1-unpinned] reboot sweep: recover --one
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-reboot-recover.sh recover --one
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+REBOOT_RECOVERY: labmate: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labmate relaunch", or decide the lane by hand
+keylog_bytes=0 state_changed=yes screen_changed=no
+--- [r1-unpinned] relaunch --recover-launch
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate relaunch --recover-launch
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: launch recovery for labmate found live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no lifecycle action taken; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labmate relaunch", or decide the lane by hand
+keylog_bytes=0 state_changed=yes screen_changed=no
+--- [r1-unpinned] interrupt
+$ env FM_CONTROL_SETTLE_WAIT=.5 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate interrupt
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labmate relaunch", or decide the lane by hand
+keylog_bytes=0 state_changed=yes screen_changed=no
+--- [r1-unpinned] exit
+$ env FM_CONTROL_SETTLE_WAIT=.5 FM_CONTROL_EXIT_WAIT=2 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate exit
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labmate relaunch", or decide the lane by hand
+keylog_bytes=0 state_changed=yes screen_changed=no
+--- [r1-unpinned] stay
+$ env FM_CONTROL_SETTLE_WAIT=.5 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate stay
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate cannot positively attribute its live Herdr agent to this task; refusing lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labmate relaunch", or decide the lane by hand
+keylog_bytes=0 state_changed=yes screen_changed=no
+--- [r1-unpinned] relaunch
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate relaunch --note keep the lane
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: task labmate cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labmate relaunch", or decide the lane by hand
+keylog_bytes=0 state_changed=yes screen_changed=no
+--- [r1-unpinned] adopt
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-control.sh labmate adopt
+rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.C3YGW9
+error: adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted; stop the agent by hand in its pane and relaunch it with "bin/fm-control.sh labmate relaunch"; nothing was changed
+keylog_bytes=0 state_changed=yes screen_changed=no
+--- [r1-unpinned] secondmate restart
+$ env FM_SECONDMATE_PERSIST_WAIT=0 FM_SECONDMATE_PERSIST_POLL=1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-secondmate-restart.sh labmate
+rc=3
+unreached: labmate: its live Herdr agent cannot be positively attributed to this task, so no request or nudge was sent to it: live agent is an unpinned native restore: its process environment was readable and carries no launch pin matching this record; no Firstmate launch record proves it, since a native restore runs without the launch token, so nothing can authorize it; stop it by hand in its pane and then relaunch it with "bin/fm-control.sh labmate relaunch", or decide the lane by hand
+summary: 0 of 1 restarted, 0 nudged, 1 unreached
+keylog_bytes=0 state_changed=no screen_changed=no
+--- [r1-unpinned] host attribution verb
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-nmt.4qgu63/wt /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E3M26SDN99JSRN9AT978AC/bin/fm-remote-secondmate-control.sh attribution labmate fm-lab-rattr-83412-12978:w2:p1
+rc=0
+attribution=refuse: remote secondmate labmate endpoint is recorded in Herdr session 'fm-lab-rattr-83412-12978', expected 'fm-remote'; refusing access until it is explicitly migrated
+keylog_bytes=0 state_changed=no screen_changed=no
+=== after row r1-unpinned
+agent_state=alive
+verdict=unmanaged
+judged=unmanaged|
+19-de12-4999-bed2-bbd561089154
+fake-claude ready pid=58191 args: --resume 5a3eec19-de12-4999-bed2-bbd561089154
+/Users/charlesabrooker/tmp/fm-lab.C3YGW9/state: guard-events.jsonl labmate.meta labmate.reboot-notice  /Users/charlesabrooker/tmp/fm-nmt.4qgu63/wt/state: 
