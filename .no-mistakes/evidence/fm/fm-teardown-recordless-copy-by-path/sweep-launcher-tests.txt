@@ -1,0 +1,28 @@
+ok - a refused ps holds a Vernant-locked copy even when the confined table cannot see its launcher, and a readable ps that shows the launcher gone still reaches the driver
+sweep rc=0
+ok - a refused or failed ps leaves a live or exited launcher unknown, whatever a table read would say
+orphan test_refused_launcher_observation rc=0
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.YVNC7U/squash-refused-ps/home/projects/example/.claude/worktrees/clean	worktree lock: vernant-session-active owner=launcher:42520 launcher=42520 (launcher 42520 cannot be observed; absence is not proved)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.YVNC7U/squash-refused-ps/home/projects/example/.claude/worktrees/tracked	worktree lock: vernant-session-active owner=launcher:43036 launcher=43036 (launcher 43036 cannot be observed; absence is not proved)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.YVNC7U/squash-refused-ps/home/projects/example/.claude/worktrees/unique	worktree lock: vernant-session-active owner=launcher:42786 launcher=42786 (launcher 42786 cannot be observed; absence is not proved)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.YVNC7U/squash-refused-ps/home/projects/example/.claude/worktrees/untracked	worktree lock: vernant-session-active owner=launcher:43272 launcher=43272 (launcher 43272 cannot be observed; absence is not proved)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=4
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.YVNC7U/squash-refused-ps/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=0 freed=0.00
+exit=0
+ok - a refused ps keeps a clean Vernant-locked copy registered and locked
+orphan test_refused_ps_keeps_a_locked_copy rc=0
+diagnostic_exit1_state=2 expected_unknown=2
+ok - only the exact not-found line for this PID joins empty absence; every other diagnostic stays unknown
+orphan test_ps_observation_diagnostics rc=0

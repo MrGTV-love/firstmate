@@ -1,0 +1,5 @@
+ok - a held close removes the task's own nested copy, through the driver when it is locked, and leaves the slot, its lease and claim and the held foreign copy alone
+ok - a held close refuses, with nothing removed, when an own nested copy holds a separate repository or another project's worktree
+ok - a held close refuses, with nothing removed, when an own nested copy holds a bare repository
+ok - a held close ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object or a modified file
+ok - a submodule of the task's own repository does not stop a held close
