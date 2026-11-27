@@ -3413,10 +3413,14 @@ PY
   #   correct-then-fail-fault  the same on a copy whose check of the producer's
   #                      status is removed by sed: accepted, so that check is what
   #                      refuses;
-  #   writes-nothing     writes nothing and returns 1, against an empty .runner:
-  #                      refused;
+  #   writes-nothing     writes nothing and returns 1, against a matching
+  #                      .runner, so the failing producer is reached: refused
+  #                      (no fault control: with nothing written cmp also
+  #                      differs, so either status refuses it; correct-then-fail
+  #                      and its control prove the producer-status check);
   #   writes-nothing-ok  writes nothing and returns 0, against an empty .runner:
-  #                      refused by the non-empty file check;
+  #                      refused by the non-empty file check before the producer
+  #                      runs (the override is asserted not to have run);
   #   writes-nothing-ok-fault  the same on a copy whose non-empty file check is
   #                      removed: accepted, so that check is what refuses;
   #   matching           no override and a matching .runner: accepted.
@@ -3429,8 +3433,8 @@ PY
   for shape in correct-then-fail correct-then-fail-fault writes-nothing writes-nothing-ok writes-nothing-ok-fault matching; do
     rm -f "$tmp/producer-ran"
     case "$shape" in
-      correct-then-fail|correct-then-fail-fault|matching) printf '%s\n' "$leader" ;;
-      writes-nothing*) : ;;
+      correct-then-fail|correct-then-fail-fault|writes-nothing|matching) printf '%s\n' "$leader" ;;
+      writes-nothing-ok*) : ;;
     esac > "$home/state/procevent/fixture-runner.runner"
     case "$shape" in
       correct-then-fail-fault) fn="$tmp/fn-status-fault.sh" ;;
@@ -3466,8 +3470,10 @@ PY
     esac
     assert_equals "$want" "$got" "runner-record-$shape: the producer's outcome was judged wrongly"
     case "$shape" in
-      correct-then-fail|correct-then-fail-fault|writes-nothing-ok-fault)
+      correct-then-fail|correct-then-fail-fault|writes-nothing|writes-nothing-ok-fault)
         assert_present "$tmp/producer-ran" "runner-record-$shape: the producer override never ran" ;;
+      writes-nothing-ok)
+        assert_absent "$tmp/producer-ran" "runner-record-$shape: the producer ran although the non-empty check should refuse first" ;;
     esac
   done
   teardown_fixture_stop "$leader"
