@@ -1,0 +1,17 @@
+== c89e6a597
+PASS: default result deadline, no-refresh checking, acknowledgement, retry origin and actual resolution
+PASS: stalled work returns at its own limit unless existing progress evidence shows it resumed
+PASS: formal silence steers ignore transport-only activity but keep genuine reports and resolved replies
+Traceback (most recent call last):
+  File "<stdin>", line 246, in <module>
+  File "<stdin>", line 110, in actionable
+AssertionError: ('plain-working-ack-and-working-same-second', True, '')
+== 3c3ae152b
+PASS: stalled work returns at its own limit unless existing progress evidence shows it resumed
+PASS: formal silence steers ignore transport-only activity but keep genuine reports and resolved replies
+PASS: an acknowledgement-only or pre-steer plain working status never settles a silence steer
+PASS: a typed report after an acknowledgement and a plain working line still settles a silence steer
+Traceback (most recent call last):
+  File "<stdin>", line 283, in <module>
+  File "<stdin>", line 278, in cadence
+AssertionError: ('cadence-failed-ship', {'id': '1f5d463b832d80387ace427d', 'category': 'silent_report', 'subject': 'worker', 'owner': 'firstmate', 'next_action': 'check in: progress, blockers, cross-workstream dependencies', 'age_seconds': 900, 'limit_seconds': 900, 'overdue': False, 'evidence': 'last heard: status=1795740208; inbox acknowledgement=None; resolved reply=None; excluded: typed failed status reports the result', 'informational': True, 'source': {'home': '/Users/charlesabrooker/tmp/fm-open-loops-steer-result.D3rIDZ/cadence-failed-ship', 'state': '/Users/charlesabrooker/tmp/fm-open-loops-steer-result.D3rIDZ/cadence-failed-ship/state', 'data': '/Users/charlesabrooker/tmp/fm-open-loops-steer-result.D3rIDZ/cadence-failed-ship/data', 'config': '/Users/charlesabrooker/tmp/fm-open-loops-steer-result.D3rIDZ/cadence-failed-ship/config', 'task': 'worker', 'generation': '2c23232b34c2396b05ecec74d044dd1079292ed7c0b33c61554edf4bde2deb97'}, 'consumer': {'source': {'home': '/Users/charlesabrooker/tmp/fm-open-loops-steer-result.D3rIDZ/cadence-failed-ship', 'state': '/Users/charlesabrooker/tmp/fm-open-loops-steer-result.D3rIDZ/cadence-failed-ship/state', 'data': '/Users/charlesabrooker/tmp/fm-open-loops-steer-result.D3rIDZ/cadence-failed-ship/data', 'config': '/Users/charlesabrooker/tmp/fm-open-loops-steer-result.D3rIDZ/cadence-failed-ship/config', 'task': 'worker', 'generation': '2c23232b34c2396b05ecec74d044dd1079292ed7c0b33c61554edf4bde2deb97'}, 'spawn_gen': 'result-generation', 'available': True}, 'current_identity': '1c1090c81fe8026e3ad98ab3'})

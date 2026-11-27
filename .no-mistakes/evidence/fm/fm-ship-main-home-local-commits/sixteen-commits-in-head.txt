@@ -1,0 +1,16 @@
+e372b7cd0 11-17 22:06 Use confirmed delivery times in remote receipt controls
+1844a03b5 11-17 21:25 Isolate serial packing fixture weights from test registration
+e4e0c4957 11-17 19:49 Do not treat transport activity as a steered report
+5f0b5d238 11-17 19:27 Preserve local secondmate follow-up without replaying receipt wakes
+9a6030a66 11-17 18:51 Keep live-only steers actionable when their worker disappears
+d55bdb2f9 11-17 18:33 Use one owned watcher exit budget in ledger tests
+8fb840f67 11-17 18:07 Keep optional consumer observations out of coverage failures
+2959d435f 11-17 18:04 Count the degraded coverage row in watcher fixtures
+1beca3686 11-17 17:59 Exercise follow-up timing and durable notification boundaries
+0dadb5142 11-17 17:54 Bind follow-up to the verified current consumer
+f994e7fdb 11-17 17:42 Reconcile steered obligations until their intended result
+1818aa8a5 11-17 12:04 test: bind batch receipt fixture to canonical home
+7e3f2053f 11-17 04:46 fix: quote literal status identity error sentinels
+5defe4386 11-17 03:33 fix: carry opening identity through bounded reads and ledger wakes
+154414227 11-17 02:07 fix: retain question identity through provenance failures
+e6a0d8173 11-17 01:00 fix: bind question follow-up receipts to opening events

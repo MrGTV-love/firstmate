@@ -1,0 +1,88 @@
+[head] plain-working-after-ack: presented_at_limit=True head_expects=True OK | sent=1795740651 at+899 presented=False; at+900 row overdue=True check-actions-lists=True label-steered-not-observed=True evidence="last heard: status=1795733447; inbox acknowledgement=None; resolved reply=None"
+[head] typed-blocked-after-working: presented_at_limit=False head_expects=False OK | sent=1795740662 at+899 presented=False; at+900 row overdue=False check-actions-lists=False label-steered-not-observed=False evidence="last heard: status=1795741512; inbox acknowledgement=1795741462; resolved reply=None; excluded: waiting on firstmate; its unanswered question or human-owned gate owns the next move"
+[head] reply-same-second: presented_at_limit=True head_expects=True OK | sent=1795740685 at+899 presented=False; at+900 row overdue=True check-actions-lists=True label-steered-not-observed=True evidence="last heard: status=1795733479; inbox acknowledgement=None; resolved reply=None"
+[head] reply-later-second: presented_at_limit=False head_expects=False OK | sent=1795740707 at+899 presented=False; at+900 row overdue=False check-actions-lists=False label-steered-not-observed=False evidence="last heard: status=1795733494; inbox acknowledgement=1795741507; resolved reply=1795740708"
+[head] failed-later-second-ship: presented_at_limit=False head_expects=False OK | sent=1795740747 at+899 presented=False; at+900 row overdue=False check-actions-lists=False label-steered-not-observed=False evidence="last heard: status=1795741547; inbox acknowledgement=1795741547; resolved reply=None"
+[head] failed-same-second-ship: presented_at_limit=True head_expects=True OK | sent=1795740759 at+899 presented=False; at+900 row overdue=True check-actions-lists=True label-steered-not-observed=True evidence="last heard: status=1795733554; inbox acknowledgement=None; resolved reply=None"
+[head] secondmate-done-later-second: presented_at_limit=False head_expects=False OK | sent=1795740775 at+899 presented=False; at+900 row overdue=False check-actions-lists=False label-steered-not-observed=False evidence="last heard: status=1795741575; inbox acknowledgement=1795741575; resolved reply=None; pending reply/check-in: do not repeat; existing reply or inbox escalation owns recovery"
+[head] secondmate-working-later-second-control: presented_at_limit=True head_expects=True OK | sent=1795740786 at+899 presented=False; at+900 row overdue=True check-actions-lists=True label-steered-not-observed=True evidence="last heard: status=1795733580; inbox acknowledgement=None; resolved reply=None"
+[head] cadence-failed-ship: cadence_ok=True | at+899 overdue=False; at+900 overdue=True informational=None presented=True check_in=eligible: reached fm-send, send refused by gate guard (lab override allowance) inbox_records=0 evidence="last heard: status=1795740801; inbox acknowledgement=None; resolved reply=None"
+[head] cadence-done-secondmate-with-work: cadence_ok=True | at+899 overdue=False; at+900 overdue=True informational=None presented=True check_in=eligible: reached fm-send, send refused by gate guard (lab override allowance) inbox_records=0 evidence="last heard: status=1795740816; inbox acknowledgement=None; resolved reply=None"
+[
+ {
+  "scenario": "plain-working-after-ack",
+  "label": "head",
+  "presented_at_limit": true,
+  "head_expectation": true,
+  "matches_head_expectation": true,
+  "detail": "sent=1795740651 at+899 presented=False; at+900 row overdue=True check-actions-lists=True label-steered-not-observed=True evidence=\"last heard: status=1795733447; inbox acknowledgement=None; resolved reply=None\""
+ },
+ {
+  "scenario": "typed-blocked-after-working",
+  "label": "head",
+  "presented_at_limit": false,
+  "head_expectation": false,
+  "matches_head_expectation": true,
+  "detail": "sent=1795740662 at+899 presented=False; at+900 row overdue=False check-actions-lists=False label-steered-not-observed=False evidence=\"last heard: status=1795741512; inbox acknowledgement=1795741462; resolved reply=None; excluded: waiting on firstmate; its unanswered question or human-owned gate owns the next move\""
+ },
+ {
+  "scenario": "reply-same-second",
+  "label": "head",
+  "presented_at_limit": true,
+  "head_expectation": true,
+  "matches_head_expectation": true,
+  "detail": "sent=1795740685 at+899 presented=False; at+900 row overdue=True check-actions-lists=True label-steered-not-observed=True evidence=\"last heard: status=1795733479; inbox acknowledgement=None; resolved reply=None\""
+ },
+ {
+  "scenario": "reply-later-second",
+  "label": "head",
+  "presented_at_limit": false,
+  "head_expectation": false,
+  "matches_head_expectation": true,
+  "detail": "sent=1795740707 at+899 presented=False; at+900 row overdue=False check-actions-lists=False label-steered-not-observed=False evidence=\"last heard: status=1795733494; inbox acknowledgement=1795741507; resolved reply=1795740708\""
+ },
+ {
+  "scenario": "failed-later-second-ship",
+  "label": "head",
+  "presented_at_limit": false,
+  "head_expectation": false,
+  "matches_head_expectation": true,
+  "detail": "sent=1795740747 at+899 presented=False; at+900 row overdue=False check-actions-lists=False label-steered-not-observed=False evidence=\"last heard: status=1795741547; inbox acknowledgement=1795741547; resolved reply=None\""
+ },
+ {
+  "scenario": "failed-same-second-ship",
+  "label": "head",
+  "presented_at_limit": true,
+  "head_expectation": true,
+  "matches_head_expectation": true,
+  "detail": "sent=1795740759 at+899 presented=False; at+900 row overdue=True check-actions-lists=True label-steered-not-observed=True evidence=\"last heard: status=1795733554; inbox acknowledgement=None; resolved reply=None\""
+ },
+ {
+  "scenario": "secondmate-done-later-second",
+  "label": "head",
+  "presented_at_limit": false,
+  "head_expectation": false,
+  "matches_head_expectation": true,
+  "detail": "sent=1795740775 at+899 presented=False; at+900 row overdue=False check-actions-lists=False label-steered-not-observed=False evidence=\"last heard: status=1795741575; inbox acknowledgement=1795741575; resolved reply=None; pending reply/check-in: do not repeat; existing reply or inbox escalation owns recovery\""
+ },
+ {
+  "scenario": "secondmate-working-later-second-control",
+  "label": "head",
+  "presented_at_limit": true,
+  "head_expectation": true,
+  "matches_head_expectation": true,
+  "detail": "sent=1795740786 at+899 presented=False; at+900 row overdue=True check-actions-lists=True label-steered-not-observed=True evidence=\"last heard: status=1795733580; inbox acknowledgement=None; resolved reply=None\""
+ },
+ {
+  "scenario": "cadence-failed-ship",
+  "label": "head",
+  "cadence_ok": true,
+  "detail": "at+899 overdue=False; at+900 overdue=True informational=None presented=True check_in=eligible: reached fm-send, send refused by gate guard (lab override allowance) inbox_records=0 evidence=\"last heard: status=1795740801; inbox acknowledgement=None; resolved reply=None\""
+ },
+ {
+  "scenario": "cadence-done-secondmate-with-work",
+  "label": "head",
+  "cadence_ok": true,
+  "detail": "at+899 overdue=False; at+900 overdue=True informational=None presented=True check_in=eligible: reached fm-send, send refused by gate guard (lab override allowance) inbox_records=0 evidence=\"last heard: status=1795740816; inbox acknowledgement=None; resolved reply=None\""
+ }
+]
