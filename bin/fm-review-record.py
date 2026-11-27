@@ -137,7 +137,8 @@ gemma, grok, kimi, llama, glm, and the exact native Claude names opus,
 sonnet, haiku, which are deliberately anthropic because Claude records bare
 model names); route prefixes ending in / are dropped, and zai/z-ai are
 recognized only as Zhipu pipeline provider names, never as bare model ids.
-Stored typed family fields
+A zhipu-family id whose last segment is not alphanumeric runs joined by single
+. _ : or - stays unknown. Stored typed family fields
 never decide independence. Uncovered-group refusals name each uncovered family,
 reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
