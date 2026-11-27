@@ -1251,19 +1251,48 @@ test_carry_over_refuses_when_the_state_directory_takes_no_scratch() {
   pass "a state directory that takes no scratch repository refuses carry-over with its reason"
 }
 
+test_carry_over_sweeps_dead_pid_scratch_and_keeps_live_scratch() {
+  # Leftover .review-carry-<pid>-* directories from killed verifiers are swept
+  # on the next carry-over proof, while a live PID's directory is preserved.
+  local case_dir live out rc=0 dead_pid dead_dir live_dir legacy_stale legacy_fresh
+  case_dir=$(make_carry_case carry-scratch-sweep)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  true &
+  dead_pid=$!
+  wait "$dead_pid"
+  dead_dir="$case_dir/home/state/.review-carry-${dead_pid}-leftover"
+  live_dir="$case_dir/home/state/.review-carry-$$-active"
+  legacy_stale="$case_dir/home/state/.review-carry-legacyold"
+  legacy_fresh="$case_dir/home/state/.review-carry-legacynew"
+  mkdir -p "$dead_dir/proof.git" "$live_dir/proof.git" "$legacy_stale/proof.git" "$legacy_fresh/proof.git"
+  touch -t 202001010000 "$legacy_stale"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK") || rc=$?
+  expect_code 0 "$rc" "carry-over must succeed while sweeping stale scratch: $out"
+  [ ! -e "$dead_dir" ] || fail "dead-PID scratch dir must be swept: $dead_dir"
+  [ ! -e "$legacy_stale" ] || fail "aged legacy scratch dir must be swept: $legacy_stale"
+  [ -d "$live_dir" ] || fail "live-PID scratch dir must be preserved: $live_dir"
+  [ -d "$legacy_fresh" ] || fail "fresh legacy scratch dir must be preserved: $legacy_fresh"
+  rm -rf "$live_dir" "$legacy_fresh"
+  pass "carry-over sweeps dead-PID and aged legacy scratch directories while preserving live ones"
+}
+
 test_carry_over_refuses_after_a_rewrite_was_itself_read() {
   # A same-tree rewrite carries from R, but once the rewrite has its own read,
   # the head it replaced is a reviewed head off the newest reviewed head's
-  # ancestry, so a later base update refuses and needs a fresh read.
+  # ancestry, so a later update of either sibling refuses until a newer
+  # reviewed head builds on both.
   # Both row orders: the rewrite read last, and a late read of R after it.
   # The unread order is the control: the same fixture with no read of the
   # rewrite must carry, so the extra read is what makes the others refuse.
   local order case_dir rewrite live out rc
   # both-merged: a third reviewed head that merges the two siblings carries
-  # while it is the newest reviewed head; both-merged-reread: a later read of
-  # R makes R the newest reviewed head again, and R does not build on it.
+  # while it is the newest reviewed head; both-merged-reread-{original,rewrite}:
+  # a later read of either sibling makes that sibling the newest reviewed head
+  # again, and neither builds on the merged head.
   local merged
-  for order in unread rewrite-last original-last both-merged both-merged-reread; do
+  for order in unread rewrite-last original-last both-merged both-merged-reread-original both-merged-reread-rewrite; do
     case_dir=$(make_carry_case "carry-rewrite-read-$order")
     carry_refs "$case_dir"
     record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
@@ -1275,11 +1304,17 @@ test_carry_over_refuses_after_a_rewrite_was_itself_read() {
     [ "$order" != original-last ] || record_review "$case_dir" "$REVIEWED" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null \
       || fail "record a late PASS at R"
     case "$order" in both-merged*)
-      cgit "$case_dir" merge -q --no-edit "$REVIEWED"
+      cgit "$case_dir" merge -q --no-edit "$REVIEWED" || fail "merge original into rewrite"
       merged=$(cgit "$case_dir" rev-parse HEAD)
       record_review "$case_dir" "$merged" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at the merged head"
-      [ "$order" = both-merged ] || record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null \
-        || fail "record a re-read of R"
+      case "$order" in
+        both-merged-reread-original)
+          record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record a re-read of R"
+          ;;
+        both-merged-reread-rewrite)
+          record_review "$case_dir" "$rewrite" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record a re-read of rewrite"
+          ;;
+      esac
       ;;
     esac
     live=$(merge_trunk_into_pr "$case_dir")
@@ -1302,12 +1337,13 @@ test_carry_over_refuses_after_a_rewrite_was_itself_read() {
     expect_code 1 "$rc" "$order: an update of a rewrite that was itself read must refuse: $out"
     expect_not_qualified "$out" "which the reviewed head does not build on" "$order read rewrite"
   done
-  pass "once a same-tree rewrite is itself read, a later base update needs a fresh read"
+  pass "once a same-tree rewrite is itself read, updates of either sibling refuse until a reviewed head builds on both"
 }
 
 fm_test_run_cases \
   test_carry_over_ignores_global_config_and_global_attributes \
   test_carry_over_scratch_lives_beside_the_review_records \
+  test_carry_over_sweeps_dead_pid_scratch_and_keeps_live_scratch \
   test_carry_over_refuses_when_the_state_directory_takes_no_scratch \
   test_carry_over_refuses_after_a_rewrite_was_itself_read \
   test_carry_over_ignores_a_merge_driver_in_the_task_worktree \

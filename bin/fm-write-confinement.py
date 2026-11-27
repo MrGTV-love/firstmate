@@ -18,7 +18,8 @@ records, every task's metadata and relaunch records, the home data root apart
 from this task's directory and the duration ledger, other tasks' branches, loose
 or packed (this task keeps its declared branch and its
 archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-owned
-records of this task, the shared legacy Jev audit, this home's config and .env,
+records of this task, the shared legacy Jev audit, the review ledger and its
+carry-over proof scratch directories, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
 and other projects' no-mistakes gate repositories. Each protected folder and
@@ -288,6 +289,8 @@ def build(args):
     lines.append("(deny file-write* " + under(state, r"[^/]+\.(meta|control-relaunch)(\.[^/]*)?(/.*)?") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
+    lines.append(f"(deny file-write* (literal {quoted(state + '/review-records.jsonl')}))")
+    lines.append("(deny file-write* " + under(state, r"\.review-carry-[^/]*(/.*)?") + ")")
     # No task operation writes a replace ref, and one changes what a commit
     # holds for every Git command in the primary checkout.
     git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]
