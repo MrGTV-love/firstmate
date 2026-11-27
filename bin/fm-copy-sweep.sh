@@ -605,10 +605,11 @@ enumerate_clones() {
   done
 }
 
-# The registered worktrees strictly inside <clone>; bin/fm-task-copy-lib.sh owns
-# the enumeration.
+# Sets FM_TASK_COPY_NESTED to the registered worktrees strictly inside <clone>,
+# and on failure FM_TASK_COPY_UNREADABLE_REGISTRATION to the registration that
+# could not be read, if any; bin/fm-task-copy-lib.sh owns the enumeration.
 list_nested() {  # <clone>
-  fm_task_copy_registered_nested "$1"
+  fm_task_copy_read_registered_nested "$1"
 }
 
 # --- bounded commands --------------------------------------------------------
@@ -1134,11 +1135,12 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
     return 0
   fi
-  if ! nested=$(list_nested "$clone"); then
+  if ! list_nested "$clone"; then
     CLASS=HELD-DIRTY
-    REASON="its registered nested copies cannot be listed, so no inner copy is ruled out$(fm_task_copy_unreadable_registration_note "$nested")"
+    REASON="its registered nested copies cannot be listed, so no inner copy is ruled out$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"
     return 0
   fi
+  nested=$FM_TASK_COPY_NESTED
   while IFS= read -r inner; do
     case "$inner" in "$copy"/*) ;; *) continue ;; esac
     [ -d "$inner" ] || continue
@@ -1350,10 +1352,11 @@ record_live_nested_copy() {  # <copy> <clone>
 
 scan_clone() {  # <pool> <container> <clone>
   local pool=$1 container=$2 clone=$3 copy nested
-  if ! nested=$(list_nested "$clone"); then
-    add_note "clone $clone was not read: its registered worktrees cannot be listed$(fm_task_copy_unreadable_registration_note "$nested")"
+  if ! list_nested "$clone"; then
+    add_note "clone $clone was not read: its registered worktrees cannot be listed$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"
     return 0
   fi
+  nested=$FM_TASK_COPY_NESTED
   # A dedicated descriptor keeps every command inside the loop off its input.
   while IFS= read -r copy <&4; do
     [ -n "$copy" ] || continue
@@ -1803,7 +1806,8 @@ apply_removals() {
       err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
       if [ "$release_rc" != 2 ]; then
         enumeration_rc=0
-        registered=$(list_nested "$clone") || enumeration_rc=$?
+        list_nested "$clone" || enumeration_rc=$?
+        registered=$FM_TASK_COPY_NESTED
         if ! { copy_still_holds "$copy" "$identity" "$lock_hash" \
           && [ "$enumeration_rc" = 0 ] && grep -qxF "$copy" <<< "$registered"; }; then
           driver_slots=$((driver_slots + 1))
@@ -1865,11 +1869,12 @@ apply_removals() {
         continue
       fi
     fi
-    if ! registered=$(list_nested "$clone"); then
+    if ! list_nested "$clone"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved; no retention receipt was cleared$(fm_task_copy_unreadable_registration_note "$registered")"$'\n'
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved; no retention receipt was cleared$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"$'\n'
       continue
     fi
+    registered=$FM_TASK_COPY_NESTED
     if [ -e "$copy" ] || [ -L "$copy" ] || grep -qxF "$copy" <<< "$registered"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
       REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it is still present or registered after its removal"$'\n'

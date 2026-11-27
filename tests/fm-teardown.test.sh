@@ -5279,6 +5279,55 @@ test_by_path_refuses_while_a_dot_named_registration_is_held_by_a_link_to_nothing
   pass 'teardown --copy reads registrations whose names begin with a dot, refusing for a present copy and a gone copy and naming the one that failed'
 }
 
+# A registration path reaches the refusal byte-exact: a registration whose name holds a newline, held by a
+# link to nothing beside the readable one, is named in full, %q-quoted on one line.
+test_by_path_names_a_registration_whose_name_holds_a_newline() {
+  local case_dir rc store name hidden want
+  make_by_path_case by-path-newline-registration
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  store=$BP_CLONE/.git/worktrees
+  name=..ghost$'\n'suffix
+  by_path_hide_registration "$case_dir" "$store" "$name" gitdir-link-dangling planted
+  hidden=$(by_path_hidden_part "$store" "$name" gitdir-link-dangling)
+  [ -L "$store/$name/gitdir" ] && [ ! -e "$store/$name/gitdir" ] || fail 'by-path-newline-registration: the fixture is not a link to nothing'
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-newline-registration: must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be read' "$case_dir/stderr" 'by-path-newline-registration: the refusal does not say the registration could not be read'
+  printf -v want '(registration %q cannot be read)' "$store/$name/gitdir"
+  assert_grep "$want" "$case_dir/stderr" "by-path-newline-registration: the refusal does not name the full registration path $want"
+  by_path_assert_untouched "$case_dir" by-path-newline-registration
+  [ -n "$hidden" ] || fail 'by-path-newline-registration: no hidden part'
+  pass 'teardown --copy names a registration whose name holds a newline in full'
+}
+
+# A git whose `worktree list` prints one nested path and then fails, with every registration readable, is a
+# list that could not be read: the refusal says so and names no registration, because the registration scan
+# found none unreadable. The listed path is not taken for one.
+test_by_path_names_no_registration_when_the_listing_fails_after_partial_output() {
+  local case_dir rc
+  make_by_path_case by-path-partial-list
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" worktree list "*) printf 'worktree %s\0' "$BP_COPY"; exit 128 ;;
+  *" worktree remove "*) printf '%s\n' "\$*" >> "$case_dir/git-remove.log" ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-partial-list: a listing that fails must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be read' "$case_dir/stderr" 'by-path-partial-list: the refusal does not say the list could not be read'
+  assert_no_grep '(registration ' "$case_dir/stderr" 'by-path-partial-list: the refusal named a registration the scan found readable'
+  by_path_assert_untouched "$case_dir" by-path-partial-list
+  pass 'teardown --copy names no registration when the git listing fails after partial output'
+}
+
 # Git repositories the copy's own clone does not register, such as a separate clone or a worktree of
 # another project under .claude/ (which the clean proof skips), would go with the copy and their
 # commits with them. Every one found is refused; the same copy goes once it holds none.
@@ -5765,6 +5814,56 @@ test_by_path_completing_command_names_the_absolute_roots_of_relative_roots() {
   pass 'a teardown --copy completing command names absolute folders for relative roots and completes from another directory'
 }
 
+# A root reaches the completing command byte-exact or not at all. A data folder whose name ends in a newline
+# is refused before any removal step ("data directory contains an invalid control byte"), so no completing
+# command is printed and the reason is named. A config folder whose name ends in a newline reaches the
+# preservation refusal: it is printed %q-quoted on one line, and the printed command, run from another
+# directory, completes the copy.
+test_by_path_completing_command_keeps_every_byte_of_a_root() {
+  local case_dir rc command want rootnl root kept
+  for root in data config; do
+    make_by_path_case "by-path-root-bytes-$root"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    rootnl=$case_dir/$root-nl$'\n'
+    mkdir -p "$BP_COPY/.claude" "$rootnl" "$case_dir/data/pres-1" "$case_dir/elsewhere"
+    [ -d "$rootnl" ] && [ ! -e "$case_dir/$root-nl" ] || fail "by-path-root-bytes-$root: the fixture did not make a folder whose name ends in a newline"
+    printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+    printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'a file where the preserve parent must be a directory\n' > "$case_dir/data/pres-1/nested-copy-preserved"
+    rc=0
+    if [ "$root" = data ]; then
+      FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
+        FM_DATA_OVERRIDE="$rootnl" FM_CONFIG_OVERRIDE="$case_dir/config" NM_HOME="$case_dir/nm" \
+        PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      [ "$rc" != 0 ] || fail "by-path-root-bytes-$root: a data folder holding a newline must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'data directory contains an invalid control byte' "$case_dir/stderr" "by-path-root-bytes-$root: the reason is not named"
+      assert_no_grep 'completing-command:' "$case_dir/stderr" "by-path-root-bytes-$root: a completing command was printed for a root it cannot carry"
+      by_path_assert_untouched "$case_dir" "by-path-root-bytes-$root"
+      continue
+    fi
+    FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
+      FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$rootnl" NM_HOME="$case_dir/nm" \
+      PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-root-bytes-$root: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+    command=$(sed -n 's/^completing-command: //p' "$case_dir/stderr")
+    [ -n "$command" ] || fail "by-path-root-bytes-$root: no completing command: $(cat "$case_dir/stderr")"
+    [ "$(printf '%s\n' "$command" | wc -l | tr -d ' ')" = 1 ] || fail "by-path-root-bytes-$root: the completing command is not one line: $command"
+    printf -v want ' FM_CONFIG_OVERRIDE=%q ' "$rootnl"
+    [[ "$command" == *"$want"* ]] || fail "by-path-root-bytes-$root: the printed command does not name the exact config folder$want: $command"
+    rm -f "$case_dir/data/pres-1/nested-copy-preserved"
+    rc=0
+    by_path_run_printed "$case_dir" "$command" "$case_dir/elsewhere" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-root-bytes-$root: the printed command failed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-root-bytes-$root: the copy was not removed"
+    kept=$(find "$case_dir/data/pres-1/nested-copy-preserved" -type d -name files -print -quit 2>/dev/null)
+    [ -n "$kept" ] || fail "by-path-root-bytes-$root: nothing was preserved under the data folder the refused run used"
+  done
+  pass 'a teardown --copy completing command carries a root byte-exact, a final newline included, or prints none and names why'
+}
+
 # A run whose state, data and config folders are the home's own defaults prints the completing command
 # it always printed, with no root override on it; the same refusal under a home whose roots differ
 # prints each differing root (test_by_path_preserves_claude_whole_and_removes_the_copy runs that text).
@@ -6106,6 +6205,8 @@ test_by_path_does_not_report_a_gone_copy_done_while_a_registration_cannot_be_rea
 test_by_path_refuses_a_copy_whose_registration_is_held_by_a_link_that_cannot_be_checked
 test_by_path_refuses_while_another_registration_is_held_by_a_link_that_cannot_be_checked
 test_by_path_refuses_while_a_dot_named_registration_is_held_by_a_link_to_nothing
+test_by_path_names_a_registration_whose_name_holds_a_newline
+test_by_path_names_no_registration_when_the_listing_fails_after_partial_output
 test_by_path_refuses_an_unregistered_nested_repository_under_the_copy
 test_by_path_refuses_when_the_audit_record_cannot_be_written
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row
@@ -6116,6 +6217,7 @@ test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
 test_by_path_preserves_claude_whole_and_removes_the_copy
 test_by_path_completing_command_prints_a_root_only_when_it_differs_from_the_home_default
 test_by_path_completing_command_names_the_absolute_roots_of_relative_roots
+test_by_path_completing_command_keeps_every_byte_of_a_root
 test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read
 test_by_path_refuses_a_holder_that_starts_after_the_first_scan
 )

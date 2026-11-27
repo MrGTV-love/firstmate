@@ -158,20 +158,26 @@ teardown_copy_question() {  # <rule> <copy>
   esac
 }
 
-# Prints the absolute form of <path>: the path itself when it is absolute,
-# otherwise the folder it names relative to the directory this run started in
-# (TEARDOWN_START_PWD; a caller that records none uses its current directory).
-# Fails when no absolute form can be made.
-teardown_absolute_root() {  # <path>
+# Sets <var> to the absolute form of <path>, byte-exact (printf -v, never a
+# captured copy, which would drop a final newline): the path itself when it is
+# absolute, otherwise the folder it names relative to the directory this run
+# started in (TEARDOWN_START_PWD; a caller that records none uses its current
+# directory). Fails when no absolute form can be made.
+teardown_absolute_root() {  # <var> <path>
   local base
-  case "$1" in
+  case "$2" in
     '') return 1 ;;
-    /*) printf '%s\n' "$1" ;;
+    /*) printf -v "$1" '%s' "$2" ;;
     *)
       base=${TEARDOWN_START_PWD:-}
-      [ -n "$base" ] || base=$(pwd -P 2>/dev/null) || return 1
+      if [ -z "$base" ]; then
+        # The trailing "." keeps a final newline of the directory through the capture.
+        base=$(pwd -P 2>/dev/null && printf .) || return 1
+        base=${base%.}
+        base=${base%$'\n'}
+      fi
       case "$base" in /*) ;; *) return 1 ;; esac
-      printf '%s/%s\n' "${base%/}" "${1#./}" ;;
+      printf -v "$1" '%s/%s' "${base%/}" "${2#./}" ;;
   esac
 }
 
@@ -186,15 +192,17 @@ teardown_root_key() {  # <path>
 # wrapper that repeats it. The command re-enters the existing proof/preservation
 # owner without force, so a forced or legacy-record run, which it could not
 # complete, gets a human-only exit instead. A new custody/disposition decision is
-# asked explicitly. The command names absolute folders only: FM_HOME, and the
-# state, data and config roots the run used whenever one differs from its default
-# under FM_HOME, each relative one taken relative to the directory the run
-# started in. Run as printed, from any directory and a shell that sets none of
-# the overrides, it reaches the same folders. A run that cannot make a root
-# absolute gets the human-only exit instead, naming that root.
+# asked explicitly. The command names absolute folders only, each quoted with
+# printf %q so every byte of it survives on one line: FM_HOME, and each of the
+# state, data and config roots the run used that is a different folder from its
+# default under FM_HOME (compared without trailing slashes), each
+# relative one taken relative to the directory the run started in. Run as
+# printed, from any directory and a shell that sets none of the overrides, it
+# reaches the same folders. A run that cannot make a root absolute gets the
+# human-only exit instead, naming that root.
 teardown_refuse_copy() {  # <rule> <missing> <copy>
-  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh} roots='' why=''
-  local abs_home abs_state abs_data abs_config
+  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh} roots='' why='' piece
+  local abs_home abs_state abs_data abs_config key_home key_root root value
   # An unavailable inspection is not a policy judgment. The later custody
   # wrapper repeats this diagnostic without manufacturing a policy event.
   if [ "$1" = inspection-unavailable ]; then
@@ -204,18 +212,32 @@ teardown_refuse_copy() {  # <rule> <missing> <copy>
   fi
   exit_text=$(teardown_copy_question "$1" "$3")
   if [ "$1" = ignored-bytes-preserved ] && [ "${FORCE:-}" != --force ] && [ "${LEGACY_RECORD_GIVEN:-0}" != 1 ]; then
-    abs_home=$(teardown_absolute_root "$FM_HOME") || why="the home folder ($FM_HOME)"
-    abs_state=$(teardown_absolute_root "${STATE:-$FM_HOME/state}") || why="${why:+$why, }the state folder (${STATE:-$FM_HOME/state})"
-    abs_data=$(teardown_absolute_root "${DATA:-$FM_HOME/data}") || why="${why:+$why, }the data folder (${DATA:-$FM_HOME/data})"
-    abs_config=$(teardown_absolute_root "${CONFIG:-$FM_HOME/config}") || why="${why:+$why, }the config folder (${CONFIG:-$FM_HOME/config})"
+    teardown_absolute_root abs_home "$FM_HOME" || { printf -v piece 'the home folder (%q)' "$FM_HOME"; why=$piece; }
+    for root in state data config; do
+      case "$root" in
+        state) value=${STATE:-$FM_HOME/state} ;;
+        data) value=${DATA:-$FM_HOME/data} ;;
+        config) value=${CONFIG:-$FM_HOME/config} ;;
+      esac
+      teardown_absolute_root "abs_$root" "$value" || { printf -v piece 'the %s folder (%q)' "$root" "$value"; why="${why:+$why, }$piece"; }
+    done
     if [ -n "$why" ]; then
       exit_text="No completing command is printed because $why is relative and the directory this run started in cannot be read, so a command naming it could not reach it from another directory. Once readable source and writable preservation storage are restored, re-run this teardown from the directory it started in."
       missing="$missing Restore readable source and writable preservation storage, then re-run this teardown from the directory it started in."
     else
       kind=machine
-      [ "$(teardown_root_key "$abs_state")" = "$(teardown_root_key "$abs_home")/state" ] || roots="$roots FM_STATE_OVERRIDE=$(printf '%q' "$abs_state")"
-      [ "$(teardown_root_key "$abs_data")" = "$(teardown_root_key "$abs_home")/data" ] || roots="$roots FM_DATA_OVERRIDE=$(printf '%q' "$abs_data")"
-      [ "$(teardown_root_key "$abs_config")" = "$(teardown_root_key "$abs_home")/config" ] || roots="$roots FM_CONFIG_OVERRIDE=$(printf '%q' "$abs_config")"
+      key_home=$(teardown_root_key "$abs_home")
+      for root in state data config; do
+        case "$root" in
+          state) value=$abs_state ;;
+          data) value=$abs_data ;;
+          config) value=$abs_config ;;
+        esac
+        key_root=$(teardown_root_key "$value")
+        [ "$key_root" = "$key_home/$root" ] && continue
+        printf -v piece ' FM_%s_OVERRIDE=%q' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$value"
+        roots+=$piece
+      done
       if [ "${TEARDOWN_BY_PATH:-}" = 1 ]; then
         printf -v command 'FM_HOME=%q%s bash %q --copy %q --record-id %q' "$abs_home" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$TEARDOWN_BY_PATH_COPY" "$ID"
       else
@@ -3100,10 +3122,11 @@ teardown_by_path_locate() {  # <canonical-copy>
       clone=$slot
     fi
     [ -n "$clone" ] || continue
-    registered=$(fm_task_copy_registered_nested "$clone") || {
-      [ -n "$TEARDOWN_BY_PATH_UNREADABLE" ] || TEARDOWN_BY_PATH_UNREADABLE="the worktree registration list of $(fm_refuse_text "$clone") could not be read$(fm_task_copy_unreadable_registration_note "$registered")"
+    fm_task_copy_read_registered_nested "$clone" || {
+      [ -n "$TEARDOWN_BY_PATH_UNREADABLE" ] || TEARDOWN_BY_PATH_UNREADABLE="the worktree registration list of $(fm_refuse_text "$clone") could not be read$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"
       continue
     }
+    registered=$FM_TASK_COPY_NESTED
     if printf '%s\n' "$registered" | grep -Fxq -- "$copy"; then
       TEARDOWN_BY_PATH_CLONE=$clone
       PROJ=$proj
@@ -3182,10 +3205,11 @@ teardown_by_path_other_repos() {  # <copy>
 # it finds is refused, because nothing here proves its commits landed.
 teardown_by_path_inner() {  # <copy>
   local copy=$1 inner rc=0
-  inner=$(fm_task_copy_registered_nested "$copy") || {
-    teardown_by_path_unread "the worktrees registered inside $(fm_refuse_text "$copy") cannot be listed$(fm_task_copy_unreadable_registration_note "$inner")"
+  fm_task_copy_read_registered_nested "$copy" || {
+    teardown_by_path_unread "the worktrees registered inside $(fm_refuse_text "$copy") cannot be listed$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"
     return 1
   }
+  inner=$FM_TASK_COPY_NESTED
   while IFS= read -r inner; do
     [ -n "$inner" ] && [ -d "$inner" ] || continue
     teardown_by_path_why "$(fm_refuse_text "$copy") holds registered worktree $(fm_refuse_text "$inner"), which removing it would delete; remove or prove that worktree first"

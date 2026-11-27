@@ -318,59 +318,65 @@ fm_task_copy_same_repository() {  # <path> <project>
   [ "$path_common" = "$proj_common" ]
 }
 
-# Succeeds when every registration <canonical-clone> keeps can be read; fails
-# and prints the path of the first part that cannot be read, so the one scan that
-# finds it is the one that names it. git leaves out a registration it cannot read
-# and still exits 0, so the list alone cannot tell a clone that registers nothing
-# from one whose registrations are hidden: the registration folder must list, and
-# each registration's folder (whatever its name, a leading dot included) must list
-# and its gitdir file read. A registration, or a gitdir, that is a link whose
-# target cannot be checked (dangling, or inside a folder nobody may search) is
-# hidden the same way, so it counts as unreadable too. A registration folder with
-# no gitdir file and no gitdir link is a broken one that git itself ignores, not
-# an unreadable one.
+# Succeeds when every registration <canonical-clone> keeps can be read. Fails
+# when one cannot, and sets FM_TASK_COPY_UNREADABLE_REGISTRATION to the path of
+# the first part that cannot be read, byte-exact (assigned, never captured as
+# text), so the one scan that finds it is the one that names it; it stays empty
+# when the failure is not a registration (the clone's own Git directory cannot
+# be read). git leaves out a registration it cannot read and still exits 0, so
+# the list alone cannot tell a clone that registers nothing from one whose
+# registrations are hidden: the registration folder must list, and each
+# registration's folder (whatever its name, a leading dot or a newline in it
+# included) must list and its gitdir file read. A registration, or a gitdir,
+# that is a link whose target cannot be checked (dangling, or inside a folder
+# nobody may search) is hidden the same way, so it counts as unreadable too. A
+# registration folder with no gitdir file and no gitdir link is a broken one
+# that git itself ignores, not an unreadable one.
+FM_TASK_COPY_UNREADABLE_REGISTRATION=
 fm_task_copy_registrations_readable() {  # <canonical-clone>
   local common store entry
-  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { printf '%s\n' "$1"; return 1; }
+  FM_TASK_COPY_UNREADABLE_REGISTRATION=
+  # The trailing "." keeps a final newline of the path through the capture.
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null && printf .) || return 1
+  common=${common%.}
+  common=${common%$'\n'}
   store=$common/worktrees
   [ -e "$store" ] || [ -L "$store" ] || return 0
-  [ -d "$store" ] && [ -r "$store" ] && [ -x "$store" ] || { printf '%s\n' "$store"; return 1; }
+  [ -d "$store" ] && [ -r "$store" ] && [ -x "$store" ] || { FM_TASK_COPY_UNREADABLE_REGISTRATION=$store; return 1; }
   for entry in "$store"/* "$store"/.[!.]* "$store"/..?*; do
-    if [ -L "$entry" ] && [ ! -e "$entry" ]; then printf '%s\n' "$entry"; return 1; fi
+    if [ -L "$entry" ] && [ ! -e "$entry" ]; then FM_TASK_COPY_UNREADABLE_REGISTRATION=$entry; return 1; fi
     [ -d "$entry" ] || continue
-    if [ ! -r "$entry" ] || [ ! -x "$entry" ]; then printf '%s\n' "$entry"; return 1; fi
-    if [ -L "$entry/gitdir" ] && [ ! -e "$entry/gitdir" ]; then printf '%s\n' "$entry/gitdir"; return 1; fi
+    if [ ! -r "$entry" ] || [ ! -x "$entry" ]; then FM_TASK_COPY_UNREADABLE_REGISTRATION=$entry; return 1; fi
+    if [ -L "$entry/gitdir" ] && [ ! -e "$entry/gitdir" ]; then FM_TASK_COPY_UNREADABLE_REGISTRATION=$entry/gitdir; return 1; fi
     [ -e "$entry/gitdir" ] || continue
-    if [ ! -r "$entry/gitdir" ]; then printf '%s\n' "$entry/gitdir"; return 1; fi
+    if [ ! -r "$entry/gitdir" ]; then FM_TASK_COPY_UNREADABLE_REGISTRATION=$entry/gitdir; return 1; fi
   done
   return 0
 }
 
-# Prints " (registration <path> cannot be read)" for the registration path
-# fm_task_copy_registered_nested printed when it failed, on one line, and
-# nothing for an empty path: the part a refusal that kept a copy names. It reads
-# nothing; the scan that failed already recorded the path.
-fm_task_copy_unreadable_registration_note() {  # <path the failed listing printed>
-  local path=${1%%$'\n'*}
-  [ -n "$path" ] || return 0
-  printf ' (registration %s cannot be read)' "$(printf '%s' "$path" | tr '\n\t\r' '   ')"
+# Prints " (registration <path> cannot be read)" with <path> quoted the way
+# printf %q quotes it, so every byte of it, a newline included, survives on one
+# line, and nothing for an empty path. It reads nothing: the path is the one
+# fm_task_copy_registrations_readable recorded.
+fm_task_copy_unreadable_registration_note() {  # <recorded path>
+  [ -n "$1" ] || return 0
+  printf ' (registration %q cannot be read)' "$1"
 }
 
-# Prints the canonical path of every worktree <canonical-clone> has registered
-# strictly inside itself, one per line. A registered copy whose directory is
-# gone keeps its raw path. Fails when the registration list cannot be read, so a
-# caller never takes an unreadable list for an empty one; that includes a list
-# git shortened because it could not read a registration
-# (fm_task_copy_registrations_readable). When it fails on an unreadable
-# registration it prints that registration's path, and nothing else, for the
-# caller's refusal to name (a caller reads it from the same command substitution
-# whose status it tests).
-fm_task_copy_registered_nested() {  # <canonical-clone>
-  local clone=$1 field path canon unreadable
-  unreadable=$(fm_task_copy_registrations_readable "$clone") || {
-    [ -z "$unreadable" ] || printf '%s\n' "$unreadable"
-    return 1
-  }
+# Sets FM_TASK_COPY_NESTED to the canonical path of every worktree
+# <canonical-clone> has registered strictly inside itself, one per line, and
+# succeeds. A registered copy whose directory is gone keeps its raw path. Fails
+# when the registration list cannot be read, so a caller never takes an
+# unreadable list for an empty one: then FM_TASK_COPY_NESTED is empty and
+# FM_TASK_COPY_UNREADABLE_REGISTRATION names the registration only when the
+# registration scan (fm_task_copy_registrations_readable) found it unreadable;
+# a git listing that fails, after partial output or none, names none. It runs in
+# the caller's shell (never inside a command substitution) so both stay set.
+FM_TASK_COPY_NESTED=
+fm_task_copy_read_registered_nested() {  # <canonical-clone>
+  local clone=$1 field path canon list=''
+  FM_TASK_COPY_NESTED=
+  fm_task_copy_registrations_readable "$clone" || return 1
   while IFS= read -r -d '' field; do
     case "$field" in
       registration-list-unreadable) return 1 ;;
@@ -378,8 +384,9 @@ fm_task_copy_registered_nested() {  # <canonical-clone>
       *) continue ;;
     esac
     canon=$(fm_task_copy_canonical_dir "$path") || canon=$path
-    case "$canon" in "$clone"/*) printf '%s\n' "$canon" ;; esac
+    case "$canon" in "$clone"/*) list+=$canon$'\n' ;; esac
   done < <(git -C "$clone" worktree list --porcelain -z 2>/dev/null || printf '\0registration-list-unreadable\0')
+  FM_TASK_COPY_NESTED=${list%$'\n'}
 }
 
 # The local copies a task record names, one "<field> <path>" line each: the

@@ -544,6 +544,22 @@ test_a_dot_named_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_
   pass 'a dot-named registration held by a link to nothing keeps every copy of its clone and is named'
 }
 
+# A git whose `worktree list` prints one nested path and then fails, with every registration readable, is a
+# list that could not be read: the sweep reads nothing from the clone and names no registration.
+test_a_listing_that_fails_after_partial_output_names_no_registration() {
+  make_world partial-listing
+  add_copy reap
+  printf '%s\n' "$(copy_path reap)" > "$W/partial-list"
+  FAKE_GIT_PARTIAL_LIST_FILE="$W/partial-list" run_sweep --apply
+  [ "$RC" = 0 ] || fail "partial listing: apply failed ($RC): $OUT"
+  assert_present "$W/partial-list.log" 'the git stand-in did not print its partial listing'
+  assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed" 'a listing that failed was read'
+  assert_not_contains "$OUT" '(registration ' 'the sweep named a registration the scan found readable'
+  assert_not_contains "$OUT" "REMOVED"$'\t' 'a copy of a clone whose listing failed was removed'
+  registered reap || fail 'the copy of a clone whose listing failed was unregistered'
+  pass 'a listing that fails after partial output keeps every copy and names no registration'
+}
+
 test_apply_removes_only_the_reapable_copy() {
   make_matrix apply
   take_snapshots before "${HELD_NAMES[@]}"
@@ -3509,6 +3525,7 @@ test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 test_unreadable_registration_is_reported_without_walking_for_copies
 test_a_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone
 test_a_dot_named_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone
+test_a_listing_that_fails_after_partial_output_names_no_registration
 test_apply_removes_only_the_reapable_copy
 test_recycled_launcher_lock_is_held
 test_dead_launcher_dirty_copy_is_held
