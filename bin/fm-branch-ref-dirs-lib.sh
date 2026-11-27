@@ -27,10 +27,6 @@
 # component that already exists, as a directory or as any other kind of entry
 # including a symbolic link, is never replaced and never followed: the walk stops
 # there. The helper never deletes anything and never fails its caller.
-#
-# fm-worker-branch-no-ref-dir-prereq's relaunch mkdir is a later user of this
-# helper: it keys its folders to state/*.meta, and this helper is the one owner of
-# restoring them from the registered prefix and the deleted branch.
 
 fm_branch_ref_dirs_parent() {
   local folder
