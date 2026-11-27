@@ -1548,16 +1548,24 @@ teardown_foreign_copies_prove() {  # <slot>
 }
 
 # Is <bare>, a bare repository found inside <copy>, landed content of the copy's own
-# repository? Only when git proves it: at least one file under it is tracked, and
-# git status for that directory (untracked files listed one by one, ignored ones
-# too) prints nothing, so every file under it is tracked and unmodified. An
-# untracked, ignored, modified or deleted file under it, a status that fails, and a
-# directory git cannot read are all "not proved": it counts as another repository.
+# repository? Only when git proves it: at least one file under it is tracked, no
+# tracked file under it carries an index flag that hides an edit from git status
+# (`git ls-files -v` tags every one H: not assume-unchanged, a lowercase tag, and
+# not skip-worktree, S), and git status for that directory (untracked files listed
+# one by one, ignored ones too) prints nothing, so every file under it is tracked
+# and unmodified. An untracked, ignored, modified or deleted file under it, a
+# flagged file, a flag read or status that fails, and a directory git cannot read
+# are all "not proved": it counts as another repository.
 teardown_copy_bare_repo_landed() {  # <copy> <bare>
-  local own=$1 bare=$2 rel tracked changes
+  local own=$1 bare=$2 rel tracked flags entry changes
   case "$bare" in "$own"/?*) rel=${bare#"$own"/} ;; *) return 1 ;; esac
   tracked=$(git -C "$own" ls-files -z -- ":(literal)$rel" 2>/dev/null) || return 1
   [ -n "$tracked" ] || return 1
+  flags=$(git -C "$own" ls-files -v -- ":(literal)$rel" 2>/dev/null) || return 1
+  [ -n "$flags" ] || return 1
+  while IFS= read -r entry; do
+    case "$entry" in 'H '*) ;; *) return 1 ;; esac
+  done <<< "$flags"
   changes=$(git -C "$own" status --porcelain=v1 -z -uall --ignored=traditional -- ":(literal)$rel" 2>/dev/null) || return 1
   [ -z "$changes" ]
 }
@@ -1569,7 +1577,8 @@ teardown_copy_bare_repo_landed() {  # <copy> <bare>
 # .claude and .opencode too. Not counted: submodules of the copy's own repository,
 # linked worktrees of the same repository (registered copies, proved on their own)
 # and a bare repository whose every file the copy's own repository tracks and holds
-# unmodified (teardown_copy_bare_repo_landed), which is landed content. Prints
+# unmodified, with no index flag hiding an edit (teardown_copy_bare_repo_landed),
+# which is landed content. Prints
 # nothing else and changes nothing. Returns 0
 # when the whole copy was searched, 2 when the copy's own Git directory cannot be
 # read, and the failing find's status when a directory could not be searched; the

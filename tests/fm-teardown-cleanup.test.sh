@@ -5473,11 +5473,12 @@ test_a_held_close_refuses_when_an_own_nested_copy_holds_a_bare_repository() {
 # A bare repository whose every file the enclosing repository tracks and holds unmodified is landed
 # content, a fixture, and does not count as another repository: the held close goes ahead. The same
 # bare repository with one untracked ref, one untracked object or one modified file counts and the
-# close refuses with nothing removed. The scan is the one teardown --copy uses too
-# (tests/fm-teardown.test.sh).
+# close refuses with nothing removed, and so does one whose tracked file was changed behind an index
+# flag (assume-unchanged or skip-worktree), which git status does not show. The scan is the one
+# teardown --copy uses too (tests/fm-teardown.test.sh).
 test_a_held_close_counts_a_bare_repository_only_when_git_does_not_hold_it_landed() {
   local rc shape second nested head
-  for shape in tracked-clean untracked-ref untracked-object modified-file; do
+  for shape in tracked-clean untracked-ref untracked-object modified-file assume-unchanged skip-worktree; do
     make_own_locked_copy_case "held-bare-tracked-$shape" enclosing
     printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
     seed_backlog_in_flight "$FOREIGN_CASE"
@@ -5493,6 +5494,12 @@ test_a_held_close_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
       untracked-ref) printf '%s\n' "$head" > "$nested/refs/heads/untracked-ref" ;;
       untracked-object) printf 'an object nothing tracks\n' | git --git-dir="$nested" hash-object -w --stdin >/dev/null ;;
       modified-file) printf 'changed after it was committed\n' >> "$nested/description" ;;
+      assume-unchanged|skip-worktree)
+        git -C "$FOREIGN_COPY" update-index "--$shape" .claude/fixtures/repo.git/description
+        printf 'changed behind an index flag\n' >> "$nested/description"
+        # The fixture bites: git status does not show the edit the flag hides.
+        [ -z "$(git -C "$FOREIGN_COPY" status --porcelain=v1 -uall --ignored=traditional -- .claude/fixtures/repo.git)" ] \
+          || fail "held-bare-tracked-$shape: git status still shows the flagged edit, so the fixture does not hide it" ;;
     esac
     second=$FOREIGN_SLOT/.claude/worktrees/fc-two
     git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
@@ -5509,14 +5516,14 @@ test_a_held_close_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
       git --git-dir="$nested" cat-file -e "$head" || fail "held-bare-tracked-$shape: the bare repository lost its commit"
       assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-bare-tracked-$shape: the task record was removed"
       case "$shape" in
-        untracked-ref | untracked-object)
+        untracked-ref | untracked-object | assume-unchanged | skip-worktree)
           assert_grep "Git repository $nested inside task task-x1's nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
             "held-bare-tracked-$shape: the refusal did not name the bare repository: $(cat "$FOREIGN_CASE/stderr")" ;;
       esac
       held_assert_untouched "held-bare-tracked-$shape" "$FOREIGN_CASE" "$second"
     fi
   done
-  pass 'a held close ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object or a modified file'
+  pass 'a held close ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object, a modified file or an edit an index flag hides'
 }
 
 # A submodule of the task's own repository is not another repository: its git

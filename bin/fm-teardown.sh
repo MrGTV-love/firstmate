@@ -632,8 +632,9 @@
 #       anywhere in it, .claude and .opencode included: a nested clone, another
 #       project's worktree or a bare repository (HEAD, objects and refs together),
 #       except a bare repository whose every file the copy's own repository tracks
-#       and holds unmodified, which is landed content (a fixture): an untracked,
-#       ignored, modified or unreadable file in it, or a failed git status, counts;
+#       and holds unmodified, with no index flag (assume-unchanged, skip-worktree)
+#       hiding an edit, which is landed content (a fixture): an untracked, ignored,
+#       modified, flagged or unreadable file in it, or a failed git read, counts;
 #     - it carries no lock but Vernant's creation lock, whose launcher process must
 #       be proved gone: a ps that was refused, failed or said anything but "no such
 #       process" counts as possibly alive, and a process-table read made under the
