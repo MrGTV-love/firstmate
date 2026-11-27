@@ -1,0 +1,49 @@
+== scenario daemon
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Gm38PP TMUX_TMPDIR=/tmp/fml.QinHO2 scratch=/tmp/fm-live.47pVMD
+shared-daemon stand-in pid=19316 ppid=1 sid-leader cwd=/private/tmp/fm-live.47pVMD/wt
+-- before
+tmux windows:
+  firstmate:fm-task-x1 panes=1
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x1 %0 pid=19236
+  bystander %1 pid=19261
+processes with cwd in the copy:
+  pid=19316 cwd=/private/tmp/fm-live.47pVMD/wt
+task record: present
+copy: present
+audit:
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 1
+stderr (last 12 lines):
+  fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Gm38PP
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8EMJFHBB0B5RCC5MM4BQ2JK/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  REFUSED: process 19316 (lstart=Fri Nov 27 09:21:27 2026, no-mistakes-daemon-standin) has its cwd at /private/tmp/fm-live.47pVMD/wt, but nothing proves it belongs to task-x1: it does not descend from the task's pane shell 19236 (lstart=Fri Nov 27 09:21:27 2026) or from a process proved the task's. It may be a shared service (a daemon that started in this copy), so teardown leaves it running and keeps the copy; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved.
+  REFUSED: cannot prove every process under /private/tmp/fm-live.47pVMD/wt belongs to task-x1 (process 19316 at the root is not proven to belong to task-x1); nothing was signalled and the worktree/tasktmp is preserved.
+-- after
+tmux windows:
+  firstmate:fm-task-x1 panes=1
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x1 %0 pid=19236
+  bystander %1 pid=19261
+processes with cwd in the copy:
+  pid=19316 cwd=/private/tmp/fm-live.47pVMD/wt
+task record: present
+copy: present
+audit:
+PASS: teardown refuses (exit 1)
+PASS: the shared daemon is still alive
+PASS: the refusal names the daemon pid and says nothing proves it is the task's
+PASS: the task window was not closed
+PASS: the bystander window was not closed
+PASS: the task record is kept
+PASS: no signal was audited
+PASS: treehouse was not asked to return the copy
+RESULT daemon: pass
+lab removed: /Users/charlesabrooker/tmp/fm-lab.Gm38PP /tmp/fml.QinHO2 /tmp/fm-live.47pVMD

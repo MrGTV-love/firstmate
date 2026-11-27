@@ -1,0 +1,33 @@
+== scenario unreadable-socket
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.HgHse3 TMUX_TMPDIR=/tmp/fml.D9AHr6 scratch=/tmp/fm-live.JatZC1
+tmux socket directory /tmp/fml.D9AHr6/tmux-501 made unreadable (mode 000)
+error connecting to /private/tmp/fml.D9AHr6/tmux-501/default (Permission denied)
+tmux itself now answers: error connecting to /private/tmp/fml.D9AHr6/tmux-501/default (Permission denied)
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 1
+stderr (last 12 lines):
+  fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HgHse3
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8EMJFHBB0B5RCC5MM4BQ2JK/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: no single live pane shell could be read from the task's endpoint firstmate:fm-task-x1 (it cannot be read). Teardown closes and signals nothing; every durable task record is kept.
+-- after-restore
+tmux windows:
+  firstmate:fm-task-x1 panes=1
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x1 %0 pid=94532
+  bystander %1 pid=94556
+processes with cwd in the copy:
+task record: present
+copy: present
+audit:
+PASS: teardown refuses (exit 1)
+PASS: the refusal says the endpoint cannot be read
+PASS: the task window still exists
+PASS: the task record is kept
+RESULT unreadable-socket: pass
+lab removed: /Users/charlesabrooker/tmp/fm-lab.HgHse3 /tmp/fml.D9AHr6 /tmp/fm-live.JatZC1

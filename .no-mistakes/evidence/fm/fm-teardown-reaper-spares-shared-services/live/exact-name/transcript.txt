@@ -1,0 +1,41 @@
+== scenario exact-name
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.SD2IKb TMUX_TMPDIR=/tmp/fml.EPohb0 scratch=/tmp/fm-live.sMbKYU
+recorded window fm-task-x1 is absent; a lookalike window fm-task-x10 (pane pid 9342) exists
+-- before
+tmux windows:
+  firstmate:fm-task-x10 panes=1
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x10 %0 pid=9342
+  bystander %1 pid=9360
+processes with cwd in the copy:
+task record: present
+copy: present
+audit:
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 0
+stderr (last 12 lines):
+  fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SD2IKb
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8EMJFHBB0B5RCC5MM4BQ2JK/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- after
+tmux windows:
+  firstmate:fm-task-x10 panes=1
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x10 %0 pid=9342
+  bystander %1 pid=9360
+processes with cwd in the copy:
+task record: absent
+copy: present
+audit:
+PASS: teardown completes (exit 0): the recorded window is absent
+PASS: the lookalike window fm-task-x10 survives
+PASS: the lookalike pane process is alive
+PASS: the bystander window survives
+RESULT exact-name: pass
+lab removed: /Users/charlesabrooker/tmp/fm-lab.SD2IKb /tmp/fml.EPohb0 /tmp/fm-live.sMbKYU

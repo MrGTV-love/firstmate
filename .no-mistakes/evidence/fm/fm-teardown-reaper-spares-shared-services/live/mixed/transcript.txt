@@ -1,0 +1,50 @@
+== scenario mixed
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.c4NNS3 TMUX_TMPDIR=/tmp/fml.B9rhOQ scratch=/tmp/fm-live.10gpTI
+pane pid=59686 proven leak pid=59729 and unproven daemon pid=60118, both at the copy root
+-- before
+tmux windows:
+  firstmate:fm-task-x1 panes=1
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x1 %0 pid=59686
+  bystander %1 pid=59649
+processes with cwd in the copy:
+  pid=59729 cwd=/private/tmp/fm-live.10gpTI/wt
+  pid=60118 cwd=/private/tmp/fm-live.10gpTI/wt
+task record: present
+copy: present
+audit:
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 1
+stderr (last 12 lines):
+  fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.c4NNS3
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8EMJFHBB0B5RCC5MM4BQ2JK/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  REFUSED: process 60118 (lstart=Fri Nov 27 09:21:45 2026, no-mistakes-daemon-standin) has its cwd at /private/tmp/fm-live.10gpTI/wt, but nothing proves it belongs to task-x1: it does not descend from the task's pane shell 59686 (lstart=Fri Nov 27 09:21:45 2026) or from a process proved the task's. It may be a shared service (a daemon that started in this copy), so teardown leaves it running and keeps the copy; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved.
+  REFUSED: cannot prove every process under /private/tmp/fm-live.10gpTI/wt belongs to task-x1 (process 60118 at the root is not proven to belong to task-x1); nothing was signalled and the worktree/tasktmp is preserved.
+-- after
+tmux windows:
+  firstmate:fm-task-x1 panes=1
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x1 %0 pid=59686
+  bystander %1 pid=59649
+processes with cwd in the copy:
+  pid=59729 cwd=/private/tmp/fm-live.10gpTI/wt
+  pid=60118 cwd=/private/tmp/fm-live.10gpTI/wt
+task record: present
+copy: present
+audit:
+PASS: teardown refuses (exit 1)
+PASS: the unproven daemon is alive
+PASS: the proven leak is also left alive (nothing signalled before every proof passed)
+PASS: the refusal names the daemon
+PASS: the task window was not closed
+PASS: no signal was audited
+PASS: the task record is kept
+RESULT mixed: pass
+lab removed: /Users/charlesabrooker/tmp/fm-lab.c4NNS3 /tmp/fml.B9rhOQ /tmp/fm-live.10gpTI

@@ -1,0 +1,47 @@
+== scenario shared-window
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.bWNiTN TMUX_TMPDIR=/tmp/fml.eijDio scratch=/tmp/fm-live.iUHISV
+recorded window has two panes: pids 79906 80089 (a user split)
+-- before
+tmux windows:
+  firstmate:fm-task-x1 panes=2
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x1 %0 pid=79906
+  fm-task-x1 %2 pid=80089
+  bystander %1 pid=79939
+processes with cwd in the copy:
+task record: present
+copy: present
+audit:
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 1
+stderr (last 12 lines):
+  fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.bWNiTN
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8EMJFHBB0B5RCC5MM4BQ2JK/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: no single live pane shell could be read from the task's endpoint firstmate:fm-task-x1 (its window holds several panes). Teardown closes and signals nothing; every durable task record is kept.
+-- after
+tmux windows:
+  firstmate:fm-task-x1 panes=2
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x1 %0 pid=79906
+  fm-task-x1 %2 pid=80089
+  bystander %1 pid=79939
+processes with cwd in the copy:
+task record: present
+copy: present
+audit:
+PASS: teardown refuses (exit 1)
+PASS: the refusal names the endpoint and several panes
+PASS: the shared window still exists
+PASS: both pane processes are alive
+PASS: second pane process is alive
+PASS: the task record is kept
+PASS: no signal was audited
+RESULT shared-window: pass
+lab removed: /Users/charlesabrooker/tmp/fm-lab.bWNiTN /tmp/fml.eijDio /tmp/fm-live.iUHISV

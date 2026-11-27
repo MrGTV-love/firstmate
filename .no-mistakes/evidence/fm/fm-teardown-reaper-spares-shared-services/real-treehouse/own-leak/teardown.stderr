@@ -1,0 +1,10 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 16s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-leak/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for task-x1: 99471
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-leak/realroot/.treehouse/project-07be76/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-leak/data/task-x1/nested-copy-preserved/df5becb762492d71f89d9eee947f24a31d5f2de8650a3e8d804a0357a60b3516
+teardown: removed landed own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-leak/realroot/.treehouse/project-07be76/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-leak/realroot/.treehouse/project-07be76/1/project

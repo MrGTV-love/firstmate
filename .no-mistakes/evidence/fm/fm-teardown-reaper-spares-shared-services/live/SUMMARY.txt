@@ -1,0 +1,80 @@
+## leak
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 0
+PASS: teardown succeeds (exit 0)
+PASS: the leaked child of the task pane is gone
+PASS: the TERM of the leak is audited
+PASS: the task window is closed
+PASS: the bystander window survives
+PASS: the task record is removed
+RESULT leak: pass
+
+## daemon
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 1
+PASS: teardown refuses (exit 1)
+PASS: the shared daemon is still alive
+PASS: the refusal names the daemon pid and says nothing proves it is the task's
+PASS: the task window was not closed
+PASS: the bystander window was not closed
+PASS: the task record is kept
+PASS: no signal was audited
+PASS: treehouse was not asked to return the copy
+RESULT daemon: pass
+REFUSED: process 19316 (lstart=Fri Nov 27 09:21:27 2026, no-mistakes-daemon-standin) has its cwd at /private/tmp/fm-live.47pVMD/wt, but nothing proves it belongs to task-x1: it does not descend from the task's pane shell 19236 (lstart=Fri Nov 27 09:21:27 2026)
+REFUSED: cannot prove every process under /private/tmp/fm-live.47pVMD/wt belongs to task-x1 (process 19316 at the root is not proven to belong to task-x1); nothing was signalled and the worktree/tasktmp is preserved.
+
+## daemon-force
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1 --force --drop-file /tmp/fm-live.vjBewu/drop.txt -> exit 1
+PASS: teardown refuses (exit 1)
+PASS: the shared daemon is still alive
+PASS: the refusal names the daemon pid and says nothing proves it is the task's
+PASS: the task window was not closed
+PASS: the bystander window was not closed
+PASS: the task record is kept
+PASS: no signal was audited
+PASS: treehouse was not asked to return the copy
+RESULT daemon-force: pass
+REFUSED: process 39481 (lstart=Fri Nov 27 09:21:36 2026, no-mistakes-daemon-standin) has its cwd at /private/tmp/fm-live.vjBewu/wt, but nothing proves it belongs to task-x1: it does not descend from the task's pane shell 39194 (lstart=Fri Nov 27 09:21:35 2026)
+REFUSED: cannot prove every process under /private/tmp/fm-live.vjBewu/wt belongs to task-x1 (process 39481 at the root is not proven to belong to task-x1); nothing was signalled and the worktree/tasktmp is preserved.
+
+## mixed
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 1
+PASS: teardown refuses (exit 1)
+PASS: the unproven daemon is alive
+PASS: the proven leak is also left alive (nothing signalled before every proof passed)
+PASS: the refusal names the daemon
+PASS: the task window was not closed
+PASS: no signal was audited
+PASS: the task record is kept
+RESULT mixed: pass
+REFUSED: process 60118 (lstart=Fri Nov 27 09:21:45 2026, no-mistakes-daemon-standin) has its cwd at /private/tmp/fm-live.10gpTI/wt, but nothing proves it belongs to task-x1: it does not descend from the task's pane shell 59686 (lstart=Fri Nov 27 09:21:45 2026)
+REFUSED: cannot prove every process under /private/tmp/fm-live.10gpTI/wt belongs to task-x1 (process 60118 at the root is not proven to belong to task-x1); nothing was signalled and the worktree/tasktmp is preserved.
+
+## shared-window
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 1
+PASS: teardown refuses (exit 1)
+PASS: the refusal names the endpoint and several panes
+PASS: the shared window still exists
+PASS: both pane processes are alive
+PASS: second pane process is alive
+PASS: the task record is kept
+PASS: no signal was audited
+RESULT shared-window: pass
+REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: no single live pane shell could be read from the task's endpoint firstmate:fm-task-x1 (its window holds several panes). Teardown closes and signals nothing; every durable task 
+
+## unreadable-socket
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 1
+PASS: teardown refuses (exit 1)
+PASS: the refusal says the endpoint cannot be read
+PASS: the task window still exists
+PASS: the task record is kept
+RESULT unreadable-socket: pass
+REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: no single live pane shell could be read from the task's endpoint firstmate:fm-task-x1 (it cannot be read). Teardown closes and signals nothing; every durable task record is kep
+
+## exact-name
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 0
+PASS: teardown completes (exit 0): the recorded window is absent
+PASS: the lookalike window fm-task-x10 survives
+PASS: the lookalike pane process is alive
+PASS: the bystander window survives
+RESULT exact-name: pass
+

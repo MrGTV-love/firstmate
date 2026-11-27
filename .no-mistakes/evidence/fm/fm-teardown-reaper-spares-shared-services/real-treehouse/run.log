@@ -1,0 +1,2 @@
+ok - own-daemon: a detached daemon at the real slot root survives, teardown refuses naming it, and the real slot stays leased with the copy and the task
+ok - own-leak: a leaked child of the real task pane at the slot root is reaped and the real binary returns the slot

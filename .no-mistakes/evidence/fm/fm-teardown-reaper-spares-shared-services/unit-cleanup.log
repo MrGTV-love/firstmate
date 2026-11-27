@@ -1,0 +1,27 @@
+ok - a detached daemon at the copy root that descends from no task process survives teardown, which refuses and keeps the copy without printing its arguments
+ok - a leaked child of the task's pane at the copy root is reaped and the task closes
+ok - the old cwd-only verdict, injected only into the case's copy, kills the detached daemon, so case 1 discriminates
+ok - a copy holding both the task's leak and an unproven daemon refuses before signalling either
+ok - an absent, forged or dead pane proves nothing, so a root process refuses unsignalled, while a quiet copy still closes
+ok - a backend with no pane-shell reader refuses a root process unsignalled, naming the backend and telling the operator to stop that agent and rerun
+ok - a proved leak keeps its proof after the reap ends its parent shell, and is force-killed
+ok - an orphan reparented to init at the copy root, and an unproven daemon at the tasktmp root, refuse unsignalled
+ok - a child forked during the grace period that leaves the task's process group refuses unsignalled
+ok - an absent recorded tmux window, or a second pane in it, proves nothing and the leak refuses unsignalled
+ok - a process in a group whose proved members are gone is unproven and refuses unsignalled
+ok - the tasktmp-only route names and leaves an unproven tasktmp holder and continues, still reaps a proved leak, and refuses with no endpoint closed when the anchor itself is unprovable
+ok - two panes in the recorded window refuse before any close, with nothing in the roots, on the owned and the tasktmp-only route
+ok - a tmux socket that cannot be opened is an unreadable endpoint and refuses with nothing closed
+ok - window membership is an exact literal name match: a prefix, suffix or glob-pattern lookalike leaves the recorded window absent, the exact name is present
+ok - the recorded window name is matched literally in memory: glob lookalikes either way are absent, the exact name is proven, a failed read is unreadable
+ok - a child spawned during grace whose proved parent then exits is refused unsignalled on the later pass
+ok - a child forked during grace by a still-live proved parent is proved by parent chain and reaped
+ok - a detached daemon at the slot root is no ownership anchor: its child launcher is not signalled and the copy is kept
+ok - an unproven daemon at the slot root beside a proved nested launcher refuses with nothing signalled
+ok - a queued nested target keeps its decided proof: it is signalled after its support exits, and a pid whose birth identity changed is reported gone and never signalled
+ok - an in-copy no-mistakes launch agent no record proves the task's refuses teardown with nothing booted out, archived or signalled
+ok - every equivalent spelling of an in-copy agent root is recognized and refuses with the agent left loaded
+ok - a forced teardown still refuses an in-copy agent no record proves the task's
+ok - an in-copy plist with no loaded service refuses with every plist left installed
+ok - a symlinked plist is judged through its target: rooted in the copy or unreadable, it refuses with nothing booted out or moved
+exit=0

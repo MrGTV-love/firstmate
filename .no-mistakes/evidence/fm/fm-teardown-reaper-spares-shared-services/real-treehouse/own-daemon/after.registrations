@@ -1,0 +1,13 @@
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-daemon/project
+HEAD 63b5b069c3e697e19ef5d0c355d3c53aeba15d00
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-daemon/realroot/.treehouse/project-b7a656/1/project
+HEAD 63b5b069c3e697e19ef5d0c355d3c53aeba15d00
+detached
+
+worktree /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-daemon/realroot/.treehouse/project-b7a656/1/project/.claude/worktrees/fc-one
+HEAD 63b5b069c3e697e19ef5d0c355d3c53aeba15d00
+branch refs/heads/fm/task-x1-v2
+locked vernant-session-active owner=launcher:8735 launcher=8735
+

@@ -1,0 +1,44 @@
+== scenario leak
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.HrNHqC TMUX_TMPDIR=/tmp/fml.m8Kx4Q scratch=/tmp/fm-live.zJtWwH
+pane pid=64867 leaked child pid=64899 cwd=/private/tmp/fm-live.zJtWwH/wt
+-- before
+tmux windows:
+  firstmate:fm-task-x1 panes=1
+  firstmate:bystander panes=1
+tmux panes:
+  fm-task-x1 %0 pid=64867
+  bystander %1 pid=64844
+processes with cwd in the copy:
+  pid=64899 cwd=/private/tmp/fm-live.zJtWwH/wt
+task record: present
+copy: present
+audit:
+$ FM_HOME=<lab> bin/fm-teardown.sh task-x1  -> exit 0
+stderr (last 12 lines):
+  fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HrNHqC
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8EMJFHBB0B5RCC5MM4BQ2JK/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  teardown: reaping leaked worktree process(es) for task-x1: 64899
+-- after
+tmux windows:
+  firstmate:bystander panes=1
+tmux panes:
+  bystander %1 pid=64844
+processes with cwd in the copy:
+task record: absent
+copy: present
+audit:
+  1795792872	TERM	64899	lstart=Fri\ Nov\ 27\ 09:21:04\ 2026	leaked-task-helper	Fri\ Nov\ 27\ 09:21:04\ 2026\ \ \ \ 	/private/tmp/fm-live.zJtWwH/wt	/private/tmp/fm-live.zJtWwH/wt	cmdline-sha256=b159debb044f14522b00d028d75dede85f5b7569d2a6460e0c5607caf72ffffa
+PASS: teardown succeeds (exit 0)
+PASS: the leaked child of the task pane is gone
+PASS: the TERM of the leak is audited
+PASS: the task window is closed
+PASS: the bystander window survives
+PASS: the task record is removed
+RESULT leak: pass
+lab removed: /Users/charlesabrooker/tmp/fm-lab.HrNHqC /tmp/fml.m8Kx4Q /tmp/fm-live.zJtWwH

@@ -1,0 +1,9 @@
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 9s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-daemon/code-root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: process 18450 (lstart=Fri Nov 27 09:14:56 2026, sleep) has its cwd at /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-daemon/realroot/.treehouse/project-b7a656/1/project, but nothing proves it belongs to task-x1: it does not descend from the task's pane shell 14284 (lstart=Fri Nov 27 09:14:54 2026) or from a process proved the task's. It may be a shared service (a daemon that started in this copy), so teardown leaves it running and keeps the copy; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved.
+REFUSED: cannot prove every process under /Users/charlesabrooker/tmp/fm-teardown-tests.ubuKqQ/real-own-daemon/realroot/.treehouse/project-b7a656/1/project belongs to task-x1 (process 18450 at the root is not proven to belong to task-x1); nothing was signalled and the worktree/tasktmp is preserved.
