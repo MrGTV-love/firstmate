@@ -6151,11 +6151,12 @@ teardown_nested_slot() {  # prove | landed | decide | retire | reprove | return
       ;;
     retire)
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root the
-      # decision above fixed. The same holder rule runs again right before the
-      # first signal; the nested copies' queued processes were proved above.
+      # decision just before this fixed (teardown_decide_before_any_close runs
+      # it, and nothing runs between). The reaper's own scans apply the same
+      # holder rule again before its signals; the nested copies' queued
+      # processes are proved again before theirs.
       [ "${TEARDOWN_SWEPT_SET:-0}" = 1 ] || teardown_nested_slot decide || exit 1
       swept=(${TEARDOWN_SWEPT[@]+"${TEARDOWN_SWEPT[@]}"})
-      task_reap_preflight ${swept[@]+"${swept[@]}"} "$TASK_TMP" || exit 1
       for root in ${swept[@]+"${swept[@]}"}; do
         conclude_task_no_mistakes_run "$root" || exit 1
       done
