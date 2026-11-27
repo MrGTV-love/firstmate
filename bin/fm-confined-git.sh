@@ -101,7 +101,7 @@ fm_confined_git_run() {
   GIT_TRACE2_EVENT=$trace GIT_TRACE2_EVENT_BRIEF=true "$real" "$@"
   status=$?
   [ "$status" -eq 0 ] || fm_confined_git_note "$task" "$common" "$trace"
-  [ ! -e "$trace" ] || /bin/rm -f -- "$trace"
+  /bin/rm -f -- "$trace"
   exit "$status"
 }
 
