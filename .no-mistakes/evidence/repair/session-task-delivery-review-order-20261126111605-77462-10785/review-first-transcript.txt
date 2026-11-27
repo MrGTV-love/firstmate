@@ -1,0 +1,62 @@
+=== S1 review-first PASS at R (no pipeline run), then a clean base merge lands at H ===
++ review PASS at 879fbf0081c5 by gpt-5.1 declaring {"ship":["claude-opus-4-5"]}
+  recorded
++ verify live head 879fbf0081c5 -> rc=0
+  ACCEPTED carried_from=none (exact  reader=gpt-5.1 facts=None
++ verify live head 5cff6c58e3d0 -> rc=0
+  ACCEPTED carried_from=879fbf0081c5 reader=gpt-5.1 facts=['review carried from 879fbf0081c51f099c39808f8cf83c80f9bb625c: the live head is that reviewed change merged cleanly with its base']
+
+=== S2 pipeline edit to a file after the review-first PASS ===
++ review PASS at cc815b65e0cc by gpt-5.1 declaring {"ship":["claude-opus-4-5"]}
+  recorded
++ pipeline run run-s2 recorded: agent=claude model=claude-opus-4-5
++ verify live head 40e217da91de -> rc=1
+  REFUSED not-qualified: head mismatch: review names cc815b65e0ccf17c96c45104b9759b527a5c43a9, live head is 40e217da91de3ea981ea27621d377b2bfca5478e; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read)
++ plan at 40e217da91de
+  groups={"ship": [{"model": "claude-opus-4-5", "family": "anthropic"}], "no-mistakes:anthropic": [{"model": "claude-opus-4-5", "family": "anthropic"}]} uncovered=[{"group": "no-mistakes:anthropic", "families": ["anthropic"]}, {"group": "ship", "families": ["anthropic"]}]
++ review PASS at 40e217da91de by gemini-2.5-pro declaring {"ship":["claude-opus-4-5"],"no-mistakes:anthropic":["claude-opus-4-5"]}
+  recorded
++ verify live head 40e217da91de -> rc=0
+  ACCEPTED carried_from=none (exact  reader=gemini-2.5-pro facts=None
+
+=== S3 review-first PASS, then a pipeline run with a NEW author family (openai) and no edits ===
++ review PASS at 879ec9275592 by gpt-5.1 declaring {"ship":["claude-opus-4-5"]}
+  recorded
++ pipeline run run-s3 recorded: agent=codex model=gpt-5.1
++ verify live head 879ec9275592 -> rc=1
+  REFUSED not-qualified: uncovered commit group no-mistakes:openai, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (see --help for unknown-pipeline coverage); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/fm-review-first.aaYYI7/s3/home FM_STATE_OVERRIDE=/tmp/fm-review-first.aaYYI7/s
++ plan at 879ec9275592
+  groups={"ship": [{"model": "claude-opus-4-5", "family": "anthropic"}], "no-mistakes:openai": [{"model": "gpt-5.1", "family": "openai"}]} uncovered=[{"group": "no-mistakes:openai", "families": ["openai"]}]
++ verify live head fc67657accaa -> rc=1
+  REFUSED not-qualified: head mismatch: review names 879ec92755929ea19b538728359122c09280bfd6, live head is fc67657accaac013f2f1ebc443c8c8427a5de741; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reads at 879ec92755929ea19b538728359122c09280bfd6 do not qualify: uncovered commit group no-mistakes:openai, family openai; each author family needs an exact-he
++ review PASS at fc67657accaa by gemini-2.5-pro declaring {"ship":["claude-opus-4-5"],"no-mistakes:openai":["gpt-5.1"]}
+  recorded
++ verify live head fc67657accaa -> rc=0
+  ACCEPTED carried_from=none (exact  reader=gemini-2.5-pro facts=None
+
+=== S3b pipeline run whose family (anthropic) equals the already-covered ship family, no edits ===
++ review PASS at 8d8353d80a78 by gpt-5.1 declaring {"ship":["claude-opus-4-5"]}
+  recorded
++ pipeline run run-s3b recorded: agent=claude model=claude-opus-4-5
++ verify live head 8d8353d80a78 -> rc=1
+  REFUSED not-qualified: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (see --help for unknown-pipeline coverage); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/fm-review-first.aaYYI7/s3b/home FM_STATE_OVERRIDE=/tmp/fm-review-first.a
++ plan at 8d8353d80a78
+  groups={"ship": [{"model": "claude-opus-4-5", "family": "anthropic"}], "no-mistakes:anthropic": [{"model": "claude-opus-4-5", "family": "anthropic"}]} uncovered=[{"group": "no-mistakes:anthropic", "families": ["anthropic"]}]
+
+=== S4 parallel-with-CI review FAILs, fix lands, closure re-review at the fixed head ===
++ review FAIL at 110dfd947d8a by gpt-5.1 declaring {"ship":["claude-opus-4-5"]}
+  recorded
++ verify live head b7163adad6aa -> rc=1
+  REFUSED not-qualified: head mismatch: review names 110dfd947d8a445def65e0e26a9451a40f3d5626, live head is b7163adad6aaab2be2df8560f8a77213696954f4; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reads at 110dfd947d8a445def65e0e26a9451a40f3d5626 do not qualify: verdict is FAIL at 110dfd947d8a445def65e0e26a9451a40f3d5626 (reader gpt-5.1, report /tmp/fm-re
++ verify live head af5837c22297 -> rc=1
+  REFUSED not-qualified: head mismatch: review names 110dfd947d8a445def65e0e26a9451a40f3d5626, live head is af5837c222975daf49ca40e6e8e3ca090bfe84c4; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the live head's tree differs from the reviewed head merged with its base, so it holds changes no PASS read)
++ review PASS at af5837c22297 by gpt-5.1 declaring {"ship":["claude-opus-4-5"]}
+  recorded
++ verify live head af5837c22297 -> rc=0
+  ACCEPTED carried_from=none (exact  reader=gpt-5.1 facts=None
+
+=== S5 adversarial: same-family reader PASS at R must not carry ===
++ review PASS at 6ff10a249aa8 by claude-sonnet-4-5 declaring {"ship":["claude-opus-4-5"]}
+  recorded
++ verify live head 9c0843824528 -> rc=1
+  REFUSED not-qualified: head mismatch: review names 6ff10a249aa8730d611626199947e6ae22d67747, live head is 9c0843824528e25f303e3704085cf9c181c79a16; review the live head and record its PASS with fm-review-record.py review, then retry the merge (no carry-over: the reads at 6ff10a249aa8730d611626199947e6ae22d67747 do not qualify: uncovered commit group ship, family anthropic; each author family needs an exact-head PASS rea
