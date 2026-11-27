@@ -1342,9 +1342,11 @@ LIFECYCLE_MUTANTS = (("approvals",), ("drop",), ("lifecycle",), ("lifecycle", "a
 # name; no measurement covers that cell, so it is reported, not judged.
 LIFECYCLE_UNJUDGED = {("absent-upper-lifecycle", ("lifecycle",)), ("absent-kelvin-lifecycle", ("lifecycle",))}
 # Names a worker could make, or an unconfined process could leave, as a
-# second name for a record, each stopping the build.
+# second name for a record or for the worker's own .git file or commondir,
+# each stopping the build.
 LIFECYCLE_ALIASES = ("record-hard-link", "drop-record-hard-link", "approvals-symlink", "drop-symlink", "lifecycle-symlink",
-                     "record-symlink", "drop-folder-symlink")
+                     "record-symlink", "drop-folder-symlink", "own-git-hard-link", "own-commondir-hard-link", "own-git-symlink",
+                     "own-commondir-symlink")
 
 
 def lifecycle_paths(spec):
@@ -1527,6 +1529,8 @@ def restore_ancestors(p):
 def lay_out_lifecycle(p, layout, originals):
     restore_ancestors(p)
     for path, data in originals.items():
+        if path.is_symlink():
+            path.unlink()
         if not path.exists() or path.read_bytes() != data:
             path.write_bytes(data)
         path.with_name(path.name + ".new").unlink(missing_ok=True)
@@ -1668,6 +1672,18 @@ def lifecycle_alias(p, name):
     if name == "drop-record-hard-link":
         os.link(d / "t1/record.json", s / "alias-drop")
         return d / "t1/record.json", "2 links"
+    own = {"own-git": p["worktree"] / ".git", "own-commondir": p["gitdir"] / "commondir"}
+    if name in ("own-git-hard-link", "own-commondir-hard-link"):
+        path = own[name[:-len("-hard-link")]]
+        os.link(path, s / ("alias-" + path.name))
+        return path, "2 links"
+    if name in ("own-git-symlink", "own-commondir-symlink"):
+        path = own[name[:-len("-symlink")]]
+        target = s / ("own-" + path.name.lstrip("."))
+        target.write_bytes(path.read_bytes())
+        path.unlink()
+        path.symlink_to(target)
+        return path, f"symbolic link to {target}"
     folder, target = {"approvals-symlink": (a, s / "fake-approvals"), "drop-symlink": (d, s / "fake-drop"),
                       "lifecycle-symlink": (life, s / "fake-lifecycle"), "record-symlink": (a / "task.json", s / "forged.json"),
                       "drop-folder-symlink": (d / "t2", s / "fake-folder")}[name]
@@ -1803,7 +1819,7 @@ def lifecycle_records(repo, manifest, base, harness, mode, env):
             lifecycle_alias(p, alias)
             profile = base / f"lifecycle-alias-{alias}-without-check.sb"
             try:
-                build_lifecycle(repo, lc, workers["vernant"], harness, profile, env, manifest, replaced={"lifecycle_links": lambda common: []})
+                build_lifecycle(repo, lc, workers["vernant"], harness, profile, env, manifest, replaced={"lifecycle_links": lambda common, worktree, gitdir: []})
             except (OSError, ValueError, subprocess.CalledProcessError) as error:
                 failures.append(f"alias {alias} without the alias check: {error}")
             if not profile.exists():

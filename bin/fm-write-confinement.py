@@ -38,7 +38,8 @@ commondir, other tasks' branch refs and reflogs, replace refs, other
 worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
 link, or a folder above one is a symbolic link, naming the path and the link
 count or target, because a write through such an alias would be judged by the
-alias's path; it also stops while a lifecycle record has a second hard link,
+alias's path; it also stops while a lifecycle record, the worker's own .git
+file or its <gitdir>/commondir has a second hard link or is a symbolic link,
 or the lifecycle folder, a record folder or an entry inside one is a symbolic
 link. A HEAD symbolic link to a refs/heads name stays allowed. Other
 projects' and gate repositories' Git directories are not scanned. Task ids
@@ -168,7 +169,7 @@ def extra_links(common, gitdir, own_branch):
     symbolic link to a refs/heads name is Git's core.preferSymlinkRefs form,
     which Git reads as the name and never follows. The task's own branch, its
     reflog and its own worktree Git directory are writable by design and are
-    not checked.
+    not checked here; lifecycle_links checks that directory's commondir.
     """
     root = Path(common)
     own = {root / "refs/heads" / own_branch, root / "logs/refs/heads" / own_branch} if own_branch else set()
@@ -203,34 +204,38 @@ def extra_links(common, gitdir, own_branch):
     return found
 
 
-def lifecycle_links(common):
+def lifecycle_links(common, worktree, gitdir):
     """Existing second names for Vernant's lifecycle records.
 
     The record folders are denied by path, but a write through another name
     for a record is judged by that name: a second hard link to a record, or a
     symbolic link at the lifecycle folder, at a record folder or at any entry
-    inside one. Such a name made before the build can sit anywhere the worker
-    writes, so the build stops while one exists, as for the shared refs above.
+    inside one. The same holds for the worker's own .git file and its
+    commondir, which name the shared Git directory that lifecycle readers of
+    the worktree resolve. Such a name made before the build can sit anywhere
+    the worker writes, so the build stops while one exists, as for the shared
+    refs above.
     """
     lifecycle = Path(common) / VERNANT_LIFECYCLE
+    paths = [Path(worktree) / ".git", Path(gitdir) / "commondir"]
     if lifecycle.is_symlink():
-        return [(lifecycle, f"symbolic link to {os.readlink(lifecycle)}")]
+        paths.append(lifecycle)
+    else:
+        for folder in (Path(common) / name for name in VERNANT_RECORDS):
+            paths.append(folder)
+            if not folder.is_symlink():
+                for where, folders, names in os.walk(folder):
+                    paths += [Path(where) / name for name in folders + names]
     found = []
-    for folder in (Path(common) / name for name in VERNANT_RECORDS):
-        if folder.is_symlink():
-            found.append((folder, f"symbolic link to {os.readlink(folder)}"))
+    for path in paths:
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
             continue
-        for where, folders, names in os.walk(folder):
-            for name in folders + names:
-                path = Path(where) / name
-                try:
-                    info = path.lstat()
-                except FileNotFoundError:
-                    continue
-                if stat.S_ISLNK(info.st_mode):
-                    found.append((path, f"symbolic link to {os.readlink(path)}"))
-                elif stat.S_ISREG(info.st_mode) and info.st_nlink > 1:
-                    found.append((path, f"{info.st_nlink} links"))
+        if stat.S_ISLNK(info.st_mode):
+            found.append((path, f"symbolic link to {os.readlink(path)}"))
+        elif stat.S_ISREG(info.st_mode) and info.st_nlink > 1:
+            found.append((path, f"{info.st_nlink} links"))
     return found
 
 
@@ -271,7 +276,7 @@ def build(args):
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
         raise ValueError("a repository with reftable ref storage cannot be confined")
-    linked = extra_links(common, gitdir, args.branch) + lifecycle_links(common)
+    linked = extra_links(common, gitdir, args.branch) + lifecycle_links(common, worktree, gitdir)
     if linked:
         shown = ", ".join(f"{path} ({why})" for path, why in linked[:5])
         raise ValueError(
