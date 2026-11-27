@@ -288,6 +288,35 @@ fixture_process() {
   [ -s "$TEST_DIR/process-birth-$FIXTURE_PID" ] || fail "generated process lacks a birth identity"
   printf '%s\n' "$FIXTURE_PID" >> "$TEST_DIR/inventory-pids"
 }
+# pane_fixture_process <pane> <cwd>: a process the task really owns. The owned
+# lanes' panes run an idle shell, so the leak is typed into that shell and runs
+# as its child with its cwd at <cwd>, as a worker's leaked job does; it is
+# proved to descend from the pane's shell_pid before it is used.
+pane_fixture_process() {
+  local pane=$1 cwd=$2 out shell p n=0 command
+  out="$TEST_DIR/pane-fixture-${2##*/}.pid"
+  rm -f "$out"
+  printf -v command 'cd %q && { sleep 3600 & echo $! > %q; }; cd %q' "$cwd" "$out" "$TEST_DIR"
+  lab pane run "$pane" "$command" >/dev/null || fail "the owned leak could not be started in pane $pane"
+  while [ ! -s "$out" ] && [ "$n" -lt 100 ]; do sleep 0.1; n=$((n + 1)); done
+  FIXTURE_PID=$(cat "$out" 2>/dev/null) || fail "the owned leak in pane $pane did not start"
+  FIXTURE_PIDS="$FIXTURE_PIDS $FIXTURE_PID"
+  shell=$(lab pane process-info --pane "$pane" | jq -r '.result.process_info.shell_pid // empty')
+  [ -n "$shell" ] || fail "pane $pane reports no shell_pid"
+  p=$FIXTURE_PID n=0
+  while [ "$p" != "$shell" ]; do
+    p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+    n=$((n + 1))
+    { [ -n "$p" ] && [ "$p" -gt 1 ] && [ "$n" -lt 64 ]; } || fail "the owned leak $FIXTURE_PID does not descend from pane $pane's shell $shell"
+  done
+  for n in $(seq 100); do
+    [ "$(lsof -a -d cwd -p "$FIXTURE_PID" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$(cd "$cwd" && pwd -P)" ] && break
+    sleep 0.1
+  done
+  LC_ALL=C ps -p "$FIXTURE_PID" -o lstart= > "$TEST_DIR/process-birth-$FIXTURE_PID"
+  [ -s "$TEST_DIR/process-birth-$FIXTURE_PID" ] || fail "the owned leak lacks a birth identity"
+  printf '%s\n' "$FIXTURE_PID" >> "$TEST_DIR/inventory-pids"
+}
 fixture_process "$TEST_DIR/offline-owned"
 OFFLINE_OWNED_PID=$FIXTURE_PID
 fixture_process "$TEST_DIR/offline-unrelated"
@@ -307,6 +336,10 @@ STATE="$TEST_DIR/home-primary/state"
   export PROJ="$TEST_DIR/project-primary" STATE="$TEST_DIR/home-primary/state"
   # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
+  # The task pane's shell, the anchor of the reaper's ownership proof, is this
+  # test's shell: the generated processes are its children.
+  # shellcheck disable=SC2329 # Called by the sourced reaper's ownership proof.
+  task_endpoint_shell_pid() { printf 'proven %s\n' "$$"; }
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline owned inventory failed"
   [ "$TASK_PIDS" = "$OFFLINE_OWNED_PID" ] || fail "offline inventory did not isolate the owned process: $TASK_PIDS"
   ID=offline-owned BACKEND=herdr reap_task_worktree_processes worktree "$TEST_DIR/offline-owned" || fail "offline owned reaper failed"
@@ -599,7 +632,7 @@ for phase in conclude reap; do
   touch "$TEST_DIR/fail-$abort" "$TEST_DIR/fail-$fresh"
   owned_meta="$TEST_DIR/home-primary/state/$id.meta"
   owned_pane=$(field "$owned_meta" herdr_pane_id)
-  fixture_process "$TEST_DIR/copy-$lane"
+  pane_fixture_process "$owned_pane" "$TEST_DIR/copy-$lane"
   owned_pid=$FIXTURE_PID
   touch "$TEST_DIR/hold-$phase-$lane"
   [ "$phase" != conclude ] || touch "$TEST_DIR/run-$lane"

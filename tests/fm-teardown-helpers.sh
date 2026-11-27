@@ -206,11 +206,20 @@ make_case() {
 # `treehouse return --force <wt>`: succeed silently.
 exit 0
 SH
-  cat > "$fakebin/tmux" <<'SH'
+  # tmux kill-window etc. succeed silently. Teardown's process ownership proof
+  # anchors on the task pane's shell, which it finds with list-panes as the only
+  # pane of the recorded window: the case's pane-rows file is that listing
+  # verbatim (window name, pane id, pane pid), and without one a single row for
+  # fm-task-x1 carries the case's pane-pid file, by default this test runner's
+  # own shell, the parent of every teardown_fixture_start process, so those
+  # fixtures are the task's leaks. Ownership cases point it elsewhere.
+  cat > "$fakebin/tmux" <<SH
 #!/usr/bin/env bash
-# tmux kill-window etc.: succeed silently.
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 exit 0
 SH
+  printf '%s\n' "$$" > "$case_dir/pane-pid"
   add_gh_no_pr "$case_dir"
   # Default hermetic no-mistakes stub: `axi status` answers FM_FAKE_AXI_STATUS
   # verbatim (empty by default, i.e. no active run - the pre-teardown run-abort
@@ -287,6 +296,8 @@ case "${1:-}" in
       abort)
         shift
         [ -z "${FM_FAKE_NM_ABORT_LOG:-}" ] || printf 'abort %s\n' "$*" >> "$FM_FAKE_NM_ABORT_LOG"
+        # A run whose abort leaves late work behind, as a dying step can.
+        [ -z "${FM_FAKE_NM_ABORT_WRITES:-}" ] || printf 'late work\n' > "$FM_FAKE_NM_ABORT_WRITES"
         exit 0 ;;
     esac
     ;;
@@ -2218,6 +2229,8 @@ printf '%s\n' '{"ok":true}'
 EOF
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in
   kill-window|kill-pane) exec "$case_dir/fakebin/child-boundary" "\$@" ;;
 esac
@@ -2461,6 +2474,8 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -2580,6 +2595,8 @@ nested_seed_task_files() {
   printf 'tasktmp=%s\n' "$case_dir/tasktmp" >> "$case_dir/state/task-x1.meta"
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint.log" ;; esac
 exit 0
 SH
@@ -2776,6 +2793,8 @@ stuck_endpoint_tmux() {  # <case-dir>
   local case_dir=$1
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 if [ -e "$case_dir/endpoint-stuck" ]; then
   case "\${1:-}" in
     kill-window) exit 1 ;;
@@ -3270,7 +3289,9 @@ SH
 # session runs in the slot and whose creation lock names a launcher. shape agent:
 # the launcher is the session itself; child: a descendant of the session whose
 # cwd is /; stubborn: that descendant, ignoring TERM; unrelated: a process outside
-# the session. The session is not told to take its descendant down. Sets
+# the session; detached: the "session" is a double-forked session leader that
+# descends from no task process (a shared daemon), and the launcher is its child
+# with cwd /. The session is not told to take its descendant down. Sets
 # FOREIGN_AGENT and FOREIGN_LAUNCHER. The stub lsof reports the session in the
 # slot while it lives, as lsof reports a process by its cwd.
 start_foreign_session_case() {
@@ -3285,6 +3306,27 @@ start_foreign_session_case() {
       FOREIGN_AGENT=$TEARDOWN_FIXTURE_PID
       for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
       FOREIGN_LAUNCHER=$(cat "$pidfile")
+      ;;
+    detached)
+      # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+      perl -MPOSIX -e '
+        my ($cwd, $out) = @ARGV;
+        my $first = fork(); die "fork" unless defined $first;
+        if ($first) { waitpid($first, 0); exit 0; }
+        POSIX::setsid();
+        my $second = fork(); die "fork" unless defined $second;
+        POSIX::_exit(0) if $second;
+        chdir $cwd or die "chdir";
+        open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+        $SIG{CHLD} = "IGNORE";
+        my $child = fork(); die "fork" unless defined $child;
+        if (!$child) { chdir "/"; exec "sleep", "300"; }
+        open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $child\n"; close $fh; rename "$out.tmp", $out or die "rename";
+        sleep 300 while 1;' "$FOREIGN_SLOT" "$pidfile"
+      for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
+      read -r FOREIGN_AGENT FOREIGN_LAUNCHER < "$pidfile" || fail "detached session fixture did not start"
+      teardown_fixture_track "$FOREIGN_AGENT" KILL
+      teardown_fixture_track "$FOREIGN_LAUNCHER" KILL
       ;;
     *)
       teardown_fixture_start "$FOREIGN_SLOT" KILL sleep 300
@@ -3345,9 +3387,16 @@ make_own_locked_copy_case() {
 # class the recorded cases hold, and notes/unique.dat, the class teardown's own
 # preservation selects). Snapshots the copy, the slot claim and the lease record.
 make_retained_case() {
-  local exclude
+  local exclude admin
   dead_launcher_pid
   make_own_locked_copy_case "$1" "${2:-enclosing}" "$FOREIGN_DEAD_PID"
+  # The lock names a launcher that has already exited. Its pid can be reused
+  # while the fixture is still being built, and a reuse that starts before the
+  # lock is written (or within ps's two-second rounding of it) would read as a
+  # live launcher. The lock is backdated an hour, so any reuse started after it
+  # and is a recycled pid by the creation-lock rule.
+  admin=$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)
+  fm_touch_epoch "$(( $(date +%s) - 3600 ))" "$admin/locked"
   printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
   add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_CASE/project" rev-parse main)"
   seed_backlog_in_flight "$FOREIGN_CASE"

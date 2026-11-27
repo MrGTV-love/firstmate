@@ -448,6 +448,8 @@ test_isolated_tmux_invalid_and_valid_cleanup() {
   printf '%s\n' "$socket_id" > "$dir/socket.identity"
   cat > "$dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$dir/pane-rows" ]; then cat "$dir/pane-rows"; elif [ -f "$dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$dir/pane-rows" ]; then cut -f1 "$dir/pane-rows" | sort -u; elif [ -f "$dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 set -eu
 [ -z "\${TMUX:-}" ] && [ -z "\${TMUX_PANE:-}" ] || exit 91
 [ "\${FM_TEST_TMUX_SOCKET:-}" = '$socket_id' ] || exit 92
@@ -689,6 +691,8 @@ test_recorded_endpoint_that_changed_directory_still_tears_down() {
   # endpoint identity still owns the lifecycle; cwd alone must not brick it.
   cat > "$dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$dir/pane-rows" ]; then cat "$dir/pane-rows"; elif [ -f "$dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$dir/pane-rows" ]; then cut -f1 "$dir/pane-rows" | sort -u; elif [ -f "$dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 if [ "\${1:-}" = display-message ]; then
   printf '%s\n' '$dir/other-directory'
   exit 0
@@ -1238,15 +1242,21 @@ write_close_failing_tmux_shim() {  # <dir> <socket-name> <real-tmux>
   local dir=$1 socket=$2 real=$3
   cat > "$dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$dir/pane-rows" ]; then cat "$dir/pane-rows"; elif [ -f "$dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$dir/pane-rows" ]; then cut -f1 "$dir/pane-rows" | sort -u; elif [ -f "$dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 set -u
 printf 'tmux' >> "\${FM_RUNTIME_LOG:?}"
 printf ' <%s>' "\$@" >> "\${FM_RUNTIME_LOG:?}"
 printf '\n' >> "\${FM_RUNTIME_LOG:?}"
 if [ -n "\${FM_TEST_BLOCK_KILL:-}" ] && [ "\${1:-}" = kill-window ]; then
+  : > '$dir/kill-attempted'
   echo "can't find window" >&2
   exit 1
 fi
-if [ -n "\${FM_TEST_UNREADABLE_LIST:-}" ] && [ "\${1:-}" = list-windows ]; then
+# The inventory turns unreadable only once the close has been attempted, so the
+# pre-close decision reads the live window and the close's own re-read is what
+# cannot run.
+if [ -n "\${FM_TEST_UNREADABLE_LIST:-}" ] && [ "\${1:-}" = list-windows ] && [ -e '$dir/kill-attempted' ]; then
   echo "lost server" >&2
   exit 1
 fi

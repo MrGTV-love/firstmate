@@ -724,13 +724,13 @@
       "id": "nm-launch-agent-unloaded-first",
       "version": "1",
       "owner": "bin/fm-teardown.sh",
-      "invariant": "Task-copy removal leaves no task-private loaded no-mistakes launch agent pointing into it.",
+      "invariant": "Task-copy removal never proceeds while a no-mistakes launch agent is rooted in the copy, and never unloads or archives one no task record proves the task created.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:811302f52a",
-      "trigger": "refuses removing a copy while a no-mistakes launchd agent rooted in it cannot be classified, unloaded (launchctl missing/unknown/still loaded) or its plist archived",
+      "trigger": "refuses removing a copy while a no-mistakes launchd agent, loaded or not, is rooted in it (no Firstmate record proves a task created one) or its root cannot be classified",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "Preserve the copy and launch-agent plist; have the owner confirm its task-private root and unload only that agent, then retry bash bin/fm-teardown.sh <task> without force; never stop the shared daemon.",
+      "remedy": "Preserve the copy and launch-agent plist; have the agent's owner unload it (launchctl bootout) and move its plist aside, or move its root out of the copy, then retry bash bin/fm-teardown.sh <task> without force; never stop the shared daemon.",
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
@@ -754,19 +754,11 @@
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: cannot tell whether no-mistakes launch agent $label (rooted in $ID's copy) is loaded (launchctl print exited $rc); preserving the worktree and $plist.\" >&2"
+          "match": "echo \"REFUSED: no-mistakes launch agent $label ($plist) has its daemon root $root inside $ID's copy, but no record of $ID proves the task created it, so teardown neither unloads nor archives it and keeps the copy. If it is this task's private agent, stop it yourself (launchctl bootout gui/$uid/$label, then move $plist aside) and rerun teardown; if it is another owner's service, leave it and move its root out of the copy first.\" >&2"
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: could not archive no-mistakes launch agent plist $plist to $dest; preserving the worktree.\" >&2"
-        },
-        {
-          "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: no-mistakes launch agent $label (rooted in $ID's copy) is still loaded after launchctl bootout; preserving the worktree and $plist.\" >&2"
-        },
-        {
-          "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: no-mistakes launch agent $label is rooted in $ID's copy but launchctl is unavailable, so it cannot be unloaded; preserving the worktree and $plist.\" >&2"
+          "match": "echo \"REFUSED: no-mistakes launch agent plist $plist is a symbolic link to $(readlink \"$plist\" 2>/dev/null || printf '<unreadable>') whose target cannot be read or parsed, so whether its agent is rooted in $ID's copy cannot be decided; teardown neither unloads nor archives it and keeps the copy. Repair or remove the link $plist, then rerun teardown.\" >&2"
         }
       ]
     },
@@ -2451,7 +2443,7 @@
       "invariant": "Process reaping preserves any process whose task-copy custody cannot be proved.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:3b8c73e3b6",
-      "trigger": "refuses process reaping and preserves worktree/tasktmp when a matched process sits in a nested lane or descendant cwd whose ownership is unproven, leaked processes cannot be enumerated or identified, or survive 3 reap passes",
+      "trigger": "refuses process reaping and preserves worktree/tasktmp when a matched process sits in a nested lane or descendant cwd whose ownership is unproven, a process at a task root, or anywhere in a copy a forced treehouse return would reset, is not proved the task's (the validated endpoint pane shell, its descendant by parent chain, or a descendant of a proved process; in a returned firstmate home also a member of the process group led by that home's proved process-event runner) before any signal or return, leaked processes cannot be enumerated or identified, or survive 3 reap passes",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2488,6 +2480,50 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: process $pid has its cwd at $dir but no readable birth identity, so its ownership by $ID cannot be proven; preserving it and task $ID without signalling.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: process $pid ($identity${command:+, $command}) has its cwd at $dir, but nothing proves it belongs to $ID: $TASK_ANCHOR_NOTE. It may be a shared service (a daemon that started in this copy), so teardown leaves it running and keeps the copy; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: leaked process $pid changed identity between its ownership proof and its signal for $ID; preserving the worktree/tasktmp for manual inspection or retry.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: lsof is unavailable, so the processes the forced return of $label $dir would end cannot be proved $ID's; nothing was returned.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the processes in $label $dir cannot be listed, so the forced return could end one that is not $ID's; nothing was returned.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: process $pid ($identity${command:+, $command}) has its cwd at $path in $label $dir, which the forced return would end, but nothing proves it belongs to $ID: $TASK_ANCHOR_NOTE. Teardown leaves it running and returns nothing; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: cannot prove every process under ${TASK_PIDS_FAILED_DIR:-<missing>} belongs to $ID ($TASK_PIDS_ERROR); nothing was signalled and the worktree/tasktmp is preserved.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: leaked process $pid has no recorded parent-chain proof that it belongs to $ID before its signal; preserving the worktree/tasktmp without signalling it.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: leaked process $pid has no recorded parent-chain proof that it belongs to $ID before its signal; preserving the worktree/tasktmp without force-killing it.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the tasktmp sweep for $ID refused and $(if [ \"$TASK_ANCHOR_STATE\" != proven ]; then printf '%s' \"$TASK_ANCHOR_NOTE\"; else printf 'the refusal was not an unproven holder'; fi), so teardown stops before any endpoint close or signal; every durable task record is kept.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the endpoint ${T:-<none>} of $1 cannot be closed safely: $TASK_ANCHOR_NOTE. Teardown closes and signals nothing; every durable task record is kept.\" >&2"
         }
       ]
     },

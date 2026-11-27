@@ -37,6 +37,8 @@ test_tasktmp_preserves_current_and_prior_reassociated_copies() {
     cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -114,6 +116,8 @@ test_secondmate_home_preserves_other_tasks_prior_copy() {
       cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
       cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -186,6 +190,8 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -247,6 +253,8 @@ exit 0
 SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -359,6 +367,8 @@ test_reservation_window_reassignment_reproves_own_landing() {
     cp "$case_dir/state/task-x1.meta" "$case_dir/task-meta.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -2152,8 +2162,8 @@ SH
 # the task record is never deleted while the enclosing slot is unproved and
 # still claimed, and the nested copy is removed only once its phase is reached.
 #   prove      the slot has uncommitted work before anything starts
-#   retire     a launch agent rooted in the slot will not unload
-#   pre-remove a dying process leaves work in the slot after the first proof
+#   retire     a launch agent is rooted in the slot (no record proves it the task's)
+#   pre-remove a run's abort leaves work in the slot after the first proof
 #   pre-copy   the same, but in the nested copy itself
 #   return     the nested copy is gone and treehouse refuses the return
 test_nested_rerun_matrix_refusal_at_each_phase() {
@@ -2165,13 +2175,13 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
     pid=
     case "$phase" in
       prove) printf 'slot scratch\n' > "$NESTED_SLOT/scratch.txt" ;;
-      retire|pre-remove|pre-copy)
+      retire)
         add_fake_launchctl "$case_dir"
         mkdir -p "$NESTED_SLOT/.claude/nm/h"
         teardown_fixture_start "$NESTED_SLOT/.claude/nm/h" KILL sleep 300
         pid=$TEARDOWN_FIXTURE_PID
         sleep 0.3
-        add_nm_launch_agent "$case_dir" "7a11e0${phase//-/}" "$NESTED_SLOT/.claude/nm/h" "$pid"
+        add_nm_launch_agent "$case_dir" "7a11e0retire" "$NESTED_SLOT/.claude/nm/h" "$pid"
         ;;
       return)
         fail_switch_treehouse "$case_dir"
@@ -2181,17 +2191,19 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
     rc=0
     case "$phase" in
       retire)
-        FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" FAKE_LAUNCHCTL_BOOTOUT_FAILS=1 \
+        FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
           run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         ;;
       pre-remove)
-        FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
-          FAKE_LAUNCHCTL_BOOTOUT_WRITES="$NESTED_SLOT/late.txt" \
+        FM_HOME="$case_dir/home" \
+          FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1-v2 "$(git -C "$NESTED_COPY" rev-parse HEAD)")" \
+          FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FM_FAKE_NM_ABORT_WRITES="$NESTED_SLOT/late.txt" \
           run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         ;;
       pre-copy)
-        FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
-          FAKE_LAUNCHCTL_BOOTOUT_WRITES="$NESTED_COPY/late.txt" \
+        FM_HOME="$case_dir/home" \
+          FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1-v2 "$(git -C "$NESTED_COPY" rev-parse HEAD)")" \
+          FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FM_FAKE_NM_ABORT_WRITES="$NESTED_COPY/late.txt" \
           run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         ;;
       *)
@@ -2218,7 +2230,14 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
         git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm "slot scratch"
         git -C "$NESTED_SLOT" push -q origin HEAD:main
         ;;
-      retire) assert_grep "still loaded" "$case_dir/stderr" "$label: the refusal did not name the unloaded agent" ;;
+      retire)
+        assert_grep "REFUSED: no-mistakes launch agent $NM_AGENT_PREFIX.7a11e0retire" "$case_dir/stderr" "$label: the refusal did not name the in-slot agent"
+        assert_no_grep bootout "$case_dir/launchctl-calls" "$label: the unproven agent was booted out"
+        # Its owner unloads it and moves its plist aside, then re-runs.
+        rm -f "$case_dir/launchagents/$NM_AGENT_PREFIX.7a11e0retire.plist" "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.7a11e0retire"
+        teardown_fixture_stop "$pid"
+        pid=
+        ;;
       pre-remove)
         assert_grep "claimed pool slot $NESTED_SLOT" "$case_dir/stderr" "$label: the refusal did not name the slot"
         assert_present "$NESTED_SLOT/late.txt" "$label: the refusal removed the slot's late work"
@@ -2248,9 +2267,10 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
 }
 
 # Returning the enclosing slot sweeps more than the nested current copy, so the
-# safety steps run on every copy swept: a run parked on the slot's own branch is
-# aborted and a task-private launch agent rooted in the slot is retired before
-# the return, not left holding a fleet slot or pointing into a reset copy.
+# safety steps run on every copy swept: a launch agent rooted in the slot, which
+# no record proves the task's, refuses before any run is aborted or process
+# signalled, and once its owner has removed it a re-run aborts the run parked on
+# the slot's own branch before the return.
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot() {
   local case_dir rc pid label agent_root slot_head
   make_nested_slot_case nested-slot-safety enclosing .claude/worktrees/x
@@ -2270,20 +2290,28 @@ test_nested_slot_return_concludes_runs_and_agents_on_the_slot() {
   FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$slot_head")" \
   FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  if kill -0 "$pid" 2>/dev/null; then
-    teardown_fixture_stop "$pid"
-    fail "nested-slot-safety: the launch agent rooted in the returned slot survived teardown"
-  fi
-  expect_code 0 "$rc" "nested-slot-safety: teardown must finish: $(cat "$case_dir/stderr")"
+  kill -0 "$pid" 2>/dev/null || fail "nested-slot-safety: the agent's daemon was signalled"
+  expect_code 1 "$rc" "nested-slot-safety: an in-slot agent must refuse: $(tail -3 "$case_dir/stderr")"
+  assert_grep "REFUSED: no-mistakes launch agent $label" "$case_dir/stderr" "nested-slot-safety: the refusal did not name the agent"
+  assert_absent "$case_dir/nm-abort.log" "nested-slot-safety: a run was aborted before the refusal"
+  assert_no_grep bootout "$case_dir/launchctl-calls" "nested-slot-safety: the unproven agent was booted out"
+  assert_present "$case_dir/launchagents/$label.plist" "nested-slot-safety: the plist was moved"
+  assert_present "$NESTED_COPY" "nested-slot-safety: the nested copy was removed"
+  [ ! -e "$case_dir/treehouse.log" ] || fail "nested-slot-safety: the slot was returned"
+  # The agent's owner unloads it and moves its plist aside.
+  rm -f "$case_dir/launchagents/$label.plist" "$case_dir/launchctl-loaded/$label"
+  teardown_fixture_stop "$pid"
+  rc=0
+  FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$slot_head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+    run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "nested-slot-safety: the re-run must finish: $(tail -3 "$case_dir/stderr2")"
   assert_grep "abort --run 01RUN" "$case_dir/nm-abort.log" \
     "nested-slot-safety: the run parked on the returned slot's branch was not aborted"
-  assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" \
-    "nested-slot-safety: the launch agent rooted in the returned slot was not booted out"
-  assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
-    "nested-slot-safety: the launch agent plist was not archived"
   assert_absent "$NESTED_COPY" "nested-slot-safety: the nested copy was not removed"
   assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "nested-slot-safety: the slot was not returned"
-  pass "returning the enclosing slot aborts its parked run and retires its launch agent before the return"
+  pass "an in-slot launch agent refuses before any abort or signal, and once removed the re-run aborts the slot's parked run and returns it"
 }
 
 # A forced teardown whose daemon is silent concludes two roots here, the nested copy
@@ -2311,7 +2339,7 @@ test_forced_nested_teardown_waits_one_stall_for_a_silent_daemon() {
 }
 
 test_shared_nested_copy_concludes_only_its_own_runtime() {
-  local ownership case_dir head rc own_pid worker_pid root_pid label root_label own_survived root_survived daemon_survived late
+  local ownership case_dir head rc worker_pid root_pid root_label own_survived root_survived late
   for ownership in duplicate own foreign late; do
     make_nested_slot_case "shared-nested-runtime-$ownership" enclosing .claude/worktrees/x
     case_dir=$NESTED_CASE
@@ -2319,16 +2347,12 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     fm_write_meta "$case_dir/state/parked.meta" "worktree=$NESTED_SLOT" "kind=ship"
     cp "$case_dir/state/parked.meta" "$case_dir/parked.before"
     add_fake_launchctl "$case_dir"
-    mkdir -p "$NESTED_COPY/.claude/nm/h" "$NESTED_SLOT/.claude/nm/h"
-    teardown_fixture_start "$NESTED_COPY/.claude/nm/h" KILL perl -e 'sleep'
-    own_pid=$TEARDOWN_FIXTURE_PID
+    mkdir -p "$NESTED_SLOT/.claude/nm/h"
     teardown_fixture_start "$NESTED_COPY" KILL perl -e 'sleep'
     worker_pid=$TEARDOWN_FIXTURE_PID
     teardown_fixture_start "$NESTED_SLOT/.claude/nm/h" KILL perl -e 'sleep'
     root_pid=$TEARDOWN_FIXTURE_PID
-    label="$NM_AGENT_PREFIX.5a11c001"
     root_label="$NM_AGENT_PREFIX.5a11c002"
-    add_nm_launch_agent "$case_dir" 5a11c001 "$NESTED_COPY/.claude/nm/h" "$own_pid"
     add_nm_launch_agent "$case_dir" 5a11c002 "$NESTED_SLOT/.claude/nm/h" "$root_pid"
     if [ "$ownership" = duplicate ]; then
       fm_write_meta "$case_dir/state/other-nested.meta" "worktree=$NESTED_COPY" "kind=ship"
@@ -2344,24 +2368,20 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     rc=0
     FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
       FM_FAKE_AXI_STATUS="$(parked_axi_status_toon "$([ "$ownership" = foreign ] && printf fm/foreign || printf fm/task-x1-v2)" "$head")" \
-      FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FAKE_LAUNCHCTL_BOOTOUT_WRITES="$late" \
+      FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FM_FAKE_NM_ABORT_WRITES="$late" \
       run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     own_survived=0
     root_survived=0
-    daemon_survived=0
     kill -0 "$worker_pid" 2>/dev/null && own_survived=1
     kill -0 "$root_pid" 2>/dev/null && root_survived=1
-    kill -0 "$own_pid" 2>/dev/null && daemon_survived=1
     teardown_fixture_stop "$worker_pid"
-    teardown_fixture_stop "$own_pid"
     teardown_fixture_stop "$root_pid"
     if [ "$ownership" = duplicate ]; then
       expect_code 1 "$rc" "duplicate nested custody must refuse before any runtime cleanup: $(cat "$case_dir/stderr")"
       assert_grep 'other-nested' "$case_dir/stderr" 'the refusal must name the other nested owner'
-      [ "$own_survived$root_survived$daemon_survived" = 111 ] || fail 'duplicate-copy refusal signalled a live process'
+      [ "$own_survived$root_survived" = 11 ] || fail 'duplicate-copy refusal signalled a live process'
       assert_absent "$case_dir/nm-abort.log" 'duplicate-copy refusal aborted the parked run'
       assert_absent "$case_dir/state/task-x1.teardown-processes" 'duplicate-copy refusal recorded signal targets'
-      assert_present "$case_dir/launchagents/$label.plist" 'duplicate-copy refusal removed the own launch agent'
       assert_present "$case_dir/launchagents/$root_label.plist" 'duplicate-copy refusal removed the root launch agent'
       assert_no_grep 'bootout' "$case_dir/launchctl-calls" 'duplicate-copy refusal unloaded a launch agent'
       cmp -s "$case_dir/own.before" "$case_dir/state/task-x1.meta" || fail 'duplicate-copy refusal changed its own record'
@@ -2390,8 +2410,6 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     else
       assert_absent "$case_dir/nm-abort.log" 'a foreign parked run was aborted'
     fi
-    assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" 'the own nested launch agent was not retired'
-    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" 'the own launch agent was not archived'
     assert_present "$case_dir/launchagents/$root_label.plist" 'the parked root launch agent was removed'
     assert_no_grep "bootout gui/$(id -u)/$root_label" "$case_dir/launchctl-calls" 'the parked root launch agent was unloaded'
     assert_present "$NESTED_COPY" 'shared cleanup removed the own nested copy'
@@ -2399,7 +2417,7 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     assert_absent "$case_dir/state/task-x1.meta" 'the finished task record survived'
     cmp -s "$case_dir/parked.before" "$case_dir/state/parked.meta" || fail 'shared cleanup changed the parked record'
   done
-  pass 'shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work'
+  pass 'shared nested cleanup concludes an owned run and reaps its process, preserving the parked root, its launch agent, foreign runs and late work'
 }
 
 test_other_record_copy_overlap_is_component_aware() {
@@ -2565,6 +2583,8 @@ test_forced_nested_secondmate_admits_only_locked_current_copies() {
     printf 'retained bytes\n' > "$child_home/retained.txt"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in
   kill-*)
     printf '%s\n' "\$*" >> "$case_dir/kill.log"
@@ -2689,6 +2709,8 @@ test_forced_descendant_reassociated_copy_preserves_checkout_and_storage() {
     cp "$home/state/child-b.meta" "$case_dir/child.before"
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -2782,6 +2804,8 @@ test_cleanup_roots_preserve_foreign_copy_git_storage() {
         common=$(cd "$target/P/.git" && pwd -P)
         cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -2834,6 +2858,8 @@ test_tasktmp_preserves_reassociated_copy_git_storage() {
     common=$(cd "$tmp/P/.git" && pwd -P)
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -3011,6 +3037,829 @@ SH
 }
 
 # A custody refusal at a child's return is final; no fallback may delete the copy.
+# Forced secondmate cleanup closes each child endpoint and returns each child
+# worktree with treehouse return --force, which ends every process with its cwd
+# there. A detached holder of the child worktree that nothing proves the
+# retiring tree's refuses before any child endpoint is closed, with nothing
+# returned or signalled. The fault
+# control replaces the check with an unconditional pass in the case's own copy
+# of bin/: the forced return then runs with the holder inside.
+test_forced_child_return_refuses_an_unproven_holder() {
+  local mode case_dir home rc pid out i
+  for mode in guarded fault; do
+    case_dir=$(make_case "child-return-holder-$mode")
+    write_meta "$case_dir" local-only secondmate
+    configure_secondmate_with_tmux_children "$case_dir"
+    home="$case_dir/secondmate-home"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    # Every endpoint close is logged: the refusal must come before any of them.
+    mv "$case_dir/fakebin/tmux" "$case_dir/fakebin/tmux.inner"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exec "$case_dir/fakebin/tmux.inner" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+    out="$case_dir/holder.pid"
+    # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+    perl -MPOSIX -e '
+      my ($cwd, $out) = @ARGV;
+      my $first = fork(); die "fork" unless defined $first;
+      if ($first) { waitpid($first, 0); exit 0; }
+      POSIX::setsid();
+      my $second = fork(); die "fork" unless defined $second;
+      POSIX::_exit(0) if $second;
+      chdir $cwd or die "chdir";
+      open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+      exec "sleep", "300";' "$case_dir/child-a-wt" "$out"
+    for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+    pid=$(cat "$out") || fail "child-return-holder-$mode: the holder did not start"
+    teardown_fixture_track "$pid" KILL
+    sleep 0.3
+    if [ "$mode" = fault ]; then
+      rm "$case_dir/code-root/bin"
+      cp -R "$ROOT/bin" "$case_dir/code-root/bin"
+      python3 -I - "$case_dir/code-root/bin/fm-teardown.sh" <<'PY' || fail "child-return-holder-fault: the check could not be replaced"
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+head = "teardown_return_holders_proven() {  # <dir> <label>\n"
+assert text.count(head) == 1
+path.write_text(text.replace(head, head + "  return 0  # injected fault: no ownership check before the forced return\n"))
+PY
+    fi
+    rc=0
+    if [ "$mode" = fault ]; then
+      TEARDOWN="$case_dir/code-root/bin/fm-teardown.sh" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      assert_grep "return --force $case_dir/child-a-wt" "$case_dir/treehouse.log" \
+        "child-return-holder-fault: without the check the forced return did not run over the holder"
+    else
+      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 5 "$rc" "child-return-holder: the unproven holder must stop teardown: $(tail -3 "$case_dir/stderr")"
+      grep -Eq "REFUSED: process $pid .*which the forced return would end, but nothing proves it belongs to" "$case_dir/stderr" \
+        || fail "child-return-holder: the refusal did not name the holder: $(tail -3 "$case_dir/stderr")"
+      assert_absent "$case_dir/treehouse.log" 'child-return-holder: treehouse was asked to return the child worktree'
+      assert_absent "$case_dir/endpoint-close.log" "child-return-holder: an endpoint was closed before the refusal: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
+      assert_present "$case_dir/child-a-wt/.git" 'child-return-holder: the child worktree was removed'
+      assert_present "$home/state/child-a.meta" 'child-return-holder: the child record was retired'
+      kill -0 "$pid" 2>/dev/null || fail "child-return-holder: the holder was signalled"
+      ownership_assert_unsignalled_pool "$case_dir" "$pid"
+    fi
+    teardown_fixture_stop "$pid"
+  done
+  pass "a forced child-worktree return refuses on a holder it cannot prove the task's, and the fault control shows the check is what stops it"
+}
+
+ownership_assert_unsignalled_pool() {  # <case-dir> <pid>
+  local f
+  for f in "$1"/state/*.teardown-processes "$1"/secondmate-home/state/*.teardown-processes; do
+    [ -f "$f" ] || continue
+    assert_no_grep $'\t'"$2"$'\t' "$f" "child-return-holder: teardown audited a signal for the holder"
+  done
+}
+
+# The one pre-close decision accepts only proofs that cannot expire, so two
+# holders that an expiring proof once let through now refuse before any endpoint
+# is closed, with every process left running:
+#   runner   the secondmate home, returned through Treehouse, holds a process a
+#            stale process-event runner record names: the pid is live but its
+#            claim's recorded birth identity is not that process's (a reused pid);
+#   runner-nonleader  the claim's identity matches, but the process does not
+#            lead its process group, which the home's sweep requires;
+#   runner-content    the claim's identity matches a group leader, but the
+#            .runner file records another pid than the claim;
+#   runner-spaced, runner-leading-space, runner-two-line, runner-empty
+#            the same valid leader, but the .runner file is not exactly one line
+#            of digits naming the claim's pid ("12 34", " 1234", a second line,
+#            or nothing);
+#   group    a child worktree holds a process that only shares a process group
+#            with the child pane's chain-proved child, not descending from it;
+#            no process-event runner leads that group and it is not in a
+#            returned home, so the group proves nothing (a home's proved runner
+#            group is test_home_with_a_live_process_event_runner_tears_down).
+test_forced_cleanup_refuses_expiring_proofs_before_any_close() {
+  local shape case_dir home rc holder pane kid out claims i leader='' identity
+  for shape in runner runner-nonleader runner-content runner-spaced runner-leading-space runner-two-line runner-empty group; do
+    case_dir=$(make_case "forced-expiring-$shape")
+    write_meta "$case_dir" local-only secondmate
+    home="$case_dir/secondmate-home"
+    if [ "$shape" != group ]; then
+      # The home is a Treehouse-style worktree of the code root, so it is
+      # returned with treehouse return --force.
+      rm "$case_dir/code-root/bin"
+      git init -q "$case_dir/code-root"
+      ln -s "$ROOT/bin" "$case_dir/code-root/bin"
+      git -C "$case_dir/code-root" add bin
+      git -C "$case_dir/code-root" -c user.email=t@t -c user.name=t commit -qm "code root"
+      git -C "$case_dir/code-root" worktree add -q --detach "$home"
+    fi
+    configure_secondmate_with_tmux_children "$case_dir"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+    printf 'fm-task-x1\t%%1\t%s\n' "$$" > "$case_dir/pane-rows"
+    out="$case_dir/fixture.pids"
+    claims="$case_dir/claims"
+    mkdir -p "$claims"
+    if [ "$shape" != group ]; then
+      # The holder leads a session and group of its own, with its cwd in the
+      # home; for runner-nonleader the holder is instead that leader's child,
+      # a member of the group that does not lead it.
+      # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+      perl -MPOSIX -e '
+        my ($cwd, $out, $member) = @ARGV;
+        my $first = fork(); die "fork" unless defined $first;
+        if ($first) { waitpid($first, 0); exit 0; }
+        my $second = fork(); die "fork" unless defined $second;
+        POSIX::_exit(0) if $second;
+        POSIX::setsid() or die "setsid";
+        chdir $cwd or die "chdir";
+        open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+        my $pid = $$;
+        if ($member) {
+          $SIG{CHLD} = "IGNORE";
+          my $child = fork(); die "fork" unless defined $child;
+          if (!$child) { exec "sleep", "300"; }
+          $pid = $child;
+          chdir "/" or die "chdir";
+        }
+        open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$pid $$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+        exec "sleep", "300" unless $member;
+        sleep 300 while 1;' "$home" "$out" "$([ "$shape" = runner-nonleader ] && echo 1 || true)"
+      for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+      read -r holder leader < "$out" || fail "forced-$shape: the holder did not start"
+      teardown_fixture_track "$holder" KILL
+      [ "$leader" = "$holder" ] || teardown_fixture_track "$leader" KILL
+      if [ "$shape" = runner-nonleader ]; then
+        [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$holder" | tr -d ' ')" = "$leader" ] \
+          || fail "forced-runner-nonleader: the holder is not a member of its leader's group"
+      else
+        [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$holder" | tr -d ' ')" = "$holder" ] \
+          || fail "forced-$shape: the holder does not lead its group"
+      fi
+      mkdir -p "$home/state/procevent"
+      identity=$(bash -c '. "$1/bin/fm-wake-lib.sh" >/dev/null 2>&1; fm_pid_identity "$2"' _ "$ROOT" "$holder") \
+        || fail "forced-$shape: the holder's identity cannot be read"
+      case "$shape" in
+        runner)
+          # The claim's recorded identity belongs to an earlier process at this pid.
+          identity="lstart=Thu Jan  1 00:00:00 1970"
+          printf '%s\n' "$holder" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-nonleader)
+          # The identity matches, but the holder does not lead its group.
+          printf '%s\n' "$holder" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-content)
+          # The identity matches and the holder leads its group, but the .runner
+          # file records another pid than the claim does.
+          printf '%s\n' "$((holder + 100000))" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-spaced)
+          # The claim's pid split by a space, as "12 34" for 1234.
+          printf '%s %s\n' "${holder:0:1}" "${holder:1}" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-leading-space)
+          printf ' %s\n' "$holder" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-two-line)
+          printf '%s\n%s\n' "$holder" "$holder" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-empty)
+          : > "$home/state/procevent/fixture-runner.runner"
+          ;;
+      esac
+      printf '%s\n' "$home" "$holder" token1 "$identity" "" "" active > "$claims/fixture-runner.claim"
+    else
+      # The child pane leads its own group, forks a chain-proved child K into
+      # the child worktree, and double-forks H into it: H keeps the group but
+      # descends from no pane.
+      # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+      teardown_fixture_start "$case_dir" KILL perl -e '
+        my ($cwd, $out) = @ARGV;
+        setpgrp(0, 0) or die "setpgrp";
+        $SIG{CHLD} = "IGNORE";
+        my $kid = fork(); die "fork" unless defined $kid;
+        if (!$kid) { chdir $cwd or die "chdir"; exec "sleep", "300"; }
+        my $first = fork(); die "fork" unless defined $first;
+        if (!$first) {
+          my $second = fork(); die "fork" unless defined $second;
+          if ($second) {
+            open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$kid $second\n"; close $fh; rename "$out.tmp", $out or die "rename";
+            exit 0;
+          }
+          chdir $cwd or die "chdir";
+          exec "sleep", "300";
+        }
+        sleep 300 while 1;' "$case_dir/child-a-wt" "$out"
+      pane=$TEARDOWN_FIXTURE_PID
+      for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+      read -r kid holder < "$out" || fail "forced-group: the child pane's processes did not start"
+      teardown_fixture_track "$kid" KILL
+      teardown_fixture_track "$holder" KILL
+      printf 'fm-child-a\t%%5\t%s\n' "$pane" >> "$case_dir/pane-rows"
+      sleep 0.3
+      [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$holder" | tr -d ' ')" = "$pane" ] \
+        || fail "forced-group: the holder does not share the child pane's group"
+      ! ownership_pool_descends "$holder" "$pane" || fail "forced-group: the holder descends from the child pane"
+    fi
+    rc=0
+    FM_PROCEVENT_CLAIM_ROOT="$claims" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 5 "$rc" "forced-$shape: teardown must refuse before any close: $(tail -3 "$case_dir/stderr")"
+    assert_absent "$case_dir/endpoint-close.log" "forced-$shape: an endpoint was closed: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
+    assert_absent "$case_dir/treehouse.log" "forced-$shape: treehouse was asked to return something"
+    kill -0 "$holder" 2>/dev/null || fail "forced-$shape: the holder was signalled"
+    grep -Eq "REFUSED: process $holder .*which the forced return would end, but nothing proves it belongs to task-x1" "$case_dir/stderr" \
+      || fail "forced-$shape: the refusal did not name the holder: $(tail -3 "$case_dir/stderr")"
+    assert_present "$home/state/child-a.meta" "forced-$shape: a child record was retired"
+    [ -z "${leader:-}" ] || [ "$leader" = "$holder" ] || kill -0 "$leader" 2>/dev/null \
+      || fail "forced-$shape: the holder's group leader was signalled"
+    if [ "$shape" = group ]; then
+      kill -0 "$kid" 2>/dev/null || fail "forced-group: the chain-proved child was signalled"
+      kill -0 "$pane" 2>/dev/null || fail "forced-group: the child pane was signalled"
+      teardown_fixture_stop "$kid"
+    fi
+    teardown_fixture_stop "$holder"
+    [ -z "${leader:-}" ] || [ "$leader" = "$holder" ] || teardown_fixture_stop "$leader"
+    leader=
+  done
+  pass "a reused runner pid, an identity-matched non-leader runner, a .runner that is not exactly one line naming the claim's pid, and a group-only child holder each refuse before any endpoint close, with every process left running"
+}
+
+# The forced-holders preflight decides every child endpoint before it looks at
+# the child's home: a secondmate child whose recorded home folder is missing and
+# whose window holds two panes, or cannot be read, refuses with the endpoint's
+# own refusal; with one pane it passes. The real teardown entry cannot reach the
+# preflight with a missing child home (its home checks refuse first, and its
+# lock collection creates the child's state folder), so this drives
+# teardown_forced_holders_preflight itself, with the teardown functions it runs.
+test_forced_cleanup_decides_a_homeless_secondmate_child_endpoint() {
+  local shape tmp home rc
+  tmp=$(fm_test_tmproot homeless-child-preflight)
+  mkdir -p "$tmp/fakebin"
+  python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/fn.sh" <<'PY' || fail "homeless-child: the preflight functions could not be extracted"
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+out = []
+for name in ("meta_value", "teardown_child_copy_route", "teardown_child_route_returns",
+             "teardown_forced_holders_preflight", "teardown_with_anchor", "teardown_endpoint_closable",
+             "task_endpoint_shell_pid", "task_process_identity", "task_anchor_load"):
+    head = name + "() {"
+    assert source.count("\n" + head) == 1, name
+    start = source.index("\n" + head) + 1
+    end = source.index("\n}\n", start) + 3
+    out.append(source[start:end])
+pathlib.Path(sys.argv[2]).write_text("".join(out))
+PY
+  cat > "$tmp/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$tmp/pane-rows" ;; esac
+case "\${1:-}" in list-windows) { cut -f1 "$tmp/pane-rows"; cat "$tmp/extra-windows" 2>/dev/null; } | sort -u ;; esac
+exit 0
+SH
+  chmod +x "$tmp/fakebin/tmux"
+  for shape in two-panes unreadable one-pane; do
+    home="$tmp/$shape/home"
+    mkdir -p "$home/state"
+    fm_write_meta "$home/state/child-sm.meta" \
+      'window=firstmate:fm-child-sm' 'endpoint_task_id=child-sm' \
+      "worktree=$tmp/$shape/child-sm-home" "project=$tmp/$shape/project" \
+      'kind=secondmate' 'mode=local-only' "home=$tmp/$shape/child-sm-home"
+    rm -f "$tmp/extra-windows"
+    case "$shape" in
+      two-panes) printf 'fm-child-sm\t%%5\t%s\nfm-child-sm\t%%6\t%s\n' "$$" "$$" > "$tmp/pane-rows" ;;
+      # The window is listed but no pane row names it, so it cannot be read.
+      unreadable) : > "$tmp/pane-rows"; printf 'fm-child-sm\n' > "$tmp/extra-windows" ;;
+      one-pane) printf 'fm-child-sm\t%%5\t%s\n' "$$" > "$tmp/pane-rows" ;;
+    esac
+    [ ! -e "$tmp/$shape/child-sm-home" ] || fail "homeless-child-$shape: the child home exists"
+    rc=0
+    PATH="$tmp/fakebin:$PATH" ROOT=$ROOT F="$tmp/fn.sh" H="$home" bash -c '
+      . "$ROOT/bin/fm-backend.sh" >/dev/null 2>&1 || exit 9
+      . "$ROOT/bin/fm-nm-run-lib.sh" >/dev/null 2>&1 || exit 9
+      . "$F"
+      ID=task-x1 T= BACKEND=tmux
+      TASK_ANCHOR_READ=0 TASK_ANCHOR_STATE= TASK_ANCHOR_PID= TASK_ANCHOR_IDENTITY= TASK_ANCHOR_NOTE=
+      firstmate_home_has_treehouse_slot() { return 1; }
+      teardown_forced_holders_preflight "$H"' > "$tmp/$shape.stdout" 2> "$tmp/$shape.stderr" || rc=$?
+    if [ "$shape" = one-pane ]; then
+      expect_code 0 "$rc" "homeless-child-one-pane: a provable child endpoint must pass: $(cat "$tmp/$shape.stderr")"
+    else
+      expect_code 1 "$rc" "homeless-child-$shape: the preflight must refuse: $(cat "$tmp/$shape.stderr")"
+      grep -Eq "REFUSED: the endpoint firstmate:fm-child-sm of child child-sm cannot be closed safely: no single live pane shell could be read from the task's endpoint firstmate:fm-child-sm \((its window holds several panes|it cannot be read)\)" "$tmp/$shape.stderr" \
+        || fail "homeless-child-$shape: the refusal was not the child endpoint's: $(cat "$tmp/$shape.stderr")"
+    fi
+  done
+  pass "the forced-holders preflight refuses a homeless secondmate child whose window holds two panes or cannot be read, and passes one with a single pane"
+}
+
+# The forced-holders preflight checks a child copy only when the child cleanup's
+# route ends in a forced return of it:
+#   owned       a pool slot this child still owns is returned, so a holder there
+#               that nothing proves refuses before any endpoint is closed;
+#   reassigned  a pool slot another task claimed takes the records-only route,
+#               so the other task's process there is never checked, refused or
+#               signalled, and the slot is not returned.
+test_forced_holders_preflight_follows_the_child_copy_route() {
+  local shape case_dir home slot rc pid out i holder_task
+  for shape in owned reassigned; do
+    case_dir=$(make_case "child-route-$shape")
+    write_meta "$case_dir" local-only secondmate
+    configure_secondmate_with_tmux_children "$case_dir"
+    home="$case_dir/secondmate-home"
+    slot="$case_dir/pool/1/project"
+    mkdir -p "${slot%/*}" "$case_dir/primary-home/state"
+    git -C "$case_dir/project" worktree add -q -b fm/child-route "$slot" main
+    holder_task='child-a'
+    [ "$shape" = owned ] || holder_task='other-task'
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
+      "$slot" "$holder_task" > "$case_dir/pool/treehouse-state.json"
+    if [ "$shape" = owned ]; then
+      printf 'task=child-a\nhome=%s\n' "$home" > "${slot%/*}/.fm-slot-owner"
+    else
+      printf 'task=other-task\nhome=%s\n' "$case_dir/primary-home" > "${slot%/*}/.fm-slot-owner"
+    fi
+    fm_write_meta "$home/state/child-a.meta" \
+      'window=firstmate:fm-child-a' 'endpoint_task_id=child-a' \
+      "worktree=$slot" "project=$case_dir/project" 'kind=ship' 'mode=local-only'
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in list-windows) cut -f1 "$case_dir/pane-rows" | sort -u ;; esac
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exit 0
+SH
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in pool-dir|status) exit 0 ;; esac
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
+    printf 'fm-task-x1\t%%1\t%s\n' "$$" > "$case_dir/pane-rows"
+    out="$case_dir/holder.pid"
+    # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+    perl -MPOSIX -e '
+      my ($cwd, $out) = @ARGV;
+      my $first = fork(); die "fork" unless defined $first;
+      if ($first) { waitpid($first, 0); exit 0; }
+      POSIX::setsid();
+      my $second = fork(); die "fork" unless defined $second;
+      POSIX::_exit(0) if $second;
+      chdir $cwd or die "chdir";
+      open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+      exec "sleep", "300";' "$slot" "$out"
+    for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+    pid=$(cat "$out") || fail "child-route-$shape: the holder did not start"
+    teardown_fixture_track "$pid" KILL
+    sleep 0.3
+    rc=0
+    FM_HOME="$case_dir/primary-home" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    kill -0 "$pid" 2>/dev/null || fail "child-route-$shape: the slot holder was signalled"
+    ownership_assert_unsignalled_pool "$case_dir" "$pid"
+    if [ "$shape" = owned ]; then
+      expect_code 5 "$rc" "child-route-owned: the unproven holder must stop teardown: $(tail -3 "$case_dir/stderr")"
+      grep -Eq "REFUSED: process $pid .*in child child-a worktree .*which the forced return would end, but nothing proves it belongs to" "$case_dir/stderr" \
+        || fail "child-route-owned: the refusal did not name the holder: $(tail -3 "$case_dir/stderr")"
+      assert_absent "$case_dir/endpoint-close.log" "child-route-owned: an endpoint was closed before the refusal: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
+      assert_absent "$case_dir/treehouse.log" 'child-route-owned: treehouse was asked to return something'
+      assert_present "$home/state/child-a.meta" 'child-route-owned: the child record was retired'
+    else
+      expect_code 0 "$rc" "child-route-reassigned: the records-only route must not refuse on the other task's process: $(tail -3 "$case_dir/stderr")"
+      assert_no_grep "REFUSED: process $pid " "$case_dir/stderr" 'child-route-reassigned: the other task'\''s process was judged as a holder'
+      assert_no_grep "return --force $slot" "$case_dir/treehouse.log" 'child-route-reassigned: the reassigned slot was returned'
+      assert_present "$slot/.git" 'child-route-reassigned: the reassigned slot was removed'
+      assert_absent "$home/state/child-a.meta" 'child-route-reassigned: the child record was not retired'
+    fi
+    teardown_fixture_stop "$pid"
+  done
+  pass "the forced-holders preflight checks an owned child pool slot that will be returned and skips a child slot reassigned to another task"
+}
+
+# runner_group_fixture <cwd> <out> <member>: starts a detached session and
+# group leader L whose cwd is /, and, when <member> is 1, L's child M in that
+# group with its cwd at <cwd>; when <member> is 0, the leader itself has its cwd
+# at <cwd>. Writes "<holder> <leader>" to <out>.
+runner_group_fixture() {  # <cwd> <out> <member>
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  perl -MPOSIX -e '
+    my ($cwd, $out, $member) = @ARGV;
+    my $first = fork(); die "fork" unless defined $first;
+    if ($first) { waitpid($first, 0); exit 0; }
+    my $second = fork(); die "fork" unless defined $second;
+    POSIX::_exit(0) if $second;
+    POSIX::setsid() or die "setsid";
+    open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+    my $pid = $$;
+    if ($member) {
+      $SIG{CHLD} = "IGNORE";
+      my $child = fork(); die "fork" unless defined $child;
+      if (!$child) { chdir $cwd or die "chdir"; exec "sleep", "300"; }
+      $pid = $child;
+      chdir "/" or die "chdir";
+    } else {
+      chdir $cwd or die "chdir";
+    }
+    open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$pid $$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+    exec "sleep", "300" unless $member;
+    sleep 300 while 1;' "$1" "$2" "$3"
+  for _ in $(seq 100); do [ -s "$2" ] && break; sleep 0.05; done
+}
+
+# A process in a returned secondmate home is the home's own only when its
+# process group is led by a process-event runner of that home that passes the
+# leader proof the home's sweep makes before it signals that group. Every other
+# home holder refuses before any endpoint close, with every process left
+# running (a runner that leads no group is the runner-nonleader shape above):
+#   member-reused    group member M's leader L has its cwd at /, but L's claim
+#                    records another birth identity;
+#   member-content   L's .runner file names another pid than its claim;
+#   outside          L is proved, but the holder H in the home is in a session
+#                    and group of its own.
+test_home_holder_outside_a_proved_runner_group_refuses() {
+  local shape case_dir home rc out claims holder leader identity other other_leader
+  for shape in member-reused member-content outside; do
+    case_dir=$(make_case "runner-group-$shape")
+    write_meta "$case_dir" local-only secondmate
+    home="$case_dir/secondmate-home"
+    rm "$case_dir/code-root/bin"
+    git init -q "$case_dir/code-root"
+    ln -s "$ROOT/bin" "$case_dir/code-root/bin"
+    git -C "$case_dir/code-root" add bin
+    git -C "$case_dir/code-root" -c user.email=t@t -c user.name=t commit -qm "code root"
+    git -C "$case_dir/code-root" worktree add -q --detach "$home"
+    configure_secondmate_with_tmux_children "$case_dir"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in list-windows) cut -f1 "$case_dir/pane-rows" | sort -u ;; esac
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+    printf 'fm-task-x1\t%%1\t%s\n' "$$" > "$case_dir/pane-rows"
+    claims="$case_dir/claims"
+    mkdir -p "$claims" "$home/state/procevent"
+    out="$case_dir/fixture.pids"
+    if [ "$shape" = outside ]; then
+      runner_group_fixture / "$out" 0
+    else
+      runner_group_fixture "$home" "$out" 1
+    fi
+    read -r holder leader < "$out" || fail "runner-group-$shape: the runner group did not start"
+    teardown_fixture_track "$holder" KILL
+    [ "$leader" = "$holder" ] || teardown_fixture_track "$leader" KILL
+    other=
+    if [ "$shape" = outside ]; then
+      runner_group_fixture "$home" "$case_dir/other.pids" 0
+      read -r other other_leader < "$case_dir/other.pids" || fail "runner-group-outside: the outside holder did not start"
+      teardown_fixture_track "$other" KILL
+      holder=$other
+    fi
+    sleep 0.3
+    [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$leader" | tr -d ' ')" = "$leader" ] \
+      || fail "runner-group-$shape: the runner does not lead its group"
+    if [ "$shape" = outside ]; then
+      [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$holder" | tr -d ' ')" != "$leader" ] \
+        || fail "runner-group-outside: the outside holder is in the runner's group"
+    else
+      [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$holder" | tr -d ' ')" = "$leader" ] \
+        || fail "runner-group-$shape: the holder is not a member of the runner's group"
+    fi
+    identity=$(bash -c '. "$1/bin/fm-wake-lib.sh" >/dev/null 2>&1; fm_pid_identity "$2"' _ "$ROOT" "$leader") \
+      || fail "runner-group-$shape: the runner's identity cannot be read"
+    [ "$shape" != member-reused ] || identity="lstart=Thu Jan  1 00:00:00 1970"
+    if [ "$shape" = member-content ]; then
+      printf '%s\n' "$((leader + 100000))" > "$home/state/procevent/fixture-runner.runner"
+    else
+      printf '%s\n' "$leader" > "$home/state/procevent/fixture-runner.runner"
+    fi
+    printf '%s\n' "$home" "$leader" token1 "$identity" "" "" active > "$claims/fixture-runner.claim"
+    rc=0
+    FM_PROCEVENT_CLAIM_ROOT="$claims" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 5 "$rc" "runner-group-$shape: teardown must refuse before any close: $(tail -3 "$case_dir/stderr")"
+    assert_absent "$case_dir/endpoint-close.log" "runner-group-$shape: an endpoint was closed: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
+    assert_absent "$case_dir/treehouse.log" "runner-group-$shape: treehouse was asked to return something"
+    grep -Eq "REFUSED: process $holder .*which the forced return would end, but nothing proves it belongs to task-x1" "$case_dir/stderr" \
+      || fail "runner-group-$shape: the refusal did not name the holder: $(tail -3 "$case_dir/stderr")"
+    kill -0 "$holder" 2>/dev/null || fail "runner-group-$shape: the holder was signalled"
+    kill -0 "$leader" 2>/dev/null || fail "runner-group-$shape: the runner was signalled"
+    assert_present "$home/state/child-a.meta" "runner-group-$shape: a child record was retired"
+    teardown_fixture_stop "$holder"
+    [ "$leader" = "$holder" ] || teardown_fixture_stop "$leader"
+    [ -z "$other" ] || teardown_fixture_stop "$other_leader"
+  done
+  pass "a member of an unproved runner's group and a home holder outside every runner group refuse before any close, with every process left running"
+}
+
+# A secondmate home returned through Treehouse runs one real process-event
+# source: its runner was started from inside the home, and its source child
+# holds its cwd in the home inside the runner's group. The runner's owner guard
+# has its cwd at / once it reported ready, so it holds no home folder. The
+# forced teardown completes: the decision accepts the runner and its group
+# member as the home's own, and the home's own sweep then stops that whole
+# group before the home is returned.
+test_home_with_a_live_process_event_runner_tears_down() {
+  local case_dir home rc claims stub marker runner child guard cwd
+  case_dir=$(make_case runner-group-live)
+  write_meta "$case_dir" local-only secondmate
+  home="$case_dir/secondmate-home"
+  rm "$case_dir/code-root/bin"
+  git init -q "$case_dir/code-root"
+  # The home's bin/ is the real one, except that its fm-procevent.sh drops the
+  # case's state, data and config overrides, which belong to the parent home,
+  # before it runs the real script for the home it is called for.
+  mkdir "$case_dir/code-root/bin"
+  for f in "$ROOT"/bin/*; do ln -s "$f" "$case_dir/code-root/bin/${f##*/}"; done
+  rm "$case_dir/code-root/bin/fm-procevent.sh"
+  printf '#!/usr/bin/env bash\nunset FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE\nexec %q "$@"\n' \
+    "$ROOT/bin/fm-procevent.sh" > "$case_dir/code-root/bin/fm-procevent.sh"
+  chmod +x "$case_dir/code-root/bin/fm-procevent.sh"
+  git -C "$case_dir/code-root" add bin
+  git -C "$case_dir/code-root" -c user.email=t@t -c user.name=t commit -qm "code root"
+  git -C "$case_dir/code-root" worktree add -q --detach "$home"
+  configure_secondmate_with_tmux_children "$case_dir"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in list-windows) cut -f1 "$case_dir/pane-rows" | sort -u ;; esac
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+  printf 'fm-task-x1\t%%1\t%s\n' "$$" > "$case_dir/pane-rows"
+  claims="$case_dir/claims"
+  mkdir -p "$claims"
+  stub="$case_dir/source-stub.sh"
+  marker="$case_dir/source"
+  cat > "$stub" <<'SH'
+#!/usr/bin/env bash
+cd "$1" || exit 1
+printf '%s\n' "$$" > "$2.pid"
+while [ ! -e "$2.trigger" ]; do
+  [ "$SECONDS" -lt 120 ] || exit 75
+  sleep 0.1
+done
+printf 'payload\n'
+SH
+  chmod +x "$stub"
+  fm_test_track_procevent_home "$home" "$claims"
+  ( cd "$home" && FM_HOME="$home" FM_PROCEVENT_CLAIM_ROOT="$claims" \
+      "$home/bin/fm-procevent.sh" register lavish live-src -- "$stub" "$home" "$marker" >/dev/null \
+    && FM_HOME="$home" FM_PROCEVENT_CLAIM_ROOT="$claims" "$home/bin/fm-procevent.sh" reconcile >/dev/null ) \
+    || fail "runner-group-live: the source could not be started"
+  for _ in $(seq 200); do
+    [ -s "$home/state/procevent/live-src.runner" ] && [ -s "$marker.pid" ] && break
+    sleep 0.1
+  done
+  runner=$(cat "$home/state/procevent/live-src.runner" 2>/dev/null | tr -d '[:space:]')
+  child=$(cat "$marker.pid" 2>/dev/null | tr -d '[:space:]')
+  [ -n "$runner" ] && [ -n "$child" ] || fail "runner-group-live: the runner or its source child never started"
+  [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$runner" | tr -d ' ')" = "$runner" ] \
+    || fail "runner-group-live: the runner does not lead its group"
+  [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$child" | tr -d ' ')" = "$runner" ] \
+    || fail "runner-group-live: the source child is not in the runner's group"
+  [ "$("$REAL_LSOF_FOR_TEST" -a -d cwd -p "$child" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$(cd "$home" && pwd -P)" ] \
+    || fail "runner-group-live: the source child does not hold its cwd in the home"
+  guard=$("$REAL_PS_FOR_TEST" -axo pid=,command= | awk -v r="$runner" '$0 ~ ("_owner-watchdog live-src " r " ") { print $1; exit }')
+  [ -n "$guard" ] || fail "runner-group-live: the runner's owner guard was not found"
+  cwd=$("$REAL_LSOF_FOR_TEST" -a -d cwd -p "$guard" -Fn 2>/dev/null | sed -n 's/^n//p')
+  [ "$cwd" = / ] || fail "runner-group-live: the owner guard's cwd is $cwd, not /"
+  rc=0
+  FM_PROCEVENT_CLAIM_ROOT="$claims" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "runner-group-live: teardown must complete: $(grep -v '^●' "$case_dir/stderr" | tail -5)"
+  for _ in $(seq 100); do
+    "$REAL_PS_FOR_TEST" -o pid= -p "$runner" >/dev/null 2>&1 || "$REAL_PS_FOR_TEST" -o pid= -p "$child" >/dev/null 2>&1 || break
+    sleep 0.1
+  done
+  ! "$REAL_PS_FOR_TEST" -o pid= -p "$runner" >/dev/null 2>&1 || fail "runner-group-live: the sweep left the runner running"
+  ! "$REAL_PS_FOR_TEST" -o pid= -p "$child" >/dev/null 2>&1 || fail "runner-group-live: the sweep left the runner's source child running"
+  assert_grep "return --force" "$case_dir/treehouse.log" "runner-group-live: the home was not returned"
+  assert_absent "$case_dir/state/task-x1.meta" "runner-group-live: the secondmate record was not retired"
+  pass "a home with a live process-event runner tears down: its group member is the home's own, the guard holds no home folder, and the home's sweep stops the group"
+}
+
+# fm_procevent_runner_leader_proved is the one owner of runner acceptance, used
+# by the home sweep and by teardown's pre-close decision: a live
+# identity-matched group leader is proved (0), a gone pid is stale (1), and a
+# non-leader or a mismatched identity cannot be proved (2).
+test_runner_leader_acceptance_is_one_shared_rule() {
+  local tmp out leader member got
+  tmp=$(fm_test_tmproot runner-acceptance)
+  out="$tmp/pids"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  perl -MPOSIX -e '
+    my ($out) = @ARGV;
+    my $first = fork(); die "fork" unless defined $first;
+    if ($first) { waitpid($first, 0); exit 0; }
+    my $second = fork(); die "fork" unless defined $second;
+    POSIX::_exit(0) if $second;
+    POSIX::setsid() or die "setsid";
+    open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+    $SIG{CHLD} = "IGNORE";
+    my $child = fork(); die "fork" unless defined $child;
+    if (!$child) { exec "sleep", "300"; }
+    open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $child\n"; close $fh; rename "$out.tmp", $out or die "rename";
+    sleep 300 while 1;' "$out"
+  for _ in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+  read -r leader member < "$out" || fail "runner-acceptance: setup did not start"
+  teardown_fixture_track "$leader" KILL
+  teardown_fixture_track "$member" KILL
+  [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$leader" | tr -d ' ')" = "$leader" ] || fail "runner-acceptance: the leader does not lead its group"
+  [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$member" | tr -d ' ')" = "$leader" ] || fail "runner-acceptance: the member is not in the leader's group"
+  got=$(ROOT=$ROOT L=$leader M=$member bash -c '
+    . "$ROOT/bin/fm-pr-lib.sh" >/dev/null 2>&1
+    . "$ROOT/bin/fm-wake-lib.sh" >/dev/null 2>&1
+    . "$ROOT/bin/fm-procevent-lib.sh" >/dev/null 2>&1 || exit 9
+    lid=$(fm_pid_identity "$L") && mid=$(fm_pid_identity "$M") || exit 8
+    fm_procevent_runner_leader_proved "$L" "$lid"; a=$?
+    fm_procevent_runner_leader_proved "$M" "$mid"; b=$?
+    fm_procevent_runner_leader_proved "$L" "lstart=Thu Jan  1 00:00:00 1970"; c=$?
+    printf "%s %s %s\n" "$a" "$b" "$c"')
+  assert_equals "0 2 2" "$got" "runner-acceptance: leader, non-leader and reused-identity verdicts"
+  teardown_fixture_stop "$member"
+  teardown_fixture_stop "$leader"
+  pass "runner acceptance proves only a live identity-matched group leader"
+}
+
+# teardown_home_runner_member accepts a home's runner only when its .runner file
+# is exactly the pid line the runner writes ("1234\n") for a live
+# identity-matched group leader whose claim the home owns; every other content,
+# a NUL byte included, is refused. The claims live in a scratch claim root.
+test_home_runner_record_must_be_exactly_its_pid_line() {
+  local tmp home out leader identity shape got want fn mode
+  tmp=$(fm_test_tmproot runner-record-shape)
+  home="$tmp/home"
+  mkdir -p "$home/state/procevent" "$tmp/claims"
+  out="$tmp/pids"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  perl -MPOSIX -e '
+    my ($out) = @ARGV;
+    my $first = fork(); die "fork" unless defined $first;
+    if ($first) { waitpid($first, 0); exit 0; }
+    my $second = fork(); die "fork" unless defined $second;
+    POSIX::_exit(0) if $second;
+    POSIX::setsid() or die "setsid";
+    open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+    open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+    exec "sleep", "300";' "$out"
+  for _ in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+  read -r leader < "$out" || fail "runner-record: setup did not start"
+  teardown_fixture_track "$leader" KILL
+  identity=$(bash -c '. "$1/bin/fm-wake-lib.sh" >/dev/null 2>&1; fm_pid_identity "$2"' _ "$ROOT" "$leader") \
+    || fail "runner-record: the leader's identity cannot be read"
+  printf '%s\n' "$home" "$leader" token1 "$identity" "" "" active > "$tmp/claims/fixture-runner.claim"
+  python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/fn.sh" <<'PY' || fail "runner-record: the function could not be extracted"
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+start = source.index("teardown_home_runner_member() {")
+end = source.index("\n}\n", start) + 3
+pathlib.Path(sys.argv[2]).write_text(source[start:end])
+PY
+  for shape in exact spaced leading-space two-line empty no-newline nul; do
+    case "$shape" in
+      exact) printf '%s\n' "$leader" ;;
+      spaced) printf '%s %s\n' "${leader:0:1}" "${leader:1}" ;;
+      leading-space) printf ' %s\n' "$leader" ;;
+      two-line) printf '%s\n%s\n' "$leader" "$leader" ;;
+      empty) : ;;
+      no-newline) printf '%s' "$leader" ;;
+      # The pid, a NUL byte, then the newline: a shell read would drop the NUL.
+      nul) printf '%s\000\n' "$leader" ;;
+    esac > "$home/state/procevent/fixture-runner.runner"
+    if [ "$shape" = nul ]; then
+      [ "$(wc -c < "$home/state/procevent/fixture-runner.runner" | tr -d ' ')" = "$(( ${#leader} + 2 ))" ] \
+        || fail "runner-record-nul: the fixture did not write the pid, one byte and a newline"
+      # The byte after the pid is a NUL and the last byte a newline.
+      [ "$(od -An -c -j "${#leader}" -N 2 "$home/state/procevent/fixture-runner.runner" | tr -s ' ' | sed 's/^ //; s/ $//')" = '\0 \n' ] \
+        || fail "runner-record-nul: the byte after the pid is not NUL: $(od -An -c "$home/state/procevent/fixture-runner.runner")"
+    fi
+    got=$(FM_PROCEVENT_CLAIM_ROOT="$tmp/claims" SCRIPT_DIR="$ROOT/bin" H="$home" P="$leader" F="$tmp/fn.sh" bash -c '
+      . "$SCRIPT_DIR/fm-pr-lib.sh" >/dev/null 2>&1
+      . "$SCRIPT_DIR/fm-wake-lib.sh" >/dev/null 2>&1
+      . "$F"
+      if teardown_home_runner_member "$H" "$P"; then echo accepted; else echo refused; fi')
+    want=refused
+    [ "$shape" != exact ] || want=accepted
+    assert_equals "$want" "$got" "runner-record-$shape: the .runner content was judged wrongly"
+  done
+  # The expected-bytes producer is the printf of exactly the claim pid line. A
+  # test-local printf override, inside this extracted-function test only, makes
+  # that one call misbehave:
+  #   correct-then-fail  writes the full correct line, then returns 1, against a
+  #                      matching .runner: refused (its status is read);
+  #   correct-then-fail-fault  the same on a copy whose check of the producer's
+  #                      status is removed by sed: accepted, so that check is what
+  #                      refuses;
+  #   writes-nothing     writes nothing and returns 1, against a matching
+  #                      .runner, so the failing producer is reached: refused
+  #                      (no fault control: with nothing written cmp also
+  #                      differs, so either status refuses it; correct-then-fail
+  #                      and its control prove the producer-status check);
+  #   writes-nothing-ok  writes nothing and returns 0, against an empty .runner:
+  #                      refused by the non-empty file check before the producer
+  #                      runs (the override is asserted not to have run);
+  #   writes-nothing-ok-fault  the same on a copy whose non-empty file check is
+  #                      removed: accepted, so that check is what refuses;
+  #   matching           no override and a matching .runner: accepted.
+  # shellcheck disable=SC2016 # The patterns match the literal source text.
+  sed 's/\[ "\${runner_cmp_status\[0\]}" = 0 \] && //' "$tmp/fn.sh" > "$tmp/fn-status-fault.sh"
+  ! cmp -s "$tmp/fn.sh" "$tmp/fn-status-fault.sh" || fail "runner-record-producer: the fault control did not remove the producer status check"
+  # shellcheck disable=SC2016 # The pattern matches the literal source text.
+  sed 's/\[ -f "\$runner_file" \] && \[ -s "\$runner_file" \] || continue/:/' "$tmp/fn.sh" > "$tmp/fn-empty-fault.sh"
+  ! cmp -s "$tmp/fn.sh" "$tmp/fn-empty-fault.sh" || fail "runner-record-producer: the fault control did not remove the non-empty file check"
+  for shape in correct-then-fail correct-then-fail-fault writes-nothing writes-nothing-ok writes-nothing-ok-fault matching; do
+    rm -f "$tmp/producer-ran"
+    case "$shape" in
+      correct-then-fail|correct-then-fail-fault|writes-nothing|matching) printf '%s\n' "$leader" ;;
+      writes-nothing-ok*) : ;;
+    esac > "$home/state/procevent/fixture-runner.runner"
+    case "$shape" in
+      correct-then-fail-fault) fn="$tmp/fn-status-fault.sh" ;;
+      writes-nothing-ok-fault) fn="$tmp/fn-empty-fault.sh" ;;
+      *) fn="$tmp/fn.sh" ;;
+    esac
+    mode=none
+    case "$shape" in
+      correct-then-fail*) mode=correct-then-fail ;;
+      writes-nothing-ok*) mode=writes-nothing-ok ;;
+      writes-nothing) mode=writes-nothing ;;
+    esac
+    got=$(FM_PROCEVENT_CLAIM_ROOT="$tmp/claims" SCRIPT_DIR="$ROOT/bin" H="$home" P="$leader" MARK="$tmp/producer-ran" \
+      MODE=$mode F="$fn" bash -c '
+      . "$SCRIPT_DIR/fm-pr-lib.sh" >/dev/null 2>&1
+      . "$SCRIPT_DIR/fm-wake-lib.sh" >/dev/null 2>&1
+      . "$F"
+      if [ "$MODE" != none ]; then
+        printf() {
+          if [ "$#" = 2 ] && [ "$1" = "%s\n" ] && [ "$2" = "$P" ] && [ ! -e "$MARK" ]; then
+            : > "$MARK"
+            [ "$MODE" != correct-then-fail ] || builtin printf "%s\n" "$P"
+            [ "$MODE" != writes-nothing-ok ] || return 0
+            return 1
+          fi
+          builtin printf "$@"
+        }
+      fi
+      if teardown_home_runner_member "$H" "$P"; then echo accepted; else echo refused; fi')
+    case "$shape" in
+      correct-then-fail|writes-nothing|writes-nothing-ok) want=refused ;;
+      *) want=accepted ;;
+    esac
+    assert_equals "$want" "$got" "runner-record-$shape: the producer's outcome was judged wrongly"
+    case "$shape" in
+      correct-then-fail|correct-then-fail-fault|writes-nothing|writes-nothing-ok-fault)
+        assert_present "$tmp/producer-ran" "runner-record-$shape: the producer override never ran" ;;
+      writes-nothing-ok)
+        assert_absent "$tmp/producer-ran" "runner-record-$shape: the producer ran although the non-empty check should refuse first" ;;
+    esac
+  done
+  teardown_fixture_stop "$leader"
+  pass "a home runner record counts only as exactly its pid line; spaced, padded, two-line, empty, unterminated and NUL-carrying records are refused, and a producer that fails, after writing the full line or nothing, never proves one"
+}
+
+ownership_pool_descends() {  # <pid> <ancestor>
+  local p=$1 n=0
+  while [ -n "$p" ] && [ "$p" -gt 1 ] && [ "$n" -lt 64 ]; do
+    [ "$p" != "$2" ] || return 0
+    p=$("$REAL_PS_FOR_TEST" -o ppid= -p "$p" 2>/dev/null | tr -d '[:space:]')
+    n=$((n + 1))
+  done
+  return 1
+}
+
 test_child_return_custody_refusal_keeps_non_pool_worktree() {
   local case_dir home nested rc=0
   case_dir=$(make_case child-return-custody)
@@ -3021,6 +3870,8 @@ test_child_return_custody_refusal_keeps_non_pool_worktree() {
   git -C "$case_dir/project" worktree add -q --detach "$nested" main
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
@@ -4152,6 +5003,8 @@ test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap() {
   tasks-axi start live-task --file "$case_dir/data/backlog.md" >/dev/null
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 if [ -e "$case_dir/endpoint-stuck" ]; then
   case "\${1:-}" in
     kill-window) : > "$case_dir/kill-attempted"; exit 1 ;;
@@ -4232,6 +5085,8 @@ test_child_pool_return_custody_refusal_keeps_slot() {
   lock=$(git_index_lock_path "$slot")
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
@@ -4962,6 +5817,14 @@ test_unverified_pool_reservation_preserves_processes
 test_non_pool_returns_recheck_registered_copies
 test_return_missing_slot_reports_canonicalization_refusal
 test_child_return_custody_refusal_keeps_non_pool_worktree
+test_forced_child_return_refuses_an_unproven_holder
+test_forced_cleanup_refuses_expiring_proofs_before_any_close
+test_forced_cleanup_decides_a_homeless_secondmate_child_endpoint
+test_forced_holders_preflight_follows_the_child_copy_route
+test_home_holder_outside_a_proved_runner_group_refuses
+test_home_with_a_live_process_event_runner_tears_down
+test_runner_leader_acceptance_is_one_shared_rule
+test_home_runner_record_must_be_exactly_its_pid_line
 test_child_pool_return_custody_refusal_keeps_slot
 test_reassigned_dirty_slot_retires_only_finished_task
 test_reassigned_slot_unlanded_task_refuses

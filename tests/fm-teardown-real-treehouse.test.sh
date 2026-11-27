@@ -543,6 +543,76 @@ test_the_scratch_tmux_server_starts_whatever_the_length_of_tmpdir() {
   pass "the scratch tmux server starts and keeps its socket path short under a TMPDIR of ${#long_tmp} bytes"
 }
 
+# Fix 2 ownership on the real binaries: the real tmux pane's process is the
+# anchor teardown reads, the real lsof finds the slot's cwd-holders, and the real
+# treehouse would end every process left in the slot on return. A detached,
+# session-leading process at the slot root that descends from no task process
+# (the shape of the shared no-mistakes daemon that auto-started in a task's
+# slot) survives, and the slot is neither returned nor released.
+test_a_detached_daemon_at_the_real_slot_root_survives_and_the_slot_stays_leased() {
+  local rc pid out i
+  real_case own-daemon
+  out=$FOREIGN_CASE/daemon.pid
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  perl -MPOSIX -e '
+    my ($cwd, $out) = @ARGV;
+    my $first = fork(); die "fork" unless defined $first;
+    if ($first) { waitpid($first, 0); exit 0; }
+    POSIX::setsid();
+    my $second = fork(); die "fork" unless defined $second;
+    POSIX::_exit(0) if $second;
+    chdir $cwd or die "chdir";
+    open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+    open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+    exec "sleep", "300";' "$FOREIGN_SLOT" "$out"
+  for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+  pid=$(cat "$out") || fail "own-daemon: the detached daemon did not start"
+  teardown_fixture_track "$pid" KILL
+  sleep 1
+  [ "$(ps -o ppid= -p "$pid" | tr -d ' ')" != "$$" ] || fail "own-daemon: the daemon is the runner's child"
+  real_teardown rc
+  real_record after
+  kill -0 "$pid" 2>/dev/null || fail "own-daemon: teardown or the real treehouse killed the detached daemon"
+  expect_code 1 "$rc" "own-daemon: teardown must refuse while an unproven process holds the slot root: $(tail -3 "$FOREIGN_CASE/stderr")"
+  grep -Eq "REFUSED: process $pid .*nothing proves it belongs to task-x1" "$FOREIGN_CASE/stderr" \
+    || fail "own-daemon: the refusal did not name the daemon: $(tail -3 "$FOREIGN_CASE/stderr")"
+  assert_equals 0 "$(real_returns)" "own-daemon: the real slot was returned"
+  [ "$(jq -r '.[0].status' <<<"$(real_slot_entry)")" = leased ] || fail "own-daemon: the real slot is not leased: $(real_slot_entry)"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "own-daemon: the task record was removed"
+  assert_present "$FOREIGN_COPY" "own-daemon: the copy was removed"
+  teardown_fixture_stop "$pid"
+  pass "own-daemon: a detached daemon at the real slot root survives, teardown refuses naming it, and the real slot stays leased with the copy and the task"
+}
+
+# The legitimate counterpart: a leaked child of the real tmux pane's process, at
+# the slot root, is reaped, and the real binary returns the slot.
+test_a_leaked_child_of_the_real_task_pane_is_reaped_and_the_real_slot_is_returned() {
+  local rc pane leak i
+  real_case own-leak
+  tmux respawn-pane -k -t firstmate:fm-task-x1 "sh -c '(cd \"$FOREIGN_SLOT\" && exec sleep 600) & exec sleep 3600'" \
+    || fail "own-leak: the real pane could not be respawned"
+  pane=$(tmux display-message -p -t firstmate:fm-task-x1 '#{pane_pid}')
+  leak=
+  for i in $(seq 100); do
+    leak=$(pgrep -P "$pane" sleep 2>/dev/null | head -n 1)
+    [ -n "$leak" ] && [ "$(lsof -a -d cwd -p "$leak" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$FOREIGN_SLOT" ] && break
+    leak=
+    sleep 0.05
+  done
+  [ -n "$leak" ] || fail "own-leak: the pane's leak did not start in the slot"
+  teardown_fixture_track "$leak" KILL
+  real_teardown rc
+  real_record after
+  expect_code 0 "$rc" "own-leak: the close must succeed on a real pool slot: $(tail -3 "$FOREIGN_CASE/stderr")"
+  for i in $(seq 50); do kill -0 "$leak" 2>/dev/null || break; sleep 0.1; done
+  kill -0 "$leak" 2>/dev/null && fail "own-leak: the pane's leaked child survived teardown"
+  assert_grep "	TERM	$leak	" "$FOREIGN_CASE/state/task-x1.teardown-processes" "own-leak: the leak's signal was not audited"
+  assert_grep '|return ' "$FOREIGN_CASE/treehouse.calls.log" "own-leak: the real binary was not asked to return the slot"
+  [ "$(jq -r '.[0].status // "gone"' <<<"$(real_slot_entry)")" != leased ] || fail "own-leak: the real slot is still leased: $(real_slot_entry)"
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" "own-leak: the task record survived"
+  pass "own-leak: a leaked child of the real task pane at the slot root is reaped and the real binary returns the slot"
+}
+
 teardown_test_cases=(
 test_a_real_pool_slot_keeps_its_lease_and_the_unique_files_are_preserved_and_the_control_is_left_out
 test_a_real_pool_slot_is_returned_after_the_unique_file_is_preserved_and_the_control_is_removed
@@ -554,6 +624,8 @@ test_a_start_racing_the_close_of_an_unleased_slot_never_resets_the_copy
 test_an_ignored_file_created_while_the_driver_runs_is_not_closed_over_on_a_real_pool_slot
 test_a_copy_sweep_apply_during_a_teardown_in_the_driver_makes_no_second_archive
 test_the_scratch_tmux_server_starts_whatever_the_length_of_tmpdir
+test_a_detached_daemon_at_the_real_slot_root_survives_and_the_slot_stays_leased
+test_a_leaked_child_of_the_real_task_pane_is_reaped_and_the_real_slot_is_returned
 )
 
 fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"
