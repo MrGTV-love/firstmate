@@ -873,7 +873,7 @@ case "$MODE" in
     ;;
   *)  # no-mistakes
     SETUP2="
-2. Run \`no-mistakes doctor\`; if it reports the repo is not initialized here, run \`no-mistakes init\`."
+2. Run \`no-mistakes doctor\`; if it reports the repo is not initialized here, append one \`blocked [at=<epoch>]: no-mistakes is not initialized in this copy; firstmate runs init\` line and stop."
     ;;
 esac
 RULE1=$(fm_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1

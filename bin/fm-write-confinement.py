@@ -21,7 +21,13 @@ archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-
 records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
-and other projects' no-mistakes gate repositories. Each protected folder and
+and other projects' no-mistakes gate repositories. In this repository's shared
+Git directory it also denies every file that can name a program an unconfined
+Git command runs: config and config.worktree, the hooks, modules, remotes and
+branches folders, every file a config file there includes and an absolute
+core.hooksPath folder it names, plus this worktree's own config.worktree and
+the user and system Git config files, each on the path Git opens and on its
+real path when that is a regular file or absent. Each protected folder and
 every folder above it also refuses rename and deletion. --data is this task's
 directory below the home data root. The build refuses while a protected ref
 path in this repository's shared Git directory (packed-refs, HEAD, index,
@@ -29,7 +35,10 @@ commondir, other tasks' branch refs and reflogs, replace refs, other
 worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
 link, or a folder above one is a symbolic link, naming the path and the link
 count or target, because a write through such an alias would be judged by the
-alias's path. A HEAD symbolic link to a refs/heads name stays allowed. Other
+alias's path. The build also stops while one of those program files, or a file in
+those folders outside a Git object store (the objects folder beside a HEAD),
+has a second hard link. A HEAD
+symbolic link to a refs/heads name stays allowed. Other
 projects' and gate repositories' Git directories are not scanned. Task ids
 come from the state/<id>.meta
 records of this home and every --protect home. The caller wraps its final
@@ -146,7 +155,7 @@ def extra_links(common, gitdir, own_branch):
     symbolic link to a refs/heads name is Git's core.preferSymlinkRefs form,
     which Git reads as the name and never follows. The task's own branch, its
     reflog and its own worktree Git directory are writable by design and are
-    not checked.
+    not checked here; git_program_paths covers that directory's config.worktree.
     """
     root = Path(common)
     own = {root / "refs/heads" / own_branch, root / "logs/refs/heads" / own_branch} if own_branch else set()
@@ -181,6 +190,146 @@ def extra_links(common, gitdir, own_branch):
     return found
 
 
+# Shared Git directory entries that name a program an unconfined Git command
+# runs: a config file names fsmonitor, filter, diff, merge, editor, pager,
+# credential and hook-path programs; hooks holds the hooks the primary checkout
+# runs when no core.hooksPath is set; modules holds each submodule's own Git
+# directory, with its own config and hooks; a remotes or branches file names a
+# <helper>::<address> URL, which runs git-remote-<helper>.
+GIT_PROGRAM_FILES = ("config", "config.worktree")
+GIT_PROGRAM_FOLDERS = ("hooks", "modules", "remotes", "branches")
+# Git stops following include directives at this depth (MAX_INCLUDE_DEPTH).
+GIT_INCLUDE_DEPTH = 10
+
+
+def config_values(path, key):
+    """Each value of the keys matching KEY in the one config file PATH.
+
+    Git expands ~/ and %(prefix)/ in a path value; a relative path stays as
+    written. A file Git cannot parse stops the build.
+    """
+    listed = subprocess.run(["git", "config", "--file", str(path), "--no-includes", "--type=path", "-z", "--get-regexp", key],
+                            capture_output=True, env=dict(os.environ, LC_ALL="C"))
+    if listed.returncode == 1 and not listed.stdout:
+        return []
+    if listed.returncode:
+        raise ValueError(f"{path}: git config --get-regexp {key} failed (exit {listed.returncode})")
+    return [os.fsdecode(entry.split(b"\n", 1)[1]) for entry in listed.stdout.split(b"\0") if b"\n" in entry]
+
+
+def user_git_configs(home):
+    """The user and system Git config files an unconfined Git command reads.
+
+    Git reads $XDG_CONFIG_HOME/git/config, or ~/.config/git/config, and
+    ~/.gitconfig for the user, unless GIT_CONFIG_GLOBAL names another file,
+    and its compiled-in system file unless GIT_CONFIG_SYSTEM does. A Git run
+    outside the profile need not share this launch's environment, so both
+    default user files are listed whatever the environment says, beside any
+    file the environment names.
+    """
+    paths = [Path(home) / ".gitconfig", Path(home) / ".config/git/config"]
+    if os.environ.get("XDG_CONFIG_HOME"):
+        paths.append(Path(os.environ["XDG_CONFIG_HOME"]) / "git/config")
+    paths += [Path(os.environ[name]) for name in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM") if os.environ.get(name)]
+    system = subprocess.run(["git", "var", "GIT_CONFIG_SYSTEM"], capture_output=True, text=True,
+                            env={name: value for name, value in os.environ.items() if name not in ("GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM")})
+    if system.returncode:
+        raise ValueError(f"git var GIT_CONFIG_SYSTEM failed (exit {system.returncode})")
+    paths += [Path(line) for line in system.stdout.splitlines() if line]
+    return [Path(os.path.abspath(path)) for path in paths]
+
+
+def deniable(path):
+    """A path Git would read as a config or hook file that a deny can safely name.
+
+    An absent path or a regular file is; an existing device, folder or other
+    special file, such as the /dev/null GIT_CONFIG_GLOBAL often names, is not,
+    because a deny there would block the worker's ordinary writes to it.
+    """
+    try:
+        return stat.S_ISREG(os.stat(path).st_mode)
+    except FileNotFoundError:
+        return True
+    except NotADirectoryError:
+        return True
+
+
+def git_program_paths(common, gitdir, home):
+    """Files and folders that can name a program an unconfined Git command runs.
+
+    Returns (files, folders, aliases). The files are the shared config and
+    config.worktree, this worktree's own config.worktree, the user and system
+    config files (user_git_configs) and every file any of them includes,
+    followed as deep as Git follows includes. The folders are
+    GIT_PROGRAM_FOLDERS and every absolute core.hooksPath those files name; a
+    relative one resolves inside whichever checkout Git runs in. Each is listed
+    both as the name Git opens and at its real path, which the kernel judges a
+    write through a symbolic link by, and so is the real path of every symbolic
+    link inside a listed folder at any depth, object stores included, whose own
+    entries are then walked in turn. A second hard link has no path this build
+    can find, so each hard-linked regular file among them is returned as an
+    alias that stops the build, apart from a file inside a Git object store,
+    the objects folder beside a HEAD, whose files a local clone hard-links and
+    which names no program; a folder holding its own HEAD inside a store is a
+    Git directory again, outside it. An unreadable folder stops the build.
+    """
+    files, folders, entries = [], [str(Path(common) / name) for name in GIT_PROGRAM_FOLDERS], []
+    queue = [(Path(common) / name, 0) for name in GIT_PROGRAM_FILES] + [(Path(gitdir) / "config.worktree", 0)]
+    queue += [(path, 0) for path in user_git_configs(home)]
+    while queue:
+        path, depth = queue.pop(0)
+        if str(path) in files:
+            continue
+        files.append(str(path))
+        if depth >= GIT_INCLUDE_DEPTH or not path.is_file():
+            continue
+        # Git reads a relative include from the folder of the file naming it.
+        queue += [(Path(os.path.normpath(path.parent / value)), depth + 1)
+                  for value in config_values(path, r"^include(if\..+)?\.path$")]
+        # A hooks path that exists as a file, such as /dev/null, holds no hook.
+        folders += [value for value in config_values(path, r"^core\.hookspath$")
+                    if os.path.isabs(value) and (os.path.isdir(value) or not os.path.lexists(value))]
+
+    def unreadable(error):
+        raise error
+
+    walked, stores = [], set()
+    for folder in folders:
+        real = canonical(folder)
+        if real in walked or not os.path.isdir(real):
+            continue
+        walked.append(real)
+        for where, subfolders, names in os.walk(real, onerror=unreadable):
+            # A Git directory keeps its object store in the objects folder
+            # beside its HEAD, and a folder inside a store belongs to it, but
+            # a folder holding its own HEAD is a Git directory and never in a
+            # store. Any other folder named objects, such as the Git directory
+            # of a submodule named objects under modules, is not a store.
+            stored, gitdir_here = where in stores, os.path.lexists(os.path.join(where, "HEAD"))
+            for name in subfolders + names:
+                entry = os.path.join(where, name)
+                if (name in subfolders and (stored or (gitdir_here and name == "objects"))
+                        and not os.path.lexists(os.path.join(entry, "HEAD"))):
+                    stores.add(canonical(entry) if os.path.islink(entry) else entry)
+                if os.path.islink(entry):
+                    (folders if os.path.isdir(entry) else files).append(canonical(entry))
+                elif name in names and not stored:
+                    entries.append(Path(entry))
+    # A symbolic link is denied by its own name, so it cannot be replaced, and
+    # at its real path only when that is a file a deny can name.
+    files = [path for path in files if os.path.islink(path) or deniable(path)]
+    files += [canonical(path) for path in files if deniable(canonical(path))]
+    aliases = []
+    for path in dict.fromkeys([Path(canonical(path)) for path in files] + entries):
+        try:
+            info = path.lstat()
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        if stat.S_ISREG(info.st_mode) and info.st_nlink > 1:
+            aliases.append((path, f"{info.st_nlink} links"))
+    return list(dict.fromkeys(files)), list(dict.fromkeys(folders + [canonical(folder) for folder in folders])), aliases
+
+
 def build(args):
     if not re.fullmatch(TASK_ID, args.task):
         raise ValueError("invalid task id")
@@ -196,7 +345,8 @@ def build(args):
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
         raise ValueError("a repository with reftable ref storage cannot be confined")
-    linked = extra_links(common, gitdir, args.branch)
+    program_files, program_folders, program_aliases = git_program_paths(common, gitdir, home)
+    linked = extra_links(common, gitdir, args.branch) + program_aliases
     if linked:
         shown = ", ".join(f"{path} ({why})" for path, why in linked[:5])
         raise ValueError(
@@ -280,7 +430,7 @@ def build(args):
     # Shared roots inside protected assets that the worker's ordinary tools
     # write: the home state directory (procevent, friction and fleet ledgers)
     # and its own repository's shared Git directory (objects, remote-tracking
-    # refs, stash, config).
+    # refs, stash); its program files are denied again below.
     for root in (state, common):
         lines.append(f"(allow file-write* (subpath {quoted(root)}))")
     # Every task's metadata and relaunch records decide its next launch's
@@ -313,9 +463,10 @@ def build(args):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
     # A commondir file makes the primary checkout read every ref from the Git
     # directory it names, and a reftable folder holds every ref once the
-    # writable config selects reftable storage. Both denies cover only these
-    # default locations: an extensions.refStorage path in the writable config
-    # still sends ref reads to a folder this profile does not name.
+    # config selects reftable storage. Both denies cover only these default
+    # locations; the config, which could select reftable storage or name
+    # another ref folder through an extensions.refStorage path, is denied with
+    # the program files below.
     lines.append(f"(deny file-write* (literal {quoted(Path(common) / 'commondir')}))")
     lines.append(f"(deny file-write* (subpath {quoted(Path(common) / 'reftable')}))")
     # Other tasks' state records and temp roots: /tmp/fm-<id>, its launch
@@ -372,9 +523,16 @@ def build(args):
     lines += [f"(allow file-write* {item})" for item in runtime]
     lines += [f"(allow file-write-create {item})" for item in created]
     lines += [f"(deny file-write* {item})" for item in harness_protected]
+    # Program files of the shared Git directory (git_program_paths) come after
+    # every grant that reaches them: the shared Git directory, this worktree's
+    # own Git directory and the task's own roots. This task's Git hooks and
+    # fetch.prune reach the worker as GIT_CONFIG entries set by fm-spawn.sh, so
+    # no Git config file is written for the launch.
+    lines += [f"(deny file-write* (literal {quoted(path)}))" for path in program_files]
+    lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in program_folders]
     # A protected folder, a folder holding protected entries, and every folder
     # above them refuse rename and deletion; creating children stays allowed.
-    anchors = deny + git_shared + claude_children + [state, common, str(gates), home + "/tmp", claude_tmp]
+    anchors = deny + git_shared + program_files + program_folders + claude_children + [state, common, str(gates), home + "/tmp", claude_tmp]
     fixed = []
     for anchor in anchors:
         path = Path(anchor)

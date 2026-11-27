@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -154,6 +155,136 @@ def refused(path):
     return False
 
 
+def program_refused(path):
+    """True only when an append to an existing Git program file was refused and left it unchanged.
+
+    The appended line is a comment, so the unconfined control leaves every
+    config file valid for the Git commands that follow it.
+    """
+    path = Path(path)
+    before = path.read_bytes()
+    try:
+        with path.open("a") as stream:
+            stream.write("\n# fixture write\n")
+    except PermissionError:
+        return path.read_bytes() == before
+    return False
+
+
+def program_create_refused(path):
+    """True only when creating a new Git program file, and any folder above it, was refused."""
+    path = Path(path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("x") as stream:
+            stream.write("# fixture write\n")
+    except PermissionError:
+        return not path.exists()
+    return False
+
+
+def rename_over_refused(target, prepared):
+    """True only when renaming a prepared file over TARGET was refused and left it unchanged."""
+    target, prepared = Path(target), Path(prepared)
+    before = target.read_bytes()
+    prepared.write_bytes(before + b"\n# prepared\n")
+    try:
+        os.replace(prepared, target)
+    except PermissionError:
+        prepared.unlink()
+        return target.read_bytes() == before
+    return False
+
+
+def link_create_refused(target, alias):
+    """True only when making a new hard link to TARGET was refused."""
+    alias = Path(alias)
+    try:
+        os.link(target, alias)
+    except PermissionError:
+        return not alias.exists()
+    return False
+
+
+def rename_into_place_refused(target, prepared):
+    """True only when moving a prepared folder to the absent TARGET was refused."""
+    target, prepared = Path(target), Path(prepared)
+    write(prepared / "probe", "probe::fixture\n")
+    try:
+        prepared.rename(target)
+    except PermissionError:
+        shutil.rmtree(prepared)
+        return not os.path.lexists(target)
+    return False
+
+
+def link_replace_refused(link):
+    """True only when removing the symbolic link LINK, to put a file of the worker's own there, was refused."""
+    link = Path(link)
+    try:
+        link.unlink()
+    except PermissionError:
+        return link.is_symlink()
+    link.write_text("# replaced\n")
+    return False
+
+
+def folder_link_replace_refused(link, opened):
+    """True only when replacing the folder link LINK by a folder of the worker's own, holding OPENED, was refused.
+
+    A refused create leaves the worker's folder in the link's place; the
+    caller puts the link back outside any profile.
+    """
+    link, opened = Path(link), Path(opened)
+    try:
+        link.unlink()
+    except PermissionError:
+        return link.is_symlink()
+    try:
+        link.mkdir()
+        with opened.open("x") as stream:
+            stream.write("# fixture write\n")
+    except PermissionError:
+        return not opened.exists()
+    return False
+
+
+def move_edit_back_refused(protected, anchor, moved):
+    """True only when moving the folder ANCHOR to MOVED, to edit PROTECTED below it there and move it back, was refused.
+
+    The verdict is the first move: once it lands, the program file has left
+    its name. The edit and the move back then show what a worker gains.
+    """
+    protected, anchor, moved = Path(protected), Path(anchor), Path(moved)
+    before = protected.read_bytes()
+    try:
+        anchor.rename(moved)
+    except PermissionError:
+        return anchor.is_dir() and protected.read_bytes() == before
+    try:
+        with (moved / protected.relative_to(anchor)).open("a") as stream:
+            stream.write("\n# fixture write\n")
+        moved.rename(anchor)
+    except OSError:
+        pass  # the caller puts the folder back
+    return False
+
+
+def tracking_checkout_clean(worktree):
+    """True only when starting the task's branch from a remote-tracking ref exits 0, records no upstream and tries no config write."""
+    tip = git("-C", worktree, "rev-parse", "HEAD").stdout.strip()
+    result = git("-C", worktree, "checkout", "-B", "fm/task", "no-mistakes/fm/task")
+    clean = (result.returncode == 0 and "could not write config file" not in result.stderr
+             and git("-C", worktree, "config", "--get", "branch.fm/task.remote").returncode == 1)
+    git("-C", worktree, "-c", "branch.autoSetupMerge=false", "checkout", "-B", "fm/task", tip)
+    return clean
+
+
+CASES = {"program": program_refused, "tracking-checkout": tracking_checkout_clean, "create": program_create_refused, "rename-over": rename_over_refused,
+         "link-create": link_create_refused, "rename-into-place": rename_into_place_refused, "link-replace": link_replace_refused,
+         "folder-link-replace": folder_link_replace_refused, "move-edit-back": move_edit_back_refused}
+
+
 def writable(path):
     path = Path(path)
     try:
@@ -227,12 +358,24 @@ def child(manifest):
     results["own-git-commit"] = True
     # The gate push runs receive-pack and the gate hooks inside this process tree.
     head = git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip()
-    push = git("-C", str(worktree), "push", "-u", "no-mistakes", "fm/task")
+    push = git("-C", str(worktree), "push", "no-mistakes", "fm/task")
     daemon_log = own_gate / "fixture-daemon.log"
     results["gate-push"] = (push.returncode == 0
                             and git("--git-dir", str(own_gate), "rev-parse", "refs/heads/fm/task").stdout.strip() == head
                             and daemon_log.exists() and daemon_log.read_text().split() == ["admit-push", "notify-push"])
-    results["push-upstream"] = git("-C", str(worktree), "config", "branch.fm/task.remote").stdout.strip() == "no-mistakes"
+    # An upstream is recorded in the shared config, which the profile refuses;
+    # the push itself has already landed. Git's exit status and message for the
+    # refused record are printed, not judged.
+    config = Path(manifest["git_common"]) / "config"
+    config_before = config.read_bytes()
+    upstream = git("-C", str(worktree), "push", "-u", "no-mistakes", "fm/task")
+    results["g2"] = {"push -u": {"exit": upstream.returncode, "stderr": upstream.stderr.strip().splitlines()[-3:]}}
+    results["refused-push-upstream-config"] = (config.read_bytes() == config_before
+                                               and git("-C", str(worktree), "config", "--get", "branch.fm/task.remote").returncode == 1)
+    # Configuration reads the worker's own Git work relies on: the shared
+    # config, and this worktree's own config.worktree written before the launch.
+    results["local-config-read"] = git("-C", str(worktree), "config", "--local", "--get", "remote.no-mistakes.url").stdout.strip() == str(own_gate)
+    results["worktree-config-read"] = git("-C", str(worktree), "config", "--get", "fixture.own").stdout.strip() == "1"
     # The gate deleted fm/gone, whose remote-tracking ref is packed, and the
     # repository asks fetch to prune. Pruning it needs a packed-refs rewrite.
     packed_refs = Path(manifest["packed_refs"])
@@ -246,6 +389,8 @@ def child(manifest):
     fetch = git("-C", str(worktree), "fetch", "no-mistakes")
     results["fetch"] = (fetch.returncode == 0 and git("-C", str(worktree), "rev-parse", "refs/remotes/no-mistakes/fm/task").returncode == 0
                         and resolves(gone, manifest["forged_sha"]))
+    results["g2"]["fetch"] = {"exit": fetch.returncode, "stderr": fetch.stderr.strip().splitlines()[-3:]}
+    results.update(ordinary_git(manifest, worktree, results["g2"]))
     pruned = git("-C", str(worktree), "fetch", "--prune", "no-mistakes")
     results["refused-fetch-prune-packed"] = (pruned.returncode == 1 and f"could not delete reference {gone}: {refusal}" in pruned.stderr
                                              and resolves(gone, manifest["forged_sha"]) and packed_refs.read_bytes() == packed_before)
@@ -293,6 +438,7 @@ def child(manifest):
                                                    and git("-C", str(worktree), "rev-parse", "refs/heads/" + name).stdout.strip() == base)
         results[f"archive-own-{label}-update"] = moved.returncode == 0 and reflog[:2] == [base, head]
         deleted = git("-C", str(worktree), "branch", "-D", name)
+        results["g2"][f"branch -D own archive ({label})"] = {"exit": deleted.returncode, "stderr": deleted.stderr.strip().splitlines()[-3:]}
         results[f"archive-own-{label}-delete"] = deleted.returncode == 0 and not ref_exists(name)
     for label, name in (("other-task", "archive/other-submitted-0123abcd"),
                         ("extending-id", "archive/task-2-submitted-0123abcd"),
@@ -594,6 +740,20 @@ console.log(JSON.stringify({ foreignDenied, filesystemOwner }));
         results["refused-" + name] = refused(path)
     for name, path in manifest["writable"].items():
         results[name] = writable(path)
+    # The shared config includes /dev/null; the profile must not deny it.
+    results["dev-null-writable"] = writable("/dev/null")
+    # Every shared Git file that can name a program a Git command outside the
+    # profile runs, one case per deny: a write by its name, by another
+    # spelling the volume folds into it, through a symbolic link to its real
+    # path, a new file in its folder, a rename over it, a new hard link to it,
+    # a prepared folder moved into place where none exists, a symbolic link
+    # replaced by a file of the worker's own, and a folder above one moved away.
+    for case in manifest["git_cases"]:
+        results["refused-" + case["name"]] = CASES[case["kind"]](*case["args"])
+        for alias in case["cleanup"]:
+            # The unconfined control leaves no alias for a later build to refuse.
+            if case["kind"] == "link-create" and os.path.lexists(alias):
+                os.unlink(alias)
     # The transcript container holds other sessions' transcripts: moving it to
     # a writable place must fail while this session's own transcript writes.
     container = manifest.get("transcript_container")
@@ -611,6 +771,78 @@ console.log(JSON.stringify({ foreignDenied, filesystemOwner }));
         results["refused-rename-" + name] = rename_refused(path)
     results["identity"] = pid_identity(manifest["repo"], manifest["identity_pid"], Path(os.environ["TMPDIR"]) / "identity-state")
     print(json.dumps(results, sort_keys=True))
+    return results
+
+
+def ordinary_git(manifest, worktree, table):
+    """The task's ordinary Git work, each command's exit status kept in TABLE.
+
+    Commit runs under the core.hooksPath entry the launch environment carries,
+    so the task's own hook runs. A branch the task creates from a
+    remote-tracking ref asks Git to record an upstream in the shared config;
+    it runs once as Git does by default and once with branch.autoSetupMerge
+    off, and both outcomes are printed, not judged.
+    """
+    identity = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid"]
+
+    def run(label, *args):
+        result = git("-C", str(worktree), *args)
+        table[label] = {"exit": result.returncode, "stderr": result.stderr.strip().splitlines()[-3:]}
+        return result
+
+    def on_task_branch():
+        return git("-C", str(worktree), "symbolic-ref", "HEAD").stdout.strip() == "refs/heads/fm/task"
+
+    results = {}
+    (worktree / "g2-file").write_text("ordinary\n")
+    status = run("status", "status", "--porcelain")
+    results["g2-status"] = status.returncode == 0 and "?? g2-file" in status.stdout.splitlines()
+    added = run("add", "add", "g2-file")
+    marker = Path(manifest["g2_hook_marker"])
+    marker.unlink(missing_ok=True)
+    committed = run("commit", *identity, "commit", "-m", "g2 ordinary")
+    results["g2-add-commit"] = (added.returncode == 0 and committed.returncode == 0
+                                and git("-C", str(worktree), "log", "-1", "--format=%s").stdout.strip() == "g2 ordinary")
+    results["g2-launch-hook-ran"] = marker.exists() and marker.read_text() == "ran\n"
+    tip = git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip()
+    detached = run("checkout --detach", "checkout", "--detach")
+    dropped = run("branch -D own branch", "branch", "-D", "fm/task")
+    created = run("checkout -b own branch", "checkout", "-b", "fm/task")
+    results["g2-checkout-b"] = (detached.returncode == 0 and dropped.returncode == 0 and created.returncode == 0
+                                and on_task_branch() and git("-C", str(worktree), "rev-parse", "fm/task").stdout.strip() == tip)
+    listed = run("branch --list", "branch", "--list", "fm/*")
+    results["g2-branch-list"] = listed.returncode == 0 and "* fm/task" in listed.stdout.splitlines()
+    # The launch environment carries branch.autoSetupMerge=false, so starting
+    # the task's branch from a remote-tracking ref records no upstream and
+    # tries no config write; Git's own default, true, is printed beside it.
+    tracking = "checkout -B own branch from remote-tracking ref"
+    for label, extra in ((tracking, []),
+                         ("checkout -B own branch from remote-tracking ref, Git's default branch.autoSetupMerge=true",
+                          ["-c", "branch.autoSetupMerge=true"])):
+        run(label, *extra, "checkout", "-B", "fm/task", "no-mistakes/fm/task")
+        table[label].update(on_task_branch=on_task_branch(),
+                            at_remote=git("-C", str(worktree), "rev-parse", "fm/task").stdout.strip()
+                            == git("-C", str(worktree), "rev-parse", "no-mistakes/fm/task").stdout.strip(),
+                            upstream=git("-C", str(worktree), "config", "--get", "branch.fm/task.remote").stdout.strip())
+        if label == tracking:
+            row = table[label]
+            results["g2-tracking-checkout-clean"] = (row["exit"] == 0 and row["on_task_branch"] and row["at_remote"] and row["upstream"] == ""
+                                                     and not any("could not write config" in line for line in row["stderr"]))
+        if extra:
+            git("-C", str(worktree), "config", "--unset", "branch.fm/task.remote")  # the unconfined control records one
+            git("-C", str(worktree), "config", "--unset", "branch.fm/task.merge")
+        git("-C", str(worktree), "-c", "branch.autoSetupMerge=false", "checkout", "-B", "fm/task", tip)
+    results["g2-restored"] = on_task_branch() and git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip() == tip
+    # Commands whose whole purpose is a shared config write, printed with
+    # whether the value was recorded; the unconfined control removes it again.
+    for label, args, key, undo in (("remote add", ["remote", "add", "g2probe", manifest["own_gate"]], "remote.g2probe.url",
+                                    ["remote", "remove", "g2probe"]),
+                                   ("config --local write", ["config", "--local", "g2.probe", "1"], "g2.probe",
+                                    ["config", "--local", "--unset", "g2.probe"])):
+        run(label, *args)
+        table[label]["recorded"] = git("-C", str(worktree), "config", "--get", key).returncode == 0
+        if table[label]["recorded"]:
+            git("-C", str(worktree), *undo)
     return results
 
 
@@ -683,10 +915,9 @@ def packed_refs_results(manifest, primary, worktree):
     commondir = packed.with_name("commondir")
     results["refused-commondir"] = unchanged(lambda: commondir.write_text(str(forged_common) + "\n"), restore=False)
     commondir.unlink(missing_ok=True)
-    # The shared config is writable, so it can select reftable storage; a
-    # reftable folder built elsewhere would then hold every ref Git reads.
-    # This covers only the payload-less value; a reftable:///<path> or
-    # files://<path> value is not refused.
+    # The shared config could select reftable storage, and a reftable folder
+    # built elsewhere would then hold every ref Git reads. Both the config
+    # write and the planted folder are refused.
     forged_reftable = scratch / "forged-reftable.git"
     assert git("init", "-q", "--bare", "--ref-format=reftable", str(forged_reftable)).returncode == 0
     (forged_reftable / "objects/info/alternates").write_text(str(Path(primary) / ".git/objects") + "\n")
@@ -701,10 +932,13 @@ def packed_refs_results(manifest, primary, worktree):
     except PermissionError:
         planted = False
     switched_sha = resolved()
-    config.write_bytes(saved)
+    try:
+        config.write_bytes(saved)  # the unconfined control puts the config back
+    except PermissionError:
+        pass
     shutil.rmtree(reftable, ignore_errors=True)
-    results["refused-reftable-switch"] = (switched and not planted and switched_sha != manifest["forged_sha"]
-                                          and resolved() == manifest["packed_sha"])
+    results["refused-reftable-switch"] = (not switched and not planted and switched_sha != manifest["forged_sha"]
+                                          and config.read_bytes() == saved and resolved() == manifest["packed_sha"])
     # A new hard link to packed-refs would be a second name for the file. The
     # worktree and a task-owned ~/tmp entry are both places the worker writes.
     for key, link in (("refused-packed-refs-link-create", Path(manifest["worktree"]) / "packed-refs-alias"),
@@ -729,6 +963,149 @@ def pid_identity(repo, pid, state):
     """The shared process identity, read through bin/fm-wake-lib.sh."""
     return subprocess.run(["bash", "-c", '. "$0/bin/fm-wake-lib.sh"; fm_pid_identity "$1"', repo, str(pid)],
                           env=dict(os.environ, FM_STATE_OVERRIDE=str(state)), capture_output=True, text=True).stdout
+
+
+def git_program_fixture(common, worktree, user_home, base):
+    """Lay out every Git program file the profile must deny, and one case per deny.
+
+    Each case names the rule whose removal must turn it red: the literal deny
+    of a file or the subpath deny of a folder, at the path the builder derives.
+    """
+    gitdir = Path(git("-C", str(worktree), "rev-parse", "--absolute-git-dir").stdout.strip())
+    included, conditional = user_home / "git-include/shared.gitconfig", user_home / "git-include/conditional.gitconfig"
+    conditional_real, hooks_path = user_home / "git-real/conditional.gitconfig", user_home / "task-hooks"
+    hook_script = user_home / "hook-scripts/pre-push"
+    write(included, "[fixture]\n\tincluded = 1\n")
+    write(conditional_real, "[fixture]\n\tconditional = 1\n")
+    conditional.symlink_to(conditional_real)
+    write(common / "config.worktree", "[fixture]\n\tmain = 1\n")
+    # An absolute hooks path in the worktree's own config is the hooks folder a
+    # Git command run in that worktree uses.
+    write(gitdir / "config.worktree", f"[fixture]\n\town = 1\n[core]\n\thooksPath = {hooks_path}\n")
+    write(hooks_path / "post-checkout", "#!/bin/sh\n")
+    write(common / "hooks/post-checkout", "#!/bin/sh\n")
+    write(hook_script, "#!/bin/sh\n")
+    (common / "hooks/pre-push").symlink_to(hook_script)
+    write(common / "modules/sub/config", "[core]\n\tbare = false\n")
+    # A submodule's Git directory holds its HEAD beside its object store; a
+    # symbolic link inside that store is denied at its real path too.
+    write(common / "modules/sub/HEAD", "ref: refs/heads/main\n")
+    object_link_target = user_home / "object-link-target/target"
+    write(object_link_target, "fixture\n")
+    (common / "modules/sub/objects/info").mkdir(parents=True)
+    (common / "modules/sub/objects/info/fixture-link").symlink_to(object_link_target)
+    # A folder holding its own HEAD inside that store is a Git directory
+    # again, outside the store, so a second hard link to its config still
+    # stops the build (program_aliases).
+    write(common / "modules/sub/objects/nested/HEAD", "ref: refs/heads/main\n")
+    write(common / "modules/sub/objects/nested/config", "[core]\n\tbare = false\n")
+    # The Git directory of a submodule named objects is no object store: its
+    # hooks are walked like any other, so a hook link there is denied at its
+    # real path.
+    module_hook_script = user_home / "module-hook-scripts/pre-commit"
+    write(module_hook_script, "#!/bin/sh\n")
+    write(common / "modules/objects/HEAD", "ref: refs/heads/main\n")
+    write(common / "modules/objects/config", "[core]\n\tbare = false\n")
+    (common / "modules/objects/hooks").mkdir(parents=True)
+    (common / "modules/objects/hooks/pre-commit").symlink_to(module_hook_script)
+    write(common / "remotes/probe", "URL: probe::fixture\n")
+    # The user's own Git config, which every Git command of this user reads.
+    user_config, user_xdg_config = user_home / ".gitconfig", user_home / ".config/git/config"
+    write(user_config, "[fixture]\n\tuser = 1\n")
+    write(user_xdg_config, "[fixture]\n\txdg = 1\n")
+    # Git's compiled-in system file, which the builder asks `git var
+    # GIT_CONFIG_SYSTEM` for, opened through a folder link as /etc/gitconfig
+    # is through /etc -> private/etc. The host's own system file is
+    # root-owned, so a stand-in git on the builder's PATH alone names this
+    # file there and hands every other command to Git (build_profile).
+    system_real, system_config = user_home / "system/private/etc/gitconfig", user_home / "system/etc/gitconfig"
+    write(system_real, "[fixture]\n\tsystem = 1\n")
+    system_config.parent.symlink_to("private/etc", target_is_directory=True)
+    stand_in = base / "git-var-stand-in/git"
+    write(stand_in, "#!/bin/sh\n"
+                    "if [ \"$#\" -eq 2 ] && [ \"$1\" = var ] && [ \"$2\" = GIT_CONFIG_SYSTEM ]; then\n"
+                    f"  printf '%s\\n' {shlex.quote(str(system_config))}\n"
+                    "  exit 0\n"
+                    "fi\n"
+                    f"exec {shlex.quote(shutil.which('git'))} \"$@\"\n")
+    stand_in.chmod(0o755)
+    for key, value in (("extensions.worktreeConfig", "true"), ("include.path", str(included)),
+                       (f"includeIf.gitdir:{common}/.path", str(conditional))):
+        assert git("-C", str(common.parent), "config", key, value).returncode == 0
+    # An include of /dev/null names no file the profile may deny.
+    assert git("-C", str(common.parent), "config", "--add", "include.path", "/dev/null").returncode == 0
+    probe = base / "CaseProbe"
+    probe.mkdir()
+    folds = (base / "caseprobe").is_dir()
+    probe.rmdir()
+    literal, subpath = "literal", "subpath"
+    cases = [
+        ("git-config", "program", [common / "config"], literal, common / "config", []),
+        ("git-config-rename-over", "rename-over", [common / "config", worktree / "prepared-config"], literal, common / "config", []),
+        ("git-config-link-create", "link-create", [common / "config", worktree / "config-alias"], literal, common / "config",
+         [worktree / "config-alias"]),
+        ("git-config-worktree", "program", [common / "config.worktree"], literal, common / "config.worktree", []),
+        ("git-own-config-worktree", "program", [gitdir / "config.worktree"], literal, gitdir / "config.worktree", []),
+        ("git-include", "program", [included], literal, included, []),
+        ("git-user-config", "program", [user_config], literal, user_config, []),
+        ("git-user-xdg-config", "program", [user_xdg_config], literal, user_xdg_config, []),
+        # Written by the name Git opens, through the folder link; the kernel
+        # judges the write at the real path.
+        ("git-system-config", "program", [system_config], literal, system_real, []),
+        # A write through the link name is judged at the link's real path.
+        ("git-include-through-link", "program", [conditional], literal, conditional_real, []),
+        ("git-include-link-replace", "link-replace", [conditional], literal, conditional, []),
+        ("git-hook", "program", [common / "hooks/post-checkout"], subpath, common / "hooks", []),
+        ("git-hook-new", "create", [common / "hooks/fixture-new"], subpath, common / "hooks", [common / "hooks/fixture-new"]),
+        ("git-hook-link-target", "program", [common / "hooks/pre-push"], literal, hook_script, []),
+        ("git-hooks-path-hook", "program", [hooks_path / "post-checkout"], subpath, hooks_path, []),
+        ("git-hooks-path-new", "create", [hooks_path / "fixture-new"], subpath, hooks_path, [hooks_path / "fixture-new"]),
+        ("git-module-config", "program", [common / "modules/sub/config"], subpath, common / "modules", []),
+        ("git-module-new", "create", [common / "modules/new/config"], subpath, common / "modules", [common / "modules/new"]),
+        ("git-module-objects-hook-link-target", "program", [common / "modules/objects/hooks/pre-commit"], literal, module_hook_script, []),
+        ("git-object-store-link-target", "program", [common / "modules/sub/objects/info/fixture-link"], literal, object_link_target, []),
+        ("git-remote-file", "program", [common / "remotes/probe"], subpath, common / "remotes", []),
+        ("git-remote-new", "create", [common / "remotes/new"], subpath, common / "remotes", [common / "remotes/new"]),
+        ("git-branches-rename-into-place", "rename-into-place", [common / "branches", worktree / "prepared-branches"],
+         subpath, common / "branches", [common / "branches", worktree / "prepared-branches"]),
+    ]
+    # Every folder the profile anchors above a program path planted here,
+    # strictly below the user's home or the shared Git directory, whose own
+    # denies are older and cover other entries too: moving the folder to a
+    # writable place, to edit the program file there and move it back, must be
+    # refused. A folder a subpath deny also covers is refused by that deny as
+    # well, so mutants pairs the two rules for it ("pair"); the system file's
+    # folder link has its own block there.
+    planted = [common / "config.worktree", gitdir / "config.worktree", included, conditional_real, user_config, user_xdg_config,
+               system_real, hook_script, module_hook_script, object_link_target]
+    covered = {common / "hooks": common / "hooks/post-checkout", common / "modules": common / "modules/sub/config",
+               common / "remotes": common / "remotes/probe", hooks_path: hooks_path / "post-checkout",
+               common / "worktrees": gitdir / "config.worktree"}
+    moves = base / "anchor-moves"
+    moves.mkdir()
+    anchors = {}
+    for folder in list(covered) + [parent for path in planted + [system_config] for parent in path.parents]:
+        if (folder in anchors or folder in (user_home, common) or folder.is_symlink()
+                or not (user_home in folder.parents or common in folder.parents)):
+            continue
+        anchors[folder] = covered.get(folder) or next(path for path in planted if folder in path.parents)
+    pairs = set()
+    for folder, protected in anchors.items():
+        root, prefix = (common, "git") if common in folder.parents else (user_home, "home")
+        slug = prefix + "-" + str(folder.relative_to(root)).replace("/", "-")
+        cases.append((f"git-anchor-{slug}", "move-edit-back", [protected, folder, moves / slug], literal, folder, []))
+        if folder in covered:
+            pairs.add(f"git-anchor-{slug}")
+    if folds:
+        # This volume folds case, so Git reads these spellings as the real names.
+        cases += [("git-config-other-spelling", "program", [common / "CONFIG"], literal, common / "config", []),
+                  ("git-branches-other-spelling", "create", [common / "BRANCHES/fixture"], subpath, common / "branches",
+                   [common / "BRANCHES"])]
+    return [{"name": name, "kind": kind, "args": [str(arg) for arg in args], "rule": rule, "path": str(path),
+             "cleanup": [str(entry) for entry in cleanup],
+             "relink": [str(conditional), str(conditional_real)] if kind == "link-replace" else None,
+             "pair": str(path) if name in pairs else None}
+            for name, kind, args, rule, path, cleanup in cases]
 
 
 def write(path, text="original"):
@@ -781,6 +1158,7 @@ def fixture(repo, base, harness, user_home, other):
     # Stands in for a host's global fetch.prune=true, which GIT_CONFIG_GLOBAL
     # hides here; the launch's own GIT_CONFIG entry outranks both.
     assert git("-C", str(project), "config", "fetch.prune", "true").returncode == 0
+    git_cases = git_program_fixture(project / ".git", worktree, user_home, base)
     own_gate = nm / "repos" / (hashlib.sha256(str(project).encode()).hexdigest()[:12] + ".git")
     other_gate = nm / "repos/000000000000.git"
     fake_client = base / "bin/no-mistakes"
@@ -820,6 +1198,10 @@ def fixture(repo, base, harness, user_home, other):
     write(state / "task.inbox/001.msg", "message")
     (state / "task.inbox/handled").mkdir()
     (state / "task.git-hooks").mkdir()
+    # The task's own hook, which the launch environment's core.hooksPath names.
+    g2_hook_marker = data / "task/g2-post-commit"
+    write(state / "task.git-hooks/post-commit", f"#!/bin/sh\nprintf 'ran\\n' >> '{g2_hook_marker}'\n")
+    (state / "task.git-hooks/post-commit").chmod(0o755)
     subprocess.run(["bash", str(repo / "bin/fm-busy-event.sh"), "arm", str(state), "task"], check=True, capture_output=True)
     write(home / "README")
     write(home / "config/crew-harness")
@@ -848,7 +1230,8 @@ def fixture(repo, base, harness, user_home, other):
     renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
                "state": state, "claude-temp-session": claude_tmp / f"base.{other}",
                "git-refs": project / ".git/refs", "git-worktrees": project / ".git/worktrees",
-               "git-packed-refs": project / ".git/packed-refs"}
+               "git-packed-refs": project / ".git/packed-refs", "git-hooks": project / ".git/hooks",
+               "git-modules": project / ".git/modules", "git-remotes": project / ".git/remotes"}
     slug = re.sub(r"[^A-Za-z0-9]", "-", str(worktree))
     claude_code = (".claude/CLAUDE.md", ".claude/rules/rule.md", ".claude/agents/agent.md", ".claude/commands/command.md",
                    ".claude/skills/skill/SKILL.md", ".claude/plugins/plugin.json", ".claude/hooks/hook.sh", ".claude/settings.json",
@@ -893,15 +1276,25 @@ def fixture(repo, base, harness, user_home, other):
             "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp), "late": [str(path) for path in late.values()],
             "late_tasks": [str(state / "task-late.meta"), str(state / "task-pipeline.meta")],
             "transcript_container": str(user_home / f".claude/projects/{slug}") if harness == "claude" else "",
+            "git_common": str(project / ".git"), "git_cases": git_cases, "g2_hook_marker": str(g2_hook_marker),
+            "git_var_stand_in": str(base / "git-var-stand-in"),
             "protected": {name: str(path) for name, path in protected.items()},
             "writable": {name: str(path) for name, path in writable_paths.items()},
             "renamed": {name: str(path) for name, path in renamed.items()}}
 
 
-def launch_git_env(env):
-    """The child's environment with the GIT_CONFIG entry fm-spawn.sh appends to a confined launch."""
+def launch_git_env(env, hooks, auto_setup_merge=True):
+    """The child's environment with the GIT_CONFIG entries fm-spawn.sh sets for a confined launch.
+
+    AUTO_SETUP_MERGE=False leaves out the branch.autoSetupMerge=false entry,
+    for the mutant that shows the tracking-checkout case depends on it.
+    """
     count = int(env.get("GIT_CONFIG_COUNT") or 0)
-    return dict(env, GIT_CONFIG_COUNT=str(count + 1), **{f"GIT_CONFIG_KEY_{count}": "fetch.prune", f"GIT_CONFIG_VALUE_{count}": "false"})
+    entries = [("core.hooksPath", str(hooks)), ("fetch.prune", "false")] + ([("branch.autoSetupMerge", "false")] if auto_setup_merge else [])
+    numbered = {}
+    for index, (key, value) in enumerate(entries, count):
+        numbered.update({f"GIT_CONFIG_KEY_{index}": key, f"GIT_CONFIG_VALUE_{index}": value})
+    return dict(env, GIT_CONFIG_COUNT=str(count + len(entries)), **numbered)
 
 
 def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktree=None):
@@ -914,7 +1307,10 @@ def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktre
         command += ["--claude-session", OWN_SESSION]
     if agent_dir:
         command += ["--agent-dir", str(agent_dir)]
-    subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"]), check=True, capture_output=True, text=True)
+    # Only the builder runs with the git_program_fixture stand-in first on its
+    # PATH; the worker's own Git commands never see it.
+    path = manifest["git_var_stand_in"] + os.pathsep + env.get("PATH", os.defpath)
+    subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"], PATH=path), check=True, capture_output=True, text=True)
 
 
 def invalid_project_source(repo, manifest, base, env):
@@ -1000,6 +1396,165 @@ def hardlink_alias(repo, manifest, base, harness, env):
     assert clean.exists(), "the build still refuses after every alias was removed"
     print(f"{harness} aliases: " + ", ".join([*aliases, *symlinks]) + " refused naming path and link count or target;"
           " symbolic-link HEAD and clean builds still work")
+
+
+def program_aliases(repo, manifest, base, harness, env):
+    # A second hard link to a Git program file has no path the profile can
+    # deny, so the build must refuse while one exists, naming the file and its
+    # link count, and publish no profile. A hard-linked file inside a Git
+    # object store, the objects folder beside a submodule Git directory's HEAD,
+    # names no program and leaves the build working; the Git directory of a
+    # submodule named objects, and a folder holding its own HEAD inside a
+    # store, are no object store, so their files still count.
+    common = Path(manifest["git_common"])
+    gitdir = Path(git("-C", manifest["worktree"], "rev-parse", "--absolute-git-dir").stdout.strip())
+    user_home = Path(env["HOME"])
+    targets = {"config": common / "config", "config-worktree": common / "config.worktree", "own-config-worktree": gitdir / "config.worktree",
+               "include": user_home / "git-include/shared.gitconfig", "include-real-path": user_home / "git-real/conditional.gitconfig",
+               "user-config": user_home / ".gitconfig", "user-xdg-config": user_home / ".config/git/config",
+               "system-config": user_home / "system/private/etc/gitconfig",
+               "hook": common / "hooks/post-checkout", "hook-link-target": user_home / "hook-scripts/pre-push",
+               "hooks-path-hook": user_home / "task-hooks/post-checkout", "module-config": common / "modules/sub/config",
+               "module-named-objects-config": common / "modules/objects/config",
+               "module-named-objects-hook-link-target": user_home / "module-hook-scripts/pre-commit",
+               "object-store-link-target": user_home / "object-link-target/target",
+               "gitdir-in-object-store-config": common / "modules/sub/objects/nested/config",
+               "remote-file": common / "remotes/probe"}
+    for name, target in targets.items():
+        profile, alias = base / f"program-alias-{name}-{harness}.sb", Path(manifest["user_tmp"]) / f"fm-task-program-alias-{name}"
+        alias.parent.mkdir(parents=True, exist_ok=True)
+        os.link(target, alias)
+        try:
+            build_profile(repo, manifest, harness, profile, env)
+        except subprocess.CalledProcessError as error:
+            assert error.returncode == 1 and f"{target} (2 links)" in error.stderr, (name, error.stderr)
+            assert not profile.exists(), f"{name}: a refused build published a profile"
+        else:
+            raise AssertionError(f"{harness}: a profile was built while {target} had a second link at {alias}")
+        finally:
+            alias.unlink()
+    pack, source = common / "modules/sub/objects/pack", Path(manifest["user_tmp"]) / "fm-task-object-source"
+    pack.mkdir(parents=True)
+    write(source)
+    os.link(source, pack / "linked-object")
+    try:
+        build_profile(repo, manifest, harness, base / f"program-alias-objects-{harness}.sb", env)
+    finally:
+        shutil.rmtree(pack)
+        source.unlink()
+    clean = base / f"program-alias-clean-{harness}.sb"
+    build_profile(repo, manifest, harness, clean, env)
+    assert clean.exists(), "the build still refuses after every program-file alias was removed"
+    print(f"{harness} program-file aliases: " + ", ".join(targets) + " refused naming path and link count;"
+          " a hard-linked object-store file and clean builds still work")
+
+
+def mutants(repo, manifest, base, harness, env, launch_env):
+    """Remove each Git program deny from the built profile and run its case.
+
+    The case must turn red: the write it tries now lands. Returns every
+    mutant whose case stayed refused, for the run to fail on after all of them
+    have printed; a mutant that finds no rule to remove fails at once. So
+    every deny is shown to be the one rule that stops its case, or, where a
+    second rule also stops it, to stop it alone.
+    """
+    profile = base / f"mutant-head-{harness}.sb"
+    build_profile(repo, manifest, harness, profile, env)
+    lines = profile.read_text().splitlines()
+    survived = []
+
+    def run_without(case, removed, label):
+        """Run CASE under the profile less the REMOVED rules, then put the fixture back outside any profile."""
+        for rule in removed:
+            assert lines.count(rule) == 1, (case["name"], rule, lines.count(rule))
+        mutant = base / f"mutant-{case['name']}{label}-{harness}.sb"
+        mutant.write_text("\n".join(line for line in lines if line not in removed) + "\n")
+        before = {path: Path(path).read_bytes() for path in case["args"][:1] if Path(path).is_file()}
+        run = subprocess.run(["/usr/bin/sandbox-exec", "-f", str(mutant), sys.executable, __file__, "--case", json.dumps(case)],
+                             capture_output=True, text=True, env=launch_env)
+        if case["kind"] == "move-edit-back" and os.path.lexists(case["args"][2]) and not os.path.lexists(case["args"][1]):
+            os.rename(case["args"][2], case["args"][1])
+        for path, data in before.items():
+            Path(path).write_bytes(data)
+        for path in case["cleanup"]:
+            if os.path.isdir(path) and not os.path.islink(path):
+                shutil.rmtree(path)
+            elif os.path.lexists(path):
+                os.unlink(path)
+        if case["relink"]:
+            os.unlink(case["relink"][0])
+            os.symlink(case["relink"][1], case["relink"][0])
+        return run
+
+    for case in manifest["git_cases"]:
+        if case["pair"]:
+            continue
+        rule = f"(deny file-write* ({case['rule']} {json.dumps(case['path'], ensure_ascii=False)}))"
+        run = run_without(case, (rule,), "")
+        landed = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": False})
+        if not landed:
+            survived.append((case["name"], run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
+        print(f"{harness} mutant {case['name']}: removed {rule}; " + ("the case's write landed" if landed else "SURVIVED: the case stayed refused"))
+    # A folder a subpath deny also covers: moving it away is refused by its own
+    # deny and by that subpath deny, each alone, and lands with both removed.
+    for case in (case for case in manifest["git_cases"] if case["pair"]):
+        own = f"(deny file-write* (literal {json.dumps(case['path'], ensure_ascii=False)}))"
+        subpath = f"(deny file-write* (subpath {json.dumps(case['pair'], ensure_ascii=False)}))"
+        for label, removed, expected in (("its own deny removed", (own,), True), ("the subpath deny removed", (subpath,), True),
+                                         ("both removed", (own, subpath), False)):
+            run = run_without(case, removed, "-" + label.replace(" ", "-"))
+            held = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": expected})
+            if not held:
+                survived.append((case["name"] + " " + label, run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
+            print(f"{harness} pair {case['name']}, {label}: " + ("refused" if expected else "landed")
+                  + (" as expected" if held else f" NOT as expected ({run.stdout.strip()})"))
+    # The system file's opened name, as /etc/gitconfig, sits under a folder
+    # link, as /etc -> private/etc, so the kernel judges a write by that name
+    # only once a folder of the worker's own replaces the link. The literal
+    # deny on the link, which every folder above a program file has, refuses
+    # that first, so the opened-name deny is the second of two rules: under the
+    # head profile and with either deny alone removed the replacement stays
+    # refused, and with both removed it lands. A dead link deny would turn the
+    # opened-name-only run red, and a dead opened-name deny the link-only run.
+    system = next(case for case in manifest["git_cases"] if case["name"] == "git-system-config")
+    opened = Path(system["args"][0])
+    link, target = opened.parent, os.readlink(opened.parent)
+    replace = {"kind": "folder-link-replace", "args": [str(link), str(opened)]}
+    link_rule, opened_rule = (f"(deny file-write* (literal {json.dumps(str(path), ensure_ascii=False)}))" for path in (link, opened))
+    for rule in (link_rule, opened_rule):
+        assert lines.count(rule) == 1, ("git-system-config folder link", rule, lines.count(rule))
+    for label, removed, expected in (("head profile", (), True), ("link deny removed", (link_rule,), True),
+                                     ("opened-name deny removed", (opened_rule,), True),
+                                     ("link and opened-name denies removed", (link_rule, opened_rule), False)):
+        mutant = base / f"mutant-git-system-config-folder-link-{label.replace(' ', '-')}-{harness}.sb"
+        mutant.write_text("\n".join(line for line in lines if line not in removed) + "\n")
+        run = subprocess.run(["/usr/bin/sandbox-exec", "-f", str(mutant), sys.executable, __file__, "--case", json.dumps(replace)],
+                             capture_output=True, text=True, env=launch_env)
+        # Put the link back for the next run, outside any profile.
+        if not link.is_symlink():
+            if link.exists():
+                shutil.rmtree(link)
+            link.symlink_to(target, target_is_directory=True)
+        held = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": expected})
+        if not held:
+            survived.append(("git-system-config folder link " + label, run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
+        print(f"{harness} system config folder link replaced, {label}: " + ("refused" if expected else "landed")
+              + (" as expected" if held else f" NOT as expected ({run.stdout.strip()})"))
+    # The launch's branch.autoSetupMerge=false entry, under the unchanged
+    # profile: with it the tracking checkout is clean, and without it Git
+    # tries the refused config write.
+    case = {"kind": "tracking-checkout", "args": [manifest["worktree"]]}
+    for label, environment, expected in (("with the entry", launch_env, True),
+                                         ("mutant without the entry", launch_git_env(env, Path(manifest["home"]) / "state/task.git-hooks",
+                                                                                      auto_setup_merge=False), False)):
+        run = subprocess.run(["/usr/bin/sandbox-exec", "-f", str(profile), sys.executable, __file__, "--case", json.dumps(case)],
+                             capture_output=True, text=True, env=environment)
+        held = run.returncode == 0 and run.stdout.strip() == json.dumps({"refused": expected})
+        if not held:
+            survived.append(("tracking-checkout " + label, run.returncode, run.stdout.strip(), run.stderr.strip()[-400:]))
+        print(f"{harness} tracking checkout {label}: " + ("clean" if expected else "tries the config write")
+              + (" as expected" if held else f" NOT as expected ({run.stdout.strip()})"))
+    return survived
 
 
 def reftable_source(repo, manifest, base, env):
@@ -1148,10 +1703,17 @@ def reader_startup(repo, root):
 if sys.argv[1] == "--child":
     results = child(json.loads(sys.argv[2]))
     sys.exit(0 if all(results.values()) else 1)
+if sys.argv[1] == "--case":
+    case = json.loads(sys.argv[2])
+    print(json.dumps({"refused": CASES[case["kind"]](*case["args"])}))
+    sys.exit(0)
 
 repo = Path(sys.argv[1])
 root = Path(sys.argv[2]).resolve()
 reader_startup(repo, root)
+# Child results and mutants are gathered and judged after both harnesses ran,
+# so one run prints every case, ordinary Git command and mutant.
+failures = []
 for harness in ("claude", "omp"):
     for mode in ("baseline", "confined"):
         base = root / f"{harness}-{mode}"
@@ -1179,7 +1741,8 @@ for harness in ("claude", "omp"):
             remove_archive_folders(manifest)
             command = [sys.executable, __file__, "--child", json.dumps(manifest)]
             invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
-            result = subprocess.run(invocation, capture_output=True, text=True, env=launch_git_env(env))
+            result = subprocess.run(invocation, capture_output=True, text=True,
+                                    env=launch_git_env(env, Path(manifest["home"]) / "state/task.git-hooks"))
             git("-C", manifest["worktree"], "update-ref", "-d", "refs/heads/" + OWN_PACKED_ARCHIVE)
             expected_identity = pid_identity(str(repo), unusual.pid, base / "identity-state")
             unusual.kill()
@@ -1190,7 +1753,10 @@ for harness in ("claude", "omp"):
         if not result.stdout.strip():
             raise AssertionError(f"{harness} {mode}: exit={result.returncode} stderr={result.stderr}")
         actual = json.loads(result.stdout)
+        ordinary = actual.pop("g2")
         print(f"{harness} {mode}: " + json.dumps(actual, sort_keys=True))
+        for command, row in ordinary.items():
+            print(f"{harness} {mode} git work: {command}: " + json.dumps(row, sort_keys=True))
         assert expected_identity and actual.pop("identity") == expected_identity, (harness, mode, expected_identity)
         if harness == "claude":
             fresh = fresh_container(repo, manifest, base, mode, env)
@@ -1203,11 +1769,16 @@ for harness in ("claude", "omp"):
         print(f"{harness} {mode} archive branch file: " + json.dumps(archive_file, sort_keys=True))
         assert archive_file == {"archive-branch-kept": True, "own-archive-created": mode == "baseline"}, (harness, mode, archive_file)
         if mode == "baseline":
-            for name in actual:
-                if name in CONTROL_KEYS or name.startswith("refused-"):
-                    assert actual[name] is False, (harness, mode, name, actual)
+            failures += [(harness, mode, name) for name in actual
+                         if (name in CONTROL_KEYS or name.startswith("refused-")) and actual[name] is not False]
         else:
-            assert result.returncode == 0 and all(actual.values()), (harness, mode, result.stderr, actual)
+            if result.returncode or not all(actual.values()):
+                failures.append((harness, mode, result.returncode, sorted(name for name, value in actual.items() if not value),
+                                 result.stderr.strip()[-2000:]))
             hardlink_alias(repo, manifest, base, harness, env)
+            program_aliases(repo, manifest, base, harness, env)
+            failures += [(harness, "mutant", *survivor) for survivor in
+                         mutants(repo, manifest, base, harness, env, launch_git_env(env, Path(manifest["home"]) / "state/task.git-hooks"))]
             if harness == "claude":
                 reftable_source(repo, manifest, base, env)
+assert not failures, failures
