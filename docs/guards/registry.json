@@ -2523,7 +2523,11 @@
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: the tasktmp sweep for $ID refused and $(if [ -z \"$TASK_ANCHOR_PID\" ]; then printf '%s' \"$TASK_ANCHOR_NOTE\"; else printf 'the refusal was not an unproven holder'; fi), so teardown stops before any endpoint close or signal; every durable task record is kept.\" >&2"
+          "match": "echo \"REFUSED: the tasktmp sweep for $ID refused and $(if [ \"$TASK_ANCHOR_STATE\" != proven ]; then printf '%s' \"$TASK_ANCHOR_NOTE\"; else printf 'the refusal was not an unproven holder'; fi), so teardown stops before any endpoint close or signal; every durable task record is kept.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the endpoint ${T:-<none>} of $1 cannot be closed safely: $TASK_ANCHOR_NOTE. Teardown closes and signals nothing; every durable task record is kept.\" >&2"
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",

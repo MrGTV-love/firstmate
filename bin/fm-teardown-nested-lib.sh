@@ -1554,9 +1554,10 @@ teardown_foreign_procs_retire() {
     fi
     task_process_identity_matches "$pid" "$identity" || continue
     # Right before the signal, the support this target's ownership rests on -
-    # the root process it was proved through - must still be proved the task's
-    # (a group proof expires once its group holds no live chain-proved member).
-    # If it has expired, nothing further is signalled.
+    # the root process it was proved through - must be a chain-proved process
+    # under exactly the pid and birth identity saved with the target. Any other
+    # support (a shared group, or that pid now held by another process) proves
+    # nothing, and nothing further is signalled.
     if [ -z "$anchor_pid" ] || ! task_owned_contains "$anchor_pid" "$anchor_identity"; then
       echo "REFUSED: the proof that process $pid ($identity) belongs to $ID rested on process ${anchor_pid:-<none>}, whose ownership proof has expired; signalling nothing further and preserving the worktree. Every remaining queued process is unproven." >&2
       return 1

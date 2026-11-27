@@ -3116,6 +3116,130 @@ ownership_assert_unsignalled_pool() {  # <case-dir> <pid>
   done
 }
 
+# The one pre-close decision accepts only proofs that cannot expire, so two
+# holders that an expiring proof once let through now refuse before any endpoint
+# is closed, with every process left running:
+#   runner   the secondmate home, returned through Treehouse, holds a process a
+#            stale process-event runner record names: the pid is live but its
+#            claim's recorded birth identity is not that process's (a reused pid);
+#   group    a child worktree holds a process that only shares a process group
+#            with the child pane's chain-proved child, not descending from it.
+test_forced_cleanup_refuses_expiring_proofs_before_any_close() {
+  local shape case_dir home rc holder pane kid out claims i
+  for shape in runner group; do
+    case_dir=$(make_case "forced-expiring-$shape")
+    write_meta "$case_dir" local-only secondmate
+    home="$case_dir/secondmate-home"
+    if [ "$shape" = runner ]; then
+      # The home is a Treehouse-style worktree of the code root, so it is
+      # returned with treehouse return --force.
+      rm "$case_dir/code-root/bin"
+      git init -q "$case_dir/code-root"
+      ln -s "$ROOT/bin" "$case_dir/code-root/bin"
+      git -C "$case_dir/code-root" add bin
+      git -C "$case_dir/code-root" -c user.email=t@t -c user.name=t commit -qm "code root"
+      git -C "$case_dir/code-root" worktree add -q --detach "$home"
+    fi
+    configure_secondmate_with_tmux_children "$case_dir"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+    printf 'fm-task-x1\t%%1\t%s\n' "$$" > "$case_dir/pane-rows"
+    out="$case_dir/fixture.pids"
+    claims="$case_dir/claims"
+    mkdir -p "$claims"
+    if [ "$shape" = runner ]; then
+      # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+      perl -MPOSIX -e '
+        my ($cwd, $out) = @ARGV;
+        my $first = fork(); die "fork" unless defined $first;
+        if ($first) { waitpid($first, 0); exit 0; }
+        POSIX::setsid();
+        my $second = fork(); die "fork" unless defined $second;
+        POSIX::_exit(0) if $second;
+        chdir $cwd or die "chdir";
+        open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+        open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+        exec "sleep", "300";' "$home" "$out"
+      for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+      read -r holder < "$out" || fail "forced-runner: the holder did not start"
+      teardown_fixture_track "$holder" KILL
+      mkdir -p "$home/state/procevent"
+      printf '%s\n' "$holder" > "$home/state/procevent/fixture-runner.runner"
+      # The claim's recorded identity belongs to an earlier process at this pid.
+      printf '%s\n' "$home" "$holder" token1 "lstart=Thu Jan  1 00:00:00 1970" "" "" active > "$claims/fixture-runner.claim"
+    else
+      # The child pane leads its own group, forks a chain-proved child K into
+      # the child worktree, and double-forks H into it: H keeps the group but
+      # descends from no pane.
+      # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+      teardown_fixture_start "$case_dir" KILL perl -e '
+        my ($cwd, $out) = @ARGV;
+        setpgrp(0, 0) or die "setpgrp";
+        $SIG{CHLD} = "IGNORE";
+        my $kid = fork(); die "fork" unless defined $kid;
+        if (!$kid) { chdir $cwd or die "chdir"; exec "sleep", "300"; }
+        my $first = fork(); die "fork" unless defined $first;
+        if (!$first) {
+          my $second = fork(); die "fork" unless defined $second;
+          if ($second) {
+            open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$kid $second\n"; close $fh; rename "$out.tmp", $out or die "rename";
+            exit 0;
+          }
+          chdir $cwd or die "chdir";
+          exec "sleep", "300";
+        }
+        sleep 300 while 1;' "$case_dir/child-a-wt" "$out"
+      pane=$TEARDOWN_FIXTURE_PID
+      for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+      read -r kid holder < "$out" || fail "forced-group: the child pane's processes did not start"
+      teardown_fixture_track "$kid" KILL
+      teardown_fixture_track "$holder" KILL
+      printf 'fm-child-a\t%%5\t%s\n' "$pane" >> "$case_dir/pane-rows"
+      sleep 0.3
+      [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$holder" | tr -d ' ')" = "$pane" ] \
+        || fail "forced-group: the holder does not share the child pane's group"
+      ! ownership_pool_descends "$holder" "$pane" || fail "forced-group: the holder descends from the child pane"
+    fi
+    rc=0
+    FM_PROCEVENT_CLAIM_ROOT="$claims" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 5 "$rc" "forced-$shape: teardown must refuse before any close: $(tail -3 "$case_dir/stderr")"
+    assert_absent "$case_dir/endpoint-close.log" "forced-$shape: an endpoint was closed: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
+    assert_absent "$case_dir/treehouse.log" "forced-$shape: treehouse was asked to return something"
+    kill -0 "$holder" 2>/dev/null || fail "forced-$shape: the holder was signalled"
+    grep -Eq "REFUSED: process $holder .*which the forced return would end, but nothing proves it belongs to task-x1" "$case_dir/stderr" \
+      || fail "forced-$shape: the refusal did not name the holder: $(tail -3 "$case_dir/stderr")"
+    assert_present "$home/state/child-a.meta" "forced-$shape: a child record was retired"
+    if [ "$shape" = group ]; then
+      kill -0 "$kid" 2>/dev/null || fail "forced-group: the chain-proved child was signalled"
+      kill -0 "$pane" 2>/dev/null || fail "forced-group: the child pane was signalled"
+      teardown_fixture_stop "$kid"
+    fi
+    teardown_fixture_stop "$holder"
+  done
+  pass "a reused runner pid and a group-only child holder each refuse before any endpoint close, with every process left running"
+}
+
+ownership_pool_descends() {  # <pid> <ancestor>
+  local p=$1 n=0
+  while [ -n "$p" ] && [ "$p" -gt 1 ] && [ "$n" -lt 64 ]; do
+    [ "$p" != "$2" ] || return 0
+    p=$("$REAL_PS_FOR_TEST" -o ppid= -p "$p" 2>/dev/null | tr -d '[:space:]')
+    n=$((n + 1))
+  done
+  return 1
+}
+
 test_child_return_custody_refusal_keeps_non_pool_worktree() {
   local case_dir home nested rc=0
   case_dir=$(make_case child-return-custody)
@@ -5071,6 +5195,7 @@ test_non_pool_returns_recheck_registered_copies
 test_return_missing_slot_reports_canonicalization_refusal
 test_child_return_custody_refusal_keeps_non_pool_worktree
 test_forced_child_return_refuses_an_unproven_holder
+test_forced_cleanup_refuses_expiring_proofs_before_any_close
 test_child_pool_return_custody_refusal_keeps_slot
 test_reassigned_dirty_slot_retires_only_finished_task
 test_reassigned_slot_unlanded_task_refuses

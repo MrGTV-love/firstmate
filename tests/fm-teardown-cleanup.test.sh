@@ -1906,8 +1906,15 @@ test_teardown_without_a_provable_pane_refuses_a_root_process() {
     expect_code 1 "$rc" "anchor-$state: teardown must refuse"
     assert_present "$case_dir/wt" "anchor-$state: the copy was removed"
     ownership_assert_unsignalled "$case_dir" "$pid" "anchor-$state"
-    grep -Eq "REFUSED: process $pid .*(no single live pane shell could be read|has no readable birth identity)" "$case_dir/stderr" \
-      || fail "anchor-$state: the refusal did not say the pane could not be proved: $(tail -3 "$case_dir/stderr")"
+    # An absent pane proves nothing, so the process refuses; a forged or dead
+    # pane shell is an unreadable endpoint, refused before any close.
+    if [ "$state" = absent ]; then
+      grep -Eq "REFUSED: process $pid .*no single live pane shell could be read" "$case_dir/stderr" \
+        || fail "anchor-$state: the refusal did not say the pane could not be proved: $(tail -3 "$case_dir/stderr")"
+    else
+      grep -Eq "REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: .*cannot be read" "$case_dir/stderr" \
+        || fail "anchor-$state: the refusal did not say the endpoint cannot be read: $(tail -3 "$case_dir/stderr")"
+    fi
     teardown_fixture_stop "$pid"
   done
   case_dir=$(make_case ownership-anchor-quiet)
@@ -1965,6 +1972,69 @@ test_teardown_proof_survives_the_parent_the_reap_ends() {
   assert_grep $'\tKILL\t'"$leak"$'\t' "$case_dir/state/task-x1.teardown-processes" \
     "parent-ended: the leak was not force-killed under its kept proof"
   pass "a proved leak keeps its proof after the reap ends its parent shell, and is force-killed"
+}
+
+# The endpoint is classified before any close, whether or not any process holds a
+# root: with two panes in the recorded window and nothing in the copy or an empty
+# tasktmp, teardown refuses with no endpoint closed and both pane processes
+# alive, on the owned-copy route and on the tasktmp-only route alike.
+test_teardown_ambiguous_window_refuses_before_any_close() {
+  local route case_dir rc first second root
+  for route in owned tasktmp-only; do
+    case_dir=$(make_case "ownership-ambiguous-$route")
+    root="$case_dir/tasktmp"
+    if [ "$route" = owned ]; then
+      write_meta "$case_dir" no-mistakes ship
+      land_shippable_commit "$case_dir"
+      printf '%s\n' "tasktmp=$root" >> "$case_dir/state/task-x1.meta"
+      mkdir -p "$root"
+    else
+      mkdir -p "$case_dir/home/state"
+      write_meta "$case_dir" no-mistakes ship
+      wt_commit_file "$case_dir" landed.txt "delivered work" "landed process fixture"
+      git -C "$case_dir/wt" push -q origin HEAD:main
+      git -C "$case_dir/project" fetch -q origin
+      seed_backlog_in_flight "$case_dir"
+      mkdir -p "$root" "$case_dir/pool/1"
+      git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+      ln -s "pool/1/project" "$case_dir/wt"
+      printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
+      printf 'task=other-task\nhome=%s\n' "$case_dir/other-home" > "$case_dir/pool/1/.fm-slot-owner"
+      fm_write_meta "$case_dir/state/task-x1.meta" \
+        "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+        "worktree=$case_dir/wt" "project=$case_dir/project" "tasktmp=$root" \
+        "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1"
+    fi
+    ownership_pane "$case_dir"
+    first=$OWN_PANE_PID
+    ownership_pane "$case_dir"
+    second=$OWN_PANE_PID
+    printf 'fm-task-x1\t%%1\t%s\nfm-task-x1\t%%2\t%s\n' "$first" "$second" > "$case_dir/pane-rows"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/tmux"
+    rc=0
+    if [ "$route" = owned ]; then
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    else
+      FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    expect_code 1 "$rc" "ambiguous-$route: teardown must refuse: $(tail -3 "$case_dir/stderr")"
+    assert_absent "$case_dir/endpoint-close.log" "ambiguous-$route: the endpoint was closed: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
+    ownership_alive "$first" || fail "ambiguous-$route: the first pane process was signalled"
+    ownership_alive "$second" || fail "ambiguous-$route: the second pane process was signalled"
+    assert_present "$case_dir/state/task-x1.meta" "ambiguous-$route: the task record was removed"
+    [ ! -f "$case_dir/state/task-x1.teardown-processes" ] \
+      || fail "ambiguous-$route: a signal was audited: $(cat "$case_dir/state/task-x1.teardown-processes")"
+    grep -Eq "REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: .*several panes" "$case_dir/stderr" \
+      || fail "ambiguous-$route: the refusal did not name the ambiguous endpoint: $(tail -3 "$case_dir/stderr")"
+  done
+  pass "two panes in the recorded window refuse before any close, with nothing in the roots, on the owned and the tasktmp-only route"
 }
 
 # The process-group proof does not reach a process that leaves the group: a
@@ -2186,7 +2256,7 @@ SH
       ownership_alive "$pid" || fail "tasktmp-only-ambiguous: the tasktmp holder was signalled"
       ownership_assert_unsignalled "$case_dir" "$pid" tasktmp-only-ambiguous
       assert_present "$case_dir/state/task-x1.meta" "tasktmp-only-ambiguous: the task record was removed"
-      grep -Eq "REFUSED: the tasktmp sweep for task-x1 refused and no single live pane shell could be read" "$case_dir/stderr" \
+      grep -Eq "REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: .*several panes" "$case_dir/stderr" \
         || fail "tasktmp-only-ambiguous: the refusal did not name the unprovable anchor: $(tail -3 "$case_dir/stderr")"
       teardown_fixture_stop "$pid"
       continue
@@ -3491,7 +3561,7 @@ test_in_copy_nm_launch_agent_refuses_even_with_force() {
 # or parsed refuses too, never skipped silently. Nothing is booted out or moved.
 test_symlinked_nm_launch_agent_plist_is_judged_through_its_target() {
   local shape case_dir rc label wt
-  for shape in in-copy dangling; do
+  for shape in in-copy mismatched dangling; do
     case_dir=$(make_case "symlinked-nm-agent-$shape")
     write_meta "$case_dir" no-mistakes ship
     land_shippable_commit "$case_dir"
@@ -3499,11 +3569,13 @@ test_symlinked_nm_launch_agent_plist_is_judged_through_its_target() {
     wt=$(cd "$case_dir/wt" && pwd -P)
     label="$NM_AGENT_PREFIX.5e11a1ed"
     mkdir -p "$case_dir/launchagents" "$case_dir/plist-store"
-    if [ "$shape" = in-copy ]; then
+    if [ "$shape" = in-copy ] || [ "$shape" = mismatched ]; then
       add_nm_launch_agent "$case_dir" 5e11a1ed "$wt/.no-mistakes/h"
       mv "$case_dir/launchagents/$label.plist" "$case_dir/plist-store/$label.plist"
-      ln -s "$case_dir/plist-store/$label.plist" "$case_dir/launchagents/$label.plist"
-      : > "$case_dir/launchctl-loaded/$label"
+      # The mismatched link's name names another label than its target's.
+      [ "$shape" = in-copy ] || label="$NM_AGENT_PREFIX.0dd0babe"
+      ln -s "$case_dir/plist-store/$NM_AGENT_PREFIX.5e11a1ed.plist" "$case_dir/launchagents/$label.plist"
+      : > "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.5e11a1ed"
     else
       ln -s "$case_dir/plist-store/missing.plist" "$case_dir/launchagents/$label.plist"
     fi
@@ -3515,10 +3587,10 @@ test_symlinked_nm_launch_agent_plist_is_judged_through_its_target() {
     assert_no_grep bootout "$case_dir/launchctl-calls" "symlinked-nm-agent-$shape: an agent was booted out"
     assert_absent "$case_dir/data/task-x1/launchagent-backup" "symlinked-nm-agent-$shape: something was archived"
     assert_present "$case_dir/state/task-x1.meta" "symlinked-nm-agent-$shape: the task record was removed"
-    if [ "$shape" = in-copy ]; then
-      assert_present "$case_dir/launchctl-loaded/$label" "symlinked-nm-agent-in-copy: the agent was unloaded"
-      grep -Eq "REFUSED: no-mistakes launch agent $label .*no record of task-x1 proves the task created it" "$case_dir/stderr" \
-        || fail "symlinked-nm-agent-in-copy: the refusal did not name the agent: $(tail -3 "$case_dir/stderr")"
+    if [ "$shape" != dangling ]; then
+      assert_present "$case_dir/launchctl-loaded/$NM_AGENT_PREFIX.5e11a1ed" "symlinked-nm-agent-$shape: the agent was unloaded"
+      grep -Eq "REFUSED: no-mistakes launch agent $NM_AGENT_PREFIX.5e11a1ed .*no record of task-x1 proves the task created it" "$case_dir/stderr" \
+        || fail "symlinked-nm-agent-$shape: the refusal did not name the agent: $(tail -3 "$case_dir/stderr")"
     else
       grep -Eq "REFUSED: no-mistakes launch agent plist .*$label.plist is a symbolic link whose target cannot be read or parsed" "$case_dir/stderr" \
         || fail "symlinked-nm-agent-dangling: the refusal did not name the link: $(tail -3 "$case_dir/stderr")"
@@ -7123,77 +7195,81 @@ SH
 }
 
 # The nested retire step rechecks, right before each signal, the support its
-# target's ownership rests on. Here the first queued target M is the last
-# chain-proved member of process group G; the second target D was proved
-# through A, whose ownership rests only on sharing G with M. Signalling M ends
-# the group's last chain-proved member, so A's proof has expired when D's turn
-# comes: D is not signalled, nothing further is, and the step refuses.
+# target's ownership rests on, and only a chain-proved support under its saved
+# pid and birth identity counts. M is chain-proved and leads process group G and
+# stays alive in it; A shares G with M but was never chain-proved. D is queued
+# with A as its support, once under A's live identity and once under a saved
+# identity A no longer has (a pid reused in the old group). Either way D is not
+# signalled, nothing further is, and the step refuses, while M, queued first
+# on its own proof, is signalled.
 test_nested_retire_stops_when_a_support_proof_expires() {
-  local tmp m a d rc _
-  tmp=$(fm_test_tmproot nested-support-expiry)
-  mkdir -p "$tmp/state" "$tmp/copy"
-  # M is detached (reparented to init, so its exit is reaped at once) and leads
-  # group G; its child A stays in G.
-  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
-  perl -MPOSIX -e '
-    my ($out) = @ARGV;
-    my $first = fork(); die "fork" unless defined $first;
-    if ($first) { waitpid($first, 0); exit 0; }
-    my $second = fork(); die "fork" unless defined $second;
-    POSIX::_exit(0) if $second;
-    setpgrp(0, 0) or die "setpgrp";
-    open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
-    $SIG{CHLD} = "IGNORE";
-    my $a = fork(); die "fork" unless defined $a;
-    if (!$a) { exec "sleep", "300"; }
-    open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $a\n"; close $fh; rename "$out.tmp", $out or die "rename";
-    sleep 300 while 1;' "$tmp/ma.pid"
-  for _ in $(seq 100); do [ -s "$tmp/ma.pid" ] && break; sleep 0.05; done
-  read -r m a < "$tmp/ma.pid" || fail "support-expiry: setup did not start"
-  teardown_fixture_track "$m" KILL
-  teardown_fixture_track "$a" KILL
-  teardown_fixture_start "$tmp/copy" KILL sleep 300
-  d=$TEARDOWN_FIXTURE_PID
-  sleep 0.3
-  [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$a" | tr -d ' ')" = "$m" ] || fail "support-expiry: A is not in M's group"
-  python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/reaper.sh" <<'PY' || fail "support-expiry: the reaper functions could not be extracted"
+  local tmp m a d rc _ shape
+  for shape in live reused; do
+    tmp=$(fm_test_tmproot "nested-support-$shape")
+    mkdir -p "$tmp/state" "$tmp/copy"
+    # M is detached (reparented to init, so its exit is reaped at once) and leads
+    # group G; its child A stays in G.
+    # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+    perl -MPOSIX -e '
+      my ($out) = @ARGV;
+      my $first = fork(); die "fork" unless defined $first;
+      if ($first) { waitpid($first, 0); exit 0; }
+      my $second = fork(); die "fork" unless defined $second;
+      POSIX::_exit(0) if $second;
+      setpgrp(0, 0) or die "setpgrp";
+      open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+      $SIG{CHLD} = "IGNORE";
+      my $a = fork(); die "fork" unless defined $a;
+      if (!$a) { exec "sleep", "300"; }
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $a\n"; close $fh; rename "$out.tmp", $out or die "rename";
+      sleep 300 while 1;' "$tmp/ma.pid"
+    for _ in $(seq 100); do [ -s "$tmp/ma.pid" ] && break; sleep 0.05; done
+    read -r m a < "$tmp/ma.pid" || fail "support-$shape: setup did not start"
+    teardown_fixture_track "$m" KILL
+    teardown_fixture_track "$a" KILL
+    teardown_fixture_start "$tmp/copy" KILL sleep 300
+    d=$TEARDOWN_FIXTURE_PID
+    sleep 0.3
+    [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$a" | tr -d ' ')" = "$m" ] || fail "support-$shape: A is not in M's group"
+    python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/reaper.sh" <<'PY' || fail "support-$shape: the reaper functions could not be extracted"
 import pathlib, sys
 source = pathlib.Path(sys.argv[1]).read_text()
 start = source.index("pids_with_cwd_under() {")
 end = source.index("\n}\n", source.index("reap_task_worktree_processes() {", start)) + 3
 pathlib.Path(sys.argv[2]).write_text(source[start:end])
 PY
-  rc=0
-  TAB=$'\t' TMPX=$tmp ROOT=$ROOT M=$m A=$a D=$d bash -c '
-set +e
-for l in fm-tasks-axi-lib fm-backlog-transition-lib fm-nm-run-lib fm-task-copy-lib fm-lock-lib fm-refuse-lib fm-teardown-nested-lib; do . "$ROOT/bin/$l.sh" || exit 9; done
-STATE=$TMPX/state ID=support-expiry
-. "$TMPX/reaper.sh"
-mid=$(task_process_identity "$M") && aid=$(task_process_identity "$A") && did=$(task_process_identity "$D") || exit 8
-TASK_OWNED=("$M""$TAB""$mid""$TAB""$M")
-TASK_GROUP_OWNED=("$A""$TAB""$aid""$TAB""$M")
-TEARDOWN_FOREIGN_PROCS=("$M""$TAB""$mid""$TAB""$TMPX/copy""$TAB""$M""$TAB""$mid" "$D""$TAB""$did""$TAB""$TMPX/copy""$TAB""$A""$TAB""$aid")
-# The ancestry proof before the first signal is not under test here.
-teardown_pid_is_task_own() { return 0; }
-# Signal delivery is made synchronous for M, so its exit lands before the next
-# target is judged, deterministically: the fixture waits for M to be gone.
-kill() {
-  builtin kill "$@"
-  if [ "${2:-}" = "$M" ]; then
-    for _ in $(seq 100); do builtin kill -0 "$M" 2>/dev/null || return 0; sleep 0.05; done
-  fi
-}
-teardown_foreign_procs_retire
-' > "$tmp/stdout" 2> "$tmp/stderr" || rc=$?
-  ownership_alive "$d" || fail "support-expiry: D was signalled after its support proof expired"
-  ownership_wait_dead "$m" || fail "support-expiry: M, whose own proof held, was not signalled: $(cat "$tmp/stderr")"
-  expect_code 1 "$rc" "support-expiry: the retire step must refuse: $(cat "$tmp/stderr")"
-  assert_grep $'\tTERM\t'"$m"$'\t' "$tmp/state/support-expiry.teardown-processes" "support-expiry: M's signal was not audited"
-  grep -Eq "REFUSED: the proof that process $d .*rested on process $a, whose ownership proof has expired; signalling nothing further" "$tmp/stderr" \
-    || fail "support-expiry: the refusal did not name the expired support: $(cat "$tmp/stderr")"
-  teardown_fixture_stop "$d"
-  teardown_fixture_stop "$a"
-  pass "a queued nested process whose support proof expired mid-loop is not signalled, and nothing further is"
+    rc=0
+    SHAPE=$shape TAB=$'\t' TMPX=$tmp ROOT=$ROOT M=$m A=$a D=$d bash -c '
+  set +e
+  for l in fm-tasks-axi-lib fm-backlog-transition-lib fm-nm-run-lib fm-task-copy-lib fm-lock-lib fm-refuse-lib fm-teardown-nested-lib; do . "$ROOT/bin/$l.sh" || exit 9; done
+  STATE=$TMPX/state ID=support-expiry
+  . "$TMPX/reaper.sh"
+  mid=$(task_process_identity "$M") && aid=$(task_process_identity "$A") && did=$(task_process_identity "$D") || exit 8
+  TASK_OWNED=("$M""$TAB""$mid""$TAB""$M")
+  [ "$SHAPE" = live ] || aid="lstart=Thu Jan  1 00:00:00 1970"
+  TEARDOWN_FOREIGN_PROCS=("$M""$TAB""$mid""$TAB""$TMPX/copy""$TAB""$M""$TAB""$mid" "$D""$TAB""$did""$TAB""$TMPX/copy""$TAB""$A""$TAB""$aid")
+  # The ancestry proof before the first signal is not under test here.
+  teardown_pid_is_task_own() { return 0; }
+  # Signal delivery is made synchronous for M, so its exit lands before the next
+  # target is judged, deterministically: the fixture waits for M to be gone.
+  kill() {
+    builtin kill "$@"
+    if [ "${2:-}" = "$M" ]; then
+      for _ in $(seq 100); do builtin kill -0 "$M" 2>/dev/null || return 0; sleep 0.05; done
+    fi
+  }
+  teardown_foreign_procs_retire
+  ' > "$tmp/stdout" 2> "$tmp/stderr" || rc=$?
+    ownership_alive "$d" || fail "support-$shape: D was signalled after its support proof expired"
+    ownership_wait_dead "$m" || fail "support-$shape: M, whose own proof held, was not signalled: $(cat "$tmp/stderr")"
+    expect_code 1 "$rc" "support-$shape: the retire step must refuse: $(cat "$tmp/stderr")"
+    assert_grep $'\tTERM\t'"$m"$'\t' "$tmp/state/support-expiry.teardown-processes" "support-$shape: M's signal was not audited"
+    grep -Eq "REFUSED: the proof that process $d .*rested on process $a, whose ownership proof has expired; signalling nothing further" "$tmp/stderr" \
+      || fail "support-$shape: the refusal did not name the unproven support: $(cat "$tmp/stderr")"
+    teardown_fixture_stop "$d"
+    teardown_fixture_stop "$a"
+  done
+  pass "a queued nested process whose support is only a shared group, live or under a reused pid, is not signalled, and nothing further is"
 }
 
 # A live launcher outside the task's session keeps its copy untouched. One inside
@@ -7950,7 +8026,7 @@ teardown_nested_slot retire
   assert_grep "conclude $tmp/wt" "$log" "kept-helper-retire: the task's worktree was not swept"
   assert_grep "reap $tmp/wt $tmp/slot $tmp/slot/other $tmp/tasktmp" "$log" "kept-helper-retire: the reaper's roots are not the other roots"
   assert_grep "preflight $tmp/wt $tmp/slot $tmp/slot/other $tmp/tasktmp" "$log" "kept-helper-retire: the preflight's roots are not the reaper's"
-  [ "$(grep -n '^preflight ' "$log" | cut -d: -f1)" -lt "$(grep -n '^conclude ' "$log" | head -n 1 | cut -d: -f1)" ] \
+  [ "$(grep -n '^preflight ' "$log" | head -n 1 | cut -d: -f1)" -lt "$(grep -n '^conclude ' "$log" | head -n 1 | cut -d: -f1)" ] \
     || fail "kept-helper-retire: the preflight did not run before the first run was concluded: $(cat "$log")"
   rm -rf "$tmp"
   pass "on a retry whose record matches, the retire step concludes, retires and reaps every root but the kept copy"
@@ -9444,6 +9520,7 @@ test_teardown_grace_child_that_leaves_the_group_is_refused
 test_teardown_tmux_anchor_needs_the_one_recorded_pane
 test_teardown_recycled_group_proves_nothing
 test_tasktmp_only_route_names_an_unproven_holder_and_continues
+test_teardown_ambiguous_window_refuses_before_any_close
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races

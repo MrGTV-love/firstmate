@@ -3382,9 +3382,16 @@ make_own_locked_copy_case() {
 # class the recorded cases hold, and notes/unique.dat, the class teardown's own
 # preservation selects). Snapshots the copy, the slot claim and the lease record.
 make_retained_case() {
-  local exclude
+  local exclude admin
   dead_launcher_pid
   make_own_locked_copy_case "$1" "${2:-enclosing}" "$FOREIGN_DEAD_PID"
+  # The lock names a launcher that has already exited. Its pid can be reused
+  # while the fixture is still being built, and a reuse that starts before the
+  # lock is written (or within ps's two-second rounding of it) would read as a
+  # live launcher. The lock is backdated an hour, so any reuse started after it
+  # and is a recycled pid by the creation-lock rule.
+  admin=$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)
+  fm_touch_epoch "$(( $(date +%s) - 3600 ))" "$admin/locked"
   printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
   add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_CASE/project" rev-parse main)"
   seed_backlog_in_flight "$FOREIGN_CASE"
