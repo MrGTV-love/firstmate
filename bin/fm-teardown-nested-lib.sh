@@ -1601,13 +1601,12 @@ teardown_copy_other_repo_dirs() {  # <copy>
   return "$status"
 }
 
-# Does one of the task's own nested copies hold a Git repository or linked
-# worktree that is not the task's own, such as a separate clone or a worktree of
-# another project? The held close removes that own copy with its contents, and
-# no registered-copy list sees such a repository, so its commits would be lost
-# with no ref left behind. Submodules of the own repository and linked worktrees
-# of the same repository are not counted: the latter are foreign copies and are
-# proved on their own. Prints a refusal and returns 1 for the first repository
+# Does one of the task's own nested copies hold a Git repository that is not the
+# task's own, such as a separate clone, a worktree of another project or a bare
+# repository that is not landed content? The held close removes that own copy
+# with its contents, and no registered-copy list sees such a repository, so its
+# commits would be lost with no ref left behind. teardown_copy_other_repo_dirs
+# owns what counts. Prints a refusal and returns 1 for the first repository
 # found, or when the scan cannot be completed; changes nothing.
 teardown_own_nested_other_repos() {
   local own hit dir status
