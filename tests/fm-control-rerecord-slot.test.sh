@@ -1073,10 +1073,24 @@ test_RB2_a_restore_publish_that_leaves_no_readable_record_reports_it_unreadable(
   [ "$rc" != 0 ] || fail "RB2: the run was expected to fail"$'\n'"$out"
   a=$(rr_audits)
   [ ! -e "$RR_META" ] || fail "RB2: the fixture did not remove the record"
-  assert_contains "$out" "error: task $RR_ID's prior record could not be restored (injected publish failure that removed the record); the record could not be read; the prior record is archived at $(rr_field "$a" archive)" "RB2"
-  assert_contains "$out" "error: this run published task $RR_ID's record and could not tell whether the prior record was restored, because the task record could not be read; the prior record is archived at $(rr_field "$a" archive)" "RB2"
+  assert_contains "$out" "error: the restore publish of task $RR_ID's record reported failure (injected publish failure that removed the record), so whether the prior record was restored is not known; the record could not be read; the prior record is archived at $(rr_field "$a" archive)" "RB2"
+  assert_contains "$out" "error: this run published task $RR_ID's record and whether the prior record was restored is not known, because the task record could not be read; the prior record is archived at $(rr_field "$a" archive)" "RB2"
+  assert_not_contains "$out" "could not be restored" "RB2: nothing established that the restore failed"
   assert_not_contains "$out" "neither the prior" "RB2: an unreadable record must not be reported as other bytes"
-  rr_ok RB2 "a restore publish that leaves no readable record: both the rollback's error and the run's outcome say the record could not be read"
+  rr_ok RB2 "a restore publish that leaves no readable record: both the rollback's error and the run's outcome say whether it was restored is not known and that the record could not be read"
+}
+test_RB3_a_restore_publish_that_leaves_other_bytes_reports_restore_not_known() {
+  local out rc a
+  rr_setup_SF4head RB3
+  rr_restore_publish_shim 'printf "other=bytes\\n" > "$3"; FM_BACKLOG_TRANSITION_ERROR="injected publish failure that left other bytes"; return 1'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "RB3: the run was expected to fail"$'\n'"$out"
+  a=$(rr_audits)
+  [ "$(cat "$RR_META")" = other=bytes ] || fail "RB3: the fixture did not leave other bytes in the record"
+  assert_contains "$out" "error: the restore publish of task $RR_ID's record reported failure (injected publish failure that left other bytes), so whether the prior record was restored is not known; the record holds bytes that are neither the prior nor the staged record; the prior record is archived at $(rr_field "$a" archive)" "RB3"
+  assert_contains "$out" "error: this run published task $RR_ID's record and the restore publish reported failure (injected publish failure that left other bytes), so whether the prior record was restored is not known; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $(rr_field "$a" archive)" "RB3"
+  assert_not_contains "$out" "could not be restored" "RB3: nothing established that the restore failed"
+  rr_ok RB3 "a restore publish that leaves other bytes: both lines say whether the prior record was restored is not known and name the bytes as neither"
 }
 
 # The EXIT trap is the one printer. A TERM right after a step 3 audit rename lands, before its entry is recorded, still
@@ -1096,6 +1110,23 @@ test_TS1_term_after_a_step_3_audit_rename_names_that_audit_once() {
   [ "$(printf '%s\n' "$out" | grep -c -F "audit $a ")" = 1 ] || fail "TS1: the audit was not named exactly once"$'\n'"$out"
   [ "$(rr_sha "$RR_META")" = "$p" ] || fail "TS1: the record changed"
   rr_ok TS1 "a TERM right after a step 3 audit rename, before its entry is recorded: the trap reads the audit back and names it once"
+}
+# A TERM right after a refusal is stored while the closing marker names a step 3 audit whose rename landed: the refusal
+# the trap prints names that audit once, in its own tail.
+test_TS3_term_after_a_refusal_is_stored_names_the_closing_audit_once() {
+  local out rc p a
+  rr_make_f TS3
+  p=$(rr_sha "$RR_META")
+  rr_crash_run "$RR_META" before 1
+  a=$(rr_audit_for "$p") || fail "TS3: no audit record after the crash"
+  rr_wrap fm-slot-provision-lib.sh fm_slot_rerecord_audit_set
+  rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_audit_set() { real_fm_slot_rerecord_audit_set "$@" || return; [ "${2:-}" != abandoned ] && return 0; fm_slot_rerecord_refuse injected_refusal "stored while the audit was being closed"; kill -TERM $$; }'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "TS3: the TERM did not stop the run"$'\n'"$out"
+  assert_contains "$out" "error: slot rerecord refused: injected_refusal: stored while the audit was being closed; before refusing, this run reconciled earlier interrupted runs: audit $a reads abandoned (this run stopped while closing it); no manifest, copy or journal was changed" "TS3"
+  [ "$(printf '%s\n' "$out" | grep -c -F "audit $a ")" = 1 ] || fail "TS3: the audit was not named exactly once"$'\n'"$out"
+  [ "$(printf '%s\n' "$out" | grep -c 'slot rerecord refused')" = 1 ] || fail "TS3: the refusal was not printed exactly once"$'\n'"$out"
+  rr_ok TS3 "a TERM right after a refusal is stored while the closing marker names an audit whose rename landed: the refusal names that audit once"
 }
 test_TS2_term_after_the_outcome_is_stored_prints_it_once() {
   local out rc
@@ -1956,11 +1987,34 @@ test_L20_a_failed_step_3_restore_names_the_audit_closed_before_it() {
   out=$(rr_write); rc=$?
   [ "$rc" != 0 ] || fail "L20: expected a failure"$'\n'"$out"
   assert_contains "$out" "error: could not stage the restore of task $RR_ID's record" "L20"
-  assert_contains "$out" "error: before stopping, this run reconciled earlier interrupted runs: audit $first superseded-other (the audit was closed with the task record left unchanged); no manifest, copy or journal was changed" "L20"
-  [ "$(printf '%s\n' "$out" | grep -c 'reconciled earlier interrupted runs')" = 1 ] || fail "L20: the step 3 entries were not named exactly once"$'\n'"$out"
-  [ "$(printf '%s\n' "$out" | grep -c 'this run stopped')" = 0 ] || fail "L20: the trap printed a kept-rename line after the run reported"$'\n'"$out"
+  rr_expect_l20_stop L20 "$out" "$first"
   [ "$(rr_field "$first" result)" = superseded-other ] || fail "L20: the first audit is '$(rr_field "$first" result)'"
-  rr_ok L20 "step 3 closes a first audit as superseded-other, then the second's resumed restore fails: the stop names the first audit"
+  rr_ok L20 "step 3 closes a first audit as superseded-other, then the second's resumed restore fails: the stop names both audits, each once"
+}
+# rr_expect_l20_stop <id> <output> <first-audit>: the stop after L20's failed resumed restore names the audit step 3 closed
+# and the audit it was closing (RR_L13_AUDIT, left rolling-back), each exactly once, in one line.
+rr_expect_l20_stop() {
+  assert_contains "$2" "error: before stopping, this run reconciled earlier interrupted runs: audit $3 superseded-other (the audit was closed with the task record left unchanged), audit $RR_L13_AUDIT reads rolling-back (this run stopped while closing it); no manifest, copy or journal was changed" "$1"
+  [ "$(printf '%s\n' "$2" | grep -c 'reconciled earlier interrupted runs')" = 1 ] || fail "$1: the step 3 entries were not named in exactly one line"$'\n'"$2"
+  [ "$(printf '%s\n' "$2" | grep -c -F "audit $3 ")" = 1 ] || fail "$1: the first audit was not named exactly once"$'\n'"$2"
+  [ "$(printf '%s\n' "$2" | grep -c -F "audit $RR_L13_AUDIT ")" = 1 ] || fail "$1: the audit being closed was not named exactly once"$'\n'"$2"
+  [ "$(printf '%s\n' "$2" | grep -c 'this run stopped while')" = 1 ] || fail "$1: expected only the closing entry's 'this run stopped while'"$'\n'"$2"
+}
+# L20 with a TERM right after the run stored its rc 2 outcome: the trap prints that stored outcome, still naming both
+# audits once each, because the stored outcome carries a marker for the entries rather than a copy of them.
+test_TS4_term_after_the_rc_2_outcome_is_stored_names_both_audits_once() {
+  local out rc first
+  rr_setup_L13 TS4
+  first="$(rr_audit_dir)/0-first.record"
+  printf 'result=pending\nprior_sha256=%064d\nstaged_sha256=%064d\nprior_block_sha256=x\nstaged_block_sha256=y\n' 0 1 > "$first"
+  chmod 600 "$first"
+  rr_fail_mktemp '*.meta.rerecord-restore.XXXXXX'
+  rr_wrap fm-slot-provision-lib.sh fm_slot_rerecord_report
+  rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_report() { real_fm_slot_rerecord_report "$@"; [ "${1:-}" != err ] || [ -z "$FM_RR_CLOSING" ] || kill -TERM $$; }'
+  out=$(rr_write); rc=$?
+  [ "$rc" = 143 ] || fail "TS4: expected the TERM exit 143, got $rc"$'\n'"$out"
+  rr_expect_l20_stop TS4 "$out" "$first"
+  rr_ok TS4 "a TERM right after L20's rc 2 outcome is stored, while the closing marker names the second audit: the printed stop names both audits, each once"
 }
 test_SF4_owner_changed_after_the_rebind() {
   rr_setup_SF4owner SF4-owner
@@ -2435,7 +2489,9 @@ test_RP3_a_malformed_ok_verdict_is_refused_and_changes_nothing
 test_RP4_the_owner_reread_compares_the_whole_verdict
 test_RB1_a_restore_publish_that_fails_after_its_rename_reports_the_prior_record
 test_RB2_a_restore_publish_that_leaves_no_readable_record_reports_it_unreadable
+test_RB3_a_restore_publish_that_leaves_other_bytes_reports_restore_not_known
 test_TS1_term_after_a_step_3_audit_rename_names_that_audit_once
+test_TS3_term_after_a_refusal_is_stored_names_the_closing_audit_once
 test_TS2_term_after_the_outcome_is_stored_prints_it_once
 test_H1_owner_mismatch
 test_H2_worktree_path_mismatch
@@ -2515,6 +2571,7 @@ test_SF4_head_after_a_reconciled_crash
 test_SF4_head_with_a_failed_restore
 test_SF4_head_with_a_failed_restore_publish
 test_L20_a_failed_step_3_restore_names_the_audit_closed_before_it
+test_TS4_term_after_the_rc_2_outcome_is_stored_names_both_audits_once
 test_SF4_owner_changed_after_the_rebind
 test_SF5_term_to_relaunch_leaves_the_launcher_holding_the_spawn_lock
 test_S1a_identity_verdict
