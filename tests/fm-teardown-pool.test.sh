@@ -3028,10 +3028,11 @@ SH
 }
 
 # A custody refusal at a child's return is final; no fallback may delete the copy.
-# Forced secondmate cleanup returns each child worktree with treehouse return
-# --force, which ends every process with its cwd there, and no reap runs first.
-# A detached holder of the child worktree that nothing proves the retiring
-# task's makes that return refuse with nothing returned or signalled. The fault
+# Forced secondmate cleanup closes each child endpoint and returns each child
+# worktree with treehouse return --force, which ends every process with its cwd
+# there. A detached holder of the child worktree that nothing proves the
+# retiring tree's refuses before any child endpoint is closed, with nothing
+# returned or signalled. The fault
 # control replaces the check with an unconditional pass in the case's own copy
 # of bin/: the forced return then runs with the holder inside.
 test_forced_child_return_refuses_an_unproven_holder() {
@@ -3046,7 +3047,14 @@ test_forced_child_return_refuses_an_unproven_holder() {
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
 exit 0
 SH
-    chmod +x "$case_dir/fakebin/treehouse"
+    # Every endpoint close is logged: the refusal must come before any of them.
+    mv "$case_dir/fakebin/tmux" "$case_dir/fakebin/tmux.inner"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exec "$case_dir/fakebin/tmux.inner" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
     out="$case_dir/holder.pid"
     # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
     perl -MPOSIX -e '
@@ -3089,6 +3097,7 @@ PY
       grep -Eq "REFUSED: process $pid .*which the forced return would end, but nothing proves it belongs to" "$case_dir/stderr" \
         || fail "child-return-holder: the refusal did not name the holder: $(tail -3 "$case_dir/stderr")"
       assert_absent "$case_dir/treehouse.log" 'child-return-holder: treehouse was asked to return the child worktree'
+      assert_absent "$case_dir/endpoint-close.log" "child-return-holder: an endpoint was closed before the refusal: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
       assert_present "$case_dir/child-a-wt/.git" 'child-return-holder: the child worktree was removed'
       assert_present "$home/state/child-a.meta" 'child-return-holder: the child record was retired'
       kill -0 "$pid" 2>/dev/null || fail "child-return-holder: the holder was signalled"

@@ -755,6 +755,10 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: no-mistakes launch agent $label ($plist) has its daemon root $root inside $ID's copy, but no record of $ID proves the task created it, so teardown neither unloads nor archives it and keeps the copy. If it is this task's private agent, stop it yourself (launchctl bootout gui/$uid/$label, then move $plist aside) and rerun teardown; if it is another owner's service, leave it and move its root out of the copy first.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: no-mistakes launch agent plist $plist is a symbolic link whose target cannot be read or parsed, so whether its agent is rooted in $ID's copy cannot be decided; teardown neither unloads nor archives it and keeps the copy. Repair or remove the link, then rerun teardown.\" >&2"
         }
       ]
     },
@@ -2516,6 +2520,14 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without force-killing it.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the tasktmp sweep for $ID refused and $(if [ -z \"$TASK_ANCHOR_PID\" ]; then printf '%s' \"$TASK_ANCHOR_NOTE\"; else printf 'the refusal was not an unproven holder'; fi), so teardown stops before any endpoint close or signal; every durable task record is kept.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: the proof that process $pid ($identity) belongs to $ID rested on process ${anchor_pid:-<none>}, whose ownership proof has expired; signalling nothing further and preserving the worktree. Every remaining queued process is unproven.\" >&2"
         }
       ]
     },

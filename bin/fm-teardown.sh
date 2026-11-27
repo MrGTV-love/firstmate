@@ -708,7 +708,9 @@
 #     its refusing return mode does no cleanup, so forced cleanup cannot use it.
 #     The tasktmp-only sweep (a task that no longer owns its copy) names an
 #     unproven tasktmp holder and continues, since removing the directory does
-#     not need it dead; it signals nothing after such a refusal.
+#     not need it dead; it signals nothing after such a refusal. It continues
+#     only when the endpoint's pane shell was proved and the refusal was an
+#     unproven holder: otherwise it refuses before any endpoint close.
 #     Nested-lane boundary: a matched cwd inside a linked git worktree that
 #     sits beneath either root (registered by any repository, the project or
 #     a sibling clone, and including lanes this task's own worker created) is
@@ -736,9 +738,10 @@
 #     A missing lsof refuses too: without the scan no target can be audited, so
 #     no unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
-#     row: epoch, signal, pid, birth identity, executable with the SHA-256 of its
-#     command line (never the arguments, which can carry credentials),
-#     start time, cwd, matched open path (cwd descriptor), all shell-escaped
+#     row: epoch, signal, pid, birth identity, executable,
+#     start time, cwd, matched open path (cwd descriptor), and
+#     cmdline-sha256=<SHA-256 of the full command line ps prints> (never the
+#     arguments themselves, which can carry credentials), all shell-escaped
 #     with printf %q. For such a process both cwd columns name the cwd of the
 #     process it was proved through, the process itself or the ancestor it
 #     descends from, not necessarily its own. This audit survives task-record
@@ -767,10 +770,11 @@
 #     task created, so teardown never boots one out or archives its plist: an
 #     in-copy agent, loaded or not, refuses even with --force, naming its label
 #     and plist with the manual bootout for its owner, and the copy stays.
-#     The shared daemon's agent (root ~/.no-mistakes), another task's agent,
-#     symlinked plists, and plists whose root cannot be proven are left as found;
-#     teardown never runs `no-mistakes daemon stop`, which targets the shared
-#     daemon.
+#     A symlinked plist is read through its target and judged the same way;
+#     one whose target cannot be read or parsed refuses.
+#     The shared daemon's agent (root ~/.no-mistakes), another task's agent, and
+#     regular plists that cannot be parsed are left as found; teardown never
+#     runs `no-mistakes daemon stop`, which targets the shared daemon.
 #     tests/fm-teardown-cleanup.test.sh's private, foreign, nested, and
 #     absent-copy launch-agent cases exercise this boundary with a fake launchctl.
 #   Fix 4 - remove the task's own Docker stacks. Docker resources survive process
@@ -3813,6 +3817,23 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
 # --if-reset-ref) cannot serve here: it also refuses untracked files and an
 # unlanded HEAD and never cleans, which forced cleanup needs. A holder arriving
 # between this scan and treehouse's own scan is a disclosed residual.
+# Succeeds when <pid> is a process-event runner recorded in <home>'s registry,
+# or a member of that runner's process group, which the home's own sweep stops
+# before the home is returned. Used only by the forced-cleanup preflight; the
+# check right before the return accepts no runner.
+teardown_home_runner_member() {  # <home> <pid>
+  local runner_file runner pgid
+  pgid=$(task_pid_pgid "$2" 2>/dev/null) || pgid=
+  for runner_file in "$1/state/procevent"/*.runner; do
+    [ -f "$runner_file" ] && [ ! -L "$runner_file" ] || continue
+    runner=$(sed -n 1p "$runner_file" 2>/dev/null | tr -d '[:space:]')
+    case "$runner" in ''|*[!0-9]*) continue ;; esac
+    [ "$runner" != "$2" ] || return 0
+    [ -z "$pgid" ] || [ "$pgid" != "$runner" ] || return 0
+  done
+  return 1
+}
+
 teardown_return_holders_proven() {  # <dir> <label>
   local dir=$1 label=$2 holders pid path identity command ancestors="" p n=0
   [ -d "$dir" ] || return 0
@@ -3841,6 +3862,8 @@ teardown_return_holders_proven() {  # <dir> <label>
       identity="identity unavailable"
     elif task_pid_proved_own "$pid" "$identity" && task_process_identity_matches "$pid" "$identity"; then
       continue
+    elif [ -n "${TEARDOWN_HOLDERS_RUNNER_HOME:-}" ] && teardown_home_runner_member "$TEARDOWN_HOLDERS_RUNNER_HOME" "$pid"; then
+      continue
     fi
     command=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) || command=
     command=${command##*/}
@@ -3850,6 +3873,67 @@ teardown_return_holders_proven() {  # <dir> <label>
   done <<HOLDERS
 $holders
 HOLDERS
+}
+
+# Runs <command...> with the ownership anchor taken from another task's
+# endpoint (<backend> <target>), as forced secondmate cleanup does for each
+# child, then restores this task's anchor. Processes proved meanwhile stay in
+# TASK_OWNED: they are the retiring tree's own, and the later forced return of
+# the same copy must still accept them by their retained pid and identity.
+teardown_with_anchor() {  # <backend> <target> <command...>
+  local saved_t=${T:-} saved_backend=${BACKEND:-} saved_read=$TASK_ANCHOR_READ
+  local saved_pid=$TASK_ANCHOR_PID saved_identity=$TASK_ANCHOR_IDENTITY saved_note=$TASK_ANCHOR_NOTE rc=0
+  BACKEND=$1 T=$2
+  shift 2
+  [ "$BACKEND" != herdr ] || fm_backend_source herdr >/dev/null 2>&1 || true
+  TASK_ANCHOR_READ=0 TASK_ANCHOR_PID='' TASK_ANCHOR_IDENTITY='' TASK_ANCHOR_NOTE=''
+  "$@" || rc=$?
+  T=$saved_t BACKEND=$saved_backend TASK_ANCHOR_READ=$saved_read
+  TASK_ANCHOR_PID=$saved_pid TASK_ANCHOR_IDENTITY=$saved_identity TASK_ANCHOR_NOTE=$saved_note
+  return "$rc"
+}
+
+# Forced secondmate cleanup closes each child endpoint and then returns the
+# child's copy, and finally the home, with forced returns that end every process
+# in them. Decide every one of those returns first: before any child endpoint is
+# closed, every process in each child copy must be that child's own (its pane
+# shell or a descendant) or this task's, and every process in a home that will
+# be returned must be this task's, a child's, or the home's own process-event
+# runner (whose sweep stops it) or a member of that runner's process group.
+# Any other holder refuses with no endpoint closed and nothing signalled. The
+# check right before each return still runs.
+teardown_forced_holders_preflight() {  # <home>
+  local home=$1 sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend child_t
+  sub_state="$home/state"
+  if [ -d "$sub_state" ]; then
+    for child_meta in "$sub_state"/*.meta; do
+      [ -e "$child_meta" ] || continue
+      child_id=$(basename "$child_meta" .meta)
+      child_wt=$(meta_value "$child_meta" worktree)
+      child_proj=$(meta_value "$child_meta" project)
+      child_kind=$(meta_value "$child_meta" kind)
+      [ -n "$child_kind" ] || child_kind=ship
+      child_backend=$(fm_backend_of_meta "$child_meta")
+      if [ "$child_backend" = orca ]; then
+        child_t=$(meta_value "$child_meta" terminal)
+      else
+        child_t=$(fm_backend_target_of_meta "$child_meta")
+      fi
+      if [ "$child_kind" = secondmate ]; then
+        child_home=$(meta_value "$child_meta" home)
+        [ -n "$child_home" ] || child_home=$child_wt
+        [ -n "$child_home" ] && [ -d "$child_home" ] || continue
+        teardown_with_anchor "$child_backend" "$child_t" teardown_forced_holders_preflight "$child_home" || return 1
+        continue
+      fi
+      [ -n "$child_wt" ] && [ -d "$child_wt" ] || continue
+      ! teardown_preserves_reassociated_copy "$child_meta" "$child_kind" "$child_backend" "$child_proj" "$child_wt" || continue
+      teardown_with_anchor "$child_backend" "$child_t" \
+        teardown_return_holders_proven "$child_wt" "child $child_id worktree" || return 1
+    done
+  fi
+  firstmate_home_has_treehouse_slot "$home" || return 0
+  TEARDOWN_HOLDERS_RUNNER_HOME=$home teardown_return_holders_proven "$home" "firstmate home"
 }
 
 # Return a worktree/home via `treehouse return --force`, tolerating a transient or
@@ -4721,6 +4805,7 @@ task_pids_under_roots() {  # <dir>...
   TASK_PIDS=
   TASK_PIDS_FAILED_DIR=
   TASK_PIDS_ERROR="lsof failed"
+  TASK_PIDS_HOLDER_UNPROVEN=0
   TASK_PID_CWDS=()
   TASK_SCAN_PIDS=()
   local dir dir_matches pid path lane identity command root pids=""
@@ -4770,6 +4855,7 @@ task_pids_under_roots() {  # <dir>...
         echo "REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$lane
         TASK_PIDS_ERROR="registered nested worktree lane holds process $pid"
+        TASK_PIDS_HOLDER_UNPROVEN=1
         return 1
       fi
       if [ "$path" != "$dir" ]; then
@@ -4777,6 +4863,7 @@ task_pids_under_roots() {  # <dir>...
         echo "REFUSED: process $pid ($identity) matched path $path beneath scan root $dir, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$path
         TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"
+        TASK_PIDS_HOLDER_UNPROVEN=1
         return 1
       fi
       # A cwd at the root is where to look, never proof of ownership.
@@ -4788,6 +4875,7 @@ task_pids_under_roots() {  # <dir>...
         echo "REFUSED: process $pid has its cwd at $dir but no readable birth identity, so its ownership by $ID cannot be proven; preserving it and task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$dir
         TASK_PIDS_ERROR="process $pid at the root has no readable birth identity"
+        TASK_PIDS_HOLDER_UNPROVEN=1
         return 1
       fi
       if ! task_pid_proved_own "$pid" "$identity" \
@@ -4799,6 +4887,7 @@ task_pids_under_roots() {  # <dir>...
         echo "REFUSED: process $pid ($identity${command:+, $command}) has its cwd at $dir, but nothing proves it belongs to $ID: $TASK_ANCHOR_NOTE. It may be a shared service (a daemon that started in this copy), so teardown leaves it running and keeps the copy; if it is this task's own leftover, stop it and rerun teardown, otherwise rerun once it has exited or moved." >&2
         TASK_PIDS_FAILED_DIR=$dir
         TASK_PIDS_ERROR="process $pid at the root is not proven to belong to $ID"
+        TASK_PIDS_HOLDER_UNPROVEN=1
         return 1
       fi
       TASK_SCAN_PIDS+=("$pid")
@@ -4830,22 +4919,22 @@ task_record_process_signal() {  # <pid> <birth-identity> <signal>
     fi
     return 1
   fi
-  # Arguments can carry credentials, so the audit keeps the executable and a
-  # SHA-256 of the full command line, never the arguments themselves.
+  # Arguments can carry credentials, so the audit keeps the executable in its
+  # own field and a SHA-256 of the full command line `ps -ww -o command=`
+  # prints (executable and arguments together), never the arguments.
   exe=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) || exe=
   exe=${exe##*/}
   [ -n "$exe" ] || exe=${command%% *}
   exe=${exe##*/}
   digest=$(perl -MDigest::SHA=sha256_hex -e 'print sha256_hex($ARGV[0])' -- "$command") || return 1
-  command="$exe args-sha256=$digest"
   epoch=$(date +%s) || return 1
   fm_backlog_record_parent_authorized "$record" "teardown process audit" "$STATE" || return 1
   if [ -e "$record" ] || [ -L "$record" ]; then
     [ -f "$record" ] && [ ! -L "$record" ] || return 1
   fi
-  (umask 077; printf '%q\t%q\t%q\t%q\t%q\t%q\t%q\t%q\n' \
-    "$epoch" "$signal" "$pid" "$identity" "$command" \
-    "$start" "$cwd" "$cwd" >> "$record") || return 1
+  (umask 077; printf '%q\t%q\t%q\t%q\t%q\t%q\t%q\t%q\t%q\n' \
+    "$epoch" "$signal" "$pid" "$identity" "$exe" \
+    "$start" "$cwd" "$cwd" "cmdline-sha256=$digest" >> "$record") || return 1
 }
 
 # Fix 2's preflight: classify every holder of <dir>... with the full proof and
@@ -4925,10 +5014,6 @@ EOF
       identity=${tracked_identities[$i]}
       if task_pid_list_contains "$current_pids" "$pid" \
          && task_process_identity_matches "$pid" "$identity"; then
-        if ! task_owned_contains "$pid" "$identity"; then
-          echo "REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without signalling it." >&2
-          return 1
-        fi
         if task_record_process_signal "$pid" "$identity" TERM; then
           :
         else
@@ -4937,6 +5022,12 @@ EOF
           return 1
         fi
         task_process_identity_matches "$pid" "$identity" || continue
+        # The ownership proof is checked last, right before the signal: a group
+        # proof whose live chain-proved member is gone has expired.
+        if ! task_owned_contains "$pid" "$identity"; then
+          echo "REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without signalling it." >&2
+          return 1
+        fi
         kill -TERM "$pid" 2>/dev/null || true
       fi
     done
@@ -4969,10 +5060,6 @@ EOF
         identity=${remaining_identities[$i]}
         if task_pid_list_contains "$current_pids" "$pid" \
            && task_process_identity_matches "$pid" "$identity"; then
-          if ! task_owned_contains "$pid" "$identity"; then
-            echo "REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without force-killing it." >&2
-            return 1
-          fi
           if task_record_process_signal "$pid" "$identity" KILL; then
             :
           else
@@ -4981,6 +5068,12 @@ EOF
             return 1
           fi
           task_process_identity_matches "$pid" "$identity" || continue
+          # The ownership proof is checked last, right before the signal: a group
+          # proof whose live chain-proved member is gone has expired.
+          if ! task_owned_contains "$pid" "$identity"; then
+            echo "REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without force-killing it." >&2
+            return 1
+          fi
           kill -KILL "$pid" 2>/dev/null || true
         fi
       done
@@ -5119,8 +5212,15 @@ retire_task_private_nm_launch_agents() {  # <worktree>
   fi
   uid=$(id -u)
   for plist in "$dir"/com.kunchenguid.no-mistakes.daemon.*.plist; do
-    [ -f "$plist" ] || continue
-    if [ -L "$plist" ] || ! fields=$(nm_launch_agent_fields "$plist"); then
+    [ -f "$plist" ] || [ -L "$plist" ] || continue
+    # A symlinked plist is read through its target: launchd loads it, so an
+    # agent it names is judged like any other, and one whose target cannot be
+    # read or parsed cannot be shown to point outside the copy, so it refuses.
+    if ! fields=$(nm_launch_agent_fields "$plist"); then
+      if [ -L "$plist" ]; then
+        echo "REFUSED: no-mistakes launch agent plist $plist is a symbolic link whose target cannot be read or parsed, so whether its agent is rooted in $ID's copy cannot be decided; teardown neither unloads nor archives it and keeps the copy. Repair or remove the link, then rerun teardown." >&2
+        return 1
+      fi
       echo "teardown: leaving unreadable no-mistakes launch agent $plist as found; its root cannot be proven to be $ID's" >&2
       continue
     fi
@@ -7296,6 +7396,7 @@ fi
 
 if [ "$KIND" = secondmate ] && [ "$FORCE" = "--force" ]; then
   preflight_descendant_treehouse_slots || exit 1
+  teardown_forced_holders_preflight "$HOME_PATH" || exit "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
   teardown_release_herdr_locks
   cleanup_firstmate_home_children "$HOME_PATH" || exit $?
 fi
@@ -7502,8 +7603,16 @@ elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
 elif [ "$KIND" != secondmate ]; then
   # The task owns no copy here, so a tasktmp process this teardown cannot prove
   # the task's is named and left running, and teardown continues: removing the
-  # directory does not need it dead (Fix 2 header).
+  # directory does not need it dead (Fix 2 header). That holds only while the
+  # endpoint's pane shell was itself proved: an unprovable anchor (an absent
+  # window, several panes) refuses before any endpoint close or signal, because
+  # closing that endpoint could end the very process left running.
   if ! reap_task_worktree_processes tasktmp "$TASK_TMP"; then
+    task_anchor_load
+    if [ "${TASK_PIDS_HOLDER_UNPROVEN:-0}" != 1 ] || [ -z "$TASK_ANCHOR_PID" ]; then
+      echo "REFUSED: the tasktmp sweep for $ID refused and $(if [ -z "$TASK_ANCHOR_PID" ]; then printf '%s' "$TASK_ANCHOR_NOTE"; else printf 'the refusal was not an unproven holder'; fi), so teardown stops before any endpoint close or signal; every durable task record is kept." >&2
+      exit 1
+    fi
     echo "teardown: leaving the tasktmp process(es) named above running in $TASK_TMP and continuing; nothing there was signalled after the refusal" >&2
   fi
 fi
