@@ -264,7 +264,7 @@ while IFS= read -r entry; do
     printf '%s\n' "$test" | tr ',' '\n' | while IFS= read -r f; do
       f=$(printf '%s' "$f" | tr -d ' \t')
       [ -n "$f" ] || continue
-      [ -e "$ROOT/$f" ] || printf 'R7\t%s\tnonexistent test file %s\n' "$id" "$f" >>"$VIOLATIONS"
+      [ -e "$ROOT/$f" ] || violation R7 "$id" "nonexistent test file $f"
     done
   fi
 

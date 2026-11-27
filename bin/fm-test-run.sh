@@ -2043,6 +2043,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-control-relaunch.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-recovery.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-real-treehouse.test.sh"
       printf '%s\n' "__script__:fm-session-end-relaunch.test.sh"
       ;;
     bin/fm-quota-axi-lib.sh)
@@ -2101,6 +2102,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-control-relaunch.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-recovery.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-real-treehouse.test.sh"
       printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' session-bootstrap
       ;;

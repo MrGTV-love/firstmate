@@ -369,19 +369,22 @@ test_changed_owners_of_the_moved_real_treehouse_cases_select_them() {
     printf '#!/usr/bin/env bash\n' >"$repo/tests/$script.test.sh"
     chmod +x "$repo/tests/$script.test.sh"
   done
-  for source in backends/tmux.sh backends/herdr.sh fm-control-lib.sh fm-teardown-nested-lib.sh fm-teardown.sh fm-spawn.sh fm-watch.sh; do
+  for source in backends/tmux.sh backends/herdr.sh fm-control-lib.sh fm-teardown-nested-lib.sh fm-teardown.sh fm-spawn.sh fm-model-index.sh fm-watch.sh; do
     : >"$repo/bin/$source"
   done
   git -C "$repo" add bin tests
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm real-treehouse-selection-fixture
 
-  for source in backends/tmux.sh backends/herdr.sh fm-control-lib.sh fm-teardown-nested-lib.sh fm-teardown.sh fm-spawn.sh fm-watch.sh; do
+  for source in backends/tmux.sh backends/herdr.sh fm-control-lib.sh fm-teardown-nested-lib.sh fm-teardown.sh fm-spawn.sh fm-model-index.sh fm-watch.sh; do
     printf '\n' >"$repo/bin/$source"
     listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
       || fail "$source changed selection failed"
     for script in "${scripts[@]}"; do
       if [ "$source" = fm-watch.sh ]; then
         assert_not_contains "$listed" "tests/$script.test.sh" "$source does not select $script"
+      elif [ "$source" = fm-model-index.sh ]; then
+        [ "$script" != fm-control-relaunch-real-treehouse ] \
+          || assert_contains "$listed" "tests/$script.test.sh" "$source selects $script, as it selected its old host script"
       else
         assert_contains "$listed" "tests/$script.test.sh" "$source selects $script"
       fi
