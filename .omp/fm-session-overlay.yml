@@ -1,14 +1,16 @@
 # Firstmate session posture for omp (Oh My Pi), passed as `--config` on every
-# Firstmate-launched omp session (crewmate, scout, and secondmate alike) by
+# canonical Firstmate-launched omp session (crewmate, scout, and secondmate alike) by
 # bin/fm-spawn.sh, whose header owns why the launch carries it. It is the omp
 # analogue of the Pi adapter's `--tui-mode regular` pin: a per-launch overlay,
 # never a write to the captain's own ~/.omp/agent/config.yml, which stays
 # exactly as the captain set it (model roles, theme, providers, compaction).
 # Each key below pins one setting whose captain-facing value would park an
 # unattended worker on an interactive prompt, change its pinned model under it,
-# or make its composer unreadable to bin/fm-composer-lib.sh. Verified against
+# or make its composer unreadable to bin/fm-composer-lib.sh. The one exception
+# is the `lsp` key, which protects host CPU instead. Verified against
 # omp 18.1.11's own settings schema (`omp config list`); the fallback keys against
-# omp 18.11.0 by tests/fm-omp-fallback-chain-live-e2e.test.sh.
+# omp 18.11.0 by tests/fm-omp-fallback-chain-live-e2e.test.sh; the `lsp` key
+# against omp 19.0.0 by tests/fm-omp-lsp-overlay-live-e2e.test.sh.
 composer:
   # Pins the bare `❯` (U+276F) row for predictable worker rendering.
   # omp live-reloads this overlay, so removing the pin also changes sessions
@@ -35,3 +37,10 @@ retry:
     openai-codex/gpt-6.1-sol: []
   # Keep omp's native return behavior for permitted non-DeepSeek chains.
   fallbackRevertPolicy: cooldown-expiry
+lsp:
+  # Canonical omp launches by bin/fm-spawn.sh keep the language server off in unattended fleet sessions.
+  # Main 3115 measured basedpyright servers under live omp sessions at 25 to 95 percent CPU and a host load average of 117.
+  # Captain-side omp sessions never layer this file, so they keep the language server.
+  # A raw omp command passed to bin/fm-spawn.sh receives no overlay from the launcher and is not covered.
+  # an omp session that live-reloads the overlay may turn its language server off mid-session; this is not tested either way.
+  enabled: false
