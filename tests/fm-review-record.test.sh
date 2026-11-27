@@ -611,7 +611,725 @@ test_plan_agrees_with_verify_for_an_unrecorded_pipeline_family() {
   pass "plan applies the one-reader relief for an unrecorded pipeline family and the two-reader rule for any other unknown group exactly as verify does, names the families a reader must lie outside, and verify keeps its disclosure"
 }
 
+# Review carry-over fixtures: branch pr adds app.txt from BASE (the reviewed
+# head); trunk moves the base by adding other.txt. Each case builds its live
+# head from those two, so every outcome is decided by the live head's content.
+cgit() {  # <case_dir> <git args...>
+  local case_dir=$1
+  shift
+  git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' "$@"
+}
+
+make_carry_case() {  # <name>; prints the case dir
+  local case_dir
+  case_dir=$(make_case "$1")
+  cgit "$case_dir" checkout -q -b pr "$BASE"
+  printf 'one\ntwo\nthree\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm 'ship change'
+  cgit "$case_dir" checkout -q -b trunk "$BASE"
+  printf 'other\n' > "$case_dir/wt/other.txt"
+  cgit "$case_dir" add other.txt
+  cgit "$case_dir" commit -qm 'base moves'
+  printf '%s\n' "$case_dir"
+}
+
+carry_refs() {  # <case_dir>: sets REVIEWED and TRUNK
+  REVIEWED=$(cgit "$1" rev-parse pr)
+  TRUNK=$(cgit "$1" rev-parse trunk)
+}
+
+merge_trunk_into_pr() {  # <case_dir>; prints the merge head
+  cgit "$1" checkout -q pr
+  cgit "$1" merge -q --no-edit trunk
+  cgit "$1" rev-parse HEAD
+}
+
+unread_merge_into_pr() {  # <case_dir>; prints a merge head that hides one unread line
+  cgit "$1" checkout -q pr
+  cgit "$1" merge -q --no-commit --no-ff trunk >/dev/null 2>&1
+  printf 'unread\n' >> "$1/wt/app.txt"
+  cgit "$1" add app.txt
+  cgit "$1" commit -qm "Merge branch 'trunk' into pr"
+  cgit "$1" rev-parse HEAD
+}
+
+verify_on() {  # <case_dir> <head> <base> [flags...]
+  verify_with "$RECORD" -- "$@"
+}
+
+verify_with() {  # <record script> [env-args... --] <case_dir> <head> <base> [flags...]
+  # env-args go to env(1) for this call only, for example -u NAME or NAME=value.
+  local script=$1 case_dir head base
+  local -a envs=()
+  shift
+  while [ "$1" != -- ]; do envs+=("$1"); shift; done
+  shift
+  case_dir=$1 head=$2 base=$3
+  shift 3
+  env ${envs[@]+"${envs[@]}"} NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$script" verify --pr "$URL" --head "$head" \
+    --task task-x1 --base "$base" "$@"
+}
+
+test_carry_over_accepts_a_clean_merge_of_the_base() {
+  local case_dir live later out rc=0
+  case_dir=$(make_carry_case carry-merge)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at the reviewed head"
+  live=$(merge_trunk_into_pr "$case_dir")
+  # The base keeps moving after the update; the proof uses the base content the live head holds.
+  cgit "$case_dir" checkout -q trunk
+  printf 'later\n' > "$case_dir/wt/later.txt"
+  cgit "$case_dir" add later.txt
+  cgit "$case_dir" commit -qm 'base moves again'
+  later=$(cgit "$case_dir" rev-parse HEAD)
+  out=$(verify_on "$case_dir" "$live" "$later" --json) || rc=$?
+  expect_code 0 "$rc" "a clean merge of the base must carry the PASS: $out"
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
+  "$JQ_BIN" -e --arg live "$live" --arg reviewed "$REVIEWED" '
+    .ok == true and .basis == "independent-review" and .head == $live
+    and .carried_from == $reviewed and .reader_model == "sonnet"
+    and (.facts | any(startswith("review carried from " + $reviewed)))' <<<"$out" >/dev/null \
+    || fail "carried JSON must name the live head, the reviewed head and the fact: $out"
+  rc=0
+  out=$(verify_on "$case_dir" "$live" "$later") || rc=$?
+  expect_code 0 "$rc" "text verify must accept the carry-over: $out"
+  case "$out" in "review: PASS"*) ;; *) fail "text verify keeps review: PASS first: $out" ;; esac
+  case "$out" in *"review: review carried from $REVIEWED"*) ;; *) fail "text verify discloses the carry-over: $out" ;; esac
+  rc=0
+  out=$(verify_on "$case_dir" "$live" "$later" --review-only) || rc=$?
+  expect_code 0 "$rc" "--review-only accepts a carried independent PASS: $out"
+  pass "a PASS carries to a head that is exactly the reviewed change merged with base content, and says so"
+}
+
+test_carry_over_accepts_a_clean_rebase() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-rebase)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q -b rebased "$REVIEWED"
+  cgit "$case_dir" rebase -q trunk
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  out=$(verify_on "$case_dir" "$live" "$TRUNK") || rc=$?
+  expect_code 0 "$rc" "a clean rebase onto the base must carry the PASS: $out"
+  pass "a PASS carries across a clean rebase onto the base"
+}
+
+test_carry_over_refuses_an_unread_change() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-unread)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  # An edit hidden inside the update merge itself, where an unread line most easily hides.
+  live=$(unread_merge_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "an unread line in the update merge must refuse: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "unread change"
+  expect_not_qualified "$out" "head mismatch" "unread change keeps the head-mismatch refusal"
+  pass "an update that adds any unread line keeps the exact-head refusal"
+}
+
+test_carry_over_refusal_comes_from_the_tree_proof() {
+  # Sensitivity control: a disposable copy with only the tree comparison
+  # forced equal must accept the same unread change, so the refusal above is
+  # the tree proof's and not a setup or coverage failure.
+  local case_dir live copy out rc=0
+  case_dir=$(make_carry_case carry-unread-control)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(unread_merge_into_pr "$case_dir")
+  copy="$TMP_ROOT/unguarded-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = 'if lines[0] != live.stdout.strip():'
+assert text.count(needle) == 1, "tree comparison line not found exactly once"
+open(path, "w").write(text.replace(needle, "if False:"))
+PY
+  out=$(verify_with "$copy/fm-review-record.py" -- "$case_dir" "$live" "$TRUNK") || rc=$?
+  expect_code 0 "$rc" "with the tree comparison removed the unread change must be accepted: $out"
+  pass "removing only the tree comparison lets the unread change through, so the refusal is the tree proof's"
+}
+
+test_carry_over_refuses_a_conflict_resolution() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-conflict)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q trunk
+  printf 'base version\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm 'base edits the same file'
+  TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit trunk >/dev/null 2>&1 || true
+  # Resolve by keeping the reviewed side exactly; a hand resolution still needs a read.
+  printf 'one\ntwo\nthree\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm "Merge branch 'trunk' into pr"
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a conflict resolution must refuse: $out"
+  expect_not_qualified "$out" "does not merge cleanly" "conflict resolution"
+  pass "a conflicted update needs a fresh read even when the resolution keeps the reviewed side"
+}
+
+test_carry_over_never_carries_a_captain_word() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-word)
+  carry_refs "$case_dir"
+  record_word "$case_dir" "$REVIEWED" 'Merge PR 9.' >/dev/null || fail "record captain-word at the reviewed head"
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a captain-word at an older head must not carry: $out"
+  expect_not_qualified "$out" "review record is missing" "captain-word carry"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  rc=0
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "the PASS carries while the older captain-word stays out: $out"
+  "$JQ_BIN" -e '.basis == "independent-review"' <<<"$out" >/dev/null || fail "basis must be the review, not the word: $out"
+  pass "a captain-word never carries to a new head; only recorded reads do"
+}
+
+test_carry_over_keeps_a_standing_fail() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-fail)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  record_review "$case_dir" "$REVIEWED" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL"
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a FAIL standing at the reviewed head must not carry as a PASS: $out"
+  expect_not_qualified "$out" "do not qualify: verdict is FAIL at $REVIEWED" "standing FAIL"
+  pass "a FAIL standing at the reviewed head stands at the live head too"
+}
+
+test_carry_over_never_overrides_a_read_of_the_live_head() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-live-read)
+  carry_refs "$case_dir"
+  live=$(merge_trunk_into_pr "$case_dir")
+  record_review "$case_dir" "$live" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at the live head"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record a later PASS of the older head"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a read of the live head must not be bypassed by an older head's PASS: $out"
+  expect_not_qualified "$out" "head mismatch" "live head read"
+  case "$out" in *"no carry-over"*) fail "a read of the live head must stop carry-over before the proof: $out" ;; esac
+  pass "any read of the live head turns carry-over off"
+}
+
+test_carry_over_refuses_a_missing_reviewed_object() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-missing)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$HEAD2" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS of an absent head"
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "an absent reviewed head must refuse: $out"
+  expect_not_qualified "$out" "is not available in the task worktree" "absent reviewed head"
+  pass "a reviewed head that is not available locally cannot carry"
+}
+
+test_carry_over_refuses_a_branch_that_is_not_on_the_base() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-side-branch)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  # A side branch that never reached the base: a clean merge of it is still unread content.
+  cgit "$case_dir" checkout -q -b side "$BASE"
+  printf 'side\n' > "$case_dir/wt/side.txt"
+  cgit "$case_dir" add side.txt
+  cgit "$case_dir" commit -qm 'side work'
+  live=$(merge_trunk_into_pr "$case_dir")
+  cgit "$case_dir" merge -q --no-edit side
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a merged branch that is not on the base must refuse: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "side branch"
+  pass "a clean merge of a branch that is not on the base is unread content and refuses"
+}
+
+test_carry_over_accepts_a_same_tree_rewrite() {
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-rewrite)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  # Only the commit message changes: the content every read saw is unchanged, so the PASS stands.
+  cgit "$case_dir" checkout -q -b reworded "$REVIEWED"
+  cgit "$case_dir" commit -q --amend -m 'ship change, reworded'
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  out=$(verify_on "$case_dir" "$live" "$BASE") || rc=$?
+  expect_code 0 "$rc" "a same-tree rewrite must carry the PASS: $out"
+  pass "a rewrite that keeps the reviewed tree, such as an amended message, carries the PASS"
+}
+
+test_carry_over_refuses_after_a_later_head_was_read() {
+  local case_dir r2 live out rc=0
+  case_dir=$(make_carry_case carry-later-fail)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+  r2=$(merge_trunk_into_pr "$case_dir")
+  record_review "$case_dir" "$r2" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at R2"
+  # A late PASS of R is appended after the FAIL, so R is again the newest review.
+  record_review "$case_dir" "$REVIEWED" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record late PASS at R"
+  cgit "$case_dir" checkout -q trunk
+  printf 'more\n' > "$case_dir/wt/more.txt"
+  cgit "$case_dir" add more.txt
+  cgit "$case_dir" commit -qm 'base moves again'
+  TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a FAIL at a later head must not be skipped by a late PASS of an earlier head: $out"
+  expect_not_qualified "$out" "head mismatch" "later head read"
+  pass "a read of any later head turns carry-over off, so row order cannot skip a FAIL"
+}
+
+test_carry_over_refuses_after_a_fail_recorded_before_the_pass() {
+  # GLM-5.4 review finding 1: a FAIL at a clean update H1 recorded BEFORE R's
+  # first PASS, then a later clean update H2 (or a same-tree reword of H1).
+  local variant case_dir h1 live out rc
+  for variant in update reword; do
+    case_dir=$(make_carry_case "carry-fail-first-$variant")
+    carry_refs "$case_dir"
+    h1=$(merge_trunk_into_pr "$case_dir")
+    record_review "$case_dir" "$h1" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at H1"
+    record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+    if [ "$variant" = update ]; then
+      cgit "$case_dir" checkout -q trunk
+      printf 'more\n' > "$case_dir/wt/more.txt"
+      cgit "$case_dir" add more.txt
+      cgit "$case_dir" commit -qm 'base moves again'
+      TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+      live=$(merge_trunk_into_pr "$case_dir")
+    else
+      cgit "$case_dir" checkout -q pr
+      cgit "$case_dir" commit -q --amend -m 'reworded update merge'
+      live=$(cgit "$case_dir" rev-parse HEAD)
+    fi
+    rc=0
+    out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    expect_code 1 "$rc" "$variant: a FAIL recorded before R's PASS must not be skipped: $out"
+    expect_not_qualified "$out" "head mismatch" "$variant: FAIL before PASS"
+    rc=0
+    out=$(verify_on "$case_dir" "$live" "$TRUNK" --review-only --json) || rc=$?
+    expect_code 1 "$rc" "$variant: --review-only must refuse too: $out"
+  done
+  pass "a read of any head that is not an ancestor of R turns carry-over off, whatever the row order"
+}
+
+test_carry_over_allows_reads_of_heads_r_was_built_on() {
+  # The legitimate path: a FAIL at an earlier head, fixed by commits on top
+  # (R descends from it), PASS at R, then a clean base update.
+  local case_dir h0 live out rc=0
+  case_dir=$(make_carry_case carry-fail-then-fix)
+  cgit "$case_dir" checkout -q pr
+  h0=$(cgit "$case_dir" rev-parse HEAD)
+  record_review "$case_dir" "$h0" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at H0"
+  printf 'fixed\n' >> "$case_dir/wt/app.txt"
+  cgit "$case_dir" commit -qam 'fix the FAIL'
+  REVIEWED=$(cgit "$case_dir" rev-parse HEAD)
+  TRUNK=$(cgit "$case_dir" rev-parse trunk)
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK") || rc=$?
+  expect_code 0 "$rc" "a FAIL at a head R was built on must not block carrying R's PASS: $out"
+  pass "reads of earlier heads that R builds on leave carry-over available"
+}
+
+test_carry_over_writes_nothing_to_the_task_object_store() {
+  # GLM-5.4 finding 4 and DeepSeek finding 1: a refusing proof builds a tree the
+  # store lacks (a conflict tree here), so the scratch store is what keeps the
+  # task's object store unchanged. A disposable copy without the override must
+  # change the store, so this case can see the behavior it names.
+  local case_dir live base before after out rc copy
+  case_dir=$(make_carry_case carry-readonly)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q trunk
+  printf 'base version\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm 'base edits the same file'
+  base=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit trunk >/dev/null 2>&1 || true
+  printf 'one\ntwo\nthree\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm "Merge branch 'trunk' into pr"
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  before=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
+  rc=0
+  out=$(verify_on "$case_dir" "$live" "$base" --json) || rc=$?
+  after=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
+  expect_code 1 "$rc" "the conflicted update must refuse: $out"
+  expect_not_qualified "$out" "does not merge cleanly" "conflicted update"
+  assert_equals "$before" "$after" "a refusing proof must not add objects to the task worktree's store"
+  copy="$TMP_ROOT/no-scratch-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY2' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = 'merged = isolated_merge_tree(scratch, objects.stdout.strip(), object_format.stdout.strip(), point.stdout.strip(), reviewed)'
+assert text.count(needle) == 1, "isolated merge call not found exactly once"
+open(path, "w").write(text.replace(needle, 'merged = run("merge-tree", "--write-tree", "--no-messages", point.stdout.strip(), reviewed)'))
+PY2
+  verify_with "$copy/fm-review-record.py" -- "$case_dir" "$live" "$base" >/dev/null 2>&1 || true
+  after=$(find "$case_dir/wt/.git/objects" -type f | sort | shasum | cut -c1-40)
+  [ "$before" != "$after" ] || fail "control: without the scratch store the refusing proof must write to the task store, or this case observes nothing"
+  pass "the carry-over proof writes its merged trees to a scratch repository, and running it in the worktree makes the store change"
+}
+
+test_carry_over_ignores_grafts() {
+  # DeepSeek finding 2: a graft can make a FAILed later head look like an ancestor of R.
+  local case_dir h1 live out rc=0
+  case_dir=$(make_carry_case carry-graft)
+  carry_refs "$case_dir"
+  h1=$(merge_trunk_into_pr "$case_dir")
+  record_review "$case_dir" "$h1" FAIL gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record FAIL at H1"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+  mkdir -p "$case_dir/wt/.git/info"
+  printf '%s %s %s\n' "$REVIEWED" "$BASE" "$h1" > "$case_dir/wt/.git/info/grafts"
+  cgit "$case_dir" checkout -q trunk
+  printf 'more\n' > "$case_dir/wt/more.txt"
+  cgit "$case_dir" add more.txt
+  cgit "$case_dir" commit -qm 'base moves again'
+  TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a graft must not make the FAILed head an ancestor of R: $out"
+  expect_not_qualified "$out" "does not build on" "graft"
+  pass "grafts are ignored by the carry-over proof, so they cannot fake ancestry"
+}
+
+test_carry_over_refuses_a_base_older_than_the_update() {
+  # DeepSeek note: a --base older than the base content the live head merged
+  # makes the trees differ, so it refuses rather than carries.
+  local case_dir live out rc=0
+  case_dir=$(make_carry_case carry-old-base)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  out=$(verify_on "$case_dir" "$live" "$BASE" --json) || rc=$?
+  expect_code 1 "$rc" "a base older than the merged base content must refuse: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "old base"
+  pass "a base older than the base content the live head merged refuses"
+}
+
+test_carry_over_ignores_a_graft_that_fakes_base_content() {
+  # DeepSeek round-2 finding 3: a graft on the base tip that makes an unread
+  # side commit look like base content. A copy without the proof's graft
+  # setting must accept it, so this case observes the harmful acceptance.
+  local case_dir side live out rc=0 copy
+  case_dir=$(make_carry_case carry-graft-base)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q -b side "$BASE"
+  printf 'unread side work\n' > "$case_dir/wt/side.txt"
+  cgit "$case_dir" add side.txt
+  cgit "$case_dir" commit -qm 'unread side work'
+  side=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit side
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  mkdir -p "$case_dir/wt/.git/info"
+  printf '%s %s %s\n' "$TRUNK" "$BASE" "$side" > "$case_dir/wt/.git/info/grafts"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a graft must not turn unread side work into base content: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "base graft"
+  copy="$TMP_ROOT/graft-honoring-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY2' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = '    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull}\n'
+assert text.count(needle) == 1, "proof env line not found exactly once"
+open(path, "w").write(text.replace(needle, '    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}\n'))
+PY2
+  rc=0
+  out=$(verify_with "$copy/fm-review-record.py" -- "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "control: with grafts honored the side work must carry, or this case observes nothing: $out"
+  pass "the proof ignores a graft that would pass unread side work off as base content"
+}
+
+plant_proof_in_worktree() {  # <copy_dir>: copy bin/ with the merge proof run in the task worktree
+  cp -R "$ROOT/bin" "$1"
+  python3 - "$1/fm-review-record.py" <<'PY2' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = 'merged = isolated_merge_tree(scratch, objects.stdout.strip(), object_format.stdout.strip(), point.stdout.strip(), reviewed)'
+assert text.count(needle) == 1, "isolated merge call not found exactly once"
+open(path, "w").write(text.replace(needle, 'merged = run("merge-tree", "--write-tree", "--no-messages", point.stdout.strip(), reviewed)'))
+PY2
+}
+
+test_carry_over_ignores_a_merge_driver_in_the_task_worktree() {
+  # GLM-5.4 round-3 findings 1 and 2: the PR author's worker can write the task
+  # worktree's config and attributes. A merge driver there resolves a conflict
+  # with bytes no reader saw; the proof must still see the conflict. A copy that
+  # runs the proof in the worktree must carry, so this case observes the harm.
+  local case_dir live out rc=0 copy
+  case_dir=$(make_carry_case carry-driver)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q trunk
+  printf 'base version\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm 'base edits the same file'
+  TRUNK=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" config merge.forge.driver "printf 'unread driver bytes\\n' > %A"
+  printf 'app.txt merge=forge\n' > "$case_dir/wt/.gitattributes"
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit trunk >/dev/null 2>&1 || fail "the driver must resolve the conflict"
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  [ "$(cat "$case_dir/wt/app.txt")" = "unread driver bytes" ] || fail "fixture: the driver wrote the merged file"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a worktree merge driver must not hide a conflict resolution: $out"
+  expect_not_qualified "$out" "does not merge cleanly" "worktree merge driver"
+  copy="$TMP_ROOT/driver-honoring-bin"
+  plant_proof_in_worktree "$copy"
+  rc=0
+  out=$(verify_with "$copy/fm-review-record.py" -- "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "control: a proof run in the worktree must honor the worktree config and root .gitattributes and carry: $out"
+  # The same driver through the caller's environment and .git/info/attributes.
+  cgit "$case_dir" config --unset merge.forge.driver
+  rm "$case_dir/wt/.gitattributes"
+  mkdir -p "$case_dir/wt/.git/info"
+  printf 'app.txt merge=forge\n' > "$case_dir/wt/.git/info/attributes"
+  rc=0
+  out=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=merge.forge.driver GIT_CONFIG_VALUE_0="printf 'unread driver bytes\\n' > %A" \
+    verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "an environment merge driver must not hide a conflict resolution: $out"
+  expect_not_qualified "$out" "does not merge cleanly" "environment merge driver"
+  rc=0
+  out=$(verify_with "$copy/fm-review-record.py" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=merge.forge.driver \
+    GIT_CONFIG_VALUE_0="printf 'unread driver bytes\\n' > %A" -- "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "control: a proof run in the worktree must honor the driver and carry, or this case observes nothing: $out"
+  pass "the proof ignores merge drivers and attributes from the task worktree and the caller's environment"
+}
+
+test_carry_over_ignores_replace_refs() {
+  # GLM-5.4 round-3 finding 4: a replace ref on the base tip that gives it the
+  # unread side commit as a second parent. A copy without the proof's
+  # replace-ref setting must accept it, so this case observes the harm.
+  local case_dir side live out rc=0 copy
+  case_dir=$(make_carry_case carry-replace-base)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q -b side "$BASE"
+  printf 'unread side work\n' > "$case_dir/wt/side.txt"
+  cgit "$case_dir" add side.txt
+  cgit "$case_dir" commit -qm 'unread side work'
+  side=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" checkout -q pr
+  cgit "$case_dir" merge -q --no-edit side
+  live=$(cgit "$case_dir" rev-parse HEAD)
+  cgit "$case_dir" replace --graft "$TRUNK" "$BASE" "$side" || fail "fixture: replace ref"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 1 "$rc" "a replace ref must not turn unread side work into base content: $out"
+  expect_not_qualified "$out" "holds changes no PASS read" "base replace ref"
+  copy="$TMP_ROOT/replace-honoring-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY2' || fail "plant the fault"
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = '    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull}\n'
+assert text.count(needle) == 1, "proof env line not found exactly once"
+open(path, "w").write(text.replace(needle, '    env = {**os.environ, "GIT_GRAFT_FILE": os.devnull}\n'))
+PY2
+  rc=0
+  out=$(verify_with "$copy/fm-review-record.py" -- "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  expect_code 0 "$rc" "control: with replace refs honored the side work must carry, or this case observes nothing: $out"
+  pass "the proof ignores a replace ref that would pass unread side work off as base content"
+}
+
+conflicted_driver_case() {  # <name>; prints the case dir; sets TRUNK and LIVE to a driver-resolved update
+  local case_dir
+  case_dir=$(make_carry_case "$1")
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  cgit "$case_dir" checkout -q trunk
+  printf 'base version\n' > "$case_dir/wt/app.txt"
+  cgit "$case_dir" add app.txt
+  cgit "$case_dir" commit -qm 'base edits the same file'
+  cgit "$case_dir" checkout -q pr
+  printf '%s\n' "$case_dir"
+}
+
+test_carry_over_ignores_global_config_and_global_attributes() {
+  # DeepSeek round-4 finding 4: a merge driver and attribute mapping from the
+  # caller's global configuration, at ~/.gitconfig with core.attributesFile and
+  # at $XDG_CONFIG_HOME/git/config with git/attributes. Each location is
+  # removed twice (GIT_CONFIG_GLOBAL or core.attributesFile, and the scratch
+  # HOME and XDG_CONFIG_HOME), so no one-line removal flips the result; the
+  # control runs the proof unisolated and must carry, so the fixture is real.
+  # System configuration and system attributes are removed too, but a test
+  # cannot plant those files, so they are not exercised here.
+  local layout case_dir fake live out rc copy
+  copy="$TMP_ROOT/global-honoring-bin"
+  plant_proof_in_worktree "$copy"
+  for layout in home xdg; do
+    case_dir=$(conflicted_driver_case "carry-global-$layout")
+    TRUNK=$(cgit "$case_dir" rev-parse trunk)
+    fake="$case_dir/fake-home"
+    mkdir -p "$fake/xdg/git"
+    if [ "$layout" = home ]; then
+      printf 'app.txt merge=forge\n' > "$fake/attrs"
+      git config --file "$fake/.gitconfig" merge.forge.driver "printf 'unread driver bytes\\n' > %A"
+      git config --file "$fake/.gitconfig" core.attributesFile "$fake/attrs"
+    else
+      printf 'app.txt merge=forge\n' > "$fake/xdg/git/attributes"
+      git config --file "$fake/xdg/git/config" merge.forge.driver "printf 'unread driver bytes\\n' > %A"
+    fi
+    # The suite runs every case with GIT_CONFIG_GLOBAL=/dev/null; these calls
+    # lift only that, so the planted files are the caller's real global config.
+    env -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" \
+      git -C "$case_dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+      merge -q --no-edit trunk >"$case_dir/merge.out" 2>&1 \
+      || fail "$layout: the global driver must resolve the conflict: $(cat "$case_dir/merge.out")"
+    live=$(cgit "$case_dir" rev-parse HEAD)
+    [ "$(cat "$case_dir/wt/app.txt")" = "unread driver bytes" ] || fail "$layout fixture: the global driver wrote the merged file"
+    rc=0
+    out=$(verify_with "$RECORD" -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" -- \
+      "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    expect_code 1 "$rc" "$layout: a global merge driver must not hide a conflict resolution: $out"
+    expect_not_qualified "$out" "does not merge cleanly" "$layout global merge driver"
+    rc=0
+    out=$(verify_with "$copy/fm-review-record.py" -u GIT_CONFIG_GLOBAL HOME="$fake" XDG_CONFIG_HOME="$fake/xdg" -- \
+      "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    expect_code 0 "$rc" "$layout control: an unisolated proof must honor the global driver and carry: $out"
+  done
+  pass "the proof ignores merge drivers and attributes from the caller's global configuration in both locations"
+}
+
+test_carry_over_scratch_lives_beside_the_review_records() {
+  # DeepSeek round-4 finding 5: the scratch repository is made in the state
+  # directory that holds the review records, not the shared temporary
+  # directory, and is gone afterwards. A git shim logs where git init runs.
+  local case_dir live out rc=0 shim made
+  case_dir=$(make_carry_case carry-scratch-place)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  shim="$case_dir/shim"
+  mkdir -p "$shim"
+  cat > "$shim/git" <<SH
+#!/usr/bin/env bash
+[ "\$1" != init ] || printf '%s\n' "\${@: -1}" >> "$case_dir/init.log"
+exec $(command -v git) "\$@"
+SH
+  chmod +x "$shim/git"
+  out=$(PATH="$shim:$PATH" TMPDIR="$case_dir/shared-tmp" verify_on "$case_dir" "$live" "$TRUNK") || rc=$?
+  expect_code 0 "$rc" "the clean update must carry: $out"
+  made=$(cat "$case_dir/init.log" 2>/dev/null || true)
+  [ -n "$made" ] || fail "the proof ran no git init"
+  case "$made" in
+    "$case_dir/home/state/.review-carry-"*/proof.git) ;;
+    *) fail "the scratch repository must be made in the state directory, not elsewhere: $made" ;;
+  esac
+  [ -z "$(find "$case_dir/home/state" -maxdepth 1 -name '.review-carry-*')" ] || fail "the scratch directory must be removed after the proof"
+  pass "the proof's scratch repository is made beside the review records and removed afterwards"
+}
+
+test_carry_over_refuses_when_the_state_directory_takes_no_scratch() {
+  # An unwritable state directory is a typed refusal with its reason, never a traceback.
+  local case_dir live out rc=0
+  [ "$(id -u)" != 0 ] || { printf 'skipped: running as root, a mode-500 directory is still writable\n'; return 0; }
+  case_dir=$(make_carry_case carry-scratch-denied)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  chmod 500 "$case_dir/home/state"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+  chmod 700 "$case_dir/home/state"
+  expect_code 1 "$rc" "no scratch repository must refuse: $out"
+  expect_not_qualified "$out" "cannot make the proof's scratch repository" "unwritable state directory"
+  pass "a state directory that takes no scratch repository refuses carry-over with its reason"
+}
+
+test_carry_over_refuses_after_a_rewrite_was_itself_read() {
+  # A same-tree rewrite carries from R, but once the rewrite has its own read,
+  # the head it replaced is a reviewed head off the newest reviewed head's
+  # ancestry, so a later base update refuses and needs a fresh read.
+  # Both row orders: the rewrite read last, and a late read of R after it.
+  # The unread order is the control: the same fixture with no read of the
+  # rewrite must carry, so the extra read is what makes the others refuse.
+  local order case_dir rewrite live out rc
+  # both-merged: a third reviewed head that merges the two siblings carries
+  # while it is the newest reviewed head; both-merged-reread: a later read of
+  # R makes R the newest reviewed head again, and R does not build on it.
+  local merged
+  for order in unread rewrite-last original-last both-merged both-merged-reread; do
+    case_dir=$(make_carry_case "carry-rewrite-read-$order")
+    carry_refs "$case_dir"
+    record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at R"
+    cgit "$case_dir" checkout -q pr
+    cgit "$case_dir" commit -q --amend -m 'ship change, reworded'
+    rewrite=$(cgit "$case_dir" rev-parse HEAD)
+    [ "$order" = unread ] || record_review "$case_dir" "$rewrite" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null \
+      || fail "record PASS at the rewrite"
+    [ "$order" != original-last ] || record_review "$case_dir" "$REVIEWED" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null \
+      || fail "record a late PASS at R"
+    case "$order" in both-merged*)
+      cgit "$case_dir" merge -q --no-edit "$REVIEWED"
+      merged=$(cgit "$case_dir" rev-parse HEAD)
+      record_review "$case_dir" "$merged" PASS gemini-3-pro '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS at the merged head"
+      [ "$order" = both-merged ] || record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null \
+        || fail "record a re-read of R"
+      ;;
+    esac
+    live=$(merge_trunk_into_pr "$case_dir")
+    rc=0
+    out=$(verify_on "$case_dir" "$live" "$TRUNK" --json) || rc=$?
+    if [ "$order" = unread ]; then
+      expect_code 0 "$rc" "control: an update of a rewrite nobody read must carry from R: $out"
+      # shellcheck disable=SC2016  # jq program; single quotes are intended.
+      "$JQ_BIN" -e --arg r "$REVIEWED" '.carried_from == $r' <<<"$out" >/dev/null \
+        || fail "control: the carry must name R: $out"
+      continue
+    fi
+    if [ "$order" = both-merged ]; then
+      expect_code 0 "$rc" "a reviewed head that merges both siblings must carry while it is the newest reviewed head: $out"
+      # shellcheck disable=SC2016  # jq program; single quotes are intended.
+      "$JQ_BIN" -e --arg m "$merged" '.carried_from == $m' <<<"$out" >/dev/null \
+        || fail "the carry must name the merged reviewed head: $out"
+      continue
+    fi
+    expect_code 1 "$rc" "$order: an update of a rewrite that was itself read must refuse: $out"
+    expect_not_qualified "$out" "which the reviewed head does not build on" "$order read rewrite"
+  done
+  pass "once a same-tree rewrite is itself read, a later base update needs a fresh read"
+}
+
 fm_test_run_cases \
+  test_carry_over_ignores_global_config_and_global_attributes \
+  test_carry_over_scratch_lives_beside_the_review_records \
+  test_carry_over_refuses_when_the_state_directory_takes_no_scratch \
+  test_carry_over_refuses_after_a_rewrite_was_itself_read \
+  test_carry_over_ignores_a_merge_driver_in_the_task_worktree \
+  test_carry_over_ignores_replace_refs \
+  test_carry_over_refuses_a_branch_that_is_not_on_the_base \
+  test_carry_over_ignores_a_graft_that_fakes_base_content \
+  test_carry_over_refuses_a_base_older_than_the_update \
+  test_carry_over_writes_nothing_to_the_task_object_store \
+  test_carry_over_ignores_grafts \
+  test_carry_over_refuses_after_a_fail_recorded_before_the_pass \
+  test_carry_over_allows_reads_of_heads_r_was_built_on \
+  test_carry_over_refuses_after_a_later_head_was_read \
+  test_carry_over_accepts_a_same_tree_rewrite \
+  test_carry_over_accepts_a_clean_merge_of_the_base \
+  test_carry_over_accepts_a_clean_rebase \
+  test_carry_over_refuses_an_unread_change \
+  test_carry_over_refusal_comes_from_the_tree_proof \
+  test_carry_over_refuses_a_conflict_resolution \
+  test_carry_over_never_carries_a_captain_word \
+  test_carry_over_keeps_a_standing_fail \
+  test_carry_over_never_overrides_a_read_of_the_live_head \
+  test_carry_over_refuses_a_missing_reviewed_object \
   test_review_only_json_is_immutable_record_time_evidence \
   test_default_text_and_captain_word_json \
   test_review_only_cannot_be_satisfied_by_captain_word \

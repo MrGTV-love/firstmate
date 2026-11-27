@@ -284,8 +284,10 @@
 # so the process-event runner's feed seam is unchanged.
 #
 # `complete` is the shared investigation and visual-review completion gate.
-# It attests, in the origin task's metadata, the reviewed inventory of
-# captain-held tasks that carry the origin's unresolved captain calls.
+# The originating home's supervisor runs it after reviewing the scout's
+# report/status handoff and any visual review; the worker's report-ready
+# status is not an attestation. `complete` records the reviewed inventory of
+# captain-held tasks in the origin's supervisor-owned metadata.
 # `--none` is an explicit semantic attestation that the just-reviewed surface
 # has no unresolved captain call, and is refused while the origin still has an
 # open keyed status decision. With a non-empty inventory, every listed task is
@@ -3243,21 +3245,21 @@ EOF
   status_file="$STATE/$origin.status"
   open=$(status_open_decisions "$status_file") \
     || fail "cannot read origin $origin's status stream, which is past the status read limits, so its open captain decisions are unknown"
-  if [ -n "$open" ] && [ -z "$keys" ]; then
+  if [ -n "$open" ] && [ -z "$supplied" ]; then
     fail "origin $origin still has open captain decisions in its status stream; hold a captain task for what remains, or answer them, before attesting --none"
   fi
 
   if [ "$has_meta" = 1 ]; then
     if [ "$(meta_value "$meta" decisions_reviewed)" != 1 ] || [ "$previous" != "$keys" ]; then
       CAPTAIN_META_TMP=$(umask 077; mktemp "$STATE/.fm-captain-meta.XXXXXX") \
-        || fail "cannot stage the reviewed inventory"
+        || fail "cannot attest completion in $meta; have the originating home's supervisor run complete after reviewing the report and any open decisions"
       # Use the existing metadata publication pattern: refreshed fields first,
       # remaining fields in their original order, then a rename under the same
       # metadata lock as PR registration. In particular, never append inventory
       # fields after the PR identity footer or move an unknown trailing field
       # ahead of it: the managed poll must keep enforcing that boundary.
       printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" > "$CAPTAIN_META_TMP" \
-        || fail "cannot stage the reviewed inventory"
+        || fail "cannot attest completion in $meta; have the originating home's supervisor run complete after reviewing the report and any open decisions"
       while IFS= read -r line || [ -n "$line" ]; do
         case "$line" in
           decisions_reviewed=*|decision_keys=*) ;;
@@ -3266,10 +3268,10 @@ EOF
         esac
       done < "$meta" || fail "cannot read task metadata while recording the reviewed inventory"
       if ! chmod 0600 "$CAPTAIN_META_TMP"; then
-        fail "cannot publish the reviewed inventory"
+        fail "cannot attest completion in $meta; have the originating home's supervisor run complete after reviewing the report and any open decisions"
       fi
       if ! mv -f -- "$CAPTAIN_META_TMP" "$meta"; then
-        fail "cannot publish the reviewed inventory"
+        fail "cannot attest completion in $meta; have the originating home's supervisor run complete after reviewing the report and any open decisions"
       fi
       CAPTAIN_META_TMP=
     fi

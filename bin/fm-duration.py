@@ -109,9 +109,42 @@ COMPACT_AT sample rows; timeout and filed rows are always kept.
 
 The default margin is 3, and run reports p99 x 3 as a "slower than usual"
 advisory line rather than using it to stop healthy slow work. run stops a
-command only at a true extreme: no output and no process-tree CPU progress for
-15 minutes (FM_DURATION_NO_PROGRESS_SECS), or 6 hours wall clock overall
-(FM_DURATION_ABSOLUTE_SECS). A no-mistakes.<step> key, a wrapped pipeline drive
+command only at a true extreme: no output, no runnable descendant and no
+process-tree CPU progress for 15 minutes (FM_DURATION_NO_PROGRESS_SECS), or 6
+hours wall clock overall (FM_DURATION_ABSOLUTE_SECS). For run, CPU is progress
+only above an idle floor: more than IDLE_CPU_FLOOR_SECS of tree CPU gained
+within the trailing IDLE_CPU_WINDOW_SECS, because sleeping processes keep
+accruing housekeeping CPU (the constants' comment holds the measured creep), so
+a tree blocked on a peer is stopped even while its counters tick. Work that
+uses less CPU than the floor and writes nothing, such as a slow silent network
+read, reads as a stall; it should print progress. The floor can hold the clock
+for up to one window after the last real CPU burst. keep-going keeps any CPU
+growth as progress. On a no-progress or absolute stop, run first writes one
+read-only process snapshot of the command's group and descendants (pid, ppid,
+state, CPU, elapsed and executable name; never argv or the environment, at
+most SNAPSHOT_ROWS rows) to command-duration-trips/ beside the table, keeping
+the newest SNAPSHOT_KEEP, and names it as snapshot= in the trip line; with
+recording off or refused the rows go to stderr instead. The stop signals the
+command's process group only. Resources a command owns outside that group,
+such as Docker containers, networks and volumes that the Docker daemon holds,
+survive the stop, so such a command must stop and remove its own resources in
+its TERM handling or its owner's cleanup; run neither finds nor removes them.
+For run, a blind stretch is neither idle time nor progress, from the start of
+the run onward until a stop begins: each sample that cannot read complete
+tree CPU pauses the no-progress clock for the interval it ends, and the CPU window restarts once
+samples return, so CPU gained across the gap is not credited as progress. A
+no-progress stop therefore needs the bound in sighted time; a run that stays
+blind is bounded only by the absolute stop. keep-going keeps its base rule:
+it stops nothing while its latest sample is blind. The floor's owner is fm-repair, then Main once the
+repair session hands back: reassess it from the trip snapshots after the first
+5 real run trips, or at once after any reported false trip.
+Claim and tier: run's stops are containment of the command's own process group
+for a cooperative caller (Standard tier). Outside resources the command creates
+(Docker containers, networks and volumes, anything another daemon holds) are
+excluded from that claim by the policy owner's decision; their containment
+belongs to the command's owner, such as the C5 corpus driver, which must clean
+them up on its own stop.
+A no-mistakes.<step> key, a wrapped pipeline drive
 call whose client waits quietly on the shared daemon, is exempt from the
 no-progress stop and keeps only the 6 hour absolute stop; a cleanup that a
 forwarded signal or the absolute stop began still follows the cleanup rule
@@ -132,9 +165,13 @@ then waits for the leader to exit, with no guessed grace number, so a leader's
 own TERM cleanup runs for as long as it keeps making progress. SIGKILL goes to
 the group only when the leader has exited and group members remain, on a second
 forwarded signal, when the cleanup shows no output and no process-tree CPU
-progress for the same no-progress interval (counted from the stop, or from the
-cleanup's last progress), or when the cleanup itself has run for the same
-absolute limit. A true no-progress or absolute stop still records a timed-out
+progress (for run, CPU above the same idle floor) for the same no-progress
+interval (counted from the stop, or from the cleanup's last progress), or when
+the cleanup itself has run for the same absolute limit. During a cleanup a blind
+sample is not progress and does not pause that interval, so a cleanup that
+stays blind is still killed after it. A TERM cleanup that
+waits quietly on another owner, such as a Docker teardown blocked on the
+daemon, should therefore print progress while it waits. A true no-progress or absolute stop still records a timed-out
 sample, so repeated stops file the same repair work as any other real limit.
 run exports FM_DURATION_MANAGED_KEY so a self-instrumented command with the same
 key leaves its one complete wall-time sample to the outer runner.
@@ -319,10 +356,25 @@ MIN_SAMPLES = 5  # sample-count policy: eligible samples before a measured limit
 KEEP_SAMPLES = 100  # sample-count policy: newest samples kept per host and key
 COMPACT_AT = 200  # sample-count policy: host/key sample rows that trigger compaction
 # run's lifetime is a progress rule, not a duration target: silence for this
-# long with no process-tree CPU growth, or this much wall clock overall, is the
-# only extreme that stops a command. Both have environment overrides for tests.
+# long with no runnable descendant and no process-tree CPU progress (for run,
+# CPU above the idle floor below; for keep-going, any growth), or this much
+# wall clock overall, is the only extreme that stops a command. Both have
+# environment overrides for tests.
 NO_PROGRESS_LIMIT = 900
 ABSOLUTE_LIMIT = 6 * 3600
+# run's idle CPU floor: sleeping processes keep accruing housekeeping CPU, so
+# only a tree that gains more than IDLE_CPU_FLOOR_SECS of CPU within the
+# trailing IDLE_CPU_WINDOW_SECS shows CPU progress. A stalled corpus run
+# (bash, Python and Docker clients blocked on the daemon) crept 0.029-0.084 s
+# per minute over 332 one-minute intervals (median 0.045, at most 0.74 s in any
+# 900 s); a bash -> python3 -> docker events tree crept 0.01 s in 300 s here.
+# measured: value=0.5 date=2026-11-23 host=Mac-Studio.local margin=5.9
+IDLE_CPU_FLOOR_SECS = 0.5
+# The floor's averaging window; one minute matches the idle samples above.
+# measured: value=60 date=2026-11-23 host=Mac-Studio.local margin=1
+IDLE_CPU_WINDOW_SECS = 60
+SNAPSHOT_ROWS = 200  # most process rows one trip snapshot keeps
+SNAPSHOT_KEEP = 100  # newest trip snapshots kept beside the duration table
 QUIET_WAIT_PREFIX = 'no-mistakes.'  # a wrapped drive call waits quietly on the shared daemon, so silence is not a stall
 PROGRESS_REPORT_AFTER = 60  # seconds between progress heartbeat lines, not a deadline
 EVENTS = ('timeout', 'filed')
@@ -850,6 +902,91 @@ def warn_blind_telemetry():
     scalar('cpu_telemetry_unavailable', f'cannot sample complete process-tree CPU on '
            f'{sys.platform}; hung work cannot be recovered here, so nothing is stopped '
            'for inactivity while CPU cannot be sampled', sys.stderr)
+
+
+def snapshot_rows(pid):
+    """Rows (pid, ppid, stat, cpu, elapsed, comm) for PID's group and descendants.
+
+    comm is the kernel's executable name (ps ucomm; macOS ps comm would be
+    argv[0]), never argv or the environment, so a snapshot cannot copy a secret
+    a caller passed on its command line. Under
+    a confinement that refuses ps, fm-proc-info.py supplies pid, ppid and state
+    only (its command field is argv, so it is not read).
+    """
+    # ucomm is the kernel name on Darwin and procps; a ps that rejects it (busybox) falls back to
+    # comm off Darwin, where comm is that same kernel name, and to no name column on Darwin,
+    # where comm would be argv[0].
+    names = ['ucomm', 'comm'] if sys.platform != 'darwin' else ['ucomm', None]
+    for name in names:
+        columns = 'pid=,ppid=,pgid=,stat=,time=,etime=' + (f',{name}=' if name else '')
+        try:
+            result, timed = proc_read(['ps', '-axo', columns], ['table', 'pid,ppid,pgid,stat'], env=dict(os.environ, LC_ALL='C'))
+        except (OSError, ValueError):
+            return None
+        if not result.returncode or not timed:
+            break
+    if result.returncode:
+        return None
+    table = {}
+    for line in result.stdout.splitlines():
+        fields = line.split(None, 6) if timed else line.split()
+        if len(fields) < (6 if timed else 4) or not fields[0].isdigit() or not fields[1].isdigit():
+            continue
+        if timed:
+            table[int(fields[0])] = (int(fields[1]), fields[2], fields[3], fields[4], fields[5], fields[6] if len(fields) > 6 else '-')
+        else:
+            table[int(fields[0])] = (int(fields[1]), fields[2], fields[3], '-', '-', '-')
+    children = collections.defaultdict(list)
+    for child, row in table.items():
+        children[row[0]].append(child)
+    members, todo = [], [pid]
+    while todo:
+        child = todo.pop()
+        if child in table and child not in members:
+            members.append(child)
+            todo.extend(children[child])
+    members += sorted(child for child, row in table.items() if row[1] == str(pid) and child not in members)
+    return [(child, *table[child][:1], *table[child][2:]) for child in members]
+
+
+def write_trip_snapshot(key, rule, pid, facts):
+    """One bounded, read-only process snapshot beside the duration table.
+
+    Returns the path, or a short reason when no file can be written; then the
+    rows go to stderr so the evidence still reaches the caller's log.
+    """
+    rows = snapshot_rows(pid)
+    lines = [f'key: {key}', f'rule: {rule}', *(f'{name}: {value}' for name, value in facts),
+             f'leader_pid: {pid}', 'columns: pid ppid stat cpu elapsed comm']
+    if rows is None:
+        lines.append('process table unavailable')
+    else:
+        lines += [' '.join(str(field) for field in row) for row in rows[:SNAPSHOT_ROWS]]
+        if len(rows) > SNAPSHOT_ROWS:
+            lines.append(f'truncated: {len(rows) - SNAPSHOT_ROWS} more rows')
+    text = '\n'.join(lines) + '\n'
+    table = ledger_path()
+    reason = ('recording refused' if REFUSED else 'recording is off') if table is None else ''
+    if table is not None:
+        directory = table.parent / 'command-duration-trips'
+        name = re.sub(r'[^A-Za-z0-9._-]', '_', key)[:80] + '.' + time.strftime('%Y%m%dT%H%M%S') + f'.{pid}.txt'
+        path = directory / name
+        try:
+            if not may_write(path, data_dir()):
+                raise OSError(f'{directory} is inside a git work tree that is not a firstmate checkout data directory')
+            directory.mkdir(parents=True, exist_ok=True)
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+            with os.fdopen(descriptor, 'w') as handle:
+                handle.write(text)
+        except (OSError, ValueError) as error:
+            reason = str(error)
+        else:
+            with contextlib.suppress(OSError):  # retention only; the snapshot is already written
+                for old in sorted(directory.glob('*.txt'), key=lambda entry: entry.stat().st_mtime)[:-SNAPSHOT_KEEP]:
+                    old.unlink()
+            return str(path)
+    sys.stderr.write(text)
+    return f'unavailable ({reason}; rows on stderr)'
 
 
 def communicate_progress(child, inactivity):
@@ -1764,6 +1901,12 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
     previous_cpu, previous_bytes = -1, -1
     next_cpu_sample = started
     observed_cpu = {}
+    cpu_window = collections.deque()  # (time, tree CPU) samples inside the idle-floor window
+    window_gain = 0.0
+    # A blind sample is neither idle time nor progress (run only, before a stop): the interval it ends does not
+    # advance the no-progress clock, and the CPU window restarts after the gap, so CPU gained
+    # across the gap is never read as progress either.
+    last_sampled = started
     occurrence_id = str(uuid.uuid4())
     expired = False
     last_progress = started
@@ -1782,7 +1925,7 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
                     streams.unregister(ready.fileobj)
             elapsed = time.monotonic() - started
             cpu = max(0, previous_cpu)
-            runnable = False
+            runnable = cpu_progress = False
             if child.poll() is None and time.monotonic() >= next_cpu_sample:
                 sample, runnable = tree_cpu(child.pid, observed_cpu)
                 cpu = cpu if sample is None else sample
@@ -1790,9 +1933,22 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
                 if blind and not warned_blind:
                     warned_blind = True
                     warn_blind_telemetry()
+                sampled_at = time.monotonic()
+                if blind and inactivity is None:
+                    if not stopping_since:
+                        last_progress = min(sampled_at, last_progress + (sampled_at - last_sampled))  # pause the clock
+                    cpu_window.clear()
+                last_sampled = sampled_at
+                if sample is not None:
+                    cpu_window.append((sampled_at, sample))
+                    while cpu_window[0][0] < sampled_at - IDLE_CPU_WINDOW_SECS:
+                        cpu_window.popleft()
+                    window_gain = sample - cpu_window[0][1]
+                    # keep-going keeps any growth as progress; run requires CPU above the idle floor.
+                    cpu_progress = sample > previous_cpu if inactivity is not None else window_gain > IDLE_CPU_FLOOR_SECS
                 next_cpu_sample = time.monotonic() + cadence  # Observation, not a deadline.
             now = time.monotonic()
-            if runnable or cpu > previous_cpu or output_bytes > previous_bytes:
+            if runnable or cpu_progress or output_bytes > previous_bytes:
                 last_progress = now
                 if now >= next_progress_report and inactivity is None:
                     scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)
@@ -1807,13 +1963,25 @@ def run(key, command, calibration_file, *, inactivity=None, admission=None):
                 if inactivity is not None and os.getppid() != owner:
                     interrupted.append(signal.SIGTERM)
                     begin_stop()
-                elif now - started >= absolute:
+                elif now - started >= absolute or (idle >= no_progress and not key.startswith(QUIET_WAIT_PREFIX) and not blind):
                     expired = True
-                    scalar('absolute_limit', f'{key} reached the {absolute}s absolute limit; stopping', sys.stderr)
-                    begin_stop()
-                elif idle >= no_progress and not key.startswith(QUIET_WAIT_PREFIX) and not blind:
-                    expired = True
-                    scalar('no_progress', f'{key} made no output or CPU progress for {idle:.0f}s; stopping', sys.stderr)
+                    rule = 'absolute_limit' if now - started >= absolute else 'no_progress'
+                    if inactivity is None:
+                        # Capture the tree before the stop signals change it; keep-going is record-free and writes none.
+                        try:
+                            snapshot = write_trip_snapshot(key, rule, child.pid, (
+                                ('elapsed_secs', f'{now - started:.1f}'), ('idle_secs', f'{idle:.1f}'), ('output_bytes', output_bytes),
+                                ('tree_cpu_secs', f'{cpu:.2f}'), ('cpu_gain_in_window_secs', f'{window_gain:.2f}'),
+                                ('idle_cpu_floor', f'{IDLE_CPU_FLOOR_SECS}s per {IDLE_CPU_WINDOW_SECS}s'), ('telemetry', 'blind' if blind else 'sampled')))
+                        except Exception as error:
+                            snapshot = f'unavailable (snapshot failed: {type(error).__name__})'
+                    if inactivity is not None:
+                        scalar('no_progress', f'{key} made no output or CPU progress for {idle:.0f}s; stopping', sys.stderr)
+                    elif rule == 'absolute_limit':
+                        scalar('absolute_limit', f'{key} reached the {absolute}s absolute limit; stopping; snapshot={snapshot}', sys.stderr)
+                    else:
+                        scalar('no_progress', f'{key} made no output and no CPU progress above the idle floor '
+                               f'({IDLE_CPU_FLOOR_SECS}s per {IDLE_CPU_WINDOW_SECS}s) for {idle:.0f}s; stopping; snapshot={snapshot}', sys.stderr)
                     begin_stop()
                 elif advisory and elapsed >= advisory and not slower_reported:
                     slower_reported = True
