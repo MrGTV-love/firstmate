@@ -4929,6 +4929,11 @@ task_pids_under_roots() {  # <dir>...
       fi
       if [ -n "$lane" ]; then
         identity=$(task_process_identity "$pid") || identity="identity unavailable"
+        # A process that has already exited (kernel ESRCH) holds nothing.
+        if [ "$identity" = "identity unavailable" ] \
+           && perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$pid"; then
+          continue
+        fi
         echo "REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$lane
         TASK_PIDS_ERROR="registered nested worktree lane holds process $pid"
@@ -4937,6 +4942,11 @@ task_pids_under_roots() {  # <dir>...
       fi
       if [ "$path" != "$dir" ]; then
         identity=$(task_process_identity "$pid") || identity="identity unavailable"
+        # A process that has already exited (kernel ESRCH) holds nothing.
+        if [ "$identity" = "identity unavailable" ] \
+           && perl -MErrno=ESRCH -e 'exit((kill(0, $ARGV[0]) == 0 && $! == ESRCH) ? 0 : 1)' -- "$pid"; then
+          continue
+        fi
         echo "REFUSED: process $pid ($identity) matched path $path beneath scan root $dir, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
         TASK_PIDS_FAILED_DIR=$path
         TASK_PIDS_ERROR="descendant cwd holds process $pid without proven task custody"

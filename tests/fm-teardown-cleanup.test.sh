@@ -2495,7 +2495,12 @@ test_process_refusal_has_no_close_replay_authority() {
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
-case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
+# The window reads as live, so the pane shell anchors the ownership proof,
+# except in the legacy scenario, whose endpoint must read as gone.
+if [ "\${1:-}" = list-windows ] && [ -e "$case_dir/endpoint-live" ]; then
+  echo fm-task-x1
+  exit 0
+fi
 if [ "\${1:-}" = list-windows ]; then
   echo "can't find session: firstmate" >&2
   exit 1
@@ -2506,6 +2511,7 @@ fi
 exit 0
 SH
     chmod +x "$case_dir/fakebin/tmux"
+    [ "$scenario" = legacy ] || : > "$case_dir/endpoint-live"
     teardown_fixture_start "$root" KILL sleep 300
     pid=$TEARDOWN_FIXTURE_PID
     birth=$(teardown_fixture_birth "$pid") || fail "refusal-replay-$scenario: missing process identity"
