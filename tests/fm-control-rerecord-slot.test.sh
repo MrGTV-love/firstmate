@@ -240,6 +240,8 @@ rr_run() { # <args...>: the verb, through the shim when RR_CONTROL is set; its o
     fi
     run_control "$RR_DIR" "$RR_ID" rerecord-slot "$@"
   ); rc=$?
+  # A sensitivity control (rr_once_control) plants one outcome line twice, as a run that repeated it would print.
+  [ -z "${RR_PLANT_DUPLICATE:-}" ] || out=$(printf '%s\n%s\n%s' "$out" "$RR_PLANT_DUPLICATE" "$RR_PLANT_DUPLICATE")
   [ -z "$out" ] || printf '%s\n' "$out"
   rr_once_check "$out"
   return "$rc"
@@ -989,6 +991,35 @@ test_RP2_a_verdict_that_exits_non_zero_is_refused_on_both_paths() {
     fail "RP2: the replay did not refuse a verdict that printed ok and exited 2: $RR_REPLAY"
   rr_expect_refusal RP2-write 'manifest_unreadable: the verdict could not be computed;'
   rr_ok RP2 "a stand-in identity verdict that prints ok and exits 2 is refused manifest_unreadable by the replay (exit 1) and by the write, which changes nothing"
+}
+
+# rr_copy_journal_fp: the copy's HEAD, status and every working file's bytes, and the relaunch journal's bytes (or its
+# absence), so a run that changes either changes the fingerprint.
+rr_copy_journal_fp() {
+  local journal="$RR_DIR/home/state/$RR_ID.control-relaunch"
+  git -C "$RR_DIR/wt" rev-parse HEAD
+  git -C "$RR_DIR/wt" status --porcelain --untracked-files=all
+  (cd "$RR_DIR/wt" && find . -path ./.git -prune -o -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256)
+  if [ -e "$journal" ]; then shasum -a 256 "$journal"; else echo 'journal absent'; fi
+}
+
+# The identity, base and scope verdicts print exactly ok on success, so a first line that only starts with ok is
+# malformed: through the real rerecord-slot entry, a stand-in identity verdict printing ok<TAB>x is refused and the task
+# record, manifest, copy and journal are unchanged; the same stand-in printing exactly ok reaches the normal publish.
+test_RP3_a_malformed_ok_verdict_is_refused_and_changes_nothing() {
+  local before slot out rc
+  rr_make_f RP3
+  rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_identity_verdict() { printf 'ok\\tx\\n'; return 0; }"
+  before=$(rr_copy_journal_fp)
+  rr_expect_refusal RP3-write 'manifest_unreadable: the verdict printed a malformed ok line;'
+  [ "$before" = "$(rr_copy_journal_fp)" ] || fail "RP3: a refused run changed the copy or the journal"$'\n'"$before"$'\n---\n'"$(rr_copy_journal_fp)"
+  rr_make_f RP3-exact
+  rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_identity_verdict() { printf 'ok\\n'; return 0; }"
+  slot=$(rr_slot_lines)
+  out=$(rr_write); rc=$?
+  expect_code 0 "$rc" "RP3-exact: a stand-in printing exactly ok did not reach the normal publish"$'\n'"$out"
+  [ "$slot" != "$(rr_slot_lines)" ] || fail "RP3-exact: a stand-in printing exactly ok published no renewal"$'\n'"$out"
+  rr_ok RP3 "a stand-in identity verdict printing ok<TAB>x is refused manifest_unreadable and the record, manifest, copy and journal are unchanged; printing exactly ok, the same run publishes"
 }
 
 
@@ -2191,6 +2222,29 @@ test_S22_committing_rolls_back() {
     || fail "S22: expected the prior record under a published audit record"
   rr_ok S22 "R9e with committing mapped to rollback: the trap restores P, the late commit rename lands, P stands under a published audit record"
 }
+# rr_once_control <case-function> <id>: the case fails with the once-check message when one outcome line is planted
+# twice in its runs' output, and passes without the plant. Each run is in a subshell, so neither result is recorded.
+rr_once_control() {
+  local out rc
+  out=$( (RR_RESULTS=; RR_PLANT_DUPLICATE="error: this run stopped (planted by the once-check sensitivity control)"; "$1") 2>&1 ); rc=$?
+  rm -f "$TMP_ROOT/rr-once-violations"
+  [ "$rc" != 0 ] || fail "$2: the case passed with a planted duplicate outcome line"$'\n'"$out"
+  assert_contains "$out" "a run named one outcome more than once" "$2: the case did not fail on the once-check"
+  out=$( (RR_RESULTS=; "$1") 2>&1 ); rc=$?
+  rm -f "$TMP_ROOT/rr-once-violations"
+  expect_code 0 "$rc" "$2: the case failed without the plant"$'\n'"$out"
+}
+# The r9 once-check controls: S20, S22 and S7/R1b each end through the once-check, so a planted duplicate fails them.
+test_S25_once_check_fails_S20_S22_and_S7_R1b() {
+  rr_once_control test_S7_R1b_defense_in_depth S25-S7-R1b
+  if rr_term_runs_trap_with_child; then
+    rr_once_control test_S20_publishing_rolls_back S25-S20
+    rr_once_control test_S22_committing_rolls_back S25-S22
+  else
+    rr_record S25 unverified "this bash holds TERM until the foreground child exits, so S20 and S22 skip their runs and have no output to plant in"
+  fi
+  rr_ok S25 "S7/R1b, S20 and S22 each fail with the once-check message when one outcome line is planted twice, and pass without it"
+}
 # SF4's control: remove only the post-publish comparison (the second fm_slot_rerecord_inputs_unchanged call).
 test_SF4c_post_publish_comparison() {
   rr_setup_SF4head SF4c
@@ -2288,6 +2342,7 @@ test_E1_relaunch_after_rerecord_adopts
 test_E2_relaunch_without_rerecord_refuses_base_mismatch
 test_RP1_the_replay_and_the_write_give_one_content_verdict
 test_RP2_a_verdict_that_exits_non_zero_is_refused_on_both_paths
+test_RP3_a_malformed_ok_verdict_is_refused_and_changes_nothing
 test_H1_owner_mismatch
 test_H2_worktree_path_mismatch
 test_H3_base_not_forward
@@ -2398,5 +2453,6 @@ test_SF4_owner_reread_alone_refuses
 test_SF4o_control_owner_reread
 test_S23_check_pending_noop_claim
 test_S24_check_pending_refusal_suffix
+test_S25_once_check_fails_S20_S22_and_S7_R1b
 )
 control_relaunch_run "$@"

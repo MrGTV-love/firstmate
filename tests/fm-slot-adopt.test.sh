@@ -897,8 +897,17 @@ PY2
   out=$(fm_slot_rerecord_uncommitted_paths() { return 1; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src); rc=$?
   [ "$rc" -ne 0 ] || fail "an unreadable uncommitted set still exited 0: $out"
   [ "${out%%$'\t'*}" = scope_release_strands_work ] || fail "an unreadable uncommitted set was not refused by name: $out"
+  # The identity, base and scope verdicts print exactly ok on success, so a first line that only starts with ok is
+  # malformed: an identity verdict printing ok<TAB>x is refused, and the same stand-in printing exactly ok is admitted.
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_identity_verdict() { printf 'ok\tx\n'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$out" = "manifest_unreadable"$'\t'"the verdict printed a malformed ok line" ] \
+    || fail "an identity verdict printing ok<TAB>x was not refused: $out"
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_identity_verdict() { printf 'ok\n'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$(printf '%s\n' "$out" | head -n 1)" = ok ] || fail "an identity verdict printing exactly ok was refused: $out"
   [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail 'the replay changed the copy'
-  pass "rerecord replay: a forward-merged renewal is admitted with its labels; an untouched entry, a stale base, and an unreadable own line or uncommitted set are refused by name; the copy is unchanged"
+  pass "rerecord replay: a forward-merged renewal is admitted with its labels; an untouched entry, a stale base, an unreadable own line or uncommitted set, and a malformed ok verdict are refused by name; an exact ok verdict is admitted; the copy is unchanged"
 }
 
 CASES=(

@@ -1403,12 +1403,14 @@ fm_slot_rerecord_field() { # <file> <key>
   sed -n "s/^$2=//p" "$1"
 }
 
-# A verdict file's first line: ok, or "<reason><TAB><detail>" loaded as the refusal.
+# A verdict file's first line: exactly ok, or "<reason><TAB><detail>" loaded as the refusal. The identity, base and scope
+# verdicts print exactly ok on success, so any other ok-prefixed line is malformed and refuses under <reason-if-empty>.
 fm_slot_rerecord_verdict_ok() { # <verdict-file> <reason-if-empty>
   local line=
   IFS= read -r line < "$1" 2>/dev/null || true
   case "$line" in
-    ok|ok$'\t'*) return 0 ;;
+    ok) return 0 ;;
+    ok$'\t'*) fm_slot_rerecord_fail "$2" 'the verdict printed a malformed ok line' ;;
     '') fm_slot_rerecord_fail "$2" 'the verdict could not be computed' ;;
     *$'\t'*) fm_slot_rerecord_fail "${line%%$'\t'*}" "${line#*$'\t'}" ;;
     *) fm_slot_rerecord_fail "$line" '' ;;
