@@ -188,6 +188,14 @@ assert_clean "R7 accepts a test list whose items carry outer spaces" "$TRIMMED"
 rm -f "$TRIMMED/tests/gguard-real.test.sh"
 assert_fails_with "R7 checks the second trimmed item too" "$TRIMMED" R7
 
+# An item holding a control character is refused, whatever file its other characters spell: the shell drops a NUL, so
+# "tests/gguard.\u0000test.sh" would otherwise be checked as the existing tests/gguard.test.sh.
+for ctl in '\u0000' '\u0001'; do
+  CTL=$(fixture "control-$ctl")
+  mutate "$CTL" ".guards[0].test = \"tests/gguard.${ctl}test.sh\""
+  assert_fails_with "R7 fails a test path holding $ctl" "$CTL" R7
+done
+
 # --- R8 telemetry -----------------------------------------------------------
 NOTEL=$(fixture notel)
 mutate "$NOTEL" '.guards[0].telemetry = ""'

@@ -269,7 +269,7 @@ while IFS= read -r entry; do
     while IFS= read -r line; do
       case "${line%%$'\t'*}" in
         path) [ -e "$ROOT/${line#*$'\t'}" ] || violation R7 "$id" "nonexistent test file ${line#*$'\t'}" ;;
-        *) violation R7 "$id" "test path ${line#*$'\t'} holds a line break" ;;
+        *) violation R7 "$id" "test path ${line#*$'\t'} holds a control character" ;;
       esac
     done <<EOF
 $test_items

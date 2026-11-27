@@ -145,6 +145,17 @@ assert_clean "a registry test list whose items carry outer spaces is clean" "$TR
 rm -f "$TRIMMED/tests/gguard-real.test.sh"
 assert_fails_with "the second trimmed registry test item is checked too" "$TRIMMED" "MISSING tests/gguard-real.test.sh registration=registry:gguard"
 
+# An item holding a control character is refused, whatever file its other characters spell: the shell drops a NUL, so
+# "tests/gguard.\u0000test.sh" would otherwise be checked as the existing tests/gguard.test.sh.
+for ctl in '\u0000' '\u0001'; do
+  CTL=$(fixture "control-$ctl")
+  jq ".guards[0].test = \"tests/gguard.${ctl}test.sh\"" "$CTL/docs/guards/registry.json" >"$CTL/registry.tmp"
+  mv "$CTL/registry.tmp" "$CTL/docs/guards/registry.json"
+  $GIT "$CTL" add -A
+  $GIT "$CTL" -c user.email=t@example.invalid -c user.name=t commit -qm "control $ctl"
+  assert_fails_with "a registry test path holding $ctl fails" "$CTL" "MISSING \"tests/gguard.${ctl}test.sh\" registration=registry:gguard"
+done
+
 REGSPEC=$(fixture regspec)
 jq '.spec = "docs/guard-spec.md"' "$REGSPEC/docs/guards/registry.json" >"$REGSPEC/registry.tmp"
 mv "$REGSPEC/registry.tmp" "$REGSPEC/docs/guards/registry.json"

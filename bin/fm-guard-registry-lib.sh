@@ -11,8 +11,10 @@
 #
 # fm_guard_registry_test_items <guard-json>
 #   Prints one line per item: "path<TAB><item>" for an item to check exactly as
-#   written, or "invalid<TAB><item as JSON>" for an item holding a line break,
-#   which no single file check can match exactly. Prints nothing when the field
+#   written, or "invalid<TAB><item as JSON>" for an item holding a control
+#   character (U+0000-U+001F or U+007F, a line break or NUL among them) after
+#   trimming: the shell cannot carry such a byte intact (NUL is dropped), so no
+#   file check could test the path exactly as recorded. Prints nothing when the field
 #   names no item. Returns nonzero when the entry cannot be read; a caller must
 #   then refuse the entry rather than treat it as having no test.
 
@@ -23,5 +25,5 @@ fm_guard_registry_test_items() {  # <guard-json>
     | map(sub("^[ \t]+"; "") | sub("[ \t]+$"; ""))
     | map(select(length > 0))
     | .[]
-    | if test("[\n\r]") then "invalid\t" + tojson else "path\t" + . end'
+    | if (explode | any(. < 32 or . == 127)) then "invalid\t" + tojson else "path\t" + . end'
 }

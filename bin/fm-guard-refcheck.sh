@@ -139,7 +139,7 @@ if [ -f "$REGISTRY" ]; then
       fi
     done
     # bin/fm-guard-registry-lib.sh owns how the test field is read. Each item must exist exactly as written; a field
-    # that cannot be read, names no item, or holds an item with a line break proves nothing about the guard.
+    # that cannot be read, names no item, or holds an item with a control character proves nothing about the guard.
     if ! test_items=$(fm_guard_registry_test_items "$entry"); then
       test_items=$'invalid\t(the test field cannot be read)'
     elif [ -z "$test_items" ]; then

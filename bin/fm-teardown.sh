@@ -3441,30 +3441,17 @@ teardown_return_collisions() { # <copy> <branch>
 teardown_skipped_row() { # <copy> <reason> <holder> <epoch> <endpoint>
   if [ -n "$5" ]; then printf '%s\t%s\t%s\t%s\t%s\n' "$@"; else printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4"; fi
 }
-# teardown_acquisition_pane_note <pane> [<closed-suffix>]: what a skipped-copy notice may say about the spawn's
-# acquisition pane <pane>, the endpoint recorded in that row. It says teardown closed that window, then appends
-# <closed-suffix>, only when all three hold at print time: this teardown's own close of the task endpoint succeeded
-# (TEARDOWN_ENDPOINT_CLOSED=1), <pane> names that same endpoint (TEARDOWN_CLOSED_ENDPOINT_IDS, read before the close), and
-# a read through the backend's own inventory now shows <pane> absent. A close return alone never counts: some adapters
-# return success without closing. Anything else - a failed or skipped close, another endpoint, a backend with no
-# definitive absence read, or a read that fails - says the window may still be live.
-TEARDOWN_ENDPOINT_CLOSED=0
-TEARDOWN_CLOSED_ENDPOINT_IDS=()
-teardown_acquisition_pane_note() {  # <pane> [<closed-suffix>]
-  if [ "$TEARDOWN_ENDPOINT_CLOSED" = 1 ] && teardown_is_closed_endpoint "$1" && teardown_endpoint_read_absent "$1"; then
-    printf 'acquisition pane %s of the spawn stood in it; teardown closed that window%s' "$1" "${2:-}"
+# teardown_acquisition_pane_note <pane> [<gone-suffix>]: what a skipped-copy notice may say about the spawn's
+# acquisition pane <pane>, the endpoint recorded in that row. It states only what a read at print time establishes, and
+# never a cause: when a definitive read through the backend's own inventory shows <pane> absent, its window is gone
+# (then <gone-suffix> is appended); in every other case - the endpoint is still listed, the read fails, or the backend
+# has no definitive absence read - teardown did not establish that the window is gone, so it may still be live.
+teardown_acquisition_pane_note() {  # <pane> [<gone-suffix>]
+  if teardown_endpoint_read_absent "$1"; then
+    printf 'acquisition pane %s of the spawn stood in it; its window is gone: a read after teardown shows it absent%s' "$1" "${2:-}"
   else
-    printf 'acquisition pane %s of the spawn stood in it; teardown did not establish that its window closed, so it may still be live' "$1"
+    printf 'acquisition pane %s of the spawn stood in it; teardown did not establish that its window is gone, so it may still be live' "$1"
   fi
-}
-
-# teardown_is_closed_endpoint <pane>: <pane> is one of the identifiers of the endpoint this teardown closed.
-teardown_is_closed_endpoint() {  # <pane>
-  local id
-  for id in "${TEARDOWN_CLOSED_ENDPOINT_IDS[@]+"${TEARDOWN_CLOSED_ENDPOINT_IDS[@]}"}"; do
-    [ -n "$id" ] && [ "$id" = "$1" ] && return 0
-  done
-  return 1
 }
 
 # teardown_endpoint_read_absent <pane>: a read through the backend's own inventory shows <pane> absent. Only a definitive
@@ -3485,17 +3472,6 @@ teardown_endpoint_read_absent() {  # <pane>
       ;;
     *) return 1 ;;
   esac
-}
-
-# teardown_record_closed_endpoint_ids: before the task endpoint is closed, record every identifier a skipped-copies row
-# may name for it: the recorded target, and for tmux the stable window id the spawn recorded as its acquisition pane.
-teardown_record_closed_endpoint_ids() {
-  local wid
-  TEARDOWN_CLOSED_ENDPOINT_IDS=("$T")
-  if [ "$BACKEND" = tmux ] && [ "${T#*:}" != "$T" ]; then
-    wid=$(tmux display-message -p -t "=${T%%:*}:=${T#*:}" '#{window_id}' 2>/dev/null) || wid=
-    case "$wid" in @*) TEARDOWN_CLOSED_ENDPOINT_IDS+=("$wid") ;; esac
-  fi
 }
 
 teardown_skipped_copies() {
@@ -3520,7 +3496,7 @@ teardown_skipped_copies() {
     if [ "$holder" != "firstmate-skipped:$ID" ]; then
       # Only the exact holder this task's spawn leased under is this task's to return. A row naming anyone else (a copy the
       # spawn passed over because another holder's lease was already there) is never returned, whatever the pool says.
-      echo "notice: the record row for $copy names holder '$holder', not this task's firstmate-skipped:$ID; that lease is not this task's, so nothing is returned and the row is left as it is${pane:+ ($(teardown_acquisition_pane_note "$pane" ', which does not release the lease of the other holder'))}" >&2
+      echo "notice: the record row for $copy names holder '$holder', not this task's firstmate-skipped:$ID; that lease is not this task's, so nothing is returned and the row is left as it is${pane:+ ($(teardown_acquisition_pane_note "$pane" ', and a gone window does not release the lease of the other holder'))}" >&2
       teardown_skipped_row "$copy" "$reason" "$holder" "$when" "$pane" >> "$keep"
       continue
     fi
@@ -7463,10 +7439,8 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
       "$WT/.fm-grok-turnend" "$WT/.fm-kimi-turnend"
   fi
   if [ -n "$T_ORCA" ]; then
-    teardown_record_closed_endpoint_ids
     fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
       || { endpoint_close_refusal "$ID" "$BACKEND" "$T" 0; exit 1; }
-    TEARDOWN_ENDPOINT_CLOSED=1
   fi
   if teardown_owns_worktree && [ -d "$WT" ]; then
     fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
@@ -7494,13 +7468,8 @@ elif { [ -d "$WT" ] || [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; } && [ "$KIND" != seco
 fi
 
 if [ "$BACKEND" != herdr ] && [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS" != 1 ]; then
-  # A close that failed and continues only under --force leaves the endpoint possibly live, so it is not closed.
-  teardown_record_closed_endpoint_ids
-  if fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID"; then
-    TEARDOWN_ENDPOINT_CLOSED=1
-  else
-    endpoint_close_refusal "$ID" "$BACKEND" "$T" 1 || exit 1
-  fi
+  fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
+    || endpoint_close_refusal "$ID" "$BACKEND" "$T" 1 || exit 1
 fi
 # A refused, skipped, or failed Herdr close must never erase a live task's
 # durable endpoint identity: unless the exact pane is confirmed gone, retain
@@ -7518,8 +7487,6 @@ if [ "$BACKEND" = herdr ]; then
     echo "error: herdr pane $T for $ID is not confirmed gone after its close was refused, skipped, or failed; retaining every durable task record - rerun teardown once the close can run under the session lock" >&2
     exit 1
   fi
-  TEARDOWN_CLOSED_ENDPOINT_IDS=("$T")
-  TEARDOWN_ENDPOINT_CLOSED=1
 fi
 if [ "$KIND" != secondmate ]; then
   REPORT_RC=0
