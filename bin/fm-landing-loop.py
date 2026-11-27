@@ -42,6 +42,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -144,24 +145,51 @@ def emit_wake_once(home, state_doc, task, pr, head, key, text, state_path=None):
     dedup = f"{task}:{head or ''}"
     if dedup in emitted:
         return False
-    # Persist the dedup marker BEFORE appending to the wake queue so a crash
-    # after append cannot emit a duplicate wake on restart.
-    emitted[dedup] = int(time.time())
-    if state_path is not None:
-        write_atomic(state_path, json.dumps(state_doc, sort_keys=True, indent=1) + "\n")
-    script = '. "$1/fm-wake-lib.sh" && fm_wake_append check "$2" "$3"'
+    marker_file = home.root / "emitted-wakes.log"
+    marker_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # Commit the wake row and durable marker atomically under FM_WAKE_QUEUE_LOCK
+    # (the exact pattern documented in bin/fm-wake-lib.sh:fm_wake_append_locked)
+    # so neither a lost wake nor a duplicate wake can occur across a crash.
+    script = r'''
+. "$1/fm-wake-lib.sh"
+dedup=$2
+wake_key="landing-loop:$dedup"
+payload=$3
+marker=$4
+fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
+rc=0
+already=0
+if [ -f "$marker" ] && grep -Fxq -- "$dedup" "$marker" 2>/dev/null; then
+  already=1
+elif [ -e "$FM_WAKE_QUEUE" ] && awk -F '\t' -v k="$wake_key" 'NF==5 && $3=="check" && $4==k {f=1} END {exit(f?0:1)}' "$FM_WAKE_QUEUE" 2>/dev/null; then
+  already=1
+  printf '%s\n' "$dedup" >> "$marker" || rc=$?
+fi
+if [ "$already" -eq 0 ] && [ "$rc" -eq 0 ]; then
+  if fm_wake_append_locked check "$wake_key" "$payload"; then
+    printf '%s\n' "$dedup" >> "$marker" || rc=$?
+  else
+    rc=$?
+  fi
+fi
+fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+if [ "$rc" -ne 0 ]; then exit "$rc"; fi
+if [ "$already" -eq 1 ]; then exit 3; fi
+exit 0
+'''
     sent = run(
-        ["bash", "-c", script, "fm-landing-loop", str(BIN), f"landing-loop:{dedup}",
-         f"check: landing-loop {task}: {text}"],
+        ["bash", "-c", script, "fm-landing-loop", str(BIN), dedup,
+         f"check: landing-loop {task}: {text}", str(marker_file)],
         home,
         timeout=30,
     )
-    if sent.returncode == 0:
-        append_event(home, task, pr, head, f"wake:{key}", text)
-        return True
-    emitted.pop(dedup, None)
-    if state_path is not None:
-        write_atomic(state_path, json.dumps(state_doc, sort_keys=True, indent=1) + "\n")
+    if sent.returncode in (0, 3):
+        emitted[dedup] = int(time.time())
+        if state_path is not None:
+            write_atomic(state_path, json.dumps(state_doc, sort_keys=True, indent=1) + "\n")
+        if sent.returncode == 0:
+            append_event(home, task, pr, head, f"wake:{key}", text)
+            return True
     return False
 
 
@@ -312,19 +340,36 @@ def worktree_is_clean(worktree):
     return res.returncode == 0 and res.stdout.strip() == ""
 
 
+TERMINAL_NM_STATUSES = frozenset({
+    "completed",
+    "passed",
+    "failed",
+    "aborted",
+    "cancelled",
+    "canceled",
+    "ci_monitor_interrupted",
+})
+
+
 def no_mistakes_run_state(worktree):
-    """Return (busy_or_unreadable, reason). Fails closed on timeout or non-zero exit."""
+    """Return (busy_or_unreadable, reason). Mirrors bin/fm-nm-run-lib.sh:fm_nm_run_is_active and fails closed."""
     res = run(["no-mistakes", "axi", "status"], cwd=worktree, timeout=GH_TIMEOUT)
     if res.returncode != 0:
         return True, f"no-mistakes axi status unreadable or timed out (exit {res.returncode})"
     seen_status = None
+    seen_outcome = None
     for line in res.stdout.splitlines():
         stripped = line.strip()
-        if stripped.startswith("status:"):
+        if seen_status is None and stripped.startswith("status:"):
             seen_status = stripped.split(":", 1)[1].strip().strip('"').lower()
-            break
-    if seen_status is None or seen_status in ("", "none", "idle", "completed", "passed", "failed", "aborted", "cancelled", "canceled"):
-        return False, "idle"
+        elif seen_outcome is None and stripped.startswith("outcome:"):
+            seen_outcome = stripped.split(":", 1)[1].strip().strip('"').lower()
+    if seen_outcome:
+        return False, f"terminal outcome ({seen_outcome})"
+    if seen_status is None:
+        return True, "no-mistakes axi status returned no run status"
+    if seen_status in TERMINAL_NM_STATUSES:
+        return False, f"terminal status ({seen_status})"
     return True, f"no-mistakes run already active in worktree (status: {seen_status})"
 
 
@@ -505,11 +550,30 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                 stdout, stderr = proc.communicate(timeout=UPDATE_TIMEOUT)
                 rc = proc.returncode
             except subprocess.TimeoutExpired:
+                # Signal SIGTERM first so fm-duration.py's signal handler forwards
+                # SIGTERM to its child's separate process group (bin/fm-duration.py:1829).
+                # A second SIGTERM triggers fm-duration.py's SIGKILL escalation before
+                # we fall back to killing the wrapper group directly.
+                stdout, stderr = "", ""
                 try:
-                    os.killpg(proc.pid, 9)
+                    os.killpg(proc.pid, signal.SIGTERM)
                 except OSError:
-                    proc.kill()
-                stdout, stderr = proc.communicate()
+                    proc.terminate()
+                try:
+                    stdout, stderr = proc.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(proc.pid, signal.SIGTERM)
+                    except OSError:
+                        pass
+                    try:
+                        stdout, stderr = proc.communicate(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except OSError:
+                            proc.kill()
+                        stdout, stderr = proc.communicate()
                 rc = 124
             log_path.write_text((stdout or "") + (stderr or ""), encoding="utf-8")
             tail = [
@@ -522,9 +586,11 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
             else:
                 detail = "no-mistakes rerun completed" if rc == 0 else (tail[-1][:200] if tail else f"no-mistakes rerun exited {rc}")
         elif mode == "direct-PR":
-            # Build the exact merge commit in an isolated bare scratch repo so the
-            # task worktree is never mutated or hard-reset, and push that exact
-            # immutable commit SHA rather than a mutable HEAD.
+            # Perform the real git merge inside a temporary shared clone with the
+            # worktree's hook and identity settings so project pre-merge-commit /
+            # commit-msg hooks run normally while the task worktree is never mutated
+            # or reset. Push the exact verified commit SHA (never mutable HEAD), then
+            # fast-forward the clean task worktree if it is still at expected_head.
             logs = []
             local_head = run(["git", "-C", worktree, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT)
             if local_head.returncode != 0 or local_head.stdout.strip() != expected_head:
@@ -544,78 +610,60 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                     rc = 1
                     detail = f"proved base commit {base_tip[:12]} unavailable after fetch"
                 else:
-                    objects = run(["git", "-C", worktree, "rev-parse", "--path-format=absolute", "--git-path", "objects"], timeout=GIT_TIMEOUT)
-                    obj_fmt = run(["git", "-C", worktree, "rev-parse", "--show-object-format"], timeout=GIT_TIMEOUT)
                     author_name = run(["git", "-C", worktree, "config", "user.name"], timeout=GIT_TIMEOUT).stdout.strip() or "Firstmate Landing Loop"
                     author_email = run(["git", "-C", worktree, "config", "user.email"], timeout=GIT_TIMEOUT).stdout.strip() or "landing-loop@local.invalid"
-                    if objects.returncode != 0 or obj_fmt.returncode != 0:
-                        rc = 1
-                        detail = "could not locate worktree object store for direct-PR merge"
+                    hooks_cfg = run(["git", "-C", worktree, "config", "core.hooksPath"], timeout=GIT_TIMEOUT)
+                    if hooks_cfg.returncode == 0 and hooks_cfg.stdout.strip():
+                        hooks_path = hooks_cfg.stdout.strip()
+                        if not os.path.isabs(hooks_path):
+                            hooks_path = str((Path(worktree) / hooks_path).resolve())
                     else:
-                        with tempfile.TemporaryDirectory(prefix="fm-direct-merge-") as scratch:
-                            env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-                            repo = os.path.join(scratch, "merge.git")
-                            env.update({
-                                "GIT_CONFIG_NOSYSTEM": "1",
-                                "GIT_CONFIG_GLOBAL": os.devnull,
-                                "GIT_ATTR_NOSYSTEM": "1",
-                                "GIT_NO_REPLACE_OBJECTS": "1",
-                                "GIT_GRAFT_FILE": os.devnull,
-                                "XDG_CONFIG_HOME": scratch,
-                                "HOME": scratch,
-                                "GIT_TERMINAL_PROMPT": "0",
-                                "GIT_AUTHOR_NAME": author_name,
-                                "GIT_AUTHOR_EMAIL": author_email,
-                                "GIT_COMMITTER_NAME": author_name,
-                                "GIT_COMMITTER_EMAIL": author_email,
-                            })
-                            made = subprocess.run(
-                                ["git", "init", "-q", "--bare", "--template=", f"--object-format={obj_fmt.stdout.strip()}", repo],
-                                capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
-                            )
-                            if made.returncode != 0:
-                                rc = 1
-                                detail = "could not initialize scratch merge repo"
+                        hooks_dir_res = run(["git", "-C", worktree, "rev-parse", "--path-format=absolute", "--git-path", "hooks"], timeout=GIT_TIMEOUT)
+                        hooks_path = hooks_dir_res.stdout.strip() if hooks_dir_res.returncode == 0 else ""
+                    with tempfile.TemporaryDirectory(prefix="fm-direct-merge-") as scratch:
+                        scratch_wt = os.path.join(scratch, "wt")
+                        cl = run(["git", "clone", "--quiet", "--shared", "--no-checkout", worktree, scratch_wt], timeout=GIT_TIMEOUT)
+                        logs.append(f"$ git clone --quiet --shared --no-checkout {worktree} {scratch_wt}\n{cl.stdout}{cl.stderr}\n")
+                        if cl.returncode != 0:
+                            rc = cl.returncode
+                            detail = f"could not clone shared scratch worktree (exit {rc})"
+                        else:
+                            run(["git", "-C", scratch_wt, "config", "user.name", author_name], timeout=GIT_TIMEOUT)
+                            run(["git", "-C", scratch_wt, "config", "user.email", author_email], timeout=GIT_TIMEOUT)
+                            if hooks_path:
+                                run(["git", "-C", scratch_wt, "config", "core.hooksPath", hooks_path], timeout=GIT_TIMEOUT)
+                            co = run(["git", "-C", scratch_wt, "checkout", "--quiet", "--detach", expected_head], timeout=GIT_TIMEOUT)
+                            logs.append(f"$ git -C {scratch_wt} checkout --quiet --detach {expected_head}\n{co.stdout}{co.stderr}\n")
+                            if co.returncode != 0:
+                                rc = co.returncode
+                                detail = f"could not checkout {expected_head[:12]} in scratch worktree"
                             else:
-                                with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
-                                    handle.write(objects.stdout.strip() + "\n")
-                                env["GIT_DIR"] = repo
-                                mt = subprocess.run(
-                                    ["git", "-c", f"core.attributesFile={os.devnull}", "merge-tree", "--write-tree", "--no-messages", expected_head, base_tip],
-                                    capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
+                                mg = run(
+                                    ["git", "-C", scratch_wt, "-c", "merge.ff=false", "merge", "--no-ff", "--no-edit",
+                                     "-m", f"Merge {base_name} ({base_tip[:10]}) into {branch}", base_tip],
+                                    timeout=GIT_TIMEOUT,
                                 )
-                                tree_lines = mt.stdout.splitlines()
-                                merged_tree = tree_lines[0] if mt.returncode == 0 and len(tree_lines) == 1 and SHA.fullmatch(tree_lines[0]) else ""
-                                if not merged_tree:
-                                    rc = 1
-                                    detail = f"scratch merge-tree failed (exit {mt.returncode})"
-                                elif expected_tree and merged_tree != expected_tree:
-                                    rc = 1
-                                    detail = f"merged tree {merged_tree[:12]} diverged from proved tree {expected_tree[:12]}"
+                                logs.append(f"$ git -C {scratch_wt} merge --no-ff --no-edit {base_tip}\n{mg.stdout}{mg.stderr}\n")
+                                if mg.returncode != 0:
+                                    rc = mg.returncode
+                                    detail = f"merge failed (exit {rc}): {(mg.stderr or mg.stdout).strip()[:160]}"
                                 else:
-                                    ct = subprocess.run(
-                                        ["git", "commit-tree", merged_tree, "-p", expected_head, "-p", base_tip,
-                                         "-m", f"Merge {base_name} ({base_tip[:10]}) into {branch}"],
-                                        capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
-                                    )
-                                    merged_sha = ct.stdout.strip()
-                                    if ct.returncode != 0 or not SHA.fullmatch(merged_sha):
+                                    merged_sha = run(["git", "-C", scratch_wt, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT).stdout.strip()
+                                    merged_tree = run(["git", "-C", scratch_wt, "rev-parse", "HEAD^{tree}"], timeout=GIT_TIMEOUT).stdout.strip()
+                                    if not SHA.fullmatch(merged_sha):
                                         rc = 1
-                                        detail = "commit-tree failed in scratch merge repo"
+                                        detail = "could not read merged commit SHA from scratch worktree"
+                                    elif expected_tree and merged_tree != expected_tree:
+                                        rc = 1
+                                        detail = f"merged tree {merged_tree[:12]} diverged from proved tree {expected_tree[:12]}"
                                     else:
-                                        # Expose the immutable merge commit via a scratch ref so any Git version
-                                        # can fetch it into the worktree object store without touching HEAD, index,
-                                        # or working tree, then push that exact commit SHA.
-                                        ur = subprocess.run(
-                                            ["git", "update-ref", "refs/heads/fm-landing-merge", merged_sha],
-                                            capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
-                                        )
+                                        ur = run(["git", "-C", scratch_wt, "update-ref", "refs/heads/fm-landing-merge", merged_sha], timeout=GIT_TIMEOUT)
                                         if ur.returncode != 0:
                                             rc = ur.returncode
                                             detail = f"failed to stage scratch ref for {merged_sha[:12]}"
                                         else:
-                                            imp = run(["git", "-C", worktree, "fetch", "--no-tags", repo, "refs/heads/fm-landing-merge"], timeout=GIT_TIMEOUT)
-                                            logs.append(f"$ git -C {worktree} fetch --no-tags {repo} refs/heads/fm-landing-merge\n{imp.stdout}{imp.stderr}\n")
+                                            imp = run(["git", "-C", worktree, "fetch", "--no-tags", scratch_wt, "refs/heads/fm-landing-merge"], timeout=GIT_TIMEOUT)
+                                            logs.append(f"$ git -C {worktree} fetch --no-tags {scratch_wt} refs/heads/fm-landing-merge\n{imp.stdout}{imp.stderr}\n")
                                             if imp.returncode != 0:
                                                 rc = imp.returncode
                                                 detail = f"failed to import scratch merge commit {merged_sha[:12]}"
@@ -624,6 +672,10 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                                                 logs.append(f"$ git -C {worktree} push origin {merged_sha}:refs/heads/{branch}\n{ps.stdout}{ps.stderr}\n")
                                                 rc = ps.returncode
                                                 if rc == 0:
+                                                    # Advance clean task worktree via safe fast-forward only if still at expected_head.
+                                                    cur_head = run(["git", "-C", worktree, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT).stdout.strip()
+                                                    if cur_head == expected_head and worktree_is_clean(worktree):
+                                                        run(["git", "-C", worktree, "merge", "--ff-only", "--quiet", merged_sha], timeout=GIT_TIMEOUT)
                                                     detail = f"merged {base_name} ({base_tip[:10]}) into {merged_sha[:10]} and pushed {branch}"
                                                 else:
                                                     detail = f"push failed (exit {rc}): {(ps.stderr or ps.stdout).strip()[:160]}"

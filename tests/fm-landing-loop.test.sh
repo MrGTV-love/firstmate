@@ -212,16 +212,26 @@ test_direct_pr_merges_base_and_pushes_cleanly() {
 }
 JSON
   write_fake_gh "$shim" "$dir/gh.json"
+  local hooks_dir="$dir/hooks" hook_ran="$dir/hook-ran"
+  mkdir -p "$hooks_dir"
+  cat > "$hooks_dir/commit-msg" <<SH
+#!/usr/bin/env bash
+printf 'ran\n' >> "$hook_ran"
+exit 0
+SH
+  chmod +x "$hooks_dir/commit-msg"
+  git -C "$wt" config core.hooksPath "$hooks_dir"
   PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "direct-PR step must exit 0"
   PATH="$shim:$PATH" wait_for_inflight_done "$home" || fail "direct-PR update must finish"
   local new_remote wt_head
   new_remote=$(git --git-dir="$dir/repo/origin.git" rev-parse refs/heads/fm/direct-a)
   wt_head=$(git -C "$wt" rev-parse HEAD)
   [ "$new_remote" != "$head" ] || fail "direct-PR update must push a new head to origin"
-  assert_equals "$head" "$wt_head" "direct-PR scratch merge must not mutate the task worktree HEAD"
+  [ -f "$hook_ran" ] || fail "direct-PR merge must run the worktree's commit-msg hook"
+  assert_equals "$new_remote" "$wt_head" "clean task worktree HEAD must fast-forward to the pushed merge commit"
   git --git-dir="$dir/repo/origin.git" merge-base --is-ancestor "$tip" "$new_remote" \
     || fail "pushed direct-PR head must contain the base tip"
-  pass "direct-PR clean stale-base update merges base in scratch and pushes exact commit cleanly"
+  pass "direct-PR clean stale-base update honors hooks in scratch, pushes exact commit, and fast-forwards clean worktree"
 }
 
 test_failed_update_backs_off_and_wakes_main_once() {
@@ -452,7 +462,96 @@ SH
   "$JQ_BIN" -e '.tasks["status-fail"].action == "busy"' "$home/state/.landing-loop/state.json" >/dev/null \
     || fail "unreadable/timed-out no-mistakes axi status must fail closed as busy"
   [ ! -e "$dir/nm.log" ] || fail "must not launch rerun when no-mistakes axi status fails"
-  pass "unreadable or timed-out no-mistakes axi status fails closed as busy without launching rerun"
+  # Zero-exit error response with no status: field must also fail closed as busy.
+  cat > "$shim/no-mistakes" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = axi ] && [ "\$2" = status ]; then
+  printf 'error: daemon unavailable\n'
+  exit 0
+fi
+printf 'unexpected rerun\n' >> "$dir/nm.log"
+exit 0
+SH
+  chmod +x "$shim/no-mistakes"
+  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "zero-exit error step must exit 0"
+  "$JQ_BIN" -e '.tasks["status-fail"].action == "busy"' "$home/state/.landing-loop/state.json" >/dev/null \
+    || fail "zero-exit status response without status: field must fail closed as busy"
+  [ ! -e "$dir/nm.log" ] || fail "must not launch rerun on zero-exit error status response"
+  # Terminal status ci_monitor_interrupted must be recognized as idle (eligible for update).
+  cat > "$shim/no-mistakes" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = axi ] && [ "\$2" = status ]; then
+  printf 'run:\n  status: ci_monitor_interrupted\n'
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$shim/no-mistakes"
+  local plan_out
+  plan_out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" plan --json)
+  "$JQ_BIN" -e '.tasks[0].action == "update"' <<<"$plan_out" >/dev/null \
+    || fail "ci_monitor_interrupted must be treated as terminal/eligible, got: $plan_out"
+  pass "no-mistakes axi status fails closed on exit error and statusless zero-exit errors, and treats ci_monitor_interrupted as terminal"
+}
+
+test_detached_update_timeout_terminates_nested_child() {
+  local dir="$TMP_ROOT/timeout-child" home="$TMP_ROOT/timeout-child/home" shim="$TMP_ROOT/timeout-child/shim"
+  mkdir -p "$home/state" "$home/config" "$home/data" "$shim"
+  local info wt head tip
+  info=$(make_git_pair "$dir/repo" "fm/timeout-a" "t.txt" "main-t.txt" 0)
+  read -r wt head tip <<< "$info"
+  local url="https://github.com/example/repo/pull/108"
+  fm_write_meta "$home/state/timeout-a.meta" "kind=ship" "mode=no-mistakes" "branch=fm/timeout-a" "worktree=$wt" "pr=$url"
+  cat > "$dir/gh.json" <<JSON
+{
+  "prs": {
+    "$url": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/timeout-a", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
+  },
+  "compares": {
+    "$head": {"base_commit": {"sha": "$tip"}, "behind_by": 1}
+  }
+}
+JSON
+  write_fake_gh "$shim" "$dir/gh.json"
+  cat > "$shim/no-mistakes" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = axi ] && [ "\$2" = status ]; then
+  printf 'status: completed\n'
+  exit 0
+fi
+printf '%s\n' "\$\$" > "$dir/child.pid"
+exec sleep 60
+SH
+  chmod +x "$shim/no-mistakes"
+  cat > "$shim/fake-duration.py" <<PY
+#!/usr/bin/env python3
+import os, signal, subprocess, sys
+args = sys.argv[1:]
+cmd = args[args.index("--") + 1:]
+child = subprocess.Popen(cmd, start_new_session=True)
+def forward(sig, _f):
+    try:
+        os.killpg(child.pid, signal.SIGTERM)
+    except OSError:
+        pass
+signal.signal(signal.SIGTERM, forward)
+sys.exit(child.wait())
+PY
+  chmod +x "$shim/fake-duration.py"
+  PATH="$shim:$PATH" FM_TEST_SEAM=1 FM_LANDING_LOOP_DURATION_BIN="$shim/fake-duration.py" \
+    FM_LANDING_LOOP_UPDATE_TIMEOUT=1 FM_HOME="$home" python3 "$LOOP" step --no-reconcile \
+    || fail "timeout step must exit 0"
+  PATH="$shim:$PATH" FM_TEST_SEAM=1 FM_LANDING_LOOP_DURATION_BIN="$shim/fake-duration.py" \
+    FM_LANDING_LOOP_UPDATE_TIMEOUT=1 wait_for_inflight_done "$home" \
+    || fail "timed-out update worker must exit and be reaped"
+  local cpid
+  cpid=$(cat "$dir/child.pid" 2>/dev/null || true)
+  [ -n "$cpid" ] || fail "nested child must have started and written its pid"
+  if kill -0 "$cpid" 2>/dev/null; then
+    kill -9 "$cpid" 2>/dev/null || true
+    fail "nested child pid $cpid survived the update timeout"
+  fi
+  pass "detached update timeout forwards SIGTERM through wrapper and terminates nested child process group"
 }
 
 fm_test_run_cases \
@@ -461,6 +560,7 @@ fm_test_run_cases \
   test_direct_pr_merges_base_and_pushes_cleanly \
   test_direct_pr_refuses_unpushed_local_commits_and_wakes_once \
   test_unreadable_nm_status_fails_closed \
+  test_detached_update_timeout_terminates_nested_child \
   test_failed_update_backs_off_and_wakes_main_once \
   test_train_plans_and_builds_conflict_free_batch_excluding_conflicts \
   test_launchd_installer_renders_installs_and_uninstalls -- "$@"
