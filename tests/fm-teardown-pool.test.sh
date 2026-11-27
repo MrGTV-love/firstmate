@@ -4619,6 +4619,61 @@ SH
   pass "teardown releases a skipped copy only when it is clean and landed, idle, and still this task's lease"
 }
 
+# The skipped-copy notices name the acquisition pane and claim teardown closed its window only when that close is
+# established. A forced teardown that went on past a close that failed must say the window may still be live.
+test_a_skipped_copy_notice_claims_the_window_closed_only_when_it_closed() {
+  local case_dir rec rc out busy canon kill
+  for kill in works fails; do
+    case_dir=$(make_case "skipped-notice-close-$kill")
+    write_meta "$case_dir" no-mistakes ship
+    mkdir -p "$case_dir/data/task-x1"
+    busy="$case_dir/skip-busy"
+    git -C "$case_dir/project" worktree add -q --detach "$busy" main
+    canon=$(cd "$busy" && pwd -P)
+    rec="$case_dir/data/task-x1/skipped-copies.tsv"
+    printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\t@41\n%s\tpassed over\tholder-with-pane\t1\t@42\n' \
+      "$busy" "$case_dir/passed-with-pane" > "$rec"
+    printf '[{"path": "%s", "lease_holder": "firstmate-skipped:task-x1", "processes": [{"pid": 1}]}]\n' "$canon" > "$case_dir/pool.json"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+# In the failing case the close is refused and the window is still listed afterwards, so the close did not happen.
+if [ "$kill" = fails ]; then
+  case "\${1:-}" in
+    kill-window) echo "refused" >&2; exit 1 ;;
+    list-windows) printf '%s\n' fm-task-x1; exit 0 ;;
+  esac
+fi
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+    rc=0
+    if [ "$kill" = fails ]; then
+      run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "skipped-notice-$kill: the forced teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+      assert_grep "could not be closed" "$case_dir/stderr" "skipped-notice-$kill: the forced run did not report the failed close"
+      out="teardown did not establish that its window closed, so it may still be live"
+    else
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "skipped-notice-$kill: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+      out="teardown closed that window"
+    fi
+    grep -Fq "that lease is not this task's, so nothing is returned and the row is left as it is (acquisition pane @42 of the spawn stood in it; $out" "$case_dir/stderr" \
+      || fail "skipped-notice-$kill: the passed-over notice did not say '$out'"$'\n'"$(cat "$case_dir/stderr")"
+    grep -Fq "process(es) are running inside it (acquisition pane @41 of the spawn stood in it; $out" "$case_dir/stderr" \
+      || fail "skipped-notice-$kill: the busy-copy warning did not say '$out'"$'\n'"$(cat "$case_dir/stderr")"
+    if [ "$kill" = fails ]; then
+      ! grep -Fq "teardown closed that window" "$case_dir/stderr" \
+        || fail "skipped-notice-$kill: a notice claimed the window closed after its close failed"$'\n'"$(cat "$case_dir/stderr")"
+    fi
+  done
+  pass "the skipped-copy notices claim teardown closed the acquisition window only when the close succeeded"
+}
+
 # D4 (review of 8c6c20ece): a skipped copy is released only on teardown_landed proof. An anchor makes a commit
 # recoverable; it does not make it landed. An ignored file at a path the copy's HEAD would be reset to is work.
 test_skipped_copies_with_an_anchor_or_ignored_work_are_kept() {
@@ -5060,6 +5115,7 @@ test_cleanup_roots_preserve_foreign_copy_git_storage
 test_tasktmp_preserves_reassociated_copy_git_storage
 test_subordinate_slot_cleanup_preserves_ancestor_custody
 test_skipped_copies_are_released_only_when_clean_and_landed
+test_a_skipped_copy_notice_claims_the_window_closed_only_when_it_closed
 test_skipped_copies_with_an_anchor_or_ignored_work_are_kept
 test_a_skipped_copy_whose_pool_row_has_no_process_list_stays_leased
 test_a_skipped_copy_whose_process_list_is_null_stays_leased
