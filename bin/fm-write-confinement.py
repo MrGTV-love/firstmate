@@ -288,6 +288,9 @@ def build(args):
     lines.append("(deny file-write* " + under(state, r"[^/]+\.(meta|control-relaunch)(\.[^/]*)?(/.*)?") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
+    # The standalone landing loop stores its durable state and per-run update
+    # artifacts under state/.landing-loop/; confined workers must never write there.
+    lines.append(f"(deny file-write* (subpath {quoted(state + '/.landing-loop')}))")
     # No task operation writes a replace ref, and one changes what a commit
     # holds for every Git command in the primary checkout.
     git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]

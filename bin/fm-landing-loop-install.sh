@@ -31,12 +31,18 @@ TEMPLATE="$FM_ROOT/docs/examples/fm-landing-loop.plist"
 AGENT_DIR="$HOME/Library/LaunchAgents"
 LAUNCHCTL=launchctl
 if [ "${FM_TEST_SEAM:-}" = 1 ]; then
-  AGENT_DIR=${FM_LANDING_LOOP_AGENT_DIR:-$AGENT_DIR}
-  LAUNCHCTL=${FM_LANDING_LOOP_LAUNCHCTL:-$LAUNCHCTL}
+  AGENT_DIR=${FM_LANDING_LOOP_AGENT_DIR:-}
+  LAUNCHCTL=${FM_LANDING_LOOP_LAUNCHCTL:-}
 fi
 
 usage() { sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+require_test_seam_overrides() {
+  if [ "${FM_TEST_SEAM:-}" = 1 ]; then
+    [ -n "$AGENT_DIR" ] && [ -n "$LAUNCHCTL" ] \
+      || die "FM_TEST_SEAM=1 requires both FM_LANDING_LOOP_AGENT_DIR and FM_LANDING_LOOP_LAUNCHCTL"
+  fi
+}
 
 home_sum=$(printf '%s' "$FM_HOME" | cksum | cut -d' ' -f1)
 LABEL="com.firstmate.landing-loop.$home_sum"
@@ -78,6 +84,7 @@ cmd_install() {
     render "$interval"
     return 0
   fi
+  require_test_seam_overrides
   [ "${FM_TEST_SEAM:-}" = 1 ] || [ "$(uname)" = Darwin ] || die "launchd agents exist only on macOS"
   [ -x "$SCRIPT_DIR/fm-landing-loop.py" ] || die "missing $SCRIPT_DIR/fm-landing-loop.py"
   [ -d "$FM_HOME/state" ] || die "no state directory at $FM_HOME/state"
@@ -95,6 +102,7 @@ cmd_install() {
 }
 
 cmd_uninstall() {
+  require_test_seam_overrides
   loaded && "$LAUNCHCTL" bootout "$DOMAIN/$LABEL" >/dev/null 2>&1
   if loaded; then
     die "launchctl still has $LABEL loaded"
@@ -104,6 +112,7 @@ cmd_uninstall() {
 }
 
 cmd_status() {
+  require_test_seam_overrides
   local plist=absent state=not-loaded
   [ -f "$PLIST" ] && plist=present
   loaded && state=loaded

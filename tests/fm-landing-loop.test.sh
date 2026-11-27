@@ -286,7 +286,48 @@ SH
     FM_LANDING_LOOP_AGENT_DIR="$agents" FM_LANDING_LOOP_LAUNCHCTL="$fake_lc" \
     "$INSTALL" status)
   grep -q "plist=absent launchd=not-loaded" <<<"$st" || fail "expected uninstalled status, got: $st"
-  pass "launchd installer renders valid plist, installs, reports status, and uninstalls cleanly"
+  # FM_TEST_SEAM=1 without explicit overrides must fail closed and never touch ~/Library/LaunchAgents.
+  if FM_TEST_SEAM=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_LANDING_LOOP_AGENT_DIR="" FM_LANDING_LOOP_LAUNCHCTL="" \
+    "$INSTALL" status >/dev/null 2>&1; then
+    fail "FM_TEST_SEAM=1 without agent-dir and launchctl overrides must refuse"
+  fi
+  pass "launchd installer renders valid plist, installs, reports status, enforces test-seam overrides, and uninstalls cleanly"
+}
+
+test_direct_pr_refuses_unpushed_local_commits_and_wakes_once() {
+  local dir="$TMP_ROOT/unpushed" home="$TMP_ROOT/unpushed/home" shim="$TMP_ROOT/unpushed/shim"
+  mkdir -p "$home/state" "$home/config" "$home/data"
+  local info wt head tip
+  info=$(make_git_pair "$dir/repo" "fm/unpushed-a" "u.txt" "main-u.txt" 0)
+  read -r wt head tip <<< "$info"
+  printf 'local unpushed work\n' > "$wt/unpushed.txt"
+  git -C "$wt" add unpushed.txt
+  git -C "$wt" commit -q -m 'local unpushed commit'
+  local url="https://github.com/example/repo/pull/106"
+  fm_write_meta "$home/state/unpushed-a.meta" "kind=ship" "mode=direct-PR" "branch=fm/unpushed-a" "worktree=$wt" "pr=$url"
+  cat > "$dir/gh.json" <<JSON
+{
+  "prs": {
+    "$url": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/unpushed-a", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
+  },
+  "compares": {
+    "$head": {"base_commit": {"sha": "$tip"}, "behind_by": 1}
+  }
+}
+JSON
+  write_fake_gh "$shim" "$dir/gh.json"
+  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "unpushed step must exit 0"
+  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "repeat unpushed step must exit 0"
+  "$JQ_BIN" -e '.tasks["unpushed-a"].action == "held"' "$home/state/.landing-loop/state.json" >/dev/null \
+    || fail "direct-PR with unpushed local commit must be held"
+  local remote_head
+  remote_head=$(git --git-dir="$dir/repo/origin.git" rev-parse refs/heads/fm/unpushed-a)
+  assert_equals "$head" "$remote_head" "unpushed local commit must never be published"
+  local wakes
+  wakes=$(grep -c "landing-loop unpushed-a:" "$home/state/.wake-queue" 2>/dev/null || echo 0)
+  assert_equals "1" "$wakes" "held unpushed checkout must emit exactly one wake"
+  pass "direct-PR refuses to publish unpushed local commits and wakes Main once"
 }
 
 test_train_plans_and_builds_conflict_free_batch_excluding_conflicts() {
@@ -328,13 +369,24 @@ test_train_plans_and_builds_conflict_free_batch_excluding_conflicts() {
   git -C "$wt" push -q origin fm/pr203
   local h203
   h203=$(git -C "$wt" rev-parse HEAD)
+  # PR 204 targets a different base branch (release) and must be excluded from a main train.
+  git -C "$wt" checkout -q -b fm/pr204 main
+  printf 'from 204\n' > "$wt/d.txt"
+  git -C "$wt" add d.txt
+  git -C "$wt" commit -q -m 'pr 204'
+  git -C "$wt" push -q origin fm/pr204
+  local h204
+  h204=$(git -C "$wt" rev-parse HEAD)
   git -C "$wt" checkout -q main
+  # Force merge.ff=only in worktree config to prove train build overrides it cleanly.
+  git -C "$wt" config merge.ff only
   cat > "$dir/gh.json" <<JSON
 {
   "prs": {
     "https://github.com/example/repo/pull/201": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h201", "headRefName": "fm/pr201", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
     "https://github.com/example/repo/pull/202": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h202", "headRefName": "fm/pr202", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
-    "https://github.com/example/repo/pull/203": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h203", "headRefName": "fm/pr203", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}}
+    "https://github.com/example/repo/pull/203": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h203", "headRefName": "fm/pr203", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
+    "https://github.com/example/repo/pull/204": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h204", "headRefName": "fm/pr204", "baseRefName": "release", "baseRefOid": "$tip", "statusCheckRollup": []}}
   },
   "compares": {
     "$h201": {"base_commit": {"sha": "$tip"}, "behind_by": 0}
@@ -343,10 +395,18 @@ test_train_plans_and_builds_conflict_free_batch_excluding_conflicts() {
 JSON
   write_fake_gh "$shim" "$dir/gh.json"
   local out
-  out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" train --repo example/repo --prs 201,202,203 --worktree "$wt" --branch fm/train-batch-1 --build --json) \
+  out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" train --repo example/repo --prs 201,202,203,204 --worktree "$wt" --branch fm/train-batch-1 --build --json) \
     || fail "train --build failed"
-  "$JQ_BIN" -e '(.selected | map(.number)) == [201, 202] and (.excluded | length) == 1 and .excluded[0].reason == "conflicts with train batch"' <<<"$out" >/dev/null \
-    || fail "train must select 201+202 and exclude conflicting 203: $out"
+  "$JQ_BIN" -e '(.selected | map(.number)) == [201, 202] and (.excluded | length) == 2' <<<"$out" >/dev/null \
+    || fail "train must select 201+202 and exclude wrong-base 204 and conflicting 203: $out"
+  "$JQ_BIN" -e 'any(.excluded[]; .pr == "https://github.com/example/repo/pull/204" and (.reason | contains("targets base release")))' <<<"$out" >/dev/null \
+    || fail "train must exclude PR targeting release: $out"
+  "$JQ_BIN" -e 'any(.excluded[]; .pr == "https://github.com/example/repo/pull/203" and .reason == "conflicts with train batch")' <<<"$out" >/dev/null \
+    || fail "train must exclude conflicting PR 203: $out"
+  # Re-running --build with an existing branch name must refuse rather than overwriting it.
+  if PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" train --repo example/repo --prs 201,202 --worktree "$wt" --branch fm/train-batch-1 --build --json >/dev/null 2>&1; then
+    fail "train --build must refuse to overwrite an existing branch"
+  fi
   [ "$(cat "$wt/a.txt")" = "from 201" ] && [ "$(cat "$wt/b.txt")" = "from 202" ] \
     || fail "built train worktree must hold both selected PRs"
   "$JQ_BIN" -r '.closes_block' <<<"$out" | grep -qx '<!-- firstmate-backlog-closes:begin -->' \
@@ -355,13 +415,14 @@ JSON
     || fail "closes block must list PR 201"
   "$JQ_BIN" -r '.closes_block' <<<"$out" | grep -qx 'Train-member: https://github.com/example/repo/pull/202' \
     || fail "closes block must list PR 202"
-  pass "train command proves cumulative conflict-free batch, excludes conflicting PR, builds branch, and emits canonical Train-member closes block"
+  pass "train command proves cumulative conflict-free batch, excludes wrong-base and conflicting PRs, protects existing branches, builds under merge.ff=only, and emits canonical Train-member closes block"
 }
 
 fm_test_run_cases \
   test_serial_admission_updates_one_clean_stale_pr_at_a_time \
   test_conflict_holds_and_emits_single_wake \
   test_direct_pr_merges_base_and_pushes_cleanly \
+  test_direct_pr_refuses_unpushed_local_commits_and_wakes_once \
   test_failed_update_backs_off_and_wakes_main_once \
   test_train_plans_and_builds_conflict_free_batch_excluding_conflicts \
   test_launchd_installer_renders_installs_and_uninstalls -- "$@"

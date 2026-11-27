@@ -54,6 +54,10 @@ SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 MAX_INFLIGHT = int(os.environ.get("FM_LANDING_LOOP_MAX_INFLIGHT", "1") or 1)
 RETRY_SECS = int(os.environ.get("FM_LANDING_LOOP_RETRY_SECS", "1800") or 1800)
 DEFAULT_INTERVAL = int(os.environ.get("FM_LANDING_LOOP_INTERVAL", "120") or 120)
+GH_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_GH_TIMEOUT", "60") or 60)
+GIT_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_GIT_TIMEOUT", "120") or 120)
+RECONCILE_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_RECONCILE_TIMEOUT", "300") or 300)
+DEFAULT_CMD_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_CMD_TIMEOUT", "120") or 120)
 
 _AUTO_REVIEW_MOD = []
 
@@ -88,7 +92,7 @@ class Home:
         }
 
 
-def run(command, home=None, cwd=None, timeout=None):
+def run(command, home=None, cwd=None, timeout=DEFAULT_CMD_TIMEOUT):
     try:
         return subprocess.run(
             command,
@@ -136,7 +140,7 @@ def append_event(home, task, pr, head, kind, detail):
 
 def emit_wake_once(home, state_doc, task, pr, head, key, text):
     emitted = state_doc.setdefault("emitted_wakes", {})
-    dedup = f"{task}:{(head or '')[:12]}:{key}"
+    dedup = f"{task}:{(head or '')[:12]}"
     if dedup in emitted:
         return False
     script = '. "$1/fm-wake-lib.sh" && fm_wake_append check "$2" "$3"'
@@ -144,10 +148,11 @@ def emit_wake_once(home, state_doc, task, pr, head, key, text):
         ["bash", "-c", script, "fm-landing-loop", str(BIN), f"landing-loop:{dedup}",
          f"check: landing-loop {task}: {text}"],
         home,
+        timeout=30,
     )
     if sent.returncode == 0:
         emitted[dedup] = int(time.time())
-        append_event(home, task, pr, head, "wake", text)
+        append_event(home, task, pr, head, f"wake:{key}", text)
         return True
     return False
 
@@ -198,7 +203,7 @@ def ship_tasks(home, repo_filter=None):
 
 def gh_pr_view(url):
     fields = "state,isDraft,mergeable,mergeStateStatus,headRefOid,headRefName,baseRefName,baseRefOid,statusCheckRollup"
-    res = run(["gh", "pr", "view", url, "--json", fields])
+    res = run(["gh", "pr", "view", url, "--json", fields], timeout=GH_TIMEOUT)
     if res.returncode != 0:
         return None
     try:
@@ -212,7 +217,7 @@ def gh_pr_view(url):
 
 def gh_compare(owner, repo, base, head):
     seg = urllib.parse.quote(base, safe="")
-    res = run(["gh", "api", f"repos/{owner}/{repo}/compare/{seg}...{head}?per_page=1"])
+    res = run(["gh", "api", f"repos/{owner}/{repo}/compare/{seg}...{head}?per_page=1"], timeout=GH_TIMEOUT)
     if res.returncode != 0:
         return None
     try:
@@ -255,40 +260,43 @@ def check_clean_merge_tree(worktree, base_tip, head):
     obj_fmt = run(["git", "-C", str(wt), "rev-parse", "--show-object-format"])
     if objects.returncode != 0 or obj_fmt.returncode != 0:
         return False, "could not locate worktree object store", None
-    with tempfile.TemporaryDirectory(prefix="fm-land-mt-") as scratch:
-        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-        repo = os.path.join(scratch, "proof.git")
-        env.update({
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_ATTR_NOSYSTEM": "1",
-            "GIT_NO_REPLACE_OBJECTS": "1",
-            "GIT_GRAFT_FILE": os.devnull,
-            "XDG_CONFIG_HOME": scratch,
-            "HOME": scratch,
-            "GIT_TERMINAL_PROMPT": "0",
-        })
-        made = subprocess.run(
-            ["git", "init", "-q", "--bare", "--template=", f"--object-format={obj_fmt.stdout.strip()}", repo],
-            capture_output=True, text=True, check=False, env=env,
-        )
-        if made.returncode != 0:
-            return False, "could not initialize scratch merge-tree repo", None
-        with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
-            handle.write(objects.stdout.strip() + "\n")
-        env["GIT_DIR"] = repo
-        merged = subprocess.run(
-            ["git", "-c", f"core.attributesFile={os.devnull}", "merge-tree", "--write-tree", "--no-messages", base_tip, head],
-            capture_output=True, text=True, check=False, env=env,
-        )
-        if merged.returncode == 1:
-            return False, "conflicts with current base tip", None
-        if merged.returncode != 0:
-            return False, f"git merge-tree failed (exit {merged.returncode})", None
-        lines = merged.stdout.splitlines()
-        if len(lines) != 1 or not SHA.fullmatch(lines[0]):
-            return False, "unexpected git merge-tree output", None
-        return True, "clean", lines[0]
+    try:
+        with tempfile.TemporaryDirectory(prefix="fm-land-mt-") as scratch:
+            env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+            repo = os.path.join(scratch, "proof.git")
+            env.update({
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_ATTR_NOSYSTEM": "1",
+                "GIT_NO_REPLACE_OBJECTS": "1",
+                "GIT_GRAFT_FILE": os.devnull,
+                "XDG_CONFIG_HOME": scratch,
+                "HOME": scratch,
+                "GIT_TERMINAL_PROMPT": "0",
+            })
+            made = subprocess.run(
+                ["git", "init", "-q", "--bare", "--template=", f"--object-format={obj_fmt.stdout.strip()}", repo],
+                capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
+            )
+            if made.returncode != 0:
+                return False, "could not initialize scratch merge-tree repo", None
+            with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
+                handle.write(objects.stdout.strip() + "\n")
+            env["GIT_DIR"] = repo
+            merged = subprocess.run(
+                ["git", "-c", f"core.attributesFile={os.devnull}", "merge-tree", "--write-tree", "--no-messages", base_tip, head],
+                capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
+            )
+            if merged.returncode == 1:
+                return False, "conflicts with current base tip", None
+            if merged.returncode != 0:
+                return False, f"git merge-tree failed (exit {merged.returncode})", None
+            lines = merged.stdout.splitlines()
+            if len(lines) != 1 or not SHA.fullmatch(lines[0]):
+                return False, "unexpected git merge-tree output", None
+            return True, "clean", lines[0]
+    except subprocess.TimeoutExpired:
+        return False, "git merge-tree timed out", None
 
 
 def worktree_is_clean(worktree):
@@ -329,7 +337,9 @@ def reap_inflight(home, state_doc):
     backoff = state_doc.setdefault("backoff", {})
     completed = state_doc.setdefault("completed_heads", {})
     still_running = {}
+    tracked_dirs = set()
     for task, entry in list(inflight.items()):
+        tracked_dirs.add(str(Path(entry["run_dir"]).resolve()))
         st = inflight_status(entry)
         if st == "running":
             still_running[task] = entry
@@ -341,7 +351,7 @@ def reap_inflight(home, state_doc):
         if rc == 0:
             append_event(home, task, entry["pr"], entry["head"], "update-completed", detail)
             backoff.pop(task, None)
-            completed[task] = {"head": entry["head"], "until": int(time.time()) + RETRY_SECS}
+            completed[task] = {"head": entry["head"], "at": int(time.time())}
         else:
             backoff[task] = {"until": int(time.time()) + RETRY_SECS, "head": entry["head"], "reason": detail}
             append_event(home, task, entry["pr"], entry["head"], "update-failed", detail)
@@ -349,11 +359,34 @@ def reap_inflight(home, state_doc):
                 home, state_doc, task, entry["pr"], entry["head"], "update-failed",
                 f"base update for {entry['pr']} failed: {detail[:200]} (log: {run_dir / 'output.log'})",
             )
+    # Also detect any live detached updater whose state.json write was interrupted
+    # before persisting, so serial admission (MAX_INFLIGHT) holds even across SIGKILL.
+    runs_dir = home.root / "runs"
+    if runs_dir.is_dir():
+        for run_dir in sorted(runs_dir.iterdir()):
+            if not run_dir.is_dir():
+                continue
+            resolved = str(run_dir.resolve())
+            if resolved in tracked_dirs or (run_dir / "result.json").exists():
+                continue
+            if inflight_status({"run_dir": str(run_dir)}) == "running":
+                req = read_json(run_dir / "request.json", {})
+                task = str(req.get("task") or run_dir.name)
+                if task not in still_running:
+                    still_running[task] = {
+                        "task": task,
+                        "pr": str(req.get("pr") or ""),
+                        "head": str(req.get("head") or ""),
+                        "base_tip": str(req.get("base_tip") or ""),
+                        "mode": str(req.get("mode") or ""),
+                        "run_dir": str(run_dir),
+                        "started_at": int(req.get("at") or time.time()),
+                    }
     state_doc["inflight"] = still_running
     return still_running
 
 
-def launch_update(home, item, base_name, base_tip, state_doc):
+def launch_update(home, item, base_name, base_tip, expected_tree, state_doc, state_path):
     task = item["task"]
     meta = item["meta"]
     mode = meta["mode"]
@@ -372,22 +405,16 @@ def launch_update(home, item, base_name, base_tip, state_doc):
         "head": head,
         "base_name": base_name,
         "base_tip": base_tip,
+        "expected_tree": expected_tree,
         "at": int(time.time()),
     }
-    write_atomic(run_dir / "request.json", json.dumps(request, indent=1) + "\n")
+    req_text = json.dumps(request, indent=1) + "\n"
+    write_atomic(run_dir / "request.json", req_text)
     lock = open(run_dir / "lock", "a+")
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    subprocess.Popen(
-        [sys.executable, str(Path(__file__).resolve()), "_update", str(run_dir), str(lock.fileno())],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        pass_fds=(lock.fileno(),),
-        start_new_session=True,
-        env=home.env(),
-    )
-    lock.close()
-    state_doc.setdefault("inflight", {})[task] = {
+    # Persist admission BEFORE spawning so an interruption right after Popen cannot
+    # break serial admission on the next pass.
+    inflight_entry = {
         "task": task,
         "pr": item["pr"],
         "head": head,
@@ -396,15 +423,44 @@ def launch_update(home, item, base_name, base_tip, state_doc):
         "run_dir": str(run_dir),
         "started_at": request["at"],
     }
+    state_doc.setdefault("inflight", {})[task] = inflight_entry
+    write_atomic(state_path, json.dumps(state_doc, sort_keys=True, indent=1) + "\n")
+    req_r, req_w = os.pipe()
+    try:
+        os.write(req_w, req_text.encode("utf-8"))
+        os.close(req_w)
+        req_w = -1
+        subprocess.Popen(
+            [sys.executable, str(Path(__file__).resolve()), "_update", str(run_dir), str(lock.fileno()), str(req_r)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            pass_fds=(lock.fileno(), req_r),
+            start_new_session=True,
+            env=home.env(),
+        )
+    except Exception:
+        state_doc.get("inflight", {}).pop(task, None)
+        write_atomic(state_path, json.dumps(state_doc, sort_keys=True, indent=1) + "\n")
+        raise
+    finally:
+        if req_w >= 0:
+            os.close(req_w)
+        os.close(req_r)
+        lock.close()
     append_event(home, task, item["pr"], head, "update-started", f"updating onto {base_name} ({base_tip[:10]}) via {mode}")
 
 
-def update_worker(run_dir_str, fd_str):
+def update_worker(run_dir_str, fd_str, req_fd_str):
     run_dir = Path(run_dir_str)
-    req = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
+    with os.fdopen(int(req_fd_str), "r", encoding="utf-8") as req_stream:
+        req = json.load(req_stream)
     worktree = req["worktree"]
     mode = req["mode"]
     base_name = req["base_name"]
+    base_tip = req["base_tip"]
+    expected_head = req["head"]
+    expected_tree = req.get("expected_tree") or ""
     branch = req["branch"]
     log_path = run_dir / "output.log"
     rc = 1
@@ -435,25 +491,47 @@ def update_worker(run_dir_str, fd_str):
             ]
             detail = "no-mistakes rerun completed" if rc == 0 else (tail[-1][:200] if tail else f"no-mistakes rerun exited {rc}")
         elif mode == "direct-PR":
-            steps = [
-                ["git", "-C", worktree, "fetch", "origin", base_name],
-                ["git", "-C", worktree, "merge", "--no-edit", f"origin/{base_name}"],
-                ["git", "-C", worktree, "push", "origin", f"HEAD:{branch}"],
-            ]
             logs = []
-            rc = 0
-            for cmd in steps:
-                done = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, check=False)
-                logs.append(f"$ {' '.join(cmd)}\n{done.stdout}{done.stderr}\n")
-                if done.returncode != 0:
-                    rc = done.returncode
-                    # Abort any partial merge so the worktree is never left conflicted.
-                    subprocess.run(["git", "-C", worktree, "merge", "--abort"], capture_output=True, check=False)
-                    detail = f"{cmd[2]} failed (exit {rc}): {(done.stderr or done.stdout).strip()[:160]}"
-                    break
+            local_head = run(["git", "-C", worktree, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT)
+            if local_head.returncode != 0 or local_head.stdout.strip() != expected_head:
+                rc = 1
+                detail = f"direct-PR update stopped: local HEAD {(local_head.stdout.strip() or '(unreadable)')[:12]} differs from proved forge head {expected_head[:12]}"
+            elif not worktree_is_clean(worktree):
+                rc = 1
+                detail = "direct-PR update stopped: worktree has uncommitted changes"
+            else:
+                if run(["git", "-C", worktree, "cat-file", "-e", f"{base_tip}^{{commit}}"], timeout=GIT_TIMEOUT).returncode != 0:
+                    ft = run(["git", "-C", worktree, "fetch", "origin", base_tip], timeout=GIT_TIMEOUT)
+                    logs.append(f"$ git -C {worktree} fetch origin {base_tip}\n{ft.stdout}{ft.stderr}\n")
+                    if run(["git", "-C", worktree, "cat-file", "-e", f"{base_tip}^{{commit}}"], timeout=GIT_TIMEOUT).returncode != 0:
+                        ft2 = run(["git", "-C", worktree, "fetch", "origin", base_name], timeout=GIT_TIMEOUT)
+                        logs.append(f"$ git -C {worktree} fetch origin {base_name}\n{ft2.stdout}{ft2.stderr}\n")
+                if run(["git", "-C", worktree, "cat-file", "-e", f"{base_tip}^{{commit}}"], timeout=GIT_TIMEOUT).returncode != 0:
+                    rc = 1
+                    detail = f"proved base commit {base_tip[:12]} unavailable after fetch"
+                else:
+                    mg = run(["git", "-C", worktree, "-c", "merge.ff=false", "merge", "--no-edit", base_tip], timeout=GIT_TIMEOUT)
+                    logs.append(f"$ git -C {worktree} -c merge.ff=false merge --no-edit {base_tip}\n{mg.stdout}{mg.stderr}\n")
+                    if mg.returncode != 0:
+                        run(["git", "-C", worktree, "merge", "--abort"], timeout=GIT_TIMEOUT)
+                        rc = mg.returncode
+                        detail = f"merge failed (exit {rc}): {(mg.stderr or mg.stdout).strip()[:160]}"
+                    else:
+                        tree_res = run(["git", "-C", worktree, "rev-parse", "HEAD^{tree}"], timeout=GIT_TIMEOUT)
+                        actual_tree = tree_res.stdout.strip()
+                        if expected_tree and actual_tree != expected_tree:
+                            run(["git", "-C", worktree, "reset", "--hard", expected_head], timeout=GIT_TIMEOUT)
+                            rc = 1
+                            detail = f"merged tree {actual_tree[:12]} diverged from proved tree {expected_tree[:12]}; reset to {expected_head[:12]}"
+                        else:
+                            ps = run(["git", "-C", worktree, "push", "origin", f"HEAD:{branch}"], timeout=GIT_TIMEOUT)
+                            logs.append(f"$ git -C {worktree} push origin HEAD:{branch}\n{ps.stdout}{ps.stderr}\n")
+                            rc = ps.returncode
+                            if rc == 0:
+                                detail = f"merged {base_name} ({base_tip[:10]}) and pushed {branch}"
+                            else:
+                                detail = f"push failed (exit {rc}): {(ps.stderr or ps.stdout).strip()[:160]}"
             log_path.write_text("".join(logs), encoding="utf-8")
-            if rc == 0:
-                detail = f"merged origin/{base_name} and pushed {branch}"
         else:
             detail = f"unsupported delivery mode: {mode}"
             rc = 2
@@ -544,7 +622,7 @@ def assess_candidates(home, include_stale_red=False, inflight=None, backoff=None
             rows.append(entry)
             continue
         done_head = completed_heads.get(task)
-        if done_head and done_head.get("head") == head and now < done_head.get("until", 0):
+        if done_head and done_head.get("head") == head:
             entry["action"] = "updated"
             entry["reason"] = "update already ran for this head; waiting for forge head to advance"
             rows.append(entry)
@@ -580,17 +658,26 @@ def assess_candidates(home, include_stale_red=False, inflight=None, backoff=None
             entry["reason"] = "worktree has uncommitted changes"
             rows.append(entry)
             continue
+        if meta["mode"] == "direct-PR":
+            lh = run(["git", "-C", worktree, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT)
+            local_head = lh.stdout.strip() if lh.returncode == 0 else ""
+            if local_head != head:
+                entry["action"] = "held"
+                entry["reason"] = f"local HEAD {(local_head or '(unreadable)')[:12]} differs from forge head {head[:12]}; reconcile custody"
+                rows.append(entry)
+                continue
         if meta["mode"] == "no-mistakes" and no_mistakes_run_active(worktree):
             entry["action"] = "busy"
             entry["reason"] = "no-mistakes run already active in worktree"
             rows.append(entry)
             continue
-        clean, detail, _ = check_clean_merge_tree(worktree, cmp["base_tip"], head)
+        clean, detail, expected_tree = check_clean_merge_tree(worktree, cmp["base_tip"], head)
         if not clean:
             entry["action"] = "conflict" if "conflict" in detail else "held"
             entry["reason"] = detail
             rows.append(entry)
             continue
+        entry["expected_tree"] = expected_tree
         entry["action"] = "update"
         entry["reason"] = f"behind {base_name} by {cmp['behind_by']} ({'PASS verified' if has_pass else 'checks green' if not failed else 'stale-red opt-in'})"
         rows.append(entry)
@@ -610,7 +697,7 @@ def run_step(home, no_reconcile=False, include_stale_red=False, repo_filter=None
         state_doc = read_json(state_path, {"v": 1, "inflight": {}, "backoff": {}, "emitted_wakes": {}, "tasks": {}})
         # Phase 1: run reconcile + auto-review/merge independently of Main's watcher.
         if not no_reconcile:
-            rec = run([str(BIN / "fm-pr-ready-reconcile.sh")], home)
+            rec = run([str(BIN / "fm-pr-ready-reconcile.sh")], home, timeout=RECONCILE_TIMEOUT)
             state_doc["last_reconcile"] = {"at": int(time.time()), "rc": rec.returncode}
         # Phase 2: collect finished detached base-update workers.
         inflight = reap_inflight(home, state_doc)
@@ -633,8 +720,11 @@ def run_step(home, no_reconcile=False, include_stale_red=False, repo_filter=None
             if row["action"] == "conflict":
                 emit_wake_once(home, state_doc, task, row["pr"], row["head"], "conflict",
                                f"{row['pr']} has merge conflicts against {row['base_name']}; needs conflict resolution")
+            elif row["action"] == "held":
+                emit_wake_once(home, state_doc, task, row["pr"], row["head"], "held",
+                               f"{row['pr']} held: {row['reason']}")
             elif row["action"] == "update" and admitted < MAX_INFLIGHT:
-                launch_update(home, row, row["base_name"], row["base_tip"], state_doc)
+                launch_update(home, row, row["base_name"], row["base_tip"], row.get("expected_tree") or "", state_doc, state_path)
                 summary[task]["action"] = "inflight"
                 summary[task]["reason"] = f"launched {row['mode']} base update"
                 admitted += 1
@@ -704,7 +794,7 @@ def plan_train_batch(worktree, base_tip, candidates, max_members=5):
         })
         made = subprocess.run(
             ["git", "init", "-q", "--bare", "--template=", f"--object-format={obj_fmt.stdout.strip()}", repo],
-            capture_output=True, text=True, check=False, env=env,
+            capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
         )
         if made.returncode != 0:
             return [], [{"pr": c["pr"], "reason": "could not initialize scratch train repo"} for c in candidates], None
@@ -717,12 +807,12 @@ def plan_train_batch(worktree, base_tip, candidates, max_members=5):
                 excluded.append({"pr": cand["pr"], "head": cand["head"], "reason": f"batch cap ({max_members}) reached"})
                 continue
             head = cand["head"]
-            if subprocess.run(["git", "cat-file", "-e", f"{head}^{{commit}}"], capture_output=True, env=env).returncode != 0:
+            if subprocess.run(["git", "cat-file", "-e", f"{head}^{{commit}}"], capture_output=True, env=env, timeout=GIT_TIMEOUT).returncode != 0:
                 excluded.append({"pr": cand["pr"], "head": head, "reason": "commit unavailable in object store"})
                 continue
             merged = subprocess.run(
                 ["git", "-c", f"core.attributesFile={os.devnull}", "merge-tree", "--write-tree", "--no-messages", cur_commit, head],
-                capture_output=True, text=True, check=False, env=env,
+                capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
             )
             if merged.returncode == 1:
                 excluded.append({"pr": cand["pr"], "head": head, "reason": "conflicts with train batch"})
@@ -737,7 +827,7 @@ def plan_train_batch(worktree, base_tip, candidates, max_members=5):
             tree = tree_lines[0]
             ct = subprocess.run(
                 ["git", "commit-tree", tree, "-p", cur_commit, "-p", head, "-m", f"train member {cand['pr']}"],
-                capture_output=True, text=True, check=False, env=env,
+                capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
             )
             if ct.returncode != 0 or not SHA.fullmatch(ct.stdout.strip()):
                 excluded.append({"pr": cand["pr"], "head": head, "reason": "commit-tree failed in scratch repo"})
@@ -760,6 +850,7 @@ def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale
               worktree=None, branch=None, base_name="main", build=False, as_json=False):
     wt = worktree or str(home.home)
     candidates = []
+    excluded_pre = []
     if prs_csv:
         if not repo_filter or "/" not in repo_filter:
             print("error: --prs requires --repo <owner/repo>", file=sys.stderr)
@@ -772,12 +863,16 @@ def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale
             view = gh_pr_view(url)
             if not view or str(view.get("state", "")).upper() != "OPEN" or view.get("isDraft") is not False:
                 continue
+            cand_base = view.get("baseRefName") or ""
+            if cand_base != base_name:
+                excluded_pre.append({"pr": url, "head": view["headRefOid"], "reason": f"targets base {cand_base or '(unknown)'}, not {base_name}"})
+                continue
             candidates.append({
                 "task": f"pr-{tok}",
                 "pr": url,
                 "number": int(tok),
                 "head": view["headRefOid"],
-                "base_name": view.get("baseRefName") or base_name,
+                "base_name": cand_base,
             })
         owner, repo = repo_filter.split("/", 1)
     else:
@@ -787,22 +882,25 @@ def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale
                                  completed_heads=state_doc.get("completed_heads"), repo_filter=repo_filter)
         for r in rows:
             if r["action"] in ("update", "at-tip"):
+                cand_base = r["base_name"] or ""
+                if cand_base != base_name:
+                    excluded_pre.append({"pr": r["pr"], "head": r["head"], "reason": f"targets base {cand_base or '(unknown)'}, not {base_name}"})
+                    continue
                 candidates.append({
                     "task": r["task"],
                     "pr": r["pr"],
                     "number": r["number"],
                     "head": r["head"],
-                    "base_name": r["base_name"] or base_name,
+                    "base_name": cand_base,
                 })
         if not candidates:
-            out = {"ok": True, "selected": [], "excluded": [], "closes_block": ""}
+            out = {"ok": True, "selected": [], "excluded": excluded_pre, "closes_block": ""}
             print(json.dumps(out, indent=1) if as_json else "landing-loop train: no eligible PRs")
             return 0
         match = PR_URL.fullmatch(candidates[0]["pr"])
         owner, repo = match.group(1), match.group(2)
-        base_name = candidates[0]["base_name"]
     if not candidates:
-        out = {"ok": True, "selected": [], "excluded": [], "closes_block": ""}
+        out = {"ok": True, "selected": [], "excluded": excluded_pre, "closes_block": ""}
         print(json.dumps(out, indent=1) if as_json else "landing-loop train: no eligible PRs")
         return 0
     cmp = gh_compare(owner, repo, base_name, candidates[0]["head"])
@@ -810,7 +908,8 @@ def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale
         print(f"error: could not resolve live tip of {owner}/{repo} {base_name}", file=sys.stderr)
         return 1
     base_tip = cmp["base_tip"]
-    selected, excluded, final_tree = plan_train_batch(wt, base_tip, candidates, max_members=max_members)
+    selected, excluded_plan, final_tree = plan_train_batch(wt, base_tip, candidates, max_members=max_members)
+    excluded = excluded_pre + excluded_plan
     closes_block = format_train_closes_block(selected) if selected else ""
     built_head = None
     intent_path = None
@@ -824,18 +923,29 @@ def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale
         if not worktree_is_clean(worktree):
             print(f"error: train worktree {worktree} is not clean", file=sys.stderr)
             return 1
-        run(["git", "-C", worktree, "fetch", "--quiet", "origin", base_name, *(m["head"] for m in selected)])
-        co = run(["git", "-C", worktree, "checkout", "-B", branch, base_tip])
+        if run(["git", "-C", worktree, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], timeout=GIT_TIMEOUT).returncode == 0:
+            print(f"error: branch {branch} already exists; pick a new branch name to preserve existing commits", file=sys.stderr)
+            return 1
+        run(["git", "-C", worktree, "fetch", "--quiet", "origin", base_name, *(m["head"] for m in selected)], timeout=GIT_TIMEOUT)
+        co = run(["git", "-C", worktree, "checkout", "-b", branch, base_tip], timeout=GIT_TIMEOUT)
         if co.returncode != 0:
             print(f"error: could not checkout {branch} at {base_tip}: {co.stderr.strip()}", file=sys.stderr)
             return 1
         for member in selected:
-            mg = run(["git", "-C", worktree, "merge", "--no-edit", "-m", f"train: merge PR #{member['number']} ({member['head'][:10]})", member["head"]])
+            mg = run(
+                ["git", "-C", worktree, "-c", "merge.ff=false", "merge", "--no-ff", "--no-edit",
+                 "-m", f"train: merge PR #{member['number']} ({member['head'][:10]})", member["head"]],
+                timeout=GIT_TIMEOUT,
+            )
             if mg.returncode != 0:
-                run(["git", "-C", worktree, "merge", "--abort"])
+                run(["git", "-C", worktree, "merge", "--abort"], timeout=GIT_TIMEOUT)
                 print(f"error: merge failed for {member['pr']}: {mg.stderr.strip()}", file=sys.stderr)
                 return 1
-        built_head = run(["git", "-C", worktree, "rev-parse", "HEAD"]).stdout.strip()
+        built_tree = run(["git", "-C", worktree, "rev-parse", "HEAD^{tree}"], timeout=GIT_TIMEOUT).stdout.strip()
+        if final_tree and built_tree != final_tree:
+            print(f"error: built train tree {built_tree[:12]} diverged from proven final_tree {final_tree[:12]}", file=sys.stderr)
+            return 1
+        built_head = run(["git", "-C", worktree, "rev-parse", "HEAD"], timeout=GIT_TIMEOUT).stdout.strip()
         trains_dir = home.root / "trains"
         trains_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         slug_name = re.sub(r"[^A-Za-z0-9._-]", "_", branch)
@@ -903,8 +1013,8 @@ def cmd_events(home, limit=50):
 
 
 def main(argv):
-    if len(argv) == 4 and argv[1] == "_update":
-        update_worker(argv[2], argv[3])
+    if len(argv) == 5 and argv[1] == "_update":
+        update_worker(argv[2], argv[3], argv[4])
         return 0
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
