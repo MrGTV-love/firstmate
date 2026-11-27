@@ -38,7 +38,7 @@ test_complete_preserves_authenticated_pr_poll() {
     || fail "could not publish the first inventory after PR registration"
   fm_pr_poll_snapshot_matches "$home/state" "$id" "$ROOT/bin/fm-pr-poll.sh" \
     || fail "the first inventory invalidated or replaced managed poll provenance"
-  run_captain "$home" hold completion-call-b --title "Choose the second route" \
+  run_captain "$home" hold completion-call-b --title "Pick the fallback path" \
     --reason "second route remains undecided" --repo sample --origin "$id" >/dev/null \
     || fail "could not create the second completion call"
   run_captain "$home" complete "$id" completion-call-b >/dev/null \
