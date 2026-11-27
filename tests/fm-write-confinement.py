@@ -945,11 +945,13 @@ def hardlink_alias(repo, manifest, base, harness, env):
     # path rules. The build must refuse, say which file and how many links,
     # and publish no profile, whatever path the alias sits at.
     common = Path(manifest["home"]) / "projects/project/.git"
+    state = Path(manifest["home"]) / "state"
     aliases = {"worktree": (common / "packed-refs", Path(manifest["worktree"]) / "packed-refs-alias"),
                "outside-worktree": (common / "packed-refs", Path(manifest["user_tmp"]) / "fm-task-packed-refs-alias"),
                "task-data": (common / "packed-refs", Path(manifest["home"]) / "data/task/packed-refs-alias"),
                "loose-ref": (common / "refs/heads/fm/other", Path(manifest["worktree"]) / "loose-ref-alias"),
-               "head": (common / "HEAD", Path(manifest["user_tmp"]) / "fm-task-head-alias")}
+               "head": (common / "HEAD", Path(manifest["user_tmp"]) / "fm-task-head-alias"),
+               "review-records": (state / "review-records.jsonl", Path(manifest["worktree"]) / "review-records-alias")}
     aliases.update({f"other-worktree-{name}": (common / "worktrees/fm-other" / name, Path(manifest["worktree"]) / f"other-worktree-{name}-alias")
                     for name in ("HEAD", "index", "commondir")})
     for name, (target, alias) in aliases.items():

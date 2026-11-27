@@ -135,8 +135,8 @@ def child_dirs(root, keep):
     return [canonical(path) for path in Path(root).iterdir() if path.is_dir() and canonical(path) not in keep] if Path(root).is_dir() else []
 
 
-def extra_links(common, gitdir, own_branch):
-    """Protected shared ref paths that another name reaches.
+def extra_links(common, gitdir, own_branch, state=None):
+    """Protected shared ref and review-ledger paths that another name reaches.
 
     The profile denies these paths by their own name, but a write opened
     through another name for the same file is judged by that other name: a
@@ -153,6 +153,8 @@ def extra_links(common, gitdir, own_branch):
     own = {root / "refs/heads" / own_branch, root / "logs/refs/heads" / own_branch} if own_branch else set()
     heads = {root / "HEAD"}
     paths = [root / name for name in ("packed-refs", "HEAD", "index", "commondir", "refs", "logs", "logs/refs", "worktrees")]
+    if state:
+        paths.append(Path(state) / "review-records.jsonl")
     for folder in ("refs/heads", "logs/refs/heads", "refs/replace"):
         paths.append(root / folder)
         if os.path.realpath(root / folder) == str(root / folder):
@@ -197,15 +199,15 @@ def build(args):
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
         raise ValueError("a repository with reftable ref storage cannot be confined")
-    linked = extra_links(common, gitdir, args.branch)
+    state = canonical(args.state)
+    linked = extra_links(common, gitdir, args.branch, state=state)
     if linked:
         shown = ", ".join(f"{path} ({why})" for path, why in linked[:5])
         raise ValueError(
-            f"protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: {shown}"
+            f"protected path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: {shown}"
             + (f" and {len(linked) - 5} more" if len(linked) > 5 else "") + "; remove the extra link or symbolic link and launch again")
     data = canonical(args.data)
     data_root = str(Path(data).parent)
-    state = canonical(args.state)
     protect = [canonical(path) for path in args.protect]
     deny = [canonical(Path(home) / name) for name in HARNESS_HOMES]
     deny += [canonical(args.home), canonical(args.config), data_root] + protect

@@ -536,8 +536,8 @@ def sweep_stale_carry_scratch(state):
         if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
             continue
         match = CARRY_SCRATCH_PID_RE.match(name)
-        if match:
-            pid = int(match.group(1))
+        pid = int(match.group(1)) if match else None
+        if pid is not None and 0 < pid <= 0x7FFFFFFF:
             if pid == os.getpid():
                 continue
             try:
@@ -545,9 +545,7 @@ def sweep_stale_carry_scratch(state):
                 continue
             except ProcessLookupError:
                 pass
-            except PermissionError:
-                continue
-            except OSError:
+            except (PermissionError, OverflowError, OSError):
                 continue
         elif max_age >= 0 and (now - info.st_mtime) < max_age:
             continue

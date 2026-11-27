@@ -62,8 +62,7 @@ record_word() {  # <case_dir> <head> <words>
 run_verify() {  # <case_dir> <head> [flags...]
   local case_dir=$1 head=$2
   shift 2
-  NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" --head "$head" \
-    --task task-x1 --base "$BASE" "$@"
+  verify_on "$case_dir" "$head" "$BASE" "$@"
 }
 
 expect_not_qualified() {  # <json> <message needle> <label>
@@ -1228,8 +1227,8 @@ SH
   made=$(cat "$case_dir/init.log" 2>/dev/null || true)
   [ -n "$made" ] || fail "the proof ran no git init"
   case "$made" in
-    "$case_dir/home/state/.review-carry-"*/proof.git) ;;
-    *) fail "the scratch repository must be made in the state directory, not elsewhere: $made" ;;
+    "$case_dir/home/state/.review-carry-"[0-9]*-*/proof.git) ;;
+    *) fail "the scratch repository must be made in the state directory with the verifier's PID, not elsewhere: $made" ;;
   esac
   [ -z "$(find "$case_dir/home/state" -maxdepth 1 -name '.review-carry-*')" ] || fail "the scratch directory must be removed after the proof"
   pass "the proof's scratch repository is made beside the review records and removed afterwards"
@@ -1266,7 +1265,8 @@ test_carry_over_sweeps_dead_pid_scratch_and_keeps_live_scratch() {
   live_dir="$case_dir/home/state/.review-carry-$$-active"
   legacy_stale="$case_dir/home/state/.review-carry-legacyold"
   legacy_fresh="$case_dir/home/state/.review-carry-legacynew"
-  mkdir -p "$dead_dir/proof.git" "$live_dir/proof.git" "$legacy_stale/proof.git" "$legacy_fresh/proof.git"
+  local huge_pid_fresh="$case_dir/home/state/.review-carry-999999999999999999999999-huge"
+  mkdir -p "$dead_dir/proof.git" "$live_dir/proof.git" "$legacy_stale/proof.git" "$legacy_fresh/proof.git" "$huge_pid_fresh/proof.git"
   touch -t 202001010000 "$legacy_stale"
   out=$(verify_on "$case_dir" "$live" "$TRUNK") || rc=$?
   expect_code 0 "$rc" "carry-over must succeed while sweeping stale scratch: $out"
@@ -1274,7 +1274,8 @@ test_carry_over_sweeps_dead_pid_scratch_and_keeps_live_scratch() {
   [ ! -e "$legacy_stale" ] || fail "aged legacy scratch dir must be swept: $legacy_stale"
   [ -d "$live_dir" ] || fail "live-PID scratch dir must be preserved: $live_dir"
   [ -d "$legacy_fresh" ] || fail "fresh legacy scratch dir must be preserved: $legacy_fresh"
-  rm -rf "$live_dir" "$legacy_fresh"
+  [ -d "$huge_pid_fresh" ] || fail "fresh out-of-range PID scratch dir must not crash or be swept before max-age: $huge_pid_fresh"
+  rm -rf "$live_dir" "$legacy_fresh" "$huge_pid_fresh"
   pass "carry-over sweeps dead-PID and aged legacy scratch directories while preserving live ones"
 }
 
