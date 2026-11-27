@@ -1642,7 +1642,7 @@ mode = os.environ.get("FM_TEST_OWNER_MODE", "pass")
 if mode == "refuse" or (mode == "refuse-supersedes" and getattr(a, "supersedes", None)):
     print(json.dumps({"state": "BLOCKED", "reason": "fixture_predecessor_not_live"}))
     raise SystemExit(2)
-record = dict(worktree_path=os.path.realpath(a.worktree_path), owner_id=a.owner_id, branch=a.branch,
+record = dict(repo_root=os.path.realpath(a.repo_root), worktree_path=os.path.realpath(a.worktree_path), owner_id=a.owner_id, branch=a.branch,
               base_sha=a.base_sha, owned_paths=a.owned_path, lifecycle_state="worktree_active")
 manifest = Path(os.environ["FM_TEST_SLOT_RECORD"])
 manifest.write_text(json.dumps(record), encoding="utf-8")
@@ -1928,20 +1928,28 @@ test_successor_of_retained_retry() {
   assert_no_grep 'recovery=slot-provision-refused' "$meta" 'the admitted retry kept the refusal marker'
   assert_grep "slot_manifest=$CASE_DIR/manifest.json" "$meta" 'the admitted retry recorded no declaration'
 
-  # A later relaunch is an ordinary attestation: no flag, predecessor not required.
+  # A later relaunch attests as for any governed task: it adopts its own recorded
+  # manifest, with no flag, no provisioner call and no predecessor required.
   mv "$HOME_DIR/state/pred-live.meta" "$CASE_DIR/pred-live.meta.away"
   rc=0
   out=$(run_successor_relaunch) || rc=$?
   expect_code 0 "$rc" "the relaunch of an admitted successor failed: $out"
-  [ "$(successor_calls)" = 4 ] || fail 'the relaunch of an admitted successor did not call the provisioner once'
-  successor_argv_ok 4 '' || fail 'the relaunch of an admitted successor passed --supersedes'
+  [ "$(successor_calls)" = 3 ] || fail 'the relaunch of an admitted successor called the provisioner instead of adopting its manifest'
   [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the relaunch lost or duplicated successor_of'
 
   # An admitted successor whose attestation is refused refuses as for any task.
+  python3 - "$CASE_DIR/manifest.json" <<'PY2'
+import json, sys
+record = json.load(open(sys.argv[1], encoding="utf-8"))
+record["branch"] = "fm/elsewhere"
+json.dump(record, open(sys.argv[1], "w", encoding="utf-8"))
+PY2
   rc=0
-  out=$(OWNER_MODE=refuse run_successor_relaunch) || rc=$?
-  [ "$rc" -ne 0 ] || fail 'a refusing provisioner admitted the successor relaunch'
-  successor_argv_ok 5 '' || fail 'the refused attestation passed --supersedes'
+  out=$(run_successor_relaunch) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'a manifest that disagrees with the task admitted the successor relaunch'
+  assert_contains "$out" 'slot adoption refused: branch_mismatch' 'the refused attestation did not refuse as for any task'
+  [ "$(successor_calls)" = 3 ] || fail 'the refused attestation reached the provisioner'
+  [ "$(successor_meta_count "$SUCC_ID" pred-live)" = 1 ] || fail 'the refused attestation lost or duplicated successor_of'
   pass 'a refused declaration is kept and retried with --supersedes; an admitted successor relaunches ordinarily'
 }
 
