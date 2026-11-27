@@ -1,0 +1,95 @@
+=== base builder: confined worker vs lifecycle records (fixture with Vernant module) ===
+  build ok; lifecycle folder present after build: yes
+  approvals: create own approval                 exit=0 records-changed=YES 
+  approvals: overwrite seeded record             exit=0 records-changed=YES 
+  approvals: append seeded record                exit=0 records-changed=YES 
+  approvals: delete seeded record                exit=0 records-changed=YES 
+  approvals: rename forged file in               exit=0 records-changed=YES 
+  approvals: hard link forged file in            exit=0 records-changed=YES 
+  approvals: symlink in                          exit=0 records-changed=YES 
+  captain-drop: <task>/record.json               exit=0 records-changed=YES 
+  captain-drop: <task>/captain-words.txt         exit=0 records-changed=YES 
+  captain-drop: overwrite other record           exit=0 records-changed=YES 
+  captain-drop: delete other record              exit=0 records-changed=YES 
+  swap prepared folder onto approvals            exit=0 records-changed=YES 
+  rename whole lifecycle folder away             exit=0 records-changed=YES 
+  approvals absent: mkdir folder itself          exit=0 records-changed=YES 
+  approvals absent: rename prepared folder       exit=0 records-changed=YES 
+  captain-drop absent: mkdir -p task folder      exit=0 records-changed=YES 
+  --- sibling lifecycle paths (must stay writable; records must not change) ---
+  sibling: slot manifest + retired receipt       exit=0 records-changed=no  supervisor
+  sibling: python mkdir(parents,exist_ok)        exit=0 records-changed=no  mkdir-ok
+  read a record (reads stay open)                exit=0 records-changed=no  supervisor supervisor
+  --- own .git / commondir ---
+  own .git: append                                     exit=0 
+  own commondir: overwrite                             exit=0 
+  .git now: gitdir: <S>/lc-base/home/projects/proj/.git/worktrees/wt x  commondir now: /tmp/fake
+  --- ordinary git work (fresh fixture) ---
+  git status/add/commit                                exit=0 5b03b70 work
+  git branch --list / show-current                     exit=0 * fm/task + main fm/task
+  git checkout -B own branch                           exit=0 ok
+  git fetch origin                                     exit=0 fetched
+  git worktree add other path                          exit=128 fatal: could not create directory of '/Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/git-base/home/projects/proj/.git/worktrees/extra-wt': Operation not pe
+  git gc                                               exit=0 fatal: unable to write new packed-refs: unable to create file <S>/git-base/home/projects/proj/.git/packed-refs.new: Operation not permitted error: failed to run
+  --- unconfined supervisor control (no profile) ---
+  supervisor unconfined approve+drop write: wrote
+  --- folder swaps that would plant a forged .git / commondir (fresh fixture each) ---
+  swap worktree folder                                 exit=0 swapped
+    .git now: gitdir: /tmp/fake
+  swap gitdir folder                                   exit=0 swapped
+    commondir now: /tmp/fake
+=== head builder: confined worker vs lifecycle records (fixture with Vernant module) ===
+  build ok; lifecycle folder present after build: yes
+  approvals: create own approval                 exit=1 records-changed=no  /bin/sh: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals/task.json: Operation not permitted
+  approvals: overwrite seeded record             exit=1 records-changed=no  /bin/sh: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals/seed.json: Operation not permitted
+  approvals: append seeded record                exit=1 records-changed=no  /bin/sh: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals/seed.json: Operation not permitted
+  approvals: delete seeded record                exit=1 records-changed=no  rm: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals/seed.json: Operation not permitted
+  approvals: rename forged file in               exit=1 records-changed=no  mv: rename <S>/lc-head/wt/forged.json to <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals/moved.json: Operation no
+  approvals: hard link forged file in            exit=1 records-changed=no  ln: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals/link.json: Operation not permitted
+  approvals: symlink in                          exit=1 records-changed=no  ln: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals/sym.json: Operation not permitted
+  captain-drop: <task>/record.json               exit=1 records-changed=no  mkdir: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop/task: Operation not permitted
+  captain-drop: <task>/captain-words.txt         exit=1 records-changed=no  mkdir: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop/task: Operation not permitted
+  captain-drop: overwrite other record           exit=1 records-changed=no  /bin/sh: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop/other-task/record.json: Operation not permitted
+  captain-drop: delete other record              exit=1 records-changed=no  rm: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop/other-task/record.json: Operation not permitted
+  swap prepared folder onto approvals            exit=1 records-changed=no  mv: rename <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals to <S>/lc-head/wt/old-a: Operation not permitted
+  rename whole lifecycle folder away             exit=1 records-changed=no  mv: rename <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle to <S>/lc-head/wt/old-lifecycle: Operation not permitted
+  approvals absent: mkdir folder itself          exit=1 records-changed=no  mkdir: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals: Operation not permitted
+  approvals absent: rename prepared folder       exit=1 records-changed=no  mv: rename prep2 to <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals: Operation not permitted
+  captain-drop absent: mkdir -p task folder      exit=1 records-changed=no  mkdir: <S>/lc-head/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop: Operation not permitted
+  --- sibling lifecycle paths (must stay writable; records must not change) ---
+  sibling: slot manifest + retired receipt       exit=0 records-changed=no  supervisor
+  sibling: python mkdir(parents,exist_ok)        exit=0 records-changed=no  mkdir-ok
+  read a record (reads stay open)                exit=0 records-changed=no  supervisor supervisor
+  --- own .git / commondir ---
+  own .git: append                                     exit=1 /bin/sh: .git: Operation not permitted
+  own commondir: overwrite                             exit=1 /bin/sh: /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/lc-head/home/projects/proj/.git/worktrees/wt/commondir: Operation not permitted
+  .git now: gitdir: <S>/lc-head/home/projects/proj/.git/worktrees/wt  commondir now: ../..
+  --- ordinary git work (fresh fixture) ---
+  git status/add/commit                                exit=0 5b4d7f3 work
+  git branch --list / show-current                     exit=0 * fm/task + main fm/task
+  git checkout -B own branch                           exit=0 ok
+  git fetch origin                                     exit=0 fetched
+  git worktree add other path                          exit=128 fatal: could not create directory of '/Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/git-head/home/projects/proj/.git/worktrees/extra-wt': Operation not pe
+  git gc                                               exit=0 fatal: unable to write new packed-refs: unable to create file <S>/git-head/home/projects/proj/.git/packed-refs.new: Operation not permitted error: failed to run
+  --- unconfined supervisor control (no profile) ---
+  supervisor unconfined approve+drop write: wrote
+  --- folder swaps that would plant a forged .git / commondir (fresh fixture each) ---
+  swap worktree folder                                 exit=1 mv: rename /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/sw1-head/wt to /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/sw1-head/home/data/task/old: O
+    .git now: gitdir: <S>/sw1-head/home/projects/proj/.git/worktrees/wt
+  swap gitdir folder                                   exit=1 mv: rename /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/sw2-head/home/projects/proj/.git/worktrees/wt to /Users/charlesabrooker/tmp/fm-live-lifecycle.WuB
+    commondir now: ../..
+=== project without the Vernant module (head builder) ===
+  build: ok; lifecycle folder: absent
+  worker commit in plain project                       exit=0 committed
+=== pre-build repoint and missing --project (head vs base builder) ===
+  base: repointed .git -> BUILT profile (protects /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/rp-base/fake/.git)
+  profile published: yes
+  base: repointed commondir -> BUILT profile
+  base: hard-linked commondir -> BUILT profile
+  head: repointed .git -> REFUSED: error: cannot prepare worker write confinement: the worktree's shared Git directory is /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/rp-head/fake/.git, not the project's /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/rp-head/home/projects/proj/.git
+  profile published: no
+  head: repointed commondir -> REFUSED: error: cannot prepare worker write confinement: the worktree's shared Git directory is /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/rp-head/fake/.git, not the project's /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/rp-head/home/projects/proj/.git
+  head: hard-linked commondir -> REFUSED: error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-live-lifecycle.WuBMwC/rp-head/home/projects/proj/.git/worktrees/wt/commondir (2 links); remove the extra link or symbolic link and launch again
+  head: no --project -> REFUSED: error: cannot prepare worker write confinement: no --project checkout was given, so the worker's repository cannot be proved to be the project's
+  profile published: no
+  head: restored fixture -> BUILT profile

@@ -1,0 +1,7 @@
+head profile rules naming the record folders:
+32:(deny file-write* (subpath "<S>/fx/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals"))
+33:(deny file-write* (subpath "<S>/fx/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop"))
+  owned-paths-approvals        head.sb                  -> mkdir: <S>/fx/home/projects/proj/.git/vernant-worktree-lifecycle/owned-paths-approvals/task: Operation not permitted
+  owned-paths-approvals        mut-owned-paths-approvals.sb -> WROTE
+  captain-drop                 head.sb                  -> mkdir: <S>/fx/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop/task: Operation not permitted
+  captain-drop                 mut-captain-drop.sb      -> WROTE

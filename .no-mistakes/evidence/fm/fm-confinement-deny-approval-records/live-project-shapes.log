@@ -1,0 +1,13 @@
+=== --project spellings (head builder must build) ===
+  --project physical path                          exit=0 
+  --project via symlink to project                 exit=0 
+  --project with different letter case             exit=0 
+  --project as a linked worktree of same repo      exit=0 
+  --project logical path with /./ and trailing /   exit=0 
+  --worktree via symlink                           exit=0 
+=== --project naming a different repository (head builder must refuse) ===
+  --project is another repository                  exit=1 error: cannot prepare worker write confinement: the worktree's shared Git directory is <S>/fx/home/projects/proj/.git, not the project's <S>/fx/other/.git
+=== drop-record files inside a supervisor-made captain-drop/<task>/ folder ===
+  confined create captain-drop/task/record.json        -> /bin/sh: <S>/fx/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop/task/record.json: Operation not permitted ; file exists after: no
+  confined create captain-drop/task/captain-words.txt  -> /bin/sh: <S>/fx/home/projects/proj/.git/vernant-worktree-lifecycle/captain-drop/task/captain-words.txt: Operation not permitted ; file exists after: no
+  unconfined supervisor writes both files -> WROTE
