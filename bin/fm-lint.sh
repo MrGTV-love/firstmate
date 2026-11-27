@@ -342,10 +342,11 @@
 # the identity the same census listed it under that member; a replacement, a
 # recycled pid, or any identity or memory that cannot be read makes the sample
 # unknown, never counted or adopted. Any missed sample while the root runs that is
-# followed by a later tick fails that root (status 96, reason unmeasured; only a miss
-# on its very last tick, its own exit, is exempt; each tick first reaps an exited
-# root, so its exit is not sampled as misses), even if it later crosses the
-# cap: 96 comes before 98, so no memory retry follows and no success is recorded.
+# followed by a later tick fails that root unless it is rerun alone (below) (status
+# 96, reason unmeasured; only a miss on its very last tick, its own exit, is exempt;
+# each tick first reaps an exited root, so its exit is not sampled as misses), even
+# if it later crosses the cap: 96 comes before 98, so no memory retry follows and no
+# success is recorded.
 # THE ALONE RERUN (Main 4343, 4351). When that unmeasured interval is the root's
 # only failure (its readers stayed up, no reading was over its cap, its owner did
 # not signal it, and every process it counted was proven ended: the watch then
@@ -368,8 +369,9 @@
 # admission counts them by charge only), and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # ShellCheck started outside this script (an agent or a test running it
-# directly) holds no slot and is not bounded by the pool; each admission counts
-# it at its current resident size.
+# directly) holds no slot and is not bounded by the pool; no admission counts it,
+# and it is never the reason a governed root waits or is held (option C above):
+# the host memory guard (bin/fm-mem-guard.sh) owns it.
 # A cold root takes one pass of the host-wide CPU pool before its host slot
 # (bin/fm-cpu-pass.sh; docs/cpu-pass-pool.md owns the protocol), so ShellChecks and
 # test scripts together never exceed the pool. The changed-root dependency scan and
@@ -442,6 +444,8 @@
 # refused a waiting root because the run was marked to stop), rerun-queued (its
 # first run was only unmeasured, so its result is not used and it runs once more
 # alone; the rerun has its own begin and end rows in the alone pass), or error:<rc>.
+# The closing meta rows count each root once, by its last row in the log, so a
+# rerun root is one begun root, completed when its rerun ended.
 # Memory requires process-level evidence (a GHC exhaustion status or runtime
 # error on stderr), not an echoed source excerpt or an OOM phrase in a
 # filename. In partition mode begin/end
@@ -2817,7 +2821,8 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_INTERNAL_ABORT_FILE="$TMP_ROOT/census.abort" FM_LINT_INTERNAL_RUN_ENTRY="$RUN_ENTRY")
   worker_env+=(FM_LINT_INTERNAL_RUN_ID="$$")
   # The first pass queues a root whose only failure was an unmeasured interval;
-  # the alone pass (fm_lint_run_alone_pass) reruns each once with this set to 1.
+  # the alone pass (after the first-pass workers end, below) reruns each once with
+  # this set to 1.
   worker_env+=(FM_LINT_INTERNAL_ALONE_QUEUE="$TMP_ROOT/alone.queue" FM_LINT_INTERNAL_ALONE="$ALONE_PASS")
   # The most one root can hold: its address-space limit under the enforced
   # envelope, else the resident watch bound. The gate charges it for a root
@@ -2946,10 +2951,12 @@ done
 if [ -s "$ROOTS_LOG" ]; then
   read -r roots_completed roots_unfinished roots_begun <<EOF
 $(awk -F '\t' '
-  $1 == "begin" { begun[$2 FS $3] = 1; total++ }
-  $1 == "end" { ended[$2 FS $3] = 1; done_count++ }
-  END { unfinished = 0; for (key in begun) if (!(key in ended)) unfinished++
-        printf "%d %d %d\n", done_count + 0, unfinished, total + 0 }
+  $1 == "begin" { begun[$2 FS $3] = 1 }
+  $1 == "begin" || $1 == "end" { last[$2 FS $3] = $1 }
+  END { total = 0; done_count = 0; unfinished = 0
+        for (key in begun) total++
+        for (key in last) if (last[key] == "end") done_count++; else unfinished++
+        printf "%d %d %d\n", done_count, unfinished, total }
 ' "$ROOTS_LOG")
 EOF
   {
@@ -2984,7 +2991,8 @@ if [ -n "$TELEMETRY" ]; then
   source_directives=0
   source_boundaries=0
   source_followed=0
-  awk -F '\t' '$1 == "end" && $12 == 0 { print $2 }' "$ROOTS_LOG" > "$TMP_ROOT/no-source-indices"
+  awk -F '\t' '$1 == "end" { nosource[$2] = ($12 == 0) } END { for (i in nosource) if (nosource[i]) print i }' \
+    "$ROOTS_LOG" > "$TMP_ROOT/no-source-indices"
   root_index=0
   for path in "${ROOTS[@]}"; do
     root_index=$((root_index + 1))

@@ -3878,8 +3878,9 @@ test_resident_watch_bounds_footprint_beyond_resident() {
 
 # A reader that answers one tick past the deadline and its retry makes that tick a
 # miss (no other source samples it); a new reader takes over and answers the next tick, so the miss
-# is followed by a later tick and the root fails unmeasured (96): no narrower retry
-# follows, and the run fails.
+# is followed by a later tick. That reading is over the cap (204800 KiB against
+# 102400 KiB), so the root is not queued for an alone rerun (Main 4351) and fails
+# unmeasured (96) at once: no narrower retry follows, and the run fails.
 test_resident_watch_replaces_a_stalled_reader() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-stall)
@@ -3897,7 +3898,7 @@ test_resident_watch_replaces_a_stalled_reader() {
   case "$samples" in libproc:[1-9]*,unmeasured) ;; *) fail "the stalled tick was not recorded as an unmeasured interval: $samples" ;; esac
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 2 ] \
     || fail "the stalled reader was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
-  pass "a reader that misses one deadline is replaced, and the missed tick followed by a later one fails the root unmeasured with no narrower retry"
+  pass "a reader that misses one deadline is replaced, and the missed tick followed by a reading over the cap fails the root unmeasured with no narrower retry and no alone rerun"
 }
 
 # A reader's first reply has the same 6 s as every reply, so a reader that starts
@@ -3958,6 +3959,10 @@ test_a_late_reply_reruns_the_root_alone_and_a_measured_rerun_under_the_cap_passe
     || fail "the root did not run exactly twice with source following"$'\n'"$(cat "$tmp/flags.log")"
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 3 ] \
     || fail "expected two readers for the first run and one for the rerun"$'\n'"$(cat "$tmp/py.log")"
+  # The closing meta rows count each of the two roots once, the rerun root included.
+  awk -F '\t' '$1 == "meta" && $2 ~ /^roots_(begun|completed|unfinished)$/ { m[$2] = $3 }
+    END { exit !(m["roots_begun"] == 2 && m["roots_completed"] == 2 && m["roots_unfinished"] == 0) }' "$log" \
+    || fail "the roots log meta rows do not count each of the two roots once"$'\n'"$(cat "$log")"
   pass "a late reply's unmeasured interval reruns the root once alone after the other roots, and a rerun measured under the cap passes"
 }
 
@@ -4007,7 +4012,9 @@ test_a_rerun_alone_measured_over_the_cap_fails_the_root() {
 
 # A replacement reader that exits before its first reply is one failed restart,
 # not a reader that exited at start: the next replacement answers again. The two
-# missed ticks were followed by later ones, so the root fails unmeasured (96).
+# missed ticks were followed by later ones whose reading is over the cap (204800 KiB
+# against 102400 KiB), so the root is not queued for an alone rerun (Main 4351) and
+# fails unmeasured (96) at once.
 test_resident_watch_retries_a_replacement_that_exits() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-replacement-exit)
@@ -4025,7 +4032,7 @@ test_resident_watch_retries_a_replacement_that_exits() {
   case "$samples" in libproc:[1-9]*,unmeasured) ;; *) fail "the failed replacement's ticks were not recorded as an unmeasured interval: $samples" ;; esac
   [ "$(grep -c 'rss-tree' "$tmp/py.log")" -eq 3 ] \
     || fail "the failed replacement was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
-  pass "a replacement reader that exits before replying is retried, and the missed ticks fail the root unmeasured"
+  pass "a replacement reader that exits before replying is retried, and the missed ticks followed by a reading over the cap fail the root unmeasured with no alone rerun"
 }
 
 # Three failed replacements in a row give the reader up for the rest of the
