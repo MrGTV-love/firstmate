@@ -4926,21 +4926,27 @@ require_exclusive_task_worktree_slot() {
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$slot"
 }
 
+# The refusal of a copy-clearance scan that ran past its deadline: one text for the scan's per-record
+# check and for its inner pass. The caller returns 1 right after it.
+teardown_clearance_deadline_refuse() {  # <task-id> <limit>
+  echo "REFUSED: the copy-clearance scan for task $1 ran past its ${2}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown" >&2
+}
+
 require_cleanup_copy_clearance() {
   local record_meta=$1 record_id=$2 record_state=$3 target=$4 allow_current=${5:-0} target_kind=${6:-}
   local canonical state_dir other_meta line field copy copy_real copy_common retiring i owner_home keep_current overlaps own skipped
   local -a rec_lines=()
   local rec_kind wt_real
-  local scan_limit=600 scan_end=0
+  local scan_limit=600 scan_end=0 released
   fm_task_copy_canonical_dir_to canonical "$target" || return 0
-  # A scan that holds the project lock is bounded: it reads every task record of every local
-  # home, and a spawn or another teardown waits on that lock for as long as it runs. Past the
-  # deadline, checked before each record (a pure-bash scan cannot be interrupted), it refuses.
-  # The scan only reads, and it sits where its other refusals do, so a refusal here leaves exactly
-  # what they leave: nothing was changed by the scan, the EXIT trap releases the lock, and a retry
-  # is safe. No process is signalled. The value is read once per scan.
-  teardown_scan_limit_to scan_limit
-  [ "$TREEHOUSE_PROJECT_LOCK_HELD" != 1 ] || scan_end=$((SECONDS + scan_limit))
+  # A scan that holds a project lock is bounded, whichever lock it is (this teardown's own, or a
+  # child lock of a forced secondmate teardown; teardown_project_lock_held): it reads every task
+  # record of every local home, and a spawn or another teardown waits on that lock for as long as
+  # it runs. Past the deadline, checked before each record (a pure-bash scan cannot be interrupted),
+  # it refuses. The scan only reads, and it sits where its other refusals do, so a refusal here
+  # leaves exactly what they leave: nothing was changed by the scan, the EXIT trap releases the
+  # lock, and a retry is safe. No process is signalled. The value is read once per scan.
+  teardown_scan_window_to scan_limit scan_end
   # A retiring secondmate's own registered home that is already gone holds
   # nothing to lose, so it alone is not a reason to refuse; every other home
   # the walk cannot prove still refuses.
@@ -4961,7 +4967,7 @@ require_cleanup_copy_clearance() {
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
       if [ "$scan_end" -gt 0 ] && [ "$SECONDS" -ge "$scan_end" ]; then
-        echo "REFUSED: the copy-clearance scan for task $record_id ran past its ${scan_limit}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown" >&2
+        teardown_clearance_deadline_refuse "$record_id" "$scan_limit"
         return 1
       fi
       retiring=0
@@ -5037,10 +5043,20 @@ require_cleanup_copy_clearance() {
         # fm_task_copy_prior_root_released's).
         if [ "$overlaps" = 1 ] && [ "$field" = prior_worktree ] && [ "$own" = 0 ] \
            && [ "$KIND" != secondmate ] && [ "$record_meta" = "$META" ] \
-           && fm_task_copy_canonical_dir_to wt_real "$WT" 2>/dev/null && [ "$canonical" = "$wt_real" ] \
-           && fm_task_copy_prior_root_released "$other_meta" "$copy_real" "$canonical" "$record_meta" \
-             "${FM_LOCAL_FIRSTMATE_STATES[@]}"; then
-          overlaps=0
+           && fm_task_copy_canonical_dir_to wt_real "$WT" 2>/dev/null && [ "$canonical" = "$wt_real" ]; then
+          # The inner pass reads every record again, so it ends where this scan must end (status 3).
+          released=0
+          FM_TASK_COPY_SCAN_END=$scan_end
+          fm_task_copy_prior_root_released "$other_meta" "$copy_real" "$canonical" "$record_meta" \
+            "${FM_LOCAL_FIRSTMATE_STATES[@]}" || released=$?
+          FM_TASK_COPY_SCAN_END=0
+          case "$released" in
+            0) overlaps=0 ;;
+            3)
+              teardown_clearance_deadline_refuse "$record_id" "$scan_limit"
+              return 1
+              ;;
+          esac
         fi
         if [ "$overlaps" = 1 ] \
            && ! fm_task_copy_ancestor_current "$other_meta" "$record_state" "$field" "$copy_real" "$canonical"; then
@@ -5432,7 +5448,7 @@ teardown_held_copies_record_or_refuse() {  # [check]
   return 1
 }
 teardown_slot_peers_detect() {  # <slot>
-  local slot=$1 target state_dir other_meta line names_slot scan_limit scan_end
+  local slot=$1 target state_dir other_meta line names_slot scan_limit scan_end released
   TEARDOWN_PEER_IDS=()
   TEARDOWN_PEER_HOMES=()
   target=$(fm_task_copy_canonical_dir "$WT" 2>/dev/null) || {
@@ -5453,8 +5469,12 @@ teardown_slot_peers_detect() {  # <slot>
         [ "$(fm_task_copy_canonical_dir "${line#prior_worktree=}" 2>/dev/null)" != "$slot" ] || names_slot=1
       done < "$other_meta"
       [ "$names_slot" = 1 ] || continue
-      fm_task_copy_prior_root_released "$other_meta" "$slot" "$target" "$META" "${FM_LOCAL_FIRSTMATE_STATES[@]}" \
-        || continue
+      released=0
+      FM_TASK_COPY_SCAN_END=$scan_end
+      fm_task_copy_prior_root_released "$other_meta" "$slot" "$target" "$META" "${FM_LOCAL_FIRSTMATE_STATES[@]}" || released=$?
+      FM_TASK_COPY_SCAN_END=0
+      [ "$released" != 3 ] || teardown_scan_deadline_refuse "$scan_limit" "the peer walk for task $ID"
+      [ "$released" = 0 ] || continue
       TEARDOWN_PEER_IDS+=("$(basename "$other_meta" .meta)")
       TEARDOWN_PEER_HOMES+=("${state_dir%/*}")
     done
@@ -6735,10 +6755,18 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
 
 cleanup_firstmate_home_children() {
   local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i child_copy_mode child_keep_copy child_pool_return child_project_lock child_leased child_pool_slot
+  local scan_limit scan_end
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
+  # This walk of the child records changes each child in turn. When it starts under a project lock (the
+  # child locks a Treehouse without the lease command keeps through the whole cleanup) it is bounded like
+  # every other walk under a lock: checked before each child, so past the deadline it refuses before that
+  # child's first step. The children before it are cleaned up, as after any refusal in this loop; this
+  # child and the ones after it, their reservations and their return-pending records are kept for the retry.
+  teardown_scan_window_to scan_limit scan_end
   for child_meta in "$sub_state"/*.meta; do
     [ -e "$child_meta" ] || continue
+    teardown_scan_deadline_check "$scan_end" "$scan_limit" "the child cleanup walk of $home"
     child_id=$(basename "$child_meta" .meta)
     for ((child_admission_i=0; child_admission_i < ${#TEARDOWN_HERDR_ADMITTED_METAS[@]}; child_admission_i++)); do
       [ "${TEARDOWN_HERDR_ADMITTED_METAS[$child_admission_i]}" = "$child_meta" ] || continue

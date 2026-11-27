@@ -3776,7 +3776,7 @@
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: the copy-clearance scan for task $record_id ran past its ${scan_limit}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown\" >&2"
+          "match": "echo \"REFUSED: the copy-clearance scan for task $1 ran past its ${2}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown\" >&2"
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",
@@ -3785,6 +3785,15 @@
         {
           "file": "bin/fm-teardown-nested-lib.sh",
           "match": "[ \"$1\" -le 0 ] || [ \"$SECONDS\" -lt \"$1\" ] || teardown_scan_deadline_refuse \"$2\" \"$3\""
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "teardown_clearance_deadline_refuse \"$record_id\" \"$scan_limit\"",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "[ \"$released\" != 3 ] || teardown_scan_deadline_refuse \"$scan_limit\" \"the peer walk for task $ID\""
         },
         {
           "file": "bin/fm-teardown-nested-lib.sh",

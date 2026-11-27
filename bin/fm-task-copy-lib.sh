@@ -464,7 +464,7 @@ FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
 FM_TASK_COPY_SCAN_LIMIT_SECS=0
 fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta>...]
   local record_meta=$1 record_state=$2 path=$3
-  local target state_dir other_meta line field other_path other_real skip scan_end=0
+  local target state_dir other_meta line field other_path other_real skip scan_end=0 released
   local -a rec_lines=()
   shift 3
   case "${FM_TASK_COPY_SCAN_LIMIT_SECS:-0}" in
@@ -500,10 +500,16 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
         other_real=$(fm_task_copy_canonical_dir "$other_path") || continue
         fm_task_copy_paths_overlap "$other_real" "$target" || continue
         fm_task_copy_ancestor_current "$other_meta" "$record_state" "$field" "$other_real" "$target" && continue
-        if [ "$field" = prior_worktree ] && [ -n "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" ] \
-           && fm_task_copy_prior_root_released "$other_meta" "$other_real" "$target" \
-             "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" "${FM_LOCAL_FIRSTMATE_STATES[@]}"; then
-          continue
+        if [ "$field" = prior_worktree ] && [ -n "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" ]; then
+          released=0
+          FM_TASK_COPY_SCAN_END=$scan_end
+          fm_task_copy_prior_root_released "$other_meta" "$other_real" "$target" \
+            "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" "${FM_LOCAL_FIRSTMATE_STATES[@]}" || released=$?
+          FM_TASK_COPY_SCAN_END=0
+          case "$released" in
+            0) continue ;;
+            3) return 3 ;;
+          esac
         fi
         FM_TASK_COPY_OTHER_ID=$(basename "$other_meta" .meta)
         FM_TASK_COPY_OTHER_FIELD=$field
@@ -514,6 +520,11 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
   return 1
 }
 
+# FM_TASK_COPY_SCAN_END: the SECONDS value a caller that holds a lock hands to the inner pass
+# below, for the one call, so that its pass over every record ends where the caller's own walk
+# must end; 0 (the default) is unbounded. Like the limit above it is a fact the caller states, set
+# around the call and put back to 0 after it.
+FM_TASK_COPY_SCAN_END=0
 # Whether the prior_worktree= <root> of record <other-meta> is a pool slot root
 # that task has left, so that it does not keep <target>, a copy of the retiring
 # task strictly inside <root>, from being cleaned up. bin/fm-control.sh
@@ -533,9 +544,17 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
 #     or home=; a copy of some record inside <root> belongs to that record.
 # <state-dir>... are the local Firstmate state directories to scan, as
 # fm_local_firstmate_state_dirs produced them. <root> and <target> are canonical.
+# Returns 0 when released, 1 when not (or when that cannot be told), and 3 when its pass
+# over the records ran past FM_TASK_COPY_SCAN_END: it checks the clock before each record, reads
+# only, and changes and signals nothing. A caller must read 3 as "stop", never as "not
+# released", because every caller counts a failure as an overlap that keeps the copy.
 fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-meta> <state-dir>...
-  local other=$1 root=$2 target=$3 retiring=$4 kind project wt state_dir meta field path real line named
+  local other=$1 root=$2 target=$3 retiring=$4 kind project wt state_dir meta field path real line named scan_end=0
   shift 4
+  case "${FM_TASK_COPY_SCAN_END:-0}" in
+    ''|*[!0-9]*) ;;
+    *) scan_end=$((10#$FM_TASK_COPY_SCAN_END)) ;;
+  esac
   case "$target" in "$root"/*) ;; *) return 1 ;; esac
   kind=$(fm_meta_get "$other" kind)
   case "${kind:-ship}" in ship|scout) ;; *) return 1 ;; esac
@@ -554,6 +573,7 @@ fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-m
   for state_dir in "$@"; do
     for meta in "$state_dir"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      [ "$scan_end" -le 0 ] || [ "$SECONDS" -lt "$scan_end" ] || return 3
       [ "${meta##*/}" = "${other##*/}" ] && [ "$meta" -ef "$other" ] && continue
       [ "${meta##*/}" = "${retiring##*/}" ] && [ "$meta" -ef "$retiring" ] && continue
       for field in worktree home; do
