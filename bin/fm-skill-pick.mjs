@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // The TypeSafe skill-suggestion cookbook recipe on the vendored hyper-jev client.
 // Usage: node bin/fm-skill-pick.mjs roster <catalog-dir>... > roster.json
-//        node bin/fm-skill-pick.mjs pick <task-file> <roster.json> <policy-path> <scratch-path> < keys
+//        node bin/fm-skill-pick.mjs pick <task-file> <roster.json> <policy-path> <scratch-path> [<journal> <spawn-gen>] < keys
+// The optional private journal is exclusive and records its launch generation
+// alongside input hashes, provider/call/attempt numbers, status, and usage.
+// Missing response identities or usage are not zero-charge evidence.
 // Recipe: https://docs.typesafe.ai/cookbooks/skill_suggestion ("rank the whole
 // roster", "rerank the top three", suggest()); question texts, the 0.30 need
 // and fit thresholds, three-skill shortlist and 700-character excerpt are retained.
@@ -20,14 +23,16 @@
 // pick prints status=, reason=, picked=, path=, fit=, provider= and model=
 // lines; path is a JSON string, and status is picked, none or unavailable.
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { openAttemptJournal, requestIdDigest } from './fm-jev-attempt-journal.mjs';
 import { closeSync, lstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 let JevClient, choice, noul, LIMITS;
 try {
-  ({ JevClient } = await import('../.agents/skills/hyper-jev/templates/starter/src/core/client.ts'));
-  ({ choice, noul } = await import('../.agents/skills/hyper-jev/templates/starter/src/core/helpers.ts'));
-  ({ LIMITS } = await import('../.agents/skills/hyper-jev/templates/starter/src/core/types.ts'));
+  ({ JevClient } = await import('./ten-levels/src/core/client.ts'));
+  ({ choice, noul } = await import('./ten-levels/src/core/helpers.ts'));
+  ({ LIMITS } = await import('./ten-levels/src/core/types.ts'));
 } catch (error) {
   if (error.code === 'ERR_UNKNOWN_FILE_EXTENSION' && error.message.includes('".ts"')) {
     process.stderr.write(`unsupported Node runtime: importing the vendored TypeScript client requires Node with TypeScript support (${error.message})\n`);
@@ -167,16 +172,33 @@ function line(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
 }
 
-async function pick(taskFile, rosterFile, policyPath, scratchPath) {
+async function pick(taskFile, rosterFile, policyPath, scratchPath, journalPath, spawnGen) {
+  if (journalPath !== undefined && (!journalPath || !/^[A-Za-z0-9_.:/-]{1,128}$/.test(spawnGen ?? ''))) {
+    throw new Error('invalid attempt journal path or spawn generation');
+  }
   const request = readFileSync(taskFile, 'utf8');
-  const { skills, not_judged = [] } = JSON.parse(readFileSync(rosterFile, 'utf8'));
+  const rosterText = readFileSync(rosterFile, 'utf8');
+  const { skills, not_judged = [] } = JSON.parse(rosterText);
   const [typesafe = '', openrouter = ''] = readFileSync(0, 'utf8').split('\n');
   const keys = { typesafe: typesafe.trim(), openrouter: openrouter.trim() };
   const byName = new Map(skills.map((skill) => [skill.name, skill]));
   const out = { status: 'unavailable', reason: '', picked: '', path: '', fit: '', provider: '', model: '' };
   let directFailure = '';
   let fallbackReason = '';
+  // Keep provider-reported counts only when every client call has one measured attempt.
+  let clientCalls = 0, attempts = 0, input = 0, output = 0;
+  const isCount = (value) => Number.isSafeInteger(value) && value >= 0;
+  const journal = journalPath ? openAttemptJournal(journalPath) : null;
+  const digest = (text) => createHash('sha256').update(text).digest('hex');
+  if (journal) journal.append({ kind: 'opened', version: 2, stage: 'skill-selection', spawn_gen: spawnGen,
+    task_sha256: digest(request), roster_sha256: digest(rosterText) });
   const done = () => {
+    if (journal && !journal.close({ kind: 'closed', client_calls: clientCalls })) {
+      attempts = input = output = null;
+      process.stderr.write('skill picker: attempt journal closeout unverified\n');
+    }
+    out.accounting = JSON.stringify({ client_calls: clientCalls, transport_attempts: attempts,
+      input_tokens: input, output_tokens: output });
     if (directFailure) out.reason = [out.reason, `TypeSafe direct failed (${directFailure})`].filter(Boolean).join('; ');
     if (fallbackReason) out.reason = [out.reason, fallbackReason].filter(Boolean).join('; ');
     for (const [key, value] of Object.entries(out)) process.stdout.write(`${key}=${key === 'path' ? JSON.stringify(value) : line(value)}\n`);
@@ -220,14 +242,46 @@ async function pick(taskFile, rosterFile, policyPath, scratchPath) {
   }
   const deadline = AbortSignal.timeout(RUN_DEADLINE_MS);
   const state = { request, recent_context: '' };
+  const measuredCall = async (questions) => {
+    const call = ++clientCalls;
+    const provider = current.provider;
+    let result;
+    try {
+      result = await current.systemOne(state, questions, { signal: deadline,
+        ...(journal ? {
+          beforeTransportAttempt: (attempt) => journal.append({ kind: 'attempt_started', call, provider, attempt }),
+          observeTransportResponse: (attempt, status, id) => journal.observe({ kind: 'response_observed', call,
+            provider, attempt, http_status: status, request_id_sha256: requestIdDigest(id) }),
+        } : {}),
+      });
+    } catch (error) {
+      attempts = input = output = null;
+      throw error;
+    }
+    const n = result.meta.attempts;
+    attempts = attempts !== null && isCount(n) && n > 0 ? attempts + n : null;
+    const { input_tokens, output_tokens } = result.usage ?? {};
+    journal?.observe({ kind: 'reported_usage', call, provider, attempt: n,
+      served_model: /^(?:~typesafe\/)?jev-[0-9]+(?:\.[0-9]+)*$/.test(result.model) && result.model.length <= 80 ? result.model : null,
+      input_tokens: isCount(input_tokens) ? input_tokens : null,
+      output_tokens: isCount(output_tokens) ? output_tokens : null });
+    if (input === null || n !== 1 || !isCount(input_tokens) || !isCount(output_tokens) ||
+        !isCount(input + input_tokens) || !isCount(output + output_tokens)) {
+      input = output = null;
+    } else {
+      input += input_tokens;
+      output += output_tokens;
+    }
+    return result;
+  };
   const ask = async (questions) => {
     try {
-      return await current.systemOne(state, questions, { signal: deadline });
+      return await measuredCall(questions);
     } catch (error) {
       if (!fallback || deadline.aborted || ['QuestionValidationError', 'PrivacyError'].includes(error?.name)) throw error;
       directFailure = `${line(error?.message)}; used OpenRouter`;
       [current, fallback] = [fallback, null];
-      return current.systemOne(state, questions, { signal: deadline });
+      return measuredCall(questions);
     }
   };
   try {
@@ -308,9 +362,9 @@ const [command, ...args] = process.argv.slice(2);
 try {
   if (command === 'check' && !args.length) {}
   else if (command === 'roster' && args.length) process.stdout.write(`${JSON.stringify(roster(args))}\n`);
-  else if (command === 'pick' && args.length === 4) await pick(...args);
+  else if (command === 'pick' && (args.length === 4 || args.length === 6)) await pick(...args);
   else {
-    process.stderr.write('usage: fm-skill-pick.mjs check | roster <catalog-dir>... | pick <task-file> <roster.json> <policy-path> <scratch-path> < keys\n');
+    process.stderr.write('usage: fm-skill-pick.mjs check | roster <catalog-dir>... | pick <task-file> <roster.json> <policy-path> <scratch-path> [<journal> <spawn-gen>] < keys\n');
     process.exit(2);
   }
 } catch (error) {

@@ -1,0 +1,303 @@
+{
+  "records": [
+    {
+      "id": "aa-lcr",
+      "disposition": "shadow-eligible",
+      "required_tags": [
+        "long_document_synthesis"
+      ],
+      "excluded_tags": [
+        "unsafe_or_unreviewed_scope",
+        "capacity_only"
+      ],
+      "overlap_group": "document_reasoning",
+      "source_series": [
+        {
+          "id": 5,
+          "label": "AA-LCR v1.1",
+          "version": "1.1",
+          "unit": "fraction",
+          "scale": "fraction"
+        }
+      ]
+    },
+    {
+      "id": "frontiercode",
+      "disposition": "shadow-eligible",
+      "required_tags": [
+        "repository_patch",
+        "blocking_maintainer_checks"
+      ],
+      "excluded_tags": [
+        "unsafe_or_unreviewed_scope",
+        "puzzle_only"
+      ],
+      "overlap_group": "repository_work",
+      "source_series": [
+        {
+          "id": 20,
+          "label": "FrontierCode",
+          "version": null,
+          "unit": "fraction",
+          "scale": "fraction"
+        }
+      ]
+    },
+    {
+      "id": "ifbench",
+      "disposition": "shadow-eligible",
+      "required_tags": [
+        "machine_checked_output_constraints"
+      ],
+      "excluded_tags": [
+        "unsafe_or_unreviewed_scope",
+        "style_only"
+      ],
+      "overlap_group": "instruction_constraints",
+      "source_series": [
+        {
+          "id": 29,
+          "label": "IFBench",
+          "version": null,
+          "unit": "fraction",
+          "scale": "fraction"
+        }
+      ]
+    },
+    {
+      "id": "omniscience-accuracy",
+      "disposition": "shadow-eligible",
+      "required_tags": [
+        "factual_correctness_checked"
+      ],
+      "excluded_tags": [
+        "unsafe_or_unreviewed_scope",
+        "citation_fidelity_only"
+      ],
+      "overlap_group": "omniscience",
+      "source_series": [
+        {
+          "id": 42,
+          "label": "AA-Omniscience Accuracy",
+          "version": null,
+          "unit": "fraction",
+          "scale": "fraction"
+        }
+      ]
+    },
+    {
+      "id": "omniscience-hallucination-rate",
+      "disposition": "shadow-eligible",
+      "required_tags": [
+        "abstention_expected",
+        "incorrect_guess_penalized"
+      ],
+      "excluded_tags": [
+        "unsafe_or_unreviewed_scope",
+        "citation_fidelity_only"
+      ],
+      "overlap_group": "omniscience",
+      "source_series": [
+        {
+          "id": 43,
+          "label": "AA-Omniscience Hallucination Rate",
+          "version": null,
+          "unit": null,
+          "scale": "fraction"
+        }
+      ]
+    },
+    {
+      "id": "scicode",
+      "disposition": "shadow-eligible",
+      "required_tags": [
+        "numerical_scientific_implementation"
+      ],
+      "excluded_tags": [
+        "unsafe_or_unreviewed_scope",
+        "explanation_only"
+      ],
+      "overlap_group": "scientific_programming",
+      "source_series": [
+        {
+          "id": 58,
+          "label": "SciCode",
+          "version": null,
+          "unit": "fraction",
+          "scale": "fraction"
+        }
+      ]
+    },
+    {
+      "id": "terminal-bench-4-0",
+      "disposition": "shadow-eligible",
+      "required_tags": [
+        "verified_terminal_execution"
+      ],
+      "excluded_tags": [
+        "unsafe_or_unreviewed_scope",
+        "explanation_only"
+      ],
+      "overlap_group": "terminal",
+      "source_series": [
+        {
+          "id": 61,
+          "label": "Terminal-Bench 4.0",
+          "version": null,
+          "unit": "fraction",
+          "scale": "fraction"
+        }
+      ]
+    },
+    {
+      "id": "terminalbench21",
+      "disposition": "shadow-eligible",
+      "required_tags": [
+        "verified_terminal_execution"
+      ],
+      "excluded_tags": [
+        "unsafe_or_unreviewed_scope",
+        "explanation_only"
+      ],
+      "overlap_group": "terminal",
+      "source_series": [
+        {
+          "id": 62,
+          "label": "Terminal-Bench 2.1",
+          "version": null,
+          "unit": "fraction",
+          "scale": "fraction"
+        }
+      ]
+    }
+  ],
+  "tag_vocabulary": [
+    "abstention_expected",
+    "academic_image_dependent_question",
+    "activation_size_comparison",
+    "advice_only",
+    "agent_only_workflow",
+    "all_criteria_pass",
+    "all_document_criteria",
+    "all_state_checks_pass",
+    "balanced_recall_penalty",
+    "blind_visual_preference",
+    "blocking_maintainer_checks",
+    "business_work_product",
+    "cache_hit_budget",
+    "cache_miss_only",
+    "capacity_only",
+    "citation_fidelity_only",
+    "clinical_decision",
+    "closed_book_only",
+    "closed_book_recency",
+    "combined_quality_rubric",
+    "commercial_license_review",
+    "comparative_analysis_presentation",
+    "competition_math_checked_answer",
+    "competitive_program",
+    "concise_complete_answer",
+    "coordinated_user_actions",
+    "different_token_mix",
+    "different_workload",
+    "effort_promotion",
+    "enterprise_state_change",
+    "experiment_design",
+    "expert_closed_question",
+    "explanation_only",
+    "factual_correctness_checked",
+    "first_reasoning_latency",
+    "first_returned_token_latency",
+    "first_token_latency",
+    "first_visible_answer_latency",
+    "first_visible_answer_only",
+    "format_only",
+    "graduate_science_mcq",
+    "graduate_ten_choice_exam",
+    "guardrail_checked",
+    "hidden_cases",
+    "incorrect_guess_penalized",
+    "input_only",
+    "input_only_budget",
+    "interactive_threejs_scene",
+    "latency_forecast",
+    "layout_only",
+    "legal_clearance",
+    "legal_matter_deliverable",
+    "license_terms_review",
+    "lifecycle_turnaround",
+    "lifecycle_usage",
+    "live_remediation",
+    "long_document_synthesis",
+    "machine_checked_output_constraints",
+    "matched_blend_budget",
+    "matched_decode_throughput",
+    "matched_endpoint_completion_latency",
+    "material_fact_check",
+    "modality_check_only",
+    "multilingual_knowledge_mcq",
+    "numerical_scientific_implementation",
+    "objective_artifact_criteria",
+    "occupational_deliverable",
+    "offline_kubernetes_snapshot",
+    "olympiad_integer_answer",
+    "open_report",
+    "open_research_only",
+    "output_only_budget",
+    "output_token_budget_usd",
+    "pairwise_work_quality",
+    "peak_memory_estimate",
+    "plan_only",
+    "policy_lookup",
+    "professional_multitool_workflow",
+    "professional_pdf_reasoning",
+    "proof_only",
+    "prose_edit_only",
+    "puzzle_only",
+    "quality_only",
+    "redistribution_clearance",
+    "release_openness_comparison",
+    "release_order",
+    "repeatable_quantitative_answer",
+    "repository_patch",
+    "required_context_headroom",
+    "required_input_modality",
+    "required_output_modality",
+    "required_reasoning_mode",
+    "research_physics_checked_answer",
+    "retrieval_required",
+    "root_cause_entities",
+    "rubric_only",
+    "same_workload_dollar_budget",
+    "same_workload_output_usage",
+    "same_workload_reasoning_usage",
+    "same_workload_time",
+    "scientific_workflow_artifact",
+    "shell_browser_allowed",
+    "short_answer_only",
+    "simulated_banking_support",
+    "simulated_saas_objectives",
+    "single_job_budget",
+    "software_tolerance_test",
+    "specific_job_quality",
+    "spreadsheet_analysis",
+    "state_checks",
+    "static_render_only",
+    "style_only",
+    "suite_composite_reporting",
+    "suite_output_usage",
+    "suite_run_budget",
+    "synthetic_medical_record_synthesis",
+    "telecom_support",
+    "total_size_comparison",
+    "translation_only",
+    "uncached_input_budget",
+    "unsafe_or_unreviewed_scope",
+    "verified_terminal_execution",
+    "weights_required"
+  ],
+  "catalog_sha256": "4565582ded219c7047f41aaa045e7ead1d6b3bde0b19c912bcbc9b73757c91b6",
+  "evidence_hashes": {
+    "observations.jsonl.gz": "b59099bbf5ed45894e7fc0d768edd933600e14d999a7d6e0b79a19f2469170d5"
+  }
+}
