@@ -1,0 +1,44 @@
+ok - reconciled source: KILL at the locked checkpoint leaves no blocking state; the same task then progresses
+ok - reconciled source: TERM at the locked checkpoint leaves no blocking state; the same task then progresses
+ok - reconciled source: the task lands into local main only through the normal fast-forward guard
+ok - reconciled source: an old governed project owner refuses through its own argparse channel, with no local-default fallback
+ok - reconciled source refuses: missing-r
+ok - reconciled source refuses: missing-l
+ok - reconciled source refuses: task
+ok - reconciled source refuses: project
+ok - reconciled source refuses: declined
+ok - reconciled source refuses: unclear
+ok - reconciled source refuses: conflicting
+ok - reconciled source refuses: engineering
+ok - reconciled source refuses: wrong-tree
+ok - reconciled source refuses: referent
+ok - reconciled source refuses: hash
+ok - reconciled source refuses: version
+ok - reconciled source refuses: short-sha
+ok - reconciled source refuses: duplicate-key
+ok - reconciled source refuses: extra-key
+ok - reconciled source refuses: default-ref
+ok - reconciled source refuses: remote-ref
+ok - reconciled source refuses: symbolic-ref
+ok - reconciled source refuses: ref-moved-before
+ok - reconciled source refuses: no-origin
+ok - reconciled source refuses: origin-ahead
+ok - reconciled source refuses: origin-renamed
+ok - reconciled source refuses: brief-missing
+ok - reconciled source refuses: brief-other
+ok - reconciled source refuses: declaration-moved
+ok - reconciled source refuses: response-moved
+ok - reconciled source refuses: ref-moved-after-plan
+ok - reconciled source refuses: local-moved-after-plan
+ok - reconciled source refuses: origin-swapped
+ok - reconciled source refuses: rewrite-changed
+ok - reconciled source refuses: read-error
+ok - reconciled source refuses: repeated
+ok - reconciled source refuses: with-base
+ok - reconciled source refuses: publish
+ok - reconciled source refuses: scout
+ok - reconciled source refuses: batch
+ok - reconciled source: stable effective-origin rewrite admitted; the sentinel reaches the identity input but no output or record
+ok - reconciled source: a corrected same-task declaration progresses after planning and locked refusals
+ok - reconciled source: a source moved after the first locked checkpoint is refused at the second, before the copy is prepared
+ok - reconciled source: omitted input refuses divergence; the approved successor is selected with L, R, provenance and no fetch

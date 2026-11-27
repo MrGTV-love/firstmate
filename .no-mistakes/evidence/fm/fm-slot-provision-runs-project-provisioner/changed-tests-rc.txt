@@ -1,0 +1,4 @@
+fm-slot-adopt rc=0
+fm-session-end-relaunch rc=0
+fm-control-relaunch-provision rc=0
+fm-spawn-slot-move rc=1

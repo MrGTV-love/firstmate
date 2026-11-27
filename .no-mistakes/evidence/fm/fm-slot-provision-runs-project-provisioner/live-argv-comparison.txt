@@ -1,0 +1,4 @@
+branch-edits-guard: head ran A from /Users/charlesabrooker/tmp/fm-slot-export.deCks7/scripts/git-stability/provision_existing_slot.py; base ran B from /Users/charlesabrooker/tmp/fm-lab.xvVvyQ/projects/branch-edits-guard/copy branch-edits-guard/scripts/git-stability/provision_existing_slot.py
+  argv after script path identical head vs base: True; head --worktree-path = '/Users/charlesabrooker/tmp/fm-lab.xvVvyQ/projects/branch-edits-guard/copy branch-edits-guard'
+stale-copy-guard: head ran A from /Users/charlesabrooker/tmp/fm-slot-export.iPQTLU/scripts/git-stability/provision_existing_slot.py; base ran B from /Users/charlesabrooker/tmp/fm-lab.xvVvyQ/projects/stale-copy-guard/copy stale-copy-guard/scripts/git-stability/provision_existing_slot.py
+  argv after script path identical head vs base: True; head --worktree-path = '/Users/charlesabrooker/tmp/fm-lab.xvVvyQ/projects/stale-copy-guard/copy stale-copy-guard'

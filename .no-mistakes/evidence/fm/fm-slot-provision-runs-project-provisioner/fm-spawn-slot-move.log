@@ -112,34 +112,4 @@ ok - the shell treehouse opened under the recorded endpoint, in the slot, is thi
 ok - a foreign shell beside the recorded tree still holds the slot
 ok - an orphan reparented away from every tree still holds the slot
 ok - an agent inside the recorded tree still holds the slot
-ok - an agent whose executable is named by its version, under claude/versions/, still holds the slot
-ok - a node process whose argv0 names a harness still holds the slot
-ok - a node process whose first argument is a Gemini CLI script still holds the slot
-ok - a tree member with an empty argv is still judged by its executable path
-ok - with no readable recorded window, the recorded tree's shell holds the slot
-ok - a recorded endpoint whose start time does not match refuses
-ok - a failed comparison after the move records changed_during_move
-ok - an ignored file at a newly tracked path refuses before the merge
-ok - a copy that turns dirty after the proof is never prepared
-ok - a change of the checked-out branch during the move fails it
-ok - an ignored file below a directory the target replaces with a file skips the copy
-ok - a commit after the proof that makes git refuse is a failure, not a skip
-ok - a shell under a treehouse launcher that started after the spawn, under the pane, is the spawn's own
-ok - a launcher that started before the spawn is not the spawn's own
-ok - an ancestor that is not named treehouse does not make a shell the spawn's own
-ok - a launcher that does not run under the named pane does not own the shell
-ok - a shell whose parent chain cannot be read is a holder
-ok - with no pane pid, a shell under a later treehouse launcher is the spawn's own
-ok - a process in the recorded tree is reported with every member up to the root
-ok - a process whose chain does not reach the recorded root is a holder
-ok - a live process whose chain cannot be read is unknown, never excused
-ok - a recorded root whose start time does not match ends the probe
-ok - a tree member whose executable or argv cannot be read is unknown
-ok - a recorded tree of a shell and sleep is not a holder
-ok - an agent named by its executable path holds the slot
-ok - an agent whose path is under claude/versions holds the slot
-ok - a node process with a harness argv0 holds the slot
-ok - a node process whose arguments name the Gemini CLI holds the slot
-ok - an agent behind an ordinary first member holds the slot
-ok - with no agent classifier loaded, a recorded tree is unknown and refuses
-# all fm-spawn-slot-move tests passed
+not ok - an agent whose executable is named by its version, under claude/versions/, still holds the slot: expected the code 20, got 21: skip: pooled copy '/Users/charlesabrooker/tmp/fm-spawn-slot-move.SzXbWb/r101-versioned/slot' was not moved (unknown_holders): the parent chain of a live process (pid 6415, sleep) in the slot cannot be read
