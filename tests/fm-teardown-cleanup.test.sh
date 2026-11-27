@@ -2132,8 +2132,15 @@ test_teardown_tmux_anchor_needs_the_one_recorded_pane() {
     expect_code 1 "$rc" "tmux-$shape: teardown must refuse"
     ownership_assert_unsignalled "$case_dir" "$pid" "tmux-$shape"
     ownership_assert_unsignalled "$case_dir" "$OWN_PANE_PID" "tmux-$shape"
-    grep -Eq "REFUSED: process $pid .*no single live pane shell could be read" "$case_dir/stderr" \
-      || fail "tmux-$shape: the refusal did not say the pane could not be read: $(tail -3 "$case_dir/stderr")"
+    # An absent window proves nothing, so the leak refuses; a second pane makes
+    # the endpoint ambiguous, refused before any close.
+    if [ "$shape" = absent ]; then
+      grep -Eq "REFUSED: process $pid .*no single live pane shell could be read" "$case_dir/stderr" \
+        || fail "tmux-$shape: the refusal did not say the pane could not be read: $(tail -3 "$case_dir/stderr")"
+    else
+      grep -Eq "REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: .*several panes" "$case_dir/stderr" \
+        || fail "tmux-$shape: the refusal did not name the ambiguous endpoint: $(tail -3 "$case_dir/stderr")"
+    fi
     teardown_fixture_stop "$pid"
   done
   pass "an absent recorded tmux window, or a second pane in it, proves nothing and the leak refuses unsignalled"
