@@ -5065,6 +5065,161 @@ test_by_path_does_not_report_a_gone_copy_done_while_a_registration_cannot_be_rea
   pass 'teardown --copy treats a registration folder, registration or gitdir file it cannot read as a list it cannot read'
 }
 
+# A registration held by a link whose target cannot be checked is hidden from git the way an unreadable
+# one is: git leaves it out and exits 0. <shape> says which part is the link and why its target cannot
+# be checked: gitdir-link-* is the registration's gitdir file, entry-link-* is the registration folder
+# itself; *-dangling points at nothing (unreadable for any user), *-untraversable points into a folder
+# with no search permission (<case>/sealed, mode 000 until the caller restores it). <kind> existing turns
+# the registration <store>/<name> into the link; planted makes a new registration <name> out of it.
+by_path_hide_registration() {  # <case> <store> <name> <shape> <existing|planted>
+  local case_dir=${1:?} store=${2:?} name=${3:?} shape=${4:?} kind=${5:?}
+  mkdir -p "$case_dir/sealed"
+  case "$shape" in
+    gitdir-link-dangling)
+      [ "$kind" != planted ] || mkdir -p "$store/$name"
+      rm -f "${store:?}/${name:?}/gitdir"
+      ln -s "$case_dir/no-such-target" "$store/$name/gitdir" ;;
+    gitdir-link-untraversable)
+      [ "$kind" != planted ] || mkdir -p "$store/$name"
+      if [ -e "$store/$name/gitdir" ]; then mv "$store/$name/gitdir" "$case_dir/sealed/gitdir"; else printf 'unread\n' > "$case_dir/sealed/gitdir"; fi
+      ln -s "$case_dir/sealed/gitdir" "$store/$name/gitdir"
+      chmod 000 "$case_dir/sealed" ;;
+    entry-link-dangling)
+      rm -rf "${store:?}/${name:?}"
+      ln -s "$case_dir/no-such-target" "$store/$name" ;;
+    entry-link-untraversable)
+      if [ -d "$store/$name" ]; then mv "$store/$name" "$case_dir/sealed/entry"; else mkdir "$case_dir/sealed/entry"; fi
+      ln -s "$case_dir/sealed/entry" "$store/$name"
+      chmod 000 "$case_dir/sealed" ;;
+    *) fail "by_path_hide_registration: unknown shape $shape" ;;
+  esac
+}
+
+# The registration folder name of <copy> in <clone>'s store, found by its gitdir content.
+by_path_registration_entry() {  # <clone> <copy>
+  local obstacle entry=
+  for obstacle in "$1/.git/worktrees"/*; do
+    [ "$(cat "$obstacle/gitdir" 2>/dev/null)" = "$2/.git" ] && entry=${obstacle##*/}
+  done
+  [ -n "$entry" ] || return 1
+  printf '%s\n' "$entry"
+}
+
+# The part the hide function made unreadable: the link itself.
+by_path_hidden_part() {  # <store> <name> <shape>
+  case "$3" in gitdir-*) printf '%s\n' "$1/$2/gitdir" ;; *) printf '%s\n' "$1/$2" ;; esac
+}
+
+# A registration held by a link whose target cannot be checked is an unreadable registration, so the
+# copy it hides is kept and the refusal names the registration, for a present copy and for a gone copy
+# that has an audit line (never reported "already gone"). Each fixture bites: git itself exits 0 and
+# leaves the registration out. The dangling cases run as any user; the untraversable ones need a
+# permission bit root ignores and are skipped as root, saying so.
+test_by_path_refuses_a_copy_whose_registration_is_held_by_a_link_that_cannot_be_checked() {
+  local shape scenario label case_dir rc store entry hidden list skipped=
+  for shape in gitdir-link-dangling gitdir-link-untraversable entry-link-dangling entry-link-untraversable; do
+    case "$shape" in
+      *-untraversable) [ "$(id -u)" != 0 ] || { skipped="$skipped $shape"; continue; } ;;
+    esac
+    for scenario in present gone; do
+      label="by-path-link-$shape-$scenario"
+      make_by_path_case "$label"
+      case_dir=$BP_CASE
+      BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+      store=$BP_CLONE/.git/worktrees
+      if [ "$scenario" = gone ]; then
+        rc=0
+        run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        expect_code 0 "$rc" "$label: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "$label: the copy was not removed"
+        # The same path registered again and then removed behind git's back: a stale registration.
+        git -C "$case_dir/project" worktree add -q -b "fm/stale-$label" "$BP_COPY" main
+        rm -rf "${BP_COPY:?}"
+      fi
+      entry=$(by_path_registration_entry "$BP_CLONE" "$BP_COPY") || fail "$label: the registration is not in the fixture"
+      by_path_hide_registration "$case_dir" "$store" "$entry" "$shape" existing
+      hidden=$(by_path_hidden_part "$store" "$entry" "$shape")
+      [ -L "$hidden" ] || { chmod 755 "$case_dir/sealed" 2>/dev/null; fail "$label: the fixture did not make the registration a link"; }
+      if [ -e "$hidden" ]; then chmod 755 "$case_dir/sealed" 2>/dev/null; fail "$label: the fixture's link target can still be checked"; fi
+      rc=0
+      list=$(git -C "$BP_CLONE" worktree list --porcelain 2>/dev/null) || rc=$?
+      if [ "$rc" != 0 ] || printf '%s\n' "$list" | grep -Fqx "worktree $BP_COPY"; then
+        chmod 755 "$case_dir/sealed" 2>/dev/null
+        fail "$label: the fixture does not bite: git exited $rc and still lists the registration"
+      fi
+      rc=0
+      run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      chmod 755 "$case_dir/sealed" 2>/dev/null || true
+      expect_code 1 "$rc" "$label: a registration held by an unreadable link must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'could not be read' "$case_dir/stderr" "$label: the refusal does not say the registration could not be read"
+      assert_grep "$hidden" "$case_dir/stderr" "$label: the refusal does not name the registration $hidden"
+      if grep -Fq 'already gone' "$case_dir/stderr"; then fail "$label: a copy was reported done"; fi
+      [ -L "$hidden" ] || fail "$label: the refused run changed the registration"
+      assert_absent "$case_dir/treehouse.log" "$label: the provider was called"
+      if [ "$scenario" = present ]; then
+        assert_present "$BP_COPY" "$label: the copy was removed"
+        assert_absent "$case_dir/data/record-less-copy-removals.log" "$label: an audit record was written for a refused run"
+        assert_absent "$case_dir/git-remove.log" "$label: git worktree remove was called"
+      else
+        assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "$label: the refused run changed the audit record"
+        assert_equals 1 "$(wc -l < "$case_dir/git-remove.log" | tr -d ' ')" "$label: the refused run called git worktree remove"
+      fi
+    done
+  done
+  if [ -n "$skipped" ]; then pass "skipped as root, a permission bit does not stop root:$skipped"; fi
+  pass 'teardown --copy keeps a copy, and does not report a gone copy done, while a registration is held by a link that cannot be checked, and names that registration'
+}
+
+# Another registration the clone keeps, held by a link that cannot be checked, is not hidden by the
+# readable registration beside it (the copy's own), whichever sorts first; once it is gone the same
+# copy goes. A registration folder with neither a gitdir file nor a gitdir link is a broken
+# registration git ignores, and the copy still goes with it beside.
+test_by_path_refuses_while_another_registration_is_held_by_a_link_that_cannot_be_checked() {
+  local spec shape name label case_dir rc store hidden list
+  for spec in gitdir-link-dangling:a-ghost gitdir-link-dangling:z-ghost gitdir-link-untraversable:a-ghost entry-link-dangling:z-ghost entry-link-untraversable:z-ghost; do
+    shape=${spec%%:*}
+    name=${spec##*:}
+    case "$shape" in
+      *-untraversable) [ "$(id -u)" != 0 ] || continue ;;
+    esac
+    label="by-path-link-sibling-$shape-$name"
+    make_by_path_case "$label"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    store=$BP_CLONE/.git/worktrees
+    by_path_hide_registration "$case_dir" "$store" "$name" "$shape" planted
+    hidden=$(by_path_hidden_part "$store" "$name" "$shape")
+    if [ -e "$hidden" ]; then chmod 755 "$case_dir/sealed" 2>/dev/null; fail "$label: the fixture's link target can still be checked"; fi
+    rc=0
+    list=$(git -C "$BP_CLONE" worktree list --porcelain 2>/dev/null) || rc=$?
+    if [ "$rc" != 0 ] || ! printf '%s\n' "$list" | grep -Fqx "worktree $BP_COPY"; then
+      chmod 755 "$case_dir/sealed" 2>/dev/null
+      fail "$label: the fixture does not bite: git exited $rc and does not list the readable registration"
+    fi
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    chmod 755 "$case_dir/sealed" 2>/dev/null || true
+    expect_code 1 "$rc" "$label: a registration held by an unreadable link must refuse beside a readable one: $(cat "$case_dir/stderr")"
+    assert_grep 'could not be read' "$case_dir/stderr" "$label: the refusal does not say the registration could not be read"
+    assert_grep "$hidden" "$case_dir/stderr" "$label: the refusal does not name the registration $hidden"
+    by_path_assert_untouched "$case_dir" "$label"
+    rm -rf "${store:?}/${name:?}"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$label: with the link gone the same copy goes: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "$label: the copy was not removed"
+  done
+  make_by_path_case by-path-link-sibling-no-gitdir
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  mkdir -p "$BP_CLONE/.git/worktrees/broken-no-gitdir"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-link-sibling-no-gitdir: a registration folder with no gitdir is a broken one git ignores and must not refuse: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-link-sibling-no-gitdir: the copy was not removed'
+  pass 'teardown --copy refuses beside a readable registration while another is held by a link that cannot be checked, and still proceeds beside a registration folder with no gitdir'
+}
+
 # Git repositories the copy's own clone does not register, such as a separate clone or a worktree of
 # another project under .claude/ (which the clean proof skips), would go with the copy and their
 # commits with them. Every one found is refused; the same copy goes once it holds none.
@@ -5848,6 +6003,8 @@ test_by_path_resolves_a_slot_claim_naming_the_record_id_in_every_local_home
 test_by_path_refuses_a_present_copy_when_a_registration_list_cannot_be_read
 test_by_path_refuses_a_gone_copy_when_a_registration_list_cannot_be_read
 test_by_path_does_not_report_a_gone_copy_done_while_a_registration_cannot_be_read
+test_by_path_refuses_a_copy_whose_registration_is_held_by_a_link_that_cannot_be_checked
+test_by_path_refuses_while_another_registration_is_held_by_a_link_that_cannot_be_checked
 test_by_path_refuses_an_unregistered_nested_repository_under_the_copy
 test_by_path_refuses_when_the_audit_record_cannot_be_written
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row

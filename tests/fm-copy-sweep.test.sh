@@ -487,6 +487,37 @@ test_unreadable_registration_is_reported_without_walking_for_copies() {
   pass 'unreadable registered-worktree enumeration reports the gap without a directory-walk fallback'
 }
 
+# git leaves out a registration it cannot read and still exits 0, so a clone whose registration is a
+# link to nothing lists one copy fewer and looks complete. The sweep does not take that list for the
+# clone's registrations: it reads nothing from the clone, removes no copy of it, and names the
+# registration it could not read. With the registration readable the same sweep reaps the clean copy.
+test_a_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone() {
+  local store list rc=0
+  make_world link-held-registration
+  add_copy reap
+  add_copy hidden
+  store=$SLOT/.git/worktrees
+  mv "$store/hidden/gitdir" "$W/hidden-gitdir.saved"
+  ln -s "$W/no-such-target" "$store/hidden/gitdir"
+  [ -L "$store/hidden/gitdir" ] && [ ! -e "$store/hidden/gitdir" ] || fail 'the fixture did not make the registration a link to nothing'
+  list=$(git -C "$SLOT" worktree list --porcelain 2>/dev/null) || rc=$?
+  [ "$rc" = 0 ] || fail "the fixture does not bite: git exited $rc"
+  printf '%s\n' "$list" | grep -qxF "worktree $(copy_path reap)" || fail 'the fixture does not bite: git lost the readable registration too'
+  printf '%s\n' "$list" | grep -qxF "worktree $(copy_path hidden)" && fail 'the fixture does not bite: git still lists the hidden registration'
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "link-held registration: apply failed ($RC): $OUT"
+  assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed (registration " 'a clone with an unreadable registration was read'
+  assert_contains "$OUT" '.git/worktrees/hidden/gitdir cannot be read)' 'the sweep did not name the registration it could not read'
+  assert_not_contains "$OUT" "REMOVED"$'\t' 'a copy of a clone with an unreadable registration was removed'
+  [ -e "$(copy_path reap)" ] || fail 'the clean copy of a clone with an unreadable registration was removed'
+  registered reap || fail 'the clean copy of a clone with an unreadable registration was unregistered'
+  mv -f "$W/hidden-gitdir.saved" "$store/hidden/gitdir"
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "readable registration: apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path reap)" 'with the registration readable the clean copy was not reaped'
+  pass 'a registration held by a link to nothing keeps every copy of its clone and is named, and a readable one lets the clean copy go'
+}
+
 test_apply_removes_only_the_reapable_copy() {
   make_matrix apply
   take_snapshots before "${HELD_NAMES[@]}"
@@ -3439,6 +3470,7 @@ test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report
 test_a_new_youngest_copy_is_named_first_and_the_wake_stays_bounded
 test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 test_unreadable_registration_is_reported_without_walking_for_copies
+test_a_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone
 test_apply_removes_only_the_reapable_copy
 test_recycled_launcher_lock_is_held
 test_dead_launcher_dirty_copy_is_held

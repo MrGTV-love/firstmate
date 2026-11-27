@@ -668,7 +668,9 @@
 #   audit line, or refuses when no line names it; a gone copy a clone still
 #   registers refuses and names `git worktree prune`, which this mode never runs,
 #   and a registration list or projects folder that cannot be read refuses, for a
-#   present copy too.
+#   present copy too. A registration, or its gitdir, that is a link whose target
+#   cannot be checked (dangling, or inside a folder nobody may search) cannot be
+#   read either: git leaves it out and exits 0, so the refusal names it.
 #
 # Transient / stale worktree git lock recovery (teardown-lock-race): a crew process
 # killed mid-git-operation can leave a .git/worktrees/<wt>/index.lock (or, for a
