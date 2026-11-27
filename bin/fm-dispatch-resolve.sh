@@ -3,7 +3,21 @@
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #
 # Usage:
-#   fm-dispatch-resolve.sh <brief-file>
+#   fm-dispatch-resolve.sh [--print-request-digest] <brief-file>
+#   fm-dispatch-resolve.sh --attempt-journal <new-file> --launch-binding <file> <sha256> [--attempt-closeout <new-file>] <brief-file>
+#
+#   Attempt journaling is opt-in and uses a new private file in an operator-owned
+#   directory. The Level 5 adapter checks the frozen assignment/execution and
+#   request digest before any send. The ordinary route and quota policy still
+#   apply. Journaling permits the offline registry observer, not the legacy
+#   model-using shadow picker. --attempt-closeout records the inner adapter exit and
+#   journal digest in a separate private file, before applying routing and quota.
+#   An unwritten receipt or incomplete journal does not prove zero usage.
+#
+#   --print-request-digest prepares the exact adapter input through ordinary
+#   rule, brief, and never-send checks, prints only its SHA-256 and exits before
+#   transport or quota. It does not read provider credentials. No digest means
+#   the request was not prepared or allowed, not a zero-token usage receipt.
 #
 # Opt-in gate: fm_typesafe_key in bin/fm-typesafe-lib.sh owns credential
 #   resolution and precedence.
@@ -188,6 +202,10 @@ die_rules() {
   die "malformed rules file: $RULES_PATH - $1; fix that field in $RULES_PATH resolved against $CONFIG/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>"
 }
 escalate_unsent() {
+  if [ "$PRINT_REQUEST_DIGEST" = 1 ]; then
+    echo "dispatch-resolve: request digest unavailable ($1)" >&2
+    exit 0
+  fi
   log_result escalate "$1"
   printf 'dispatch-resolve:\n  status: escalate\n  reason: %s\n' "$1"
   exit 0
@@ -202,16 +220,49 @@ usage() {
 
 BRIEF='' PROJECT='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
 NEVER_SEND_PATH="$CONFIG/dispatch-never-send"
+PRINT_REQUEST_DIGEST=0
+ATTEMPT_JOURNAL='' LAUNCH_BINDING='' LAUNCH_BINDING_SHA256='' ATTEMPT_REGISTRY='' ATTEMPT_CLOSEOUT=''
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
+    --print-request-digest) PRINT_REQUEST_DIGEST=1; shift ;;
+    --attempt-journal)
+      [ $# -ge 2 ] && [ -n "$2" ] && [ -z "$ATTEMPT_JOURNAL" ] || die 'expected one --attempt-journal path'
+      ATTEMPT_JOURNAL=$2; shift 2 ;;
+    --attempt-closeout)
+      [ $# -ge 2 ] && [ -n "$2" ] && [ -z "$ATTEMPT_CLOSEOUT" ] || die 'expected one --attempt-closeout path'
+      ATTEMPT_CLOSEOUT=$2; shift 2 ;;
+    --launch-binding)
+      [ $# -ge 3 ] && [ -n "$2" ] && [[ "$3" =~ ^[a-f0-9]{64}$ ]] && [ -z "$LAUNCH_BINDING" ] \
+        || die 'expected one --launch-binding path and SHA-256'
+      LAUNCH_BINDING=$2; LAUNCH_BINDING_SHA256=$3; shift 3 ;;
     -*) die "unknown flag $1" ;;
     *) [ -z "$BRIEF" ] || die "one brief file only"; BRIEF=$1; shift ;;
   esac
 done
+ATTEMPT_ARGS=()
+if [ -n "$ATTEMPT_JOURNAL$LAUNCH_BINDING" ]; then
+  [ "$PRINT_REQUEST_DIGEST" = 0 ] && [ -n "$ATTEMPT_JOURNAL" ] && [ -n "$LAUNCH_BINDING" ] \
+    || die 'attempt journaling needs both options and cannot run in digest-only mode'
+  if fm_model_picker_shadow_enabled; then
+    [ -n "${FM_MODEL_PICKER_REGISTRY:-}" ] \
+      || die 'attempt journaling does not cover the model-using shadow picker'
+    ATTEMPT_REGISTRY=$FM_MODEL_PICKER_REGISTRY
+  fi
+  ATTEMPT_ARGS=(--attempt-journal "$ATTEMPT_JOURNAL" --launch-binding "$LAUNCH_BINDING" "$LAUNCH_BINDING_SHA256")
+fi
+if [ -n "$ATTEMPT_CLOSEOUT" ]; then
+  [ -n "$ATTEMPT_JOURNAL" ] || die 'attempt closeout requires attempt journaling'
+  python3 - "$ATTEMPT_CLOSEOUT" "$ATTEMPT_JOURNAL" <<'PY' || die 'attempt closeout must name a new file distinct from the journal'
+import os, sys
+output, journal = sys.argv[1:]
+valid = not os.path.lexists(output) and os.path.realpath(output) != os.path.realpath(journal)
+raise SystemExit(0 if valid else 1)
+PY
+fi
 
 # ---- opt-in gate ---------------------------------------------------------------
-if ! fm_typesafe_key "$FM_HOME"; then
+if [ "$PRINT_REQUEST_DIGEST" = 0 ] && ! fm_typesafe_key "$FM_HOME"; then
   echo "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and $FM_HOME/.env or the primary home .env)" >&2
   exit 0
 fi
@@ -225,14 +276,14 @@ LAT_MS=null QUOTA_MS=null RESPONSE_VALID=0
 [ -e "$RULES_PATH" ] || [ -L "$RULES_PATH" ] || escalate_unsent 'no rules to match'
 [ -r "$RULES_PATH" ] || die "rules file not readable: $RULES_PATH; fix that path or its permissions, then rerun bin/fm-dispatch-resolve.sh <brief>"
 command -v jq >/dev/null 2>&1 || die "jq required"
-RULES=$(mktemp) || die "mktemp failed"
-trap 'rm -f "$RULES"' EXIT
-MODEL_CONFIG=$(mktemp -d) || die "mktemp failed"
-trap 'rm -f "$RULES"; rm -rf "$MODEL_CONFIG"' EXIT
+MODEL_CONFIG=$(mktemp -d "${TMPDIR:-/tmp}/fm-dispatch-resolve.XXXXXX") || die "mktemp failed"
+trap 'rm -rf "$MODEL_CONFIG"' EXIT
+RULES="$MODEL_CONFIG/rules.json"
 if [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
   cp "$CONFIG/model-index.json" "$MODEL_CONFIG/model-index.json" || die "could not snapshot model index"
 fi
-cp "$RULES_PATH" "$RULES" || die "could not snapshot rules file: $RULES_PATH"
+# This private working copy is rewritten below even when the source is read-only.
+cat "$RULES_PATH" > "$RULES" || die "could not snapshot rules file: $RULES_PATH"
 jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not JSON); fix the JSON syntax in $RULES_PATH resolved against $CONFIG/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>"
 # Resolve roles against the frozen index offline; only the chosen profile's
 # catalog is checked, after the never-send filter permits this intake to reach
@@ -370,6 +421,7 @@ emit_telemetry() {
 emit_error() {
   local reason=$1
   echo "dispatch-resolve: error ($reason)" >&2
+  [ "$PRINT_REQUEST_DIGEST" = 0 ] || exit 0
   log_result error "$reason"
   printf 'dispatch-resolve:\n  status: error\n  reason: %s\n' "$reason"
   emit_telemetry
@@ -381,11 +433,10 @@ if [ "$RULE_COUNT" -eq 0 ]; then
   escalate_unsent 'no rules to match'
 fi
 
-RESP_FILE=$(mktemp) || die "mktemp failed"
-QUOTA=$(mktemp) || { rm -f "$RESP_FILE"; die "mktemp failed"; }
-TASK_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA"; die "mktemp failed"; }
-SEND_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA" "$TASK_TEXT"; die "mktemp failed"; }
-trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"; rm -rf "$MODEL_CONFIG"' EXIT
+RESP_FILE="$MODEL_CONFIG/response.json"
+QUOTA="$MODEL_CONFIG/quota.json"
+TASK_TEXT="$MODEL_CONFIG/task.txt"
+SEND_TEXT="$MODEL_CONFIG/privacy-scan.txt"
 
 # ---- shadow model picker (observe only) ---------------------------------------
 # Off unless FM_MODEL_PICKER_SHADOW is an explicit on value; every other value leaves
@@ -396,17 +447,31 @@ trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"; rm -rf "$M
 # measured: value=20 date=2026-10-23 host=Mac-Studio margin=1.3 (the shadow stage makes at most three bounded provider calls, each with a five-second deadline; one stalled-call run measured 5.2 s, so three fit inside this bound)
 SHADOW_TIMEOUT_SECONDS=20
 run_shadow() {  # <status> [reason]
-  local status=$1 reason=${2:-} result_file
+  local status=$1 reason=${2:-} result_file shadow_key=${TYPESAFE_API_KEY_PRIVATE:-}
+  local observer=("$SCRIPT_DIR/fm-model-picker-shadow.sh")
+  [ "$PRINT_REQUEST_DIGEST" = 0 ] || return 0
   fm_model_picker_shadow_enabled || return 0
-  result_file=$(mktemp) || return 0
-  if [ -n "${RESULT:-}" ]; then printf '%s' "$RESULT" > "$result_file"; else printf '{}' > "$result_file"; fi \
-    || { rm -f "$result_file"; return 0; }
-  fm_run_timed "$SHADOW_TIMEOUT_SECONDS" "$SCRIPT_DIR/fm-model-picker-shadow.sh" --observe \
+  if [ -n "$ATTEMPT_JOURNAL" ]; then
+    [ -n "$ATTEMPT_REGISTRY" ] || return 0
+    # Pin the offline mode in the observer's environment and withhold the key.
+    observer=(env "FM_MODEL_PICKER_REGISTRY=$ATTEMPT_REGISTRY" "${observer[@]}")
+    shadow_key=''
+  fi
+  result_file="$MODEL_CONFIG/shadow-result.json"
+  if [ -z "${RESULT:-}" ]; then
+    printf '{}'
+  elif [ "$status" = clear ] && [ -n "$ATTEMPT_REGISTRY" ]; then
+    # The ordinary adapter already checked this launch binding before transport.
+    jq -c --arg binding "$LAUNCH_BINDING_SHA256" '. + {route_launch_binding_sha256:$binding}' <<< "$RESULT"
+  else
+    printf '%s' "$RESULT"
+  fi > "$result_file" || { rm -f "$result_file"; return 0; }
+  fm_run_timed "$SHADOW_TIMEOUT_SECONDS" "${observer[@]}" --observe \
     --brief "${BRIEF:-/dev/null}" --task-text "${TASK_TEXT:-/dev/null}" \
     --rules "${RULES:-/dev/null}" --result "$result_file" --quota "${QUOTA:-/dev/null}" \
     --status "$status" --reason "$reason" --never-send "$NEVER_SEND_PATH" \
     --project "${PROJECT:-}" \
-    3< <(printf '%s' "${TYPESAFE_API_KEY_PRIVATE:-}") >/dev/null 2>/dev/null || true
+    3< <(printf '%s' "$shadow_key") >/dev/null 2>/dev/null || true
   rm -f "$result_file"
   return 0
 }
@@ -484,9 +549,16 @@ PROJECT=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" resolve "$BRIEF" "$MODEL_
   || emit_error "Level 5 request preparation failed"
 REQUEST=$(cat "$MODEL_CONFIG/level5-request.json")
 never_send_check
+if [ "$PRINT_REQUEST_DIGEST" = 1 ]; then
+  # Hash the exact stdin bytes below, including command substitution's removal
+  # of the preparer's final newline. Do not emit or persist the request here.
+  printf '%s' "$REQUEST" | python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())' \
+    || die 'could not fingerprint dispatch request'
+  exit 0
+fi
 # The complete upstream exchange is preserved until policy derives its view.
 api_rc=0
-API_RESPONSE=$(printf '%s' "$REQUEST" | "${LEVEL5[@]}" call \
+API_RESPONSE=$(printf '%s' "$REQUEST" | "${LEVEL5[@]}" call "${ATTEMPT_ARGS[@]+"${ATTEMPT_ARGS[@]}"}" \
   3< <(printf '%s' "$TYPESAFE_API_KEY_PRIVATE") 2>"$MODEL_CONFIG/call.err") || api_rc=$?
 cat "$MODEL_CONFIG/call.err" >&2
 # Report the code at once so a credit or key failure does not wait for the next
@@ -494,6 +566,39 @@ cat "$MODEL_CONFIG/call.err" >&2
 if [ "$api_rc" -eq 0 ]; then HTTP=200
 else HTTP=$(sed -n 's/^dispatch-level5: TypeSafe HTTP \([0-9][0-9][0-9]\)$/\1/p' "$MODEL_CONFIG/call.err" | head -n 1); fi
 [ -z "${HTTP:-}" ] || FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-typesafe-health.sh" record "$HTTP" dispatch-resolve </dev/null >/dev/null 2>&1 || true
+if [ -n "$ATTEMPT_CLOSEOUT" ]; then
+  # Observe the inner adapter, not the resolver's later structured exit code.
+  # Never change a route result because the measurement write failed after send.
+  if ! python3 - "$ATTEMPT_JOURNAL" "$ATTEMPT_CLOSEOUT" "$LAUNCH_BINDING_SHA256" "$api_rc" "$MODEL_CONFIG/call.err" 2>/dev/null <<'PY'; then
+import hashlib, json, os, stat, sys
+from pathlib import Path
+journal, output, plan, status, diagnostic = sys.argv[1:]
+code = int(status)
+digest, verified = None, False
+try:
+    with os.fdopen(os.open(journal, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise ValueError('not a journal file')
+        raw = handle.read(65537)
+    if len(raw) <= 65536 and raw.endswith(b'\n'):
+        digest = hashlib.sha256(raw).hexdigest()
+        records = raw.splitlines()
+        verified = (len(records) >= 2 and
+                    json.loads(records[0]) == dict(kind='opened', version=4, launch_binding_sha256=plan) and
+                    json.loads(records[-1]) == dict(kind='closed', valid_response=(code == 0)) and
+                    b'dispatch-level5: attempt journal closeout unverified' not in Path(diagnostic).read_bytes())
+except (OSError, ValueError, RecursionError):
+    pass
+receipt = dict(launch_binding_sha256=plan, exit_code=code, timed_out=False,
+               journal_unverified=not verified, journal_sha256=digest)
+with os.fdopen(os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as handle:
+    handle.write(json.dumps(receipt, separators=(',', ':')) + '\n')
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+    echo 'dispatch-resolve: attempt closeout not retained' >&2
+  fi
+fi
 [ "$api_rc" -eq 0 ] || emit_error "Level 5 API request failed"
 printf '%s' "$API_RESPONSE" > "$RESP_FILE"
 LAT_MS=$(jq -r '.meta.elapsedMs | floor' "$RESP_FILE")
@@ -740,10 +845,11 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg rou
       (((.quota_score | type) == "number" and (.quota_parts.headroom | type) == "number") or
        (.capacity.status == "usable" and (.unknown // false | not))))]) as $cheap |
     (if $r.route.model.model == "fast" and ($cheap | length) > 0 then $cheap else $cands end) as $set |
+    ($cands | map(. as $c | . + {comparison_member: (($set | index($c)) != null)})) as $annotated |
     ([$set[] | select((.quota_score | type) == "number")]) as $elig |
     if ([$set[] | select(.eligible)] | length) == 1 and
        any($set[]; .eligible and .capacity.status == "usable" and (.unknown // false | not))
-    then $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: ($set[] | select(.eligible))}
+    then $ev + {status: "clear", note: $sel.note, candidates: $annotated, chosen: ($set[] | select(.eligible))}
     elif ($elig | length) == 0 then
       $ev + {status: "escalate", reason: "no rankable eligible candidate", note: $sel.note, candidates: $cands}
     else
@@ -758,7 +864,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg rou
         $ev + {status: "escalate", reason: "genuine quota evidence tie", note: $sel.note, candidates: $cands}
       elif $final[0].short then
         $ev + {status: "escalate", reason: "highest-ranked candidate \($final[0].profile.harness):\($final[0].profile.model // "-") has established runway shorter than the \(horizon_seconds / 60)-minute task horizon; completion is not proven", note: $sel.note, candidates: $cands}
-      else $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: $final[0]} end
+      else $ev + {status: "clear", note: $sel.note, candidates: $annotated, chosen: $final[0]} end
     end
   end') || emit_error "resolution failed"
 
@@ -775,7 +881,8 @@ if jq -e '.status == "escalate" and .reason == "no rankable eligible candidate" 
       RESULT=$(jq -c --argjson selected "$selected" '.status = "clear" | del(.reason) |
         .fallback = "primary capacity exhausted; declared model-matrix fallback" |
         .chosen = {profile: $selected.profile, capacity: $selected.capacity, eligible: true} |
-        .candidates += [.chosen]' <<<"$RESULT")
+        .candidates |= map(.comparison_member = false) |
+        .candidates += [(.chosen + {comparison_member: true})]' <<<"$RESULT")
     fi
   fi
 fi
