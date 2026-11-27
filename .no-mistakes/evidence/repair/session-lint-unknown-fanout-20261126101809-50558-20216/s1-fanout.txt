@@ -1,0 +1,6 @@
+leaf=tests/fm-review-record.test.sh version=base abs_root_selected=221 dot_root_selected=221
+leaf=tests/fm-review-record.test.sh version=head abs_root_selected=13 dot_root_selected=13
+leaf=bin/fm-lab-home.sh version=base abs_root_selected=221 dot_root_selected=221
+leaf=bin/fm-lab-home.sh version=head abs_root_selected=13 dot_root_selected=13
+
+Note: the disposable tree lives under /tmp, a symlink to /private/tmp. Base select with root /tmp/fmlintlive.9Rph gave 221 roots; base fm-lint.sh (physical root) gave 125. Head gives 13 for absolute, symlinked, and "." roots because head canonicalizes $root with abs_path(".").

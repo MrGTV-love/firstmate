@@ -1,0 +1,18 @@
+== head selection for leaf edit tests/fm-review-record.test.sh (abs root) ==
+bin/fm-inbox.sh
+bin/fm-mail.sh
+tests/fm-afk-inject-e2e.test.sh
+tests/fm-afk-inject-herdr-e2e.test.sh
+tests/fm-composer-ghost.test.sh
+tests/fm-composer-lib.test.sh
+tests/fm-daemon.test.sh
+tests/fm-gate-refuse.test.sh
+tests/fm-operational-input.test.sh
+tests/fm-pr-check-security.test.sh
+tests/fm-review-record.test.sh
+tests/fm-spawn-slot-move.test.sh
+tests/fm-wake-daemon-lifecycle-e2e.test.sh
+== '.' root identical? ==
+identical
+== inventory size ==
+     716

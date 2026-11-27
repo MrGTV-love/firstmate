@@ -1,0 +1,55 @@
+===== base =====
+--- unrelated leaf edit (bin/leaf.sh), root='.': selected =
+  bin/child-dynamic.sh bin/child-mixed.sh bin/heredoc-dynamic.sh bin/leaf.sh bin/top-unknown.sh bin/topcase-extglob-unknown.sh 
+--- unrelated leaf edit, root=abs: selected =
+  bin/child-dynamic.sh bin/child-mixed.sh bin/heredoc-dynamic.sh bin/leaf.sh bin/top-unknown.sh bin/topcase-extglob-unknown.sh 
+--- bin/lib.sh edit: selected =
+  bin/child-dynamic.sh bin/child-mixed.sh bin/heredoc-dynamic.sh bin/lib.sh bin/top-unknown.sh bin/topcase-extglob-unknown.sh 
+--- cacheable per root:
+  bin/child-dynamic.sh                     no
+  bin/child-mixed.sh                       no
+  bin/child-static.sh                      yes
+  bin/heredoc-arith-unknown.sh             yes
+  bin/heredoc-dynamic.sh                   no
+  bin/heredoc-extglob-case-unknown.sh      yes
+  bin/heredoc-literal-case-unknown.sh      yes
+  bin/heredoc-param-arith-unknown.sh       yes
+  bin/heredoc-parent-static.sh             yes
+  bin/heredoc-parent-unknown.sh            yes
+  bin/leaf.sh                              yes
+  bin/lib.sh                               yes
+  bin/top-unknown.sh                       no
+  bin/topcase-extglob-unknown.sh           no
+--- lib.sh is a cache input? (warm cache, edit lib.sh, re-check):
+  bin/child-static.sh                      miss after lib edit (lib IS an input)
+  bin/heredoc-parent-static.sh             hit after lib edit (lib NOT an input)
+===== head =====
+--- unrelated leaf edit (bin/leaf.sh), root='.': selected =
+  bin/heredoc-arith-unknown.sh bin/heredoc-extglob-case-unknown.sh bin/heredoc-param-arith-unknown.sh bin/heredoc-parent-unknown.sh bin/leaf.sh bin/top-unknown.sh bin/topcase-extglob-unknown.sh 
+--- unrelated leaf edit, root=abs: selected =
+  bin/heredoc-arith-unknown.sh bin/heredoc-extglob-case-unknown.sh bin/heredoc-param-arith-unknown.sh bin/heredoc-parent-unknown.sh bin/leaf.sh bin/top-unknown.sh bin/topcase-extglob-unknown.sh 
+--- bin/lib.sh edit: selected =
+  bin/child-mixed.sh bin/child-static.sh bin/heredoc-arith-unknown.sh bin/heredoc-extglob-case-unknown.sh bin/heredoc-param-arith-unknown.sh bin/heredoc-parent-static.sh bin/heredoc-parent-unknown.sh bin/lib.sh bin/top-unknown.sh bin/topcase-extglob-unknown.sh 
+--- cacheable per root:
+  bin/child-dynamic.sh                     yes
+  bin/child-mixed.sh                       yes
+  bin/child-static.sh                      yes
+  bin/heredoc-arith-unknown.sh             no
+  bin/heredoc-dynamic.sh                   yes
+  bin/heredoc-extglob-case-unknown.sh      no
+  bin/heredoc-literal-case-unknown.sh      yes
+  bin/heredoc-param-arith-unknown.sh       no
+  bin/heredoc-parent-static.sh             yes
+  bin/heredoc-parent-unknown.sh            no
+  bin/leaf.sh                              yes
+  bin/lib.sh                               yes
+  bin/top-unknown.sh                       no
+  bin/topcase-extglob-unknown.sh           no
+--- lib.sh is a cache input? (warm cache, edit lib.sh, re-check):
+  bin/child-static.sh                      hit after lib edit (lib NOT an input)
+  bin/heredoc-parent-static.sh             miss after lib edit (lib IS an input)
+
+Notes:
+- Base rows used root "." (and a /tmp symlinked absolute root), which base mishandles; base rows mix that bug with the child-shell bug. s2 physical-root block isolates the child-shell delta (112).
+- heredoc-literal-case-unknown.sh ("case x in esac|done)") is invalid bash; see s4b-case-pattern-probes.txt. Valid forms lc2/lc3 and the @(a|b)) fixtures are the real pattern-tracking checks.
+- Cacheability column uses "--execute true" as the cold command: it measures fm-lint-cache.pl cache eligibility, not ShellCheck findings. Real ShellCheck ground truth is in s6 and s7.

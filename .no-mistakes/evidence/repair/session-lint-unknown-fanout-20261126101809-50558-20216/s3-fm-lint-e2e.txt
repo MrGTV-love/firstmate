@@ -1,0 +1,32 @@
+Disposable git repo, branch 'feature' off 'main', one edit to leaf tests/fm-review-record.test.sh
+base (d25e907c) bin/fm-lint.sh --list-files count: 125
+head (1c83f0c9) bin/fm-lint.sh --list-files count: 13
+== head list ==
+bin/fm-inbox.sh
+bin/fm-mail.sh
+tests/fm-afk-inject-e2e.test.sh
+tests/fm-afk-inject-herdr-e2e.test.sh
+tests/fm-composer-ghost.test.sh
+tests/fm-composer-lib.test.sh
+tests/fm-daemon.test.sh
+tests/fm-gate-refuse.test.sh
+tests/fm-operational-input.test.sh
+tests/fm-pr-check-security.test.sh
+tests/fm-review-record.test.sh
+tests/fm-spawn-slot-move.test.sh
+tests/fm-wake-daemon-lifecycle-e2e.test.sh
+
+== head real ShellCheck run transcript (cold then warm) ==
+### RUN 1 (cold)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint-workflows.sh: actionlint 1.7.12 (pinned 1.7.12)
+fm-lint-workflows.sh: 4 workflow files valid
+rc=0 seconds=92
+### RUN 2 (warm)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit tests/fm-review-record.test.sh
+fm-lint-workflows.sh: actionlint 1.7.12 (pinned 1.7.12)
+fm-lint-workflows.sh: 4 workflow files valid
+rc=0 seconds=90

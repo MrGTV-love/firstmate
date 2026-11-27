@@ -1,0 +1,23 @@
+Valid literal/extglob case-pattern forms inside unquoted heredoc command substitution (head). Each must be selected on an unrelated leaf edit (parent-shell unknown source):
+--- bin/lc1.sh:
+cat <<EOF
+$(case x in (esac|done) . "$DYN";; esac)
+EOF
+selected_on_unrelated_edit=1
+--- bin/lc2.sh:
+cat <<EOF
+$(case x in done|in) . "$DYN";; esac)
+EOF
+selected_on_unrelated_edit=1
+--- bin/lc3.sh:
+cat <<EOF
+$(case x in a) echo;; (esac) . "$DYN";; esac)
+EOF
+selected_on_unrelated_edit=1
+--- bin/lc4.sh:
+cat <<EOF
+$(case $(. "$DYN") in esac) :;; esac)
+EOF
+selected_on_unrelated_edit=1
+
+Note: fixture heredoc-literal-case-unknown.sh ('case x in esac|done)') is invalid bash: bash reports 'syntax error near unexpected token done' and never runs the source; ShellCheck reports SC1010, so it is never cached as a success either.

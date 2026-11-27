@@ -1,0 +1,4 @@
+ok - real ShellCheck confirms child-shell strings stay outside its read set while top-level and unquoted-heredoc parent sources invalidate
+ok - relative root canonicalizes and production child-shell test helpers stay cacheable without fan-out
+
+Note: the first case runs real ShellCheck 0.11.0 end to end. The second case uses real select for the relative-root check but a stub ShellCheck for its cache step.

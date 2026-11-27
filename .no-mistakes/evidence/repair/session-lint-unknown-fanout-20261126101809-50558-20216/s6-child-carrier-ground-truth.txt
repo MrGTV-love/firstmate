@@ -1,0 +1,98 @@
+Ground truth: head fm-lint.sh with real ShellCheck 0.11.0, physical root /private/tmp/fmlintlive.9Rph/gt
+== selected on unrelated leaf edit (bin/fm-lab-home.sh) ==
+bin/gt-dq-dynamic.sh
+bin/gt-uq-heredoc-dynamic.sh
+== selected on bin/gt-lib.sh edit ==
+bin/gt-dq-dynamic.sh
+bin/gt-dq-static-directive.sh
+bin/gt-dq-static.sh
+bin/gt-lib.sh
+bin/gt-q-heredoc-static.sh
+bin/gt-sq-static.sh
+bin/gt-uq-heredoc-dynamic.sh
+bin/gt-uq-heredoc-static.sh
+warm-up bin/gt-dq-static.sh bin/gt-dq-static-directive.sh bin/gt-dq-dynamic.sh bin/gt-uq-heredoc-dynamic.sh bin/gt-uq-heredoc-static.sh bin/gt-q-heredoc-static.sh bin/gt-sq-static.sh rc=2 
+-- mutated bin/gt-lib.sh to use $1 --
+bin/gt-dq-static.sh bin/gt-dq-static-directive.sh bin/gt-dq-dynamic.sh bin/gt-uq-heredoc-dynamic.sh bin/gt-uq-heredoc-static.sh bin/gt-q-heredoc-static.sh bin/gt-sq-static.sh cached: rc=2 cold                | uncached: rc=2  | AGREE
+--- bin/gt-dq-static.sh:
+# shellcheck disable=SC2016
+bash -c "echo $(. bin/gt-lib.sh; gt_fn)"
+--- bin/gt-dq-static-directive.sh:
+bash -c "echo $(
+# shellcheck source=bin/gt-lib.sh
+. bin/gt-lib.sh
+gt_fn)"
+--- bin/gt-dq-dynamic.sh:
+bash -c "echo $(. "$DYN")"
+--- bin/gt-uq-heredoc-dynamic.sh:
+bash <<EOF
+$(. "$DYN")
+EOF
+--- bin/gt-uq-heredoc-static.sh:
+bash <<EOF
+$(. bin/gt-lib.sh; gt_fn)
+. "$DYN"
+EOF
+--- bin/gt-q-heredoc-static.sh:
+bash <<'EOF'
+. bin/gt-lib.sh; gt_fn
+EOF
+--- bin/gt-sq-static.sh:
+bash -c '. bin/gt-lib.sh; gt_fn'
+warm-up bin/gt-dq-static.sh rc=1 
+warm-up bin/gt-dq-static-directive.sh rc=1 
+warm-up bin/gt-dq-dynamic.sh rc=1 SC1090 
+warm-up bin/gt-uq-heredoc-dynamic.sh rc=1 SC1090 
+warm-up bin/gt-uq-heredoc-static.sh rc=1 
+warm-up bin/gt-q-heredoc-static.sh rc=1 
+warm-up bin/gt-sq-static.sh rc=1 
+-- mutated bin/gt-lib.sh so gt_fn reads $1 --
+bin/gt-dq-static.sh                cached: rc=1 cold SC2119         | uncached: rc=1 SC2119         | AGREE
+bin/gt-dq-static-directive.sh      cached: rc=1 cold SC2119         | uncached: rc=1 SC2119         | AGREE
+bin/gt-dq-dynamic.sh               cached: rc=1 cold SC1090         | uncached: rc=1 SC1090         | AGREE
+bin/gt-uq-heredoc-dynamic.sh       cached: rc=1 cold SC1090         | uncached: rc=1 SC1090         | AGREE
+bin/gt-uq-heredoc-static.sh        cached: rc=1 cold SC2119         | uncached: rc=1 SC2119         | AGREE
+bin/gt-q-heredoc-static.sh         cached: rc=1 HIT                 | uncached: rc=1                | AGREE
+bin/gt-sq-static.sh                cached: rc=1 HIT                 | uncached: rc=1                | AGREE
+
+===== RERUN inside a git repo (first pass above exited 1 from a missing comparison base, not ShellCheck) =====
+--- bin/gt-dq-static.sh:
+# shellcheck disable=SC2016
+bash -c "echo $(. bin/gt-lib.sh; gt_fn)"
+--- bin/gt-dq-static-directive.sh:
+bash -c "echo $(
+# shellcheck source=bin/gt-lib.sh
+. bin/gt-lib.sh
+gt_fn)"
+--- bin/gt-dq-dynamic.sh:
+bash -c "echo $(. "$DYN")"
+--- bin/gt-uq-heredoc-dynamic.sh:
+bash <<EOF
+$(. "$DYN")
+EOF
+--- bin/gt-uq-heredoc-static.sh:
+bash <<EOF
+$(. bin/gt-lib.sh; gt_fn)
+. "$DYN"
+EOF
+--- bin/gt-q-heredoc-static.sh:
+bash <<'EOF'
+. bin/gt-lib.sh; gt_fn
+EOF
+--- bin/gt-sq-static.sh:
+bash -c '. bin/gt-lib.sh; gt_fn'
+warm-up bin/gt-dq-static.sh rc=0 
+warm-up bin/gt-dq-static-directive.sh rc=0 
+warm-up bin/gt-dq-dynamic.sh rc=1 SC1090 
+warm-up bin/gt-uq-heredoc-dynamic.sh rc=1 SC1090 
+warm-up bin/gt-uq-heredoc-static.sh rc=0 
+warm-up bin/gt-q-heredoc-static.sh rc=0 
+warm-up bin/gt-sq-static.sh rc=0 
+-- mutated bin/gt-lib.sh so gt_fn reads $1 --
+bin/gt-dq-static.sh                cached: rc=1 cold SC2119         | uncached: rc=1 SC2119         | AGREE
+bin/gt-dq-static-directive.sh      cached: rc=1 cold SC2119         | uncached: rc=1 SC2119         | AGREE
+bin/gt-dq-dynamic.sh               cached: rc=1 cold SC1090         | uncached: rc=1 SC1090         | AGREE
+bin/gt-uq-heredoc-dynamic.sh       cached: rc=1 cold SC1090         | uncached: rc=1 SC1090         | AGREE
+bin/gt-uq-heredoc-static.sh        cached: rc=1 cold SC2119         | uncached: rc=1 SC2119         | AGREE
+bin/gt-q-heredoc-static.sh         cached: rc=0 HIT                 | uncached: rc=0                | AGREE
+bin/gt-sq-static.sh                cached: rc=0 HIT                 | uncached: rc=0                | AGREE

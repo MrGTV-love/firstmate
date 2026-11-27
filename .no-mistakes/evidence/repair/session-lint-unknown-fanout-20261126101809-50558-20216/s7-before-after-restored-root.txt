@@ -1,0 +1,5 @@
+Real bin/fm-lint.sh + ShellCheck 0.11.0 on restored root tests/fm-watch-triage-waits-away.test.sh; base=d25e907c (e2e-base), head=1c83f0c9 (e2e); fresh cache per tree
+[e2e-base run 1] rc=0 seconds=13 no cache hit (cold ShellCheck)
+[e2e-base run 2] rc=0 seconds=13 no cache hit (cold ShellCheck)
+[e2e run 1] rc=0 seconds=14 no cache hit (cold ShellCheck)
+[e2e run 2] rc=0 seconds=3 cache hit

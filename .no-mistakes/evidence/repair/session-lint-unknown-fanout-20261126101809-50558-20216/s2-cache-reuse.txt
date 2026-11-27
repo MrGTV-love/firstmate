@@ -1,0 +1,25 @@
+Cache reuse via real 'fm-lint-cache.pl check' (second identical check), cold command = true
+base: 496 of      716 roots reusable
+head: 704 of      716 roots reusable
+MISS->HIT (restored):      208
+HIT->MISS (regressed):        0
+== still MISS on head ==
+bin/fm-inbox.sh
+bin/fm-mail.sh
+tests/fm-afk-inject-e2e.test.sh
+tests/fm-afk-inject-herdr-e2e.test.sh
+tests/fm-composer-ghost.test.sh
+tests/fm-composer-lib.test.sh
+tests/fm-daemon.test.sh
+tests/fm-gate-refuse.test.sh
+tests/fm-operational-input.test.sh
+tests/fm-pr-check-security.test.sh
+tests/fm-spawn-slot-move.test.sh
+tests/fm-wake-daemon-lifecycle-e2e.test.sh
+
+===== Physical root (pwd -P), isolates the child-shell fix from the relative-root fix =====
+base: 592 of 716 roots reusable
+head: 704 of 716 roots reusable
+MISS->HIT (restored by child-shell fix): 112
+HIT->MISS (regressed): 0
+Note: the first block used root '.', where base also lost identity for bin/fm-backend.sh, so its 208 mixes both fixes. Cold command is 'true': this measures fm-lint-cache.pl cache eligibility, not ShellCheck findings.
