@@ -3346,8 +3346,8 @@ test_runner_leader_acceptance_is_one_shared_rule() {
 
 # teardown_home_runner_member accepts a home's runner only when its .runner file
 # is exactly the pid line the runner writes ("1234\n") for a live
-# identity-matched group leader whose claim the home owns; every other content
-# is refused. The claims live in a scratch claim root.
+# identity-matched group leader whose claim the home owns; every other content,
+# a NUL byte included, is refused. The claims live in a scratch claim root.
 test_home_runner_record_must_be_exactly_its_pid_line() {
   local tmp home out leader identity shape got want
   tmp=$(fm_test_tmproot runner-record-shape)
@@ -3378,7 +3378,7 @@ start = source.index("teardown_home_runner_member() {")
 end = source.index("\n}\n", start) + 3
 pathlib.Path(sys.argv[2]).write_text(source[start:end])
 PY
-  for shape in exact spaced leading-space two-line empty no-newline; do
+  for shape in exact spaced leading-space two-line empty no-newline nul; do
     case "$shape" in
       exact) printf '%s\n' "$leader" ;;
       spaced) printf '%s %s\n' "${leader:0:1}" "${leader:1}" ;;
@@ -3386,7 +3386,13 @@ PY
       two-line) printf '%s\n%s\n' "$leader" "$leader" ;;
       empty) : ;;
       no-newline) printf '%s' "$leader" ;;
+      # The pid, a NUL byte, then the newline: a shell read would drop the NUL.
+      nul) printf '%s\000\n' "$leader" ;;
     esac > "$home/state/procevent/fixture-runner.runner"
+    if [ "$shape" = nul ]; then
+      [ "$(wc -c < "$home/state/procevent/fixture-runner.runner" | tr -d ' ')" = "$(( ${#leader} + 2 ))" ] \
+        || fail "runner-record-nul: the fixture did not write the NUL byte"
+    fi
     got=$(FM_PROCEVENT_CLAIM_ROOT="$tmp/claims" SCRIPT_DIR="$ROOT/bin" H="$home" P="$leader" F="$tmp/fn.sh" bash -c '
       . "$SCRIPT_DIR/fm-pr-lib.sh" >/dev/null 2>&1
       . "$SCRIPT_DIR/fm-wake-lib.sh" >/dev/null 2>&1
@@ -3397,7 +3403,7 @@ PY
     assert_equals "$want" "$got" "runner-record-$shape: the .runner content was judged wrongly"
   done
   teardown_fixture_stop "$leader"
-  pass "a home runner record counts only as exactly its pid line; spaced, padded, two-line, empty and unterminated records are refused"
+  pass "a home runner record counts only as exactly its pid line; spaced, padded, two-line, empty, unterminated and NUL-carrying records are refused"
 }
 
 ownership_pool_descends() {  # <pid> <ancestor>

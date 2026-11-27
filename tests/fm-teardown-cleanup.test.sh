@@ -2071,7 +2071,7 @@ SH
 # exact name is present, and two panes in it still refuse.
 test_teardown_window_membership_is_exact() {
   local shape case_dir rc first second
-  for shape in prefix suffix exact; do
+  for shape in prefix suffix glob exact; do
     case_dir=$(make_case "ownership-window-$shape")
     write_meta "$case_dir" no-mistakes ship
     land_shippable_commit "$case_dir"
@@ -2082,6 +2082,8 @@ test_teardown_window_membership_is_exact() {
     case "$shape" in
       prefix) printf 'fm-task-x10\t%%1\t%s\nfm-task-x10\t%%2\t%s\n' "$first" "$second" > "$case_dir/pane-rows" ;;
       suffix) printf 'prefix-fm-task-x1\t%%1\t%s\nprefix-fm-task-x1\t%%2\t%s\n' "$first" "$second" > "$case_dir/pane-rows" ;;
+      # A listed name that is a glob pattern matching the recorded one.
+      glob) printf 'fm-task-*\t%%1\t%s\nfm-task-*\t%%2\t%s\n' "$first" "$second" > "$case_dir/pane-rows" ;;
       exact) printf 'fm-task-x1\t%%1\t%s\nfm-task-x1\t%%2\t%s\n' "$first" "$second" > "$case_dir/pane-rows" ;;
     esac
     cat > "$case_dir/fakebin/tmux" <<SH
@@ -2111,7 +2113,51 @@ SH
     teardown_fixture_stop "$first"
     teardown_fixture_stop "$second"
   done
-  pass "window membership is an exact name comparison: a prefix or suffix lookalike leaves the recorded window absent, the exact name is present"
+  pass "window membership is an exact literal name match: a prefix, suffix or glob-pattern lookalike leaves the recorded window absent, the exact name is present"
+}
+
+# The endpoint read matches the recorded window name literally, in memory: the
+# endpoint validator only admits fm-<id> names, so this drives the classifier
+# itself. A recorded fm-task-* beside a listed fm-task-x1 is absent (its glob
+# characters are literal), a listed fm-task-* never matches a recorded
+# fm-task-x1, the exact name is proven, and a failed inventory read is
+# unreadable.
+test_endpoint_window_name_is_matched_literally() {
+  local tmp got shape window listed want
+  tmp=$(fm_test_tmproot endpoint-literal)
+  mkdir -p "$tmp/fakebin"
+  python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/fn.sh" <<'PY' || fail "endpoint-literal: the classifier could not be extracted"
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+start = source.index("task_endpoint_shell_pid() {")
+end = source.index("\n}\n", start) + 3
+pathlib.Path(sys.argv[2]).write_text(source[start:end])
+PY
+  cat > "$tmp/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+[ -z "${FAKE_TMUX_FAIL:-}" ] || { echo "error connecting to /tmp/x (Permission denied)" >&2; exit 1; }
+case "${1:-}" in
+  list-windows) printf '%s\n' control "$FAKE_TMUX_LISTED" ;;
+  list-panes) printf '%s\t%%1\t%s\n' control 1111 "$FAKE_TMUX_LISTED" 2222 ;;
+esac
+SH
+  chmod +x "$tmp/fakebin/tmux"
+  for shape in recorded-glob listed-glob exact unreadable; do
+    case "$shape" in
+      recorded-glob) window='fm-task-*' listed=fm-task-x1 want=absent ;;
+      listed-glob) window=fm-task-x1 listed='fm-task-*' want=absent ;;
+      exact) window=fm-task-x1 listed=fm-task-x1 want='proven 2222' ;;
+      unreadable) window=fm-task-x1 listed=fm-task-x1 want=unreadable ;;
+    esac
+    got=$(FAKE_TMUX_LISTED=$listed FAKE_TMUX_FAIL=$([ "$shape" = unreadable ] && echo 1 || true) \
+      PATH="$tmp/fakebin:$PATH" ROOT=$ROOT F="$tmp/fn.sh" W="$window" bash -c '
+      . "$ROOT/bin/fm-backend.sh" >/dev/null 2>&1
+      fm_backend_source tmux >/dev/null 2>&1 || exit 9
+      . "$F"
+      BACKEND=tmux T="firstmate:$W" task_endpoint_shell_pid')
+    assert_equals "$want" "$got" "endpoint-literal-$shape: the endpoint was classified wrongly"
+  done
+  pass "the recorded window name is matched literally in memory: glob lookalikes either way are absent, the exact name is proven, a failed read is unreadable"
 }
 
 # The process-group proof does not reach a process that leaves the group: a
@@ -9641,6 +9687,7 @@ test_tasktmp_only_route_names_an_unproven_holder_and_continues
 test_teardown_ambiguous_window_refuses_before_any_close
 test_teardown_unreadable_tmux_socket_refuses_before_any_close
 test_teardown_window_membership_is_exact
+test_endpoint_window_name_is_matched_literally
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races

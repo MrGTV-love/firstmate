@@ -3840,16 +3840,14 @@ teardown_home_runner_member() {  # <home> <pid>
       [ -f "$runner_file" ] && [ ! -L "$runner_file" ] || continue
       source_id=${runner_file##*/}
       source_id=${source_id%.runner}
-      # The runner writes its pid with printf '%s\n' "$$", so the file counts only
-      # when its whole content is one line of ASCII digits and that newline.
-      runner_pid=$(cat -- "$runner_file" 2>/dev/null && printf x) || continue
-      runner_pid=${runner_pid%x}
-      [ "${runner_pid%$'\n'}" != "$runner_pid" ] || continue
-      runner_pid=${runner_pid%$'\n'}
-      case "$runner_pid" in (''|*[!0123456789]*) continue ;; esac
       fm_procevent_claim_load_locked "$source_id" 2>/dev/null || continue
       fm_procevent_claim_owned_by_state "$1/state" "$1" 2>/dev/null || continue
-      [ "$runner_pid" = "$FM_PROCEVENT_CLAIM_PID" ] || continue
+      case "$FM_PROCEVENT_CLAIM_PID" in (''|*[!0123456789]*) continue ;; esac
+      # The runner writes its pid with printf '%s\n' "$$", so the file counts only
+      # when its bytes are exactly the claim's pid and that newline. The bytes are
+      # compared, never read into the shell; a compare that cannot run (cmp exit
+      # 2, a failed substitution) is not a match.
+      cmp -s -- "$runner_file" <(printf '%s\n' "$FM_PROCEVENT_CLAIM_PID") 2>/dev/null || continue
       fm_procevent_runner_leader_proved "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY" 2>/dev/null || continue
       printf '%s\n' "$FM_PROCEVENT_CLAIM_PID"
     done
@@ -4578,7 +4576,7 @@ conclude_task_no_mistakes_run() {  # <worktree>
 # Herdr confirms gone is absent. Any other failed read is unreadable. A record
 # with no endpoint, or a backend that reports no pane shell, is absent.
 task_endpoint_shell_pid() {
-  local out pid='' session window rows count inventory_rc listed line
+  local out pid='' session window rows count inventory_rc
   [ -n "${T:-}" ] || { printf 'absent\n'; return 0; }
   case "${BACKEND:-}" in
     tmux)
@@ -4594,16 +4592,14 @@ task_endpoint_shell_pid() {
         2) printf 'absent\n'; return 0 ;;
         *) printf 'unreadable\n'; return 0 ;;
       esac
-      # Membership is an exact in-shell comparison with each listed name, so no
-      # external command can fail here: only a recorded name equal to no listed
-      # line is absent.
-      listed=0
-      while IFS= read -r line; do
-        [ "$line" != "$window" ] || { listed=1; break; }
-      done <<INVENTORY
-$out
-INVENTORY
-      [ "$listed" = 1 ] || { printf 'absent\n'; return 0; }
+      # Membership is a pure in-memory match of the recorded name, quoted so its
+      # glob characters are literal, against a whole line of the inventory: no
+      # step that could fail sits between the inventory read and the verdict.
+      # Only a recorded name equal to no listed line is absent.
+      case $'\n'"$out"$'\n' in
+        *$'\n'"$window"$'\n'*) ;;
+        *) printf 'absent\n'; return 0 ;;
+      esac
       out=$(tmux list-panes -s -t "=$session" -F $'#{window_name}\t#{pane_id}\t#{pane_pid}' 2>/dev/null </dev/null) \
         || { printf 'unreadable\n'; return 0; }
       rows=$(printf '%s\n' "$out" | awk -F '\t' -v w="$window" 'NF == 3 && $1 == w')
