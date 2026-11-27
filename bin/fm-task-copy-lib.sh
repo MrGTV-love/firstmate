@@ -363,6 +363,17 @@ fm_task_copy_unreadable_registration_note() {  # <recorded path>
   printf ' (registration %q cannot be read)' "$1"
 }
 
+# Prints the one text every report gives for a registration list that could not
+# be read: "<subject> worktree registration list could not be read", then the
+# note naming the registration fm_task_copy_registrations_readable recorded in
+# FM_TASK_COPY_UNREADABLE_REGISTRATION, and nothing more when it recorded none.
+# Every site that reports a failed fm_task_copy_read_registered_nested uses it,
+# so none drops or misstates the recorded registration.
+fm_task_copy_unreadable_list_text() {  # <subject>
+  printf '%s worktree registration list could not be read%s' "$1" \
+    "$(fm_task_copy_unreadable_registration_note "${FM_TASK_COPY_UNREADABLE_REGISTRATION:-}")"
+}
+
 # Sets FM_TASK_COPY_NESTED to the canonical path of every worktree
 # <canonical-clone> has registered strictly inside itself, one per line, and
 # succeeds. A registered copy whose directory is gone keeps its raw path. Fails

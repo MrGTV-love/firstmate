@@ -1137,7 +1137,7 @@ classify() {  # <copy> <clone> <pool> <container>
   fi
   if ! list_nested "$clone"; then
     CLASS=HELD-DIRTY
-    REASON="its registered nested copies cannot be listed, so no inner copy is ruled out$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"
+    REASON="$(fm_task_copy_unreadable_list_text "its clone's"), so no inner copy is ruled out"
     return 0
   fi
   nested=$FM_TASK_COPY_NESTED
@@ -1353,7 +1353,7 @@ record_live_nested_copy() {  # <copy> <clone>
 scan_clone() {  # <pool> <container> <clone>
   local pool=$1 container=$2 clone=$3 copy nested
   if ! list_nested "$clone"; then
-    add_note "clone $clone was not read: its registered worktrees cannot be listed$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"
+    add_note "clone $clone was not read: $(fm_task_copy_unreadable_list_text its)"
     return 0
   fi
   nested=$FM_TASK_COPY_NESTED
@@ -1749,7 +1749,7 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
-  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity
+  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity moved why
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1842,10 +1842,17 @@ apply_removals() {
       # before the last source/preserve comparison and non-force removal.
       scan_processes
       classify "$copy" "$clone" "$pool" "$container"
-      if [ "$CLASS" != REAPABLE-PROVEN ] || [ "$(git -C "$copy" rev-parse HEAD 2>/dev/null)" != "$head" ]; then
+      moved=0
+      [ "$(git -C "$copy" rev-parse HEAD 2>/dev/null)" = "$head" ] || moved=1
+      if [ "$CLASS" != REAPABLE-PROVEN ] || [ "$moved" = 1 ]; then
         discard_unlocked_preserve "$copy" "$identity" "$release_id"
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"copy changed after preservation; the copy was left"$'\n'
+        # The report gives classify's own class and reason; "changed after
+        # preservation" is said only when the head moved.
+        why=
+        [ "$moved" = 0 ] || why="copy changed after preservation"
+        [ "$CLASS" = REAPABLE-PROVEN ] || why="${why:+$why; }it is now $CLASS: $REASON"
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"$(printf '%s' "$why" | tr '\n\t' '  '); the copy was left"$'\n'
         continue
       fi
       want=
@@ -1871,7 +1878,7 @@ apply_removals() {
     fi
     if ! list_nested "$clone"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved; no retention receipt was cleared$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"$'\n'
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved: $(fm_task_copy_unreadable_list_text "its clone's"); no retention receipt was cleared"$'\n'
       continue
     fi
     registered=$FM_TASK_COPY_NESTED

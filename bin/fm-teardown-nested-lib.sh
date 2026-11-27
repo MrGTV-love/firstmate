@@ -3130,7 +3130,7 @@ teardown_by_path_locate() {  # <canonical-copy>
     fi
     [ -n "$clone" ] || continue
     fm_task_copy_read_registered_nested "$clone" || {
-      [ -n "$TEARDOWN_BY_PATH_UNREADABLE" ] || TEARDOWN_BY_PATH_UNREADABLE="the worktree registration list of $(fm_refuse_text "$clone") could not be read$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"
+      [ -n "$TEARDOWN_BY_PATH_UNREADABLE" ] || TEARDOWN_BY_PATH_UNREADABLE=$(fm_task_copy_unreadable_list_text "the clone $(fm_refuse_text "$clone")'s")
       continue
     }
     registered=$FM_TASK_COPY_NESTED
@@ -3213,7 +3213,7 @@ teardown_by_path_other_repos() {  # <copy>
 teardown_by_path_inner() {  # <copy>
   local copy=$1 inner rc=0
   fm_task_copy_read_registered_nested "$copy" || {
-    teardown_by_path_unread "the worktrees registered inside $(fm_refuse_text "$copy") cannot be listed$(fm_task_copy_unreadable_registration_note "$FM_TASK_COPY_UNREADABLE_REGISTRATION")"
+    teardown_by_path_unread "$(fm_task_copy_unreadable_list_text "the copy $(fm_refuse_text "$copy")'s"), so the worktrees registered inside it cannot be listed"
     return 1
   }
   inner=$FM_TASK_COPY_NESTED

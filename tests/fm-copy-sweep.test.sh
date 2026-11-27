@@ -480,7 +480,7 @@ test_unreadable_registration_is_reported_without_walking_for_copies() {
   add_copy nested
   fm_write_meta "$HOMED/state/owner.meta" "worktree=$SLOT" 'kind=ship'
   FAKE_GIT_FAIL_LIST=1 run_sweep
-  assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed" 'enumeration failure was silently treated as no copies'
+  assert_contains "$OUT" "clone $SLOT was not read: its worktree registration list could not be read" 'enumeration failure was silently treated as no copies'
   assert_not_contains "$OUT" 'HELD-LIVE-TASK nested copies=' 'failed enumeration invented a live copy'
   [ "$(du_calls)" = 0 ] || fail 'failed enumeration walked the directory and measured a copy'
   registered nested || fail 'unreadable enumeration changed a registration'
@@ -506,7 +506,7 @@ test_a_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone() {
   printf '%s\n' "$list" | grep -qxF "worktree $(copy_path hidden)" && fail 'the fixture does not bite: git still lists the hidden registration'
   run_sweep --apply
   [ "$RC" = 0 ] || fail "link-held registration: apply failed ($RC): $OUT"
-  assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed (registration " 'a clone with an unreadable registration was read'
+  assert_contains "$OUT" "clone $SLOT was not read: its worktree registration list could not be read (registration " 'a clone with an unreadable registration was read'
   assert_contains "$OUT" '.git/worktrees/hidden/gitdir cannot be read)' 'the sweep did not name the registration it could not read'
   assert_not_contains "$OUT" "REMOVED"$'\t' 'a copy of a clone with an unreadable registration was removed'
   [ -e "$(copy_path reap)" ] || fail 'the clean copy of a clone with an unreadable registration was removed'
@@ -535,7 +535,7 @@ test_a_dot_named_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_
     printf '%s\n' "$list" | grep -qxF "worktree $(copy_path reap)" || fail "$name: the fixture does not bite: git lost the readable registration"
     run_sweep --apply
     [ "$RC" = 0 ] || fail "$name: apply failed ($RC): $OUT"
-    assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed (registration " "$name: a clone with an unreadable registration was read"
+    assert_contains "$OUT" "clone $SLOT was not read: its worktree registration list could not be read (registration " "$name: a clone with an unreadable registration was read"
     assert_contains "$OUT" ".git/worktrees/$name/gitdir cannot be read)" "$name: the sweep did not name the registration it could not read"
     assert_not_contains "$OUT" "REMOVED"$'\t' "$name: a copy of a clone with an unreadable registration was removed"
     [ -e "$(copy_path reap)" ] || fail "$name: the clean copy of such a clone was removed"
@@ -553,7 +553,7 @@ test_a_listing_that_fails_after_partial_output_names_no_registration() {
   FAKE_GIT_PARTIAL_LIST_FILE="$W/partial-list" run_sweep --apply
   [ "$RC" = 0 ] || fail "partial listing: apply failed ($RC): $OUT"
   assert_present "$W/partial-list.log" 'the git stand-in did not print its partial listing'
-  assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed" 'a listing that failed was read'
+  assert_contains "$OUT" "clone $SLOT was not read: its worktree registration list could not be read" 'a listing that failed was read'
   assert_not_contains "$OUT" '(registration ' 'the sweep named a registration the scan found readable'
   assert_not_contains "$OUT" "REMOVED"$'\t' 'a copy of a clone whose listing failed was removed'
   registered reap || fail 'the copy of a clone whose listing failed was unregistered'
@@ -934,7 +934,7 @@ test_failed_nested_registration_proof_holds_copy() {
   before=$(shasum -a 256 "$admin/locked")
   FAKE_GIT_FAIL_LIST_AFTER=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
   assert_class locked HELD-DIRTY
-  assert_contains "$OUT" "registered nested copies cannot be listed" "unreadable inner-copy proof was not named"
+  assert_contains "$OUT" "its clone's worktree registration list could not be read, so no inner copy is ruled out" "unreadable inner-copy proof was not named"
   rm -f "$W/git.log.list-count"
   FAKE_GIT_FAIL_LIST_AFTER=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   assert_not_contains "$OUT" "REMOVED"$'\t' "failed inner-copy proof was reported removed"
@@ -960,6 +960,8 @@ SH
   FAKE_GIT_FAIL_LIST_FILE="$W/post-execute-list-fails" FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 1 ] || fail "unproved post-removal registration should fail: $OUT"
   assert_contains "$OUT" "registration after removal could not be proved" "failed post-removal proof was not reported"
+  assert_contains "$OUT" "registration after removal could not be proved: its clone's worktree registration list could not be read; no retention receipt was cleared" \
+    "the failed post-removal proof did not say the registration list could not be read"
   assert_not_contains "$OUT" "REMOVED"$'\t' "unknown registration was reported removed"
   assert_absent "$HOMED/data/copy-sweep.log" "unknown registration was logged as removed"
   assert_equals 1 "$(find "$HOMED/data/copy-sweep/retained" -type f | wc -l | tr -d ' ')" "unknown registration cleared the retention receipt"

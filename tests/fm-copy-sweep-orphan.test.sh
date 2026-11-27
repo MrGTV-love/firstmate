@@ -604,6 +604,82 @@ SH
   pass 'three refused applies add no preserve, keep mismatch evidence, and leave originals and held copies unchanged'
 }
 
+# A clean, landed copy whose ignored .claude/keep.txt exists nowhere else, so the
+# apply preserves it and then classifies the copy again before removing it.
+# <shape> says what the cp stand-in does while it preserves that file:
+# listing plants a registration whose gitdir is a link to nothing, so the
+# clone's registration list cannot be read at the reclassification; head moves
+# the copy's head with a new local commit.
+make_reclassify_world() {  # <shape>
+  local real_cp target
+  W="$TMP_ROOT/reclassify-$1"
+  HOMED="$W/home"
+  CLONE="$HOMED/projects/example"
+  mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
+  fm_git_init_commit "$CLONE"
+  printf '.claude/\n' > "$CLONE/.gitignore"
+  git -C "$CLONE" add .gitignore
+  git -C "$CLONE" commit -qm 'ignore payloads'
+  fm_git_add_origin "$CLONE" "$W/origin.git"
+  git -C "$CLONE" push -q origin main
+  git -C "$CLONE" fetch -q origin
+  target=$CLONE/.claude/worktrees/target
+  git -C "$CLONE" worktree add -q --detach "$target" origin/main
+  put_file "$target/.claude/keep.txt" 'original target bytes'
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$W/bin/lsof"
+  real_cp=$(command -v cp)
+  case "$1" in
+    listing)
+      cat > "$W/bin/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+case "\$2" in
+  $target/.claude)
+    mkdir -p "$CLONE/.git/worktrees/planted"
+    ln -s "$W/no-such-target" "$CLONE/.git/worktrees/planted/gitdir" ;;
+esac
+SH
+      ;;
+    head)
+      cat > "$W/bin/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+case "\$2" in
+  $target/.claude) git -C "$target" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m moved ;;
+esac
+SH
+      ;;
+  esac
+  chmod +x "$W/bin/lsof" "$W/bin/cp"
+  RECLASSIFY_TARGET=$target
+}
+
+# After preservation the apply classifies the copy again. When that
+# reclassification is not REAPABLE-PROVEN the FAILED line gives classify's own
+# class and reason: a registration list that cannot be read is reported as that,
+# naming the registration the scan found, not as a copy that changed. A head that
+# moves after preservation is still reported as a copy that changed. Either way
+# the copy and its original bytes stay.
+test_a_reclassification_after_preservation_reports_its_own_reason() {
+  local shape row
+  for shape in listing head; do
+    make_reclassify_world "$shape"
+    sweep_status --apply
+    assert_equals 1 "$SWEEP_RC" "$shape: a copy left after preservation must fail the run"
+    row=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$RECLASSIFY_TARGET"$'\t') || fail "$shape: no FAILED line for the copy: $OUT"
+    case "$shape" in
+      listing)
+        assert_contains "$row" "worktree registration list could not be read (registration " "$shape: the FAILED line does not say the registration list could not be read"
+        assert_contains "$row" "$CLONE/.git/worktrees/planted/gitdir cannot be read)" "$shape: the FAILED line does not name the registration the scan found"
+        assert_not_contains "$row" 'copy changed after preservation' "$shape: a listing that could not be read was reported as a changed copy" ;;
+      head)
+        assert_contains "$row" 'copy changed after preservation' "$shape: a head that moved after preservation was not reported as a changed copy" ;;
+    esac
+    assert_equals 'original target bytes' "$(cat "$RECLASSIFY_TARGET/.claude/keep.txt")" "$shape: the copy lost its original bytes"
+  done
+  pass 'a reclassification after preservation reports its own reason, and a moved head is still a changed copy'
+}
+
 # A write that leaves every preserved original unchanged proves nothing about the
 # preserve, so it stops the removal without adding one.
 test_activity_only_write_adds_no_preserve() {
@@ -769,4 +845,5 @@ test_regenerable_write_keeps_waiting
 test_check_matches_report_for_quiet_waiting_copy
 test_refused_removal_adds_no_preserve
 test_activity_only_write_adds_no_preserve
+test_a_reclassification_after_preservation_reports_its_own_reason
 test_ps_observation_diagnostics
