@@ -499,10 +499,13 @@ def derived_authors(home, pr, head, task, base):
                         item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
+                        # Never let a Zhipu provider promote a non-empty malformed
+                        # or unrecognized model id from unknown into zhipu.
                         provider_family = PROVIDER_FAMILIES.get(provider) if isinstance(provider, str) else None
                         if provider_family:
                             if item["family"] == "unknown":
-                                item["family"] = provider_family
+                                if provider_family != "zhipu" or not exact_model:
+                                    item["family"] = provider_family
                             elif item["family"] != provider_family:
                                 item["family"] = "unknown"
                         models.append(item)

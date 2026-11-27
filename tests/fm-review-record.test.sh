@@ -1189,8 +1189,9 @@ test_zhipu_glm_family_covers_other_families_and_blocks_self_review() {
   done
 
   # 4. Pipeline DB provider boundary: exact lowercase zai/z-ai normalize to zhipu
-  # while non-Zhipu model aliases (model_provider='gpt') and non-canonical case/Unicode
-  # spellings (OpenAI, moonſhot) stay no-mistakes:unknown, matching origin/main.
+  # only when model is empty or agrees, never promoting a non-empty malformed/unknown
+  # model (glm!!!, mystery-12) out of unknown; non-Zhipu model aliases (gpt) and
+  # non-canonical case/Unicode spellings (OpenAI, moonſhot) stay no-mistakes:unknown.
   local nm_prov="$TMP_ROOT/zhipu-provider-db"
   mkdir -p "$nm_prov"
   python3 - "$nm_prov/state.sqlite" "$URL" <<'PY2' || fail "seed provider db"
@@ -1205,6 +1206,8 @@ db.execute("INSERT INTO runs VALUES ('r-prov', ?, 'fm/fixture', 'repo1')", (sys.
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-9', 'gpt')")
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-10', 'OpenAI')")
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-11', 'moon\u017fhot')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm!!!', 'zai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-12', 'z-ai')")
 db.commit()
 PY2
   case_dir=$(make_case zhipu-provider-no-widening claude-opus-5-5)
@@ -1212,10 +1215,10 @@ PY2
     || fail "record provider-boundary PASS"
   out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
     --task task-x1 --base "$BASE") || fail "plan failed on non-zhipu provider alias db"
-  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] | length == 3' <<<"$out" >/dev/null \
-    || fail "gpt/OpenAI/moonshot-long-s providers must all stay no-mistakes:unknown: $out"
-  "$JQ_BIN" -e '.groups["no-mistakes:openai"] == null and .groups["no-mistakes:moonshot"] == null' \
-    <<<"$out" >/dev/null || fail "non-canonical non-Zhipu providers must not widen attribution: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] | length == 5' <<<"$out" >/dev/null \
+    || fail "gpt/OpenAI/moonshot-long-s and malformed zai/z-ai models must all stay no-mistakes:unknown: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:openai"] == null and .groups["no-mistakes:moonshot"] == null and .groups["no-mistakes:zhipu"] == null' \
+    <<<"$out" >/dev/null || fail "malformed models and non-Zhipu providers must not widen attribution: $out"
 
   # 5. Positive sensitivity control: removing zhipu/glm makes zai/glm-5.4 refuse as unknown.
   local copy="$TMP_ROOT/zhipu-control-bin"
@@ -1247,8 +1250,9 @@ p = sys.argv[1]
 s = open(p).read()
 n1 = '    if family == "zhipu" and not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail):\n        return "unknown"\n'
 n2 = 'provider_family = PROVIDER_FAMILIES.get(provider)'
-assert s.count(n1) == 1 and s.count(n2) == 1, "protection lines not found"
-s = s.replace(n1, '').replace(n2, 'provider_family = FAMILIES.get(provider.casefold())')
+n3 = '                                if provider_family != "zhipu" or not exact_model:\n                                    item["family"] = provider_family\n'
+assert s.count(n1) == 1 and s.count(n2) == 1 and s.count(n3) == 1, "protection lines not found"
+s = s.replace(n1, '').replace(n2, 'provider_family = FAMILIES.get(provider.casefold())').replace(n3, '                                item["family"] = provider_family\n')
 open(p, "w").write(s)
 PY2
   case_dir=$(make_case zhipu-weak-tail claude-opus-5-5)
@@ -1260,8 +1264,8 @@ PY2
   expect_code 0 "$rc" "protection control: dropping tail validation must let glm--- pass, or this test observes nothing: $out"
   out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
     --task task-x1 --base "$BASE") || fail "weak provider control plan failed"
-  "$JQ_BIN" -e '.groups["no-mistakes:openai"] != null and .groups["no-mistakes:moonshot"] != null' <<<"$out" >/dev/null \
-    || fail "protection control: widening PROVIDER_FAMILIES with casefold must attribute gpt/OpenAI/long-s: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:openai"] != null and .groups["no-mistakes:moonshot"] != null and .groups["no-mistakes:zhipu"] != null' <<<"$out" >/dev/null \
+    || fail "protection control: widening PROVIDER_FAMILIES and dropping exact_model guard must attribute gpt/OpenAI/long-s/malformed-zai: $out"
   pass "zhipu/glm family covers other families, refuses same-family self-review, and keeps unknown ids and non-Zhipu provider aliases closed"
 }
 
