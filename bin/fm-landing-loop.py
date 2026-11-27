@@ -4,6 +4,8 @@
 Usage (FM_HOME names the absolute home; FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE select state/config):
   fm-landing-loop.py step [--no-reconcile] [--include-stale-red]   one bounded pass (launchd entrypoint)
   fm-landing-loop.py plan [--include-stale-red] [--json]           read-only plan of candidates and trains
+  fm-landing-loop.py train [--repo O/R] [--prs N,M] [--max K] [--build --worktree DIR --branch B]
+                                                                   plan or build a non-conflicting Train-member batch branch
   fm-landing-loop.py status [--json]                               print durable landing-loop state
   fm-landing-loop.py events [--limit N]                            print recent landing-loop events
   fm-landing-loop.py run [--interval N] [--include-stale-red]      foreground loop calling step every N seconds
@@ -426,7 +428,11 @@ def update_worker(run_dir_str, fd_str):
             done = subprocess.run(cmd, cwd=worktree, stdin=subprocess.DEVNULL, capture_output=True, text=True, check=False)
             log_path.write_text((done.stdout or "") + (done.stderr or ""), encoding="utf-8")
             rc = done.returncode
-            tail = ((done.stderr or "") + "\n" + (done.stdout or "")).strip().splitlines()
+            tail = [
+                line.strip()
+                for line in ((done.stderr or "") + "\n" + (done.stdout or "")).splitlines()
+                if line.strip() and not line.strip().startswith(("progress:", "calibration:", "fallback:", "fm-cpu-pass:"))
+            ]
             detail = "no-mistakes rerun completed" if rc == 0 else (tail[-1][:200] if tail else f"no-mistakes rerun exited {rc}")
         elif mode == "direct-PR":
             steps = [
@@ -658,6 +664,216 @@ def cmd_plan(home, include_stale_red=False, as_json=False, repo_filter=None):
     return 0
 
 
+def plan_train_batch(worktree, base_tip, candidates, max_members=5):
+    """Greedily select up to max_members PRs that merge cleanly onto base_tip cumulatively.
+
+    Uses an isolated bare scratch repository borrowing objects from worktree so no worktree
+    config, hooks, or files are touched while proving conflict-free composition.
+    Returns (selected, excluded, final_tree).
+    """
+    wt = Path(worktree)
+    if not wt.is_dir():
+        return [], [{"pr": c["pr"], "reason": f"worktree {worktree} missing"} for c in candidates], None
+    objects = run(["git", "-C", str(wt), "rev-parse", "--path-format=absolute", "--git-path", "objects"])
+    obj_fmt = run(["git", "-C", str(wt), "rev-parse", "--show-object-format"])
+    if objects.returncode != 0 or obj_fmt.returncode != 0:
+        return [], [{"pr": c["pr"], "reason": "could not locate git object store"} for c in candidates], None
+    missing = [sha for sha in [base_tip, *(c["head"] for c in candidates)]
+               if run(["git", "-C", str(wt), "cat-file", "-e", f"{sha}^{{commit}}"]).returncode != 0]
+    if missing:
+        run(["git", "-C", str(wt), "fetch", "--quiet", "origin", *missing])
+    selected, excluded = [], []
+    final_tree = None
+    with tempfile.TemporaryDirectory(prefix="fm-train-plan-") as scratch:
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        repo = os.path.join(scratch, "train.git")
+        env.update({
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_ATTR_NOSYSTEM": "1",
+            "GIT_NO_REPLACE_OBJECTS": "1",
+            "GIT_NO_GRAFT_FILE": "1",
+            "GIT_GRAFT_FILE": os.devnull,
+            "XDG_CONFIG_HOME": scratch,
+            "HOME": scratch,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_AUTHOR_NAME": "Firstmate Train",
+            "GIT_AUTHOR_EMAIL": "train@local.invalid",
+            "GIT_COMMITTER_NAME": "Firstmate Train",
+            "GIT_COMMITTER_EMAIL": "train@local.invalid",
+        })
+        made = subprocess.run(
+            ["git", "init", "-q", "--bare", "--template=", f"--object-format={obj_fmt.stdout.strip()}", repo],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        if made.returncode != 0:
+            return [], [{"pr": c["pr"], "reason": "could not initialize scratch train repo"} for c in candidates], None
+        with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
+            handle.write(objects.stdout.strip() + "\n")
+        env["GIT_DIR"] = repo
+        cur_commit = base_tip
+        for cand in candidates:
+            if len(selected) >= max_members:
+                excluded.append({"pr": cand["pr"], "head": cand["head"], "reason": f"batch cap ({max_members}) reached"})
+                continue
+            head = cand["head"]
+            if subprocess.run(["git", "cat-file", "-e", f"{head}^{{commit}}"], capture_output=True, env=env).returncode != 0:
+                excluded.append({"pr": cand["pr"], "head": head, "reason": "commit unavailable in object store"})
+                continue
+            merged = subprocess.run(
+                ["git", "-c", f"core.attributesFile={os.devnull}", "merge-tree", "--write-tree", "--no-messages", cur_commit, head],
+                capture_output=True, text=True, check=False, env=env,
+            )
+            if merged.returncode == 1:
+                excluded.append({"pr": cand["pr"], "head": head, "reason": "conflicts with train batch"})
+                continue
+            if merged.returncode != 0:
+                excluded.append({"pr": cand["pr"], "head": head, "reason": f"merge-tree failed (exit {merged.returncode})"})
+                continue
+            tree_lines = merged.stdout.splitlines()
+            if len(tree_lines) != 1 or not SHA.fullmatch(tree_lines[0]):
+                excluded.append({"pr": cand["pr"], "head": head, "reason": "unexpected merge-tree output"})
+                continue
+            tree = tree_lines[0]
+            ct = subprocess.run(
+                ["git", "commit-tree", tree, "-p", cur_commit, "-p", head, "-m", f"train member {cand['pr']}"],
+                capture_output=True, text=True, check=False, env=env,
+            )
+            if ct.returncode != 0 or not SHA.fullmatch(ct.stdout.strip()):
+                excluded.append({"pr": cand["pr"], "head": head, "reason": "commit-tree failed in scratch repo"})
+                continue
+            cur_commit = ct.stdout.strip()
+            final_tree = tree
+            selected.append(cand)
+    return selected, excluded, final_tree
+
+
+def format_train_closes_block(members):
+    lines = ["<!-- firstmate-backlog-closes:begin -->"]
+    for member in members:
+        lines.append(f"Train-member: {member['pr']}")
+    lines.append("<!-- firstmate-backlog-closes:end -->")
+    return "\n".join(lines) + "\n"
+
+
+def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale_red=False,
+              worktree=None, branch=None, base_name="main", build=False, as_json=False):
+    wt = worktree or str(home.home)
+    candidates = []
+    if prs_csv:
+        if not repo_filter or "/" not in repo_filter:
+            print("error: --prs requires --repo <owner/repo>", file=sys.stderr)
+            return 2
+        for tok in [t.strip() for t in prs_csv.split(",") if t.strip()]:
+            if not re.fullmatch(r"[1-9][0-9]*", tok):
+                print(f"error: invalid PR number: {tok}", file=sys.stderr)
+                return 2
+            url = f"https://github.com/{repo_filter}/pull/{tok}"
+            view = gh_pr_view(url)
+            if not view or str(view.get("state", "")).upper() != "OPEN" or view.get("isDraft") is not False:
+                continue
+            candidates.append({
+                "task": f"pr-{tok}",
+                "pr": url,
+                "number": int(tok),
+                "head": view["headRefOid"],
+                "base_name": view.get("baseRefName") or base_name,
+            })
+        owner, repo = repo_filter.split("/", 1)
+    else:
+        state_doc = read_json(home.root / "state.json", {"inflight": {}, "backoff": {}})
+        rows = assess_candidates(home, include_stale_red=include_stale_red,
+                                 inflight=state_doc.get("inflight"), backoff=state_doc.get("backoff"),
+                                 completed_heads=state_doc.get("completed_heads"), repo_filter=repo_filter)
+        for r in rows:
+            if r["action"] in ("update", "at-tip"):
+                candidates.append({
+                    "task": r["task"],
+                    "pr": r["pr"],
+                    "number": r["number"],
+                    "head": r["head"],
+                    "base_name": r["base_name"] or base_name,
+                })
+        if not candidates:
+            out = {"ok": True, "selected": [], "excluded": [], "closes_block": ""}
+            print(json.dumps(out, indent=1) if as_json else "landing-loop train: no eligible PRs")
+            return 0
+        match = PR_URL.fullmatch(candidates[0]["pr"])
+        owner, repo = match.group(1), match.group(2)
+        base_name = candidates[0]["base_name"]
+    if not candidates:
+        out = {"ok": True, "selected": [], "excluded": [], "closes_block": ""}
+        print(json.dumps(out, indent=1) if as_json else "landing-loop train: no eligible PRs")
+        return 0
+    cmp = gh_compare(owner, repo, base_name, candidates[0]["head"])
+    if not cmp:
+        print(f"error: could not resolve live tip of {owner}/{repo} {base_name}", file=sys.stderr)
+        return 1
+    base_tip = cmp["base_tip"]
+    selected, excluded, final_tree = plan_train_batch(wt, base_tip, candidates, max_members=max_members)
+    closes_block = format_train_closes_block(selected) if selected else ""
+    built_head = None
+    intent_path = None
+    if build:
+        if not selected:
+            print("error: no conflict-free PRs selected for train", file=sys.stderr)
+            return 1
+        if not worktree or not branch:
+            print("error: --build requires --worktree DIR and --branch NAME", file=sys.stderr)
+            return 2
+        if not worktree_is_clean(worktree):
+            print(f"error: train worktree {worktree} is not clean", file=sys.stderr)
+            return 1
+        run(["git", "-C", worktree, "fetch", "--quiet", "origin", base_name, *(m["head"] for m in selected)])
+        co = run(["git", "-C", worktree, "checkout", "-B", branch, base_tip])
+        if co.returncode != 0:
+            print(f"error: could not checkout {branch} at {base_tip}: {co.stderr.strip()}", file=sys.stderr)
+            return 1
+        for member in selected:
+            mg = run(["git", "-C", worktree, "merge", "--no-edit", "-m", f"train: merge PR #{member['number']} ({member['head'][:10]})", member["head"]])
+            if mg.returncode != 0:
+                run(["git", "-C", worktree, "merge", "--abort"])
+                print(f"error: merge failed for {member['pr']}: {mg.stderr.strip()}", file=sys.stderr)
+                return 1
+        built_head = run(["git", "-C", worktree, "rev-parse", "HEAD"]).stdout.strip()
+        trains_dir = home.root / "trains"
+        trains_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        slug_name = re.sub(r"[^A-Za-z0-9._-]", "_", branch)
+        intent_file = trains_dir / f"{slug_name}.intent.txt"
+        nums = ", ".join(f"#{m['number']}" for m in selected)
+        intent_text = (
+            f"Compound merge train landing {len(selected)} conflict-free PRs ({nums}) onto {base_name} ({base_tip[:10]}).\n\n"
+            f"Include this closes block at the very top of the PR body:\n{closes_block}"
+        )
+        write_atomic(intent_file, intent_text)
+        intent_path = str(intent_file)
+        append_event(home, f"train:{slug_name}", selected[0]["pr"], built_head, "train-built",
+                     f"built {branch} with {len(selected)} members ({nums})")
+    result = {
+        "ok": True,
+        "base": base_name,
+        "base_tip": base_tip,
+        "selected": selected,
+        "excluded": excluded,
+        "final_tree": final_tree,
+        "branch": branch if build else None,
+        "built_head": built_head,
+        "intent_file": intent_path,
+        "closes_block": closes_block,
+    }
+    if as_json:
+        print(json.dumps(result, indent=1))
+        return 0
+    print(f"train base={base_name} ({base_tip[:10]}) selected={len(selected)} excluded={len(excluded)}")
+    for m in selected:
+        print(f"  + #{m['number']} {m['head'][:10]} {m['pr']}")
+    for e in excluded:
+        print(f"  - {e['pr']} ({e['reason']})")
+    if build:
+        print(f"built branch={branch} head={built_head[:10]} intent={intent_path}")
+    return 0
+
+
 def cmd_status(home, as_json=False):
     state_doc = read_json(home.root / "state.json", {})
     if as_json:
@@ -700,6 +916,16 @@ def main(argv):
     p_plan.add_argument("--include-stale-red", action="store_true")
     p_plan.add_argument("--json", action="store_true")
     p_plan.add_argument("--repo", default=None)
+    p_train = sub.add_parser("train")
+    p_train.add_argument("--repo", default=None)
+    p_train.add_argument("--prs", default=None)
+    p_train.add_argument("--max", dest="max_members", type=int, default=5)
+    p_train.add_argument("--include-stale-red", action="store_true")
+    p_train.add_argument("--worktree", default=None)
+    p_train.add_argument("--branch", default=None)
+    p_train.add_argument("--base", default="main")
+    p_train.add_argument("--build", action="store_true")
+    p_train.add_argument("--json", action="store_true")
     p_status = sub.add_parser("status")
     p_status.add_argument("--json", action="store_true")
     p_events = sub.add_parser("events")
@@ -714,6 +940,19 @@ def main(argv):
         return run_step(home, no_reconcile=args.no_reconcile, include_stale_red=args.include_stale_red, repo_filter=args.repo)
     if args.cmd == "plan":
         return cmd_plan(home, include_stale_red=args.include_stale_red, as_json=args.json, repo_filter=args.repo)
+    if args.cmd == "train":
+        return cmd_train(
+            home,
+            repo_filter=args.repo,
+            prs_csv=args.prs,
+            max_members=max(1, args.max_members),
+            include_stale_red=args.include_stale_red,
+            worktree=args.worktree,
+            branch=args.branch,
+            base_name=args.base,
+            build=args.build,
+            as_json=args.json,
+        )
     if args.cmd == "status":
         return cmd_status(home, as_json=args.json)
     if args.cmd == "events":

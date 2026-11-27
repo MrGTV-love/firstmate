@@ -289,9 +289,79 @@ SH
   pass "launchd installer renders valid plist, installs, reports status, and uninstalls cleanly"
 }
 
+test_train_plans_and_builds_conflict_free_batch_excluding_conflicts() {
+  local dir="$TMP_ROOT/train" home="$TMP_ROOT/train/home" shim="$TMP_ROOT/train/shim"
+  local bare="$dir/origin.git" wt="$dir/wt"
+  mkdir -p "$home/state" "$home/config" "$home/data" "$dir"
+  git init -q --bare "$bare"
+  git clone -q "$bare" "$wt"
+  git -C "$wt" config user.name 'Firstmate Tests'
+  git -C "$wt" config user.email 'tests@example.invalid'
+  git -C "$wt" checkout -q -b main
+  printf 'base\n' > "$wt/README.md"
+  git -C "$wt" add README.md
+  git -C "$wt" commit -q -m 'base'
+  git -C "$wt" push -q -u origin main
+  local tip
+  tip=$(git -C "$wt" rev-parse HEAD)
+  # PR 201 touches a.txt (clean)
+  git -C "$wt" checkout -q -b fm/pr201 main
+  printf 'from 201\n' > "$wt/a.txt"
+  git -C "$wt" add a.txt
+  git -C "$wt" commit -q -m 'pr 201'
+  git -C "$wt" push -q origin fm/pr201
+  local h201
+  h201=$(git -C "$wt" rev-parse HEAD)
+  # PR 202 touches b.txt (clean with 201)
+  git -C "$wt" checkout -q -b fm/pr202 main
+  printf 'from 202\n' > "$wt/b.txt"
+  git -C "$wt" add b.txt
+  git -C "$wt" commit -q -m 'pr 202'
+  git -C "$wt" push -q origin fm/pr202
+  local h202
+  h202=$(git -C "$wt" rev-parse HEAD)
+  # PR 203 touches a.txt differently (conflicts with 201)
+  git -C "$wt" checkout -q -b fm/pr203 main
+  printf 'conflicting 203\n' > "$wt/a.txt"
+  git -C "$wt" add a.txt
+  git -C "$wt" commit -q -m 'pr 203'
+  git -C "$wt" push -q origin fm/pr203
+  local h203
+  h203=$(git -C "$wt" rev-parse HEAD)
+  git -C "$wt" checkout -q main
+  cat > "$dir/gh.json" <<JSON
+{
+  "prs": {
+    "https://github.com/example/repo/pull/201": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h201", "headRefName": "fm/pr201", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
+    "https://github.com/example/repo/pull/202": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h202", "headRefName": "fm/pr202", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
+    "https://github.com/example/repo/pull/203": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h203", "headRefName": "fm/pr203", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}}
+  },
+  "compares": {
+    "$h201": {"base_commit": {"sha": "$tip"}, "behind_by": 0}
+  }
+}
+JSON
+  write_fake_gh "$shim" "$dir/gh.json"
+  local out
+  out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" train --repo example/repo --prs 201,202,203 --worktree "$wt" --branch fm/train-batch-1 --build --json) \
+    || fail "train --build failed"
+  "$JQ_BIN" -e '(.selected | map(.number)) == [201, 202] and (.excluded | length) == 1 and .excluded[0].reason == "conflicts with train batch"' <<<"$out" >/dev/null \
+    || fail "train must select 201+202 and exclude conflicting 203: $out"
+  [ "$(cat "$wt/a.txt")" = "from 201" ] && [ "$(cat "$wt/b.txt")" = "from 202" ] \
+    || fail "built train worktree must hold both selected PRs"
+  "$JQ_BIN" -r '.closes_block' <<<"$out" | grep -qx '<!-- firstmate-backlog-closes:begin -->' \
+    || fail "closes block must start with canonical marker"
+  "$JQ_BIN" -r '.closes_block' <<<"$out" | grep -qx 'Train-member: https://github.com/example/repo/pull/201' \
+    || fail "closes block must list PR 201"
+  "$JQ_BIN" -r '.closes_block' <<<"$out" | grep -qx 'Train-member: https://github.com/example/repo/pull/202' \
+    || fail "closes block must list PR 202"
+  pass "train command proves cumulative conflict-free batch, excludes conflicting PR, builds branch, and emits canonical Train-member closes block"
+}
+
 fm_test_run_cases \
   test_serial_admission_updates_one_clean_stale_pr_at_a_time \
   test_conflict_holds_and_emits_single_wake \
   test_direct_pr_merges_base_and_pushes_cleanly \
   test_failed_update_backs_off_and_wakes_main_once \
+  test_train_plans_and_builds_conflict_free_batch_excluding_conflicts \
   test_launchd_installer_renders_installs_and_uninstalls -- "$@"
