@@ -1,0 +1,5 @@
+Same fixture home; profile built by base c89e6a5 bin/fm-write-confinement.py BEFORE install, then by head c1f6b1a after 'fm-confined-git.sh install state/vernant-d6-case-deletion-build-r2.git-path'
+result: RAW BYTES IDENTICAL
+5c816cd4347b45f733c79d7977c5e43de3bfb8be6265c6c161a4be175bdcf339  /private/tmp/fmprof.jXmbwe/one-base.sb
+5c816cd4347b45f733c79d7977c5e43de3bfb8be6265c6c161a4be175bdcf339  /private/tmp/fmprof.jXmbwe/one-head.sb
+     819 /private/tmp/fmprof.jXmbwe/one-base.sb

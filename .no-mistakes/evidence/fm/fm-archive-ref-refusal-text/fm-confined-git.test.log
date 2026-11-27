@@ -1,0 +1,10 @@
+ok - a refused archive name gets one extra stderr line naming it and both allowed shapes, with git's status, stdout and stderr unchanged
+ok - a git that exits 0 gets no extra line and real git writes succeed through the wrapper
+ok - refusals outside this task's refs/heads/archive/ and other failures get no extra line
+ok - an unconfined or already-traced call passes through to git unchanged
+ok - arguments, standard input, standard output and exit status reach the caller unchanged
+ok - the wrapper resolves the real git past itself, its links and its copies, and never recurses
+ok - install refuses an invalid id, a relative folder and a symbolic link, and reinstalls in place
+ok - the write profile is byte-identical with and without the wrapper installed
+ok - inside the real profile a refused archive name gets the line, both names it offers are accepted, and the wrapper cannot be changed
+# all fm-confined-git tests passed

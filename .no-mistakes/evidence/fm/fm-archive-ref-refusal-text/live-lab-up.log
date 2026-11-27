@@ -1,0 +1,18 @@
+lab: /private/tmp/fmlab.XjXXwD (tear down with: bin/fm-live-lab.sh down /private/tmp/fmlab.XjXXwD)
+tree: c1f6b1a39e7bd7b5d0885526d85fcec07e704bc6 from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8DQFGGMTPFNABJ332JKW7XY
+local-only source: local=main@b73405d8748b6f27c1dd19ea78c682bb85b6d808 origin=main@b73405d8748b6f27c1dd19ea78c682bb85b6d808 selected=origin/main@b73405d8748b6f27c1dd19ea78c682bb85b6d808
+skill selection for lab5e062a6db44e-worker: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+spawned lab5e062a6db44e-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5e062a6db44e-worker worktree=/private/tmp/fmlab.XjXXwD/treehouse/.treehouse/notes-38eb6a/1/notes
+gate: /private/tmp/fmlab.XjXXwD/home/data/lab5e062a6db44e-worker/gate (touch, then message the worker to resume)
+primary: claude --setting-sources project,local --model sonnet --effort low --permission-mode auto
+ok primary: claude pid 88406 in /private/tmp/fmlab.XjXXwD/home
+ok probe: the primary answered LABREADY-5e062a6db44e
+ok trust: /private/tmp/fmlab.XjXXwD/home is trusted in the Claude store
+ok host: none running, as expected
+ok watcher: live watcher with a fresh beacon
+ok worker: lab5e062a6db44e-worker parked on /private/tmp/fmlab.XjXXwD/home/data/lab5e062a6db44e-worker/gate
+ok treehouse: ~/.treehouse unchanged
+ready: /private/tmp/fmlab.XjXXwD

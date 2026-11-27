@@ -1,0 +1,74 @@
+== A1 reproduction, real git inside the production seatbelt-v1 profile ==
+## base behavior (no wrapper on PATH)
+$ [PATH lead: /nonexistent] git -C <wt> branch archive/vernant-d6-case-deletion-build-r2-replay-07526ab01 HEAD
+exit=128
+--- stdout
+--- stderr
+fatal: cannot lock ref 'refs/heads/archive/vernant-d6-case-deletion-build-r2-replay-07526ab01': Unable to create '/private/tmp/fmprof.jXmbwe/project/.git/refs/heads/archive/vernant-d6-case-deletion-build-r2-replay-07526ab01.lock': Operation not permitted
+
+## head behavior (state/vernant-d6-case-deletion-build-r2.git-path first on PATH)
+$ [PATH lead: /private/tmp/fmprof.jXmbwe/home-one/state/vernant-d6-case-deletion-build-r2.git-path] git -C <wt> branch archive/vernant-d6-case-deletion-build-r2-replay-07526ab01 HEAD
+exit=128
+--- stdout
+--- stderr
+fatal: cannot lock ref 'refs/heads/archive/vernant-d6-case-deletion-build-r2-replay-07526ab01': Unable to create '/private/tmp/fmprof.jXmbwe/project/.git/refs/heads/archive/vernant-d6-case-deletion-build-r2-replay-07526ab01.lock': Operation not permitted
+firstmate: write confinement refused archive/vernant-d6-case-deletion-build-r2-replay-07526ab01; this task may write archive branches only as archive/vernant-d6-case-deletion-build-r2-submitted-<8 lowercase hex> or archive/vernant-d6-case-deletion-build-r2-pipeline-<8 lowercase hex>
+
+== A2 allowed shapes ==
+$ [PATH lead: /private/tmp/fmprof.jXmbwe/home-one/state/vernant-d6-case-deletion-build-r2.git-path] git -C <wt> branch archive/vernant-d6-case-deletion-build-r2-submitted-0123abcd HEAD
+exit=0
+--- stdout
+--- stderr
+
+$ [PATH lead: /private/tmp/fmprof.jXmbwe/home-one/state/vernant-d6-case-deletion-build-r2.git-path] git -C <wt> branch archive/vernant-d6-case-deletion-build-r2-pipeline-89abcdef HEAD
+exit=0
+--- stdout
+--- stderr
+
+  archive/vernant-d6-case-deletion-build-r2-pipeline-89abcdef
+  archive/vernant-d6-case-deletion-build-r2-submitted-0123abcd
+== A2 refusal outside refs/heads/archive/ ==
+$ [PATH lead: /nonexistent] git -C <wt> branch fm/vernant-d6-case-deletion-build-r2-other HEAD
+exit=128
+--- stdout
+--- stderr
+fatal: cannot lock ref 'refs/heads/fm/vernant-d6-case-deletion-build-r2-other': Unable to create '/private/tmp/fmprof.jXmbwe/project/.git/refs/heads/fm/vernant-d6-case-deletion-build-r2-other.lock': Operation not permitted
+
+$ [PATH lead: /private/tmp/fmprof.jXmbwe/home-one/state/vernant-d6-case-deletion-build-r2.git-path] git -C <wt> branch fm/vernant-d6-case-deletion-build-r2-other HEAD
+exit=128
+--- stdout
+--- stderr
+fatal: cannot lock ref 'refs/heads/fm/vernant-d6-case-deletion-build-r2-other': Unable to create '/private/tmp/fmprof.jXmbwe/project/.git/refs/heads/fm/vernant-d6-case-deletion-build-r2-other.lock': Operation not permitted
+
+== extra flows with wrong-shape names ==
+## force-create
+$ [PATH lead: /private/tmp/fmprof.jXmbwe/home-one/state/vernant-d6-case-deletion-build-r2.git-path] git -C <wt> branch -f archive/vernant-d6-case-deletion-build-r2-replay-07526ab01 HEAD
+exit=128
+--- stdout
+--- stderr
+fatal: cannot lock ref 'refs/heads/archive/vernant-d6-case-deletion-build-r2-replay-07526ab01': Unable to create '/private/tmp/fmprof.jXmbwe/project/.git/refs/heads/archive/vernant-d6-case-deletion-build-r2-replay-07526ab01.lock': Operation not permitted
+firstmate: write confinement refused archive/vernant-d6-case-deletion-build-r2-replay-07526ab01; this task may write archive branches only as archive/vernant-d6-case-deletion-build-r2-submitted-<8 lowercase hex> or archive/vernant-d6-case-deletion-build-r2-pipeline-<8 lowercase hex>
+
+## rename allowed -> wrong shape
+$ [PATH lead: /private/tmp/fmprof.jXmbwe/home-one/state/vernant-d6-case-deletion-build-r2.git-path] git -C <wt> branch -m archive/vernant-d6-case-deletion-build-r2-submitted-0123abcd archive/vernant-d6-case-deletion-build-r2-replay-07526ab01
+exit=128
+--- stdout
+--- stderr
+error: unable to move logfile /private/tmp/fmprof.jXmbwe/project/.git/logs/refs/.tmp-renamed-log to /private/tmp/fmprof.jXmbwe/project/.git/logs/refs/heads/archive/vernant-d6-case-deletion-build-r2-replay-07526ab01: Operation not permitted
+fatal: branch rename failed
+
+## delete allowed (should work)
+$ [PATH lead: /private/tmp/fmprof.jXmbwe/home-one/state/vernant-d6-case-deletion-build-r2.git-path] git -C <wt> branch -D archive/vernant-d6-case-deletion-build-r2-pipeline-89abcdef
+exit=0
+--- stdout
+Deleted branch archive/vernant-d6-case-deletion-build-r2-pipeline-89abcdef (was 448378b).
+--- stderr
+
+## other repo branch: rev-parse passthrough
+$ [PATH lead: /private/tmp/fmprof.jXmbwe/home-one/state/vernant-d6-case-deletion-build-r2.git-path] git -C <wt> rev-parse HEAD
+exit=0
+--- stdout
+448378bb73363b558443878a71ed3687271ac56b
+--- stderr
+
+leftover trace files in TMPDIR:        0
