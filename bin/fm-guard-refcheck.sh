@@ -15,7 +15,7 @@
 #      .codex/, .cursor/, .grok/, .pi/, .opencode/, and .omp/, plus any file the
 #      caller adds with --registrations.
 #   2. registry: the spec path and every owner and test path in the guard
-#      registry resolve.
+#      registry resolve, and each guard's test list names at least one path.
 #   3. retirement: every id in the retirement changelog has zero live references
 #      outside the changelog itself and its own retirement test, and is absent
 #      from the active registry. A mention of the retirement test's own path is
@@ -28,6 +28,7 @@
 #
 # Output:
 #   MISSING <path> registration=<file>          a wired path does not exist
+#   MISSING (no test path) registration=registry:<id>  a guard names no test
 #   RESURRECTED <guard> <file>:<line>           a retired guard is referenced
 #   REFCHECK_SUMMARY registrations=<n> paths=<n> missing=<n> retired=<n> resurrected=<n>
 # With --json, one JSON object carries the same fields plus every finding.
@@ -43,7 +44,7 @@ RETIRED=
 JSON=0
 EXTRA_REGISTRATIONS=''
 
-usage() { sed -n '3,32p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,34p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "error: $*" >&2; exit 2; }
 
 while [ $# -gt 0 ]; do
@@ -133,9 +134,14 @@ if [ -f "$REGISTRY" ]; then
         printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
       fi
     done
-    for f in $(printf '%s\n' "$test" | tr ',' '\n'); do
-      f=$(printf '%s' "$f" | tr -d ' \t')
-      [ -n "$f" ] || continue
+    # A test list with no path left after dropping empty items names no test, so nothing proves the guard.
+    test_paths=$(printf '%s\n' "$test" | tr ',' '\n' | tr -d ' \t' | grep -v '^$' || true)
+    if [ -z "$test_paths" ]; then
+      registry_missing=$((registry_missing + 1))
+      [ "$JSON" -eq 1 ] || printf 'MISSING (no test path) registration=registry:%s\n' "$id"
+      printf 'MISSING\t(no test path)\tregistry:%s\n' "$id" >>"$FINDINGS"
+    fi
+    for f in $test_paths; do
       if [ ! -e "$ROOT/$f" ]; then
         registry_missing=$((registry_missing + 1))
         [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"

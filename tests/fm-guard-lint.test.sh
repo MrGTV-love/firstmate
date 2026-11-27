@@ -167,6 +167,15 @@ assert_clean "R7 accepts a test list whose every file resolves" "$TWOTESTS"
 rm -f "$TWOTESTS/tests/gguard-real.test.sh"
 assert_fails_with "R7 fails a test list with one nonexistent file" "$TWOTESTS" R7
 
+# A test list that names no path once its empty items are dropped proves nothing, the same as an empty field.
+n=0
+for empty in '' ',' ', ,'; do
+  n=$((n + 1))
+  NOTEST=$(fixture "notest$n")
+  mutate "$NOTEST" ".guards[0].test = \"$empty\""
+  assert_fails_with "R7 fails a test list naming no file ('$empty')" "$NOTEST" R7
+done
+
 # --- R8 telemetry -----------------------------------------------------------
 NOTEL=$(fixture notel)
 mutate "$NOTEL" '.guards[0].telemetry = ""'

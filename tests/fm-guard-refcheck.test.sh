@@ -115,6 +115,18 @@ assert_clean "a registry test list whose every path resolves is clean" "$REGTEST
 rm -f "$REGTESTS/tests/gguard-real.test.sh"
 assert_fails_with "a registry test list with one missing path fails" "$REGTESTS" "MISSING tests/gguard-real.test.sh registration=registry:gguard"
 
+# A test list that names no path once its empty items are dropped proves nothing, so it fails like a missing path.
+n=0
+for empty in '' ',' ', ,'; do
+  n=$((n + 1))
+  NOTEST=$(fixture "notest$n")
+  jq --arg t "$empty" '.guards[0].test = $t' "$NOTEST/docs/guards/registry.json" >"$NOTEST/registry.tmp"
+  mv "$NOTEST/registry.tmp" "$NOTEST/docs/guards/registry.json"
+  $GIT "$NOTEST" add -A
+  $GIT "$NOTEST" -c user.email=t@example.invalid -c user.name=t commit -qm "no test path $n"
+  assert_fails_with "a registry test list naming no path fails ('$empty')" "$NOTEST" "MISSING (no test path) registration=registry:gguard"
+done
+
 REGSPEC=$(fixture regspec)
 jq '.spec = "docs/guard-spec.md"' "$REGSPEC/docs/guards/registry.json" >"$REGSPEC/registry.tmp"
 mv "$REGSPEC/registry.tmp" "$REGSPEC/docs/guards/registry.json"

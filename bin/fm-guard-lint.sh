@@ -30,8 +30,8 @@
 #   R4 the fail direction is declared closed or open
 #   R5 the block budget is declared, 1 to 3, or carries budget_reason
 #   R6 a post-write guard carries precheck_gap
-#   R7 every owner file and test file resolves (wiring itself is owned by
-#      bin/fm-guard-refcheck.sh)
+#   R7 every owner file and test file resolves, and the test list names at least
+#      one file (wiring itself is owned by bin/fm-guard-refcheck.sh)
 #   R8 every instrumented guard names its telemetry target and calls the writer
 #   R9 every exemption carries a derivation and a demotion candidate
 # plus three rules over the refusal sites bin/fm-guard-sites.py discovers in the
@@ -258,14 +258,16 @@ while IFS= read -r entry; do
       [ -e "$ROOT/$f" ] || printf 'R7\t%s\tnonexistent owner file %s\n' "$id" "$f" >>"$VIOLATIONS"
     done
   fi
-  if [ -z "$test" ]; then
+  # The test field is a comma list; a list with no path left after dropping empty items names no test, the same as "".
+  test_paths=$(printf '%s\n' "$test" | tr ',' '\n' | tr -d ' \t' | grep -v '^$' || true)
+  if [ -z "$test_paths" ]; then
     violation R7 "$id" "test is empty"
   else
-    printf '%s\n' "$test" | tr ',' '\n' | while IFS= read -r f; do
-      f=$(printf '%s' "$f" | tr -d ' \t')
-      [ -n "$f" ] || continue
+    while IFS= read -r f; do
       [ -e "$ROOT/$f" ] || violation R7 "$id" "nonexistent test file $f"
-    done
+    done <<EOF
+$test_paths
+EOF
   fi
 
   if [ -z "$telemetry" ]; then
