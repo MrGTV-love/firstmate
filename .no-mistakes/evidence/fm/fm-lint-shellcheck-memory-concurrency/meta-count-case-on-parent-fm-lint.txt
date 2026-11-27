@@ -1,0 +1,25 @@
+meta	shellcheck_version	0.11.0
+meta	probe_wait_ms	247
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	1
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	host_memory_budget_kib	3670016
+meta	root_rss_limit_kib	102400
+meta	timing_mechanism	none
+begin	1	/Users/charlesabrooker/tmp/fm-lint-rss-alone-pass.zAbiNV/footprint.sh	0	full	1795752427081
+end	1	/Users/charlesabrooker/tmp/fm-lint-rss-alone-pass.zAbiNV/footprint.sh	0	full	1795752427081	1795752450152	23071	96	rerun-queued	20416	1	1	48.92	47.14	libproc:14,unmeasured	0	20416	2048
+begin	2	/Users/charlesabrooker/tmp/fm-lint-rss-alone-pass.zAbiNV/quick.sh	1	full	1795752450321
+end	2	/Users/charlesabrooker/tmp/fm-lint-rss-alone-pass.zAbiNV/quick.sh	1	full	1795752450321	1795752451205	884	0	ok	2560	1	1	47.14	47.14	libproc:0	0	2560	unavailable
+begin	1	/Users/charlesabrooker/tmp/fm-lint-rss-alone-pass.zAbiNV/footprint.sh	2	full	1795752451391
+end	1	/Users/charlesabrooker/tmp/fm-lint-rss-alone-pass.zAbiNV/footprint.sh	2	full	1795752451391	1795752474477	23086	0	ok	20384	1	1	47.14	44.22	libproc:22	0	20384	2048
+meta	roots_begun	3
+meta	roots_completed	3
+meta	roots_unfinished	0
+meta	result_exit	0

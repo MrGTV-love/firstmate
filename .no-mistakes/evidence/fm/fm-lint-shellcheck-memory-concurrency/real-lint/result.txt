@@ -1,0 +1,1 @@
+rc=0 wall_s=14 paths=bin/fm-lint.sh tests/fm-lint-slots.test.sh

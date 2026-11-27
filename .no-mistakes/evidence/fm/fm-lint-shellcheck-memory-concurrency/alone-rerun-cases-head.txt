@@ -1,0 +1,20 @@
+=== test_a_late_reply_reruns_the_root_alone_and_a_measured_rerun_under_the_cap_passes
+ok - a late reply's unmeasured interval reruns the root once alone after the other roots, and a rerun measured under the cap passes
+bash tests/fm-lint-slots.test.sh $t  9.40s user 8.61s system 30% cpu 59.666 total
+rc=
+=== test_a_rerun_alone_that_is_unmeasured_again_fails_the_root
+ok - an alone rerun that is unmeasured again fails the root (96), with no third run
+bash tests/fm-lint-slots.test.sh $t  9.00s user 8.23s system 30% cpu 56.874 total
+rc=
+=== test_a_rerun_alone_measured_over_the_cap_fails_the_root
+ok - an alone rerun measured over its cap (and its narrower retry too) fails the root as over its cap
+bash tests/fm-lint-slots.test.sh $t  7.42s user 7.05s system 38% cpu 37.846 total
+rc=
+=== test_resident_watch_replaces_a_stalled_reader
+ok - a reader that misses one deadline is replaced, and the missed tick followed by a reading over the cap fails the root unmeasured with no narrower retry and no alone rerun
+bash tests/fm-lint-slots.test.sh $t  4.76s user 5.50s system 50% cpu 20.522 total
+rc=
+=== test_resident_watch_retries_a_replacement_that_exits
+ok - a replacement reader that exits before replying is retried, and the missed ticks followed by a reading over the cap fail the root unmeasured with no alone rerun
+bash tests/fm-lint-slots.test.sh $t  4.73s user 5.18s system 48% cpu 20.620 total
+rc=

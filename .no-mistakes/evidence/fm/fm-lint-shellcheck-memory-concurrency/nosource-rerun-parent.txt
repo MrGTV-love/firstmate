@@ -1,0 +1,26 @@
+rc=0
+--- flags (source following per attempt)
+yes
+no
+yes
+--- roots log rows
+begin	1	/Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh
+end	1	/Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh	96	rerun-queued	0
+begin	1	/Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh
+end	1	/Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh	0	ok	1
+--- meta
+meta	roots_begun	2
+meta	roots_completed	2
+meta	roots_unfinished	0
+--- telemetry source rows
+source_directives	1
+source_boundary_directives	0
+source_followed_directives	0
+source_target_count	1
+--- output tail
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint: watch miss /Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh rss_miss=late,wait_ms=7006,interrupted=0
+fm-lint: end /Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh reason=rerun-queued rc=96 duration_ms=25765 rss_kib=204800 watch=libproc:15,unmeasured
+fm-lint: /Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; the retry ran unmeasured (watch record: libproc:14,unmeasured); its result is not used, and the root runs once more alone after the other roots finish
+fm-lint: watch run rss_longest_reply_ms=326 root=/Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh rss_longest_tick_ms=8029 root=/Users/charlesabrooker/tmp/fm-lint-scratch-nosource.ajp47B/footprint.sh

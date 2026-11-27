@@ -1,0 +1,24 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	probe_wait_ms	85
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	host_memory_budget_kib	3670016
+meta	root_rss_limit_kib	8388608
+meta	timing_mechanism	none
+begin	1	bin/fm-lint.sh	1	full	1795752524606
+begin	2	tests/fm-lint-slots.test.sh	0	full	1795752524618
+end	1	bin/fm-lint.sh	1	full	1795752524606	1795752529204	4598	0	ok	728480	1	1	36.95	37.43	libproc:2	0	728480	608800
+end	2	tests/fm-lint-slots.test.sh	0	full	1795752524618	1795752532584	7386	0	ok	974208	1	1	36.95	37.43	libproc:5	580	974208	781824
+meta	roots_begun	2
+meta	roots_completed	2
+meta	roots_unfinished	0
+meta	result_exit	0
