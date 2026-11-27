@@ -170,11 +170,11 @@ wait_until_clock_passes() {
   while [ "$(date +%s)" -lt "$end" ]; do sleep 0.2; done
 }
 
-# project_lock_state <case-dir>: "free" when a probe can take the shared Treehouse project lock of the case's project and
-# release it at once, "held" when it cannot (the probe never waits).
+# project_lock_state <case-dir> [<home>]: "free" when a probe can take the shared Treehouse project lock of the case's project and
+# release it at once, "held" when it cannot (the probe never waits). <home> is the FM_HOME of the run (default: the case dir).
 project_lock_state() {
   (
-    export HOME="$1/hhome" FM_HOME="$1"
+    export HOME="$1/hhome" FM_HOME="${2:-$1}"
     mkdir -p "$HOME"
     # shellcheck disable=SC1090,SC1091
     . "$ROOT/bin/fm-backend.sh"; . "$ROOT/bin/fm-wake-lib.sh"; . "$ROOT/bin/fm-secondmate-registry-lib.sh"

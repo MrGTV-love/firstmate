@@ -22,6 +22,8 @@
 #   5. A teardown over 300 records ends like one over 10, with the same exit status and end state.
 #   6. (2026-11-26, from a second live spinner) A teardown whose table cannot hold more than 64 open files ends like one
 #      with room, and the mutant of case 3 cannot finish: one dead child does not cure a full table, the next fork meets it.
+#   7. (2026-11-27) fm_task_copy_other_record takes its time limit from its caller (FM_TASK_COPY_SCAN_LIMIT_SECS): none or 0 is unbounded,
+#      a limit stops the walk with status 3 once the clock has passed it, checked before each record, with nothing waited for.
 # Usage: bash tests/fm-record-paths-scan.test.sh [test_function_name ...]
 # The cases source libraries inside subshells on purpose, so a variable they set there is not the suite's own.
 # The libraries sourced inside the subshells are named by a variable, so ShellCheck cannot follow them.
@@ -502,6 +504,40 @@ test_mutant_teardown_with_the_old_per_record_reads_cannot_finish_with_a_full_fil
   pass "restoring the old per-record reads makes the full-table case fail: the table fills (max $FD_MAX) and the teardown is still running 30 seconds later (stopped by the harness)"
 }
 
+# other_record_rc_with_limit <bin-dir> <dir> <limit|default>: the status of fm_task_copy_other_record over <dir>'s six records when
+# reading each record takes 20 s on the clock the walk reads (the record reader is wrapped to advance SECONDS; nothing waits).
+# <limit> is what the caller hands the library in FM_TASK_COPY_SCAN_LIMIT_SECS; "default" leaves it as the library sets it.
+other_record_rc_with_limit() {
+  local bindir=$1 dir=$2 limit=$3
+  (
+    export FM_HOME="$dir/home"
+    mkdir -p "$FM_HOME/state" "$FM_HOME/data"
+    . "$bindir/fm-backend.sh"; . "$bindir/fm-wake-lib.sh"; . "$bindir/fm-secondmate-registry-lib.sh"; . "$bindir/fm-task-copy-lib.sh"
+    eval "orig_$(declare -f fm_task_copy_record_paths_to)"
+    # shellcheck disable=SC2329 # called by the library code under test
+    fm_task_copy_record_paths_to() { SECONDS=$((SECONDS + 20)); orig_fm_task_copy_record_paths_to "$@"; }
+    [ "$limit" = default ] || FM_TASK_COPY_SCAN_LIMIT_SECS=$limit
+    rc=0
+    fm_task_copy_other_record "$dir/state/self.meta" "$dir/state" "$dir/target" >/dev/null 2>&1 || rc=$?
+    echo "$rc"
+  )
+}
+
+# The caller, not the library, says a lock is held: a walk the caller hands no limit (a caller without the lock) stays unbounded,
+# and one it hands a limit stops with status 3 before the record it is on when the clock has passed it.
+test_other_record_walk_takes_its_limit_from_the_caller() {
+  local dir="$TMP_ROOT/other-limit" want limit
+  make_records_state "$dir" 6
+  for limit in default 0 abc 3600; do
+    [ "$(other_record_rc_with_limit "$SCAN_BIN" "$dir" "$limit")" = 1 ] || fail "other_record limit '$limit': the walk without a usable limit must run to its end (1)"
+  done
+  for limit in 2 08; do
+    want=$(other_record_rc_with_limit "$SCAN_BIN" "$dir" "$limit")
+    [ "$want" = 3 ] || fail "other_record limit '$limit': a walk past its limit must stop with status 3, got $want"
+  done
+  pass "fm_task_copy_other_record is unbounded unless its caller hands it a limit, and stops with status 3 past one (08 is read as decimal)"
+}
+
 CASES=(
   test_record_reader_matches_the_old_reader_byte_for_byte
   test_canonical_dir_without_a_fork_matches_the_forking_one_and_keeps_the_directory
@@ -517,6 +553,7 @@ CASES=(
   test_teardown_scan_keeps_the_fd_count_flat_for_300_records_and_ends_like_10
   test_teardown_with_a_full_file_table_ends_like_one_with_room
   test_mutant_teardown_with_the_old_per_record_reads_cannot_finish_with_a_full_file_table
+  test_other_record_walk_takes_its_limit_from_the_caller
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

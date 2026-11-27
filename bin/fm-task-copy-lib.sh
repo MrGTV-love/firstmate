@@ -438,7 +438,16 @@ fm_task_copy_ancestor_current() {
 # re-points together in one call, and checks those against each other itself.
 # Returns 0 on overlap, setting FM_TASK_COPY_OTHER_ID and
 # FM_TASK_COPY_OTHER_FIELD;
-# 1 for no overlap or a missing path; 2 when the scan cannot be completed.
+# 1 for no overlap or a missing path; 2 when the scan cannot be completed; 3 when
+# the walk ran past FM_TASK_COPY_SCAN_LIMIT_SECS (below).
+#
+# FM_TASK_COPY_SCAN_LIMIT_SECS: a caller that holds a lock other processes wait on
+# sets it, for the one call, to the seconds the walk may run; 0 (the default) is
+# unbounded. This library does not know whether any lock is held: the caller says
+# so by setting the value. The walk reads only. It checks the clock before each
+# task record (a pure-bash walk cannot be interrupted), and past the limit it
+# stops with status 3 before reading that record, having changed nothing and
+# signalled nothing. The caller decides what to refuse.
 #
 # Identity, not spelling: the same record reached through a differently
 # resolved state dir (e.g. a symlinked $FM_HOME) is still <record-meta>. A
@@ -452,11 +461,16 @@ fm_task_copy_ancestor_current() {
 FM_TASK_COPY_OTHER_ID=
 FM_TASK_COPY_OTHER_FIELD=
 FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
+FM_TASK_COPY_SCAN_LIMIT_SECS=0
 fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta>...]
   local record_meta=$1 record_state=$2 path=$3
-  local target state_dir other_meta line field other_path other_real skip
+  local target state_dir other_meta line field other_path other_real skip scan_end=0
   local -a rec_lines=()
   shift 3
+  case "${FM_TASK_COPY_SCAN_LIMIT_SECS:-0}" in
+    ''|*[!0-9]*) ;;
+    *) [ "$((10#$FM_TASK_COPY_SCAN_LIMIT_SECS))" -le 0 ] || scan_end=$((SECONDS + 10#$FM_TASK_COPY_SCAN_LIMIT_SECS)) ;;
+  esac
   FM_TASK_COPY_OTHER_ID=
   FM_TASK_COPY_OTHER_FIELD=
   target=$(fm_task_copy_canonical_dir "$path") || return 1
@@ -467,6 +481,7 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
+      [ "$scan_end" -le 0 ] || [ "$SECONDS" -lt "$scan_end" ] || return 3
       [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ] && continue
       # An unreadable record cannot be read as "names no overlapping copy": the scan cannot be completed.
       [ -r "$other_meta" ] || {

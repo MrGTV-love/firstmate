@@ -1107,7 +1107,7 @@ teardown_lease_slot_by_path() {  # <slot> <project> <holder>
 # touched. A lease that cannot be released or found is reported with its exact
 # command and never blocks this teardown.
 teardown_release_misdirected_leases() {  # <project> <task-id> <slot-name>
-  local project=$1 task_id=$2 slot_name=${3:-} path procs state_dir meta copy record records_known=1 named
+  local project=$1 task_id=$2 slot_name=${3:-} path procs state_dir meta copy record records_known=1 named scan_limit scan_end
   local -a record_copies=()
   if [ -z "$slot_name" ]; then
     echo "warning: the recorded copy's slot has no name in its pool folder's Treehouse state, so the lease an earlier teardown may have taken for $task_id by that name in the current pool cannot be singled out; inspect with (cd '$project' && treehouse status), and release that slot with: (cd '$project' && treehouse return '<slot path>' --if-lease-holder '$task_id' </dev/null)" >&2
@@ -1118,9 +1118,11 @@ teardown_release_misdirected_leases() {  # <project> <task-id> <slot-name>
     return 0
   fi
   if fm_local_firstmate_state_dirs "$STATE"; then
+    teardown_scan_window_to scan_limit scan_end
     for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
       for meta in "$state_dir"/*.meta; do
         [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+        teardown_scan_deadline_check "$scan_end" "$scan_limit" "the misdirected-lease walk for task $task_id"
         copy=$(fm_task_copy_canonical_dir "$(fm_meta_get "$meta" worktree)") && record_copies+=("$copy")
       done
     done
@@ -4451,7 +4453,7 @@ task_lane_source_add() {  # <path>
 # recorded project that is gone or not a git repository has no registry to read.
 # Every distinct source registry is read once per call.
 task_registered_lanes_under_roots() {  # <canonical-root>...
-  local root src registry line lane state_dir meta project
+  local root src registry line lane state_dir meta project scan_limit scan_end
   TASK_REGISTERED_LANES=()
   TASK_LANE_SOURCES=()
   TASK_LANE_SOURCES_SEEN=$'\n'
@@ -4463,9 +4465,11 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
     return 1
   }
+  teardown_scan_window_to scan_limit scan_end
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      teardown_scan_deadline_check "$scan_end" "$scan_limit" "the registered-lane walk for task ${ID:-?}"
       project=$(fm_meta_get "$meta" project)
       [ -n "$project" ] || continue
       task_lane_source_add "$project"
@@ -4746,7 +4750,7 @@ teardown_docker_stacks_preflight() {  # <task-id> <meta>
 # lets it remove the stacks this task owns.
 teardown_docker_stacks() {
   local ID=$1 META=$2 STATE=$3 reassigned=$4 PROJ WT
-  local state_dir other other_id siblings="" ambiguous=0 canon protected=""
+  local state_dir other other_id siblings="" ambiguous=0 canon protected="" scan_limit scan_end
   local -a roots
   roots=()
   command -v docker >/dev/null 2>&1 || return 0
@@ -4756,9 +4760,11 @@ teardown_docker_stacks() {
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
     return 1
   }
+  teardown_scan_window_to scan_limit scan_end
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other in "$state_dir"/*.meta; do
       [ -f "$other" ] || continue
+      teardown_scan_deadline_check "$scan_end" "$scan_limit" "the docker-stack walk for task $ID"
       [ "${other##*/}" = "${META##*/}" ] && [ "$other" -ef "$META" ] && continue
       other_id=$(basename "$other" .meta)
       [ "$other_id" != "$ID" ] || ambiguous=1
@@ -4925,7 +4931,7 @@ require_cleanup_copy_clearance() {
   local canonical state_dir other_meta line field copy copy_real copy_common retiring i owner_home keep_current overlaps own skipped
   local -a rec_lines=()
   local rec_kind wt_real
-  local scan_limit=${FM_TEARDOWN_SCAN_DEADLINE_SECS:-600} scan_end=0
+  local scan_limit=600 scan_end=0
   fm_task_copy_canonical_dir_to canonical "$target" || return 0
   # A scan that holds the project lock is bounded: it reads every task record of every local
   # home, and a spawn or another teardown waits on that lock for as long as it runs. Past the
@@ -4933,7 +4939,7 @@ require_cleanup_copy_clearance() {
   # The scan only reads, and it sits where its other refusals do, so a refusal here leaves exactly
   # what they leave: nothing was changed by the scan, the EXIT trap releases the lock, and a retry
   # is safe. No process is signalled. The value is read once per scan.
-  case "$scan_limit" in ''|*[!0-9]*|0) scan_limit=600 ;; esac
+  teardown_scan_limit_to scan_limit
   [ "$TREEHOUSE_PROJECT_LOCK_HELD" != 1 ] || scan_end=$((SECONDS + scan_limit))
   # A retiring secondmate's own registered home that is already gone holds
   # nothing to lose, so it alone is not a reason to refuse; every other home
@@ -5045,7 +5051,11 @@ require_cleanup_copy_clearance() {
         # while it reads a command substitution's pipe, so a git that ignored SIGTERM would hold this
         # teardown, and the project lock it holds here, past the signal. A foreground command is waited
         # for with the signal handled, so the EXIT trap runs at once.
-        [ -n "$TEARDOWN_SCAN_TMP" ] || TEARDOWN_SCAN_TMP=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-scan.XXXXXX") || return 1
+        if [ -z "$TEARDOWN_SCAN_TMP" ] && ! TEARDOWN_SCAN_TMP=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-scan.XXXXXX"); then
+          TEARDOWN_SCAN_TMP=
+          echo "REFUSED: task $record_id's copy-clearance scan could not create its scratch file under ${TMPDIR:-/tmp}, so no other holder of $canonical is proved absent; nothing was changed; fix the directory (or TMPDIR) and retry the teardown" >&2
+          return 1
+        fi
         copy_common=
         git -C "$copy_real" rev-parse --path-format=absolute --git-common-dir > "$TEARDOWN_SCAN_TMP" 2>/dev/null \
           && IFS= read -r copy_common < "$TEARDOWN_SCAN_TMP" || copy_common=
@@ -5160,7 +5170,7 @@ TEARDOWN_SLOT_SHARED=0
 TEARDOWN_SHARED_SLOT=
 TEARDOWN_SHARED_LEASE_HOLDER=
 require_shared_task_worktree_slot() {
-  local slot state_dir other_meta copy kind marker holder i last
+  local slot state_dir other_meta copy kind marker holder i last scan_limit scan_end
   local -a sharers=() sharer_metas=()
   [ "$FORCE" != --force ] || return 0
   teardown_owns_worktree || return 0
@@ -5173,9 +5183,11 @@ require_shared_task_worktree_slot() {
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
     return 1
   }
+  teardown_scan_window_to scan_limit scan_end
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
+      teardown_scan_deadline_check "$scan_end" "$scan_limit" "the shared-slot walk for task $ID"
       [ "${other_meta##*/}" = "${META##*/}" ] && [ "$other_meta" -ef "$META" ] && continue
       kind=$(fm_meta_get "$other_meta" kind)
       case "$kind" in ''|ship|scout) ;; *) continue ;; esac
@@ -5420,7 +5432,7 @@ teardown_held_copies_record_or_refuse() {  # [check]
   return 1
 }
 teardown_slot_peers_detect() {  # <slot>
-  local slot=$1 target state_dir other_meta line names_slot
+  local slot=$1 target state_dir other_meta line names_slot scan_limit scan_end
   TEARDOWN_PEER_IDS=()
   TEARDOWN_PEER_HOMES=()
   target=$(fm_task_copy_canonical_dir "$WT" 2>/dev/null) || {
@@ -5429,9 +5441,11 @@ teardown_slot_peers_detect() {  # <slot>
     target=$target/$(basename "$WT")
   }
   fm_local_firstmate_state_dirs "$STATE" || return 0
+  teardown_scan_window_to scan_limit scan_end
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
+      teardown_scan_deadline_check "$scan_end" "$scan_limit" "the peer walk for task $ID"
       [ "${other_meta##*/}" = "${META##*/}" ] && [ "$other_meta" -ef "$META" ] && continue
       names_slot=0
       while IFS= read -r line || [ -n "$line" ]; do

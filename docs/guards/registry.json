@@ -3777,6 +3777,22 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: the copy-clearance scan for task $record_id ran past its ${scan_limit}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: $2 ran past its ${1}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it stopped before the next step and released the lock; nothing more was changed; retry the teardown\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "[ \"$1\" -le 0 ] || [ \"$SECONDS\" -lt \"$1\" ] || teardown_scan_deadline_refuse \"$2\" \"$3\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "3) teardown_scan_deadline_refuse \"$scan_limit\" \"the ownership walk for foreign copy $(fm_refuse_text \"$copy\") in task $ID's pool slot\" ;;"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $record_id's copy-clearance scan could not create its scratch file under ${TMPDIR:-/tmp}, so no other holder of $canonical is proved absent; nothing was changed; fix the directory (or TMPDIR) and retry the teardown\" >&2"
         }
       ]
     },
