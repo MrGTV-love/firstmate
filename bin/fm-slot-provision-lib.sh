@@ -1314,6 +1314,8 @@ FM_RR_RECONCILED=
 # has run (whatever it reported), so no later line claims "not restored" for a record the publish may have touched.
 FM_RR_RESTORE_ERROR=
 FM_RR_RESTORE_PUBLISHED=0
+# What that restore publish returned once it ran: success or failure, so a line about the publisher says what it returned.
+FM_RR_RESTORE_RESULT=
 # A write run's outcome lines (stdout, stderr). fm_slot_rerecord_report stores them in one assignment each and only
 # fm-control's EXIT trap prints them, once, so no exit prints an outcome and then flags it as printed. A stored outcome
 # never carries a copy of the step 3 entries: it carries a marker where they go (fm_slot_rerecord_changes,
@@ -1447,8 +1449,10 @@ fm_slot_rerecord_restored() {
       ;;
     staged) outcome="the prior record could not be restored; it is archived at $FM_RR_ARCHIVE" ;;
     neither)
-      if [ "$FM_RR_RESTORE_PUBLISHED" = 1 ]; then
-        outcome="the restore publish reported failure (${FM_RR_RESTORE_ERROR:-the restored record did not read back}), so whether the prior record was restored is not known; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $FM_RR_ARCHIVE"
+      if [ "$FM_RR_RESTORE_PUBLISHED" = 1 ] && [ "$FM_RR_RESTORE_RESULT" = success ]; then
+        outcome="the restore publish returned success but the record did not read back as the prior record, so whether the prior record was restored is not known; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $FM_RR_ARCHIVE"
+      elif [ "$FM_RR_RESTORE_PUBLISHED" = 1 ]; then
+        outcome="the restore publish reported failure ($FM_RR_RESTORE_ERROR), so whether the prior record was restored is not known; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $FM_RR_ARCHIVE"
       else
         outcome="the prior record could not be restored; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $FM_RR_ARCHIVE"
       fi
@@ -2317,6 +2321,7 @@ fm_slot_rerecord_rollback() {
   local restore
   FM_RR_RESTORE_ERROR=
   FM_RR_RESTORE_PUBLISHED=0
+  FM_RR_RESTORE_RESULT=
   fm_slot_rerecord_audit_set "$FM_RR_AUDIT" rolling-back ||
     echo "warning: the audit record $FM_RR_AUDIT could not be marked rolling-back" >&2
   RERECORD_STAGE=restoring
@@ -2330,6 +2335,7 @@ fm_slot_rerecord_rollback() {
   FM_RR_RESTORE_PUBLISHED=1
   if ! fm_backlog_atomic_transition publish "$restore" "$FM_RR_META" "task record" "$FM_RR_STATE"; then
     rm -f -- "$restore"
+    FM_RR_RESTORE_RESULT=failure
     FM_RR_RESTORE_ERROR=${FM_BACKLOG_TRANSITION_ERROR:-publish failed}
     # The publish ran, so only the record's bytes say whether it restored the prior record.
     case "$(fm_slot_rerecord_record_state)" in
@@ -2348,8 +2354,23 @@ fm_slot_rerecord_rollback() {
     esac
     return 1
   fi
-  [ "$(fm_slot_rerecord_sha "$FM_RR_META")" = "$FM_RR_P" ] ||
-    { echo "error: task $FM_RR_ID's restored record does not read back with sha256 $FM_RR_P; $(fm_slot_rerecord_record_holds "the prior record is archived at $FM_RR_ARCHIVE")" >&2; return 1; }
+  FM_RR_RESTORE_RESULT=success
+  # The publish returned success; the record's bytes, read once, say whether it now holds the prior record.
+  case "$(fm_slot_rerecord_record_state)" in
+    prior) ;;
+    staged)
+      echo "error: the restore publish of task $FM_RR_ID's record returned success but the record did not read back as the prior record (sha256 $FM_RR_P); it holds the published record it was to replace, so the prior record was not restored; it is archived at $FM_RR_ARCHIVE" >&2
+      return 1
+      ;;
+    neither)
+      echo "error: the restore publish of task $FM_RR_ID's record returned success but the record did not read back as the prior record (sha256 $FM_RR_P), so whether the prior record was restored is not known; the record holds bytes that are neither the prior nor the staged record; the prior record is archived at $FM_RR_ARCHIVE" >&2
+      return 1
+      ;;
+    *)
+      echo "error: the restore publish of task $FM_RR_ID's record returned success but the record could not be read back, so whether the prior record was restored is not known; the prior record is archived at $FM_RR_ARCHIVE" >&2
+      return 1
+      ;;
+  esac
   fm_slot_rerecord_audit_set "$FM_RR_AUDIT" rolled-back ||
     echo "warning: the audit record $FM_RR_AUDIT could not be marked rolled-back" >&2
   RERECORD_STAGE='done'

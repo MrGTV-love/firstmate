@@ -1092,6 +1092,22 @@ test_RB3_a_restore_publish_that_leaves_other_bytes_reports_restore_not_known() {
   assert_not_contains "$out" "could not be restored" "RB3: nothing established that the restore failed"
   rr_ok RB3 "a restore publish that leaves other bytes: both lines say whether the prior record was restored is not known and name the bytes as neither"
 }
+# A restore publish that returns success, after which the record changes to other bytes before the read-back: the lines
+# say the publisher returned success and the record did not read back, never that the publisher reported failure.
+test_RB4_a_restore_publish_that_succeeds_but_does_not_read_back_says_it_returned_success() {
+  local out rc a
+  rr_setup_SF4head RB4
+  rr_restore_publish_shim 'real_fm_backlog_atomic_transition "$@" || return; printf "other=bytes\\n" > "$3"; return 0'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "RB4: the run was expected to fail"$'\n'"$out"
+  a=$(rr_audits)
+  [ "$(cat "$RR_META")" = other=bytes ] || fail "RB4: the fixture did not leave other bytes in the record"
+  assert_contains "$out" "error: the restore publish of task $RR_ID's record returned success but the record did not read back as the prior record (sha256 $(rr_field "$a" prior_sha256)), so whether the prior record was restored is not known; the record holds bytes that are neither the prior nor the staged record; the prior record is archived at $(rr_field "$a" archive)" "RB4"
+  assert_contains "$out" "error: this run published task $RR_ID's record and the restore publish returned success but the record did not read back as the prior record, so whether the prior record was restored is not known; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $(rr_field "$a" archive)" "RB4"
+  assert_not_contains "$out" "reported failure" "RB4: the restore publisher returned success"
+  assert_not_contains "$out" "could not be restored" "RB4: nothing established that the restore failed"
+  rr_ok RB4 "a restore publish that returns success, then other bytes before the read-back: both lines say the publisher returned success and the record did not read back, and that whether it was restored is not known"
+}
 
 # The EXIT trap is the one printer. A TERM right after a step 3 audit rename lands, before its entry is recorded, still
 # names that audit, once; a TERM right after the success lines are stored prints them, once.
@@ -2490,6 +2506,7 @@ test_RP4_the_owner_reread_compares_the_whole_verdict
 test_RB1_a_restore_publish_that_fails_after_its_rename_reports_the_prior_record
 test_RB2_a_restore_publish_that_leaves_no_readable_record_reports_it_unreadable
 test_RB3_a_restore_publish_that_leaves_other_bytes_reports_restore_not_known
+test_RB4_a_restore_publish_that_succeeds_but_does_not_read_back_says_it_returned_success
 test_TS1_term_after_a_step_3_audit_rename_names_that_audit_once
 test_TS3_term_after_a_refusal_is_stored_names_the_closing_audit_once
 test_TS2_term_after_the_outcome_is_stored_prints_it_once
