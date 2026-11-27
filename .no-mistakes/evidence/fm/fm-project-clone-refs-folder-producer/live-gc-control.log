@@ -1,0 +1,10 @@
+git: git version 2.54.0 (Apple Git-157)
+gcc: skipped: no origin remote
+key: key=false objects/17 count=10
+  before: 3002 objects, 12008 kilobytes
+  after:  0 objects, 0 kilobytes
+  repack child: 1  pack-refs child: 0
+nokey: key=unset objects/17 count=8
+  before: 3002 objects, 12008 kilobytes
+  after:  0 objects, 0 kilobytes
+  repack child: 1  pack-refs child: 0

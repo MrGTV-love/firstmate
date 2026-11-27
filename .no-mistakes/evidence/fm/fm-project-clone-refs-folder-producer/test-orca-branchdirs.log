@@ -1,0 +1,2 @@
+ok - fm-teardown.sh backend=orca: the task-branch delete restores the registered and the deleted branch's branch-ref folders, and never follows a link
+exit=0

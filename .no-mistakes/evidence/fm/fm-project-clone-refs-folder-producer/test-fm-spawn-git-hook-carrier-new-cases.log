@@ -1,0 +1,8 @@
+ok - the default env -i route carries one maintenance.pack-refs.enabled=false entry beside core.hooksPath, and its commit leaves refs/heads/fm (control: it vanishes without)
+ok - the allowlist route carries one maintenance.pack-refs.enabled=false entry, and its commit leaves refs/heads/fm
+pending: the confined commit of the seatbelt-v1 routes (no sandbox here): the supervisor runs it (evidence/c5-command.txt)
+ok - the seatbelt-v1 claude and omp launch texts carry one maintenance.pack-refs.enabled=false entry beside fetch.prune=false and the task hooks (the confined commit is pending)
+ok - a pane that already holds the key leaves exactly one false entry after the outer and the inner selection
+ok - the shared check fails each of KEY_0 dropped, VALUE_0 dropped, COUNT one too high, COUNT one too low, and the dsh-shaped environment, each for its own reason
+# all fm-spawn-git-hook-carrier tests passed
+exit=0

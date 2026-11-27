@@ -1,0 +1,113 @@
+git: git version 2.54.0 (Apple Git-157)
+head: 5af466a0653ba2fa3b68185b0d3dbbe8b3bfb60a
+base: c89e6a5977f60f3aca41c983c5410dabd3cf14f2
+
+=== S1: fleet-sync writes maintenance.pack-refs.enabled=false in every clone root ===
+-- BASE fleet-sync run (control) --
+  base| alpha: already current
+  base| badfetch: skipped: fetch failed: fatal: '/Users/charlesabrooker/tmp/fm-live-scratch.CGrxdO/does-not-exist.git' does not appear to be a git repository
+  base| beta: skipped: local-only project
+  base| dirty: STUCK: on branch main with uncommitted changes, 0 commits behind origin/main - needs attention
+  base| gamma: already current
+  base| noorigin: skipped: no origin remote
+  base| notroot: skipped: not a clone root (git would act on /Users/charlesabrooker/tmp/fm-live-scratch.CGrxdO/outer)
+  base| unreg: already current
+  after BASE: alpha key=<unset>
+  after BASE: beta key=<unset>
+  after BASE: gamma key=true
+  after BASE: dirty key=<unset>
+  after BASE: badfetch key=<unset>
+  after BASE: noorigin key=<unset>
+  after BASE: unreg key=<unset>
+-- HEAD fleet-sync run --
+  head| alpha: already current
+  head| badfetch: skipped: fetch failed: fatal: '/Users/charlesabrooker/tmp/fm-live-scratch.CGrxdO/does-not-exist.git' does not appear to be a git repository
+  head| beta: skipped: local-only project
+  head| dirty: STUCK: on branch main with uncommitted changes, 0 commits behind origin/main - needs attention
+  head| gamma: already current
+  head| noorigin: skipped: no origin remote
+  head| notroot: skipped: not a clone root (git would act on /Users/charlesabrooker/tmp/fm-live-scratch.CGrxdO/outer)
+  head| unreg: already current
+  after HEAD: alpha key=false  origin=file:.git/config  maintenance.auto=unset
+  after HEAD: beta key=false  origin=file:.git/config  maintenance.auto=unset
+  after HEAD: gamma key=false  origin=file:.git/config  maintenance.auto=unset
+  after HEAD: dirty key=false  origin=file:.git/config  maintenance.auto=unset
+  after HEAD: badfetch key=false  origin=file:.git/config  maintenance.auto=unset
+  after HEAD: noorigin key=false  origin=file:.git/config  maintenance.auto=unset
+  after HEAD: unreg key=false  origin=file:.git/config  maintenance.auto=unset
+  home repo (/Users/charlesabrooker/tmp/fm-lab.GI4E6X) key=false
+  notroot outer repo key=<unset> (must stay <unset>)
+  gamma neighbour core.custom=keep-me
+  gamma config diff vs before (only the key line may change):
+    16c16
+    < 	enabled = true
+    ---
+    > 	enabled = false
+  second HEAD run: config bytes unchanged (idempotent) OK
+-- single-name form on a new clone --
+  before: epsilon key=<unset>
+  head| epsilon: already current
+  after single-name run: epsilon key=false
+
+=== S2: write failure (pre-created .git/config.lock) warns and the sync continues ===
+  head| lockcl: warning: could not set maintenance.pack-refs.enabled=false: error: could not lock config file .git/config: File exists
+  head| after1: already current
+  head| lockcl: already current
+  lockcl key=<unset>  after1 key=false
+
+=== S3: auto maintenance from a LINKED worktree leaves refs/heads/fm in place (20 loose fm refs + main) ===
+  m-keyed-commit/commit: rc=0 key=false maintenance_child=yes pack_refs_child=no refs/heads/fm=present loose_fm=21
+  m-ctl-commit/commit: rc=0 key=<unset> maintenance_child=yes pack_refs_child=yes refs/heads/fm=ABSENT loose_fm=0
+  m-keyed-amend/amend: rc=0 key=false maintenance_child=yes pack_refs_child=no refs/heads/fm=present loose_fm=21
+  m-ctl-amend/amend: rc=0 key=<unset> maintenance_child=yes pack_refs_child=yes refs/heads/fm=ABSENT loose_fm=0
+  m-keyed-fetch/fetch: rc=0 key=false maintenance_child=yes pack_refs_child=no refs/heads/fm=present loose_fm=21
+  m-ctl-fetch/fetch: rc=0 key=<unset> maintenance_child=yes pack_refs_child=yes refs/heads/fm=ABSENT loose_fm=0
+  m-keyed-merge/merge: rc=0 key=false maintenance_child=yes pack_refs_child=no refs/heads/fm=present loose_fm=21
+  m-ctl-merge/merge: rc=0 key=<unset> maintenance_child=yes pack_refs_child=yes refs/heads/fm=ABSENT loose_fm=0
+  m-keyed-rebase/rebase: rc=0 key=false maintenance_child=no pack_refs_child=no refs/heads/fm=present loose_fm=21
+  m-ctl-rebase/rebase: rc=0 key=<unset> maintenance_child=no pack_refs_child=no refs/heads/fm=present loose_fm=21
+
+=== S4: object gc stays available with the key set ===
+  key=false loose objects before=3002 after=0
+
+=== S5: fleet-sync prune of the last loose fm/ ref restores refs/heads/<prefix> ===
+  [pr-head reg=no-mistakes branch=fm/gone script=01M8D0FFR02KZ4WA3VGZTHZN11] output: pr-head: pruned fm/gone;pr-head: already current;
+    refs/heads/fm present
+    refs/heads/fix ABSENT
+    logs/refs/heads/fm present
+    logs/refs/heads/fix ABSENT
+    branch fm/gone exists after: no
+  [pr-base reg=no-mistakes branch=fm/gone script=base] output: pr-base: pruned fm/gone;pr-base: already current;
+    refs/heads/fm ABSENT
+    refs/heads/fix ABSENT
+    logs/refs/heads/fm ABSENT
+    logs/refs/heads/fix ABSENT
+    branch fm/gone exists after: no
+  [pr-prefix reg=no-mistakes branch=fix/ branch=fm/gone script=01M8D0FFR02KZ4WA3VGZTHZN11] output: pr-prefix: pruned fm/gone;pr-prefix: already current;
+    refs/heads/fm present
+    refs/heads/fix present
+    logs/refs/heads/fm present
+    logs/refs/heads/fix present
+    branch fm/gone exists after: no
+  [pr-prefix-base reg=no-mistakes branch=fix/ branch=fm/gone script=base] output: pr-prefix-base: pruned fm/gone;pr-prefix-base: already current;
+    refs/heads/fm ABSENT
+    refs/heads/fix ABSENT
+    logs/refs/heads/fm ABSENT
+    logs/refs/heads/fix ABSENT
+    branch fm/gone exists after: no
+-- one of several loose refs deleted (nothing else changes) --
+  head| pr-many: pruned fm/gone
+  head| pr-many: already current
+    loose: stay
+-- adversarial: registered prefix team/fm/, refs/heads/team is a symlink to a folder outside the clone --
+  head| pr-link: pruned fm/gone
+  head| pr-link: already current
+    link target contents: [] (must be empty)
+    total 8
+    drwxr-xr-x@ 5 charlesabrooker  staff  160 Nov 26 18:22 .
+    drwxr-xr-x@ 5 charlesabrooker  staff  160 Nov 26 18:22 ..
+    drwxr-xr-x@ 2 charlesabrooker  staff   64 Nov 26 18:22 fm
+    -rw-r--r--@ 1 charlesabrooker  staff   41 Nov 26 18:22 main
+    lrwxr-xr-x@ 1 charlesabrooker  staff   57 Nov 26 18:22 team -> /Users/charlesabrooker/tmp/fm-live-scratch.CGrxdO/outside
+done
+exit=0

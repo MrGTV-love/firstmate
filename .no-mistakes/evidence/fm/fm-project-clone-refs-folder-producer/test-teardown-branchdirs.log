@@ -1,0 +1,4 @@
+ok - teardown's pool route restores refs/heads/fm after the last loose ref and changes nothing when another remains
+ok - teardown restores refs/heads/fm after deleting a packed-only task branch
+ok - teardown restores the registered prefix folder and the deleted branch's own folder, and never follows a link at its folder path
+exit=0
