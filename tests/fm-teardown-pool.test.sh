@@ -3349,7 +3349,7 @@ test_runner_leader_acceptance_is_one_shared_rule() {
 # identity-matched group leader whose claim the home owns; every other content,
 # a NUL byte included, is refused. The claims live in a scratch claim root.
 test_home_runner_record_must_be_exactly_its_pid_line() {
-  local tmp home out leader identity shape got want
+  local tmp home out leader identity shape got want fn
   tmp=$(fm_test_tmproot runner-record-shape)
   home="$tmp/home"
   mkdir -p "$home/state/procevent" "$tmp/claims"
@@ -3391,7 +3391,10 @@ PY
     esac > "$home/state/procevent/fixture-runner.runner"
     if [ "$shape" = nul ]; then
       [ "$(wc -c < "$home/state/procevent/fixture-runner.runner" | tr -d ' ')" = "$(( ${#leader} + 2 ))" ] \
-        || fail "runner-record-nul: the fixture did not write the NUL byte"
+        || fail "runner-record-nul: the fixture did not write the pid, one byte and a newline"
+      # The byte after the pid is a NUL and the last byte a newline.
+      [ "$(od -An -c -j "${#leader}" -N 2 "$home/state/procevent/fixture-runner.runner" | tr -s ' ' | sed 's/^ //; s/ $//')" = '\0 \n' ] \
+        || fail "runner-record-nul: the byte after the pid is not NUL: $(od -An -c "$home/state/procevent/fixture-runner.runner")"
     fi
     got=$(FM_PROCEVENT_CLAIM_ROOT="$tmp/claims" SCRIPT_DIR="$ROOT/bin" H="$home" P="$leader" F="$tmp/fn.sh" bash -c '
       . "$SCRIPT_DIR/fm-pr-lib.sh" >/dev/null 2>&1
@@ -3402,8 +3405,41 @@ PY
     [ "$shape" != exact ] || want=accepted
     assert_equals "$want" "$got" "runner-record-$shape: the .runner content was judged wrongly"
   done
+  # The expected-bytes producer fails and writes nothing (printf of exactly the
+  # claim pid line fails once, inside this extracted-function test only), with an
+  # empty .runner: the empty file must not compare equal to the empty output.
+  # The fault control runs the same with the non-empty file check removed from
+  # the extracted copy, and must be accepted, so the check is what refuses.
+  : > "$home/state/procevent/fixture-runner.runner"
+  # shellcheck disable=SC2016 # The pattern matches the literal source text.
+  sed 's/\[ -f "\$runner_file" \] && \[ -s "\$runner_file" \] || continue/:/' "$tmp/fn.sh" > "$tmp/fn-fault.sh"
+  ! cmp -s "$tmp/fn.sh" "$tmp/fn-fault.sh" || fail "runner-record-producer: the fault control did not remove the non-empty file check"
+  for shape in producer-fails producer-fails-fault; do
+    rm -f "$tmp/producer-failed"
+    fn="$tmp/fn.sh"
+    [ "$shape" = producer-fails ] || fn="$tmp/fn-fault.sh"
+    got=$(FM_PROCEVENT_CLAIM_ROOT="$tmp/claims" SCRIPT_DIR="$ROOT/bin" H="$home" P="$leader" MARK="$tmp/producer-failed" \
+      F="$fn" bash -c '
+      . "$SCRIPT_DIR/fm-pr-lib.sh" >/dev/null 2>&1
+      . "$SCRIPT_DIR/fm-wake-lib.sh" >/dev/null 2>&1
+      . "$F"
+      printf() {
+        if [ "$#" = 2 ] && [ "$1" = "%s\n" ] && [ "$2" = "$P" ] && [ ! -e "$MARK" ]; then
+          : > "$MARK"
+          return 1
+        fi
+        builtin printf "$@"
+      }
+      if teardown_home_runner_member "$H" "$P"; then echo accepted; else echo refused; fi')
+    if [ "$shape" = producer-fails ]; then
+      assert_equals refused "$got" "runner-record-producer-fails: an empty .runner was accepted against a producer that wrote nothing"
+    else
+      assert_present "$tmp/producer-failed" "runner-record-producer-fault: the producer was never forced to fail"
+      assert_equals accepted "$got" "runner-record-producer-fault: without the non-empty check the empty file did not compare equal, so the control does not discriminate"
+    fi
+  done
   teardown_fixture_stop "$leader"
-  pass "a home runner record counts only as exactly its pid line; spaced, padded, two-line, empty, unterminated and NUL-carrying records are refused"
+  pass "a home runner record counts only as exactly its pid line; spaced, padded, two-line, empty, unterminated and NUL-carrying records are refused, and an empty record never matches a producer that wrote nothing"
 }
 
 ownership_pool_descends() {  # <pid> <ancestor>

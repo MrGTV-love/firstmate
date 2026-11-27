@@ -3846,7 +3846,10 @@ teardown_home_runner_member() {  # <home> <pid>
       # The runner writes its pid with printf '%s\n' "$$", so the file counts only
       # when its bytes are exactly the claim's pid and that newline. The bytes are
       # compared, never read into the shell; a compare that cannot run (cmp exit
-      # 2, a failed substitution) is not a match.
+      # 2, a failed substitution) is not a match. The file must be a non-empty
+      # regular file first, so an expected-bytes producer that wrote nothing
+      # cannot make an empty file compare equal.
+      [ -f "$runner_file" ] && [ -s "$runner_file" ] || continue
       cmp -s -- "$runner_file" <(printf '%s\n' "$FM_PROCEVENT_CLAIM_PID") 2>/dev/null || continue
       fm_procevent_runner_leader_proved "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY" 2>/dev/null || continue
       printf '%s\n' "$FM_PROCEVENT_CLAIM_PID"
