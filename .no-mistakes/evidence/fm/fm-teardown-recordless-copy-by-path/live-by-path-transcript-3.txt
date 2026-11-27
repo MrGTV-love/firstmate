@@ -1,0 +1,39 @@
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.kK2RX2
+# origin main tracks: 22 files under fixtures/fx.git, and .gitignore = .claude/ .opencode/ 
+# tracked fixture files: HEAD objects/2a/b32044314bdb1251fec5a3ac5d64a87c6eac90 objects/4d/1ae35ba2c8ec712fa2a379db44ad639ca277bd objects/c2/050fb7a12a1bd9a5fa97d2056883ac72eaa35c refs/heads/main 
+
+##### C tracked, unmodified bare fixture (landed content) -> allowed and removed
+  git -C fixtures/fx.git rev-parse --is-bare-repository: true
+
+=== C tracked bare fixture only
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kK2RX2
+  stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture from pool slot /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj
+  stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture (HEAD c889d7cf956760460506cf4bbcac7a8b1764c917, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.kK2RX2/data/record-less-copy-removals.log
+  rc=0
+  -> copy: gone, unregistered; git-worktree-remove calls so far: 1; provider calls: 0
+
+##### C2 the same tracked fixture with one untracked ref added -> refused
+  bare fixture refs now: refs/heads/extra refs/heads/main 
+  copy git status (untracked shown): ?? fixtures/fx.git/refs/heads/extra 
+
+=== C2 tracked fixture with an untracked ref
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture2
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kK2RX2
+  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture2 holds Git repository /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture2/fixtures/fx.git that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 1; provider calls: 0
+
+##### C3 the same tracked fixture with an ignored-only extra object/ref under .claude-style ignore -> refused
+  copy git status --ignored: !! fixtures/fx.git/refs/heads/hidden 
+
+=== C3 tracked fixture with an ignored ref
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture3
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kK2RX2
+  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture3 holds Git repository /Users/charlesabrooker/tmp/fm-lab.kK2RX2/projects/proj/.claude/worktrees/fixture3/fixtures/fx.git that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 1; provider calls: 0
+
+##### teardown of the lab
+  lab removed: /Users/charlesabrooker/tmp/fm-lab.kK2RX2
+  side dir removed

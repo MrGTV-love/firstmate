@@ -1,0 +1,88 @@
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.YopocH
+# origin main tracks: 18 files under fixtures/fx.git, and .gitignore = .claude/ .opencode/ 
+
+##### T0 ordinary teardown by id at the TARGET commit still refuses a missing record the old way
+
+=== T0 bin/fm-teardown.sh <id> with no record
+$ FM_HOME=$LAB bin/fm-teardown.sh no-such-task
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.YopocH/state/no-such-task.meta
+  rc=1
+
+##### SL pool-slot shape: slot = a worktree of the clone at $SIDE/pool/<n>/proj, pool has treehouse-state.json
+
+=== SL1 landed copy in a pool slot, no claim
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/1/proj/.claude/worktrees/stray
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/1/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/1/proj
+  stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/1/proj/.claude/worktrees/stray (HEAD 37c428a610f6bb5ebda3d2278befb96951bbf295, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.YopocH/data/record-less-copy-removals.log
+  rc=0
+  -> copy: gone, unregistered; git-worktree-remove calls so far: 1; provider calls: 0
+  slot still registered: yes
+
+=== SL2 slot claimed by a live task of this home
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/2/proj/.claude/worktrees/stray
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/2/proj is claimed by task other-task, whose record is live in /Users/charlesabrooker/tmp/fm-lab.YopocH/state; tear that task down with bin/fm-teardown.sh other-task; nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 1; provider calls: 0
+
+=== SL2b slot claim unreadable
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/2/proj/.claude/worktrees/stray
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| REFUSED: the owner claim of pool slot /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/2/proj cannot be read, so who the slot belongs to is unknown; inspect the claim file beside the slot; nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 1; provider calls: 0
+
+=== SL2c stale claim (no live record)
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/2/proj/.claude/worktrees/stray
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/2/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/2/proj
+  stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/2/proj/.claude/worktrees/stray (HEAD 37c428a610f6bb5ebda3d2278befb96951bbf295, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.YopocH/data/record-less-copy-removals.log
+  rc=0
+  -> copy: gone, unregistered; git-worktree-remove calls so far: 2; provider calls: 0
+  claim file kept: yes
+
+=== SL3 claim names this run's own --record-id, live in another local home
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/3/proj/.claude/worktrees/stray --record-id shared-id
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/3/proj is claimed by task shared-id, whose record is live in /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/mate-home/state; tear that task down with bin/fm-teardown.sh shared-id; nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 2; provider calls: 0
+
+=== SL3b same claim, no home holds a live record for it
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/3/proj/.claude/worktrees/stray --record-id shared-id
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/3/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/3/proj
+  stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/pool/3/proj/.claude/worktrees/stray (HEAD 37c428a610f6bb5ebda3d2278befb96951bbf295, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.YopocH/data/record-less-copy-removals.log
+  rc=0
+  -> copy: gone, unregistered; git-worktree-remove calls so far: 3; provider calls: 0
+
+##### OF a process holding an open file (not cwd) in the copy -> refused, not signalled
+
+=== OF open file handle in copy
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.YopocH/projects/proj/.claude/worktrees/openfile
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.YopocH/projects/proj/.claude/worktrees/openfile is in use: process 14545 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.YopocH/projects/proj/.claude/worktrees/openfile/README through 3 (processes holding it: 14545); nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 3; provider calls: 0
+  holder 14545 still alive (not signalled)
+
+##### PT a captain row naming the bundle but only ONE recorded tip -> refused
+  recorded tips: 37c428a610f6bb5ebda3d2278befb96951bbf295 9748e12626d9ff7296086bd9010b8f5452650bcb c2e6fb733eac27557ee8ed8728ca6739d06354de
+  partial hold rc=1 (fm-captain-hold: Main decides: a new captain hold requires --boundary credential, spend, destructive, irreversible, tool-denial, or owner-rule-change)
+
+=== PT row names only one tip
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.YopocH/projects/proj/.claude/worktrees/partial --record-id rec-pt
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YopocH
+  stderr| teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/bundles/pt.bundle: task rec-pt has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip.
+  stderr| File the land-or-drop call as its row, then run the same teardown --copy command again: bin/fm-captain-hold.sh hold rec-pt --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-pt --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-pt\,\ tips\ c2e6fb733eac27557ee8ed8728ca6739d06354de:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab-side.RvsrG6/bundles/pt.bundle\,\ whose\ record\ lists\ advertised\ tips\ 37c428a610f6bb5ebda3d2278befb96951bbf295\ 9748e12626d9ff7296086bd9010b8f5452650bcb\ c2e6fb733eac27557ee8ed8728ca6739d06354de\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
+  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.YopocH/projects/proj/.claude/worktrees/partial is not removed: its HEAD c2e6fb733eac is not proved landed.
+  stderr| human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.YopocH/projects/proj/.claude/worktrees/partial (its HEAD c2e6fb733eac is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.YopocH/projects/proj/.claude/worktrees/partial did not pass every proof (rule=copy-landed): its HEAD c2e6fb733eac is not proved landed; nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 3; provider calls: 0
+
+##### teardown of the lab
+  lab removed: /Users/charlesabrooker/tmp/fm-lab.YopocH
+  side dir removed

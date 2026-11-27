@@ -1,0 +1,4 @@
+ok - a held close refuses, with nothing removed, when an own nested copy holds a separate repository or another project's worktree
+ok - a held close refuses, with nothing removed, when an own nested copy holds a bare repository
+ok - a held close ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object or a modified file
+exit=0

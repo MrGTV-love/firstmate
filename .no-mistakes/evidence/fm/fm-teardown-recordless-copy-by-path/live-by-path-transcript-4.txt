@@ -1,0 +1,63 @@
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.zQm3yK
+# origin main tracks: 18 files under fixtures/fx.git, and .gitignore = .claude/ .opencode/ 
+
+##### P1 .claude preserve cannot publish (data/<id> not writable) -> copy stays
+
+=== P1 preserve target read-only
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/nopublish --record-id rec-ro
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zQm3yK
+  stderr| error: preservation directory /Users/charlesabrooker/tmp/fm-lab.zQm3yK/data/rec-ro/nested-copy-preserved cannot be written through /Users/charlesabrooker/tmp/fm-lab.zQm3yK/data/rec-ro
+  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of foreign copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/nopublish could not be preserved in /Users/charlesabrooker/tmp/fm-lab.zQm3yK/data/rec-ro/nested-copy-preserved; it was not removed. Restore readable source and writable preservation storage, then run the completing command.
+  stderr| completing-command: FM_FRICTION_OPERATION_ID=69767480-fba7-4546-a9ab-3ec8d45259e3 FM_FRICTION_EPISODE_ID=69767480-fba7-4546-a9ab-3ec8d45259e3 FM_HOME=/Users/charlesabrooker/tmp/fm-lab.zQm3yK bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8EXWJS2BG0SEBJEWKN9J4CX/bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/nopublish --record-id rec-ro
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 0; provider calls: 0
+  .claude/notes.md still in copy: notes only here
+
+=== P1 same copy, preserve target writable again
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/nopublish --record-id rec-ro
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zQm3yK
+  stderr| teardown: the audit record for this copy and HEAD is already in /Users/charlesabrooker/tmp/fm-lab.zQm3yK/data/record-less-copy-removals.log
+  stderr| teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/nopublish in /Users/charlesabrooker/tmp/fm-lab.zQm3yK/data/rec-ro/nested-copy-preserved/8933effef6cfca66fda5bb9f0dd7151d9b8e5791109cec717c450e93898bb7ef
+  stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/nopublish from pool slot /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj
+  stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/nopublish (HEAD 8b598b31ea30d4fd24e86b0094c7ee0b5676945c, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.zQm3yK/data/record-less-copy-removals.log
+  rc=0
+  -> copy: gone, unregistered; git-worktree-remove calls so far: 1; provider calls: 0
+
+##### R1 registration list unreadable (clone .git/worktrees mode 000) -> 'could not read', copy stays
+
+=== R1 present copy, registration list unreadable
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/unreadable
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zQm3yK
+  stderr| REFUSED: the clone /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj's worktree registration list could not be read (registration /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.git/worktrees cannot be read), so whether it registers /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/unreadable is unknown; nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 1; provider calls: 0
+
+##### R2 gone copy, projects folder unreadable -> refused, not reported done
+
+=== R2 gone copy, projects/ unreadable
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/gone2
+  stderr| error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+  stderr| error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+  stderr| error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+  rc=3
+
+=== R2 gone copy, projects/ readable, no audit line names it
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/gone2
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zQm3yK
+  stderr| REFUSED: there is no copy at /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/gone2, and no audit record in /Users/charlesabrooker/tmp/fm-lab.zQm3yK/data/record-less-copy-removals.log names it; nothing was removed.
+  rc=1
+
+##### R3 gone copy that a clone still registers -> refused, names git worktree prune
+
+=== R3 gone but still registered
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/stale
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zQm3yK
+  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj/.claude/worktrees/stale is gone but /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj still registers it; this mode never prunes a registration - once it is checked, git -C /Users/charlesabrooker/tmp/fm-lab.zQm3yK/projects/proj worktree prune clears it; nothing was removed.
+  rc=1
+  still registered: yes
+
+##### teardown of the lab
+  lab removed: /Users/charlesabrooker/tmp/fm-lab.zQm3yK
+  side dir removed
+
+##### CORRECTION (added after the run): case R2 above (projects/ mode 000) was refused by the gate lab-home check itself (rc 3), not by teardown. It is redone with projects/ mode 311 in live-by-path-transcript-5.txt.

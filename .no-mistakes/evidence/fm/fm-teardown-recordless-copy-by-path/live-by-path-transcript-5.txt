@@ -1,0 +1,20 @@
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.HuLLNz
+# origin main tracks: 18 files under fixtures/fx.git, and .gitignore = .claude/ .opencode/ 
+
+##### R2b gone copy, projects folder not listable (mode 311) -> refused, never reported done
+
+=== R2b gone copy, audit line present, projects/ not listable
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.HuLLNz/projects/proj/.claude/worktrees/gone2
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HuLLNz
+  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.HuLLNz/projects/proj/.claude/worktrees/gone2 is gone, but the project folder /Users/charlesabrooker/tmp/fm-lab.HuLLNz/projects could not be read, so whether a clone still registers it is unknown; nothing was removed.
+  rc=1
+
+=== R2b same, projects/ listable again
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.HuLLNz/projects/proj/.claude/worktrees/gone2
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HuLLNz
+  stderr| teardown: /Users/charlesabrooker/tmp/fm-lab.HuLLNz/projects/proj/.claude/worktrees/gone2 is already gone, and this run removed nothing: the audit record in /Users/charlesabrooker/tmp/fm-lab.HuLLNz/data/record-less-copy-removals.log shows its removal was authorized at 2026-11-27T00:00:00Z for HEAD 1c9de3eeb3c599d713d432fb87efa6ef5edb386f (proof: landed).
+  rc=0
+
+##### teardown of the lab
+  lab removed: /Users/charlesabrooker/tmp/fm-lab.HuLLNz
+  side dir removed

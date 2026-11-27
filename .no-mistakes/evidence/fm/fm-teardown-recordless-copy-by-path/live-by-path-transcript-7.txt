@@ -1,0 +1,21 @@
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.TPhegq
+# origin main tracks: 18 files under fixtures/fx.git, and .gitignore = .claude/ .opencode/ 
+
+##### PT a captain row naming the bundle but only ONE recorded tip -> refused
+  recorded tips: 448d6dacbd4bfbbf64bac51aa7fdc63b0ec19ff1 51c630fbd94212aad969b6d2aa8e2513bb70b6b7 5435009dc78274a440ae5b06e52dae7581e344bd
+  partial hold rc=0 (partial-call)
+
+=== PT row names only one tip
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.TPhegq/projects/proj/.claude/worktrees/partial --record-id rec-pt
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.TPhegq
+  stderr| teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab-side.WFw8fU/bundles/pt.bundle: task rec-pt has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip.
+  stderr| File the land-or-drop call as its row, then run the same teardown --copy command again: bin/fm-captain-hold.sh hold rec-pt --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-pt --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-pt\,\ tips\ 5435009dc78274a440ae5b06e52dae7581e344bd:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab-side.WFw8fU/bundles/pt.bundle\,\ whose\ record\ lists\ advertised\ tips\ 448d6dacbd4bfbbf64bac51aa7fdc63b0ec19ff1\ 51c630fbd94212aad969b6d2aa8e2513bb70b6b7\ 5435009dc78274a440ae5b06e52dae7581e344bd\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
+  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.TPhegq/projects/proj/.claude/worktrees/partial is not removed: its HEAD 5435009dc782 is not proved landed.
+  stderr| human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.TPhegq/projects/proj/.claude/worktrees/partial (its HEAD 5435009dc782 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.TPhegq/projects/proj/.claude/worktrees/partial did not pass every proof (rule=copy-landed): its HEAD 5435009dc782 is not proved landed; nothing was removed.
+  rc=1
+  -> copy: present, registered; git-worktree-remove calls so far: 0; provider calls: 0
+
+##### teardown of the lab
+  lab removed: /Users/charlesabrooker/tmp/fm-lab.TPhegq
+  side dir removed
