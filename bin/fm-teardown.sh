@@ -4575,7 +4575,9 @@ task_endpoint_shell_pid() {
       if ! out=$(tmux list-panes -s -t "=$session" -F $'#{window_name}\t#{pane_id}\t#{pane_pid}' 2>&1 </dev/null); then
         err=$out
         case "$err" in
-          *"can't find session"*|*"no server running"*|*"error connecting to"*) printf 'absent\n' ;;
+          # The target is an exact session, so tmux's "can't find" (it says
+          # window or session) and a missing server both mean it is absent.
+          *"can't find"*|*"no server running"*|*"error connecting to"*) printf 'absent\n' ;;
           *) printf 'unreadable\n' ;;
         esac
         return 0
