@@ -44,8 +44,10 @@ recorded delivery mode is no-mistakes (an unrecorded mode counts as
 no-mistakes); a direct-PR or local-only task without either has no pipeline
 group. When a subject starts no-mistakes( but no matching run recorded any
 invocation, the pipeline group is absent unknown.
-A recorded provider can resolve an otherwise unknown model alias; conflicting
-provider/model families are unreadable unknown. An invocation that records no
+A recorded provider, matched exactly as a canonical family name or a Zhipu
+route name, can resolve an otherwise unknown model alias, but a Zhipu provider
+fills zhipu only for an empty model, so a recorded malformed or unrecognized
+model stays unknown; conflicting provider/model families are unreadable unknown. An invocation that records no
 model and no provider is absent unknown unless its agent is exactly claude. Every invocation counts, including
 cancelled and errored ones. An invocation with an empty model takes a family
 from its agent only when the agent is exactly claude (anthropic); any other
