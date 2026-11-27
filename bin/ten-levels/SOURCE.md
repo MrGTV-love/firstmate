@@ -13,7 +13,7 @@ Firstmate's worker guard uses those policies and the canonical client through `b
 
 These files remain byte-for-byte copies at their upstream paths:
 
-- `src/core/client.ts`, `helpers.ts`, `mock.ts` and `types.ts`
+- `src/core/helpers.ts`, `mock.ts` and `types.ts`
 - `src/levels/level05/intent-router.ts` and `index.ts`
 - `tests/level05.test.ts`
 - `LICENSE`
@@ -21,6 +21,15 @@ These files remain byte-for-byte copies at their upstream paths:
 The guard and `bin/fm-dispatch-level5.ts` import the same `src/core/client.ts`; neither owns a second transport.
 Provider snapshots, raw exchange retention, validation, retry behavior and cost certainty remain the canonical client's responsibility.
 The [operator contract](../../docs/configuration.md#jev-guard) owns the guard's budgets, egress and host limits.
+
+## Changed copy: core client
+
+The canonical client adds optional transport observers.
+`beforeTransportAttempt` receives the attempt number immediately before each existing live fetch, including retries; if it throws, that attempt is not sent.
+`observeTransportResponse` receives the attempt number, HTTP status and, for TypeSafe, the documented `x-typesafe-request-id` before a response can be discarded during retry handling.
+Neither observer is invoked for mock responses or local validation refusals.
+Without observers, provider selection, wire data, retry behavior and response validation are unchanged.
+The [dispatch call adapter](../fm-dispatch-level5.ts) owns the optional local journal, retains no raw request IDs, and does not supply observers in ordinary dispatch.
 
 ## Changed copies: Level 5 agent and model routers
 
@@ -44,7 +53,7 @@ The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-en
   Its terminal records also cover every host tool name and deterministic egress/coverage decisions, retaining only the tool's single destination class from the egress policy, never outbound arguments or destinations.
   Confinement-owned effects record `confinement_owner: T5` before egress authorization, so a compound skill-bearing `learn` retains its write owner even when its memory effect is refused for a missing provider grant.
   This identifies the launch-time enforcement owner and is not proof that confinement is active.
-  The canonical client is unchanged.
+  The Level 6 policy changes do not alter the canonical client.
   There is no result policy, result request budget or result audit path.
 
 The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.
