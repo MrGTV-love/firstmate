@@ -3135,11 +3135,15 @@ ownership_assert_unsignalled_pool() {  # <case-dir> <pid>
 #            lead its process group, which the home's sweep requires;
 #   runner-content    the claim's identity matches a group leader, but the
 #            .runner file records another pid than the claim;
+#   runner-spaced, runner-leading-space, runner-two-line, runner-empty
+#            the same valid leader, but the .runner file is not exactly one line
+#            of digits naming the claim's pid ("12 34", " 1234", a second line,
+#            or nothing);
 #   group    a child worktree holds a process that only shares a process group
 #            with the child pane's chain-proved child, not descending from it.
 test_forced_cleanup_refuses_expiring_proofs_before_any_close() {
   local shape case_dir home rc holder pane kid out claims i leader='' identity
-  for shape in runner runner-nonleader runner-content group; do
+  for shape in runner runner-nonleader runner-content runner-spaced runner-leading-space runner-two-line runner-empty group; do
     case_dir=$(make_case "forced-expiring-$shape")
     write_meta "$case_dir" local-only secondmate
     home="$case_dir/secondmate-home"
@@ -3225,6 +3229,19 @@ SH
           # file records another pid than the claim does.
           printf '%s\n' "$((holder + 100000))" > "$home/state/procevent/fixture-runner.runner"
           ;;
+        runner-spaced)
+          # The claim's pid split by a space, as "12 34" for 1234.
+          printf '%s %s\n' "${holder:0:1}" "${holder:1}" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-leading-space)
+          printf ' %s\n' "$holder" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-two-line)
+          printf '%s\n%s\n' "$holder" "$holder" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-empty)
+          : > "$home/state/procevent/fixture-runner.runner"
+          ;;
       esac
       printf '%s\n' "$home" "$holder" token1 "$identity" "" "" active > "$claims/fixture-runner.claim"
     else
@@ -3281,7 +3298,7 @@ SH
     [ -z "${leader:-}" ] || [ "$leader" = "$holder" ] || teardown_fixture_stop "$leader"
     leader=
   done
-  pass "a reused runner pid, an identity-matched non-leader runner, a .runner naming another pid, and a group-only child holder each refuse before any endpoint close, with every process left running"
+  pass "a reused runner pid, an identity-matched non-leader runner, a .runner that is not exactly one line naming the claim's pid, and a group-only child holder each refuse before any endpoint close, with every process left running"
 }
 
 # fm_procevent_runner_leader_proved is the one owner of runner acceptance, used
@@ -3325,6 +3342,62 @@ test_runner_leader_acceptance_is_one_shared_rule() {
   teardown_fixture_stop "$member"
   teardown_fixture_stop "$leader"
   pass "runner acceptance proves only a live identity-matched group leader"
+}
+
+# teardown_home_runner_member accepts a home's runner only when its .runner file
+# is exactly the pid line the runner writes ("1234\n") for a live
+# identity-matched group leader whose claim the home owns; every other content
+# is refused. The claims live in a scratch claim root.
+test_home_runner_record_must_be_exactly_its_pid_line() {
+  local tmp home out leader identity shape got want
+  tmp=$(fm_test_tmproot runner-record-shape)
+  home="$tmp/home"
+  mkdir -p "$home/state/procevent" "$tmp/claims"
+  out="$tmp/pids"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  perl -MPOSIX -e '
+    my ($out) = @ARGV;
+    my $first = fork(); die "fork" unless defined $first;
+    if ($first) { waitpid($first, 0); exit 0; }
+    my $second = fork(); die "fork" unless defined $second;
+    POSIX::_exit(0) if $second;
+    POSIX::setsid() or die "setsid";
+    open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+    open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+    exec "sleep", "300";' "$out"
+  for _ in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+  read -r leader < "$out" || fail "runner-record: setup did not start"
+  teardown_fixture_track "$leader" KILL
+  identity=$(bash -c '. "$1/bin/fm-wake-lib.sh" >/dev/null 2>&1; fm_pid_identity "$2"' _ "$ROOT" "$leader") \
+    || fail "runner-record: the leader's identity cannot be read"
+  printf '%s\n' "$home" "$leader" token1 "$identity" "" "" active > "$tmp/claims/fixture-runner.claim"
+  python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/fn.sh" <<'PY' || fail "runner-record: the function could not be extracted"
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+start = source.index("teardown_home_runner_member() {")
+end = source.index("\n}\n", start) + 3
+pathlib.Path(sys.argv[2]).write_text(source[start:end])
+PY
+  for shape in exact spaced leading-space two-line empty no-newline; do
+    case "$shape" in
+      exact) printf '%s\n' "$leader" ;;
+      spaced) printf '%s %s\n' "${leader:0:1}" "${leader:1}" ;;
+      leading-space) printf ' %s\n' "$leader" ;;
+      two-line) printf '%s\n%s\n' "$leader" "$leader" ;;
+      empty) : ;;
+      no-newline) printf '%s' "$leader" ;;
+    esac > "$home/state/procevent/fixture-runner.runner"
+    got=$(FM_PROCEVENT_CLAIM_ROOT="$tmp/claims" SCRIPT_DIR="$ROOT/bin" H="$home" P="$leader" F="$tmp/fn.sh" bash -c '
+      . "$SCRIPT_DIR/fm-pr-lib.sh" >/dev/null 2>&1
+      . "$SCRIPT_DIR/fm-wake-lib.sh" >/dev/null 2>&1
+      . "$F"
+      if teardown_home_runner_member "$H" "$P"; then echo accepted; else echo refused; fi')
+    want=refused
+    [ "$shape" != exact ] || want=accepted
+    assert_equals "$want" "$got" "runner-record-$shape: the .runner content was judged wrongly"
+  done
+  teardown_fixture_stop "$leader"
+  pass "a home runner record counts only as exactly its pid line; spaced, padded, two-line, empty and unterminated records are refused"
 }
 
 ownership_pool_descends() {  # <pid> <ancestor>
@@ -5297,6 +5370,7 @@ test_child_return_custody_refusal_keeps_non_pool_worktree
 test_forced_child_return_refuses_an_unproven_holder
 test_forced_cleanup_refuses_expiring_proofs_before_any_close
 test_runner_leader_acceptance_is_one_shared_rule
+test_home_runner_record_must_be_exactly_its_pid_line
 test_child_pool_return_custody_refusal_keeps_slot
 test_reassigned_dirty_slot_retires_only_finished_task
 test_reassigned_slot_unlanded_task_refuses

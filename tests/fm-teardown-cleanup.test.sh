@@ -2064,6 +2064,56 @@ SH
   pass "a tmux socket that cannot be opened is an unreadable endpoint and refuses with nothing closed"
 }
 
+# Window membership is an exact comparison with each listed name: a listed
+# window whose name only starts or ends with the recorded one (recorded
+# fm-task-x1 beside fm-task-x10 or prefix-fm-task-x1) leaves the recorded window
+# absent, so a teardown with nothing in its roots proceeds and closes it; the
+# exact name is present, and two panes in it still refuse.
+test_teardown_window_membership_is_exact() {
+  local shape case_dir rc first second
+  for shape in prefix suffix exact; do
+    case_dir=$(make_case "ownership-window-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    ownership_pane "$case_dir"
+    first=$OWN_PANE_PID
+    ownership_pane "$case_dir"
+    second=$OWN_PANE_PID
+    case "$shape" in
+      prefix) printf 'fm-task-x10\t%%1\t%s\nfm-task-x10\t%%2\t%s\n' "$first" "$second" > "$case_dir/pane-rows" ;;
+      suffix) printf 'prefix-fm-task-x1\t%%1\t%s\nprefix-fm-task-x1\t%%2\t%s\n' "$first" "$second" > "$case_dir/pane-rows" ;;
+      exact) printf 'fm-task-x1\t%%1\t%s\nfm-task-x1\t%%2\t%s\n' "$first" "$second" > "$case_dir/pane-rows" ;;
+    esac
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in list-windows) cut -f1 "$case_dir/pane-rows" | sort -u ;; esac
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/tmux"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    ownership_alive "$first" || fail "window-$shape: a pane process was signalled"
+    ownership_alive "$second" || fail "window-$shape: a pane process was signalled"
+    if [ "$shape" = exact ]; then
+      expect_code 1 "$rc" "window-exact: two panes in the recorded window must refuse: $(tail -3 "$case_dir/stderr")"
+      assert_absent "$case_dir/endpoint-close.log" "window-exact: the endpoint was closed"
+      grep -Eq "REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: .*several panes" "$case_dir/stderr" \
+        || fail "window-exact: the refusal did not name the ambiguous endpoint: $(tail -3 "$case_dir/stderr")"
+    else
+      expect_code 0 "$rc" "window-$shape: a recorded window absent from the listing must proceed: $(tail -3 "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "window-$shape: the task did not close"
+      if grep -q "cannot be closed safely" "$case_dir/stderr"; then
+        fail "window-$shape: a name that only shares a prefix or suffix was read as the recorded window"
+      fi
+    fi
+    teardown_fixture_stop "$first"
+    teardown_fixture_stop "$second"
+  done
+  pass "window membership is an exact name comparison: a prefix or suffix lookalike leaves the recorded window absent, the exact name is present"
+}
+
 # The process-group proof does not reach a process that leaves the group: a
 # child a proved process forks during the grace period and that calls setsid
 # before its parent exits (a daemon detaching) refuses unsignalled.
@@ -9590,6 +9640,7 @@ test_teardown_recycled_group_proves_nothing
 test_tasktmp_only_route_names_an_unproven_holder_and_continues
 test_teardown_ambiguous_window_refuses_before_any_close
 test_teardown_unreadable_tmux_socket_refuses_before_any_close
+test_teardown_window_membership_is_exact
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races

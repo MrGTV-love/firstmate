@@ -3822,7 +3822,8 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
 # unlanded HEAD and never cleans, which forced cleanup needs. A holder arriving
 # between this scan and treehouse's own scan is a disclosed residual.
 # Succeeds when <pid> is a process-event runner of <home>: its claim is owned by
-# that home, the pid its .runner file records is the claim's pid, and
+# that home, its .runner file is exactly one line of digits naming the claim's
+# pid, and
 # fm_procevent_runner_leader_proved (the acceptance the home's sweep itself
 # requires before its first group signal: the recorded birth identity matches
 # and the runner leads its process group) holds. A reused pid, a non-leader, a
@@ -3839,10 +3840,16 @@ teardown_home_runner_member() {  # <home> <pid>
       [ -f "$runner_file" ] && [ ! -L "$runner_file" ] || continue
       source_id=${runner_file##*/}
       source_id=${source_id%.runner}
-      runner_pid=$(sed -n 1p "$runner_file" 2>/dev/null | tr -d '[:space:]')
+      # The runner writes its pid with printf '%s\n' "$$", so the file counts only
+      # when its whole content is one line of ASCII digits and that newline.
+      runner_pid=$(cat -- "$runner_file" 2>/dev/null && printf x) || continue
+      runner_pid=${runner_pid%x}
+      [ "${runner_pid%$'\n'}" != "$runner_pid" ] || continue
+      runner_pid=${runner_pid%$'\n'}
+      case "$runner_pid" in (''|*[!0123456789]*) continue ;; esac
       fm_procevent_claim_load_locked "$source_id" 2>/dev/null || continue
       fm_procevent_claim_owned_by_state "$1/state" "$1" 2>/dev/null || continue
-      [ -n "$runner_pid" ] && [ "$runner_pid" = "$FM_PROCEVENT_CLAIM_PID" ] || continue
+      [ "$runner_pid" = "$FM_PROCEVENT_CLAIM_PID" ] || continue
       fm_procevent_runner_leader_proved "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY" 2>/dev/null || continue
       printf '%s\n' "$FM_PROCEVENT_CLAIM_PID"
     done
@@ -4571,7 +4578,7 @@ conclude_task_no_mistakes_run() {  # <worktree>
 # Herdr confirms gone is absent. Any other failed read is unreadable. A record
 # with no endpoint, or a backend that reports no pane shell, is absent.
 task_endpoint_shell_pid() {
-  local out pid='' session window rows count inventory_rc
+  local out pid='' session window rows count inventory_rc listed line
   [ -n "${T:-}" ] || { printf 'absent\n'; return 0; }
   case "${BACKEND:-}" in
     tmux)
@@ -4587,7 +4594,16 @@ task_endpoint_shell_pid() {
         2) printf 'absent\n'; return 0 ;;
         *) printf 'unreadable\n'; return 0 ;;
       esac
-      printf '%s\n' "$out" | grep -Fxq -- "$window" || { printf 'absent\n'; return 0; }
+      # Membership is an exact in-shell comparison with each listed name, so no
+      # external command can fail here: only a recorded name equal to no listed
+      # line is absent.
+      listed=0
+      while IFS= read -r line; do
+        [ "$line" != "$window" ] || { listed=1; break; }
+      done <<INVENTORY
+$out
+INVENTORY
+      [ "$listed" = 1 ] || { printf 'absent\n'; return 0; }
       out=$(tmux list-panes -s -t "=$session" -F $'#{window_name}\t#{pane_id}\t#{pane_pid}' 2>/dev/null </dev/null) \
         || { printf 'unreadable\n'; return 0; }
       rows=$(printf '%s\n' "$out" | awk -F '\t' -v w="$window" 'NF == 3 && $1 == w')
