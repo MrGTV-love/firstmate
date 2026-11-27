@@ -114,6 +114,8 @@ EOF
   assert_contains "$plan" 'An improvement outside the DoD: a follow-up note, never a block.' 'plan lost the follow-up outcome'
   assert_contains "$plan" 'A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL' 'plan lost the guard-widening FAIL outcome'
   assert_contains "$plan" 'A fix that would add scope beyond the intent: escalate to Main for the owner' 'plan lost the scope-escalation outcome'
+  assert_contains "$plan" 'strictly by materiality.' 'plan lost materiality separation'
+  assert_contains "$plan" '## Re-reviews (closure checks)' 'plan lost closure-check guidance'
   assert_not_contains "$plan" 'scout-time context' 'an unpromoted plan was labeled as scout context'
 
   printf '# Task\nLegacy task.\n' > "$brief"
