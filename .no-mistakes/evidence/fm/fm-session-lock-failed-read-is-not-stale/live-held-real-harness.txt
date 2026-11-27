@@ -1,0 +1,7 @@
+recorded holder: live claude harness pid 20861 (comm: claude)
+== /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8D27RA4JKDCWFPNAXF95TWF
+{"schema":"fm-primary-ready.v1","home":"tmp/fm-lab.bMBYCE","lock":{"state":"held","pid":20861,"live_harness":true},"wake_consumer":{"state":"down","reason":"no-beacon","beacon_age_seconds":null},"posture":{"state":"present"},"can_receive":false}
+lock: held by live harness pid 20861
+== /Users/charlesabrooker/tmp/fm-base.XZcQUf
+{"schema":"fm-primary-ready.v1","home":"tmp/fm-lab.bMBYCE","lock":{"state":"held","pid":20861,"live_harness":true},"wake_consumer":{"state":"down","reason":"no-beacon","beacon_age_seconds":null},"posture":{"state":"present"},"can_receive":false}
+lock: held by live harness pid 20861

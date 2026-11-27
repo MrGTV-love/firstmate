@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# drive.sh <head-root> <base-root> <fm_home>
+# Live driver used for live-inbox-ready-and-lock-status.txt.
+# Head root = the run worktree; base root = `git archive c89e6a597 | tar -x`;
+# fm_home = a lab home minted by `eval "$(bin/fm-lab-home.sh env)"`.
+# Runs the real bin/fm-inbox.sh ready and bin/fm-lock.sh status at the head and
+# at the base archive against that one disposable lab home. Only the external
+# `ps` (and for rows J/J2/J3 the python3 call to bin/fm-proc-info.py) is
+# replaced on PATH to simulate a failed process read; the holder pid is a
+# genuinely dead pid, so the product's own `kill -0` really fails.
+# Rows A, B, C and K use the real /bin/ps and the real bin/fm-proc-info.py.
+# The "refusing sandbox" (exit 126) is simulated by a ps stand-in that exits 126.
+HEAD=$1 BASE=$2
+export FM_HOME=$3
+SHIM=$(mktemp -d "${TMPDIR:-/tmp}/fm-shim.XXXXXX")
+REALPS=/bin/ps
+mkps() {  # <rc> <stdout> <stderr>
+  printf '#!/bin/bash\nprintf %%s %q\nprintf %%s %q >&2\nexit %s\n' "$2" "$3" "$1" > "$SHIM/ps"; chmod +x "$SHIM/ps"
+}
+REALPY=$(command -v python3)
+mkpy() {  # <rc> <stdout>: fakes only bin/fm-proc-info.py; every other python3 call is the real one
+  printf '#!/bin/bash\ncase "$1" in *fm-proc-info.py) printf %%s %q; exit %s ;; esac\nexec %q "$@"\n' "$2" "$1" "$REALPY" > "$SHIM/python3"; chmod +x "$SHIM/python3"
+}
+dead=
+for p in $(seq 61000 61999); do
+  out=$($REALPS -o comm= -p "$p" 2>/dev/null); rc=$?
+  if [ "$rc" -eq 1 ] && [ -z "$out" ]; then dead=$p; break; fi
+done
+run() {  # <label> <pid> <use-shim:0|1>
+  printf '%s\n' "$2" > "$FM_HOME/state/.lock"
+  for side in head base; do
+    root=$HEAD; [ "$side" = base ] && root=$BASE
+    if [ "$3" = 1 ]; then P="$SHIM:$PATH"; else P=$PATH; fi
+    j=$(env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE PATH="$P" FM_HOME="$FM_HOME" "$root/bin/fm-inbox.sh" ready 2>&1)
+    st=$(env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE PATH="$P" FM_HOME="$FM_HOME" "$root/bin/fm-lock.sh" status 2>&1)
+    printf '%-52s %-4s | ready: %s | status: %s\n' "$1" "$side" "$j" "$st"
+  done
+}
+echo "dead pid chosen: $dead (real ps -o comm= -p exits 1 with no row)"
+echo "== real ps, no stand-ins =="
+run "A real dead pid, real ps (proven absence)" "$dead" 0
+run "B pid too large, real macOS ps line" 99999999 0
+run "C pid 1 launchd, kill -0 EPERM, real ps row" 1 0
+echo "== ps stand-in on PATH (simulated failed read), holder is the real dead pid =="
+mkps 1 '' $'ps: error: cannot read the process table\n'; run "D ps exit1 + diagnostic stderr" "$dead" 1
+mkps 1 '' $' \n'; run "E ps exit1 + whitespace-only stderr" "$dead" 1
+mkps 1 $'claude\n' ''; run "F ps exit1 + non-empty stdout" "$dead" 1
+mkps 2 '' ''; run "G ps exit 2 (other failure)" "$dead" 1
+mkps 1 '' "ps: process id too large: 4243"$'\n'; run "H ps exit1 + too-large line, other pid" "$dead" 1
+mkps 1 '' ''; run "I ps exit1 empty/empty via stand-in" "$dead" 1
+mkps 126 '' ''; mkpy 1 ''; run "J ps 126 (sandbox), python3 fallback fails" "$dead" 1
+mkpy 0 $'1\n'"$dead"$'\n'; run "J2 ps 126, fallback table lists the pid" "$dead" 1
+mkpy 0 $'1\nx\n'; run "J3 ps 126, fallback table has a bad row" "$dead" 1
+rm -f "$SHIM/python3"; run "K ps 126, real fm-proc-info.py table" "$dead" 1
+rm -rf "$SHIM"
