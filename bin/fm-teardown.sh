@@ -3441,37 +3441,11 @@ teardown_return_collisions() { # <copy> <branch>
 teardown_skipped_row() { # <copy> <reason> <holder> <epoch> <endpoint>
   if [ -n "$5" ]; then printf '%s\t%s\t%s\t%s\t%s\n' "$@"; else printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4"; fi
 }
-# teardown_acquisition_pane_note <pane> [<gone-suffix>]: what a skipped-copy notice may say about the spawn's
-# acquisition pane <pane>, the endpoint recorded in that row. It states only what a read at print time establishes, and
-# never a cause: when a definitive read through the backend's own inventory shows <pane> absent, its window is gone
-# (then <gone-suffix> is appended); in every other case - the endpoint is still listed, the read fails, or the backend
-# has no definitive absence read - teardown did not establish that the window is gone, so it may still be live.
-teardown_acquisition_pane_note() {  # <pane> [<gone-suffix>]
-  if teardown_endpoint_read_absent "$1"; then
-    printf 'acquisition pane %s of the spawn stood in it; its window is gone: a read after teardown shows it absent%s' "$1" "${2:-}"
-  else
-    printf 'acquisition pane %s of the spawn stood in it; teardown did not establish that its window is gone, so it may still be live' "$1"
-  fi
-}
-
-# teardown_endpoint_read_absent <pane>: a read through the backend's own inventory shows <pane> absent. Only a definitive
-# answer counts: tmux's listing of every pane succeeded without it, or Herdr's structured presence read says dead. Every
-# other backend, and any read that fails, is not a definitive absence.
-teardown_endpoint_read_absent() {  # <pane>
-  local rc=0
-  case "$BACKEND" in
-    tmux)
-      fm_backend_source tmux || return 1
-      fm_backend_tmux_target_exists "$1" || rc=$?
-      [ "$rc" -eq 1 ]
-      ;;
-    herdr)
-      fm_backend_source herdr || return 1
-      declare -F fm_backend_herdr_endpoint_confirmed_gone >/dev/null 2>&1 || return 1
-      fm_backend_herdr_endpoint_confirmed_gone "$1"
-      ;;
-    *) return 1 ;;
-  esac
+# teardown_acquisition_pane_note <pane>: the one text a skipped-copy notice gives about the spawn's acquisition pane
+# <pane>, the endpoint recorded in that row. Teardown does not check that window, so the note makes no claim about its
+# state: the same words for every row, world and backend.
+teardown_acquisition_pane_note() {  # <pane>
+  printf 'acquisition pane %s of the spawn stood in it; teardown does not check that window, so it may still be live' "$1"
 }
 
 teardown_skipped_copies() {
@@ -3496,7 +3470,7 @@ teardown_skipped_copies() {
     if [ "$holder" != "firstmate-skipped:$ID" ]; then
       # Only the exact holder this task's spawn leased under is this task's to return. A row naming anyone else (a copy the
       # spawn passed over because another holder's lease was already there) is never returned, whatever the pool says.
-      echo "notice: the record row for $copy names holder '$holder', not this task's firstmate-skipped:$ID; that lease is not this task's, so nothing is returned and the row is left as it is${pane:+ ($(teardown_acquisition_pane_note "$pane" ', and a gone window does not release the lease of the other holder'))}" >&2
+      echo "notice: the record row for $copy names holder '$holder', not this task's firstmate-skipped:$ID; that lease is not this task's, so nothing is returned and the row is left as it is${pane:+ ($(teardown_acquisition_pane_note "$pane"))}" >&2
       teardown_skipped_row "$copy" "$reason" "$holder" "$when" "$pane" >> "$keep"
       continue
     fi
