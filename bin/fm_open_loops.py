@@ -429,6 +429,8 @@ class Collector:
         long_wait = False
         if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") == "done"):
             excluded = "excluded: done/ready task is covered by PR or completion handoff"
+        elif verb == "failed" or (task["kind"] == "secondmate" and verb == "done"):
+            excluded = "excluded: typed " + verb + " status reports the result"
         elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
             excluded = "excluded: idle secondmate has no routed work in flight"
         elif open_decision or self.gate_awaits_human(task):

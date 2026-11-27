@@ -110,7 +110,7 @@ class Case:
             self.collect()
         presented = self.cli('--present-overdue').stdout
         checked = self.cli('--check-actions', expected=None)
-        assert (self.ident in presented) is wanted, (wanted, presented)
+        assert (self.ident in presented) is wanted, (self.home.name, wanted, presented)
         assert (self.ident in checked.stdout) is wanted, (wanted, checked.stdout)
         if wanted:
             assert 'steered, result not observed' in presented, presented
@@ -266,6 +266,23 @@ with c.status.open('a') as stream:
 c.now = base + 900
 c.actionable(False)
 print('PASS: a typed report after an acknowledgement and a plain working line still settles a silence steer', flush=True)
+
+# A typed failed status from any report, and a typed done from a secondmate, are results that settle the steer.
+for kind, verb in (('ship', 'failed'), ('secondmate', 'done')):
+    c = Case('typed-' + verb + '-' + kind, category='silent_report', kind=kind)
+    message = c.delivery(); c.steer()
+    c.now = base + 800
+    handled = c.home / 'state/worker.inbox/handled'
+    handled.mkdir()
+    message.rename(handled / '001.msg')
+    os.utime(handled, (c.now, c.now))
+    with c.status.open('a') as stream:
+        stream.write(f'{verb} [at={c.now}]: reported the validation outcome\n')
+    c.now = base + 899
+    c.actionable(False)
+    c.now = base + 900
+    c.actionable(False)
+print('PASS: a typed failed report or a secondmate typed done report settles a silence steer', flush=True)
 
 # A reply resolved in the delivery's own second cannot be ordered after it; only a later-second reply settles.
 for mode in ('reply-same-second', 'reply-later-second'):
