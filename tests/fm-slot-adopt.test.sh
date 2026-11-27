@@ -903,11 +903,62 @@ PY2
   out=$(fm_slot_rerecord_identity_verdict() { printf 'ok\tx\n'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
   [ "$out" = "manifest_unreadable"$'\t'"the verdict printed a malformed ok line" ] \
     || fail "an identity verdict printing ok<TAB>x was not refused: $out"
+  # An ok without its newline, and ok followed by a NUL, are not byte for byte ok and one newline either.
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_identity_verdict() { printf 'ok'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$out" = "manifest_unreadable"$'\t'"the verdict printed a malformed ok line" ] \
+    || fail "an identity verdict printing an unterminated ok was not refused: $out"
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_identity_verdict() { printf 'ok\000\n'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$out" = "manifest_unreadable"$'\t'"the verdict printed a malformed ok line" ] \
+    || fail "an identity verdict printing ok and a NUL was not refused: $out"
   # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
   out=$(fm_slot_rerecord_identity_verdict() { printf 'ok\n'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
   [ "$(printf '%s\n' "$out" | head -n 1)" = ok ] || fail "an identity verdict printing exactly ok was refused: $out"
+  # The whole-file mode the post-publish owner re-read uses: exactly ok and one newline passes, a trailing blank line does
+  # not, and neither does a file the compare cannot read.
+  printf 'ok\n' > "$W_DIR/verdict-exact"
+  printf 'ok\n\n' > "$W_DIR/verdict-blank"
+  fm_slot_rerecord_verdict_ok "$W_DIR/verdict-exact" manifest_unreadable whole || fail 'the whole-file mode refused exactly ok'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-blank" manifest_unreadable whole || fail 'the whole-file mode passed ok and a blank line'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-missing" manifest_unreadable whole || fail 'the whole-file mode passed a missing file'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-missing" manifest_unreadable || fail 'the first-line mode passed a missing file'
+  fm_slot_rerecord_verdict_ok "$W_DIR/verdict-blank" manifest_unreadable || fail 'the first-line mode refused a first line of exactly ok'
+  printf 'ok\nmore\n' > "$W_DIR/verdict-more"
+  fm_slot_rerecord_verdict_ok "$W_DIR/verdict-more" manifest_unreadable || fail 'the first-line mode refused ok followed by report lines'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-more" manifest_unreadable whole || fail 'the whole-file mode passed ok followed by more lines'
+  # A file the compare cannot read refuses in both modes.
+  printf 'ok\n' > "$W_DIR/verdict-unreadable"
+  chmod 000 "$W_DIR/verdict-unreadable"
+  if [ -r "$W_DIR/verdict-unreadable" ]; then
+    chmod 600 "$W_DIR/verdict-unreadable"
+    fail 'the fixture is vacuous: an unreadable verdict file is still readable here'
+  fi
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-unreadable" manifest_unreadable || fail 'the first-line mode passed an unreadable file'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-unreadable" manifest_unreadable whole || fail 'the whole-file mode passed an unreadable file'
+  chmod 600 "$W_DIR/verdict-unreadable"
+  # Both statuses of the compare's pipeline are read: a producer that writes ok and one newline and then returns 1
+  # refuses in both modes. The fault control is a copy of the function without the producer's status check, which
+  # accepts the same input, so that status check is what refuses.
+  # shellcheck disable=SC2329,SC2059 # the stub shadows printf for the function under test and passes its arguments on
+  out=$(printf() { builtin printf "$@"; return 1; }
+    fm_slot_rerecord_verdict_ok "$W_DIR/verdict-exact" manifest_unreadable && echo first-passed
+    fm_slot_rerecord_verdict_ok "$W_DIR/verdict-exact" manifest_unreadable whole && echo whole-passed
+    true)
+  [ -z "$out" ] || fail "a producer that returned 1 after writing ok and one newline passed: $out"
+  # shellcheck disable=SC2016 # the sed pattern names the literal ${st[0]} in the function's source
+  eval "$(declare -f fm_slot_rerecord_verdict_ok | sed -e '1s/^fm_slot_rerecord_verdict_ok /fm_rr_verdict_ok_no_producer_status /' \
+    -e 's/\[ "\${st\[0\]}" = 0 \] && //')"
+  [ "$(declare -f fm_rr_verdict_ok_no_producer_status | grep -c 'st\[0\]')" = 0 ] \
+    || fail 'the fault control is vacuous: the copy still checks the producer status'
+  # shellcheck disable=SC2329,SC2059 # the stub shadows printf for the function under test and passes its arguments on
+  out=$(printf() { builtin printf "$@"; return 1; }
+    fm_rr_verdict_ok_no_producer_status "$W_DIR/verdict-exact" manifest_unreadable && echo first-passed
+    fm_rr_verdict_ok_no_producer_status "$W_DIR/verdict-exact" manifest_unreadable whole && echo whole-passed
+    true)
+  [ "$out" = "first-passed"$'\n'"whole-passed" ] || fail "the fault control without the producer status check did not accept: $out"
   [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail 'the replay changed the copy'
-  pass "rerecord replay: a forward-merged renewal is admitted with its labels; an untouched entry, a stale base, an unreadable own line or uncommitted set, and a malformed ok verdict are refused by name; an exact ok verdict is admitted; the copy is unchanged"
+  pass "rerecord replay: a forward-merged renewal is admitted with its labels; an untouched entry, a stale base, an unreadable own line or uncommitted set, and a malformed ok verdict (ok<TAB>x, an unterminated ok, ok and a NUL) are refused by name; an exact ok verdict is admitted; the whole-file mode refuses ok and a blank line; the copy is unchanged"
 }
 
 CASES=(

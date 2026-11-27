@@ -431,29 +431,37 @@ RELAUNCH_ACTIVE=0
 RELAUNCH_PHASE=start
 RELAUNCH_PAIR_DIR=
 
-# rerecord-slot write-mode exits after step 3 (every one names the step 3 entries; after this run's own publish it also
-# says what the record and the audit record hold):
+# rerecord-slot write-mode exits after step 3. Every outcome line is stored (fm_slot_rerecord_report) and printed once,
+# by this trap, never printed by the step and then flagged; every line that says what the task record holds reads its
+# bytes at print time (fm_slot_rerecord_record_state: staged, prior, neither or unreadable). Each names the step 3
+# entries, and after this run's own publish also what the record and the audit record hold:
 # - do_rerecord_slot step 3 rc 1 (rerecord_audit_unreadable via rerecord_refuse): acts on no audit record first, so
 #   "error: slot rerecord refused: rerecord_audit_unreadable: ...; no record, manifest, copy or journal was changed".
-# - do_rerecord_slot step 3 rc 2: the restore's own error, then "error: before stopping, this run reconciled ...".
+# - do_rerecord_slot step 3 rc 2: the restore's own error, then "error: before stopping, this run reconciled ..." when
+#   an earlier audit record was closed, otherwise nothing more (fm_slot_rerecord_report_none).
 # - rerecord_refuse (every proof, archive, rebind): "error: slot rerecord refused: <reason>: <detail>; before refusing, ...".
 # - rerecord_die (snapshot, stage, staged sha, note, audit body, failed publish): "error: <what failed>; before stopping, ...".
 # - do_rerecord_slot no-op exit 0: "already recorded", then "before finding it already recorded, ...".
-# - rerecord_die after a publish that reported failure but landed: "...; this run published ... and then restored ...".
-# - fm_slot_rerecord_refuse adopt_postcheck_failed: "...; this run published ... and then restored the prior record ...".
-# - rerecord_die after the audit record could not be closed as published: "...; this run published ... restored ...".
-# - rerecord_rollback when the restore fails: "error: this run published ... the prior record could not be restored ...".
+# - rerecord_die after a publish that reported failure but landed, fm_slot_rerecord_refuse adopt_postcheck_failed, and
+#   rerecord_die after the audit record could not be closed as published: "...; this run published ... and then restored
+#   the prior record ..." (fm_slot_rerecord_restored, after a rollback that succeeded).
+# - rerecord_rollback when the rollback fails: the rollback's own error, then "error: this run published ..." with what the
+#   record holds: restored (a restore publish that reported failure after its rename landed, named), not restored,
+#   neither, or that the record could not be read.
 # - do_rerecord_slot success return: the summary line, then "before publishing, ...".
 # - control_cleanup discard (a signal or error before publish): the final block's "error: before stopping, ...".
-# - control_cleanup rollback, this run's publish: "this run published ... and then restored ..." or "could not be restored".
+# - control_cleanup rollback, this run's publish: "this run published ..." as rerecord_rollback reports it.
 # - control_cleanup rollback, a step 3 restore: closes that audit record into the entries, then the final block.
-# - control_cleanup keep (publishing, committing, restoring), only for a signal during an in-flight rename: "error: this
-#   run stopped while <stage> ... the record now holds ...; the audit record <file> is left <result> ...". After a failed
-#   restore RERECORD_STAGE stays restoring, and the trap prints nothing because that exit already reported.
+# - control_cleanup keep (publishing, committing, restoring): "error: this run stopped while <stage> ... the record now
+#   holds ... (or could not be read); the audit record <file> ...". restoring is set before the restore is staged and
+#   copied, so keep also covers a signal there. After a failed restore RERECORD_STAGE stays restoring, and the trap adds
+#   nothing because that exit already stored its outcome.
+# - control_cleanup closing entry: a step 3 audit record whose rename landed before fm_slot_rerecord_closed recorded it
+#   (FM_RR_CLOSING) is read back and joins the entries, unless an entry for it is already recorded.
 # - control_cleanup final block: after this run's own publish "error: this run stopped after publishing ...", otherwise
 #   "error: before stopping, ..." (a signal before publish, or an error no message above reports); none when nothing acted.
 control_cleanup() {
-  local status=$? extra_lock published=0 whose="the earlier interrupted run's"
+  local status=$? extra_lock published=0 named whose="the earlier interrupted run's"
   if [ -n "$RERECORD_SNAP" ]; then
     whose="this run's"
     if [ -n "${FM_RR_S:-}" ] && [ -z "${FM_RR_STAGED:-}" ]; then published=1; fi
@@ -466,37 +474,38 @@ control_cleanup() {
      && declare -F reassociate_rollback >/dev/null 2>&1; then
     reassociate_rollback || true
   fi
-  if [ -n "$RERECORD_STAGE" ] && declare -F fm_slot_rerecord_trap_action >/dev/null 2>&1; then
-    case "$(fm_slot_rerecord_trap_action "$RERECORD_STAGE")" in
-      discard) fm_slot_rerecord_discard_staged || true ;;
-      rollback)
-        if [ -z "$RERECORD_SNAP" ]; then
-          if fm_slot_rerecord_rollback; then
-            fm_slot_rerecord_closed "$FM_RR_AUDIT" rolled-back "the task record was restored to the prior record's bytes" \
-              "the task record was restored to the prior record's bytes"
+  if declare -F fm_slot_rerecord_reported >/dev/null 2>&1; then
+    named=0
+    if [ -n "$RERECORD_STAGE" ]; then
+      case "$(fm_slot_rerecord_trap_action "$RERECORD_STAGE")" in
+        discard) fm_slot_rerecord_discard_staged || true ;;
+        rollback)
+          if [ -z "$RERECORD_SNAP" ]; then
+            if fm_slot_rerecord_rollback; then
+              fm_slot_rerecord_closed "$FM_RR_AUDIT" rolled-back "$(fm_slot_rerecord_record_effect)" "$(fm_slot_rerecord_record_effect)"
+            fi
+          elif fm_slot_rerecord_rollback; then
+            fm_slot_rerecord_reported || { named=1; fm_slot_rerecord_report err "rerecord-slot $FM_RR_ID: $(fm_slot_rerecord_restored)"; }
+          else
+            fm_slot_rerecord_reported || { named=1; fm_slot_rerecord_report err "error: $(fm_slot_rerecord_restored)"; }
           fi
-        elif fm_slot_rerecord_rollback; then
-          FM_RR_REPORTED=1
-          echo "rerecord-slot $FM_RR_ID: $(fm_slot_rerecord_restored)" >&2
-        else
-          FM_RR_REPORTED=1
-          echo "error: $(fm_slot_rerecord_restored unrestored)" >&2
-        fi
-        ;;
-      keep)
-        if [ "${FM_RR_REPORTED:-0}" != 1 ]; then
-          FM_RR_REPORTED=1
-          echo "error: $(fm_slot_rerecord_kept "$RERECORD_STAGE" "$whose")" >&2
-        fi
-        ;;
-    esac
-  fi
-  if [ "${FM_RR_REPORTED:-0}" != 1 ] && declare -F fm_slot_rerecord_changes >/dev/null 2>&1; then
-    if [ "$published" = 1 ]; then
-      echo "error: $(fm_slot_rerecord_kept '' "$whose")" >&2
-    elif [ -n "${FM_RR_RECONCILED:-}" ]; then
-      echo "error: $(fm_slot_rerecord_changes stopping '')" >&2
+          ;;
+        keep)
+          fm_slot_rerecord_reported || { named=1; fm_slot_rerecord_report err "error: $(fm_slot_rerecord_kept "$RERECORD_STAGE" "$whose")"; }
+          ;;
+      esac
     fi
+    [ "$named" = 1 ] || fm_slot_rerecord_closing_entry
+    if ! fm_slot_rerecord_reported; then
+      if [ "$published" = 1 ]; then
+        fm_slot_rerecord_report err "error: $(fm_slot_rerecord_kept '' "$whose")"
+      elif [ -n "${FM_RR_RECONCILED:-}" ]; then
+        fm_slot_rerecord_report err "error: $(fm_slot_rerecord_changes stopping '')"
+      fi
+    fi
+    # The one printer of a rerecord-slot run's outcome lines.
+    [ -z "$FM_RR_FINAL_OUT" ] || printf '%s' "$FM_RR_FINAL_OUT"
+    [ -z "$FM_RR_FINAL_ERR" ] || printf '%s' "$FM_RR_FINAL_ERR" >&2
   fi
   [ -z "$RERECORD_SNAP" ] || rm -rf -- "$RERECORD_SNAP"
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
@@ -3102,14 +3111,13 @@ rerecord_refuse() {
 
 rerecord_rollback() {
   fm_slot_rerecord_rollback && return 0
-  FM_RR_REPORTED=1
-  echo "error: $(fm_slot_rerecord_restored unrestored)" >&2
+  fm_slot_rerecord_report err "error: $(fm_slot_rerecord_restored)"
   exit 1
 }
 
-rerecord_die() { # <message naming the step 3 entries>
-  FM_RR_REPORTED=1
-  die "$1"
+rerecord_die() { # <message naming the step 3 entries>: stored for the EXIT trap, which prints it as die would
+  fm_slot_rerecord_report err "error: ${DIE_PREFIX}$1"
+  exit 1
 }
 
 do_rerecord_slot() {
@@ -3167,8 +3175,11 @@ do_rerecord_slot() {
     case $rc in
       0) ;;
       2)
-        [ -z "$FM_RR_RECONCILED" ] || echo "error: $(fm_slot_rerecord_changes stopping '')" >&2
-        FM_RR_REPORTED=1
+        if [ -n "$FM_RR_RECONCILED" ]; then
+          fm_slot_rerecord_report err "error: $(fm_slot_rerecord_changes stopping '')"
+        else
+          fm_slot_rerecord_report_none
+        fi
         exit 1
         ;;
       *) rerecord_refuse ;;
@@ -3232,9 +3243,11 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
       [ "$would" != pass ] || would="refuse:$stopped_proof"
     fi
     if [ "$noop" = 1 ]; then
-      echo "rerecord-slot $ID: already recorded"
-      [ -z "$FM_RR_RECONCILED" ] || echo "rerecord-slot $ID: $(fm_slot_rerecord_changes 'finding it already recorded' '')"
-      FM_RR_REPORTED=1
+      if [ -n "$FM_RR_RECONCILED" ]; then
+        fm_slot_rerecord_report out "rerecord-slot $ID: already recorded"$'\n'"rerecord-slot $ID: $(fm_slot_rerecord_changes 'finding it already recorded' '')"
+      else
+        fm_slot_rerecord_report out "rerecord-slot $ID: already recorded"
+      fi
     else
       echo "manifest_sha256=$manifest_sha"
       echo "base=$old_base -> $new_base"
@@ -3326,9 +3339,9 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
   added=$(grep -c '^added_scope=' "$snap/scope" || true)
   released=$(grep -c '^released_scope=' "$snap/scope" || true)
   side=$(grep -c '^side_branch_' "$snap/scope" || true)
-  echo "rerecord-slot $ID: base $old_base -> $new_base; scope $entries entries ($added added, $released released, $side side-branch); prior record archived at $FM_RR_ARCHIVE"
-  [ -z "$FM_RR_RECONCILED" ] || echo "rerecord-slot $ID: $(fm_slot_rerecord_changes publishing '')"
-  FM_RR_REPORTED=1
+  line="rerecord-slot $ID: base $old_base -> $new_base; scope $entries entries ($added added, $released released, $side side-branch); prior record archived at $FM_RR_ARCHIVE"
+  [ -z "$FM_RR_RECONCILED" ] || line="$line"$'\n'"rerecord-slot $ID: $(fm_slot_rerecord_changes publishing '')"
+  fm_slot_rerecord_report out "$line"
 }
 
 # --- verbs ------------------------------------------------------------------

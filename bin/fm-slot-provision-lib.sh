@@ -1310,8 +1310,47 @@ FM_RR_S=
 FM_RR_PENDING=
 # What a write run's step 3 reconciliation did to each pending or rolling-back audit record, as comma-joined phrases.
 FM_RR_RECONCILED=
-# 1 once this run's exit output names what its step 3 reconciliation did, so the EXIT trap does not print it again.
+# 1 once an exit has nothing more to report (a resumed restore that failed in step 3 and printed its own error), so the
+# EXIT trap adds nothing.
 FM_RR_REPORTED=0
+# The error a rollback's restore publish reported, named by fm_slot_rerecord_restored.
+FM_RR_RESTORE_ERROR=
+# A write run's outcome lines (stdout, stderr). fm_slot_rerecord_report stores them in one assignment each and only
+# fm-control's EXIT trap prints them, once, so no exit prints an outcome and then flags it as printed.
+FM_RR_FINAL_OUT=
+FM_RR_FINAL_ERR=
+# The step 3 audit record this run is closing (set before its rename, cleared by fm_slot_rerecord_closed), so the EXIT
+# trap can name an audit record whose rename landed before its entry was recorded.
+FM_RR_CLOSING=
+
+fm_slot_rerecord_report() { # <out|err> <text>: store <text> (one or more lines) as this run's outcome
+  if [ "$1" = out ]; then
+    FM_RR_FINAL_OUT="$FM_RR_FINAL_OUT$2"$'\n'
+  else
+    FM_RR_FINAL_ERR="$FM_RR_FINAL_ERR$2"$'\n'
+  fi
+}
+
+fm_slot_rerecord_report_none() { # an exit that already printed its own error and has nothing more to report
+  FM_RR_REPORTED=1
+}
+
+fm_slot_rerecord_reported() { # whether this run's outcome is already stored or nothing more is to be said
+  [ "${FM_RR_REPORTED:-0}" = 1 ] || [ -n "$FM_RR_FINAL_OUT$FM_RR_FINAL_ERR" ]
+}
+
+# For the EXIT trap: an audit record whose closing rename may have landed before fm_slot_rerecord_closed recorded it is
+# read back from disk and named, unless an entry for it is already recorded.
+fm_slot_rerecord_closing_entry() {
+  local audit=$FM_RR_CLOSING result
+  [ -n "$audit" ] || return 0
+  case ", $FM_RR_RECONCILED" in
+    *", audit $audit "*) FM_RR_CLOSING=; return 0 ;;
+  esac
+  result=$(fm_slot_rerecord_field "$audit" result 2>/dev/null) || result=
+  fm_slot_rerecord_reconciled "$audit" "reads ${result:-unreadable}" "this run stopped while closing it"
+  FM_RR_CLOSING=
+}
 
 fm_slot_rerecord_fail() { # <reason> <detail>
   FM_SLOT_RERECORD_REASON=$1
@@ -1330,42 +1369,81 @@ fm_slot_rerecord_changes() { # <refusing|stopping> <unchanged>
   fi
 }
 
-# What a run that published its own staged record and then restored the prior record did, or with "unrestored" what it
-# did when that restore failed, with every step 3 entry.
-fm_slot_rerecord_restored() { # [unrestored]
-  local entries='' outcome="then restored the prior record from $FM_RR_ARCHIVE"
-  [ "${1:-}" != unrestored ] || outcome="the prior record could not be restored; it is archived at $FM_RR_ARCHIVE"
+# What the task record holds now, read from its bytes at the moment of the call and never assumed from the step that ran:
+# staged (sha256 FM_RR_S), prior (FM_RR_P), neither, or unreadable when no sha256 can be read from it. A read that fails
+# is unreadable, never "neither".
+fm_slot_rerecord_record_state() {
+  local sha
+  sha=$(fm_slot_rerecord_sha "$FM_RR_META" 2>/dev/null) || sha=
+  if ! printf '%s\n' "$sha" | grep -Eqx '[0-9a-f]{64}'; then
+    printf 'unreadable\n'
+  elif [ -n "$FM_RR_S" ] && [ "$sha" = "$FM_RR_S" ]; then
+    printf 'staged\n'
+  elif [ -n "$FM_RR_P" ] && [ "$sha" = "$FM_RR_P" ]; then
+    printf 'prior\n'
+  else
+    printf 'neither\n'
+  fi
+}
+
+# A step 3 entry's record effect after it rolled an earlier interrupted run back, from fm_slot_rerecord_record_state.
+fm_slot_rerecord_record_effect() {
+  case "$(fm_slot_rerecord_record_state)" in
+    prior) printf "the task record was restored to the prior record's bytes\n" ;;
+    staged) printf "the task record still holds the interrupted run's published record\n" ;;
+    neither) printf 'the task record holds bytes that are neither the prior nor the staged record\n' ;;
+    *) printf 'the task record could not be read\n' ;;
+  esac
+}
+
+# What a run that published its own staged record did after its rollback, from what the record holds now
+# (fm_slot_rerecord_record_state), naming a restore publish that reported failure (FM_RR_RESTORE_ERROR), the audit
+# record and its result, and every step 3 entry.
+fm_slot_rerecord_restored() {
+  local entries='' outcome
+  case "$(fm_slot_rerecord_record_state)" in
+    prior)
+      outcome="then restored the prior record from $FM_RR_ARCHIVE"
+      [ -z "${FM_RR_RESTORE_ERROR:-}" ] ||
+        outcome="$outcome, although the restore publish reported failure ($FM_RR_RESTORE_ERROR)"
+      ;;
+    staged) outcome="the prior record could not be restored; it is archived at $FM_RR_ARCHIVE" ;;
+    neither)
+      outcome="the prior record could not be restored; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $FM_RR_ARCHIVE"
+      ;;
+    *)
+      outcome="could not tell whether the prior record was restored, because the task record could not be read; the prior record is archived at $FM_RR_ARCHIVE"
+      ;;
+  esac
   [ -z "$FM_RR_RECONCILED" ] || entries="; before publishing, this run reconciled earlier interrupted runs: $FM_RR_RECONCILED"
   printf "this run published task %s's record and %s; the audit record %s is %s%s; no manifest, copy or journal was changed\n" \
     "$FM_RR_ID" "$outcome" "$FM_RR_AUDIT" "$(fm_slot_rerecord_field "$FM_RR_AUDIT" result)" "$entries"
 }
 
 # What a run stopped while <stage> may still rename the task record or its audit record did, or with no <stage> what a run
-# stopped after its own publish did: what the record holds now (<whose> published record, the prior record, or neither),
-# the audit record and its result, and every step 3 entry.
+# stopped after its own publish did: what the record holds now (fm_slot_rerecord_record_state: <whose> published record,
+# the prior record, neither, or that it could not be read), the audit record and its result, and every step 3 entry.
 fm_slot_rerecord_kept() { # <stage-or-empty> <whose>
-  local sha what result audit when="after publishing task $FM_RR_ID's record"
+  local holds result audit when="after publishing task $FM_RR_ID's record"
   [ -z "$1" ] || when="while $1 task $FM_RR_ID's record, so that rename may still land"
-  sha=$(fm_slot_rerecord_sha "$FM_RR_META") || sha=
-  if [ -n "$sha" ] && [ "$sha" = "$FM_RR_S" ]; then
-    what="$2 published record"
-  elif [ -n "$sha" ] && [ "$sha" = "$FM_RR_P" ]; then
-    what="the prior record"
-  else
-    what="bytes that are neither the prior nor the staged record"
-  fi
+  case "$(fm_slot_rerecord_record_state)" in
+    staged) holds="the record now holds $2 published record" ;;
+    prior) holds='the record now holds the prior record' ;;
+    neither) holds='the record now holds bytes that are neither the prior nor the staged record' ;;
+    *) holds='the record could not be read' ;;
+  esac
   result=$(fm_slot_rerecord_field "$FM_RR_AUDIT" result 2>/dev/null) || result=
   case "$result" in
     pending|rolling-back) audit="is left $result for the next write run to reconcile" ;;
     *) audit="is ${result:-unreadable}" ;;
   esac
-  printf 'this run stopped %s; the record now holds %s; the audit record %s %s; %s\n' "$when" "$what" "$FM_RR_AUDIT" "$audit" \
+  printf 'this run stopped %s; %s; the audit record %s %s; %s\n' "$when" "$holds" "$FM_RR_AUDIT" "$audit" \
     "$(fm_slot_rerecord_changes stopping 'no manifest, copy or journal was changed')"
 }
 
-fm_slot_rerecord_refuse() { # <reason> <detail> [<tail>]
-  FM_RR_REPORTED=1
-  echo "error: slot rerecord refused: $1${2:+: $2}; ${3:-$(fm_slot_rerecord_changes refusing 'no record, manifest, copy or journal was changed')}" >&2
+fm_slot_rerecord_refuse() { # <reason> <detail> [<tail>]: stores the refusal for the EXIT trap to print
+  fm_slot_rerecord_report err \
+    "error: slot rerecord refused: $1${2:+: $2}; ${3:-$(fm_slot_rerecord_changes refusing 'no record, manifest, copy or journal was changed')}"
   return 1
 }
 
@@ -1383,6 +1461,7 @@ fm_slot_rerecord_closed() { # <audit> <result> <closed-effect> <record-effect>
   else
     fm_slot_rerecord_reconciled "$1" "could not be closed as $2" "$4; the audit stays ${now:-unreadable}"
   fi
+  FM_RR_CLOSING=
 }
 
 fm_slot_rerecord_sha() { # <file>
@@ -1403,14 +1482,26 @@ fm_slot_rerecord_field() { # <file> <key>
   sed -n "s/^$2=//p" "$1"
 }
 
-# A verdict file's first line: exactly ok, or "<reason><TAB><detail>" loaded as the refusal. The identity, base and scope
-# verdicts print exactly ok on success, so any other ok-prefixed line is malformed and refuses under <reason-if-empty>.
-fm_slot_rerecord_verdict_ok() { # <verdict-file> <reason-if-empty>
-  local line=
-  IFS= read -r line < "$1" 2>/dev/null || true
+# Whether a verdict passed: its first line is byte for byte "ok" and one newline (its first three bytes equal "ok\n"),
+# or with "whole" the whole file is exactly that. The identity, base and scope verdicts print exactly that on success.
+# The bytes are compared with cmp against "ok\n" piped from printf, never read into a variable, so a NUL, a missing
+# newline or a trailing blank line cannot pass. Both statuses of that one pipeline are read before the verdict: the
+# verdict passes only when printf and cmp both exit 0, so a missing or unreadable file, a failed write of "ok\n" or a
+# compare that cannot run does not pass. Otherwise the first line, "<reason><TAB><detail>", is loaded as the refusal,
+# and any other ok-prefixed or empty first line refuses under <reason-if-empty>.
+fm_slot_rerecord_verdict_ok() { # <verdict-file> <reason-if-empty> [whole]
+  local line='' st=()
+  if [ "${3:-}" = whole ]; then
+    printf 'ok\n' | cmp -s -- "$1" - 2>/dev/null
+    st=("${PIPESTATUS[@]}")
+  else
+    printf 'ok\n' | cmp -s -n 3 -- "$1" - 2>/dev/null
+    st=("${PIPESTATUS[@]}")
+  fi
+  [ "${#st[@]}" = 2 ] && [ "${st[0]}" = 0 ] && [ "${st[1]}" = 0 ] && return 0
+  IFS= read -r line 2>/dev/null < "$1" || true
   case "$line" in
-    ok) return 0 ;;
-    ok$'\t'*) fm_slot_rerecord_fail "$2" 'the verdict printed a malformed ok line' ;;
+    ok*) fm_slot_rerecord_fail "$2" 'the verdict printed a malformed ok line' ;;
     '') fm_slot_rerecord_fail "$2" 'the verdict could not be computed' ;;
     *$'\t'*) fm_slot_rerecord_fail "${line%%$'\t'*}" "${line#*$'\t'}" ;;
     *) fm_slot_rerecord_fail "$line" '' ;;
@@ -2129,14 +2220,24 @@ fm_slot_rerecord_discard_staged() {
 }
 
 # Step 7: after publish the record holds the staged bytes, the manifest and the copy HEAD are unchanged, the live manifest
-# still names this task's lease (owner re-read), and the real adoption check admits the published record.
+# still names this task's lease (owner re-read: the whole verdict output is byte for byte "ok" and one newline, through
+# fm_slot_rerecord_verdict_ok), and the real adoption check admits the published record. The owner re-read's output is
+# written beside <stderr-file>, which the caller already cleans up, and removed once judged.
 fm_slot_rerecord_postcheck() { # <meta> <staged-sha> <manifest> <manifest-sha> <copy> <head> <project> <task-id> <branch> <state-dir> <stderr-file>
-  local meta=$1 staged=$2 manifest=$3 msha=$4 copy=$5 head=$6 project=$7 id=$8 branch=$9 state=${10} err=${11} verdict
+  local meta=$1 staged=$2 manifest=$3 msha=$4 copy=$5 head=$6 project=$7 id=$8 branch=$9 state=${10} err=${11} owner rc=0
+  owner="$err.owner"
   fm_slot_rerecord_inputs_unchanged "$meta" "$staged" "$manifest" "$msha" "$copy" "$head" ||
     { fm_slot_rerecord_fail adopt_postcheck_failed "$FM_SLOT_RERECORD_DETAIL"; return 1; }
-  verdict=$(fm_slot_rerecord_identity_verdict "$manifest" "$copy" "$branch" "$id") || verdict=
-  [ "$verdict" = ok ] ||
-    { fm_slot_rerecord_fail adopt_postcheck_failed "the live manifest no longer names this task's lease: ${verdict:-unreadable}"; return 1; }
+  if ! fm_slot_rerecord_identity_verdict "$manifest" "$copy" "$branch" "$id" > "$owner"; then
+    fm_slot_rerecord_fail adopt_postcheck_failed "the live manifest no longer names this task's lease: the owner re-read could not run"
+    rc=1
+  elif ! fm_slot_rerecord_verdict_ok "$owner" manifest_unreadable whole; then
+    fm_slot_rerecord_fail adopt_postcheck_failed \
+      "the live manifest no longer names this task's lease: $FM_SLOT_RERECORD_REASON${FM_SLOT_RERECORD_DETAIL:+$'\t'$FM_SLOT_RERECORD_DETAIL}"
+    rc=1
+  fi
+  rm -f -- "$owner"
+  [ "$rc" = 0 ] || return 1
   if ! fm_slot_adopt_check "$project" "$copy" "$id" "$branch" "$meta" "$state" 2> "$err"; then
     fm_slot_rerecord_fail adopt_postcheck_failed "adoption refuses the published record ($(sed -n '1{s/^[^:]*: [^:]*: //;s/; [^;]*$//;p;}' "$err" 2>/dev/null))"
     return 1
@@ -2156,27 +2257,45 @@ fm_slot_rerecord_commit() {
   return 1
 }
 
+# What the task record holds now, as a clause for a rollback's own messages (fm_slot_rerecord_record_state): <if-staged>
+# when it still holds the published record the rollback was to replace, otherwise what it does hold and the archive.
+fm_slot_rerecord_record_holds() { # <if-staged>
+  case "$(fm_slot_rerecord_record_state)" in
+    staged) printf '%s\n' "$1" ;;
+    prior) printf 'the record holds the prior record, which is also archived at %s\n' "$FM_RR_ARCHIVE" ;;
+    neither) printf 'the record holds bytes that are neither the prior nor the staged record; the prior record is archived at %s\n' "$FM_RR_ARCHIVE" ;;
+    *) printf 'the record could not be read; the prior record is archived at %s\n' "$FM_RR_ARCHIVE" ;;
+  esac
+}
+
 # Step 9: restore the prior record from its archive through a fresh state/ copy and the same publisher, then verify it.
-# The archive is never moved, edited or deleted.
+# The archive is never moved, edited or deleted. Every failure returns 1, even one after which the record reads as the
+# prior bytes (a publish that reported failure after its rename landed): each message says what the record holds now.
 fm_slot_rerecord_rollback() {
   local restore
+  FM_RR_RESTORE_ERROR=
   fm_slot_rerecord_audit_set "$FM_RR_AUDIT" rolling-back ||
     echo "warning: the audit record $FM_RR_AUDIT could not be marked rolling-back" >&2
   RERECORD_STAGE=restoring
   restore=$(mktemp "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-restore.XXXXXX") ||
-    { echo "error: could not stage the restore of task $FM_RR_ID's record; the prior record is archived at $FM_RR_ARCHIVE" >&2; return 1; }
+    { echo "error: could not stage the restore of task $FM_RR_ID's record; $(fm_slot_rerecord_record_holds "the prior record is archived at $FM_RR_ARCHIVE")" >&2; return 1; }
   if ! cp -p -- "$FM_RR_ARCHIVE" "$restore" || [ "$(fm_slot_rerecord_sha "$restore")" != "$FM_RR_P" ]; then
     rm -f -- "$restore"
-    echo "error: the archive $FM_RR_ARCHIVE of task $FM_RR_ID's prior record could not be copied back intact; the record was not restored" >&2
+    echo "error: the archive $FM_RR_ARCHIVE of task $FM_RR_ID's prior record could not be copied back intact; $(fm_slot_rerecord_record_holds 'the record was not restored')" >&2
     return 1
   fi
   if ! fm_backlog_atomic_transition publish "$restore" "$FM_RR_META" "task record" "$FM_RR_STATE"; then
     rm -f -- "$restore"
-    echo "error: task $FM_RR_ID's prior record could not be restored (${FM_BACKLOG_TRANSITION_ERROR:-publish failed}); it is archived at $FM_RR_ARCHIVE" >&2
+    FM_RR_RESTORE_ERROR=${FM_BACKLOG_TRANSITION_ERROR:-publish failed}
+    if [ "$(fm_slot_rerecord_record_state)" = prior ]; then
+      echo "error: the restore publish of task $FM_RR_ID's record reported failure ($FM_RR_RESTORE_ERROR) after its rename landed; the record holds the prior record, which is also archived at $FM_RR_ARCHIVE" >&2
+    else
+      echo "error: task $FM_RR_ID's prior record could not be restored ($FM_RR_RESTORE_ERROR); $(fm_slot_rerecord_record_holds "it is archived at $FM_RR_ARCHIVE")" >&2
+    fi
     return 1
   fi
   [ "$(fm_slot_rerecord_sha "$FM_RR_META")" = "$FM_RR_P" ] ||
-    { echo "error: task $FM_RR_ID's restored record does not read back with sha256 $FM_RR_P; the prior record is archived at $FM_RR_ARCHIVE" >&2; return 1; }
+    { echo "error: task $FM_RR_ID's restored record does not read back with sha256 $FM_RR_P; $(fm_slot_rerecord_record_holds "the prior record is archived at $FM_RR_ARCHIVE")" >&2; return 1; }
   fm_slot_rerecord_audit_set "$FM_RR_AUDIT" rolled-back ||
     echo "warning: the audit record $FM_RR_AUDIT could not be marked rolled-back" >&2
   RERECORD_STAGE='done'
@@ -2231,6 +2350,7 @@ fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
     fi
     case "$state" in
       untouched-prior)
+        FM_RR_CLOSING=$audit
         if [ "$result" = pending ]; then
           fm_slot_rerecord_audit_set "$audit" abandoned
           fm_slot_rerecord_closed "$audit" abandoned "the audit was closed with the task record left unchanged" "the task record was left unchanged"
@@ -2240,6 +2360,7 @@ fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
         fi
         ;;
       untouched-staged)
+        FM_RR_CLOSING=$audit
         FM_RR_AUDIT=$audit
         FM_RR_ARCHIVE=$(fm_slot_rerecord_field "$audit" archive)
         FM_RR_P=$(fm_slot_rerecord_field "$audit" prior_sha256)
@@ -2254,8 +2375,7 @@ fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
           rm -f -- "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap.adopt-err"
           RERECORD_STAGE=published
           fm_slot_rerecord_rollback || return 2
-          fm_slot_rerecord_closed "$audit" rolled-back "the task record was restored to the prior record's bytes" \
-            "the task record was restored to the prior record's bytes"
+          fm_slot_rerecord_closed "$audit" rolled-back "$(fm_slot_rerecord_record_effect)" "$(fm_slot_rerecord_record_effect)"
           echo "note: the interrupted re-record of task $FM_RR_ID recorded in $audit was rolled back${FM_SLOT_RERECORD_DETAIL:+ ($FM_SLOT_RERECORD_DETAIL)}" >&2
         fi
         rm -f -- "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap.adopt-err"
@@ -2266,10 +2386,12 @@ fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
         RERECORD_STAGE=
         ;;
       superseded-new)
+        FM_RR_CLOSING=$audit
         fm_slot_rerecord_audit_set "$audit" "$state"
         fm_slot_rerecord_closed "$audit" "$state" "the audit was closed with the record left as published" "the record was left as published"
         ;;
       superseded-prior|superseded-other)
+        FM_RR_CLOSING=$audit
         fm_slot_rerecord_audit_set "$audit" "$state"
         fm_slot_rerecord_closed "$audit" "$state" "the audit was closed with the task record left unchanged" "the task record was left unchanged"
         ;;

@@ -1019,7 +1019,95 @@ test_RP3_a_malformed_ok_verdict_is_refused_and_changes_nothing() {
   out=$(rr_write); rc=$?
   expect_code 0 "$rc" "RP3-exact: a stand-in printing exactly ok did not reach the normal publish"$'\n'"$out"
   [ "$slot" != "$(rr_slot_lines)" ] || fail "RP3-exact: a stand-in printing exactly ok published no renewal"$'\n'"$out"
-  rr_ok RP3 "a stand-in identity verdict printing ok<TAB>x is refused manifest_unreadable and the record, manifest, copy and journal are unchanged; printing exactly ok, the same run publishes"
+  rr_make_f RP3-unterminated
+  rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_identity_verdict() { printf 'ok'; return 0; }"
+  before=$(rr_copy_journal_fp)
+  rr_expect_refusal RP3-unterminated 'manifest_unreadable: the verdict printed a malformed ok line;'
+  [ "$before" = "$(rr_copy_journal_fp)" ] || fail "RP3-unterminated: a refused run changed the copy or the journal"
+  rr_ok RP3 "a stand-in identity verdict printing ok<TAB>x, or ok with no newline, is refused manifest_unreadable and the record, manifest, copy and journal are unchanged; printing exactly ok, the same run publishes"
+}
+
+# The post-publish owner re-read passes only when the whole verdict output is exactly ok and one newline: a stand-in that
+# prints ok and a blank line passes the identity step, whose first line is ok, but fails the re-read, so the run rolls the
+# published record back and refuses adopt_postcheck_failed.
+test_RP4_the_owner_reread_compares_the_whole_verdict() {
+  local out rc p a
+  rr_make_f RP4
+  p=$(rr_sha "$RR_META")
+  rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_identity_verdict() { printf 'ok\\n\\n'; return 0; }"
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "RP4: the write was expected to refuse"$'\n'"$out"
+  assert_contains "$out" "error: slot rerecord refused: adopt_postcheck_failed: the live manifest no longer names this task's lease: manifest_unreadable"$'\t'"the verdict printed a malformed ok line" "RP4"
+  a=$(rr_audits)
+  [ "$(rr_sha "$RR_META")" = "$p" ] || fail "RP4: the record is not the prior record"$'\n'"$out"
+  [ "$(rr_field "$a" result)" = rolled-back ] || fail "RP4: the audit is '$(rr_field "$a" result)', not rolled-back"
+  rr_ok RP4 "a stand-in identity verdict printing ok and a blank line passes the identity step but fails the whole-output owner re-read: adopt_postcheck_failed, rolled back to the prior record"
+}
+
+# What a rollback reports comes from the record's bytes at print time. A restore publish whose rename lands but whose
+# post-rename check fails leaves the prior record: the run fails, and says the prior record was restored and names the
+# publisher's error. A restore publish that leaves no readable record is reported as unreadable, not as other bytes.
+rr_restore_publish_shim() { # <body run in place of the restore's publish>
+  rr_wrap fm-backlog-transition-lib.sh fm_backlog_atomic_transition
+  rr_shim fm-backlog-transition-lib.sh "fm_backlog_atomic_transition() { case \"\${2:-}\" in *.meta.rerecord-restore.*) $1 ;; esac; real_fm_backlog_atomic_transition \"\$@\"; }"
+}
+test_RB1_a_restore_publish_that_fails_after_its_rename_reports_the_prior_record() {
+  local out rc p a
+  rr_setup_SF4head RB1
+  p=$(rr_sha "$RR_META")
+  rr_restore_publish_shim 'real_fm_backlog_atomic_transition "$@" || return; FM_BACKLOG_TRANSITION_ERROR="injected post-rename check failure"; return 1'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "RB1: the run was expected to fail"$'\n'"$out"
+  a=$(rr_audits)
+  [ "$(rr_sha "$RR_META")" = "$p" ] || fail "RB1: the restore rename did not land"$'\n'"$out"
+  assert_contains "$out" "error: the restore publish of task $RR_ID's record reported failure (injected post-rename check failure) after its rename landed; the record holds the prior record, which is also archived at $(rr_field "$a" archive)" "RB1"
+  assert_contains "$out" "error: this run published task $RR_ID's record and then restored the prior record from $(rr_field "$a" archive), although the restore publish reported failure (injected post-rename check failure); the audit record $a is rolling-back" "RB1"
+  assert_not_contains "$out" "could not be restored" "RB1: the record holds the prior bytes"
+  rr_ok RB1 "a restore publish that fails after its rename lands: the run fails, says the prior record was restored and names the publisher's error"
+}
+test_RB2_a_restore_publish_that_leaves_no_readable_record_reports_it_unreadable() {
+  local out rc a
+  rr_setup_SF4head RB2
+  rr_restore_publish_shim 'rm -f -- "$3"; FM_BACKLOG_TRANSITION_ERROR="injected publish failure that removed the record"; return 1'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "RB2: the run was expected to fail"$'\n'"$out"
+  a=$(rr_audits)
+  [ ! -e "$RR_META" ] || fail "RB2: the fixture did not remove the record"
+  assert_contains "$out" "error: task $RR_ID's prior record could not be restored (injected publish failure that removed the record); the record could not be read; the prior record is archived at $(rr_field "$a" archive)" "RB2"
+  assert_contains "$out" "error: this run published task $RR_ID's record and could not tell whether the prior record was restored, because the task record could not be read; the prior record is archived at $(rr_field "$a" archive)" "RB2"
+  assert_not_contains "$out" "neither the prior" "RB2: an unreadable record must not be reported as other bytes"
+  rr_ok RB2 "a restore publish that leaves no readable record: both the rollback's error and the run's outcome say the record could not be read"
+}
+
+# The EXIT trap is the one printer. A TERM right after a step 3 audit rename lands, before its entry is recorded, still
+# names that audit, once; a TERM right after the success lines are stored prints them, once.
+test_TS1_term_after_a_step_3_audit_rename_names_that_audit_once() {
+  local out rc p a
+  rr_make_f TS1
+  p=$(rr_sha "$RR_META")
+  rr_crash_run "$RR_META" before 1
+  a=$(rr_audit_for "$p") || fail "TS1: no audit record after the crash"
+  rr_wrap fm-slot-provision-lib.sh fm_slot_rerecord_audit_set
+  rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_audit_set() { real_fm_slot_rerecord_audit_set "$@" || return; [ "${2:-}" != abandoned ] || kill -TERM $$; }'
+  out=$(rr_write); rc=$?
+  [ "$rc" != 0 ] || fail "TS1: the TERM did not stop the run"$'\n'"$out"
+  [ "$(rr_field "$a" result)" = abandoned ] || fail "TS1: the audit is '$(rr_field "$a" result)', not abandoned"
+  assert_contains "$out" "error: before stopping, this run reconciled earlier interrupted runs: audit $a reads abandoned (this run stopped while closing it); no manifest, copy or journal was changed" "TS1"
+  [ "$(printf '%s\n' "$out" | grep -c -F "audit $a ")" = 1 ] || fail "TS1: the audit was not named exactly once"$'\n'"$out"
+  [ "$(rr_sha "$RR_META")" = "$p" ] || fail "TS1: the record changed"
+  rr_ok TS1 "a TERM right after a step 3 audit rename, before its entry is recorded: the trap reads the audit back and names it once"
+}
+test_TS2_term_after_the_outcome_is_stored_prints_it_once() {
+  local out rc
+  rr_make_f TS2
+  rr_wrap fm-slot-provision-lib.sh fm_slot_rerecord_report
+  rr_shim fm-slot-provision-lib.sh 'fm_slot_rerecord_report() { real_fm_slot_rerecord_report "$@"; [ "${1:-}" != out ] || kill -TERM $$; }'
+  out=$(rr_write); rc=$?
+  [ "$rc" = 143 ] || fail "TS2: expected the TERM exit 143, got $rc"$'\n'"$out"
+  [ "$(rr_results)" = published ] || fail "TS2: the audit is '$(rr_results)', not published"
+  [ "$(printf '%s\n' "$out" | grep -c "^rerecord-slot $RR_ID: base ")" = 1 ] || fail "TS2: the summary line was not printed exactly once"$'\n'"$out"
+  assert_not_contains "$out" 'this run stopped' "TS2: the stored outcome must not be followed by a stop line"
+  rr_ok TS2 "a TERM right after the success lines are stored: the trap prints them once and nothing else"
 }
 
 
@@ -2240,10 +2328,11 @@ test_S25_once_check_fails_S20_S22_and_S7_R1b() {
   if rr_term_runs_trap_with_child; then
     rr_once_control test_S20_publishing_rolls_back S25-S20
     rr_once_control test_S22_committing_rolls_back S25-S22
+    rr_ok S25 "S7/R1b, S20 and S22 each fail with the once-check message when one outcome line is planted twice, and pass without it"
   else
     rr_record S25 unverified "this bash holds TERM until the foreground child exits, so S20 and S22 skip their runs and have no output to plant in"
+    rr_ok S25 "S7/R1b fails with the once-check message when one outcome line is planted twice, and passes without it; S20 and S22 are unverified on this bash, which holds TERM until the foreground child exits"
   fi
-  rr_ok S25 "S7/R1b, S20 and S22 each fail with the once-check message when one outcome line is planted twice, and pass without it"
 }
 # SF4's control: remove only the post-publish comparison (the second fm_slot_rerecord_inputs_unchanged call).
 test_SF4c_post_publish_comparison() {
@@ -2343,6 +2432,11 @@ test_E2_relaunch_without_rerecord_refuses_base_mismatch
 test_RP1_the_replay_and_the_write_give_one_content_verdict
 test_RP2_a_verdict_that_exits_non_zero_is_refused_on_both_paths
 test_RP3_a_malformed_ok_verdict_is_refused_and_changes_nothing
+test_RP4_the_owner_reread_compares_the_whole_verdict
+test_RB1_a_restore_publish_that_fails_after_its_rename_reports_the_prior_record
+test_RB2_a_restore_publish_that_leaves_no_readable_record_reports_it_unreadable
+test_TS1_term_after_a_step_3_audit_rename_names_that_audit_once
+test_TS2_term_after_the_outcome_is_stored_prints_it_once
 test_H1_owner_mismatch
 test_H2_worktree_path_mismatch
 test_H3_base_not_forward
