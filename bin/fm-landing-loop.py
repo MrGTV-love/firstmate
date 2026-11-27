@@ -269,7 +269,7 @@ def gh_pr_live_snapshot(owner, repo, number, timeout=GH_TIMEOUT):
     )
     res = run(
         ["gh", "api", "graphql", "-f", f"query={query}",
-         "-F", f"owner={owner}", "-F", f"repo={repo}", "-F", f"number={int(number)}"],
+         "-f", f"owner={owner}", "-f", f"repo={repo}", "-F", f"number={int(number)}"],
         timeout=timeout,
     )
     if res.returncode != 0:
