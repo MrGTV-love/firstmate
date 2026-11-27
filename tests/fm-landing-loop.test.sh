@@ -214,12 +214,14 @@ JSON
   write_fake_gh "$shim" "$dir/gh.json"
   PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "direct-PR step must exit 0"
   PATH="$shim:$PATH" wait_for_inflight_done "$home" || fail "direct-PR update must finish"
-  local new_remote
+  local new_remote wt_head
   new_remote=$(git --git-dir="$dir/repo/origin.git" rev-parse refs/heads/fm/direct-a)
+  wt_head=$(git -C "$wt" rev-parse HEAD)
   [ "$new_remote" != "$head" ] || fail "direct-PR update must push a new head to origin"
+  assert_equals "$head" "$wt_head" "direct-PR scratch merge must not mutate the task worktree HEAD"
   git --git-dir="$dir/repo/origin.git" merge-base --is-ancestor "$tip" "$new_remote" \
     || fail "pushed direct-PR head must contain the base tip"
-  pass "direct-PR clean stale-base update merges origin/main and pushes cleanly"
+  pass "direct-PR clean stale-base update merges base in scratch and pushes exact commit cleanly"
 }
 
 test_failed_update_backs_off_and_wakes_main_once() {
@@ -418,11 +420,47 @@ JSON
   pass "train command proves cumulative conflict-free batch, excludes wrong-base and conflicting PRs, protects existing branches, builds under merge.ff=only, and emits canonical Train-member closes block"
 }
 
+test_unreadable_nm_status_fails_closed() {
+  local dir="$TMP_ROOT/nm-status-fail" home="$TMP_ROOT/nm-status-fail/home" shim="$TMP_ROOT/nm-status-fail/shim"
+  mkdir -p "$home/state" "$home/config" "$home/data"
+  local info wt head tip
+  info=$(make_git_pair "$dir/repo" "fm/status-fail" "sf.txt" "main-sf.txt" 0)
+  read -r wt head tip <<< "$info"
+  local url="https://github.com/example/repo/pull/107"
+  fm_write_meta "$home/state/status-fail.meta" "kind=ship" "mode=no-mistakes" "branch=fm/status-fail" "worktree=$wt" "pr=$url"
+  cat > "$dir/gh.json" <<JSON
+{
+  "prs": {
+    "$url": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/status-fail", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
+  },
+  "compares": {
+    "$head": {"base_commit": {"sha": "$tip"}, "behind_by": 1}
+  }
+}
+JSON
+  write_fake_gh "$shim" "$dir/gh.json"
+  cat > "$shim/no-mistakes" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = axi ] && [ "\$2" = status ]; then
+  exit 127
+fi
+printf 'unexpected rerun\n' >> "$dir/nm.log"
+exit 0
+SH
+  chmod +x "$shim/no-mistakes"
+  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "status-fail step must exit 0"
+  "$JQ_BIN" -e '.tasks["status-fail"].action == "busy"' "$home/state/.landing-loop/state.json" >/dev/null \
+    || fail "unreadable/timed-out no-mistakes axi status must fail closed as busy"
+  [ ! -e "$dir/nm.log" ] || fail "must not launch rerun when no-mistakes axi status fails"
+  pass "unreadable or timed-out no-mistakes axi status fails closed as busy without launching rerun"
+}
+
 fm_test_run_cases \
   test_serial_admission_updates_one_clean_stale_pr_at_a_time \
   test_conflict_holds_and_emits_single_wake \
   test_direct_pr_merges_base_and_pushes_cleanly \
   test_direct_pr_refuses_unpushed_local_commits_and_wakes_once \
+  test_unreadable_nm_status_fails_closed \
   test_failed_update_backs_off_and_wakes_main_once \
   test_train_plans_and_builds_conflict_free_batch_excluding_conflicts \
   test_launchd_installer_renders_installs_and_uninstalls -- "$@"
