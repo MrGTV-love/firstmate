@@ -91,7 +91,7 @@ decision:      allow | deny | warn, plus the fail direction when the source is u
 remedy:        the exact runnable command that clears it, expanded for this home
 budget:        max consecutive blocks per turn, and what happens after
 telemetry:     one event per rule decision, guard, rule, task, session, decision, source_ok, elapsed_ms, cleared_by
-test:          the fixture that proves both the block and the pass; a comma-separated list when the proof spans files, naming at least one file, each of which must exist
+test:          the fixture that proves both the block and the pass; a comma-separated list when the proof spans files, naming at least one file; each item loses only its outer spaces and tabs and must exist exactly as written
 ```
 
 Registry-only fields carry what the audit scores: `tier`, `harm`,

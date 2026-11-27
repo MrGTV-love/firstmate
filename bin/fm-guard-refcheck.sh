@@ -39,6 +39,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=bin/fm-guard-registry-lib.sh
+. "$SCRIPT_DIR/fm-guard-registry-lib.sh"
 REGISTRY=''
 RETIRED=
 JSON=0
@@ -124,7 +126,9 @@ EOF
 # Registry wiring: spec, owner and test paths resolve.
 registry_missing=0
 if [ -f "$REGISTRY" ]; then
-  while IFS=$'\t' read -r id owner test; do
+  while IFS= read -r entry; do
+    id=$(printf '%s' "$entry" | jq -r '.id // ""')
+    owner=$(printf '%s' "$entry" | jq -r '.owner // ""')
     for f in $(printf '%s\n' "$owner" | tr ',' '\n' | tr '+' '\n'); do
       f=$(printf '%s' "$f" | tr -d ' \t')
       [ -n "$f" ] || continue
@@ -134,22 +138,24 @@ if [ -f "$REGISTRY" ]; then
         printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
       fi
     done
-    # A test list with no path left after dropping empty items names no test, so nothing proves the guard.
-    test_paths=$(printf '%s\n' "$test" | tr ',' '\n' | tr -d ' \t' | grep -v '^$' || true)
-    if [ -z "$test_paths" ]; then
-      registry_missing=$((registry_missing + 1))
-      [ "$JSON" -eq 1 ] || printf 'MISSING (no test path) registration=registry:%s\n' "$id"
-      printf 'MISSING\t(no test path)\tregistry:%s\n' "$id" >>"$FINDINGS"
+    # bin/fm-guard-registry-lib.sh owns how the test field is read. Each item must exist exactly as written; a field
+    # that cannot be read, names no item, or holds an item with a line break proves nothing about the guard.
+    if ! test_items=$(fm_guard_registry_test_items "$entry"); then
+      test_items=$'invalid\t(the test field cannot be read)'
+    elif [ -z "$test_items" ]; then
+      test_items=$'invalid\t(no test path)'
     fi
-    for f in $test_paths; do
-      if [ ! -e "$ROOT/$f" ]; then
-        registry_missing=$((registry_missing + 1))
-        [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"
-        printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
-      fi
-    done
+    while IFS= read -r line; do
+      f=${line#*$'\t'}
+      [ "${line%%$'\t'*}" != path ] || [ ! -e "$ROOT/$f" ] || continue
+      registry_missing=$((registry_missing + 1))
+      [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"
+      printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
+    done <<EOF
+$test_items
+EOF
   done <<EOF
-$(jq -r '.guards[] | [.id, (.owner // ""), (.test // "")] | @tsv' "$REGISTRY")
+$(jq -c '.guards[]' "$REGISTRY")
 EOF
   spec=$(jq -r '.spec // empty' "$REGISTRY")
   if [ -n "$spec" ] && [ ! -e "$ROOT/$spec" ]; then

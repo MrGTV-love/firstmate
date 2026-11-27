@@ -127,6 +127,24 @@ for empty in '' ',' ', ,'; do
   assert_fails_with "a registry test list naming no path fails ('$empty')" "$NOTEST" "MISSING (no test path) registration=registry:gguard"
 done
 
+# Each item is checked exactly as written: only its outer spaces and tabs are trimmed, so an inner space stays part of
+# the path, and a path that differs from an existing file only by that space does not exist.
+set_registry_test() {  # <root> <test-field> <message>
+  jq --arg t "$2" '.guards[0].test = $t' "$1/docs/guards/registry.json" >"$1/registry.tmp"
+  mv "$1/registry.tmp" "$1/docs/guards/registry.json"
+  $GIT "$1" add -A
+  $GIT "$1" -c user.email=t@example.invalid -c user.name=t commit -qm "$3"
+}
+INNER=$(fixture innerspace)
+set_registry_test "$INNER" 'tests/gguard. test.sh' 'inner space'
+assert_fails_with "a registry test path with an inner space that names no file fails" "$INNER" "MISSING tests/gguard. test.sh registration=registry:gguard"
+TRIMMED=$(fixture trimmed)
+: >"$TRIMMED/tests/gguard-real.test.sh"
+set_registry_test "$TRIMMED" ' tests/gguard.test.sh , tests/gguard-real.test.sh ' 'outer spaces'
+assert_clean "a registry test list whose items carry outer spaces is clean" "$TRIMMED"
+rm -f "$TRIMMED/tests/gguard-real.test.sh"
+assert_fails_with "the second trimmed registry test item is checked too" "$TRIMMED" "MISSING tests/gguard-real.test.sh registration=registry:gguard"
+
 REGSPEC=$(fixture regspec)
 jq '.spec = "docs/guard-spec.md"' "$REGSPEC/docs/guards/registry.json" >"$REGSPEC/registry.tmp"
 mv "$REGSPEC/registry.tmp" "$REGSPEC/docs/guards/registry.json"

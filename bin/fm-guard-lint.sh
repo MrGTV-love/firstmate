@@ -58,6 +58,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=bin/fm-guard-registry-lib.sh
+. "$SCRIPT_DIR/fm-guard-registry-lib.sh"
 
 MODE=enforce
 BASE_REF=origin/main
@@ -200,7 +202,6 @@ while IFS= read -r entry; do
   budget=$(printf '%s' "$entry" | jq -r '.budget | if type == "number" then tostring else . end')
   budget_reason=$(printf '%s' "$entry" | jq -r '.budget_reason // ""')
   telemetry=$(printf '%s' "$entry" | jq -r '.telemetry // ""')
-  test=$(printf '%s' "$entry" | jq -r '.test // ""')
   decision=$(printf '%s' "$entry" | jq -r '.decision // ""')
   precheck_gap=$(printf '%s' "$entry" | jq -r '.precheck_gap // ""')
   proxy=$(printf '%s' "$entry" | jq -r '.proxy // false')
@@ -258,15 +259,20 @@ while IFS= read -r entry; do
       [ -e "$ROOT/$f" ] || printf 'R7\t%s\tnonexistent owner file %s\n' "$id" "$f" >>"$VIOLATIONS"
     done
   fi
-  # The test field is a comma list; a list with no path left after dropping empty items names no test, the same as "".
-  test_paths=$(printf '%s\n' "$test" | tr ',' '\n' | tr -d ' \t' | grep -v '^$' || true)
-  if [ -z "$test_paths" ]; then
+  # bin/fm-guard-registry-lib.sh owns how the test field is read; each item it returns must exist exactly as written,
+  # and a field it cannot read, or one that names no item, is refused like an empty field.
+  if ! test_items=$(fm_guard_registry_test_items "$entry"); then
+    violation R7 "$id" "test field cannot be read"
+  elif [ -z "$test_items" ]; then
     violation R7 "$id" "test is empty"
   else
-    while IFS= read -r f; do
-      [ -e "$ROOT/$f" ] || violation R7 "$id" "nonexistent test file $f"
+    while IFS= read -r line; do
+      case "${line%%$'\t'*}" in
+        path) [ -e "$ROOT/${line#*$'\t'}" ] || violation R7 "$id" "nonexistent test file ${line#*$'\t'}" ;;
+        *) violation R7 "$id" "test path ${line#*$'\t'} holds a line break" ;;
+      esac
     done <<EOF
-$test_paths
+$test_items
 EOF
   fi
 

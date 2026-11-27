@@ -176,6 +176,18 @@ for empty in '' ',' ', ,'; do
   assert_fails_with "R7 fails a test list naming no file ('$empty')" "$NOTEST" R7
 done
 
+# Each item is checked exactly as written: only its outer spaces and tabs are trimmed, so an inner space stays part of
+# the path, and a path that differs from an existing file only by that space does not exist.
+INNER=$(fixture innerspace)
+mutate "$INNER" '.guards[0].test = "tests/gguard. test.sh"'
+assert_fails_with "R7 fails a test path with an inner space that names no file" "$INNER" R7
+TRIMMED=$(fixture trimmed)
+: >"$TRIMMED/tests/gguard-real.test.sh"
+mutate "$TRIMMED" '.guards[0].test = " tests/gguard.test.sh , tests/gguard-real.test.sh "'
+assert_clean "R7 accepts a test list whose items carry outer spaces" "$TRIMMED"
+rm -f "$TRIMMED/tests/gguard-real.test.sh"
+assert_fails_with "R7 checks the second trimmed item too" "$TRIMMED" R7
+
 # --- R8 telemetry -----------------------------------------------------------
 NOTEL=$(fixture notel)
 mutate "$NOTEL" '.guards[0].telemetry = ""'
