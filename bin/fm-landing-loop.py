@@ -610,9 +610,10 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                 log_path.write_text(detail + "\n", encoding="utf-8")
             else:
                 logs = []
+                # Single atomic GraphQL snapshot of state, baseRefName, baseRefOid, and headRefOid
+                # immediately before PUT /update-branch (no second compare round-trip between them).
                 pre_view = gh_pr_view(pr_url)
-                live_cmp = gh_compare(owner, repo_name, base_name, expected_head) if pre_view else None
-                if not pre_view or not live_cmp:
+                if not pre_view:
                     rc = 1
                     detail = f"could not re-verify live PR state and {base_name} tip before update-branch"
                 elif str(pre_view.get("state", "")).upper() != "OPEN" or pre_view.get("isDraft") is not False:
@@ -624,9 +625,9 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                 elif pre_view.get("headRefOid") != expected_head:
                     rc = 1
                     detail = f"PR head moved ({str(pre_view.get('headRefOid', ''))[:10]} != proved {expected_head[:10]}) before update-branch"
-                elif live_cmp["base_tip"] != base_tip:
+                elif pre_view.get("baseRefOid") != base_tip:
                     rc = 1
-                    detail = f"live {base_name} advanced ({live_cmp['base_tip'][:10]} != proved {base_tip[:10]}) before update-branch"
+                    detail = f"live {base_name} advanced ({str(pre_view.get('baseRefOid', ''))[:10]} != proved {base_tip[:10]}) before update-branch"
                 else:
                     endpoint = f"repos/{owner}/{repo_name}/pulls/{number}/update-branch"
                     cmd = ["gh", "api", "-X", "PUT", endpoint, "-f", f"expected_head_sha={expected_head}"]
