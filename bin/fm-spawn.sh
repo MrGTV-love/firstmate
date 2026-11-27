@@ -669,15 +669,11 @@
 #   another task's live copy. Before any lock, pool, backlog, state or window action
 #   it resolves state/<predecessor>.meta and refuses unless the recorded worktree is a
 #   git worktree root of this project, checked out on the recorded branch, and the
-#   project's provision_existing_slot.py lists --supersedes, --supersedes-branch
-#   and --supersedes-head in its --help (a helper without the last two refuses
-#   with "the provisioner cannot bind the verified branch").
+#   project's provision_existing_slot.py lists --supersedes in its --help.
 #   Spawn then re-checks that branch just before the one provisioning call, refuses
-#   if the copy moved, passes the resolved copy as --supersedes with the verified
-#   branch and head commit as --supersedes-branch and --supersedes-head, and records
-#   successor_of=<predecessor>; the project's provisioner alone writes the successor
-#   record, never firstmate, and refuses it unless the copy is still on that branch
-#   at that commit or a descendant. An id=repo batch refuses the flag.
+#   if the copy moved, passes the resolved copy to the provisioner as --supersedes
+#   and records successor_of=<predecessor>; the project's provisioner alone writes
+#   the successor record, never firstmate. An id=repo batch refuses the flag.
 #   A provisioner refusal keeps successor_of beside recovery=slot-provision-refused
 #   as an unfulfilled declaration. Its retry, fm-spawn.sh <id> --relaunch while the
 #   window lives or a fresh spawn naming the same --successor-of once it is gone,

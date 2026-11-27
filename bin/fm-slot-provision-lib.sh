@@ -14,10 +14,7 @@
 # Firstmate never deletes/replaces its manifests or creates another worktree.
 # A declared successor passes the resolved predecessor copy to that provisioner
 # as --supersedes through FM_SLOT_SUPERSEDES; the provisioner alone records it.
-# fm_slot_provision re-checks the predecessor just before that call and passes the
-# verified branch and head as --supersedes-branch and --supersedes-head, so the
-# provisioner binds the record to what was verified; a project whose provisioner
-# does not list all three options refuses the declaration before any resource.
+# fm_slot_provision re-checks the predecessor's recorded branch just before that call.
 # fm_slot_resolve_successor needs fm-pr-lib.sh (fm_task_id_path_safe) and fm_meta_get.
 # Call from a clean checkout on the task branch, using the project's existing
 # Python environment (no environment installation/sync). Preserve its full report.
@@ -32,15 +29,12 @@ FM_SLOT_SOURCE_KIND=
 FM_SLOT_SOURCE_DECLARATION_SHA256=
 FM_SLOT_SOURCE_EVIDENCE_SHA256=
 FM_SLOT_PREPARED_HEAD=
-FM_SLOT_PREVIOUS_BRANCH=
-FM_SLOT_PREVIOUS_HEAD=
 # Input to fm_slot_provision, reset here so an inherited value never reaches it.
 FM_SLOT_SUPERSEDES=
 FM_SLOT_SUCCESSOR_WT=
 FM_SLOT_SUCCESSOR_ID=
 FM_SLOT_SUCCESSOR_META=
 FM_SLOT_SUCCESSOR_BRANCH=
-FM_SLOT_SUCCESSOR_HEAD=
 # There is no undo. A refusal, or any failed check after a move has begun, leaves HEAD, every ref and every file exactly as
 # they are and says so (Main 1886 CUT).
 # The one ref change this spawn's own preparation makes before the move: "<anchor ref>=<commit it anchors>" (absent before,
@@ -86,20 +80,17 @@ fm_slot_realdir() { # <dir>; the physical path, or failure for an empty or missi
   [ -n "$1" ] && [ -d "$1" ] && (cd -P -- "$1" 2>/dev/null && pwd -P)
 }
 
-fm_slot_helper_help() { # <project>; the primary checkout provisioner's --help, one probe
-  local script=$1/scripts/git-stability/provision_existing_slot.py
+fm_slot_advertises_supersedes() { # <project>
+  local script=$1/scripts/git-stability/provision_existing_slot.py help
   [ -f "$script" ] || return 1
-  (cd "$1" && PATH="$1/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 python3 "$script" --help 2>/dev/null)
-}
-
-fm_slot_help_lists() { # <help-text> <flag>; an exact option name, never a longer one
-  printf '%s\n' "$1" | grep -Eq -- "(^|[^[:alnum:]_-])$2([^[:alnum:]_-]|\$)"
+  help=$(cd "$1" && PATH="$1/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 python3 "$script" --help 2>/dev/null) || return 1
+  printf '%s\n' "$help" | grep -Eq -- '(^|[^[:alnum:]_-])--supersedes([^[:alnum:]_-]|$)'
 }
 
 # Resolve a declared predecessor to its live copy, or refuse with one error line
 # before any resource exists. Sets FM_SLOT_SUCCESSOR_WT to the resolved path.
 fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
-  local project=$1 state=$2 id=$3 pred=$4 meta kind wt branch head real top pcommon scommon help
+  local project=$1 state=$2 id=$3 pred=$4 meta kind wt branch head real top pcommon scommon
   FM_SLOT_SUCCESSOR_WT=
   FM_SLOT_SUCCESSOR_ID=
   FM_SLOT_SUCCESSOR_META=
@@ -127,13 +118,8 @@ fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
   head=$(git -C "$real" symbolic-ref -q HEAD) || head=
   [ -n "$head" ] || { echo "error: --successor-of $pred copy $wt has a detached HEAD, not its recorded branch $branch" >&2; return 1; }
   [ "$head" = "refs/heads/$branch" ] || { echo "error: --successor-of $pred copy $wt is on ${head#refs/heads/}, not its recorded branch $branch" >&2; return 1; }
-  help=$(fm_slot_helper_help "$project") || help=
-  fm_slot_help_lists "$help" --supersedes || {
+  fm_slot_advertises_supersedes "$project" || {
     echo "error: --successor-of needs the project's primary checkout $project to advertise --supersedes on scripts/git-stability/provision_existing_slot.py; update that checkout, since the successor record needs the Vernant verb" >&2
-    return 1
-  }
-  { fm_slot_help_lists "$help" --supersedes-branch && fm_slot_help_lists "$help" --supersedes-head; } || {
-    echo "error: --successor-of refused: the provisioner cannot bind the verified branch; the project's primary checkout $project must list --supersedes-branch and --supersedes-head on scripts/git-stability/provision_existing_slot.py" >&2
     return 1
   }
   FM_SLOT_SUCCESSOR_WT=$real
@@ -142,16 +128,14 @@ fm_slot_resolve_successor() { # <project> <state-dir> <task-id> <predecessor-id>
   FM_SLOT_SUCCESSOR_BRANCH=$branch
 }
 
-# The predecessor must still be the task and branch the resolver verified. This
-# is the final check before the provisioner call: it records the branch and the
-# head commit it saw in FM_SLOT_SUCCESSOR_HEAD, and the caller passes both so the
-# project's provisioner refuses to record unless the copy is still on that branch
-# at that commit or a descendant when it writes. Spawn's pane runner can wait up
-# to SPAWN_ACQUIRE_STALL (600 seconds) before the call; the binding, not this
-# check, covers that time.
+# The predecessor must still be the task and branch the resolver verified. The
+# project's helper corroborates only the copy's current branch, so this binds
+# the proof to the branch recorded for the declared task: run it at the point
+# the path is handed over. A window remains: spawn's pane runner can wait up to
+# SPAWN_ACQUIRE_STALL (600 seconds) for the shell to start the call, and the
+# predecessor can leave its branch in that time.
 fm_slot_successor_still_bound() {
   local real head
-  FM_SLOT_SUCCESSOR_HEAD=
   { [ -f "$FM_SLOT_SUCCESSOR_META" ] && [ ! -L "$FM_SLOT_SUCCESSOR_META" ] &&
     [ "$(fm_meta_get "$FM_SLOT_SUCCESSOR_META" branch)" = "$FM_SLOT_SUCCESSOR_BRANCH" ] &&
     [ "$(fm_slot_realdir "$(fm_meta_get "$FM_SLOT_SUCCESSOR_META" worktree)")" = "$FM_SLOT_SUPERSEDES" ]; } || {
@@ -160,10 +144,8 @@ fm_slot_successor_still_bound() {
   }
   real=$(fm_slot_realdir "$FM_SLOT_SUPERSEDES") || real=
   head=$(git -C "${real:-/nonexistent}" symbolic-ref -q HEAD 2>/dev/null) || head=
-  FM_SLOT_SUCCESSOR_HEAD=$(git -C "${real:-/nonexistent}" rev-parse --verify --quiet "refs/heads/$FM_SLOT_SUCCESSOR_BRANCH^{commit}" 2>/dev/null) || FM_SLOT_SUCCESSOR_HEAD=
-  { [ "$real" = "$FM_SLOT_SUPERSEDES" ] && [ "$head" = "refs/heads/$FM_SLOT_SUCCESSOR_BRANCH" ] && [ -n "$FM_SLOT_SUCCESSOR_HEAD" ]; } || {
+  { [ "$real" = "$FM_SLOT_SUPERSEDES" ] && [ "$head" = "refs/heads/$FM_SLOT_SUCCESSOR_BRANCH" ]; } || {
     echo "error: --successor-of $FM_SLOT_SUCCESSOR_ID copy is no longer on its recorded branch $FM_SLOT_SUCCESSOR_BRANCH (now ${head#refs/heads/}); refusing to hand it to the provisioner" >&2
-    FM_SLOT_SUCCESSOR_HEAD=
     return 1
   }
 }
@@ -312,8 +294,7 @@ fm_slot_provision_run() {
     printf '{"state": "REFUSED", "reason": "successor_predecessor_moved"}\n' > "$report"
     rc=2
   else
-    [ -z "$FM_SLOT_SUPERSEDES" ] ||
-      args+=(--supersedes "$FM_SLOT_SUPERSEDES" --supersedes-branch "$FM_SLOT_SUCCESSOR_BRANCH" --supersedes-head "$FM_SLOT_SUCCESSOR_HEAD")
+    [ -z "$FM_SLOT_SUPERSEDES" ] || args+=(--supersedes "$FM_SLOT_SUPERSEDES")
     "$runner" "$project" "$report" ${FM_SLOT_PYARGS[@]+"${FM_SLOT_PYARGS[@]}"} "$provisioner" \
       --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
       --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
