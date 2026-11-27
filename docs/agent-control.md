@@ -524,7 +524,8 @@ A slot is held only when every state entry naming the same directory by device a
 An unleased entry spelled with trailing slashes, `/.` components, or repeated slashes still makes the slot unsafe even beside a leased entry.
 The same holds for an entry spelled that way that carries Treehouse's recovered-state holder on a slot that is not a local Firstmate home.
 The raw path-suffix prefilter skips only entries with an ordinary lease, so it cannot hide a conflicting unleased or recovered-lease alias; skipping an ordinary leased alias can still leave the slot unproved and refuse allocation.
-A lease carrying Treehouse's recovered-state holder counts only when the slot is itself a local Firstmate home. Treehouse never frees a recovered lease by itself (`treehouse return --all` skips it); it stays until it is returned by name or acknowledged with `treehouse lease --recover`.
+A lease carrying Treehouse's recovered-state holder counts only when the slot is itself a local Firstmate home.
+Treehouse never frees a recovered lease by itself (`treehouse return --all` skips it); it stays until it is returned by name or acknowledged with `treehouse lease --recover`.
 A live owner process, dirt, or an unmerged HEAD also makes a get skip a slot, but each can change before the get runs, so none of them counts; a slot with no state entry, an unreadable state file, or a host without `jq` to read it refuses as unproved.
 The check refuses to prove any slot held when any entry path is relative or escaped by the TSV transport, including paths containing backslashes, tabs, carriage returns, or newlines.
 It cannot safely exclude such an entry as unrelated without proving its directory identity, since even a different spelling can alias the requested slot.
