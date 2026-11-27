@@ -211,11 +211,47 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
                 (swallow_folder / 'interrupt-swallowed').touch()
         time.sleep = swallowing_sleep
     if os.environ.get('CASE_TERM_BEFORE_FORWARD'):
-        # A SIGTERM that reaches the gate before it forwards signals is caught and dropped, so a test can repeat the
-        # signal until it is forwarded. A handler, never SIG_IGN: exec resets a handler for the agent, and an agent
-        # that inherits SIG_IGN could not trap the signal.
+        # A SIGTERM, SIGINT or SIGHUP that reaches the gate before it forwards signals is caught and dropped, so a test
+        # can repeat the signal until it is forwarded. A handler, never SIG_IGN: exec resets a handler for the agent, and
+        # an agent that inherits SIG_IGN could not trap the signal.
         import signal
-        signal.signal(signal.SIGTERM, lambda *_: None)
+        for number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            signal.signal(number, lambda *_: None)
+    if os.environ.get('CASE_INTERRUPT_AT_UNLOCK'):
+        # A SIGINT lands after this start published its pending reservation and before it releases the start lock: at
+        # that unlock, once this pid's pending entry exists, interrupt-at-unlock is written and the signal is sent.
+        # With keep, the start-lock descriptor is then never closed, so the start removes its reservation while it still
+        # holds the start lock (the order before R23-7); start-lock-kept marks the skipped close.
+        import fcntl, glob, pathlib, signal
+        pool, marks = os.environ['FM_CPU_POOL_DIR'], pathlib.Path(os.environ['CASE_FOLDER'])
+        real_flock, real_close, fired = fcntl.flock, os.close, []
+        def own_pending():
+            for path in glob.glob(os.path.join(pool, 'pending-*.lock')):
+                try:
+                    with open(path) as handle:
+                        if json.load(handle).get('holder') == os.getpid():
+                            return True
+                except (OSError, ValueError):
+                    pass
+            return False
+        def interrupting_flock(fd, operation):
+            if operation == fcntl.LOCK_UN and not fired and own_pending():
+                fired.append(True)
+                (marks / 'interrupt-at-unlock').touch()
+                os.kill(os.getpid(), signal.SIGINT)
+            return real_flock(fd, operation)
+        def keeping_close(fd):
+            if fired and os.environ['CASE_INTERRUPT_AT_UNLOCK'] == 'keep':
+                try:
+                    lock = os.stat(os.path.join(pool, 'pipeline-start.lock'))
+                    held = os.fstat(fd)
+                except OSError:
+                    lock = held = None
+                if lock is not None and (held.st_dev, held.st_ino) == (lock.st_dev, lock.st_ino):
+                    (marks / 'start-lock-kept').touch()
+                    return None
+            return real_close(fd)
+        fcntl.flock, os.close = interrupting_flock, keeping_close
     if os.environ.get('CASE_PROCESS_TABLE_UNREADABLE'):
         # The process table cannot be read (both readers the engine uses), so no running client can be seen.
         try:
@@ -666,6 +702,7 @@ if mode == 'escape':  # an orphaned descendant: own session, every descriptor cl
     sys.exit(0)
 if mode.startswith('exit-'): sys.exit(int(mode[5:]))
 if mode == 'self-term': os.kill(os.getpid(), signal.SIGTERM)
+if mode == 'self-kill': os.kill(os.getpid(), signal.SIGKILL)
 while not (folder / (run + '.release')).exists(): time.sleep(0.025)
 """)
 
@@ -826,6 +863,28 @@ def agent_info(path, log=None, child=None):
     return found
 
 
+def pid_line(path, description, log=None, child=None):
+    """The pid a stand-in wrote to PATH, once it is one whole line (the stand-in creates the file, then writes it)."""
+    found = []
+
+    def whole():
+        try:
+            text = path.read_text()
+        except OSError:
+            return False
+        if re.fullmatch(r'\d+\n', text):
+            found.append(int(text))
+            return True
+        return False
+    wait_for(whole, description, log=log, child=child)
+    return found[0]
+
+
+def process_started(pid):
+    """PID's start time as ps prints it (lstart), or '' when no process has the pid."""
+    return subprocess.run(['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True).stdout.strip()
+
+
 def settled_held(folder, runs):
     """reserving_held after two censuses: an attempt with nothing left of it ends only at the second (Main 1759)."""
     reserving_held(folder, runs)
@@ -848,8 +907,18 @@ def cleanup():
         marker.with_name(marker.name + '-release').touch()
     for pid_file in root.glob('*/nested.pid'):
         if (pid_file.parent / 'nested.started').exists(): continue
-        try: os.killpg(int(pid_file.read_text()), signal.SIGKILL)
-        except (ProcessLookupError, ValueError): pass
+        try:
+            pid, started = pid_file.read_text().split('\n')[:2]
+            pid = int(pid)
+        except ValueError:
+            print('cleanup: %s names no pid and start time; nothing signalled' % pid_file, file=sys.stderr)
+            continue
+        if not started or process_started(pid) != started:
+            print('cleanup: pid %d is not the nested start launched at %r; not signalled' % (pid, started), file=sys.stderr)
+            continue
+        try: os.killpg(pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError) as exc:
+            print('cleanup: nested start %d not signalled: %s' % (pid, exc), file=sys.stderr)
     for child in children:
         if child.poll() is None:
             try: os.killpg(child.pid, signal.SIGKILL)

@@ -102,6 +102,8 @@ try:
         assert pipe_status(launch_gate, env, folder / 'wt-x') == '141'
         assert pipe_status(launch_gate, env, folder / 'wt-y') == '141'
         assert pipe_status(['bash', str(repo / 'bin/fm-mem-guard.sh'), 'run', '--'], env, folder) == '141'
+        # An admitted pipeline start's COMMAND, which starts after the go byte (R23-6).
+        assert pipe_status(cli + ['pipeline-start', '--'], env, folder) == '141'
         # The test-pass pool's direct execs keep the base disposition: SIGPIPE stays ignored, so yes exits 1 on EPIPE.
         pass_run = ['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'run', '--']
         (folder / 'not-a-pool').write_text('')
@@ -118,12 +120,15 @@ try:
             assert (folder / (run + '.agent')).exists() and settled_held(folder, ['x', 'g']) == 0, run
 
         # Exit codes and signal deaths pass through; a signal sent to the gate reaches the agent.
-        for mode, code in (('exit-0', 0), ('exit-1', 1), ('exit-75', 75), ('self-term', -signal.SIGTERM)):
+        # An agent killed by SIGKILL (the signal the gate cannot raise on itself) ends the gate with 128 + 9, never a refusal.
+        for mode, code in (('exit-0', 0), ('exit-1', 1), ('exit-75', 75), ('self-term', -signal.SIGTERM), ('self-kill', 128 + signal.SIGKILL)):
             folder, db, env = gate_case('gate-exit-' + mode)
             child, log = gate(folder, env, 'x', mode=mode)
             finish(child, code)
             held = settled_held(folder, ['x'])
             assert held == 0, (mode, repr(held))
+            text = log.with_suffix('.stderr').read_text()
+            assert 'launch-gate refused' not in text and 'launch-gate refused' not in wakes(folder), (mode, text, wakes(folder))
         folder, db, env = gate_case('gate-forward')
         child, log = gate(folder, dict(env, CASE_TERM_BEFORE_FORWARD='1'), 'x', mode='trap')
         agent_info(folder / 'x.agent', log=log, child=child)
@@ -627,13 +632,22 @@ os.waitpid(child, 0)
         for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             folder, db, env = gate_case('gate-dispatcher-%d' % number)
             out, err = open(str(folder / 'gate.stdout'), 'w'), open(str(folder / 'gate.stderr'), 'w')
+            # A signal that reaches the gate before it forwards signals is caught and dropped (CASE_TERM_BEFORE_FORWARD),
+            # so the test repeats it until the agent below the dispatcher has it or the gate exits.
             child = subprocess.Popen(['bash', str(repo / 'bin/fm-cpu-pass.sh'), 'launch-gate', '--', python, str(dispatcher)],
-                                     env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err, cwd=str(folder / 'wt-x'), start_new_session=True)
+                                     env=dict(env, CASE_TERM_BEFORE_FORWARD='1'), stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                                     cwd=str(folder / 'wt-x'), start_new_session=True)
             out.close(); err.close()
             children.append(child)
-            wait_for(lambda: (folder / 'below.ready').exists(), 'the agent below the dispatcher runs')
-            os.kill(child.pid, number)
-            wait_for(lambda: (folder / ('below.got-%d' % number)).exists(), 'signal %d reached the agent below the dispatcher' % number)
+            wait_for(lambda: (folder / 'below.ready').exists(), 'the agent below the dispatcher runs', log=folder / 'gate', child=child)
+            got = folder / ('below.got-%d' % number)
+            began = time.monotonic()
+            while not got.exists() and child.poll() is None:
+                if time.monotonic() - began >= HANG_BACKSTOP_SECS:
+                    hang_backstop_expired('signal %d to reach the agent below the dispatcher' % number, began, folder / 'gate')
+                os.kill(child.pid, number)
+                time.sleep(0.2)
+            assert got.exists(), 'signal %d never reached the agent below the dispatcher' % number
             wait_exit(child, 'the gate to exit after signal %d' % number, log=folder / 'gate')
 
     def outside_orphan(folder):

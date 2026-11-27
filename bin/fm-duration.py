@@ -2221,7 +2221,8 @@ def main():
             # start lock with its pending reservations; reattachments never requeue.
             os.execv(sys.executable, [sys.executable, str(ROOT / 'bin/fm-cpu-pass.py'),
                 'pipeline-start', '--priority', args.pipeline_priority, '--',
-                sys.executable, str(Path(__file__).resolve()), 'run', '--pipeline-admitted'] + sys.argv[2:])
+                sys.executable, str(Path(__file__).resolve()), 'run', '--pipeline-admitted',
+                '--pipeline-priority', args.pipeline_priority, args.key, '--'] + command)
         try:
             admission = admit(args.key, 2, None, f'fm-duration run {args.key}', share=True, kind='run')
         except ValueError as error:

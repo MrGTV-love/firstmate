@@ -620,6 +620,7 @@ def spawn_after_go(command: List[str], env: dict) -> Tuple[int, int, int]:
             os.close(go_write)
             os.close(error_read)
             _restore_default_signals()
+            _restore_exec_signals()
             if os.read(go_read, 1) != b"g":
                 os._exit(125)
             os.closerange(3, error_write)
@@ -3031,9 +3032,10 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
         log(2, "pipeline-start refused: %s" % exc)
         return 125
     finally:
-        release_pending()
         if admission_fd is not None:
             os.close(admission_fd)
+            admission_fd = None
+        release_pending()
 
 
 NO_MISTAKES_CONFIG = "~/.no-mistakes/config.yaml"
@@ -3619,8 +3621,10 @@ def wait_agent(child: int, watch_fd: int, relay_fd: int, record_path: str, sessi
             os.write(watch_fd, b"d")
         os.close(watch_fd)
     if code < 0:
-        signal.signal(-code, signal.SIG_DFL)
-        os.kill(os.getpid(), -code)
+        with contextlib.suppress(OSError, ValueError):
+            signal.signal(-code, signal.SIG_DFL)
+            os.kill(os.getpid(), -code)
+        return 128 - code
     return code
 
 

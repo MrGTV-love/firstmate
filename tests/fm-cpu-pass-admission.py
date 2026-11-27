@@ -643,7 +643,9 @@ if name == 'outer':
     out = open(folder / 'nested.stdout', 'w'); err = open(folder / 'nested.stderr', 'w')
     nested = subprocess.Popen(['python3', %r, 'run', 'no-mistakes.nested', '--', sys.argv[0], 'axi', 'run', '--intent', 'nested'],
                               stdout=out, stderr=err, start_new_session=True)
-    (folder / 'nested.pid').write_text(str(nested.pid))
+    started = subprocess.run(['ps', '-o', 'lstart=', '-p', str(nested.pid)], capture_output=True, text=True).stdout.strip()
+    (folder / 'nested.pid.part').write_text(str(nested.pid) + '\\n' + started + '\\n')
+    os.rename(folder / 'nested.pid.part', folder / 'nested.pid')
 (folder / (name + '.started')).touch()
 """ % str(repo / 'bin/fm-duration.py'))
     fake_nm.chmod(0o700)
@@ -1206,7 +1208,7 @@ with sqlite3.connect(folder / 'state.sqlite') as db:
 folder = pathlib.Path(os.environ['CASE_FOLDER']); args = sys.argv[1:]
 intent = args[args.index('--intent') + 1] if '--intent' in args else ''
 with (folder / 'calls.log').open('a') as out: out.write('%s :: %s\\n' % (os.path.basename(os.getcwd()), intent))
-(folder / ('pid-' + intent)).write_text(str(os.getpid()))
+(folder / ('pid-' + intent)).write_text(str(os.getpid()) + '\\n')
 if intent.startswith('hold'):
     while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
 if intent.startswith('reg'):
@@ -1270,8 +1272,7 @@ if intent.startswith('reg'):
         folder, db, env = case('nested-killed-client', cores=3)
         nest_client(folder, env)
         child = launch(mem_guard + ['bash', '-c', 'no-mistakes axi run --intent hold-k; sleep 60'], env, folder / 'x')
-        wait_for(lambda: (folder / 'pid-hold-k').exists(), 'the client runs')
-        os.kill(int((folder / 'pid-hold-k').read_text()), signal.SIGKILL)
+        os.kill(pid_line(folder / 'pid-hold-k', 'the client runs', log=folder / 'x', child=child), signal.SIGKILL)
         gap = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'gap')], env, folder / 'gap')
         finish(gap)
         assert (folder / 'gap').exists(), 'a start in the gap was not admitted'
@@ -1283,6 +1284,50 @@ if intent.startswith('reg'):
         change(db, "UPDATE runs SET status = 'completed' WHERE id = 'late-run'")
         finish(later)
         os.killpg(child.pid, signal.SIGKILL); child.wait()
+
+    def duration_without_separator():
+        # R23-8: fm-duration.py run KEY COMMAND with no -- is admitted as the same start as with it. Its admitted re-exec
+        # names the command after --, so the admission's own reservation is this client's: with 3 cores (one run) the
+        # client runs once admitted and never waits on its own start.
+        folder, db, env = case('duration-no-separator', cores=3)
+        nest_client(folder, env)
+        child = launch([str(proxy), str(repo / 'bin/fm-duration.py'), 'run', 'no-mistakes.bare', 'no-mistakes', 'axi', 'run',
+                        '--intent', 'bare'], env, folder / 'x', cwd=registered_checkout(folder, db))
+        wait_for(lambda: (folder / 'pid-bare').exists() or held_decision(folder / 'x.stderr'),
+                 'the client runs or waits', log=folder / 'x', child=child)
+        text = (folder / 'x.stderr').read_text()
+        harm('r23-8-client-waits-on-its-own-start', (folder / 'pid-bare').exists() and not held_decision(folder / 'x.stderr'), text)
+        finish(child)
+        text = (folder / 'x.stderr').read_text()
+        assert text.count('pipeline-start admitted') == 1 and calls(folder) == ['bare'], (calls(folder), text)
+        assert not list((folder / 'pool').glob('pending-*.lock')), text
+
+    def interrupt_before_unlock():
+        # R23-7: a SIGINT after a start published its pending reservation and before it released the start lock ends that
+        # start (130, COMMAND not run, its reservation removed), and the next start still gets the lock. Control (keep):
+        # a start that still holds its start-lock descriptor when it removes its reservation, as the order before R23-7
+        # did, blocks on its own start lock, and the next start meets that lock.
+        for mode in ('close', 'keep'):
+            folder, db, env = case('interrupt-before-unlock-' + mode)
+            first = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'first')],
+                           dict(env, CASE_INTERRUPT_AT_UNLOCK=mode), folder / 'first')
+            wait_for(lambda: (folder / 'interrupt-at-unlock').exists(), 'the interrupt at the unlock', log=folder / 'first', child=first)
+            if mode == 'close':
+                code = wait_exit(first, 'the interrupted start to exit', log=folder / 'first')
+                assert code == 130 and not (folder / 'first').exists(), (code, (folder / 'first.stderr').read_text())
+                assert not list((folder / 'pool').glob('pending-*.lock')), (folder / 'first.stderr').read_text()
+                second = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'second')], env, folder / 'second')
+                finish(second)
+                harm('r23-7-start-lock-released', (folder / 'second').exists(), (folder / 'second.stderr').read_text())
+            else:
+                wait_for(lambda: (folder / 'start-lock-kept').exists(), 'the start keeps its start lock', log=folder / 'first', child=first)
+                second = launch(cli + ['pipeline-start', '--', 'touch', str(folder / 'second')], env, folder / 'second')
+                wait_for(lambda: 'pipeline-start waiting: another start is registering' in (folder / 'second.stderr').read_text(),
+                         'the next start meets the kept start lock', log=folder / 'second', child=second)
+                assert first.poll() is None and list((folder / 'pool').glob('pending-*.lock')) and not (folder / 'second').exists(), \
+                    (folder / 'first.stderr').read_text()
+                for child in (first, second):
+                    os.killpg(child.pid, signal.SIGKILL); child.wait()
 
     def nested_enclosing_counted():
         # The enclosing start's unclaimed reservation keeps counting while a process in its command runs the
@@ -1510,6 +1555,8 @@ exec /bin/ln "$@"
                        ('a second fresh client inside an admitted command is admitted on its own', nested_second_client),
                        ('an enclosing start counts while its client runs or the process table is unreadable', nested_enclosing_counted),
                        ('a killed client ends its pending start; its late run is counted once its row exists', killed_client),
+                       ('R23-8 fm-duration run with no -- admits its client once', duration_without_separator),
+                       ('R23-7 an interrupt before the start-lock unlock never holds the lock', interrupt_before_unlock),
                        ('a nested second client keeps class order behind a start queued elsewhere', nested_class_order),
                        ('two nested clients started together are each counted', nested_parallel_counted),
                        ('an unplaceable interception holds a shell of two starts as one start', nested_unplaceable),
@@ -1601,7 +1648,7 @@ for index, word in enumerate(args):
         else:
             intent = (sys.stdin.read() if value == '-' else open(value).read()).strip()
         break
-(folder / ('pid-' + intent)).write_text(str(os.getpid()))
+(folder / ('pid-' + intent)).write_text(str(os.getpid()) + '\\n')
 if intent.startswith('reg'):
     with sqlite3.connect(folder / 'state.sqlite') as db:
         db.execute("UPDATE runs SET status = 'cancelled' WHERE status = 'running' AND repo_id = 'repo' AND branch = 'main'")
@@ -1730,8 +1777,7 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             folder, db, env = case('bind-named-collision-' + branch, measured=True, available=12 * GIB)
             checkout = bound_repo(folder, db, env)
             b = launch_in(mem_guard + ['bash', '-c', 'no-mistakes axi run --intent hold-b; sleep 60'], env, folder / 'b', checkout)
-            wait_for(lambda: (folder / 'pid-hold-b').exists(), 'B claims and runs')
-            os.kill(int((folder / 'pid-hold-b').read_text()), signal.SIGKILL)
+            os.kill(pid_line(folder / 'pid-hold-b', 'B claims and runs', log=folder / 'b', child=b), signal.SIGKILL)
             a = launch_in(cli + ['pipeline-start', '--', 'bash', '-c', 'sleep 30; no-mistakes axi run --intent hold-a'], env, folder / 'a', checkout)
             wait_for(lambda: 'pipeline-start admitted' in (folder / 'a.stderr').read_text(), 'A admitted, not claimed')
             row(db, 'run-hold-b', 'hold-b', branch)
@@ -2157,8 +2203,11 @@ while not (folder / ('release-' + intent)).exists(): time.sleep(0.05)
             row(db, 'stranger', 'something else', 'main')
             go.touch()
             if label == 'tight':
-                wait_for(lambda: ' pending=0 ' in (folder / 'outer.stderr').read_text() and 'waiting' in (folder / 'outer.stderr').read_text(),
-                         'the client waits on the stranger alone, not on its own reservation')
+                wait_for(lambda: held_by_count(folder / 'outer.stderr'), 'the client waits', log=folder / 'outer', child=outer)
+                waiting = re.search(r'pipeline-start waiting: counted=\d+ limit=\d+ basis=fallback [^\n]*?\bpending=(\d+)\b',
+                                    (folder / 'outer.stderr').read_text())
+                assert waiting and int(waiting.group(1)) == 0, ('the client waits on the stranger alone, not on its own reservation',
+                                                                (folder / 'outer.stderr').read_text())
                 assert not (folder / 'pid-hold-own').exists()
                 change(db, "UPDATE runs SET status = 'completed' WHERE id = 'stranger'")
             wait_for(lambda: (folder / 'pid-hold-own').exists(), label + ': the client is admitted')
