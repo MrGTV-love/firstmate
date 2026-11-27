@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd user agent template for bin/fm-landing-loop.py.
+  bin/fm-landing-loop-install.sh fills the tokens between at signs and writes the result to
+  ~/Library/LaunchAgents; do not load this file directly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>@LABEL@</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>@FM_ROOT@/bin/fm-landing-loop.py</string>
+    <string>step</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FM_HOME</key>
+    <string>@FM_HOME@</string>
+    <key>PATH</key>
+    <string>@PATH@</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>@FM_HOME@</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>@INTERVAL@</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>@FM_HOME@/state/.landing-loop.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>@FM_HOME@/state/.landing-loop.launchd.log</string>
+</dict>
+</plist>
