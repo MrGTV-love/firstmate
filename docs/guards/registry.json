@@ -7753,8 +7753,8 @@
       ],
       "invariant": "Direct commits or merges never land in a repository's primary checkout when the managed hook is installed.",
       "layer": "runtime-block",
-      "source": "git rev-parse --path-format=absolute --git-dir and --git-common-dir physical path comparison, plus hook marker inspection on install/remove",
-      "trigger": "git invokes the installed pre-commit or pre-merge-commit hook in the primary checkout without FM_ALLOW_MAIN_COMMIT=1, or worktree identity cannot be resolved, or install/remove encounters an unmanaged or symlinked hook",
+      "source": "git rev-parse --path-format=absolute --git-dir and --git-common-dir physical path comparison, plus hook marker inspection and git rev-parse --path-format=absolute --git-path hooks on install/remove/status",
+      "trigger": "git invokes the installed pre-commit or pre-merge-commit hook in the primary checkout without FM_ALLOW_MAIN_COMMIT=1, or worktree identity cannot be resolved, or the hook's guard script is missing, or install/remove encounters an unmanaged or symlinked hook, a core.hooksPath that redirects hooks away from the common dir, or (install only) a linked-worktree copy with no executable primary-checkout copy",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Commit from an isolated worktree via bin/fm-spawn.sh or treehouse get --base main -b fm/<topic>, or pass FM_ALLOW_MAIN_COMMIT=1 for an emergency primary-checkout commit.",
@@ -7774,7 +7774,7 @@
         {
           "file": "bin/fm-main-checkout-hook.sh",
           "match": "fm-main-checkout-hook: refused:",
-          "count": 12
+          "count": 15
         },
         {
           "file": "bin/fm-main-checkout-hook.sh",

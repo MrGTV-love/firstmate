@@ -85,16 +85,22 @@ git_run() {
     git --no-optional-locks -C "$home" "$@"
 }
 
-top=$(git_run rev-parse --show-toplevel 2>/dev/null) || {
+worktrees=$(git_run worktree list --porcelain 2>/dev/null) || {
   echo "fm-drift-check: error: not a git repository: $home" >&2
   exit 2
 }
-home=$(cd "$top" && pwd -P)
-
-head_sha=$(git_run rev-parse --verify HEAD 2>/dev/null) || {
-  echo "fm-drift-check: error: cannot resolve HEAD in $home" >&2
+first_block=${worktrees%%$'\n\n'*}
+primary=${first_block%%$'\n'*}
+primary=${primary#worktree }
+primary_bare=0
+case $'\n'"$first_block"$'\n' in
+  *$'\n'bare$'\n'*) primary_bare=1 ;;
+esac
+home=$([ -n "$primary" ] && cd "$primary" 2>/dev/null && pwd -P) || {
+  echo "fm-drift-check: error: cannot resolve primary worktree '$primary'" >&2
   exit 2
 }
+
 base_sha=$(git_run rev-parse --verify "${base_ref}^{commit}" 2>/dev/null) || {
   echo "fm-drift-check: error: cannot resolve base ref '$base_ref' in $home" >&2
   exit 2
@@ -103,21 +109,29 @@ base_sha=$(git_run rev-parse --verify "${base_ref}^{commit}" 2>/dev/null) || {
 drift=0
 
 # 1. Primary checkout state
-cur_branch=$(git_run symbolic-ref -q --short HEAD || true)
-if [ -n "$cur_branch" ]; then
-  echo "DRIFT: primary checkout is on branch '$cur_branch' (expected detached $base_ref)"
-  drift=1
-fi
-if [ "$head_sha" != "$base_sha" ]; then
-  counts=$(git_run rev-list --left-right --count "${base_sha}...HEAD")
-  echo "DRIFT: primary checkout HEAD (${head_sha:0:9}) != $base_ref (${base_sha:0:9}) [behind/ahead: $counts]"
-  drift=1
-fi
-tracked_dirty=$(git_run diff --name-only HEAD)
-if [ -n "$tracked_dirty" ]; then
-  echo "DRIFT: primary checkout has modified tracked files:"
-  printf '%s\n' "$tracked_dirty" | sed 's/^/  /'
-  drift=1
+if [ "$primary_bare" -eq 1 ]; then
+  echo "NOTE: primary worktree $home is a bare repository; skipping primary checkout checks."
+else
+  head_sha=$(git_run rev-parse --verify HEAD 2>/dev/null) || {
+    echo "fm-drift-check: error: cannot resolve HEAD in $home" >&2
+    exit 2
+  }
+  cur_branch=$(git_run symbolic-ref -q --short HEAD || true)
+  if [ -n "$cur_branch" ]; then
+    echo "DRIFT: primary checkout is on branch '$cur_branch' (expected detached $base_ref)"
+    drift=1
+  fi
+  if [ "$head_sha" != "$base_sha" ]; then
+    counts=$(git_run rev-list --left-right --count "${base_sha}...HEAD")
+    echo "DRIFT: primary checkout HEAD (${head_sha:0:9}) != $base_ref (${base_sha:0:9}) [behind/ahead: $counts]"
+    drift=1
+  fi
+  tracked_dirty=$(git_run diff --name-only HEAD)
+  if [ -n "$tracked_dirty" ]; then
+    echo "DRIFT: primary checkout has modified tracked files:"
+    printf '%s\n' "$tracked_dirty" | sed 's/^/  /'
+    drift=1
+  fi
 fi
 
 # 2. Local branches ahead of base ref
@@ -149,6 +163,7 @@ prunable_wts=()
 non_pool_wts=()
 wt_path=""
 wt_prunable=0
+wt_index=0
 
 flush_wt() {
   [ -n "$wt_path" ] || return 0
@@ -156,7 +171,7 @@ flush_wt() {
   if [ -d "$wt_path" ]; then
     wt_phys=$(cd "$wt_path" && pwd -P)
   fi
-  if [ "$wt_phys" != "$home" ]; then
+  if [ "$wt_index" -gt 0 ]; then
     if [ "$wt_prunable" -eq 1 ]; then
       prunable_wts+=("  $wt_path")
     else
@@ -166,6 +181,7 @@ flush_wt() {
       esac
     fi
   fi
+  wt_index=$((wt_index + 1))
   wt_path=""
   wt_prunable=0
 }
@@ -176,7 +192,7 @@ while IFS= read -r line; do
     prunable*) wt_prunable=1 ;;
     "") flush_wt ;;
   esac
-done < <(git_run worktree list --porcelain; printf '\n')
+done < <(printf '%s\n\n' "$worktrees")
 flush_wt
 
 if [ "${#prunable_wts[@]}" -gt 0 ]; then

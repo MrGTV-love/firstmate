@@ -25,7 +25,7 @@ MARKER="# FIRSTMATE-MANAGED-MAIN-CHECKOUT-HOOK"
 HOOK_NAMES="pre-commit pre-merge-commit"
 
 usage() {
-  sed -n '2,18{s/^# \{0,1\}//;p;}' "$0"
+  sed -n '2,19{s/^# \{0,1\}//;p;}' "$0"
 }
 
 emit_event() {
@@ -117,6 +117,46 @@ do_check() {
   exit 1
 }
 
+resolve_hooks_dir() {
+  HOOKS_DIR="$RESOLVED_CD/hooks"
+  local raw_eff eff_parent
+  raw_eff=$(unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
+    git_in_target rev-parse --path-format=absolute --git-path hooks 2>/dev/null) || {
+    EFFECTIVE_HOOKS_DIR="(unresolvable core.hooksPath)"
+    return 1
+  }
+  EFFECTIVE_HOOKS_DIR=$raw_eff
+  eff_parent=$(cd "$(dirname "$raw_eff")" 2>/dev/null && pwd -P) || return 1
+  EFFECTIVE_HOOKS_DIR="$eff_parent/$(basename "$raw_eff")"
+  [ "$EFFECTIVE_HOOKS_DIR" = "$HOOKS_DIR" ]
+}
+
+git_at() {
+  local dir=$1
+  shift
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR \
+    git -C "$dir" "$@"
+}
+
+resolve_stable_self() {
+  STABLE_SELF=$SELF
+  local self_gd self_cd prefix primary first_block
+  self_gd=$(git_at "$SCRIPT_DIR" rev-parse --path-format=absolute --git-dir 2>/dev/null) || return 0
+  self_cd=$(git_at "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+  self_gd=$(cd "$self_gd" && pwd -P) || return 1
+  self_cd=$(cd "$self_cd" && pwd -P) || return 1
+  [ "$self_gd" != "$self_cd" ] || return 0
+  prefix=$(git_at "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 1
+  first_block=$(git_at "$SCRIPT_DIR" worktree list --porcelain 2>/dev/null | sed '/^$/q') || return 1
+  case $'\n'"$first_block"$'\n' in
+    *$'\n'bare$'\n'*) return 1 ;;
+  esac
+  primary=$(printf '%s\n' "$first_block" | sed -n 's/^worktree //p')
+  [ -n "$primary" ] || return 1
+  STABLE_SELF="$primary/$prefix$(basename "$SELF")"
+  [ -f "$STABLE_SELF" ] && [ -x "$STABLE_SELF" ]
+}
+
 classify_hook() {
   local path=$1
   if [ -L "$path" ]; then
@@ -141,7 +181,15 @@ do_install() {
     printf 'fm-main-checkout-hook: refused: cannot resolve target git repository.\n' >&2
     exit 1
   fi
-  local hooks_dir="$RESOLVED_CD/hooks"
+  if ! resolve_hooks_dir; then
+    printf 'fm-main-checkout-hook: refused: core.hooksPath makes Git run hooks from %s, not %s; unset core.hooksPath or integrate the guard there manually.\n' "$EFFECTIVE_HOOKS_DIR" "$HOOKS_DIR" >&2
+    exit 1
+  fi
+  if ! resolve_stable_self; then
+    printf 'fm-main-checkout-hook: refused: %s is in a linked worktree and the primary checkout has no executable copy; run bin/fm-main-checkout-hook.sh install from the primary checkout.\n' "$SELF" >&2
+    exit 1
+  fi
+  local hooks_dir="$HOOKS_DIR"
   if [ -L "$hooks_dir" ]; then
     printf 'fm-main-checkout-hook: refused: hooks directory is a symbolic link (%s).\n' "$hooks_dir" >&2
     exit 1
@@ -170,7 +218,7 @@ do_install() {
   }
 
   local quoted_self tmp
-  quoted_self=$(shell_quote "$SELF")
+  quoted_self=$(shell_quote "$STABLE_SELF")
   for name in $HOOK_NAMES; do
     path="$hooks_dir/$name"
     tmp=$(mktemp "$hooks_dir/.fm-main-checkout-hook.XXXXXX") || {
@@ -180,7 +228,12 @@ do_install() {
     cat > "$tmp" <<EOF
 #!/usr/bin/env bash
 $MARKER
-exec $quoted_self check
+guard=$quoted_self
+if [ ! -x "\$guard" ]; then
+  printf 'fm-main-checkout-hook: refused: guard script %s is missing or not executable; reinstall with bin/fm-main-checkout-hook.sh install or remove with bin/fm-main-checkout-hook.sh remove.\\n' "\$guard" >&2
+  exit 1
+fi
+exec "\$guard" check
 EOF
     if ! chmod 0755 "$tmp" || ! mv -f "$tmp" "$path"; then
       rm -f "$tmp"
@@ -196,7 +249,11 @@ do_remove() {
     printf 'fm-main-checkout-hook: refused: cannot resolve target git repository.\n' >&2
     exit 1
   fi
-  local hooks_dir="$RESOLVED_CD/hooks"
+  if ! resolve_hooks_dir; then
+    printf 'fm-main-checkout-hook: refused: core.hooksPath makes Git run hooks from %s, not %s; unset core.hooksPath before running bin/fm-main-checkout-hook.sh remove.\n' "$EFFECTIVE_HOOKS_DIR" "$HOOKS_DIR" >&2
+    exit 1
+  fi
+  local hooks_dir="$HOOKS_DIR"
   if [ -L "$hooks_dir" ]; then
     printf 'fm-main-checkout-hook: refused: hooks directory is a symbolic link (%s).\n' "$hooks_dir" >&2
     exit 1
@@ -233,7 +290,11 @@ do_status() {
     printf 'fm-main-checkout-hook: error: cannot resolve target git repository.\n' >&2
     exit 1
   fi
-  local hooks_dir="$RESOLVED_CD/hooks"
+  if ! resolve_hooks_dir; then
+    printf 'hooks: inactive (core.hooksPath makes Git run hooks from %s, not %s)\n' "$EFFECTIVE_HOOKS_DIR" "$HOOKS_DIR"
+    exit 1
+  fi
+  local hooks_dir="$HOOKS_DIR"
   local name path state all_installed=1
   for name in $HOOK_NAMES; do
     path="$hooks_dir/$name"

@@ -6,7 +6,10 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-main-checkout-hook)
-HOOK="$ROOT/bin/fm-main-checkout-hook.sh"
+STABLE_BIN="$TMP_ROOT/toolbelt/bin"
+mkdir -p "$STABLE_BIN"
+cp "$ROOT/bin/fm-main-checkout-hook.sh" "$ROOT/bin/fm-guard-event.sh" "$STABLE_BIN/"
+HOOK="$STABLE_BIN/fm-main-checkout-hook.sh"
 
 make_repo() {
   local name=$1
@@ -135,6 +138,102 @@ assert_equals "1" "$?" "install refuses symlinked hooks directory"
 bash "$HOOK" remove --repo "$REPO_SYM" >/dev/null 2>&1
 assert_equals "1" "$?" "remove refuses symlinked hooks directory"
 
+# 11. A symlinked individual hook file is refused on install and remove, even when its target looks managed.
+REPO_LINK=$(make_repo hook-file-link)
+mkdir -p "$REPO_LINK/.git/hooks"
+printf '#!/usr/bin/env bash\n# FIRSTMATE-MANAGED-MAIN-CHECKOUT-HOOK\nexit 0\n' > "$TMP_ROOT/linked-pre-commit"
+chmod 0755 "$TMP_ROOT/linked-pre-commit"
+ln -s "$TMP_ROOT/linked-pre-commit" "$REPO_LINK/.git/hooks/pre-commit"
+out=$(bash "$HOOK" install --repo "$REPO_LINK" 2>&1)
+assert_equals "1" "$?" "install refuses a symlinked pre-commit hook"
+assert_contains "$out" "is symlink" "install names the symlinked hook"
+assert_absent "$REPO_LINK/.git/hooks/pre-merge-commit" "install writes no hooks after symlink refusal"
+out=$(bash "$HOOK" remove --repo "$REPO_LINK" 2>&1)
+assert_equals "1" "$?" "remove refuses a symlinked pre-commit hook"
+assert_present "$REPO_LINK/.git/hooks/pre-commit" "symlinked hook kept after refused remove"
+assert_present "$TMP_ROOT/linked-pre-commit" "symlink target kept after refused remove"
+
+# 12. core.hooksPath pointing elsewhere makes install and remove refuse and status report inactive.
+REPO_HP=$(make_repo hooks-path)
+git -C "$REPO_HP" config core.hooksPath .husky
+out=$(bash "$HOOK" install --repo "$REPO_HP" 2>&1)
+assert_equals "1" "$?" "install refuses when core.hooksPath redirects hooks"
+assert_contains "$out" "core.hooksPath" "install refusal names core.hooksPath"
+assert_absent "$REPO_HP/.git/hooks/pre-commit" "no inert hook written to .git/hooks"
+assert_absent "$REPO_HP/.husky/pre-commit" "no hook written to the core.hooksPath directory"
+out=$(bash "$HOOK" status --repo "$REPO_HP" 2>&1)
+assert_equals "1" "$?" "status exits 1 when core.hooksPath redirects hooks"
+assert_contains "$out" "inactive" "status reports hooks inactive"
+out=$(bash "$HOOK" remove --repo "$REPO_HP" 2>&1)
+assert_equals "1" "$?" "remove refuses when core.hooksPath redirects hooks"
+
+# 12b. A core.hooksPath injected only through the environment does not redirect the repository's own hooks.
+REPO_ENV_HP=$(make_repo env-hooks-path)
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$TMP_ROOT/injected-hooks" \
+  bash "$HOOK" install --repo "$REPO_ENV_HP" >/dev/null 2>&1
+assert_equals "0" "$?" "install ignores an environment-injected core.hooksPath"
+printf 'blocked\n' >> "$REPO_ENV_HP/file.txt"
+git -C "$REPO_ENV_HP" add file.txt
+out=$(git -C "$REPO_ENV_HP" commit -m "should block" 2>&1)
+assert_not_equals "0" "$?" "primary commit refused after install under injected core.hooksPath"
+assert_contains "$out" "direct commit or merge in primary checkout" "installed guard runs from the repository hooks dir"
+
+# 13. Install from a linked worktree of the toolbelt repository points the hook at the primary checkout's copy.
+TB="$TMP_ROOT/toolbelt-repo"
+git init -q -b main "$TB"
+git -C "$TB" config user.name fixture
+git -C "$TB" config user.email fixture@example.invalid
+mkdir -p "$TB/bin"
+cp "$ROOT/bin/fm-main-checkout-hook.sh" "$TB/bin/"
+git -C "$TB" add bin
+git -C "$TB" commit -q -m "toolbelt"
+TB_WT="$TMP_ROOT/toolbelt-slot"
+git -C "$TB" worktree add -q --detach "$TB_WT" HEAD
+REPO_TB=$(make_repo toolbelt-target)
+bash "$TB_WT/bin/fm-main-checkout-hook.sh" install --repo "$REPO_TB" >/dev/null 2>&1
+assert_equals "0" "$?" "install from a linked toolbelt worktree succeeds"
+git -C "$TB" worktree remove -f "$TB_WT"
+printf 'blocked\n' >> "$REPO_TB/file.txt"
+git -C "$REPO_TB" add file.txt
+out=$(git -C "$REPO_TB" commit -m "should block" 2>&1)
+assert_not_equals "0" "$?" "primary commit still refused after the installing worktree is removed"
+assert_contains "$out" "direct commit or merge in primary checkout" "guard runs from the primary toolbelt copy"
+TB_TARGET_WT="$TMP_ROOT/toolbelt-target-slot"
+git -C "$REPO_TB" worktree add -q -b tb-slot "$TB_TARGET_WT" HEAD
+printf 'allowed\n' > "$TB_TARGET_WT/slot.txt"
+git -C "$TB_TARGET_WT" add slot.txt
+git -C "$TB_TARGET_WT" commit -q -m "linked commit" >/dev/null 2>&1
+assert_equals "0" "$?" "linked worktree commit still succeeds after the installing worktree is removed"
+
+# 14. Install from a linked worktree whose primary is bare has no stable copy and is refused.
+TB_BARE="$TMP_ROOT/toolbelt-bare.git"
+git clone -q --bare "$TB" "$TB_BARE"
+TB_BARE_WT="$TMP_ROOT/toolbelt-bare-slot"
+git -C "$TB_BARE" worktree add -q --detach "$TB_BARE_WT" HEAD
+REPO_BARE_TB=$(make_repo bare-toolbelt-target)
+out=$(bash "$TB_BARE_WT/bin/fm-main-checkout-hook.sh" install --repo "$REPO_BARE_TB" 2>&1)
+assert_equals "1" "$?" "install from a linked worktree with a bare primary is refused"
+assert_contains "$out" "primary checkout has no executable copy" "refusal explains the missing primary copy"
+assert_absent "$REPO_BARE_TB/.git/hooks/pre-commit" "no hook written after bare-primary refusal"
+
+# 15. A hook whose guard script disappeared refuses with a remedy instead of a bare exec failure.
+GONE_BIN="$TMP_ROOT/gone-toolbelt/bin"
+mkdir -p "$GONE_BIN"
+cp "$ROOT/bin/fm-main-checkout-hook.sh" "$GONE_BIN/"
+REPO_GONE=$(make_repo gone-guard)
+bash "$GONE_BIN/fm-main-checkout-hook.sh" install --repo "$REPO_GONE" >/dev/null 2>&1
+assert_equals "0" "$?" "install from a standalone copy succeeds"
+rm -f "$GONE_BIN/fm-main-checkout-hook.sh"
+printf 'blocked\n' >> "$REPO_GONE/file.txt"
+git -C "$REPO_GONE" add file.txt
+gone_before=$(git -C "$REPO_GONE" rev-parse HEAD)
+out=$(git -C "$REPO_GONE" commit -m "guard gone" 2>&1)
+assert_not_equals "0" "$?" "commit refused when the guard script is missing"
+assert_equals "$gone_before" "$(git -C "$REPO_GONE" rev-parse HEAD)" "HEAD unchanged when the guard script is missing"
+assert_contains "$out" "is missing or not executable" "missing guard refusal names the problem"
+
 git -C "$REPO" worktree remove -f "$WT"
 git -C "$REPO" worktree remove -f "$WT2"
+git -C "$REPO_TB" worktree remove -f "$TB_TARGET_WT"
+git -C "$TB_BARE" worktree remove -f "$TB_BARE_WT"
 pass "fm-main-checkout-hook"

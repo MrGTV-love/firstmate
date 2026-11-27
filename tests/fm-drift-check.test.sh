@@ -55,7 +55,7 @@ assert_contains "$out" "DRIFT: primary checkout has modified tracked files:" "di
 assert_contains "$out" "README.md" "dirty tracked file listed"
 git -C "$REPO_CLEAN" checkout -q -- README.md
 
-# 4. Stale unpushed branch (>max-ahead or >max-age-days) is flagged; fresh pushed branch is not.
+# 4. A branch beyond --max-ahead is flagged; one within it is not.
 git -C "$REPO_CLEAN" branch fresh-feature origin/main
 git -C "$REPO_CLEAN" checkout -q fresh-feature
 printf 'one\n' > "$REPO_CLEAN/one.txt"
@@ -77,6 +77,30 @@ assert_equals "0" "$rc_ok" "recent branch within --max-ahead exits 0"
 assert_contains "$out_ok" "OK: primary checkout clean" "within-threshold branch prints OK"
 git -C "$REPO_CLEAN" branch -q -D fresh-feature
 
+# 4b. A branch older than --max-age-days is flagged only while it has no origin/<branch> ref.
+old_date="$(( $(date +%s) - 30 * 86400 )) +0000"
+git -C "$REPO_CLEAN" checkout -q -b aged-feature origin/main
+printf 'aged\n' > "$REPO_CLEAN/aged.txt"
+git -C "$REPO_CLEAN" add aged.txt
+GIT_COMMITTER_DATE="$old_date" GIT_AUTHOR_DATE="$old_date" git -C "$REPO_CLEAN" commit -q -m "aged commit"
+git -C "$REPO_CLEAN" checkout -q --detach origin/main
+
+out=$(bash "$CHECK" --repo "$REPO_CLEAN" --max-ahead 100 --max-age-days 7 2>&1)
+rc=$?
+assert_equals "1" "$rc" "unpushed branch older than --max-age-days exits 1"
+assert_contains "$out" "aged-feature (+1 vs origin/main, 30d old, on_origin=0)" "aged unpushed branch reported"
+
+out_ok=$(bash "$CHECK" --repo "$REPO_CLEAN" --max-ahead 100 --max-age-days 60 2>&1)
+assert_equals "0" "$?" "unpushed branch within --max-age-days exits 0"
+assert_contains "$out_ok" "OK: primary checkout clean" "within-age branch prints OK"
+
+git -C "$REPO_CLEAN" push -q origin aged-feature
+out_pushed=$(bash "$CHECK" --repo "$REPO_CLEAN" --max-ahead 100 --max-age-days 7 2>&1)
+assert_equals "0" "$?" "aged branch with an origin/<branch> ref exits 0"
+assert_contains "$out_pushed" "OK: primary checkout clean" "aged pushed branch prints OK"
+git -C "$REPO_CLEAN" push -q origin --delete aged-feature
+git -C "$REPO_CLEAN" branch -q -D aged-feature
+
 # 5. Linked worktrees: Treehouse pool path is allowed; non-Treehouse and prunable worktrees are flagged.
 th_wt="$TMP_ROOT/.treehouse/pool-1/slot"
 mkdir -p "$(dirname "$th_wt")"
@@ -84,6 +108,22 @@ git -C "$REPO_CLEAN" worktree add -q --detach "$th_wt" origin/main
 out=$(bash "$CHECK" --repo "$REPO_CLEAN" 2>&1)
 rc=$?
 assert_equals "0" "$rc" "Treehouse pool worktree is not flagged as drift"
+
+out=$(bash "$CHECK" --repo "$th_wt" 2>&1)
+rc=$?
+assert_equals "0" "$rc" "audit run from a linked worktree checks the primary checkout and exits 0"
+assert_not_contains "$out" "non-Treehouse" "primary checkout is not listed as a non-Treehouse worktree"
+
+git -C "$th_wt" checkout -q -b slot-topic
+git -C "$REPO_CLEAN" checkout -q main
+out=$(bash "$CHECK" --repo "$th_wt" 2>&1)
+rc=$?
+assert_equals "1" "$rc" "audit run from a linked worktree reports primary checkout drift"
+assert_contains "$out" "DRIFT: primary checkout is on branch 'main'" "primary branch reported, not the linked worktree branch"
+assert_not_contains "$out" "slot-topic" "linked worktree branch is not reported as the primary branch"
+git -C "$REPO_CLEAN" checkout -q --detach origin/main
+git -C "$th_wt" checkout -q --detach origin/main
+git -C "$REPO_CLEAN" branch -q -D slot-topic
 
 stray_wt="$TMP_ROOT/stray-worktree"
 git -C "$REPO_CLEAN" worktree add -q --detach "$stray_wt" origin/main
@@ -102,6 +142,18 @@ assert_contains "$out" "DRIFT: 1 prunable worktree(s)" "prunable worktree drift 
 
 git -C "$REPO_CLEAN" worktree prune
 git -C "$REPO_CLEAN" worktree remove -f "$th_wt"
+
+# 5b. A bare primary repository skips checkout checks and is not flagged as a stray worktree.
+BARE_ORIGIN="$TMP_ROOT/clean-origin.git"
+bare_wt="$TMP_ROOT/.treehouse/pool-2/slot"
+mkdir -p "$(dirname "$bare_wt")"
+git -C "$BARE_ORIGIN" worktree add -q --detach "$bare_wt" main
+out=$(bash "$CHECK" --repo "$bare_wt" --base main 2>&1)
+rc=$?
+assert_equals "0" "$rc" "bare primary with a Treehouse worktree exits 0"
+assert_contains "$out" "is a bare repository; skipping primary checkout checks" "bare primary noted"
+assert_not_contains "$out" "non-Treehouse" "bare primary is not listed as a non-Treehouse worktree"
+git -C "$BARE_ORIGIN" worktree remove -f "$bare_wt"
 
 # 6. Invalid arguments and missing base ref exit 2.
 bash "$CHECK" --repo "$REPO_CLEAN" --max-ahead notanumber >/dev/null 2>&1
