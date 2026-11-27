@@ -55,6 +55,8 @@ test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
   cat > "$child" <<'CHILD'
 #!/usr/bin/env bash
 set -u
+# This case tests the real refresh worker, so the child opts into it.
+export FM_TEST_REAL_SUMMARY_REFRESH=1
 # shellcheck source=tests/fm-teardown-helpers.sh
 . "$1/tests/fm-teardown-helpers.sh"
 case_dir=$(make_case leak-child)
@@ -4529,12 +4531,15 @@ test_legacy_preservation_refusal_prints_no_completing_command() {
 
 # A refusal is typed only when Git or the forge answered and the answer was no.
 # Git protecting the copy's contents is that answer; a removal that fails for any
-# other reason is a plain error with Git's own text and no event.
+# other reason is a plain error with Git's own text and no event. The untracked
+# file is Firstmate's managed hook file, not excluded: the copy proof does not
+# count it as work, but Git would refuse the copy for it, so the final removal
+# proof keeps the copy with that typed refusal.
 test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal() {
   local rc
   make_foreign_copy_case foreign-git-protects
   mkdir -p "$FOREIGN_COPY/.claude"
-  printf 'untracked\n' > "$FOREIGN_COPY/.claude/untracked.txt"
+  printf '{"hooks":{}}\n' > "$FOREIGN_COPY/.claude/settings.local.json"
   run_foreign_teardown rc
   expect_code 1 "$rc" "git-protects: a copy Git refuses to remove must keep refusing: $(cat "$FOREIGN_CASE/stderr")"
   assert_grep 'REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=nonforced-removal ' "$FOREIGN_CASE/stderr" 'git-protects: the refusal is not typed'
@@ -4542,7 +4547,7 @@ test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal() {
   jq -es 'length == 1 and .[0].rule_id == "nonforced-removal" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only"' \
     "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'git-protects: expected exactly one typed human-only event'
   assert_foreign_copy_untouched git-protects
-  assert_present "$FOREIGN_COPY/.claude/untracked.txt" 'git-protects: the untracked file was lost'
+  assert_present "$FOREIGN_COPY/.claude/settings.local.json" 'git-protects: the untracked file was lost'
   pass 'a foreign copy whose contents Git protects is refused as a typed nonforced-removal with its question'
 }
 
@@ -4672,9 +4677,11 @@ SH
 # protection text on a copy it had no reason to protect is only a failure.
 test_nonforced_removal_is_decided_from_the_copy_not_from_gits_message() {
   local rc
+  # The copy is protected the way only Git's own removal can judge (a modules
+  # directory under its clean git directory); an untracked file would be
+  # refused by teardown's final removal proof before Git is asked.
   make_foreign_copy_case foreign-removal-translated
-  mkdir -p "$FOREIGN_COPY/.claude"
-  printf 'untracked\n' > "$FOREIGN_COPY/.claude/untracked.txt"
+  mkdir "$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)/modules"
   cat > "$FOREIGN_CASE/fakebin/git" <<SH
 #!/usr/bin/env bash
 case " \$* " in
@@ -4707,8 +4714,7 @@ SH
   assert_foreign_copy_untouched english-clean
 
   make_foreign_copy_case foreign-removal-protected-but-failed
-  mkdir -p "$FOREIGN_COPY/.claude"
-  printf 'untracked\n' > "$FOREIGN_COPY/.claude/untracked.txt"
+  mkdir "$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)/modules"
   cat > "$FOREIGN_CASE/fakebin/git" <<SH
 #!/usr/bin/env bash
 case " \$* " in
@@ -4818,7 +4824,7 @@ test_creation_lock_owner_asks_the_same_question_at_proof_and_release_time() {
   git -C "$FOREIGN_CASE/project" worktree add -q -b fm/task-x1-v3 "$second" main
   git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID" "$second"
   cat > "$FOREIGN_SLOT/scripts/git-stability/closeout_pr.py" <<SH
-if [ "\${3:-}" != --execute-cleanup ]; then echo '{"allowed": true}'; exit 0; fi
+if [[ " \$* " != *" --execute-cleanup "* ]]; then echo '{"allowed": true}'; exit 0; fi
 printf '%s|%s\n' "\$PWD" "\$*" >> "$FOREIGN_CASE/closeout.log"
 case "\$2" in
   "$second") git worktree unlock "$FOREIGN_COPY" && git worktree lock --reason 'held by a human' "$FOREIGN_COPY" ;;
@@ -4926,27 +4932,61 @@ SH
 }
 
 # An own nested copy Vernant's creation lock holds is released through the
-# closeout driver; when its interpreter cannot run, that is known at entry, so
-# the teardown refuses before any protected step (the return-pending record,
-# the endpoint close, the inbox, status or tasktmp removal), for the plain and
-# the prior record shapes. With the interpreter there, the same case closes.
-test_own_locked_copy_with_no_closeout_interpreter_refuses_at_entry() {
+# closeout driver; when its interpreter cannot run and the lock's launcher is
+# gone, the entry check lets it through to the direct release of the dead
+# launcher's lock, which removes it without force, for the plain and the prior
+# record shapes. The driver never runs.
+test_own_locked_copy_with_no_closeout_interpreter_releases_a_dead_launchers_lock() {
   local shape rc label
   for shape in plain enclosing; do
     label="own-closeout-$shape"
     dead_launcher_pid
     make_own_locked_copy_case "$label" "$shape" "$FOREIGN_DEAD_PID"
-    nested_seed_task_files "$FOREIGN_CASE"
-    nested_snapshot "$FOREIGN_CASE" "$FOREIGN_CASE/snapshot.before"
     run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
-    assert_nested_refused_untouched "$FOREIGN_CASE" "$rc" "$label" "is not available, so it cannot be released"
+    expect_code 0 "$rc" "$label: a landed own copy under a dead launcher's lock must close with no interpreter: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on own nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+      "$label: the script's own release was not reported"
     assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
-    run_foreign_teardown rc
-    expect_code 0 "$rc" "$label: with the interpreter there the same copy must be released: $(cat "$FOREIGN_CASE/stderr")"
     assert_absent "$FOREIGN_COPY" "$label: the copy survived the release"
     assert_absent "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record survived the release"
   done
-  pass "an own Vernant-locked copy whose closeout interpreter cannot run refuses at entry for both record shapes, and closes once it can"
+  pass "an own Vernant-locked copy whose closeout interpreter cannot run is released directly when its launcher is gone, for both record shapes"
+}
+
+# Main 3556 F1 (Main 3529 Ruling 2): an own nested copy released directly after a
+# driver gap (no interpreter, dead launcher) keeps #380's own preserve where it is.
+# The case holds a selected ignored file and an earlier own preserve at the base
+# path that agrees with the copy and also holds a file the copy no longer has. The
+# release must leave that directory in place, with the same inode and every byte
+# unchanged, and set nothing aside; the copy is then removed without force.
+test_pr400_own_direct_release_leaves_the_own_preserve_in_place() {
+  local rc label root pres exclude before inode_before
+  label=pr400-own-direct-preserve
+  dead_launcher_pid
+  make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' 'notes/unique.dat' >> "$exclude"
+  mkdir -p "$FOREIGN_COPY/notes"
+  printf 'only here\n' > "$FOREIGN_COPY/notes/unique.dat"
+  root=$FOREIGN_CASE/data/task-x1/nested-copy-preserved
+  pres=$root/$(printf '%s' "$FOREIGN_COPY" | shasum -a 256 | awk '{print $1}')
+  mkdir -p "$pres/files/notes" "$pres/meta"
+  printf 'only here\n' > "$pres/files/notes/unique.dat"
+  printf 'from an earlier run\n' > "$pres/files/earlier-only.dat"
+  printf '%s\n' "$FOREIGN_COPY" > "$pres/meta/copy-path"
+  (cd "$pres/files" && shasum -a 256 notes/unique.dat earlier-only.dat) > "$pres/meta/SHA256SUMS"
+  before=$(kept_tree "$pres")
+  inode_before=$(perl -e 'print((lstat $ARGV[0])[1])' "$pres")
+  run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
+  expect_code 0 "$rc" "$label: a landed own copy under a dead launcher's lock must close with no interpreter: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on own nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+    "$label: the direct release did not run"
+  assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver ran"
+  assert_absent "$FOREIGN_COPY" "$label: the copy survived the release"
+  assert_equals "$inode_before" "$(perl -e 'print((lstat $ARGV[0])[1] // "gone")' "$pres")" "$label: the own preserve directory was moved or replaced"
+  assert_equals "$before" "$(kept_tree "$pres")" "$label: a byte of the own preserve changed"
+  assert_equals "" "$(find "$root" -mindepth 1 -maxdepth 1 -name '.*' -print)" "$label: a preserve was set aside or left staged"
+  pass "an own nested copy released directly after a driver gap leaves #380's own preserve in place, byte for byte, and sets nothing aside"
 }
 
 # Vernant's closeout driver is asked in plan mode at entry for every locked copy
@@ -5272,8 +5312,9 @@ test_a_held_close_removes_only_the_tasks_own_nested_copy() {
         || fail "held-own-nested-$shape-$locked: the foreign copy changed"
       assert_present "$second/unlanded.txt" "held-own-nested-$shape-$locked: the foreign copy's unique file is gone"
       if [ "$locked" = locked ]; then
-        assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
-          "held-own-nested-$shape-$locked: the driver was not run once, for the own copy only"
+        # The recorded PR 7 is merged and holds the copy head, so it is the credit.
+        assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --pr 7 --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+          "held-own-nested-$shape-$locked: the driver was not run once, for the own copy only, with the merged PR as its credit"
       else
         assert_absent "$FOREIGN_CASE/closeout.log" "held-own-nested-$shape-$locked: the closeout driver ran for an unlocked copy"
       fi
@@ -5366,10 +5407,15 @@ test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository() {
   held_foreign_unlanded "$second"
   held_snapshot "$FOREIGN_CASE" "$second"
   run_foreign_teardown rc
-  expect_code 0 "$rc" "held-submodule: a submodule of the own repository must not stop a held close: $(cat "$FOREIGN_CASE/stderr")"
-  held_assert_closed held-submodule
-  assert_absent "$FOREIGN_COPY" "held-submodule: the own nested copy survived"
-  pass "a submodule of the task's own repository does not stop a held close"
+  # Main 1681: the own nested copy is removed with a plain git worktree remove,
+  # and Git refuses a worktree with a checked-out submodule, so the held close
+  # stops with the copy, its submodule checkout and the task record intact.
+  expect_code 1 "$rc" "held-submodule: a checked-out submodule must keep the own nested copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_present "$FOREIGN_COPY/.git" "held-submodule: the own nested copy was removed"
+  assert_equals sub "$(cat "$FOREIGN_COPY/vendor/sub/file.txt" 2>/dev/null)" "held-submodule: the submodule checkout was lost"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-submodule: the task record was removed"
+  assert_grep 'git worktree remove (without force) refused' "$FOREIGN_CASE/stderr" "held-submodule: the refusal did not name Git's plain removal"
+  pass "a checked-out submodule of the task's own repository keeps the own nested copy: the plain removal refuses and nothing is lost"
 }
 
 test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal() {
@@ -6142,6 +6188,7 @@ test_a_foreign_copy_that_cannot_be_held_still_refuses_the_whole_close() {
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) if kill -0 $pid 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -6217,6 +6264,7 @@ case " \$* " in
     if kill -0 $agent 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $agent '$FOREIGN_SLOT'; fi
     if kill -0 $child 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $child '$FOREIGN_COPY'; fi
     exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -6468,6 +6516,7 @@ test_process_in_foreign_copy_keeps_it() {
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) if kill -0 $pid 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -6504,6 +6553,7 @@ case " \$* " in
     if kill -0 $agent 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $agent '$FOREIGN_SLOT'; fi
     if kill -0 $child 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $child '$FOREIGN_COPY'; fi
     exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -6596,7 +6646,7 @@ test_closeout_uses_the_slots_default_interpreter() {
   pass "without FM_TEARDOWN_VERNANT_PYTHON the driver runs under the slot's own .venv interpreter"
 }
 
-test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place() {
+test_missing_closeout_driver_or_interpreter_releases_a_dead_launchers_lock() {
   local rc shape
   for shape in driver interpreter; do
     dead_launcher_pid
@@ -6607,14 +6657,13 @@ test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place() {
     else
       run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
     fi
-    expect_code 1 "$rc" "missing-$shape: a locked copy with no driver to release it must refuse: $(cat "$FOREIGN_CASE/stderr")"
-    assert_grep "foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: Vernant's closeout driver" "$FOREIGN_CASE/stderr" \
-      "missing-$shape: the proof did not refuse the copy whose driver cannot start"
-    assert_grep "is not available, so it cannot be released" "$FOREIGN_CASE/stderr" "missing-$shape: the refusal did not say what was missing"
-    assert_foreign_copy_untouched "missing-$shape"
-    assert_absent "$FOREIGN_CASE/state/task-x1.teardown-return-pending" "missing-$shape: a return-pending record was written before the refusal"
+    expect_code 0 "$rc" "missing-$shape: a landed copy under a dead launcher's lock must close with no driver: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on foreign copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+      "missing-$shape: the script's own release was not reported"
+    assert_absent "$FOREIGN_COPY" "missing-$shape: the copy survived"
+    assert_absent "$FOREIGN_CASE/closeout.log" "missing-$shape: the missing driver ran"
   done
-  pass "a Vernant-locked copy whose closeout driver or interpreter is missing is refused at entry and stays"
+  pass "a landed foreign copy under a dead launcher's lock is released by the script when its closeout driver or interpreter is missing"
 }
 
 test_foreign_copy_nested_in_another_is_removed_first() {
@@ -6716,6 +6765,1287 @@ test_live_launcher_outside_the_task_keeps_its_locked_own_copy() {
     "own-live-launcher: the refusal did not name the launcher"
   assert_own_locked_copy_untouched own-live-launcher
   pass "a live lock launcher outside the task keeps a locked own copy and is named by pid"
+}
+
+# make_locked_bundle_case <name> <own|prior|foreign> <single|interior>: a Vernant-locked
+# copy (own: the task's worktree= copy nested in its slot; prior: its prior_worktree= copy;
+# foreign: a copy no record names); a Vernant-locked
+# copy whose launcher is gone, one commit (single) or two (interior) ahead of the
+# landed main, held only by a recorded verified bundle with no captain hold filed.
+# single bundles the branch and main, so the head and its only locally-only
+# commit are advertised; interior bundles only the branch, so the first commit is
+# restored by the tip but is not itself an advertised head (the driver's claim
+# rule refuses it while teardown's maximal-tip proof accepts it). Sets
+# FOREIGN_* and BUNDLE_PATH.
+make_locked_bundle_case() {
+  local name=$1 kind=$2 shape=$3
+  dead_launcher_pid
+  case "$kind" in
+    own) make_own_locked_copy_case "$name" enclosing "$FOREIGN_DEAD_PID" ;;
+    prior) make_own_locked_copy_case "$name" reverse "$FOREIGN_DEAD_PID" ;;
+    *) make_foreign_copy_case "$name" "$FOREIGN_DEAD_PID" ;;
+  esac
+  printf 'one\n' > "$FOREIGN_COPY/work1.txt"
+  git -C "$FOREIGN_COPY" add work1.txt
+  git -C "$FOREIGN_COPY" commit -qm 'unpublished one'
+  if [ "$shape" = interior ]; then
+    printf 'two\n' > "$FOREIGN_COPY/work2.txt"
+    git -C "$FOREIGN_COPY" add work2.txt
+    git -C "$FOREIGN_COPY" commit -qm 'unpublished two'
+  fi
+  BUNDLE_PATH="$FOREIGN_CASE/bundles/work.bundle"
+  if [ "$shape" = interior ]; then
+    record_fixture_bundle "$FOREIGN_CASE" "$FOREIGN_COPY" "$BUNDLE_PATH" fm/task-x1-v2 || fail "$name: cannot create the bundle fixture"
+  else
+    record_fixture_bundle "$FOREIGN_CASE" "$FOREIGN_COPY" "$BUNDLE_PATH" --all || fail "$name: cannot create the bundle fixture"
+  fi
+  add_git_worktree_log "$FOREIGN_CASE"
+}
+
+# The stored bundle restores every commit of the copy in a fresh repository after
+# the copy and the source bundle are gone.
+assert_bundle_restores_copy_commits() {  # <label> <commit>...
+  local label=$1 hash stored restored commit
+  shift
+  hash=$(cut -f2 "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv")
+  stored="$FOREIGN_CASE/data/task-x1/preserved-bundles/$hash.bundle"
+  assert_present "$stored" "$label: the stored bundle is missing after the close"
+  restored="$FOREIGN_CASE/restored-$label.git"
+  rm -rf "$restored"
+  git init -q --bare "$restored"
+  git -C "$restored" fetch -q "$stored" "$1:refs/heads/recovered" || fail "$label: the stored bundle cannot restore the tip"
+  for commit in "$@"; do
+    git -C "$restored" cat-file -e "$commit^{commit}" 2>/dev/null || fail "$label: commit $commit does not restore from the stored bundle"
+  done
+  git -C "$restored" fsck --strict --no-dangling >/dev/null 2>&1 || fail "$label: the restored repository fails fsck"
+}
+
+# A locked copy held only by a verified bundle is passed to the driver with
+# exactly one credit, --bundle-record, built from teardown's own proof. The
+# driver stub refuses any copy no credit covers, as the real driver does.
+test_locked_copy_held_by_a_bundle_gets_one_bundle_record_credit() {
+  local rc kind head hash stored
+  for kind in own prior foreign; do
+    make_locked_bundle_case "bundle-credit-$kind" "$kind" single
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    hash=$(cut -f2 "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv")
+    stored="$FOREIGN_CASE/data/task-x1/preserved-bundles/$hash.bundle"
+    run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+    expect_code 0 "$rc" "bundle-credit-$kind: a bundle-held locked copy must close with no owner step: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -8)"
+    [ "$(wc -l < "$FOREIGN_CASE/closeout.log" | tr -d ' ')" = 1 ] || fail "bundle-credit-$kind: the driver was not run once"
+    grep -Eq "^$FOREIGN_SLOT\\|--cleanup-worktree $FOREIGN_COPY --bundle-record $FOREIGN_CASE/data/task-x1/closeout-bundle-record\\.[A-Za-z0-9]+ --execute-cleanup\$" \
+      "$FOREIGN_CASE/closeout.log" || fail "bundle-credit-$kind: the driver did not get exactly the bundle record credit"
+    assert_no_grep ' --pr ' "$FOREIGN_CASE/closeout.log" "bundle-credit-$kind: a pull-request credit was passed beside the record"
+    assert_equals "$stored" "$(jq -r .bundle_path "$FOREIGN_CASE/closeout.record")" "bundle-credit-$kind: the record names another bundle"
+    assert_equals "$hash" "$(jq -r .sha256 "$FOREIGN_CASE/closeout.record")" "bundle-credit-$kind: the record carries another digest"
+    jq -e --arg head "$head" '.unpushed_commit_tips | index($head) != null' "$FOREIGN_CASE/closeout.record" >/dev/null \
+      || fail "bundle-credit-$kind: the record does not list the copy head"
+    [ -z "$(find "$FOREIGN_CASE/data/task-x1" -name 'closeout-bundle-record.*' 2>/dev/null)" ] \
+      || fail "bundle-credit-$kind: the temporary record outlived the call"
+    assert_grep "closeout credit for $FOREIGN_COPY: --bundle-record" "$FOREIGN_CASE/stderr" "bundle-credit-$kind: the credit was not printed"
+    assert_no_grep 'released creation lock' "$FOREIGN_CASE/stderr" "bundle-credit-$kind: the direct release ran although the driver could release"
+    assert_no_grep 'fm-captain-hold.sh hold' "$FOREIGN_CASE/stderr" "bundle-credit-$kind: a hold command was printed"
+    assert_absent "$FOREIGN_COPY" "bundle-credit-$kind: the copy survived"
+    assert_absent "$FOREIGN_CASE/state/task-x1.meta" "bundle-credit-$kind: the task record survived"
+    assert_bundle_restores_copy_commits "bundle-credit-$kind" "$head"
+  done
+  pass 'a bundle-held Vernant-locked copy (own nested, prior or foreign) closes through the driver with exactly one --bundle-record credit built from the proved record'
+}
+
+# A merged pull request that holds the whole copy head is the credit, even with a
+# recorded bundle beside it: the driver rejects the pair.
+test_locked_copy_landed_by_a_merged_pr_gets_one_pr_credit() {
+  local rc head
+  make_locked_bundle_case pr-credit own single
+  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+  git -C "$FOREIGN_COPY" push -q origin "HEAD:refs/pull/7/head"
+  append_pr_meta_url "$FOREIGN_CASE"
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$head"
+  run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+  expect_code 0 "$rc" "pr-credit: a locked copy held by a merged PR must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --pr 7 --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+    "pr-credit: the driver did not get exactly the pull-request credit"
+  assert_absent "$FOREIGN_CASE/closeout.record" "pr-credit: a bundle record reached the driver beside --pr"
+  assert_grep "--pr 7 (the merged pull request holds HEAD" "$FOREIGN_CASE/stderr" "pr-credit: the credit was not printed"
+  assert_absent "$FOREIGN_COPY" "pr-credit: the copy survived"
+  pass 'a locked copy whose whole head a merged pull request holds is passed --pr and never a bundle record beside it'
+}
+
+# The closeout driver reads --pr with gh pr view, so only a GitHub pull request
+# can be its credit. A merged Forgejo pull request that holds the copy head is
+# named as the reason no --pr is passed, and the bundle reason does not hide it.
+test_locked_copy_landed_by_a_merged_forgejo_pr_names_the_driver_bound() {
+  local rc head
+  make_locked_bundle_case forgejo-credit own single
+  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+  printf '%s\n' 'pr=https://git.example.org/team/repo/pulls/7' "pr_head=$head" >> "$FOREIGN_CASE/state/task-x1.meta"
+  add_gh_axi_error "$FOREIGN_CASE"
+  add_tea_pull_for_head "$FOREIGN_CASE" true "$head"
+  run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+  assert_grep 'api --login fj --repo team/repo /repos/{owner}/{repo}/pulls/7' "$FOREIGN_CASE/tea.log" "forgejo-credit: the Forgejo pull request was not read"
+  assert_no_grep ' --pr ' "$FOREIGN_CASE/closeout.log" "forgejo-credit: a Forgejo number reached the GitHub-only driver as --pr"
+  assert_grep "merged pull request https://git.example.org/team/repo/pulls/7 holds HEAD ${head:0:12}, but the closeout driver reads --pr from GitHub only" \
+    "$FOREIGN_CASE/stderr" "forgejo-credit: the driver bound was not named: $(grep -h 'closeout credit' "$FOREIGN_CASE/stderr")"
+  pass 'a merged Forgejo pull request is not passed as --pr to the GitHub-only driver, and the credit line names that bound'
+}
+
+# A bundle whose branch tip restores an interior commit is accepted by teardown's
+# maximal-tip proof but not credited by the driver. For a dead launcher the copy
+# is released by the script itself, without force and without an owner command.
+test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable() {
+  local rc kind first head label
+  for kind in own prior foreign; do
+    label='own nested'
+    [ "$kind" != foreign ] || label=foreign
+    make_locked_bundle_case "direct-release-$kind" "$kind" interior
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    first=$(git -C "$FOREIGN_COPY" rev-parse HEAD^)
+    run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+    expect_code 0 "$rc" "direct-release-$kind: a dead launcher's lock on a proved copy must not need the owner: $(cat "$FOREIGN_CASE/stderr")"
+    assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+      "direct-release-$kind: the driver was not tried once, with no credit"
+    assert_grep "closeout credit for $FOREIGN_COPY: none (commit $first is not a recorded and advertised head of the bundle)" "$FOREIGN_CASE/stderr" \
+      "direct-release-$kind: the unmet credit was not named: $(grep -h 'closeout credit' "$FOREIGN_CASE/stderr")"
+    assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on $label copy $FOREIGN_COPY (launcher $FOREIGN_DEAD_PID is gone; proof: recorded bundle " \
+      "$FOREIGN_CASE/stderr" "direct-release-$kind: the release and its proof were not printed"
+    assert_grep "removed it without force" "$FOREIGN_CASE/stderr" "direct-release-$kind: the release did not say it was unforced"
+    assert_absent "$FOREIGN_CASE/data/task-x1/creation-lock-releases.tsv" "direct-release-$kind: a release record file was written"
+    assert_grep "worktree unlock $FOREIGN_COPY" "$FOREIGN_CASE/git-worktree.log" "direct-release-$kind: the script did not unlock"
+    grep -Fxq -- "-C $FOREIGN_SLOT worktree remove $FOREIGN_COPY" "$FOREIGN_CASE/git-worktree.log" || fail "direct-release-$kind: the removal was not the plain one"
+    if grep -Eq 'worktree remove .*(^| )(-f|--force)( |$)' "$FOREIGN_CASE/git-worktree.log"; then fail "direct-release-$kind: a forced removal ran"; fi
+    assert_no_grep 'run git worktree unlock' "$FOREIGN_CASE/stderr" "direct-release-$kind: an owner command was printed"
+    assert_absent "$FOREIGN_COPY" "direct-release-$kind: the copy survived"
+    assert_absent "$FOREIGN_CASE/state/task-x1.meta" "direct-release-$kind: the task record survived"
+    assert_bundle_restores_copy_commits "direct-release-$kind" "$head" "$first"
+  done
+  pass 'a proved copy locked by a gone launcher, which no driver credit covers, is unlocked and removed by the script without force and stays restorable'
+}
+
+# The driver or its interpreter being unavailable leaves a dead launcher's lock
+# as the only obstacle to a landed copy: the script releases it.
+test_dead_launcher_lock_is_released_when_the_driver_is_unavailable() {
+  local rc
+  dead_launcher_pid
+  make_own_locked_copy_case driver-unavailable enclosing "$FOREIGN_DEAD_PID"
+  add_git_worktree_log "$FOREIGN_CASE"
+  rm -f "$FOREIGN_CASE/vernant-python"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "driver-unavailable: a landed copy under a dead launcher's lock must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'proof: the landed-work rule)' "$FOREIGN_CASE/stderr" "driver-unavailable: the release was not printed"
+  assert_grep "worktree unlock $FOREIGN_COPY" "$FOREIGN_CASE/git-worktree.log" "driver-unavailable: the script did not unlock"
+  assert_absent "$FOREIGN_COPY" "driver-unavailable: the copy survived"
+  pass 'a landed copy under a dead launcher'"'"'s lock is released by the script when the closeout driver cannot run'
+}
+
+# A preservation record left beside a copy that has no locally-only commit (its
+# work landed) is not a credit: the bundle proof returns before it reads the
+# record, and the locked copy still reaches the driver with no credit and closes.
+test_locked_landed_copy_with_a_record_but_no_unlanded_commit_reaches_the_driver() {
+  local rc
+  dead_launcher_pid
+  make_own_locked_copy_case landed-with-record enclosing "$FOREIGN_DEAD_PID"
+  mkdir -p "$FOREIGN_CASE/data/task-x1"
+  printf '%s\t%s\t%s\n' "$FOREIGN_CASE/left.bundle" 0000000000000000000000000000000000000000000000000000000000000000 \
+    0000000000000000000000000000000000000000 > "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv"
+  run_foreign_teardown rc
+  assert_no_grep 'unbound variable' "$FOREIGN_CASE/stderr" "landed-with-record: teardown stopped on an unset variable: $(grep -m1 'unbound variable' "$FOREIGN_CASE/stderr")"
+  expect_code 0 "$rc" "landed-with-record: a landed locked copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log" 2>/dev/null)" \
+    "landed-with-record: the driver was not run once with no credit"
+  assert_grep "closeout credit for $FOREIGN_COPY: none (no verified bundle holds this copy)" "$FOREIGN_CASE/stderr" \
+    "landed-with-record: the unmet credit was not named"
+  assert_absent "$FOREIGN_COPY" "landed-with-record: the copy survived"
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" "landed-with-record: the task record survived"
+  pass 'a landed locked copy with a leftover preservation record and no unlanded commit reaches the driver with no credit and closes'
+}
+
+# Every check is made again before the unlock: a process that starts running in
+# the copy after the driver refused keeps the copy locked and registered.
+test_direct_release_refuses_a_process_that_appears_before_the_unlock() {
+  local rc pid=999991
+  make_locked_bundle_case direct-appears own interior
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*|*" -Fpfn "*)
+    if [ -e "$FOREIGN_CASE/closeout.log" ]; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi
+    exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/lsof"
+  run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1
+  expect_code 1 "$rc" "direct-appears: a process running in the copy must keep it: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_grep "The copy was not released directly: process $pid runs in it after the retire phase" "$FOREIGN_CASE/stderr" \
+    "direct-appears: the refusal did not name the process"
+  assert_present "$FOREIGN_COPY/.git" "direct-appears: the copy was removed"
+  git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+    || fail 'direct-appears: the copy is no longer locked'
+  assert_absent "$FOREIGN_CASE/git-worktree.log.unlock" 'direct-appears: marker'
+  if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-appears: the script unlocked the copy'; fi
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" 'direct-appears: the task record was removed'
+  pass 'a process that appears in the copy after the driver refused keeps the copy locked, named by pid'
+}
+
+# The squash-history landing proves the copy's committed content, not its
+# ignored files: an unlocked own nested copy whose commit was squashed onto main
+# and then edited again there keeps a unique ignored file that no hash record
+# preserves, so teardown refuses and keeps the copy, the file and the record.
+# Without the ignored file the same history closes.
+test_history_landed_copy_keeps_its_unique_ignored_file() {
+  local rc shape exclude record
+  for record in enclosing reverse; do
+  for shape in unique-ignored clean; do
+    make_own_locked_copy_case "history-$record-$shape" "$record"
+    git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'start' >/dev/null
+    printf 'hello\n' > "$FOREIGN_COPY/feature.txt"
+    git -C "$FOREIGN_COPY" add -- feature.txt
+    git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q -m 'add feature'
+    land_on_origin_main "$FOREIGN_CASE" feature.txt hello
+    land_on_origin_main "$FOREIGN_CASE" feature.txt 'hello, then edited on main'
+    if [ "$shape" = unique-ignored ]; then
+      exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+      printf '%s\n' unique.dat >> "$exclude"
+      printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+    fi
+    run_foreign_teardown rc
+    assert_grep 'is in a commit of' "$FOREIGN_CASE/stderr" "history-$record-$shape: the history proof did not run: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    if [ "$shape" = unique-ignored ]; then
+      expect_code 1 "$rc" "history-$record-$shape: a unique ignored file must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_grep 'unique.dat' "$FOREIGN_CASE/stderr" "history-$record-$shape: the refusal did not name the ignored file"
+      assert_no_grep 'recorded bundle' "$FOREIGN_CASE/stderr" "history-$record-$shape: the refusal named a bundle that does not exist"
+      assert_equals 'only here' "$(cat "$FOREIGN_COPY/unique.dat" 2>/dev/null)" "history-$record-$shape: the unique ignored file was lost"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "history-$record-$shape: the task record was removed"
+    else
+      expect_code 0 "$rc" "history-$record-$shape: a clean history-landed copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "history-$record-$shape: the copy survived"
+      assert_absent "$FOREIGN_CASE/state/task-x1.meta" "history-$record-$shape: the task record survived"
+    fi
+  done
+  done
+  pass 'a copy landed only through default-branch history, recorded as the worktree or as a prior copy, keeps a unique ignored file; without one it closes'
+}
+
+# The bundle that proves a dead launcher's copy must still hold it at the unlock:
+# the fake lsof truncates the recorded source and the stored bundle, or commits a
+# new HEAD in the copy, during the last holder scan (after the landed and Git
+# proofs). Teardown keeps the copy locked and the record; with nothing changed
+# the same copy closes and its stored bundle restores the commits.
+test_direct_release_rechecks_the_bundle_and_head_at_the_unlock() {
+  local rc change marker head first hash stored
+  for change in none truncate head; do
+    make_locked_bundle_case "late-$change" own interior
+    rm -f "$FOREIGN_CASE/vernant-python"
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    first=$(git -C "$FOREIGN_COPY" rev-parse HEAD^)
+    hash=$(cut -f2 "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv")
+    stored="$FOREIGN_CASE/data/task-x1/preserved-bundles/$hash.bundle"
+    marker="$FOREIGN_CASE/git-protects-ran"
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+args=("\$@")
+for argument in "\$@"; do
+  if [ "\$argument" = worktree ]; then printf '%s\n' "\$*" >> "$FOREIGN_CASE/git-worktree.log"; break; fi
+done
+case " \$* " in *" ls-files --stage -z "*) : > "$marker" ;; esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\${args[@]}"
+SH
+    cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*)
+    if [ -e "$marker" ] && [ ! -e "$marker.done" ]; then
+      : > "$marker.done"
+      case $change in
+        truncate) : > "$BUNDLE_PATH"; : > "$stored" ;;
+        head) "\${REAL_GIT_FOR_TEST:?}" -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q --allow-empty -m late ;;
+      esac
+    fi
+    exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git" "$FOREIGN_CASE/fakebin/lsof"
+    run_foreign_teardown rc
+    assert_present "$marker.done" "late-$change: the last holder scan did not run after the Git proof"
+    if [ "$change" = none ]; then
+      expect_code 0 "$rc" "late-$change: an unchanged bundle-held copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "late-$change: the copy survived"
+      assert_bundle_restores_copy_commits "late-$change" "$head" "$first"
+    else
+      expect_code 1 "$rc" "late-$change: a change after the last proof must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_present "$FOREIGN_COPY/.git" "late-$change: the copy was removed"
+      git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+        || fail "late-$change: the copy is no longer locked"
+      if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail "late-$change: the script unlocked the copy"; fi
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "late-$change: the task record was removed"
+    fi
+    case $change in
+      truncate) assert_grep 'The copy was not released directly: its recorded bundle no longer holds it' "$FOREIGN_CASE/stderr" "late-$change: the refusal did not name the bundle" ;;
+      head) assert_grep 'The copy was not released directly: its HEAD changed after the landing proof' "$FOREIGN_CASE/stderr" "late-$change: the refusal did not name the HEAD change" ;;
+    esac
+  done
+  pass 'a bundle truncated or a HEAD committed during the last holder scan keeps a dead launcher'"'"'s copy locked; unchanged, it closes and restores'
+}
+
+# Where ps cannot run (a confined worker: exit 126) the launcher's state comes
+# from the confined process table alone, and every read of it keeps its third
+# answer: a live launcher is never taken for gone, and an unreadable table is
+# never taken for absence. Both direct-release routes (the driver unavailable,
+# and its uncovered-content verdict) keep the copy locked for a live or unknown
+# launcher; a gone launcher's copy still closes. Off Darwin the confined table
+# (bin/fm-proc-info.py, which reads Darwin sysctl) cannot be read at all, so
+# every state there must refuse as unknown, never as gone.
+test_confined_launcher_state_is_never_taken_for_absence() {
+  local rc route state label live args expected
+  teardown_signal_case_allowed 'test_confined_launcher_state_is_never_taken_for_absence' || return 0
+  for route in unavailable uncovered; do
+    for state in live unknown gone; do
+      label="confined-$route-$state"
+      expected=$state
+      [ "$(uname -s)" = Darwin ] || expected=unknown
+      args=()
+      if [ "$route" = unavailable ]; then
+        dead_launcher_pid
+        make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+        add_git_worktree_log "$FOREIGN_CASE"
+        rm -f "$FOREIGN_CASE/vernant-python"
+      else
+        make_locked_bundle_case "$label" own interior
+        args=(FM_STUB_REQUIRE_CREDIT=1)
+      fi
+      live=
+      if [ "$state" = live ]; then
+        sleep 600 &
+        live=$!
+        git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+        git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$live launcher=$live" "$FOREIGN_COPY"
+      fi
+      # ps always fails as a confined worker's does; python3 fails only the
+      # confined table read when the table must be unreadable.
+      printf '#!/usr/bin/env bash\necho "ps: Operation not permitted" >&2\nexit 126\n' > "$FOREIGN_CASE/fakebin/ps"
+      cat > "$FOREIGN_CASE/fakebin/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in *"fm-proc-info.py table pid"*) [ "$state" != unknown ] || exit 1 ;; esac
+exec "$(command -v python3)" "\$@"
+SH
+      chmod +x "$FOREIGN_CASE/fakebin/ps" "$FOREIGN_CASE/fakebin/python3"
+      run_foreign_teardown rc ${args[@]+"${args[@]}"}
+      if [ "$expected" = gone ]; then
+        expect_code 0 "$rc" "$label: a gone launcher's copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+      else
+        expect_code 1 "$rc" "$label: the copy must stay locked: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+        git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+          || fail "$label: the copy is no longer locked"
+        if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail "$label: the script unlocked the copy"; fi
+        assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+        assert_no_grep 'released creation lock' "$FOREIGN_CASE/stderr" "$label: a release was printed"
+      fi
+      if [ "$state" = live ]; then
+        kill -0 "$live" 2>/dev/null || fail "$label: the live launcher was ended"
+        [ "$expected" != live ] || assert_grep "launcher process $live may still be running" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the live launcher"
+        kill "$live" 2>/dev/null || true
+        wait "$live" 2>/dev/null || true
+      fi
+      [ "$expected" != unknown ] || assert_grep 'cannot be read' "$FOREIGN_CASE/stderr" "$label: the refusal did not name the unreadable process table"
+    done
+  done
+  if [ "$(uname -s)" = Darwin ]; then
+    pass 'with ps confined, a live or unreadable launcher keeps its locked copy on both direct-release routes, and a gone one closes'
+  else
+    pass "with ps confined on $(uname -s), where bin/fm-proc-info.py cannot read the process table, every launcher state is unknown and keeps its locked copy on both direct-release routes; the gone-launcher close is Darwin-only and not shown here"
+  fi
+}
+
+# lsof spells a name byte by byte in the C locale: a non-ASCII byte as \\xNN and
+# a backslash doubled (checked against the real lsof on macOS). A copy whose path
+# holds a non-ASCII component (cafe with an acute e) still refuses a process
+# that holds a file in it open, whatever locale teardown runs in; with no holder
+# it closes. The fake lsof prints that spelling when LC_ALL=C and the raw bytes
+# otherwise, as the real one does, and the expected spelling is written by hand.
+test_direct_release_sees_a_holder_under_an_escaped_lsof_name() {
+  local rc shape label pid=999996 raw escaped locale
+  for shape in holder-c-locale holder-utf8-locale none; do
+    label="escaped-$shape"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+    raw="${FOREIGN_COPY%/*}/caf$(printf '\303\251')-one"
+    git -C "$FOREIGN_CASE/project" worktree move "$FOREIGN_COPY" "$raw"
+    git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID" "$raw"
+    FOREIGN_COPY=$raw
+    # The slot's status would list the non-ASCII copy C-quoted; keep it out of
+    # the slot's clean check, which this case does not test.
+    printf '%s\n' '/.claude/worktrees/caf*-one/' >> "$(git -C "$FOREIGN_SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+    fm_write_meta "$FOREIGN_CASE/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$FOREIGN_COPY" "branch=fm/task-x1-v2" "project=$FOREIGN_CASE/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+      "prior_worktree=$FOREIGN_SLOT"
+    escaped="${FOREIGN_COPY%/*}/caf\\xc3\\xa9-one"
+    add_git_worktree_log "$FOREIGN_CASE"
+    rm -f "$FOREIGN_CASE/vernant-python"
+    cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*)
+    [ "$shape" != none ] || exit 0
+    if [ "\${LC_ALL:-}" = C ]; then name='$escaped/.git'; else name='$FOREIGN_COPY/.git'; fi
+    printf 'p%s\nf4\nn%s\n' $pid "\$name"
+    exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/lsof"
+    locale=C
+    [ "$shape" != holder-utf8-locale ] || locale=en_US.UTF-8
+    run_foreign_teardown rc LC_ALL="$locale"
+    if [ "$shape" = none ]; then
+      expect_code 0 "$rc" "$label: a copy no process holds must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+    else
+      expect_code 1 "$rc" "$label: a holder under an escaped name must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_grep "process $pid" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the holder: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+      if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail "$label: the script unlocked the copy"; fi
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+    fi
+  done
+  pass 'a process holding a file in a copy with a non-ASCII path keeps it, whatever locale lsof spells the name in; with no holder it closes'
+}
+
+# A direct release whose non-forced removal fails puts the lock back, and says
+# so only when the lock reads back: when the relock fails too, the refusal says
+# the copy is now unlocked. The copy and the record stay either way.
+test_direct_release_reports_a_failed_relock_truthfully() {
+  local rc relock label
+  for relock in restored fails; do
+    label="relock-$relock"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    rm -f "$FOREIGN_CASE/vernant-python"
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" worktree remove "*) echo 'fatal: simulated removal failure' >&2; exit 1 ;;
+  *" worktree lock "*) [ "$relock" = restored ] || { echo 'fatal: simulated relock failure' >&2; exit 1; } ;;
+esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "$label: a failed removal must refuse: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+    if [ "$relock" = restored ]; then
+      git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+        || fail "$label: the lock was not put back"
+      assert_grep 'its lock was restored' "$FOREIGN_CASE/stderr" "$label: the restored lock was not reported: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -4)"
+    else
+      if git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked'; then
+        fail "$label: the fixture's relock did not fail"
+      fi
+      assert_no_grep 'its lock was restored' "$FOREIGN_CASE/stderr" "$label: an absent lock was reported restored"
+      assert_grep 'its lock could not be restored, so the copy is now unlocked' "$FOREIGN_CASE/stderr" "$label: the absent lock was not reported: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -4)"
+    fi
+  done
+  pass 'a failed direct removal reports its lock restored only when it reads back, and says the copy is unlocked when the relock fails'
+}
+
+# Round 3 falsifiers. A fixture mutation runs once, after the Git-protection
+# proof, at one chosen call before the removal: the last holder scan (lsof), the
+# launcher read (on Darwin the confined table, ps exits 126 there; elsewhere,
+# where bin/fm-proc-info.py cannot read that table, the real ps launcher query)
+# or the git worktree unlock. FM_LATE_POINT names the call; "none" runs nothing.
+add_late_mutation_hooks() {  # <point>  (mutation script: $FOREIGN_CASE/mutate.sh)
+  local point=$1 marker="$FOREIGN_CASE/git-protects-ran"
+  rm -f "$FOREIGN_CASE/vernant-python"
+  cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+args=("\$@")
+for argument in "\$@"; do
+  if [ "\$argument" = worktree ]; then printf '%s\n' "\$*" >> "$FOREIGN_CASE/git-worktree.log"; break; fi
+done
+case " \$* " in
+  *" ls-files --stage -z "*) : > "$marker" ;;
+  *" worktree unlock "*)
+    if [ "$point" = unlock ] && [ -e "$marker" ] && [ ! -e "$marker.done" ]; then : > "$marker.done"; bash "$FOREIGN_CASE/mutate.sh"; fi ;;
+esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\${args[@]}"
+SH
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*)
+    if [ "$point" = scan ] && [ -e "$marker" ] && [ ! -e "$marker.done" ]; then : > "$marker.done"; bash "$FOREIGN_CASE/mutate.sh"; fi
+    exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+  if [ "$(uname -s)" = Darwin ]; then
+    printf '#!/usr/bin/env bash\necho "ps: Operation not permitted" >&2\nexit 126\n' > "$FOREIGN_CASE/fakebin/ps"
+  else
+    cat > "$FOREIGN_CASE/fakebin/ps" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -p "*" -o pid= "*)
+    if [ "$point" = launcher ] && [ -e "$marker" ] && [ ! -e "$marker.done" ]; then : > "$marker.done"; bash "$FOREIGN_CASE/mutate.sh"; fi ;;
+esac
+exec "$(command -v ps)" "\$@"
+SH
+  fi
+  cat > "$FOREIGN_CASE/fakebin/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"fm-proc-info.py table pid"*)
+    if [ "$point" = launcher ] && [ -e "$marker" ] && [ ! -e "$marker.done" ]; then : > "$marker.done"; bash "$FOREIGN_CASE/mutate.sh"; fi ;;
+esac
+exec "$(command -v python3)" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/git" "$FOREIGN_CASE/fakebin/lsof" "$FOREIGN_CASE/fakebin/ps" "$FOREIGN_CASE/fakebin/python3"
+}
+
+# A locked copy that the release keeps is still there, locked, with its record.
+assert_late_copy_kept() {  # <label>
+  assert_present "$FOREIGN_COPY/.git" "$1: the copy was removed"
+  git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+    || fail "$1: the copy is no longer locked"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "$1: the task record was removed"
+}
+
+# F1: an ignored file outside the preserve allow-list that appears after the
+# ignored files were preserved is never lost. This own copy had no selected
+# ignored file at the dispose, so no preserve was made then; a selected file that
+# appears later makes the direct release refuse, as bd76b1ee7 refused it (Main
+# 4045 F1): the copy stays, locked, with the file, and no preserve takes it in.
+test_late_unique_ignored_file_is_never_lost_at_the_removal() {
+  local rc point label exclude found
+  for point in none scan launcher unlock; do
+    label="late-ignored-$point"
+    make_locked_bundle_case "$label" own interior
+    add_late_mutation_hooks "$point"
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    printf '%s\n' unique-late.dat >> "$exclude"
+    printf 'printf %%s "late unique bytes" > %q\n' "$FOREIGN_COPY/unique-late.dat" > "$FOREIGN_CASE/mutate.sh"
+    run_foreign_teardown rc
+    if [ "$point" = none ]; then
+      expect_code 0 "$rc" "$label: a copy with no late file must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+      continue
+    fi
+    assert_present "$FOREIGN_CASE/git-protects-ran.done" "$label: the mutation did not run"
+    found=
+    if [ -f "$FOREIGN_COPY/unique-late.dat" ]; then
+      found=copy
+    elif grep -rlqF 'late unique bytes' "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" 2>/dev/null; then
+      found=preserved
+    fi
+    [ -n "$found" ] || fail "$label: the late unique ignored file was lost (rc=$rc): $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    [ "$found" = copy ] || fail "$label: the release took the late unique ignored file into a preserve and removed the copy (found=$found, rc=$rc); with no preserve at the dispose it must refuse and keep the copy"
+    expect_code 1 "$rc" "$label: a late unique ignored file must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_late_copy_kept "$label"
+    if grep -rlqF 'late unique bytes' "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" 2>/dev/null; then
+      fail "$label: a preserve took in the late unique ignored file the refused release kept in the copy"
+    fi
+  done
+  pass 'a unique ignored file that appears after preservation, at the scan, the launcher read or the unlock, keeps the copy and is taken into no preserve'
+}
+
+# F2: a bundle truncated after the last recheck, at the launcher read or the
+# unlock, still stops the removal; unchanged, the copy closes and restores.
+test_late_bundle_truncation_stops_the_removal_at_every_call() {
+  local rc point label head first hash stored
+  for point in none scan launcher unlock; do
+    label="late-bundle-$point"
+    make_locked_bundle_case "$label" own interior
+    add_late_mutation_hooks "$point"
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    first=$(git -C "$FOREIGN_COPY" rev-parse HEAD^)
+    hash=$(cut -f2 "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv")
+    stored="$FOREIGN_CASE/data/task-x1/preserved-bundles/$hash.bundle"
+    printf ': > %q; : > %q\n' "$BUNDLE_PATH" "$stored" > "$FOREIGN_CASE/mutate.sh"
+    run_foreign_teardown rc
+    if [ "$point" = none ]; then
+      expect_code 0 "$rc" "$label: an unchanged bundle-held copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_bundle_restores_copy_commits "$label" "$head" "$first"
+      continue
+    fi
+    assert_present "$FOREIGN_CASE/git-protects-ran.done" "$label: the mutation did not run"
+    expect_code 1 "$rc" "$label: a bundle truncated before the removal must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_late_copy_kept "$label"
+  done
+  pass 'a bundle truncated at the scan, the launcher read or the unlock keeps the copy; unchanged, it closes and restores'
+}
+
+# F5: a preservation record rewritten to the same bundle path and hash but tips
+# that no longer cover the copy HEAD (only main's tip, which the bundle also
+# advertises) stops the removal; the unchanged record closes.
+test_late_record_that_stops_covering_head_stops_the_removal() {
+  local rc point label head line bundle hash others
+  for point in none scan launcher unlock; do
+    label="late-record-$point"
+    make_locked_bundle_case "$label" own single
+    add_late_mutation_hooks "$point"
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    IFS=$'\t' read -r bundle hash _ < "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv"
+    others=$(git bundle list-heads "$bundle" | awk -v h="$head" '$1 != h {print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+    [ -n "$others" ] || fail "$label: the fixture bundle advertises no tip besides HEAD"
+    line=$(printf '%s\t%s\t%s' "$bundle" "$hash" "$others")
+    printf 'printf %%s\\\\n %q > %q\n' "$line" "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv" > "$FOREIGN_CASE/mutate.sh"
+    run_foreign_teardown rc
+    if [ "$point" = none ]; then
+      expect_code 0 "$rc" "$label: an unchanged record must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      continue
+    fi
+    assert_present "$FOREIGN_CASE/git-protects-ran.done" "$label: the mutation did not run"
+    grep -qF "$head" "$FOREIGN_CASE/data/task-x1/preservation-bundles.tsv" && fail "$label: the record still names HEAD after the rewrite"
+    expect_code 1 "$rc" "$label: a record that no longer covers HEAD must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_late_copy_kept "$label"
+  done
+  pass 'a record rewritten at the scan, the launcher read or the unlock so it no longer covers HEAD keeps the copy'
+}
+
+# F3: a launcher is gone only when the process table shows it absent, or shows a
+# process whose start time is later than the creation lock's own time (a recycled
+# pid). A fake ps reports a live launcher that started one second before the lock
+# was written; answering at once or four seconds late, it keeps the copy on both
+# direct-release routes. A pid that started ten seconds after the lock is
+# recycled and its copy closes; an unreadable table keeps the copy.
+test_launcher_start_time_not_observation_delay_decides_recycling() {
+  local rc route shape label live lockf locked_at start args
+  teardown_signal_case_allowed 'test_launcher_start_time_not_observation_delay_decides_recycling' || return 0
+  for route in unavailable uncovered; do
+    for shape in prompt-live delayed-live recycled unknown; do
+      label="start-$route-$shape"
+      args=()
+      if [ "$route" = unavailable ]; then
+        dead_launcher_pid
+        make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+        add_git_worktree_log "$FOREIGN_CASE"
+        rm -f "$FOREIGN_CASE/vernant-python"
+      else
+        make_locked_bundle_case "$label" own interior
+        args=(FM_STUB_REQUIRE_CREDIT=1)
+      fi
+      sleep 600 &
+      live=$!
+      git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+      git -C "$FOREIGN_CASE/project" worktree lock --reason "vernant-session-active owner=launcher:$live launcher=$live" "$FOREIGN_COPY"
+      lockf="$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)/locked"
+      locked_at=$(( $(date +%s) - 120 ))
+      python3 -c 'import os, sys; t = int(sys.argv[2]); os.utime(sys.argv[1], (t, t))' "$lockf" "$locked_at"
+      start=$(( locked_at - 1 ))
+      [ "$shape" != recycled ] || start=$(( locked_at + 10 ))
+      cat > "$FOREIGN_CASE/fakebin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"-p $live -o pid="*|*"-o pid= -p $live"*)
+    [ "$shape" != unknown ] || { echo "ps: simulated unreadable process table" >&2; exit 2; }
+    echo " $live"; exit 0 ;;
+  *"-p $live -o etime="*|*"-o etime= -p $live"*)
+    age=\$(( \$(date +%s) - $start ))
+    [ "$shape" != delayed-live ] || sleep 4
+    printf '%02d:%02d:%02d\n' \$(( age / 3600 )) \$(( age % 3600 / 60 )) \$(( age % 60 )); exit 0 ;;
+  *"-p $live -o lstart="*|*"-o lstart= -p $live"*)
+    [ "$shape" != delayed-live ] || sleep 4
+    LC_ALL=C "$(command -v python3)" -c 'import sys, time; print(time.strftime("%a %b %e %H:%M:%S %Y", time.localtime(int(sys.argv[1]))))' $start; exit 0 ;;
+esac
+[ "$(uname -s)" = Darwin ] || exec "$(command -v ps)" "\$@"
+echo "ps: Operation not permitted" >&2
+exit 126
+SH
+      chmod +x "$FOREIGN_CASE/fakebin/ps"
+      run_foreign_teardown rc ${args[@]+"${args[@]}"}
+      if [ "$shape" = recycled ]; then
+        expect_code 0 "$rc" "$label: a recycled pid's copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+      else
+        expect_code 1 "$rc" "$label: the copy must stay locked: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+        git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+          || fail "$label: the copy is no longer locked"
+        assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+        assert_no_grep 'released creation lock' "$FOREIGN_CASE/stderr" "$label: a release was printed"
+      fi
+      kill "$live" 2>/dev/null || true
+      wait "$live" 2>/dev/null || true
+    done
+  done
+  pass 'a live launcher that started before its lock keeps the copy whether ps answers at once or late; a pid started after the lock is recycled; an unreadable table keeps the copy'
+}
+
+# F4: an own unlocked nested copy landed by a merged pull request, or whose tree
+# equals the default branch tip, never loses a unique ignored file at its
+# removal: the file is preserved first, or the copy stays. Without the file the
+# same copy closes.
+test_pr_and_tip_landed_copies_keep_a_unique_ignored_file() {
+  local rc proof shape label head exclude found
+  for proof in merged-pr tip-equal; do
+    for shape in unique-ignored clean; do
+      label="landed-$proof-$shape"
+      make_own_locked_copy_case "$label" enclosing
+      printf 'hello\n' > "$FOREIGN_COPY/feature.txt"
+      git -C "$FOREIGN_COPY" add -- feature.txt
+      git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q -m 'add feature'
+      head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+      if [ "$proof" = merged-pr ]; then
+        git -C "$FOREIGN_COPY" push -q origin "HEAD:refs/pull/7/head"
+        append_pr_meta_url "$FOREIGN_CASE"
+        add_gh_pr_merged_for_head "$FOREIGN_CASE" "$head"
+      else
+        git -C "$FOREIGN_COPY" push -q origin HEAD:main
+      fi
+      if [ "$shape" = unique-ignored ]; then
+        exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+        printf '%s\n' unique.dat >> "$exclude"
+        printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+      fi
+      run_foreign_teardown rc
+      if [ "$shape" = clean ]; then
+        expect_code 0 "$rc" "$label: a clean landed copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+        continue
+      fi
+      found=
+      if [ -f "$FOREIGN_COPY/unique.dat" ]; then
+        found=copy
+        assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the record went while the copy stayed"
+      elif grep -rlqF 'only here' "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" 2>/dev/null; then
+        found=preserved
+      fi
+      [ -n "$found" ] || fail "$label: the unique ignored file was lost (rc=$rc): $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    done
+  done
+  pass 'an own copy landed by a merged pull request or equal to the default branch tip keeps or preserves a unique ignored file; clean, it closes'
+}
+
+# R2-1 and R2-2 with real processes: a live process, its cwd outside the copy,
+# holds <copy>/.git open; the real lsof lists it. Its name is the one macOS ps
+# -o comm= prints (argv[0], set with exec -a); the stand-in ps answers only that
+# query, from the kernel through bin/fm-proc-info.py comm, and exits 126 (ps
+# confined) otherwise. Named as the Spotlight worker, it does not keep a dead
+# launcher's copy; named anything else, it keeps the copy, is named by pid, and
+# is never signalled (still alive after teardown, no TERM in the process record).
+test_real_holder_process_indexer_exempt_and_never_signalled() {
+  local rc name label pid held argv0
+  teardown_signal_case_allowed 'test_real_holder_process_indexer_exempt_and_never_signalled' || return 0
+  if [ "$(uname -s)" != Darwin ]; then
+    skip_case test_real_holder_process_indexer_exempt_and_never_signalled "not run on $(uname -s): it needs bin/fm-proc-info.py, which reads Darwin sysctl; Unverified there"
+    return 0
+  fi
+  command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { skip_case test_real_holder_process_indexer_exempt_and_never_signalled 'real lsof absent on this host; Unverified here'; return 0; }
+  for name in indexer other; do
+    label="real-holder-$name"
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    add_git_worktree_log "$FOREIGN_CASE"
+    rm -f "$FOREIGN_CASE/vernant-python" "$FOREIGN_CASE/fakebin/lsof"
+    held="$(cd "$FOREIGN_COPY" && pwd -P)/.git"
+    if [ "$name" = indexer ]; then
+      argv0=/System/Library/Frameworks/CoreServices.framework/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+    else
+      argv0=/usr/local/bin/fm-test-holder
+    fi
+    (cd / && exec bash -c 'exec 3<"$1"; exec -a "$2" sleep 600' _ "$held" "$argv0") &
+    pid=$!
+    for _ in $(seq 100); do "$REAL_LSOF_FOR_TEST" -p "$pid" -Fn 2>/dev/null | grep -qxF "n$held" && break; sleep 0.05; done
+    "$REAL_LSOF_FOR_TEST" -p "$pid" -Fn 2>/dev/null | grep -qxF "n$held" || fail "$label: the holder did not open the file"
+    cat > "$FOREIGN_CASE/fakebin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  "-o comm= -p "*) exec "$(command -v python3)" "$ROOT/bin/fm-proc-info.py" comm "\${4:?}" ;;
+esac
+echo "ps: Operation not permitted" >&2
+exit 126
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/ps"
+    run_foreign_teardown rc
+    if [ "$name" = indexer ]; then
+      expect_code 0 "$rc" "$label: a copy only the Spotlight worker holds open must be released: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+    else
+      expect_code 1 "$rc" "$label: a holder must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_grep "process $pid" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the holder"
+      assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+    fi
+    kill -0 "$pid" 2>/dev/null || fail "$label: teardown ended the holder"
+    if grep -q "$(printf '\t')TERM$(printf '\t')" "$FOREIGN_CASE/state/task-x1.teardown-processes" 2>/dev/null; then
+      fail "$label: a signal was recorded: $(cat "$FOREIGN_CASE/state/task-x1.teardown-processes")"
+    fi
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
+  pass 'a real process holding a file in the copy open keeps it unless ps names it the Spotlight worker, and is never signalled'
+}
+
+# Round 4 (Main 1681) falsifiers. No case here starts, signals or waits on a
+# process of its own: a creation lock names pid 4194305, above every kernel's
+# pid limit, as its dead launcher (Main 1684).
+R4_DEAD_PID=4194305
+
+# An own nested copy, recorded as the task's worktree in the slot, landed by
+# <route> (merged-pr, tip-equal or bundle) and not locked.
+make_r4_own_copy() {  # <name> <merged-pr|tip-equal|bundle>
+  local head
+  if [ "$2" = bundle ]; then
+    make_locked_bundle_case "$1" own single
+    git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+    return 0
+  fi
+  make_own_locked_copy_case "$1" enclosing
+  printf 'hello\n' > "$FOREIGN_COPY/feature.txt"
+  git -C "$FOREIGN_COPY" add -- feature.txt
+  git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -q -m 'add feature'
+  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+  if [ "$2" = merged-pr ]; then
+    git -C "$FOREIGN_COPY" push -q origin "HEAD:refs/pull/7/head"
+    append_pr_meta_url "$FOREIGN_CASE"
+    add_gh_pr_merged_for_head "$FOREIGN_CASE" "$head"
+  else
+    git -C "$FOREIGN_COPY" push -q origin HEAD:main
+  fi
+}
+
+# R1: a unique non-ignored file under .claude in an otherwise admissible own
+# nested copy is never removed: teardown refuses and the bytes stay. The clean
+# copy closes. Merged-PR, tip-equal and bundle-admitted routes.
+test_r4_own_nested_untracked_claude_file_refuses() {
+  local rc route shape label
+  for route in merged-pr tip-equal bundle; do
+    for shape in notes clean; do
+      label="r4-claude-$route-$shape"
+      make_r4_own_copy "$label" "$route"
+      if [ "$shape" = notes ]; then
+        mkdir -p "$FOREIGN_COPY/.claude"
+        printf 'unique notes\n' > "$FOREIGN_COPY/.claude/notes.txt"
+        git -C "$FOREIGN_COPY" status --porcelain --untracked-files=all | grep -qxF '?? .claude/notes.txt' \
+          || fail "$label: the fixture's .claude/notes.txt is not untracked"
+      fi
+      run_foreign_teardown rc
+      if [ "$shape" = clean ]; then
+        expect_code 0 "$rc" "$label: a clean admissible copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+        continue
+      fi
+      expect_code 1 "$rc" "$label: an untracked .claude file must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_equals 'unique notes' "$(cat "$FOREIGN_COPY/.claude/notes.txt" 2>/dev/null)" "$label: the untracked bytes were lost"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+      assert_grep '.claude/notes.txt' "$FOREIGN_CASE/stderr" "$label: the refusal did not name the file"
+    done
+  done
+  pass 'an untracked file under .claude keeps an own nested copy on the merged-PR, tip-equal and bundle routes; clean, each closes'
+}
+
+# R3: at the lock reread just before the driver, an absent, unreadable,
+# unparsable or changed lock refuses and the driver is never called; an
+# unchanged lock reaches the driver. The mutation runs inside the credit step:
+# the unchanged run counts the copy's symbolic-ref reads, whose last one is
+# teardown_credit_pr's, and each changed run mutates at that read.
+test_r4_late_lock_change_refuses_before_the_driver() {
+  local rc state label marker admin last=0
+  for state in unchanged absent unreadable unparsable changed; do
+    label="r4-lock-$state"
+    # The copy is a prior copy, so no worktree read of the task reaches it
+    # before the credit step.
+    make_own_locked_copy_case "$label" reverse "$R4_DEAD_PID"
+    admin=$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)
+    marker="$FOREIGN_CASE/credit-read"
+    case "$state" in
+      unchanged) printf ':\n' ;;
+      absent) printf 'rm -f %q\n' "$admin/locked" ;;
+      unreadable) printf 'rm -f %q; ln -s %q %q\n' "$admin/locked" "$FOREIGN_CASE/nowhere" "$admin/locked" ;;
+      unparsable) printf 'printf %%s\\\\n %q > %q\n' 'someone else holds this' "$admin/locked" ;;
+      changed) printf 'printf %%s\\\\n %q > %q\n' 'vernant-session-active owner=launcher:4194306 launcher=4194306' "$admin/locked" ;;
+    esac > "$FOREIGN_CASE/mutate.sh"
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = -C ] && [ "\$2" = '$FOREIGN_COPY' ] && [ "\$3 \$4 \$5 \$6" = 'symbolic-ref --quiet --short HEAD' ]; then
+  n=\$(( \$(cat '$FOREIGN_CASE/reads' 2>/dev/null || echo 0) + 1 ))
+  echo "\$n" > '$FOREIGN_CASE/reads'
+  if [ "\$n" = '$last' ] && [ ! -e '$marker' ]; then
+    : > '$marker'
+    bash '$FOREIGN_CASE/mutate.sh'
+  fi
+fi
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git"
+    run_foreign_teardown rc
+    if [ "$state" = unchanged ]; then
+      expect_code 0 "$rc" "$label: an unchanged lock must reach the driver and close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_present "$FOREIGN_CASE/closeout.log" "$label: the driver was not called"
+      last=$(cat "$FOREIGN_CASE/reads" 2>/dev/null || echo 0)
+      [ "$last" -ge 1 ] || fail "$label: the credit step read no branch, so no mutation point exists"
+      continue
+    fi
+    assert_present "$marker" "$label: the credit step's read was not reached, so the mutation never ran"
+    expect_code 1 "$rc" "$label: a changed lock must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_absent "$FOREIGN_CASE/closeout.log" "$label: the driver was called after the lock changed"
+    assert_grep "teardown did not run Vernant's closeout driver" "$FOREIGN_CASE/stderr" "$label: the refusal did not come from the reread before the driver"
+    assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+  done
+  pass 'an absent, unreadable, unparsable or changed lock at the reread before the driver refuses without calling it; unchanged, the driver runs'
+}
+
+# R4: ignored files are preserved outside every removal root, and the preserved
+# payload itself is checked. The copy is an own nested copy landed by a merged
+# pull request with a unique ignored file. Shapes: external storage (control,
+# closes with the payload kept), storage that resolves into the copy through a
+# symlink, a payload changed or removed just after its publication, and a
+# failed rename at publication over an earlier preserve (which must survive).
+test_r4_ignored_preserve_storage_and_payload_are_proved() {
+  local rc shape label exclude root seeded hash path realmv found
+  realmv=$(command -v mv)
+  for shape in external in-copy changed missing failed-publish; do
+    label="r4-preserve-$shape"
+    make_r4_own_copy "$label" merged-pr
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    printf '%s\n' unique.dat >> "$exclude"
+    printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+    root="$FOREIGN_CASE/data/task-x1/nested-copy-preserved"
+    mkdir -p "$FOREIGN_CASE/data/task-x1"
+    case "$shape" in
+      in-copy)
+        mkdir -p "$FOREIGN_COPY/.claude/kept"
+        ln -s "$FOREIGN_COPY/.claude/kept" "$root"
+        ;;
+      changed|missing|failed-publish)
+        mkdir -p "$root"
+        seeded=
+        for path in "$FOREIGN_COPY" "$(cd "$FOREIGN_COPY" && pwd -P)"; do
+          hash=$(printf '%s' "$path" | shasum -a 256 | awk '{print $1}')
+          if [ "$shape" = failed-publish ]; then
+            mkdir -p "$root/$hash"
+            printf 'earlier\n' > "$root/$hash/earlier.dat"
+            seeded+="$root/$hash "
+          fi
+        done
+        cat > "$FOREIGN_CASE/fakebin/mv" <<SH
+#!/usr/bin/env bash
+src=\${@: -2:1} dst=\${@: -1}
+case "\$src" in
+  '$root'/.staging-*)
+    [ "$shape" != failed-publish ] || { echo 'mv: simulated publication failure' >&2; exit 1; }
+    '$realmv' "\$@" || exit \$?
+    case "$shape" in
+      changed) printf 'tampered\n' > "\$dst/files/unique.dat" ;;
+      missing) rm -f "\$dst/files/unique.dat" ;;
+    esac
+    exit 0 ;;
+esac
+exec '$realmv' "\$@"
+SH
+        chmod +x "$FOREIGN_CASE/fakebin/mv"
+        ;;
+    esac
+    run_foreign_teardown rc
+    if [ "$shape" = external ]; then
+      expect_code 0 "$rc" "$label: a copy whose ignored file is preserved outside must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+      grep -rlqF 'only here' "$root" 2>/dev/null || fail "$label: the preserved payload does not hold the file"
+      continue
+    fi
+    expect_code 1 "$rc" "$label: the copy must stay: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_equals 'only here' "$(cat "$FOREIGN_COPY/unique.dat" 2>/dev/null)" "$label: the unique ignored file was lost"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+    if [ "$shape" = failed-publish ]; then
+      found=0
+      for path in $seeded; do
+        [ "$(cat "$path/earlier.dat" 2>/dev/null)" != earlier ] || found=1
+      done
+      [ "$found" = 1 ] || fail "$label: the earlier preserve was lost when the publication failed"
+    fi
+  done
+  pass 'ignored files are preserved outside every removal root and their preserved payload is checked; a failed publication keeps the earlier preserve'
+}
+
+# R5: when teardown keeps project custody because the pool slot's state cannot
+# be proved, a locked copy is not released in that pass and the driver is never
+# called under the project lock; with a leased slot the driver runs with the
+# lock free and the copy closes.
+test_r4_locked_copy_is_deferred_under_project_custody() {
+  local rc shape label lock pass_no
+  for shape in leased unprovable; do
+    label="r4-custody-$shape"
+    make_own_locked_copy_case "$label" enclosing "$R4_DEAD_PID"
+    if [ "$shape" = unprovable ]; then
+      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}]}\n' \
+        "$FOREIGN_CASE/pool/1/project" > "$FOREIGN_CASE/pool/treehouse-state.json"
+    fi
+    lock=$(FM_HOME="$FOREIGN_CASE/home" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+      bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$FOREIGN_CASE/project") \
+      || fail "$label: cannot resolve the shared Treehouse project lock"
+    for pass_no in 1 2; do
+      run_foreign_teardown rc FM_STUB_LOCK="$lock"
+      [ "$shape" = unprovable ] || break
+      cp "$FOREIGN_CASE/stderr" "$FOREIGN_CASE/stderr.pass$pass_no"
+    done
+    if [ "$shape" = leased ]; then
+      expect_code 0 "$rc" "$label: a leased slot's locked copy must close: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      assert_equals free "$(cat "$FOREIGN_CASE/closeout.lock-state" 2>/dev/null)" "$label: the driver did not run with the project lock free"
+      continue
+    fi
+    if grep -qx held "$FOREIGN_CASE/closeout.lock-state" 2>/dev/null; then
+      fail "$label: the driver ran under the project lock"
+    fi
+    expect_code 1 "$rc" "$label: the locked copy must be deferred: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+    assert_grep 'deferred' "$FOREIGN_CASE/stderr.pass1" "$label: the deferral was not named"
+    assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+    git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+      || fail "$label: the copy is no longer locked"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+  done
+  pass 'under project custody for an unprovable slot a locked copy is deferred, twice in a row, and the driver never runs under the lock; a leased slot closes'
+}
+
+# Main 3529 Ruling 1: a kept-copy close (FM_STUB_CLOSEOUT=retained) in a slot whose
+# Treehouse has no lease command keeps project custody, so the locked own copy is
+# deferred: the driver is never asked, no tar and no retained record is written, and
+# the copy, its lock and the task record stay, on the first run and its retry. With a
+# lease command the same case closes around the kept copy (control).
+test_pr400_kept_copy_without_a_lease_is_deferred_and_asks_the_driver_nothing() {
+  local rc run
+  make_retained_case pr400-kept-no-lease enclosing
+  held_plain_get_slot "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/no-lease-command"
+  for run in 1 2; do
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+    expect_code 1 "$rc" "pr400-kept-no-lease run $run: a kept copy in a slot that cannot be leased must not close: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep 'deferred' "$FOREIGN_CASE/stderr" "pr400-kept-no-lease run $run: the deferral was not named"
+    assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "pr400-kept-no-lease run $run: the driver was asked or a tar was written under project custody"
+    assert_absent "$(retained_record_path)" "pr400-kept-no-lease run $run: a retained record was written though the driver was never asked"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "pr400-kept-no-lease run $run: the task record was removed"
+    assert_present "$FOREIGN_COPY/.git" "pr400-kept-no-lease run $run: the copy was removed"
+    git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+      || fail "pr400-kept-no-lease run $run: the copy is no longer locked"
+  done
+  rm -f "$FOREIGN_CASE/no-lease-command"
+  run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
+  expect_code 0 "$rc" "pr400-kept-no-lease control: with a lease command the kept copy must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "pr400-kept-no-lease control: the leased close did not ask the driver exactly once"
+  assert_present "$(retained_record_path)" "pr400-kept-no-lease control: the leased close wrote no retained record"
+  pass 'a kept-copy close in a slot with no lease command is deferred twice with no driver call, no tar and no retained record; with a lease command it closes'
+}
+
+# The open-file listing is filtered in one pass, and a listing line of a shape
+# the filter does not know still fails the scan, so the copy stays locked.
+test_direct_release_refuses_a_malformed_open_file_listing() {
+  local rc
+  dead_launcher_pid
+  make_own_locked_copy_case direct-malformed-listing enclosing "$FOREIGN_DEAD_PID"
+  add_git_worktree_log "$FOREIGN_CASE"
+  rm -f "$FOREIGN_CASE/vernant-python"
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*) printf 'p%s\ntREG\nn%s\n' 999993 '/elsewhere/file'; exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/lsof"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "direct-malformed-listing: a malformed listing must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_grep 'a scan for processes holding its files open failed' "$FOREIGN_CASE/stderr" \
+    "direct-malformed-listing: the refusal did not name the failed scan"
+  assert_present "$FOREIGN_COPY/.git" "direct-malformed-listing: the copy was removed"
+  if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-malformed-listing: the script unlocked the copy'; fi
+  pass 'an open-file listing line of an unknown shape fails the scan and keeps a dead launcher'"'"'s locked copy'
+}
+
+# The last process scan sits next to the unlock: a process that opens a file in
+# the copy while the landed and Git-protection proofs run (after the earlier
+# scans) keeps the copy locked. The fake lsof reports the holder only once
+# teardown_copy_git_protects has listed the copy's index.
+test_direct_release_scans_for_processes_after_the_landed_and_git_proofs() {
+  local rc pid=999992 marker
+  dead_launcher_pid
+  make_own_locked_copy_case direct-late-holder enclosing "$FOREIGN_DEAD_PID"
+  rm -f "$FOREIGN_CASE/vernant-python"
+  marker="$FOREIGN_CASE/git-protects-ran"
+  cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+args=("\$@")
+for argument in "\$@"; do
+  if [ "\$argument" = worktree ]; then printf '%s\n' "\$*" >> "$FOREIGN_CASE/git-worktree.log"; break; fi
+done
+case " \$* " in *" ls-files --stage -z "*) : > "$marker" ;; esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\${args[@]}"
+SH
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -Fpfn "*)
+    if [ -e "$marker" ]; then printf 'p%s\nf7\nn%s\n' $pid '$FOREIGN_COPY/late.log'; fi
+    exit 0 ;;
+  *" -d cwd "*) exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/git" "$FOREIGN_CASE/fakebin/lsof"
+  run_foreign_teardown rc
+  assert_present "$marker" "direct-late-holder: the Git-protection proof did not run"
+  expect_code 1 "$rc" "direct-late-holder: a process that opened a file during the proofs must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_grep "process $pid holds $FOREIGN_COPY/late.log open after the retire phase" "$FOREIGN_CASE/stderr" \
+    "direct-late-holder: the refusal did not name the process"
+  assert_present "$FOREIGN_COPY/.git" "direct-late-holder: the copy was removed"
+  git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+    || fail 'direct-late-holder: the copy is no longer locked'
+  if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-late-holder: the script unlocked the copy'; fi
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" 'direct-late-holder: the task record was removed'
+  pass 'a process that opens a file in the copy while the landed and Git proofs run keeps a dead launcher'"'"'s lock in place'
+}
+
+# A dead launcher's lock is released only when no process holds a file in the
+# copy open, whatever its working directory. A real process whose cwd is outside
+# the copy holds <copy>/.git open; the real lsof's open-file listing finds it on
+# both direct-release routes (the driver unavailable, exit 127, and its
+# uncovered-content verdict), before the driver runs or appearing after it, and a
+# failed listing refuses too. With no holder, or when the holder is a search
+# indexer, which only reads, the same routes release the copy.
+test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open() {
+  local rc route shape label pid held args
+  command -v "${REAL_LSOF_FOR_TEST:-}" >/dev/null 2>&1 || { skip_case test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open 'real lsof absent on this host; Unverified here'; return 0; }
+  for route in unavailable uncovered; do
+    for shape in none indexer holder appears failed; do
+      [ "$route:$shape" != unavailable:appears ] || continue
+      label="open-file-$route-$shape"
+      args=()
+      if [ "$route" = unavailable ]; then
+        dead_launcher_pid
+        make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+        add_git_worktree_log "$FOREIGN_CASE"
+        rm -f "$FOREIGN_CASE/vernant-python"
+      else
+        make_locked_bundle_case "$label" own interior
+        args=(FM_STUB_REQUIRE_CREDIT=1)
+      fi
+      held="$(cd "$FOREIGN_COPY" && pwd -P)/.git"
+      pid=
+      if [ "$shape" != none ]; then
+        # shellcheck disable=SC2016 # $1 expands in the holder's own shell.
+        teardown_fixture_start "$FOREIGN_CASE" KILL bash -c 'exec 3<"$1"; exec sleep 3600' holder "$held"
+        pid=$TEARDOWN_FIXTURE_PID
+        for _ in $(seq 100); do "$REAL_LSOF_FOR_TEST" -p "$pid" -Fn 2>/dev/null | grep -qxF "n$held" && break; sleep 0.05; done
+      fi
+      cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*) exit 0 ;;
+  *" -Fpfn "*)
+    case $shape in
+      failed) echo 'lsof: simulated failure' >&2; exit 2 ;;
+      appears) [ -e "$FOREIGN_CASE/closeout.log" ] || exit 0 ;;
+    esac
+    exec "\${REAL_LSOF_FOR_TEST:?}" "\$@" ;;
+esac
+exit 1
+SH
+      chmod +x "$FOREIGN_CASE/fakebin/lsof"
+      if [ "$shape" = indexer ]; then
+        cat > "$FOREIGN_CASE/fakebin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"-o comm= -p $pid") echo /System/Library/Frameworks/CoreServices.framework/Support/mdworker_shared; exit 0 ;;
+esac
+exec "\${REAL_PS_FOR_TEST:?}" "\$@"
+SH
+        chmod +x "$FOREIGN_CASE/fakebin/ps"
+      fi
+      run_foreign_teardown rc ${args[@]+"${args[@]}"}
+      if [ "$shape" = none ] || [ "$shape" = indexer ]; then
+        expect_code 0 "$rc" "$label: a copy no process but an indexer holds must be released: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+        assert_grep "released creation lock 'vernant-session-active owner=launcher:" "$FOREIGN_CASE/stderr" "$label: the release was not printed"
+        assert_no_grep 'Stop it or tell me it is yours' "$FOREIGN_CASE/stderr" "$label: an owner question was printed"
+        assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+        if [ -n "$pid" ]; then
+          kill -0 "$pid" 2>/dev/null || fail "$label: teardown ended the indexer"
+          teardown_fixture_stop "$pid"
+        fi
+        continue
+      fi
+      expect_code 1 "$rc" "$label: a copy whose file a process holds open must stay: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+      case "$shape" in
+        holder) assert_grep "process $pid holds $held open" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the holder" ;;
+        appears) assert_grep "The copy was not released directly: process $pid holds $held open" "$FOREIGN_CASE/stderr" \
+          "$label: the refusal did not name the holder" ;;
+        failed) assert_grep "a scan for processes holding its files open failed" "$FOREIGN_CASE/stderr" "$label: the failed scan was not named" ;;
+      esac
+      kill -0 "$pid" 2>/dev/null || fail "$label: teardown ended the holder: $(cat "$FOREIGN_CASE/state/task-x1.teardown-processes" 2>/dev/null)"
+      teardown_fixture_stop "$pid"
+      assert_present "$FOREIGN_COPY/.git" "$label: the copy was removed"
+      git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+        || fail "$label: the copy is no longer locked"
+      if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail "$label: the script unlocked the copy"; fi
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+    done
+  done
+  pass 'a process holding a file in the copy open, with its cwd outside, or a failed open-file listing keeps a dead launcher'"'"'s lock on both direct-release routes; with no holder or only a search indexer they release'
+}
+
+# Only the cwd scan hands a process to retire. A descendant of the task's session
+# whose cwd is outside the copy and which holds <copy>/log open refuses, named by
+# pid, and neither it nor the session is signalled.
+test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled() {
+  local rc held
+  start_foreign_session_case own-open-file child
+  held=$FOREIGN_COPY/log
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*) if kill -0 $FOREIGN_AGENT 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $FOREIGN_AGENT '$FOREIGN_SLOT'; fi; exit 0 ;;
+  *" -Fpfn "*) if kill -0 $FOREIGN_LAUNCHER 2>/dev/null; then printf 'p%s\nf3\nn%s\n' $FOREIGN_LAUNCHER '$held'; fi; exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/lsof"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "own-open-file: the holder must keep the copy: $(grep -v '^●' "$FOREIGN_CASE/stderr" | tail -6)"
+  assert_grep "process $FOREIGN_LAUNCHER holds $held open" "$FOREIGN_CASE/stderr" "own-open-file: the refusal did not name the holder"
+  kill -0 "$FOREIGN_LAUNCHER" 2>/dev/null || fail "own-open-file: teardown ended the holder"
+  kill -0 "$FOREIGN_AGENT" 2>/dev/null || fail "own-open-file: teardown ended the session"
+  if grep -q "$(printf '\t')TERM$(printf '\t')" "$FOREIGN_CASE/state/task-x1.teardown-processes" 2>/dev/null; then
+    fail "own-open-file: a signal was recorded: $(cat "$FOREIGN_CASE/state/task-x1.teardown-processes")"
+  fi
+  assert_foreign_copy_untouched own-open-file
+  kill "$FOREIGN_LAUNCHER" 2>/dev/null || true
+  teardown_fixture_stop "$FOREIGN_AGENT"
+  pass 'a task-own descendant that holds a file in the copy open from outside it refuses by pid and is never signalled'
+}
+
+# An unreadable process table is never taken for a gone launcher.
+test_direct_release_refuses_an_unreadable_process_table() {
+  local rc
+  make_locked_bundle_case direct-unreadable-ps own interior
+  add_fake_ps_table "$FOREIGN_CASE" "$FOREIGN_DEAD_PID"
+  run_foreign_teardown rc FM_STUB_REQUIRE_CREDIT=1 FM_FAKE_PS_UNREADABLE=1
+  expect_code 1 "$rc" "direct-unreadable-ps: an unreadable process table must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_COPY/.git" "direct-unreadable-ps: the copy was removed"
+  if grep -q 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" 2>/dev/null; then fail 'direct-unreadable-ps: the script unlocked the copy'; fi
+  pass 'a process table that cannot be read never releases a locked copy'
+}
+
+# Only the driver being unavailable, or its named uncredited-content verdict,
+# hands a copy to the direct release. Any other verdict keeps the copy locked.
+test_other_driver_verdicts_keep_the_locked_copy() {
+  local rc reason
+  for reason in cleanup_skipped_live_or_unknown cleanup_lease_conflict stub_refusal; do
+    make_locked_bundle_case "driver-verdict-$reason" own single
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=refuse FM_STUB_REASON="$reason"
+    expect_code 1 "$rc" "driver-verdict-$reason: the driver's verdict must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "The copy was not released directly: the driver's verdict is not one a direct release may take over" "$FOREIGN_CASE/stderr" \
+      "driver-verdict-$reason: the refusal did not say why the script did not take over"
+    assert_grep "\"reason\": \"$reason\"" "$FOREIGN_CASE/stderr" "driver-verdict-$reason: the driver's fact was not shown"
+    assert_no_grep 'worktree unlock' "$FOREIGN_CASE/git-worktree.log" "driver-verdict-$reason: the script unlocked the copy"
+    assert_present "$FOREIGN_COPY/.git" "driver-verdict-$reason: the copy was removed"
+  done
+  pass 'a driver verdict about a live tenant, a lease or anything else keeps the locked copy, and the driver'"'"'s own fact is shown'
 }
 
 test_locked_own_nested_copy_that_is_not_proved_is_refused() {
@@ -6904,6 +8234,1389 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
   pass "a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place"
 }
 
+# Round 5 (Main 1774): each case below ports one falsifier of the outside review
+# of b6786352 (data/<task>/r4-review/falsifiers/) and keeps its control. Each runs
+# the real library helpers on throwaway repositories in its own bash process,
+# as the falsifiers do: no full teardown, no process is started or signalled,
+# and the driver, launcher and process observations are recording stubs (the
+# process scans live in bin/fm-teardown.sh, which these cases do not source).
+# r5_harness <case> <body> runs <body> after a preamble that sources the
+# libraries of the tree under test and prints its output; r5_expect checks one
+# line of it.
+r5_harness() {  # <case-name> <body-file>
+  local base=$TMP_ROOT/r5-$1
+  mkdir -p "$base/home" "$base/tmp" "$base/fakebin"
+  cat > "$base/pre.sh" <<'PRE'
+set -u
+R5_BIN=$1 R5_BASE=$2
+export HOME="$R5_BASE/home" TMPDIR="$R5_BASE/tmp" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+export PATH="$R5_BASE/fakebin:$PATH"
+secondmate_registry_parse_line() { :; }
+fm_refuse_text() { printf '%s' "$1"; }
+[ "${R5_BACKEND:-0}" != 1 ] || . "$R5_BIN/fm-backend.sh"
+. "$R5_BIN/fm-task-copy-lib.sh"
+# bin/fm-teardown.sh sources it before the nested library: the bundle store reads
+# its mode check (fm_backlog_file_mode_is_0600).
+. "$R5_BIN/fm-backlog-transition-lib.sh"
+. "$R5_BIN/fm-teardown-nested-lib.sh"
+r5_repo() {  # <shape>: sets repo copy PROJ DATA STATE WT ID and makes the project
+  repo="$R5_BASE/$1-project" copy="$R5_BASE/$1-copy"
+  PROJ=$repo DATA="$R5_BASE/$1-data/data" STATE="$R5_BASE/$1-state" WT=$copy ID=r5-fixture
+  mkdir -p "$DATA/$ID" "$STATE"
+  git init -q -b main "$repo"
+}
+r5_reset() {  # <copy>
+  TEARDOWN_ADMIT_DIRS=() TEARDOWN_ADMIT_KINDS=() TEARDOWN_ADMIT_HEADS=() TEARDOWN_ADMIT_STORED=() TEARDOWN_ADMIT_RECORD=()
+  TEARDOWN_LOCK_SEEN_DIRS=() TEARDOWN_LOCK_SEEN_TEXT=() TEARDOWN_FOREIGN_PROCS=()
+  TEARDOWN_NESTED_COPIES=("$1") TEARDOWN_FOREIGN_COPIES=() TEARDOWN_BUNDLE_SWEEP_PROOF=
+}
+r5_dest() { printf '%s/nested-copy-preserved/%s' "$DATA/$ID" "$(printf '%s' "$1" | teardown_ignored_sha256)"; }
+PRE
+  # The body's own exit status is not the verdict: r5_expect reads its output.
+  bash -c '. "$1/pre.sh" "$2" "$1"; . "$3"' _ "$base" "$ROOT/bin" "$2" > "$base/out" 2>"$base/err" || true
+  R5_OUT=$base/out
+  R5_ERR=$base/err
+}
+r5_expect() {  # <exact-line> <message>
+  grep -qxF -- "$1" "$R5_OUT" || fail "$2 (want '$1'; output: $(paste -sd '|' - < "$R5_OUT"); stderr: $(tail -n 5 "$R5_ERR" | paste -sd '|' -))"
+}
+
+# Finding 1, preserve route (falsifier ignored-newline.sh): an ignored file whose
+# name holds a newline is preserved byte for byte beside ordinary names, and the
+# manifest cannot be satisfied by the lines of two other files.
+test_r5_ignored_newline_name_is_preserved() {
+  local body=$TMP_ROOT/r5-body-ignored-newline.sh
+  cat > "$body" <<'BODY'
+for shape in control newline; do
+  r5_repo "$shape"
+  printf '/a*\n/b\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'ordinary-a\n' > "$copy/a"
+  printf 'ordinary-b\n' > "$copy/b"
+  [ "$shape" != newline ] || printf 'unique-newline\n' > "$copy/"$'a\nb'
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  dest=$(r5_dest "$copy")
+  kept=yes
+  [ "$(cat "$dest/files/a" 2>/dev/null)" = ordinary-a ] && [ "$(cat "$dest/files/b" 2>/dev/null)" = ordinary-b ] || kept=no
+  [ "$shape" != newline ] || [ "$(cat "$dest/files/"$'a\nb' 2>/dev/null)" = unique-newline ] || kept=no
+  echo "$shape proof=$rc kept=$kept"
+  # The one-per-line list the sweep reads cannot tell a\nb from a and b, so it
+  # fails for that name and the sweep holds the copy.
+  lrc=0
+  teardown_preservable_ignored "$copy" >/dev/null || lrc=$?
+  echo "$shape line-list=$lrc"
+  if [ "$shape" = newline ] && [ "$rc" = 0 ]; then
+    # The same preserve with the newline file's payload changed must refuse.
+    printf 'changed\n' > "$dest/files/"$'a\nb'
+    rc=0
+    teardown_ignored_preserved_current "$copy" || rc=$?
+    echo "newline-tampered verify=$rc"
+  fi
+done
+BODY
+  r5_harness ignored-newline "$body"
+  r5_expect 'control proof=0 kept=yes' 'r5-newline: the ordinary ignored files were not preserved'
+  r5_expect 'newline proof=0 kept=yes' 'r5-newline: an ignored file whose name holds a newline was not preserved'
+  r5_expect 'newline-tampered verify=1' 'r5-newline: a changed payload of the newline file passed the readback'
+  r5_expect 'control line-list=0' 'r5-newline: the one-per-line list failed for ordinary names'
+  r5_expect 'newline line-list=1' 'r5-newline: the one-per-line list printed a name that holds a newline'
+  pass "an ignored file whose name holds a newline is preserved byte for byte, a changed payload of it refuses, and the one-per-line list refuses that name"
+}
+
+# Finding 1, refuse route (falsifier history-ignored-newline.sh): a copy only the
+# history rule admits keeps a unique ignored file named by one newline.
+test_r5_history_copy_keeps_a_newline_named_ignored_file() {
+  local body=$TMP_ROOT/r5-body-history-newline.sh
+  cat > "$body" <<'BODY'
+for shape in clean ordinary newline; do
+  r5_repo "$shape"
+  printf '*\n' > "$repo/.gitignore"
+  printf 'base\n' > "$repo/tracked.txt"
+  git -C "$repo" add -f .gitignore tracked.txt && git -C "$repo" commit -qm base
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'landed content\n' > "$copy/tracked.txt"
+  git -C "$copy" add tracked.txt && git -C "$copy" commit -qm task
+  printf 'landed content\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm squash
+  printf 'later default edit\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm later
+  fm_task_copy_content_in_default "$copy" "$repo" main HEAD no-fetch && echo "$shape fixture-wrong"
+  fm_task_copy_content_in_default_history "$copy" HEAD || echo "$shape fixture-wrong"
+  case "$shape" in ordinary) name=ordinary.dat ;; newline) name=$'\n' ;; *) name= ;; esac
+  [ -z "$name" ] || printf 'only ignored bytes\n' > "$copy/$name"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  rc=0
+  teardown_removal_final_proof "$copy" refuse unlocked || rc=$?
+  [ "$rc" = 0 ] || rc=refused
+  if [ -n "$name" ] && [ -f "$copy/$name" ]; then echo "$shape proof=$rc file=kept"; else echo "$shape proof=$rc file=none"; fi
+done
+BODY
+  r5_harness history-newline "$body"
+  r5_expect 'clean proof=0 file=none' 'r5-history-newline: a clean history-admitted copy did not pass'
+  r5_expect 'ordinary proof=refused file=kept' 'r5-history-newline: an ordinary unique ignored file did not refuse'
+  r5_expect 'newline proof=refused file=kept' 'r5-history-newline: a newline-named unique ignored file did not refuse'
+  pass "a history-admitted copy keeps a unique ignored file whose name is a newline, as it keeps an ordinary one; clean, it passes"
+}
+
+# Finding 2, ignored payload (falsifier preserve-leaf-retarget.sh): a preserve
+# whose published leaf is moved into the copy and replaced by a symlink refuses.
+test_r5_preserve_leaf_moved_into_the_copy_refuses() {
+  local body=$TMP_ROOT/r5-body-leaf.sh
+  mkdir -p "$TMP_ROOT/r5-leaf/fakebin"
+  cat > "$TMP_ROOT/r5-leaf/fakebin/mv" <<'SH'
+#!/bin/bash
+/bin/mv "$@" || exit $?
+case "${1:-}:${R5_REDIRECT:-0}" in
+  */.staging-*:1)
+    mkdir -p "$R5_COPY/.claude/held" || exit 1
+    /bin/mv "$2" "$R5_COPY/.claude/held/preserve" || exit 1
+    ln -s "$R5_COPY/.claude/held/preserve" "$2" || exit 1
+    ;;
+esac
+SH
+  chmod +x "$TMP_ROOT/r5-leaf/fakebin/mv"
+  cat > "$body" <<'BODY'
+for shape in control retarget; do
+  r5_repo "$shape"
+  printf '/.claude/\n/unique.dat\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'unique original bytes\n' > "$copy/unique.dat"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  R5_REDIRECT=0 R5_COPY=$copy
+  [ "$shape" != retarget ] || R5_REDIRECT=1
+  export R5_REDIRECT R5_COPY
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  R5_REDIRECT=0
+  [ "$rc" = 0 ] || rc=refused
+  echo "$shape proof=$rc original=$(cat "$copy/unique.dat" 2>/dev/null)"
+  if [ "$rc" = 0 ]; then
+    git -C "$repo" worktree remove "$copy" && echo "$shape after-remove=$(cat "$(r5_dest "$copy")/files/unique.dat" 2>/dev/null)"
+  fi
+done
+BODY
+  r5_harness leaf "$body"
+  r5_expect 'control proof=0 original=unique original bytes' 'r5-leaf: an external intact preserve did not pass'
+  r5_expect 'control after-remove=unique original bytes' 'r5-leaf: the external preserve did not survive the removal'
+  r5_expect 'retarget proof=refused original=unique original bytes' 'r5-leaf: a preserve leaf moved into the copy passed the final proof'
+  pass "a preserve whose leaf resolves inside the copy refuses and the original stays; an external preserve passes and survives the removal"
+}
+
+# Finding 2, recorded bundle (falsifier bundle-parent-retarget.sh): a stored
+# bundle whose directory is moved into the copy after admission refuses.
+test_r5_stored_bundle_moved_into_the_copy_refuses() {
+  local body=$TMP_ROOT/r5-body-bundle-parent.sh
+  cat > "$body" <<'BODY'
+for shape in control retarget; do
+  r5_repo "$shape"
+  source_bundle="$R5_BASE/$shape-source.bundle"
+  printf '/.claude/\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'unique commit\n' > "$copy/work.txt"
+  git -C "$copy" add work.txt && git -C "$copy" commit -qm unique
+  tip=$(git -C "$copy" rev-parse HEAD)
+  git -C "$copy" bundle create -q "$source_bundle" --all 2>/dev/null
+  printf '%s\t%s\t%s\n' "$source_bundle" "$(teardown_ignored_sha256 "$source_bundle")" "$tip" > "$DATA/$ID/preservation-bundles.tsv"
+  r5_reset "$copy"
+  teardown_bundle_preserved "$copy" "$tip" 2>/dev/null || echo "$shape fixture-wrong"
+  stored=$TEARDOWN_BUNDLE_ACCEPTED
+  teardown_admit "$copy" bundle "$tip" "$stored"
+  TEARDOWN_BUNDLE_SWEEP_PROOF=$stored
+  TEARDOWN_SWEEP_RECORD=$(teardown_ignored_sha256 "$DATA/$ID/preservation-bundles.tsv")
+  rm "$source_bundle"
+  if [ "$shape" = retarget ]; then
+    mkdir -p "$copy/.claude/held"
+    mv "$DATA/$ID/preserved-bundles" "$copy/.claude/held/"
+    ln -s "$copy/.claude/held/preserved-bundles" "$DATA/$ID/preserved-bundles"
+  fi
+  rc=0
+  teardown_removal_final_proof "$copy" refuse unlocked || rc=$?
+  [ "$rc" = 0 ] || rc=refused
+  echo "$shape proof=$rc"
+  if [ "$rc" = 0 ]; then
+    git -C "$repo" worktree remove "$copy"
+    git init -q --bare "$R5_BASE/recovered-$shape.git"
+    git -C "$R5_BASE/recovered-$shape.git" fetch -q "$stored" "$tip:refs/heads/recovered" 2>/dev/null
+    [ "$(git -C "$R5_BASE/recovered-$shape.git" rev-parse refs/heads/recovered 2>/dev/null)" = "$tip" ] && echo "$shape restored=yes"
+  fi
+done
+BODY
+  r5_harness bundle-parent "$body"
+  r5_expect 'control proof=0' 'r5-bundle-parent: an intact external bundle did not pass'
+  r5_expect 'control restored=yes' 'r5-bundle-parent: the external bundle did not restore the tip after removal'
+  r5_expect 'retarget proof=refused' 'r5-bundle-parent: a stored bundle moved into the copy passed the final proof'
+  pass "a stored bundle whose directory resolves inside the copy refuses at the final proof; an external one passes and restores"
+}
+
+# Finding 3 (falsifier preserve-scan-failure.sh): a failed scan of the staged
+# preserve or of the copy refuses, alone or with a changed payload.
+test_r5_failed_preserve_scan_refuses() {
+  local body=$TMP_ROOT/r5-body-scan.sh
+  mkdir -p "$TMP_ROOT/r5-scan/fakebin"
+  cat > "$TMP_ROOT/r5-scan/fakebin/find" <<'SH'
+#!/bin/bash
+case "${R5_FAIL_FIND:-}" in
+  '') ;;
+  all) echo 'simulated find failure' >&2; exit 1 ;;
+  *) case "${1:-}" in "$R5_FAIL_FIND"*) echo 'simulated find failure' >&2; exit 1 ;; esac ;;
+esac
+exec /usr/bin/find "$@"
+SH
+  cat > "$TMP_ROOT/r5-scan/fakebin/mv" <<'SH'
+#!/bin/bash
+/bin/mv "$@" || exit $?
+case "${1:-}:${R5_TAMPER:-0}" in */.staging-*:1) printf 'corrupted\n' > "$2/files/unique.dat" ;; esac
+SH
+  chmod +x "$TMP_ROOT/r5-scan/fakebin/find" "$TMP_ROOT/r5-scan/fakebin/mv"
+  cat > "$body" <<'BODY'
+for shape in control tampered build readback all-tampered; do
+  r5_repo "$shape"
+  printf '/unique.dat\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'only original copy\n' > "$copy/unique.dat"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  R5_FAIL_FIND= R5_TAMPER=0
+  case "$shape" in
+    tampered) R5_TAMPER=1 ;;
+    build) R5_FAIL_FIND="$DATA/$ID/nested-copy-preserved/.staging-" ;;
+    readback) R5_FAIL_FIND="$copy/" ;;
+    all-tampered) R5_FAIL_FIND=all R5_TAMPER=1 ;;
+  esac
+  export R5_FAIL_FIND R5_TAMPER
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  R5_FAIL_FIND= R5_TAMPER=0
+  [ "$rc" = 0 ] || rc=refused
+  echo "$shape proof=$rc original=$(cat "$copy/unique.dat" 2>/dev/null)"
+done
+BODY
+  r5_harness scan "$body"
+  r5_expect 'control proof=0 original=only original copy' 'r5-scan: an intact preserve with working scans did not pass'
+  r5_expect 'tampered proof=refused original=only original copy' 'r5-scan: a changed payload passed with working scans'
+  r5_expect 'build proof=refused original=only original copy' 'r5-scan: a failed scan of the staged preserve passed'
+  r5_expect 'readback proof=refused original=only original copy' 'r5-scan: a failed scan of the copy at the readback passed'
+  r5_expect 'all-tampered proof=refused original=only original copy' 'r5-scan: failed scans hid a changed payload'
+  pass "a failed scan of the staged preserve or of the copy refuses, alone or hiding a changed payload; working scans pass an intact preserve"
+}
+
+# Finding 4 (falsifier preserve-interrupted-retry.sh): no start state of an
+# earlier preserve (only set aside, set aside beside a newer one, or in place)
+# loses it to a failed publication, and a successful one replaces it only after
+# the new preserve is verified.
+test_r5_interrupted_preserve_keeps_the_earlier_one() {
+  local body=$TMP_ROOT/r5-body-retry.sh
+  mkdir -p "$TMP_ROOT/r5-retry/fakebin"
+  cat > "$TMP_ROOT/r5-retry/fakebin/mv" <<'SH'
+#!/bin/bash
+if [ "${R5_FAIL_PUBLISH:-0}" = 1 ]; then
+  case "${1:-}" in */.staging-*) echo 'simulated publication failure' >&2; exit 1 ;; esac
+fi
+exec /bin/mv "$@"
+SH
+  chmod +x "$TMP_ROOT/r5-retry/fakebin/mv"
+  cat > "$body" <<'BODY'
+seed() {  # <dir> <payload>
+  mkdir -p "$1/files" "$1/meta"
+  printf '%s\n' "$2" > "$1/files/earlier.dat"
+  printf '%s\n' "$copy" > "$1/meta/copy-path"
+  printf '%s  earlier.dat\n' "$(teardown_ignored_sha256 "$1/files/earlier.dat")" > "$1/meta/SHA256SUMS"
+}
+for shape in dest-only aside-only dest-and-aside success; do
+  r5_repo "$shape"
+  printf '/current.dat\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'new payload\n' > "$copy/current.dat"
+  r5_reset "$copy"
+  root="$DATA/$ID/nested-copy-preserved"
+  hash=$(printf '%s' "$copy" | teardown_ignored_sha256)
+  dest="$root/$hash" aside="$root/.aside-$hash"
+  mkdir -p "$root"
+  case "$shape" in
+    dest-only) seed "$dest" 'payload-in-place' ;;
+    aside-only|success) seed "$aside" 'payload-set-aside' ;;
+    dest-and-aside) seed "$dest" 'payload-in-place'; seed "$aside" 'payload-set-aside' ;;
+  esac
+  mkdir -p "$root/.staging-$hash"
+  printf 'staged before interruption\n' > "$root/.staging-$hash/current.dat"
+  R5_FAIL_PUBLISH=1
+  [ "$shape" != success ] || R5_FAIL_PUBLISH=0
+  export R5_FAIL_PUBLISH
+  rc=0
+  teardown_preserve_ignored "$copy" 2>/dev/null || rc=$?
+  R5_FAIL_PUBLISH=0
+  [ "$rc" = 0 ] || rc=refused
+  found=
+  for payload in payload-in-place payload-set-aside; do
+    grep -rqxF "$payload" "$root" 2>/dev/null && found="$found $payload"
+  done
+  echo "$shape preserve=$rc kept:${found:- none}"
+  if [ "$shape" = success ]; then
+    echo "success new=$(cat "$dest/files/current.dat" 2>/dev/null)"
+    v=0; teardown_ignored_preserved_current "$copy" || v=$?
+    echo "success verify=$v"
+  fi
+done
+BODY
+  r5_harness retry "$body"
+  r5_expect 'dest-only preserve=refused kept: payload-in-place' 'r5-retry: a failed publication lost the earlier preserve in place'
+  r5_expect 'aside-only preserve=refused kept: payload-set-aside' 'r5-retry: a retry after an interruption lost the earlier preserve that was set aside'
+  r5_expect 'dest-and-aside preserve=refused kept: payload-in-place payload-set-aside' 'r5-retry: a failed retry lost one of two earlier preserves'
+  r5_expect 'success new=new payload' 'r5-retry: a successful retry did not publish the new preserve'
+  r5_expect 'success verify=0' 'r5-retry: the published preserve does not verify'
+  pass "a failed or interrupted preserve publication keeps every earlier preserve; a successful one is published and verified"
+}
+
+# Finding 5, landing (falsifier landing-ref-changed.sh): a landing admission is
+# bound to the default ref it read, and a moved or unreadable ref refuses.
+test_r5_landing_admission_rechecks_the_default_ref() {
+  local body=$TMP_ROOT/r5-body-landing.sh
+  cat > "$body" <<'BODY'
+for shape in control moved gone; do
+  r5_repo "$shape"
+  printf 'base\n' > "$repo/base.txt"
+  git -C "$repo" add base.txt && git -C "$repo" commit -qm base
+  base=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'delivered\n' > "$copy/delivered.txt"
+  git -C "$copy" add delivered.txt && git -C "$copy" commit -qm delivered
+  git -C "$repo" merge -q --ff-only "f-$shape"
+  head=$(git -C "$copy" rev-parse HEAD)
+  fm_task_copy_content_in_default "$copy" "$repo" main HEAD no-fetch || echo "$shape fixture-wrong"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$head"
+  case "$shape" in
+    moved) git -C "$repo" update-ref refs/heads/main "$base" "$head" ;;
+    gone) git -C "$repo" checkout -q --detach && git -C "$repo" update-ref -d refs/heads/main ;;
+  esac
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc="refused stable=${TEARDOWN_FINAL_STABLE:-none}"
+  echo "$shape proof=$rc"
+done
+BODY
+  r5_harness landing "$body"
+  r5_expect 'control proof=0' 'r5-landing: an unchanged default ref did not pass'
+  r5_expect 'moved proof=refused stable=none' 'r5-landing: a default ref moved after the landing proof passed, or refused as stable'
+  r5_expect 'gone proof=refused stable=none' 'r5-landing: an unreadable default ref passed, or refused as stable'
+  pass "a landing admission refuses at the removal when the default ref it read moved or cannot be read, as a retry; unchanged, it passes"
+}
+
+# Finding 5, driver credit (falsifier driver-credit-stale.sh): bundle credit
+# teardown built for the driver is an admission, so a bundle truncated after the
+# credit keeps the copy before the driver runs.
+test_r5_stale_bundle_credit_stops_before_the_driver() {
+  local body=$TMP_ROOT/r5-body-credit.sh
+  cat > "$body" <<'BODY'
+pids_with_cwd_under() { :; }
+pids_with_open_file_under() { :; }
+pids_with_open_file_under_all() { :; }
+teardown_launcher_live_since() { return 1; }
+fm_lock_path_mtime() {
+  if [ "$shape" = changed ]; then : > "$source_bundle"; : > "$stored"; fi
+  printf '1\n'
+}
+teardown_run_closeout() {
+  [ "${TEARDOWN_CLOSEOUT_CREDIT[0]-}" = --bundle-record ] || { echo "$shape driver=no-bundle-credit"; return 91; }
+  echo "$shape driver=called"
+  return 0
+}
+for shape in control changed; do
+  r5_repo "$shape"
+  source_bundle="$R5_BASE/$shape-source.bundle"
+  TREEHOUSE_PROJECT_LOCK_HELD=0
+  printf 'base\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm base
+  git -C "$repo" update-ref refs/remotes/origin/main "$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'landed content\n' > "$copy/tracked.txt"
+  git -C "$copy" add tracked.txt && git -C "$copy" commit -qm task
+  tip=$(git -C "$copy" rev-parse HEAD)
+  printf 'landed content\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm squash
+  git -C "$repo" worktree lock --reason 'vernant-session-active owner=launcher:4194305 launcher=4194305' "$copy"
+  git -C "$copy" bundle create -q "$source_bundle" --all 2>/dev/null
+  hash=$(teardown_ignored_sha256 "$source_bundle")
+  printf '%s\t%s\t%s\n' "$source_bundle" "$hash" "$tip" > "$DATA/$ID/preservation-bundles.tsv"
+  stored="$DATA/$ID/preserved-bundles/$hash.bundle"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$tip"
+  teardown_copy_lock_file "$copy"
+  teardown_lock_seen "$copy" "$TEARDOWN_FOREIGN_LOCK"
+  rc=0
+  teardown_closeout_release "$repo" "$copy" 'own nested' 2>/dev/null || rc=$?
+  [ "$rc" = 0 ] || echo "$shape release=refused"
+  [ -f "$copy/.git" ] && echo "$shape copy=present"
+done
+BODY
+  r5_harness credit "$body"
+  r5_expect 'control driver=called' 'r5-credit: an intact bundle credit did not reach the driver'
+  r5_expect 'changed release=refused' 'r5-credit: a truncated credited bundle did not refuse'
+  r5_expect 'changed copy=present' 'r5-credit: the copy is gone'
+  if grep -qxF 'changed driver=called' "$R5_OUT"; then fail 'r5-credit: the driver ran with bundle credit whose bundle was truncated after the credit'; fi
+  pass "bundle credit for the driver is rechecked at the final proof: a credited bundle truncated after the credit keeps the copy and the driver never runs; intact, it runs"
+}
+
+# Finding 6 (falsifier lock-extra-line.sh): the whole lock file is compared, so
+# a line appended after the first read refuses before the driver, and a lock
+# file with more than Vernant's one line is never read as Vernant's.
+test_r5_lock_changed_after_its_first_line_refuses() {
+  local body=$TMP_ROOT/r5-body-lock.sh
+  cat > "$body" <<'BODY'
+pids_with_cwd_under() { :; }
+pids_with_open_file_under() { :; }
+pids_with_open_file_under_all() { :; }
+teardown_closeout_credit() { TEARDOWN_CLOSEOUT_CREDIT=(); TEARDOWN_CLOSEOUT_CREDIT_FILE=; }
+fm_lock_path_mtime() { printf '1\n'; }
+teardown_launcher_live_since() { return 1; }
+teardown_run_closeout() { echo "$shape driver=called"; return 0; }
+for shape in control appended; do
+  r5_repo "$shape"
+  TREEHOUSE_PROJECT_LOCK_HELD=0
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  git -C "$repo" worktree lock --reason 'vernant-session-active owner=launcher:4194305 launcher=4194305' "$copy"
+  fm_task_copy_content_in_default "$copy" "$repo" main HEAD no-fetch || echo "$shape fixture-wrong"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  teardown_copy_lock_file "$copy"
+  teardown_lock_seen "$copy" "$TEARDOWN_FOREIGN_LOCK"
+  file=$TEARDOWN_FOREIGN_LOCK_FILE
+  [ "$shape" != appended ] || printf 'changed lock content\n' >> "$file"
+  teardown_copy_lock_file "$copy"
+  if teardown_lock_is_first_seen "$copy" "$TEARDOWN_FOREIGN_LOCK"; then echo "$shape first-seen=yes"; else echo "$shape first-seen=no"; fi
+  if teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then echo "$shape vernant=yes"; else echo "$shape vernant=no"; fi
+  rc=0
+  teardown_closeout_release "$repo" "$copy" 'own nested' 2>/dev/null || rc=$?
+  [ "$rc" = 0 ] || echo "$shape release=refused"
+done
+BODY
+  r5_harness lock "$body"
+  r5_expect 'control first-seen=yes' 'r5-lock: an unchanged lock was not the one first seen'
+  r5_expect 'control vernant=yes' "r5-lock: an unchanged lock was not read as Vernant's"
+  r5_expect 'control driver=called' 'r5-lock: an unchanged lock did not reach the driver'
+  r5_expect 'appended first-seen=no' 'r5-lock: a lock with a line appended was taken for the one first seen'
+  r5_expect 'appended vernant=no' "r5-lock: a lock file with more than one line was read as Vernant's creation lock"
+  r5_expect 'appended release=refused' 'r5-lock: a lock with a line appended did not refuse'
+  if grep -qxF 'appended driver=called' "$R5_OUT"; then fail 'r5-lock: the driver ran after a line was appended to the lock'; fi
+  pass "a lock changed after its first line, or holding more than Vernant's one line, refuses before the driver; unchanged, the driver runs"
+}
+
+# Finding 7 (falsifier post-retire-holder.sh): a holder found after the retire
+# phase refuses before the driver; no process is signalled to get past it.
+test_r5_holder_after_retirement_refuses_before_the_driver() {
+  local body=$TMP_ROOT/r5-body-holder.sh
+  cat > "$body" <<'BODY'
+fm_task_copy_other_record() { return 1; }
+pids_with_cwd_under() { [ "$shape" != holder ] || printf '4194304\t%s\n' "$1"; }
+pids_with_open_file_under() { [ "$shape" != holder ] || printf '4194304\t%s/tracked.txt\n' "$1"; }
+pids_with_open_file_under_all() { pids_with_open_file_under "$1"; }
+teardown_pid_is_task_own() { TEARDOWN_OWN_CWD=$copy; return 0; }
+task_process_identity() { printf 'synthetic-identity\n'; }
+task_record_process_signal() { echo "$shape signalled=$1"; return 0; }
+teardown_lock_launcher_may_be_live() { return 1; }
+teardown_launcher_live_since() { return 1; }
+fm_lock_path_mtime() { printf '1\n'; }
+teardown_closeout_credit() { TEARDOWN_CLOSEOUT_CREDIT=(); TEARDOWN_CLOSEOUT_CREDIT_FILE=; }
+teardown_run_closeout() { echo "$shape driver=called"; return 0; }
+for shape in control holder; do
+  r5_repo "$shape"
+  TREEHOUSE_PROJECT_LOCK_HELD=0 META="$R5_BASE/$shape.meta" TEARDOWN_RETURN_SLOT=$repo
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  git -C "$repo" worktree lock --reason 'vernant-session-active owner=launcher:4194305 launcher=4194305' "$copy"
+  fm_task_copy_content_in_default "$copy" "$repo" main HEAD no-fetch || echo "$shape fixture-wrong"
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  teardown_own_locked_copies_prove 2>/dev/null
+  rc=0
+  teardown_closeout_release "$repo" "$copy" 'own nested' 2>/dev/null || rc=$?
+  [ "$rc" = 0 ] || echo "$shape release=refused"
+  case "${TEARDOWN_CLOSEOUT_NOT_RUN:-}" in *4194304*) echo "$shape named=yes" ;; esac
+done
+BODY
+  r5_harness holder "$body"
+  r5_expect 'control driver=called' 'r5-holder: a copy with no holder did not reach the driver'
+  r5_expect 'holder release=refused' 'r5-holder: a holder found after retirement did not refuse'
+  r5_expect 'holder named=yes' 'r5-holder: the refusal does not name the holder'
+  if grep -qxF 'holder driver=called' "$R5_OUT"; then fail 'r5-holder: the driver ran with a holder found after retirement'; fi
+  if grep -q 'signalled=' "$R5_OUT"; then fail 'r5-holder: a holder was signalled'; fi
+  pass "a process found in or holding a file of a locked copy after the retire phase refuses before the driver, named and unsignalled; with none, the driver runs"
+}
+
+# Finding 8 (falsifier unreadable-owner-record.sh): an active task record that
+# cannot be read means the owner is unknown, never that there is none.
+test_r5_unreadable_task_record_is_owner_unknown() {
+  local body=$TMP_ROOT/r5-body-owner.sh
+  cat > "$body" <<'BODY'
+fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$1"); }
+pids_with_cwd_under() { return 0; }
+pids_with_open_file_under() { return 0; }
+teardown_copy_lock_file() { return 1; }
+copy="$R5_BASE/copy" STATE="$R5_BASE/state" META="$R5_BASE/state/retiring.meta"
+mkdir -p "$copy" "$STATE"
+printf 'kind=ship\n' > "$META"
+other="$STATE/other.meta"
+printf 'kind=ship\nworktree=%s\n' "$copy" > "$other"
+rc=0; fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
+echo "readable other=$rc"
+chmod 000 "$other"
+if [ -r "$other" ]; then echo 'fixture-wrong'; fi
+rc=0; fm_task_copy_other_record "$META" "$STATE" "$copy" 2>/dev/null || rc=$?
+echo "unreadable other=$rc"
+rc=0; teardown_foreign_copy_unowned "$copy" 2>/dev/null || rc=$?
+echo "unreadable unowned=$rc rule=${TEARDOWN_FOREIGN_RULE:-}"
+chmod 600 "$other"
+rm "$other"
+rc=0; fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
+echo "absent other=$rc"
+BODY
+  R5_BACKEND=1 r5_harness owner "$body"
+  r5_expect 'readable other=0' 'r5-owner: a readable record naming the copy was not found'
+  r5_expect 'unreadable other=2' 'r5-owner: an unreadable record was read as no owner'
+  r5_expect 'unreadable unowned=1 rule=inspection-unavailable' 'r5-owner: the ownership guard accepted a copy whose owner record cannot be read'
+  r5_expect 'absent other=1' 'r5-owner: no record was not read as no owner'
+  pass "an unreadable active task record means its owner is unknown and the copy is refused; readable it owns the copy, absent it does not"
+}
+
+# Finding 9 (falsifier managed-hook-removal.sh): the final proof matches Git. A
+# managed hook file Git would refuse as untracked keeps the copy with a stable
+# refusal; excluded as Firstmate's spawn excludes it, the copy is removed.
+test_r5_untracked_managed_hook_file_refuses_like_git() {
+  local body=$TMP_ROOT/r5-body-hook.sh
+  cat > "$body" <<'BODY'
+for shape in clean hook hook-excluded turnend; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  case "$shape" in
+    hook|hook-excluded)
+      mkdir -p "$copy/.claude"
+      printf '{"hooks":{}}\n' > "$copy/.claude/settings.local.json"
+      if [ "$shape" = hook-excluded ]; then
+        exclude=$(git -C "$copy" rev-parse --git-path info/exclude)
+        mkdir -p "$(dirname "$exclude")"
+        printf '.claude/settings.local.json\n' >> "$exclude"
+      fi
+      ;;
+    turnend) : > "$copy/.fm-grok-turnend" ;;
+  esac
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc="refused stable=${TEARDOWN_FINAL_STABLE:-none}"
+  echo "$shape proof=$rc"
+  if [ "$rc" = 0 ]; then
+    if git -C "$repo" worktree remove "$copy" 2>/dev/null; then echo "$shape git=removed"; else echo "$shape git=refused"; fi
+  fi
+done
+BODY
+  r5_harness hook "$body"
+  r5_expect 'clean proof=0' 'r5-hook: a clean copy did not pass'
+  r5_expect 'clean git=removed' 'r5-hook: Git did not remove the clean copy'
+  r5_expect 'hook proof=refused stable=1' 'r5-hook: an untracked managed hook file Git refuses passed the final proof'
+  r5_expect 'turnend proof=refused stable=1' 'r5-hook: an untracked turn-end marker Git refuses passed the final proof'
+  r5_expect 'hook-excluded proof=0' 'r5-hook: an excluded managed hook file did not pass'
+  r5_expect 'hook-excluded git=removed' 'r5-hook: Git did not remove a copy whose hook file is excluded'
+  pass "the final proof refuses what a plain git worktree remove refuses: an untracked managed hook file or turn-end marker keeps the copy, an excluded one is removed"
+}
+
+# Item 5 through bin/fm-teardown.sh's own code (Main 1783): work_is_landed is
+# taken out of bin/fm-teardown.sh and run alone, with the landing proof itself a
+# stub, so nothing reaches fm_run_timed, a kill or a backend. A cached landing
+# proof that is reused keeps the default ref and commit its proof read, so a ref
+# that moved between the proof and the reuse still refuses at the final proof.
+test_r5_landing_cache_reuse_keeps_the_proofs_default_ref() {
+  local body=$TMP_ROOT/r5-body-landing-cache.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^work_is_landed\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+# The proof records the default-branch commit it read, as the real one does.
+work_is_landed_proof() { TEARDOWN_LANDED_PROOF_SNAP="refs/heads/main $(git -C "$repo" rev-parse refs/heads/main)"; return 0; }
+work_is_landed_bundle() { return 1; }
+TREEHOUSE_PROJECT_LOCK_HELD=0 TEARDOWN_SLOT_CUSTODY='' TEARDOWN_NM_RECORD_SILENT=0 FM_PROJECT_LOCK_BUSY_EXIT=75
+for shape in control moved; do
+  r5_repo "$shape"
+  printf 'base\n' > "$repo/base.txt"
+  git -C "$repo" add base.txt && git -C "$repo" commit -qm base
+  base=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'delivered\n' > "$copy/delivered.txt"
+  git -C "$copy" add delivered.txt && git -C "$copy" commit -qm delivered
+  git -C "$repo" merge -q --ff-only "f-$shape"
+  head=$(git -C "$copy" rev-parse HEAD)
+  r5_reset "$copy"
+  TEARDOWN_LANDED_DIRS=() TEARDOWN_LANDED_HEADS=() TEARDOWN_LANDED_SNAPS=()
+  WT=$copy
+  work_is_landed "f-$shape" || echo "$shape first-proof=no"
+  [ "$shape" != moved ] || git -C "$repo" update-ref refs/heads/main "$base" "$head"
+  work_is_landed "f-$shape" || echo "$shape reuse=no"
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc="refused stable=${TEARDOWN_FINAL_STABLE:-none}"
+  echo "$shape proof=$rc"
+done
+BODY
+  r5_harness landing-cache "$body"
+  r5_expect 'control proof=0' 'r5-landing-cache: a reused proof with an unchanged default ref did not pass'
+  r5_expect 'moved proof=refused stable=none' 'r5-landing-cache: a reused landing proof passed after the default ref it read moved'
+  if grep -q 'first-proof=no\|reuse=no' "$R5_OUT"; then fail "r5-landing-cache: the landing rule did not answer: $(paste -sd '|' - < "$R5_OUT")"; fi
+  pass "a reused landing proof keeps the default ref it read: moved before the reuse, the final proof refuses as a retry; unchanged, it passes"
+}
+
+# Item 9 through bin/fm-teardown.sh's own code (Main 1783): the own nested
+# removal is taken out of bin/fm-teardown.sh and run alone. An untracked managed
+# hook file is refused by the final proof as content nothing holds, before Git
+# is asked; excluded, the copy is removed without force.
+test_r5_own_nested_removal_refuses_an_untracked_hook_before_git() {
+  local body=$TMP_ROOT/r5-body-own-nested-hook.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^teardown_remove_own_nested_copies\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+eval "$(awk '/^teardown_history_admitted\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+FORCE='' KIND=ship TEARDOWN_OWN_RELEASED=() TEARDOWN_HISTORY_ADMITTED=()
+for shape in clean hook hook-excluded; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  if [ "$shape" != clean ]; then
+    mkdir -p "$copy/.claude"
+    printf '{"hooks":{}}\n' > "$copy/.claude/settings.local.json"
+    if [ "$shape" = hook-excluded ]; then
+      exclude=$(git -C "$copy" rev-parse --git-path info/exclude)
+      mkdir -p "$(dirname "$exclude")"
+      printf '.claude/settings.local.json\n' >> "$exclude"
+    fi
+  fi
+  r5_reset "$copy"
+  teardown_admit "$copy" landed "$(git -C "$copy" rev-parse HEAD)"
+  rc=0
+  ( teardown_remove_own_nested_copies 'from the test slot' ) 2> "$R5_BASE/$shape.err" || rc=$?
+  if [ -e "$copy" ]; then where=kept; else where=removed; fi
+  why=none
+  if grep -q 'uncommitted or untracked content nothing holds' "$R5_BASE/$shape.err"; then why=final-proof
+  elif grep -q 'git worktree remove (without force) refused' "$R5_BASE/$shape.err"; then why=git; fi
+  echo "$shape rc=$rc copy=$where why=$why"
+done
+BODY
+  r5_harness own-nested-hook "$body"
+  r5_expect 'clean rc=0 copy=removed why=none' 'r5-own-nested-hook: a clean own nested copy was not removed'
+  r5_expect 'hook rc=1 copy=kept why=final-proof' 'r5-own-nested-hook: an untracked managed hook file was not refused by the final proof before Git'
+  r5_expect 'hook-excluded rc=0 copy=removed why=none' 'r5-own-nested-hook: an own nested copy whose hook file is excluded was not removed'
+  pass "the own nested removal refuses an untracked managed hook file at the final proof before Git is asked; clean or excluded, the copy is removed without force"
+}
+
+# Item 8 on teardown's own cleanup-target custody scan (Main 1774 item 8):
+# require_cleanup_copy_clearance is taken out of bin/fm-teardown.sh and run
+# alone, with the state-directory walk a stub, so nothing reaches fm_run_timed,
+# a kill or a backend. Another task's record that cannot be read leaves its
+# custody unknown and refuses; readable and naming another path, or absent, it
+# does not.
+test_r5_cleanup_clearance_refuses_an_unreadable_task_record() {
+  local body=$TMP_ROOT/r5-body-clearance.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^require_cleanup_copy_clearance\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+fm_local_firstmate_state_dirs() { FM_LOCAL_FIRSTMATE_STATES=("$1"); FM_LOCAL_FIRSTMATE_SKIPPED=(); }
+KIND=ship DESCENDANT_TASK_STATES=() DESCENDANT_TASK_IDS=() META="$R5_BASE/state/task-x1.meta" WT="$R5_BASE/target"
+STATE="$R5_BASE/state"
+mkdir -p "$STATE" "$R5_BASE/target" "$R5_BASE/elsewhere"
+printf 'kind=ship\nworktree=%s\n' "$R5_BASE/target" > "$META"
+other="$STATE/other.meta"
+for shape in readable unreadable absent; do
+  case "$shape" in
+    readable) printf 'kind=ship\nworktree=%s\n' "$R5_BASE/elsewhere" > "$other" ;;
+    unreadable) chmod 000 "$other"; [ ! -r "$other" ] || echo 'fixture-wrong' ;;
+    absent) chmod 600 "$other"; rm -f "$other" ;;
+  esac
+  rc=0
+  # allow_current 1, as the retiring task's own call passes: its own record
+  # naming the target is the retiring one.
+  require_cleanup_copy_clearance "$META" task-x1 "$STATE" "$R5_BASE/target" 1 2> "$R5_BASE/$shape.err" || rc=$?
+  [ "$rc" = 0 ] || sed "s/^/$shape err: /" "$R5_BASE/$shape.err"
+  named=no
+  grep -q 'cannot be read, so the custody it records' "$R5_BASE/$shape.err" && named=yes
+  echo "$shape rc=$rc named=$named"
+done
+BODY
+  R5_BACKEND=1 r5_harness clearance "$body"
+  r5_expect 'readable rc=0 named=no' 'r5-clearance: a readable record naming another path refused the cleanup'
+  r5_expect 'unreadable rc=1 named=yes' 'r5-clearance: an unreadable task record was read as no custody'
+  r5_expect 'absent rc=0 named=no' 'r5-clearance: no other record refused the cleanup'
+  pass "teardown's cleanup-target custody scan refuses when another task's record cannot be read; readable and elsewhere, or absent, it clears"
+}
+
+# Item 5 for a local-only landing (outside the review's falsifiers; same class):
+# work_is_landed and work_is_landed_proof are taken out of bin/fm-teardown.sh
+# and run alone, so nothing reaches fm_run_timed, a kill or a backend. A
+# local-only copy whose project also has an origin remote is landed by the local
+# branch, and its admission watches that branch: unchanged it passes, rewound
+# it refuses.
+test_r5_local_only_landing_watches_the_local_branch() {
+  local body=$TMP_ROOT/r5-body-local-only.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^work_is_landed\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+eval "$(awk '/^work_is_landed_proof\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+pr_is_merged() { return 1; }
+work_is_landed_bundle() { return 1; }
+MODE=local-only TREEHOUSE_PROJECT_LOCK_HELD=0 TEARDOWN_SLOT_CUSTODY='' TEARDOWN_NM_RECORD_SILENT=0 FM_PROJECT_LOCK_BUSY_EXIT=75
+for shape in control rewound; do
+  r5_repo "$shape"
+  printf 'base\n' > "$repo/base.txt"
+  git -C "$repo" add base.txt && git -C "$repo" commit -qm base
+  base=$(git -C "$repo" rev-parse HEAD)
+  git init -q --bare "$R5_BASE/$shape-origin.git"
+  git -C "$repo" remote add origin "$R5_BASE/$shape-origin.git"
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'delivered\n' > "$copy/delivered.txt"
+  git -C "$copy" add delivered.txt && git -C "$copy" commit -qm delivered
+  git -C "$repo" merge -q --ff-only "f-$shape"
+  head=$(git -C "$copy" rev-parse HEAD)
+  r5_reset "$copy"
+  TEARDOWN_LANDED_DIRS=() TEARDOWN_LANDED_HEADS=() TEARDOWN_LANDED_SNAPS=()
+  WT=$copy
+  work_is_landed "f-$shape" || echo "$shape landed=no"
+  [ "$shape" != rewound ] || git -C "$repo" update-ref refs/heads/main "$base" "$head"
+  rc=0
+  teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc="refused stable=${TEARDOWN_FINAL_STABLE:-none}"
+  echo "$shape proof=$rc"
+done
+BODY
+  r5_harness local-only "$body"
+  r5_expect 'control proof=0' 'r5-local-only: a local-only copy landed on the local branch did not pass with an origin remote present'
+  r5_expect 'rewound proof=refused stable=none' 'r5-local-only: a local-only landing passed after the local branch it read was rewound'
+  if grep -q 'landed=no' "$R5_OUT"; then fail "r5-local-only: the local-only landing rule did not answer: $(paste -sd '|' - < "$R5_OUT")"; fi
+  pass "a local-only landing with an origin remote present watches the local branch its proof read: unchanged it passes, rewound it refuses"
+}
+
+# PR 400 round 2 (Main 1839 items 1-10, Main 1843 a and c): each case below
+# ports one finding of the outside review of 49ded5b4 (r-49ded5b4-review) with
+# its control. Like the round 5 cases they source the libraries, and take single
+# functions out of bin/fm-teardown.sh, on scratch repositories with recording
+# stubs: no case starts, signals or groups a process, and none runs
+# bin/fm-teardown.sh, fm_run_timed or a provider.
+
+
+# Main 1839 item 1: an untracked file under .claude is the copy's own work on the
+# root route too; only the files Firstmate itself writes are exempt.
+test_pr400_root_claude_untracked_file_is_the_copys_work() {
+  local body=$TMP_ROOT/pr400-body-root-claude.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^validate_worktree_teardown_safety\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+work_is_landed() { return 0; }
+teardown_history_swept_ignored_kept() { return 0; }
+report_worktree_dirt() { :; }
+FORCE='' KIND=ship MODE=normal TEARDOWN_SLOT_REASSIGNED=0 TEARDOWN_SLOT_SHARED=0 TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY=task
+TEARDOWN_BUNDLE_PROOF='' SCRIPT_DIR=/nonexistent
+for shape in clean managed claude-notes other-notes; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  case "$shape" in
+    managed) mkdir -p "$copy/.claude" && printf '{}\n' > "$copy/.claude/settings.local.json" && : > "$copy/.fm-busy-stop" ;;
+    claude-notes) mkdir -p "$copy/.claude" && printf 'only here\n' > "$copy/.claude/notes.txt" ;;
+    other-notes) mkdir -p "$copy/src" && printf 'only here\n' > "$copy/src/notes.txt" ;;
+  esac
+  WT=$copy TEARDOWN_NESTED_COPIES=()
+  rc=0; validate_worktree_teardown_safety >/dev/null 2>&1 || rc=$?
+  prc=0; fm_task_copy_preserve "$repo" "$ID" "$copy" 0 >/dev/null 2>&1 || prc=$?
+  echo "$shape root=$rc anchor=$prc"
+done
+BODY
+  r5_harness root-claude "$body"
+  r5_expect 'clean root=0 anchor=2' 'pr400-root-claude: a clean copy did not pass the root check (anchor: no anchor yet, 2)'
+  r5_expect 'managed root=0 anchor=2' "pr400-root-claude: Firstmate's own managed files were counted as the copy's work"
+  r5_expect 'claude-notes root=1 anchor=1' 'pr400-root-claude: an untracked .claude/notes.txt passed the root check or the anchor proof'
+  r5_expect 'other-notes root=1 anchor=1' 'pr400-root-claude: an untracked src/notes.txt passed'
+  pass "an untracked file under .claude is the copy's own work on the root check and the anchor proof; only Firstmate's managed files are exempt"
+}
+
+# Main 1839 item 2: a successful replacement keeps an earlier preserve that holds
+# a file the new one lacks; an earlier preserve the new one fully covers goes.
+test_pr400_preserve_replacement_keeps_an_earlier_only_payload() {
+  local body=$TMP_ROOT/pr400-body-earlier-only.sh
+  cat > "$body" <<'BODY'
+for shape in earlier-only covered; do
+  r5_repo "$shape"
+  printf '/current.dat\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'current bytes\n' > "$copy/current.dat"
+  r5_reset "$copy"
+  root="$DATA/$ID/nested-copy-preserved"
+  hash=$(printf '%s' "$copy" | teardown_ignored_sha256)
+  aside="$root/.aside-$hash"
+  mkdir -p "$aside/files" "$aside/meta"
+  printf '%s\n' "$copy" > "$aside/meta/copy-path"
+  if [ "$shape" = earlier-only ]; then
+    printf 'earlier only bytes\n' > "$aside/files/earlier.dat"
+    printf '%s  earlier.dat\n' "$(teardown_ignored_sha256 "$aside/files/earlier.dat")" > "$aside/meta/SHA256SUMS"
+  else
+    printf 'current bytes\n' > "$aside/files/current.dat"
+    printf '%s  current.dat\n' "$(teardown_ignored_sha256 "$aside/files/current.dat")" > "$aside/meta/SHA256SUMS"
+  fi
+  rc=0; teardown_preserve_ignored "$copy" 2>/dev/null || rc=$?
+  kept=no
+  grep -rqxF 'earlier only bytes' "$root" 2>/dev/null && kept=yes
+  asides=$(find "$root" -maxdepth 1 -name ".aside-$hash*" | wc -l | tr -d ' ')
+  v=0; teardown_ignored_preserved_current "$copy" || v=$?
+  echo "$shape publish=$rc earlier-kept=$kept asides=$asides verify=$v"
+done
+BODY
+  r5_harness earlier-only "$body"
+  r5_expect 'earlier-only publish=0 earlier-kept=yes asides=1 verify=0' 'pr400-earlier-only: a successful replacement deleted an earlier preserve holding a file the new one lacks'
+  r5_expect 'covered publish=0 earlier-kept=no asides=0 verify=0' 'pr400-earlier-only: an earlier preserve the new one fully covers was not dropped'
+  pass 'a successful preserve replacement keeps an earlier preserve with a file the new one lacks, and drops one the new preserve fully covers'
+}
+
+# Main 1839 item 3: the landing admission carries the commit the proof itself
+# read, so a ref that moves after the proof, even before the snapshot, refuses;
+# a merged-PR proof needs no default-branch ref.
+test_pr400_landing_admission_carries_the_proofs_commit() {
+  local body=$TMP_ROOT/pr400-body-landing-commit.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^work_is_landed\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+eval "$(awk '/^work_is_landed_proof\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+work_is_landed_bundle() { return 1; }
+teardown_history_admit() { :; }
+MODE=normal BASE_BRANCH=main TREEHOUSE_PROJECT_LOCK_HELD=0 TEARDOWN_SLOT_CUSTODY='' TEARDOWN_NM_RECORD_SILENT=0 FM_PROJECT_LOCK_BUSY_EXIT=75
+for shape in stable moved-during-proof merged-pr-no-default-ref; do
+  r5_repo "$shape"
+  printf 'base\n' > "$repo/base.txt"
+  git -C "$repo" add base.txt && git -C "$repo" commit -qm base
+  bad=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  printf 'delivered\n' > "$copy/delivered.txt"
+  git -C "$copy" add delivered.txt && git -C "$copy" commit -qm delivered
+  good=$(git -C "$copy" rev-parse HEAD)
+  git init -q --bare "$R5_BASE/$shape-origin.git"
+  git -C "$repo" remote add origin "$R5_BASE/$shape-origin.git"
+  git -C "$repo" update-ref refs/remotes/origin/main "$good"
+  PR_URL=''
+  pr_is_merged() { return 1; }
+  fm_task_copy_content_in_default() {
+    FM_TASK_COPY_UNASKED=
+    FM_TASK_COPY_COMPARED="remotes/origin/main $good"
+    # The ref moves after the proof read it but before the admission is taken.
+    [ "$shape" != moved-during-proof ] || git -C "$repo" update-ref refs/remotes/origin/main "$bad"
+    return 0
+  }
+  if [ "$shape" = merged-pr-no-default-ref ]; then
+    PR_URL=https://github.com/owner/repo/pull/7
+    pr_is_merged() { return 0; }
+    git -C "$repo" update-ref -d refs/remotes/origin/main
+  fi
+  r5_reset "$copy"
+  TEARDOWN_LANDED_DIRS=() TEARDOWN_LANDED_HEADS=() TEARDOWN_LANDED_SNAPS=()
+  WT=$copy
+  work_is_landed "f-$shape" 2>/dev/null || echo "$shape landed=no"
+  snap=${TEARDOWN_ADMIT_STORED[${#TEARDOWN_ADMIT_STORED[@]}-1]-}
+  case "$snap" in "refs/remotes/origin/main $good") snap=proof-commit ;; "refs/remotes/origin/main $bad") snap=moved-commit ;; 'pr '*) snap=pr ;; esac
+  rc=0; teardown_removal_final_proof "$copy" preserve unlocked || rc=$?
+  [ "$rc" = 0 ] || rc=refused
+  echo "$shape snapshot=$snap proof=$rc"
+done
+BODY
+  r5_harness landing-commit "$body"
+  r5_expect 'stable snapshot=proof-commit proof=0' 'pr400-landing-commit: an unchanged proof commit did not pass'
+  r5_expect 'moved-during-proof snapshot=proof-commit proof=refused' 'pr400-landing-commit: the admission did not carry the commit the proof read, or a moved ref passed'
+  r5_expect 'merged-pr-no-default-ref snapshot=pr proof=0' 'pr400-landing-commit: a merged-PR landing needed the absent origin default ref'
+  if grep -q 'landed=no' "$R5_OUT"; then fail "pr400-landing-commit: the landing rule did not answer: $(paste -sd '|' - < "$R5_OUT")"; fi
+  pass "the landing admission carries the commit its proof read: a ref moved after the proof refuses, unchanged it passes, and a merged-PR landing needs no default-branch ref"
+}
+
+# Main 1839 item 4: the last check before the unlock scans working directories
+# as well as open files, and the search-indexer exemption never covers a process
+# this teardown recorded as its own.
+test_pr400_last_holder_check_sees_cwd_and_own_indexer() {
+  local body=$TMP_ROOT/pr400-body-last-holder.sh
+  cat > "$body" <<'BODY'
+teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:4194305 launcher=4194305'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s; return 0; }
+teardown_launcher_gone() { return 0; }
+teardown_lock_is_first_seen() { return 0; }
+teardown_landed() { teardown_admit "$1" landed "$(git -C "$1" rev-parse HEAD)" "refs/heads/main x"; return 0; }
+teardown_copy_git_protects() { return 1; }
+teardown_admitted_bundles_current() { return 0; }
+fm_lock_path_mtime() { printf '1\n'; }
+teardown_removal_final_proof() { return 0; }
+fm_task_copy_other_record() { return 1; }
+teardown_pid_is_task_own() { TEARDOWN_OWN_CWD=$copy; return 0; }
+task_process_identity() { printf 'id\n'; }
+fm_task_copy_indexer_pid() { [ "$1" = 4194304 ]; }
+teardown_lock_launcher_may_be_live() { return 1; }
+TEARDOWN_CLOSEOUT_PROOF=fixture META="$R5_BASE/task.meta"
+# The ownership proof's filtered open-file scan, as bin/fm-teardown.sh builds it
+# from the unfiltered one.
+pids_with_open_file_under() {
+  local p l
+  pids_with_open_file_under_all "$1" | while IFS=$'\t' read -r p l; do
+    [ -n "$p" ] || continue
+    fm_task_copy_indexer_pid "$p" || printf '%s\t%s\n' "$p" "$l"
+  done
+}
+pids_with_cwd_under() { case "$shape" in own-indexer-cwd|other-cwd) printf '4194304\t%s\n' "$1" ;; esac; }
+pids_with_open_file_under_all() { case "$shape" in indexer-open) printf '4194304\t%s/f\n' "$1" ;; esac; }
+for shape in own-indexer-cwd other-cwd indexer-open none; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  r5_reset "$copy"
+  head=$(git -C "$copy" rev-parse HEAD)
+  git() { case " $* " in *' worktree unlock '*|*' worktree remove '*) echo "$shape git=$2 $3 $4"; return 0 ;; esac; command git "$@"; }
+  rc=0; teardown_dead_launcher_release "$repo" "$copy" "$head" foreign 2>/dev/null || rc=$?
+  unset -f git
+  echo "$shape release=$rc why=${TEARDOWN_RELEASE_WHY:-none}"
+done
+BODY
+  r5_harness last-holder "$body"
+  r5_expect 'own-indexer-cwd release=1 why=process 4194304 runs in it after the retire phase' 'pr400-last-holder: a task-own cwd holder named like the indexer reached the unlock'
+  r5_expect 'other-cwd release=1 why=process 4194304 runs in it after the retire phase' 'pr400-last-holder: a cwd holder reached the unlock'
+  r5_expect 'indexer-open release=0 why=none' 'pr400-last-holder: an open-file-only search indexer this teardown did not record kept the copy'
+  r5_expect 'none release=0 why=none' 'pr400-last-holder: a copy with no holder did not reach the unlock'
+  if grep -q '^own-indexer-cwd git=\|^other-cwd git=' "$R5_OUT"; then fail 'pr400-last-holder: an unlock or remove ran with a holder present'; fi
+  pass 'the last holder check before the unlock refuses any cwd holder, an indexer name included; an open-file-only indexer not recorded as own is exempt; with none the release proceeds'
+}
+
+# Main 3851 (R6-1): the direct release of a dead launcher's lock preserves the
+# retained population (the .claude and .opencode trees whole) before it unlocks,
+# for a foreign copy and for an own nested copy whose #380 preserve already holds
+# its selected file; the real final proof then checks that preserve, and the
+# unlock and remove run. Logs and evidence are archived, never deleted. R7-1: a
+# .claude file that appears in an own nested copy after that preserve, just
+# before the unlock, refuses at the final proof: the lock goes back on and the
+# copy is not removed. R8-1: the copy's other ignored files, a top-level .cache
+# that #380's retained list leaves out included, are preserved and verified too.
+test_pr400_direct_release_preserves_claude_and_opencode() {
+  local body=$TMP_ROOT/pr400-body-direct-retained.sh
+  cat > "$body" <<'BODY'
+teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:4194305 launcher=4194305'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s; return 0; }
+teardown_launcher_gone() { return 0; }
+teardown_launcher_live_since() { return 1; }
+teardown_lock_is_first_seen() {
+  [ "$shape" != own-late ] || printf 'late\n' > "$copy/.claude/channel-outbox/c.jsonl"
+  return 0
+}
+teardown_landed() { teardown_admit "$1" landed "$(git -C "$1" rev-parse HEAD)" "refs/heads/main $(git -C "$1" rev-parse main)"; return 0; }
+teardown_copy_git_protects() { return 1; }
+teardown_admitted_bundles_current() { return 0; }
+teardown_foreign_copy_unowned() { return 0; }
+teardown_copy_holder_free() { return 0; }
+fm_lock_path_mtime() { printf '1\n'; }
+TEARDOWN_CLOSEOUT_PROOF=fixture META="$R5_BASE/task.meta"
+for shape in foreign own-nested own-late; do
+  kind='own nested'
+  [ "$shape" != foreign ] || kind=foreign
+  r5_repo "$shape"
+  printf '/.claude/\n/.opencode/\n/notes/\n/.cache/\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  mkdir -p "$copy/.claude/channel-outbox" "$copy/.opencode/state" "$copy/notes" "$copy/.cache"
+  printf 'run\n' > "$copy/.cache/run.bin"
+  printf 'one\n' > "$copy/.claude/channel-outbox/a.jsonl"
+  printf 'evidence\n' > "$copy/.opencode/state/log.json"
+  printf 'only here\n' > "$copy/notes/unique.dat"
+  r5_reset "$copy"
+  TEARDOWN_PRESERVE_DIR=
+  [ "$kind" != 'own nested' ] || teardown_own_preserve "$copy" 2>/dev/null || echo "$shape own-preserve=failed"
+  head=$(git -C "$copy" rev-parse HEAD)
+  : > "$R5_BASE/$shape-git"
+  git() { case " $* " in *' worktree unlock '*|*' worktree remove '*) printf '%s ' "$4" >> "$R5_BASE/$shape-git"; return 0 ;; esac; command git "$@"; }
+  rc=0; teardown_dead_launcher_release "$repo" "$copy" "$head" "$kind" 2>/dev/null || rc=$?
+  unset -f git
+  dest=${TEARDOWN_PRESERVE_DIR:-$(r5_dest "$copy")}
+  kept=
+  for f in .cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat; do
+    sum=$(teardown_ignored_sha256 "$copy/$f")
+    if [ "$(teardown_ignored_sha256 "$dest/files/$f" 2>/dev/null)" = "$sum" ] && grep -qxF "$sum  $f" "$dest/meta/SHA256SUMS"; then
+      kept+=" $f"
+    fi
+  done
+  why=${TEARDOWN_RELEASE_WHY:-none}
+  case "$why" in *'does not hold its ignored files, the .claude and .opencode trees whole included,'*'; its lock was restored') why=late-refused-restored ;; esac
+  late=gone
+  [ ! -f "$copy/.claude/channel-outbox/c.jsonl" ] || late=in-copy
+  echo "$shape release=$rc why=$why kept=${kept# } git=$(cat "$R5_BASE/$shape-git") late=$late"
+done
+BODY
+  r5_harness direct-retained "$body"
+  r5_expect 'foreign release=0 why=none kept=.cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone' 'pr400-direct-retained: a foreign copy was not released and removed with its .claude and .opencode files preserved'
+  r5_expect 'own-nested release=0 why=none kept=.cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock remove  late=gone' 'pr400-direct-retained: an own nested copy was not released and removed with its .claude and .opencode files preserved'
+  r5_expect 'own-late release=1 why=late-refused-restored kept=.cache/run.bin .claude/channel-outbox/a.jsonl .opencode/state/log.json notes/unique.dat git=unlock  late=in-copy' 'pr400-direct-retained: a .claude file that appeared after the own preserve was removed unpreserved, or the lock was not put back'
+  pass 'the direct release of a dead launcher'"'"'s lock preserves the .claude and .opencode trees whole, byte for byte with their SHA256SUMS lines, for a foreign and an own nested copy, before it unlocks and removes; a .claude file that appears in an own copy after its preserve refuses and the lock goes back on'
+}
+
+# Main 1839 item 5: a lock proved earlier that now reads absent or unreadable
+# refuses on the foreign, own-release and own-removal routes; never the unlocked
+# route.
+test_pr400_vanished_lock_never_takes_the_unlocked_route() {
+  local body=$TMP_ROOT/pr400-body-vanished-lock.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^teardown_remove_own_nested_copies\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+eval "$(awk '/^teardown_history_admitted\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+teardown_preserve_ignored() { return 0; }
+teardown_removal_final_proof() { return 0; }
+teardown_closeout_release() { echo "$shape/$route driver"; return 0; }
+teardown_foreign_copy_present() { return 1; }
+teardown_friction_outcome() { :; }
+teardown_refuse_copy() { echo "$shape/$route refused"; }
+teardown_own_locked_copies_prove() { return 0; }
+teardown_own_copy_dispose() { echo "$shape/$route dispose"; return 0; }
+teardown_copy_lock_file() {
+  TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:1 launcher=1'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s
+  case "$shape" in seen-then-absent|never-locked) return 1 ;; unreadable) return 2 ;; *) return 0 ;; esac
+}
+git() { case " $* " in *' worktree remove '*) echo "$shape/$route remove"; return 0 ;; esac; command git "$@"; }
+FORCE='' KIND=ship TEARDOWN_OWN_RELEASED=() TEARDOWN_HISTORY_ADMITTED=() TEARDOWN_BUNDLE_SWEEP_PROOF=''
+copy="$R5_BASE/copy"; mkdir -p "$copy" "$R5_BASE/slot"; PROJ="$R5_BASE/proj"; DATA="$R5_BASE/data" STATE="$R5_BASE/state" ID=r5-fixture
+for shape in seen-then-absent unreadable never-locked locked; do
+  TEARDOWN_LOCK_SEEN_DIRS=() TEARDOWN_LOCK_SEEN_TEXT=()
+  [ "$shape" = never-locked ] || teardown_lock_seen "$copy" 'vernant-session-active owner=launcher:1 launcher=1'
+  TEARDOWN_NESTED_COPIES=("$copy") TEARDOWN_RETURN_SLOT="$R5_BASE/slot"
+  route=foreign; rc=0; teardown_foreign_copy_dispose "$R5_BASE/slot" "$copy" >/dev/null 2>&1 || rc=$?; echo "$shape/foreign rc=$rc"
+  route=own-release; rc=0; teardown_own_locked_copies_release >/dev/null 2>&1 || rc=$?; echo "$shape/own-release rc=$rc"
+  route=own-remove; rc=0; ( teardown_remove_own_nested_copies 'from the slot' ) >/dev/null 2>&1 || rc=$?; echo "$shape/own-remove rc=$rc"
+done 2>&1 | grep -v '^$'
+BODY
+  r5_harness vanished-lock "$body"
+  # The stubs echo inside command substitutions the cases discard, so the
+  # removal attempts are read from the exit codes and the route markers.
+  for route in foreign own-release own-remove; do
+    r5_expect "seen-then-absent/$route rc=1" "pr400-vanished-lock: a lock seen earlier that now reads absent did not refuse on the $route route"
+    r5_expect "unreadable/$route rc=1" "pr400-vanished-lock: an unreadable lock did not refuse on the $route route"
+  done
+  r5_expect 'never-locked/foreign rc=0' 'pr400-vanished-lock: a copy never seen locked did not take the unlocked foreign removal'
+  r5_expect 'never-locked/own-remove rc=0' 'pr400-vanished-lock: a copy never seen locked did not take the plain own removal'
+  r5_expect 'locked/foreign rc=0' 'pr400-vanished-lock: an unchanged lock did not reach the driver route'
+  pass 'a lock proved earlier that now reads absent or unreadable refuses on the foreign, own-release and own-removal routes; never-locked and still-locked controls take their routes'
+}
+
+# Main 1839 item 6: the nested-repository guard reads paths NUL-framed, so an
+# independent repository under a path that holds a newline is found.
+test_pr400_nested_repository_under_a_newline_path_is_found() {
+  local body=$TMP_ROOT/pr400-body-nested-repo.sh
+  cat > "$body" <<'BODY'
+teardown_refuse_copy() { echo "refused: $2" >&2; }
+for shape in none ordinary newline; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  case "$shape" in
+    ordinary) inner="$copy/.claude/inner" ;;
+    newline) inner="$copy/.claude/one"$'\n'"docs" ;;
+    *) inner= ;;
+  esac
+  if [ -n "$inner" ]; then
+    mkdir -p "$inner"
+    git init -q "$inner"
+    printf 'independent\n' > "$inner/work.txt"
+    git -C "$inner" add work.txt && git -C "$inner" commit -qm independent
+  fi
+  # The copy holds a docs directory and the guard runs from inside it, so a path
+  # split at its newline would resolve its second half, docs, to the copy's own
+  # repository (the shape the review's falsifier modeled).
+  mkdir -p "$copy/docs"
+  TEARDOWN_NESTED_COPIES=("$copy") TEARDOWN_RETURN_SLOT=$repo
+  rc=0; ( cd "$copy" && teardown_own_nested_other_repos ) 2>/dev/null || rc=$?
+  echo "$shape guard=$rc"
+done
+BODY
+  r5_harness nested-repo "$body"
+  r5_expect 'none guard=0' 'pr400-nested-repo: a copy with no other repository was refused'
+  r5_expect 'ordinary guard=1' 'pr400-nested-repo: an independent repository was not found'
+  r5_expect 'newline guard=1' 'pr400-nested-repo: an independent repository under a path holding a newline was not found'
+  pass 'the nested-repository guard finds an independent repository under a path that holds a newline, as it finds an ordinary one'
+}
+
+# Main 1839 item 7: copy paths are ordered NUL-framed, so a path that holds a
+# newline reaches disposal as one path, on the foreign and own routes.
+test_pr400_newline_copy_path_reaches_disposal_whole() {
+  local body=$TMP_ROOT/pr400-body-copy-order.sh
+  cat > "$body" <<'BODY'
+teardown_foreign_copy_prove() { return 0; }
+teardown_foreign_copy_dispose() { printf 'foreign-dispose %q\n' "$2"; }
+teardown_own_locked_copies_prove() { return 0; }
+teardown_copy_lock_file() { return 0; }
+teardown_own_copy_dispose() { printf 'own-dispose %q\n' "$2"; }
+for shape in ordinary newline; do
+  case "$shape" in ordinary) p="$R5_BASE/slot/copy" ;; newline) p="$R5_BASE/slot/one"$'\n'"two" ;; esac
+  mkdir -p "$p" "$R5_BASE/slot"
+  TEARDOWN_RETURN_SLOT="$R5_BASE/slot" TEARDOWN_FOREIGN_COPIES=("$p") TEARDOWN_NESTED_COPIES=("$p") TEARDOWN_OWN_RELEASED=()
+  out=$(teardown_foreign_copies_release; teardown_own_locked_copies_release)
+  want_f=$(printf 'foreign-dispose %q' "$p"); want_o=$(printf 'own-dispose %q' "$p")
+  lines=$(printf '%s\n' "$out" | grep -c 'dispose')
+  ok=no
+  [ "$lines" = 2 ] && printf '%s\n' "$out" | grep -qxF -- "$want_f" && printf '%s\n' "$out" | grep -qxF -- "$want_o" && ok=yes
+  echo "$shape whole=$ok calls=$lines"
+done
+BODY
+  r5_harness copy-order "$body"
+  r5_expect 'ordinary whole=yes calls=2' 'pr400-copy-order: an ordinary path did not reach disposal once on each route'
+  r5_expect 'newline whole=yes calls=2' 'pr400-copy-order: a path holding a newline was split before disposal'
+  pass 'a copy path that holds a newline reaches foreign and own disposal as one path'
+}
+
+# Main 1839 item 8: the root return takes its safety check again before each
+# retry; a changed result stops the retry.
+test_pr400_root_return_retry_rechecks_safety() {
+  local body=$TMP_ROOT/pr400-body-root-retry.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^teardown_treehouse_return\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+TREEHOUSE_RETURN_LOCK_RETRIES=1 TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0
+TEARDOWN_TREEHOUSE_CUSTODY_REFUSED=61 TEARDOWN_TREEHOUSE_LOCK_REFUSED=62
+require_registered_slot_copies() { return 0; }
+treehouse_return_is_index_lock_error() { return 0; }
+worktree_git_lock_path() { printf '%s\n' "$R5_BASE/no-such-lock"; }
+sleep() { :; }
+check_changed() { return 1; }
+check_stable() { return 0; }
+treehouse() {
+  n=$(( $(cat "$R5_BASE/calls-$shape" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$R5_BASE/calls-$shape"
+  [ "$n" -gt 1 ] || { echo 'simulated index.lock error'; return 1; }
+  return 0
+}
+mkdir -p "$R5_BASE/dir"
+for shape in changed stable; do
+  callback=check_$shape
+  rc=0; teardown_treehouse_return "$R5_BASE/dir" "$R5_BASE" copy task "$callback" >/dev/null 2>&1 || rc=$?
+  echo "$shape rc=$rc provider-calls=$(cat "$R5_BASE/calls-$shape")"
+done
+BODY
+  r5_harness root-retry "$body"
+  r5_expect 'changed rc=1 provider-calls=1' 'pr400-root-retry: a retry ran the provider again although the safety check now failed'
+  r5_expect 'stable rc=0 provider-calls=2' 'pr400-root-retry: an unchanged safety check did not let the retry succeed'
+  pass 'the root return takes its safety check again before each retry: a changed result stops the retry, an unchanged one retries'
+}
+
+# Main 1843 (a): a copy that only a merged Forgejo pull request admits, with no
+# content proof and no bundle, is held: the driver cannot credit it, so the
+# direct release does not take over.
+test_pr400_forgejo_only_landing_is_held() {
+  local body=$TMP_ROOT/pr400-body-forgejo.sh
+  cat > "$body" <<'BODY'
+teardown_copy_lock_file() { TEARDOWN_FOREIGN_LOCK='vernant-session-active owner=launcher:4194305 launcher=4194305'; TEARDOWN_FOREIGN_LOCK_FILE=/virtual/lock; TEARDOWN_FOREIGN_LOCK_SHA=s; return 0; }
+teardown_launcher_gone() { return 0; }
+teardown_lock_is_first_seen() { return 0; }
+teardown_foreign_copy_unowned() { return 0; }
+teardown_copy_git_protects() { return 1; }
+teardown_copy_holder_free() { return 0; }
+pids_with_open_file_under() { :; }
+teardown_admitted_bundles_current() { return 0; }
+fm_lock_path_mtime() { printf '1\n'; }
+teardown_removal_final_proof() { return 0; }
+TEARDOWN_CLOSEOUT_PROOF=fixture
+fm_task_copy_content_in_default() {
+  [ "$shape" = forgejo-and-content ] && [ "$4" = HEAD ] || { FM_TASK_COPY_UNASKED=; return 1; }
+  FM_TASK_COPY_UNASKED= FM_TASK_COPY_COMPARED='remotes/origin/main c0ffee'
+}
+teardown_landed() {
+  case "$shape" in
+    forgejo|forgejo-and-bundle|forgejo-and-content) snap='pr https://git.example.org/team/repo/pulls/7' ;;
+    github) snap='pr https://github.com/team/repo/pull/7' ;;
+    content) snap='refs/remotes/origin/main abc' ;;
+  esac
+  teardown_admit "$1" landed "$(git -C "$1" rev-parse HEAD)" "$snap"
+  [ "$shape" != forgejo-and-bundle ] || teardown_admit "$1" bundle "$(git -C "$1" rev-parse HEAD)" "$R5_BASE/stored.bundle"
+  return 0
+}
+for shape in forgejo github content forgejo-and-bundle forgejo-and-content; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  r5_reset "$copy"
+  git() { case " $* " in *' worktree unlock '*) echo "$shape unlocked"; return 0 ;; *' worktree remove '*) return 0 ;; esac; command git "$@"; }
+  rc=0; teardown_dead_launcher_release "$repo" "$copy" "$(git -C "$copy" rev-parse HEAD)" foreign 2>/dev/null || rc=$?
+  unset -f git
+  case "$TEARDOWN_RELEASE_WHY" in *'Main 1843'*) why=forgejo-held ;; '') why=none ;; *) why=other ;; esac
+  echo "$shape release=$rc why=$why landed=$(teardown_latest_admission "$copy" landed)"
+done
+BODY
+  r5_harness forgejo "$body"
+  r5_expect 'forgejo release=1 why=forgejo-held landed=pr https://git.example.org/team/repo/pulls/7' 'pr400-forgejo: a copy only a merged Forgejo PR admits was released directly'
+  r5_expect 'github release=0 why=none landed=pr https://github.com/team/repo/pull/7' 'pr400-forgejo: a GitHub-PR landing was held'
+  r5_expect 'content release=0 why=none landed=refs/remotes/origin/main abc' 'pr400-forgejo: a content landing was held'
+  r5_expect 'forgejo-and-bundle release=0 why=none landed=pr https://git.example.org/team/repo/pulls/7' 'pr400-forgejo: a Forgejo landing that a bundle also holds was held'
+  r5_expect 'forgejo-and-content release=0 why=none landed=refs/remotes/origin/main c0ffee' 'pr400-forgejo: a Forgejo-PR copy whose content is in the default branch was held, or its admission does not name the commit the content proof read'
+  if grep -q '^forgejo unlocked' "$R5_OUT"; then fail 'pr400-forgejo: the Forgejo-only copy was unlocked'; fi
+  pass 'a copy that only a merged Forgejo pull request admits is held with a named reason unless the content proof holds it; GitHub, content, bundle-held and Forgejo-plus-content controls are released'
+}
+
+# Main 1881 (C2-1): the root dirt rule skips the untracked entry of a worktree
+# registered to the copy's own repository under the copy's .claude/worktrees/
+# (the nested copy Vernant makes there); one elsewhere, an unregistered directory
+# or repository of that name, or an unreadable worktree list, is still dirt.
+test_pr400_registered_nested_worktree_is_not_root_dirt() {
+  local body=$TMP_ROOT/pr400-body-nested-worktree.sh
+  cat > "$body" <<'BODY'
+for shape in registered registered-elsewhere unregistered-file unregistered-repo unreadable; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  inner="$copy/.claude/worktrees/x"
+  [ "$shape" != registered-elsewhere ] || inner="$copy/sub"
+  case "$shape" in
+    registered|registered-elsewhere|unreadable) git -C "$repo" worktree add -q -b "n-$shape" "$inner" main ;;
+    unregistered-file) mkdir -p "$inner" && printf 'work\n' > "$inner/work.txt" ;;
+    unregistered-repo) git init -q "$inner" && printf 'work\n' > "$inner/work.txt" ;;
+  esac
+  real=$(fm_task_copy_canonical_dir "$copy")
+  status=$(git -C "$copy" status --porcelain --untracked-files=all --ignore-submodules=none)
+  [ "$shape" != unreadable ] || git() { case " $* " in *' worktree list '*) return 1 ;; esac; command git "$@"; }
+  dirt=$(fm_task_copy_dirty_status "$status" "$real")
+  unset -f git
+  n=0; [ -z "$dirt" ] || n=$(printf '%s\n' "$dirt" | wc -l | tr -d ' ')
+  echo "$shape dirt=$n"
+done
+BODY
+  r5_harness nested-worktree "$body"
+  r5_expect 'registered dirt=0' 'pr400-nested-worktree: a registered nested worktree of the same repository was counted as dirt'
+  r5_expect 'registered-elsewhere dirt=1' 'pr400-nested-worktree: a registered worktree outside .claude/worktrees was not counted as dirt'
+  r5_expect 'unregistered-file dirt=1' 'pr400-nested-worktree: an untracked file in an unregistered directory was not counted as dirt'
+  r5_expect 'unregistered-repo dirt=1' 'pr400-nested-worktree: an unregistered repository in the copy was not counted as dirt'
+  r5_expect 'unreadable dirt=1' 'pr400-nested-worktree: an unreadable worktree list let a nested entry pass'
+  pass 'the root dirt rule skips only a registered worktree of the same repository under .claude/worktrees; one elsewhere, an unregistered directory or repository, or an unreadable worktree list, is dirt'
+}
+
+# CI shard 23 (retained-bundle): Git lists an ignored directory and an ignored
+# file inside it (notes/ and notes/unique.dat). The preserve readback counts
+# each file once, so a whole preserve verifies; a payload changed after the
+# preserve still refuses.
+test_pr400_overlapping_ignored_entries_count_each_file_once() {
+  local body=$TMP_ROOT/pr400-body-overlap.sh
+  cat > "$body" <<'BODY'
+for shape in dirpattern overlap; do
+  r5_repo "$shape"
+  printf 'tracked\n' > "$repo/tracked.txt"
+  git -C "$repo" add tracked.txt && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$shape" "$copy" main
+  exclude=$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)
+  if [ "$shape" = overlap ]; then
+    printf '%s\n' 'notes/unique.dat' >> "$exclude"
+  else
+    printf '%s\n' 'notes/' >> "$exclude"
+  fi
+  mkdir -p "$copy/notes"
+  printf 'only here\n' > "$copy/notes/unique.dat"
+  r5_reset "$copy"
+  rc=0
+  { teardown_preserve_ignored "$copy" && teardown_ignored_preserved_current "$copy"; } 2>/dev/null || rc=$?
+  echo "$shape readback=$rc"
+  printf 'changed\n' > "$(r5_dest "$copy")/files/notes/unique.dat"
+  rc=0
+  teardown_ignored_preserved_current "$copy" || rc=$?
+  echo "$shape changed=$rc"
+done
+BODY
+  r5_harness pr400-overlap "$body"
+  r5_expect 'dirpattern readback=0' 'pr400-overlap: a plain ignored directory did not verify'
+  r5_expect 'overlap readback=0' 'pr400-overlap: an ignored file Git also lists under its directory was counted twice'
+  r5_expect 'dirpattern changed=1' 'pr400-overlap: a changed payload verified'
+  r5_expect 'overlap changed=1' 'pr400-overlap: a changed payload verified when entries overlap'
+  pass 'the preserve readback counts each ignored file once when Git lists a directory and a file inside it, and still refuses a changed payload'
+}
+
+# R5-1: a launcher's start time is read and converted in UTC, so the hour that
+# repeats when clocks go back cannot move it. Two launchers start at 01:30 EDT
+# and at 01:30 EST on 2026-11-01 in America/New_York; ps prints the same local
+# time for both, so only a UTC reading tells them apart. R6-2: a lock time that
+# cannot be read counts as live, not as an unreadable process table.
+test_pr400_launcher_start_epoch_is_exact_in_the_repeated_hour() {
+  local body=$TMP_ROOT/pr400-body-start-epoch.sh
+  cat > "$body" <<'BODY'
+cat > "$R5_BASE/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *'-p 101 -o lstart='*) utc='Sun Nov  1 05:30:00 2026' ;;
+  *'-p 102 -o lstart='*) utc='Sun Nov  1 06:30:00 2026' ;;
+  *) exit 1 ;;
+esac
+if [ "${TZ:-}" = UTC0 ]; then echo "$utc"; else echo 'Sun Nov  1 01:30:00 2026'; fi
+SH
+chmod +x "$R5_BASE/fakebin/ps"
+export TZ=America/New_York
+for pid in 101 102; do
+  echo "pid $pid start=$(teardown_pid_start_epoch "$pid" || echo failed)"
+done
+fm_task_copy_launcher_state() { return 0; }
+for mtime in '' 1793511060 1793510000; do
+  rc=0; teardown_launcher_live_since 101 "$mtime" || rc=$?
+  echo "live mtime=${mtime:-unread} rc=$rc"
+done
+BODY
+  r5_harness start-epoch "$body"
+  r5_expect 'pid 101 start=1793511000' 'pr400-start-epoch: the launcher started at 01:30 EDT got the wrong epoch'
+  r5_expect 'pid 102 start=1793514600' 'pr400-start-epoch: the launcher started at 01:30 EST got the wrong epoch'
+  r5_expect 'live mtime=unread rc=0' 'pr400-start-epoch: an unreadable lock time did not count as live'
+  r5_expect 'live mtime=1793511060 rc=0' 'pr400-start-epoch: a launcher that started before its lock was written did not count as live'
+  r5_expect 'live mtime=1793510000 rc=1' 'pr400-start-epoch: a launcher that started after its lock was written was not taken for a recycled pid'
+  pass 'a launcher start time in the hour repeated when clocks go back converts to its exact epoch, and an unreadable lock time counts as live'
+}
+
+# Main 1843 (c): an Orca-backed task keeps base behaviour: the direct release, the
+# history landing and the no-hold bundle route this change adds each refuse for
+# it with a named reason; the same copies on another backend are admitted.
+test_pr400_orca_keeps_base_behaviour() {
+  local body=$TMP_ROOT/pr400-body-orca.sh
+  cat > "$body" <<'BODY'
+eval "$(awk '/^work_is_landed_proof\(\) \{/{on=1} on{print} on && /^}/{exit}' "$R5_BIN/fm-teardown.sh")"
+pr_is_merged() { return 1; }
+TEARDOWN_CLOSEOUT_PROOF=fixture META="$R5_BASE/task.meta"
+fm_task_copy_content_in_default() { FM_TASK_COPY_UNASKED=; FM_TASK_COPY_COMPARED='remotes/origin/main abc'; return 1; }
+fm_task_copy_content_in_default_history() { return 0; }
+teardown_history_admit() { :; }
+MODE=normal
+for arm in orca tmux recovery; do
+  case "$arm" in
+    orca) BACKEND=orca TEARDOWN_CLEANUP_RECOVERY= ;;
+    tmux) BACKEND=tmux TEARDOWN_CLEANUP_RECOVERY= ;;
+    recovery) BACKEND=tmux TEARDOWN_CLEANUP_RECOVERY=orca ;;
+  esac
+  backend=$arm
+  r5_repo "$backend"
+  source_bundle="$R5_BASE/$backend-source.bundle"
+  printf '/.claude/\n' > "$repo/.gitignore"
+  git -C "$repo" add .gitignore && git -C "$repo" commit -qm initial
+  git -C "$repo" worktree add -q -b "f-$backend" "$copy" main
+  printf 'unique\n' > "$copy/work.txt"
+  git -C "$copy" add work.txt && git -C "$copy" commit -qm unique
+  tip=$(git -C "$copy" rev-parse HEAD)
+  git -C "$copy" bundle create -q "$source_bundle" --all 2>/dev/null
+  printf '%s\t%s\t%s\n' "$source_bundle" "$(teardown_ignored_sha256 "$source_bundle")" "$tip" > "$DATA/$ID/preservation-bundles.tsv"
+  r5_reset "$copy"
+  brc=0; teardown_bundle_preserved "$copy" "$tip" 2> "$R5_BASE/$backend.bundle.err" || brc=$?
+  bw=none; grep -qF 'land the commits; the bundle route is not admitted for an Orca-backed task (Main 1843 (c))' "$R5_BASE/$backend.bundle.err" && bw=orca
+  TEARDOWN_LANDED_DIR=$copy TEARDOWN_LANDED_REF=HEAD
+  hrc=0; work_is_landed_proof task 2> "$R5_BASE/$backend.history.err" || hrc=$?
+  hw=none; grep -q 'Orca-backed task (Main 1843)' "$R5_BASE/$backend.history.err" && hw=orca
+  unset TEARDOWN_LANDED_DIR TEARDOWN_LANDED_REF
+  drc=0; teardown_dead_launcher_release "$repo" "$copy" "$tip" foreign 2>/dev/null || drc=$?
+  dw=other; case "${TEARDOWN_RELEASE_WHY:-}" in *'Orca-backed task (Main 1843)'*) dw=orca ;; esac
+  echo "$backend bundle=$brc/$bw history=$hrc/$hw direct=$drc/$dw"
+done
+BODY
+  r5_harness orca "$body"
+  r5_expect 'orca bundle=1/orca history=1/orca direct=1/orca' 'pr400-orca: an Orca-backed task was admitted by a route this change adds, or the refusal did not name Orca'
+  r5_expect 'tmux bundle=0/none history=0/none direct=1/other' 'pr400-orca: another backend lost the bundle or history route, or was refused as Orca'
+  r5_expect 'recovery bundle=1/orca history=1/orca direct=1/orca' 'pr400-orca: a task with an Orca cleanup-recovery record was admitted by a route this change adds, or the refusal did not name Orca'
+  pass 'an Orca-backed task, an Orca cleanup-recovery record included, keeps base behaviour: the no-hold bundle route, the history landing and the direct release refuse it with a named reason; another backend keeps them'
+}
 
 # --- Kept own copies (bin/fm-teardown-nested-lib.sh "Kept own copies") -----------------------
 #
@@ -6943,9 +9656,15 @@ TEARDOWN_NESTED_COPIES=("$KC/copy")
 teardown_copy_lock_file() {
   TEARDOWN_FOREIGN_LOCK_FILE=$KC/lock
   TEARDOWN_FOREIGN_LOCK=$(cat "$KC/lock")
+  TEARDOWN_FOREIGN_LOCK_SHA=$(teardown_ignored_sha256 "$KC/lock")
   return 0
 }
 teardown_vernant_lock_pid() { printf '%s\n' 1; }
+# The lock's launcher is gone and no process runs in the copy or holds a file in it open
+# (the scans live in bin/fm-teardown.sh, which this route does not source).
+teardown_launcher_live_since() { return 1; }
+pids_with_cwd_under() { :; }
+pids_with_open_file_under_all() { :; }
 teardown_landed() { [ ! -e "$KC/unlanded" ]; }
 teardown_own_nested_other_repos() { return 0; }
 teardown_friction_outcome() { :; }
@@ -7021,9 +9740,13 @@ kept_helper_dispose() {
   for run in $(seq 1 "$runs"); do
     KC=$kc ROOT=$ROOT COPY=$copy bash -c "$(kept_helper_env)"'
 TEARDOWN_NESTED_COPIES=("$COPY")
-# A product whose dispose needs the proof'"'"'s lock note (round 4) gets it here, so the round-4
-# product is judged on the same path; the current product has no such note.
-! declare -F teardown_lock_proved_note >/dev/null || { teardown_copy_lock_file "$COPY"; teardown_lock_proved_note "$COPY"; }
+# What the entry proof leaves for the copy before dispose (bin/fm-teardown-nested-lib.sh,
+# teardown_removal_final_proof): its lock as first proved and a landing admission (a merged
+# pull request, so no default-branch ref is read). The kept answer'"'"'s judge checks the landing
+# again through teardown_landed.
+teardown_copy_lock_file "$COPY"
+teardown_lock_seen "$COPY" "$TEARDOWN_FOREIGN_LOCK"
+teardown_admit "$COPY" landed "$(git -C "$COPY" rev-parse --verify "HEAD^{commit}" 2>/dev/null)" "pr https://example.invalid/pull/1"
 teardown_own_copy_dispose "$KC" "$COPY" 2>>"$KC/stderr"
 rc=$?
 kept=no
@@ -7215,8 +9938,11 @@ teardown_run_closeout() { TEARDOWN_CLOSEOUT_STDOUT="{\"allowed\": true}"; TEARDO
 teardown_own_locked_copies_prove; rc=$?
 printf "rc=%s\n" "$rc"
 printf "%s\n" "${TEARDOWN_FOREIGN_PROCS[@]}"
-' 2>&1)
+' 2>"$tmp/stderr")
   assert_equals "rc=0"$'\n'"4242	identity	$tmp/other" "$out" "kept-helper-queue: the proof kept a signal queued for the matching kept copy, or dropped another copy's"
+  # Main 3529 Ruling 3b: stderr stays checked. The only line this path may write is the
+  # credit line of the copy whose plan runs ($tmp/other); any other line is an error.
+  assert_equals "" "$(grep -v '^teardown: closeout credit for ' "$tmp/stderr")" "kept-helper-queue: the proof wrote error output: $(cat "$tmp/stderr")"
   rm -rf "$tmp"
   pass "on a retry whose record matches, the kept copy's proof runs but queues nothing for the retire signal, and another copy's queue stays"
 }
@@ -7565,7 +10291,12 @@ TEARDOWN_NESTED_COPIES=("$COPY")
 mkdir -p "$KC/slot"
 TEARDOWN_RETURN_SLOT=$KC/slot
 TEARDOWN_FOREIGN_PROCS=()
-teardown_foreign_copy_unowned() { return 0; }
+# The real teardown_foreign_copy_unowned records the lock it proved; the landing proof
+# admits the copy (a merged pull request, so no default-branch ref is read).
+teardown_foreign_copy_unowned() {
+  teardown_lock_seen "$1" "$TEARDOWN_FOREIGN_LOCK"
+  teardown_admit "$1" landed "$(git -C "$1" rev-parse --verify "HEAD^{commit}" 2>/dev/null)" "pr https://example.invalid/pull/1"
+}
 prove=0; teardown_own_locked_copies_prove 2>>"$KC/stderr" || prove=$?
 dispose=-
 if [ "$prove" = 0 ]; then dispose=0; teardown_own_copy_dispose "$KC/slot" "$COPY" 2>>"$KC/stderr" || dispose=$?; fi
@@ -7838,10 +10569,10 @@ test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing() {
   make_retained_case retained-retry enclosing
   held_plain_get_slot "$FOREIGN_CASE"
   held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 1 "$rc" "retained-retry: a slot that cannot be leased must refuse the close: $(cat "$FOREIGN_CASE/stderr")"
-  assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-retry: the refusal did not say why"
+  assert_grep 'which another live task still works in' "$FOREIGN_CASE/stderr" "retained-retry: the refusal did not say why"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-retry: run 1 should have asked the driver once"
   record=$(retained_record_path)
   assert_present "$record" "retained-retry: run 1 wrote no record"
@@ -7852,7 +10583,7 @@ test_a_retry_of_an_unchanged_kept_copy_asks_the_driver_nothing() {
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-retry: an unchanged copy asked the driver again"
   assert_absent "$FOREIGN_CASE/data/task-x1/vernant-closeout."* "retained-retry: a retry saved another driver output"
   cmp -s "$FOREIGN_CASE/record.run1" "$record" || fail "retained-retry: the unchanged copy's record was rewritten"
-  rm -f "$FOREIGN_CASE/no-lease-command"
+  retained_peer_drop
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 0 "$rc" "retained-retry: run 3 with a lease must close: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-retry: the closing run asked the driver again"
@@ -7866,7 +10597,7 @@ test_a_changed_kept_copy_is_assessed_afresh() {
   for change in more-ignored opencode-entry tab-name link-newline dirty-tracked unlanded; do
     make_retained_case "retained-changed-$change" enclosing
     held_plain_get_slot "$FOREIGN_CASE"
-    : > "$FOREIGN_CASE/no-lease-command"
+    retained_peer_add
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 1 "$rc" "retained-changed-$change: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
     record=$(retained_record_path)
@@ -7890,7 +10621,7 @@ test_a_changed_kept_copy_is_assessed_afresh() {
     case "$change" in
       more-ignored|opencode-entry|tab-name|link-newline)
         assert_equals "2 2" "$(retained_call_count) $(retained_tar_count)" "retained-changed-$change: a changed copy that passes every proof was not evaluated again"
-        assert_grep 'could not be durably leased' "$FOREIGN_CASE/stderr" "retained-changed-$change: run 2 did not reach the lease check"
+        assert_grep 'which another live task still works in' "$FOREIGN_CASE/stderr" "retained-changed-$change: run 2 did not reach the lease check"
         cmp -s "$FOREIGN_CASE/record.run1" "$record" && fail "retained-changed-$change: the stale record was not replaced"
         # No earlier preserved byte is overwritten or removed. A changed selected file goes
         # beside the earlier preserve; a new payload-only entry is copied into the earlier
@@ -7927,6 +10658,28 @@ test_a_changed_kept_copy_is_assessed_afresh() {
     assert_present "$FOREIGN_COPY/.git" "retained-changed-$change: the copy was removed"
   done
   pass "a kept copy whose ignored files, tracked status or HEAD changed is assessed afresh: still-eligible goes to the driver again, failing a proof refuses before any driver call"
+}
+
+# retained_peer_add: another live task (task-y1) works in the slot of the current
+# retained case, so a kept-copy close takes the peer route: no slot reservation and
+# no project lock, so the driver runs and the kept copy then refuses after it
+# (teardown_retained_hold). Main 3529 Ruling 1 moves the setup of the #380 cases that
+# used a slot with no lease command here, since such a slot now keeps project custody
+# and defers the driver (Main 1681 R5); their assertions are unchanged.
+# retained_peer_drop: the peer's record goes and the slot claim it was handed
+# (teardown_peer_claim_handoff) is put back as the case snapshot it (Main 3541 C).
+retained_peer_add() {
+  local peer=$FOREIGN_SLOT/peer-copy
+  mkdir -p "$peer"
+  fm_write_meta "$FOREIGN_CASE/state/task-y1.meta" \
+    "window=firstmate:fm-task-y1" "endpoint_task_id=task-y1" \
+    "worktree=$peer" "branch=fm/task-y1" "project=$FOREIGN_CASE/project" \
+    "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-y1" \
+    "prior_worktree=$FOREIGN_SLOT"
+}
+retained_peer_drop() {
+  rm -f "$FOREIGN_CASE/state/task-y1.meta"
+  cp "$FOREIGN_CASE/claim-before" "$FOREIGN_CASE/pool/1/.fm-slot-owner"
 }
 
 # A kept copy in a slot another live task still works in (the peer route) cannot
@@ -8165,9 +10918,13 @@ test_the_preserve_and_the_archives_survive_the_close_and_every_later_run() {
 
 # C1 (config): the production default interpreter (<slot>/.venv/bin/python, with
 # FM_TEARDOWN_VERNANT_PYTHON truly unset, and set to an empty string) and the explicit
-# override give the same close; a missing default interpreter refuses and removes nothing.
+# override give the same close; with a missing interpreter the driver never runs, so
+# the copy, whose launcher is gone, takes the direct release of a dead launcher's lock:
+# its unique ignored file and its .claude/channel-outbox files are preserved (Main
+# 3851: logs and evidence are archived, never deleted), the copy is removed and no
+# retained record is written.
 test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
-  local rc mode
+  local rc mode preserved f
   for mode in default default-empty override missing missing-empty override-missing; do
     make_retained_case "retained-config-$mode" enclosing
     case "$mode" in
@@ -8194,19 +10951,30 @@ test_the_default_driver_interpreter_and_the_override_close_the_same_way() {
         ;;
     esac
     if [ "$mode" = missing ] || [ "$mode" = missing-empty ] || [ "$mode" = override-missing ]; then
-      assert_grep 'is not available' "$FOREIGN_CASE/stderr" "retained-config-$mode: the refusal did not say the interpreter is not available"
-      expect_code 1 "$rc" "retained-config-$mode: a missing default interpreter must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      expect_code 0 "$rc" "retained-config-$mode: a landed copy under a dead launcher's lock must close with no interpreter: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "released creation lock 'vernant-session-active owner=launcher:$FOREIGN_DEAD_PID launcher=$FOREIGN_DEAD_PID' on own nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+        "retained-config-$mode: the script's own release was not reported"
       assert_equals "0 0" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver ran without an interpreter"
-      assert_present "$FOREIGN_CASE/state/task-x1.meta" "retained-config-$mode: the refusal removed the task record"
-      assert_present "$FOREIGN_COPY/.git" "retained-config-$mode: the copy was removed"
-      kept_assert_lacks 'complete' "$FOREIGN_CASE/stdout" "retained-config-$mode: the task closed"
+      assert_absent "$FOREIGN_COPY" "retained-config-$mode: the copy survived the release"
+      assert_absent "$FOREIGN_CASE/state/task-x1.meta" "retained-config-$mode: the task record survived the release"
+      assert_absent "$(retained_record_path)" "retained-config-$mode: a retained record was written with no driver answer"
+      preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -path '*/notes/unique.dat' -type f 2>/dev/null | head -n 1)
+      [ -n "$preserved" ] || fail "retained-config-$mode: the unique ignored file was not preserved"
+      assert_equals "only here" "$(cat "$preserved")" "retained-config-$mode: the preserved file changed"
+      for f in a:one b:two; do
+        preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -path "*/files/.claude/channel-outbox/${f%%:*}.jsonl" -type f 2>/dev/null | head -n 1)
+        [ -n "$preserved" ] || fail "retained-config-$mode: .claude/channel-outbox/${f%%:*}.jsonl was not preserved"
+        assert_equals "${f#*:}" "$(cat "$preserved")" "retained-config-$mode: the preserved .claude/channel-outbox/${f%%:*}.jsonl changed"
+        assert_grep "$(printf '%s\n' "${f#*:}" | shasum -a 256 | awk '{print $1}')  .claude/channel-outbox/${f%%:*}.jsonl" "${preserved%/files/*}/meta/SHA256SUMS" \
+          "retained-config-$mode: SHA256SUMS does not record .claude/channel-outbox/${f%%:*}.jsonl"
+      done
     else
       expect_code 0 "$rc" "retained-config-$mode: the close must succeed: $(cat "$FOREIGN_CASE/stderr")"
       assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-config-$mode: the driver was not asked exactly once"
       retained_assert_closed "retained-config-$mode"
     fi
   done
-  pass "the default interpreter and the explicit override close the kept-copy task the same way, and a missing default interpreter refuses with nothing removed"
+  pass "the default interpreter and the explicit override close the kept-copy task the same way, and with a missing interpreter a dead launcher's lock is released directly with the unique ignored file and the .claude/channel-outbox files preserved"
 }
 
 # C2 (legacy): a copy that already holds driver tars and saved outputs, with no
@@ -8240,7 +11008,7 @@ test_a_head_only_change_of_a_kept_copy_asks_the_driver_exactly_once_more() {
   local rc record head
   make_retained_case retained-head-only enclosing
   held_plain_get_slot "$FOREIGN_CASE"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 1 "$rc" "retained-head-only: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-head-only: run 1 should have asked the driver once"
@@ -8268,7 +11036,7 @@ test_a_changed_payload_is_archived_once_per_change_and_never_again_while_unchang
   local rc step want=1 run
   make_retained_case retained-p3 enclosing
   held_plain_get_slot "$FOREIGN_CASE"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   for step in none new-entry changed-bytes second-change earlier-payload; do
     case "$step" in
       none) ;;
@@ -8291,7 +11059,7 @@ test_a_replaced_creation_lock_of_a_kept_copy_asks_the_driver_once_more() {
   local rc pid
   make_retained_case retained-lock enclosing
   held_plain_get_slot "$FOREIGN_CASE"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-lock: run 1 should have asked the driver once"
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
@@ -8424,7 +11192,7 @@ test_a_damaged_or_unclosed_task_record_is_never_reported_as_already_closed() {
   make_retained_case retained-closed-shape enclosing
   held_plain_get_slot "$FOREIGN_CASE"
   held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
-  : > "$FOREIGN_CASE/no-lease-command"
+  retained_peer_add
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   expect_code 1 "$rc" "closed-shape: the close without a durable lease must refuse"
   assert_present "$(retained_record_path)" "closed-shape: the refused close wrote no retained record, so the case tests nothing"
@@ -8580,7 +11348,7 @@ test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
   for age in 30 400; do
     make_retained_case "retained-aged-$age" enclosing
     held_plain_get_slot "$FOREIGN_CASE"
-    : > "$FOREIGN_CASE/no-lease-command"
+    retained_peer_add
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 1 "$rc" "retained-aged-$age: run 1 must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
     record=$(retained_record_path)
@@ -8590,7 +11358,7 @@ test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 1 "$rc" "retained-aged-$age: the aged run must refuse for the lease: $(cat "$FOREIGN_CASE/stderr")"
     assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: an aged record asked the driver again"
-    rm -f "$FOREIGN_CASE/no-lease-command"
+    retained_peer_drop
     run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
     expect_code 0 "$rc" "retained-aged-$age: the aged record must still close the task: $(cat "$FOREIGN_CASE/stderr")"
     assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: the closing run asked the driver again"
@@ -8785,8 +11553,9 @@ test_two_foreign_copies_are_released_together_or_not_at_all
 test_foreign_copy_nested_in_another_is_removed_first
 test_foreign_copy_is_released_before_the_project_lock_wait
 test_closeout_uses_the_slots_default_interpreter
-test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place
-test_own_locked_copy_with_no_closeout_interpreter_refuses_at_entry
+test_missing_closeout_driver_or_interpreter_releases_a_dead_launchers_lock
+test_own_locked_copy_with_no_closeout_interpreter_releases_a_dead_launchers_lock
+test_pr400_own_direct_release_leaves_the_own_preserve_in_place
 test_closeout_plan_refusal_refuses_at_entry
 test_linux_removability_refuses_an_entry_it_cannot_open
 test_preserve_parent_and_metadata_boundaries
@@ -8795,6 +11564,65 @@ test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place
 test_locked_own_nested_copy_is_released_by_the_closeout_driver
 test_locked_own_nested_copy_with_a_recycled_launcher_pid_is_released
 test_live_launcher_outside_the_task_keeps_its_locked_own_copy
+test_locked_copy_held_by_a_bundle_gets_one_bundle_record_credit
+test_locked_copy_landed_by_a_merged_pr_gets_one_pr_credit
+test_locked_copy_landed_by_a_merged_forgejo_pr_names_the_driver_bound
+test_dead_launcher_lock_is_released_directly_when_no_credit_is_satisfiable
+test_dead_launcher_lock_is_released_when_the_driver_is_unavailable
+test_locked_landed_copy_with_a_record_but_no_unlanded_commit_reaches_the_driver
+test_direct_release_refuses_a_process_that_appears_before_the_unlock
+test_direct_release_scans_for_processes_after_the_landed_and_git_proofs
+test_direct_release_refuses_a_malformed_open_file_listing
+test_history_landed_copy_keeps_its_unique_ignored_file
+test_direct_release_rechecks_the_bundle_and_head_at_the_unlock
+test_confined_launcher_state_is_never_taken_for_absence
+test_direct_release_sees_a_holder_under_an_escaped_lsof_name
+test_direct_release_reports_a_failed_relock_truthfully
+test_late_unique_ignored_file_is_never_lost_at_the_removal
+test_late_bundle_truncation_stops_the_removal_at_every_call
+test_late_record_that_stops_covering_head_stops_the_removal
+test_launcher_start_time_not_observation_delay_decides_recycling
+test_pr_and_tip_landed_copies_keep_a_unique_ignored_file
+test_real_holder_process_indexer_exempt_and_never_signalled
+test_r4_own_nested_untracked_claude_file_refuses
+test_r4_late_lock_change_refuses_before_the_driver
+test_r4_ignored_preserve_storage_and_payload_are_proved
+test_r4_locked_copy_is_deferred_under_project_custody
+test_pr400_kept_copy_without_a_lease_is_deferred_and_asks_the_driver_nothing
+test_r5_ignored_newline_name_is_preserved
+test_r5_history_copy_keeps_a_newline_named_ignored_file
+test_r5_preserve_leaf_moved_into_the_copy_refuses
+test_r5_stored_bundle_moved_into_the_copy_refuses
+test_r5_failed_preserve_scan_refuses
+test_r5_interrupted_preserve_keeps_the_earlier_one
+test_r5_landing_admission_rechecks_the_default_ref
+test_r5_stale_bundle_credit_stops_before_the_driver
+test_r5_lock_changed_after_its_first_line_refuses
+test_r5_holder_after_retirement_refuses_before_the_driver
+test_r5_unreadable_task_record_is_owner_unknown
+test_r5_untracked_managed_hook_file_refuses_like_git
+test_r5_landing_cache_reuse_keeps_the_proofs_default_ref
+test_r5_own_nested_removal_refuses_an_untracked_hook_before_git
+test_r5_cleanup_clearance_refuses_an_unreadable_task_record
+test_r5_local_only_landing_watches_the_local_branch
+test_pr400_root_claude_untracked_file_is_the_copys_work
+test_pr400_preserve_replacement_keeps_an_earlier_only_payload
+test_pr400_landing_admission_carries_the_proofs_commit
+test_pr400_last_holder_check_sees_cwd_and_own_indexer
+test_pr400_direct_release_preserves_claude_and_opencode
+test_pr400_vanished_lock_never_takes_the_unlocked_route
+test_pr400_nested_repository_under_a_newline_path_is_found
+test_pr400_newline_copy_path_reaches_disposal_whole
+test_pr400_root_return_retry_rechecks_safety
+test_pr400_forgejo_only_landing_is_held
+test_pr400_registered_nested_worktree_is_not_root_dirt
+test_pr400_overlapping_ignored_entries_count_each_file_once
+test_pr400_launcher_start_epoch_is_exact_in_the_repeated_hour
+test_pr400_orca_keeps_base_behaviour
+test_direct_release_refuses_a_process_holding_a_file_in_the_copy_open
+test_task_own_descendant_holding_a_file_open_refuses_and_is_not_signalled
+test_direct_release_refuses_an_unreadable_process_table
+test_other_driver_verdicts_keep_the_locked_copy
 test_locked_own_nested_copy_that_is_not_proved_is_refused
 test_locked_own_nested_copy_with_unique_ignored_file_is_preserved_and_released
 test_locked_own_nested_copy_stays_when_a_foreign_copy_is_refused

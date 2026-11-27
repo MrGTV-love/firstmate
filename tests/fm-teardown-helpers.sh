@@ -29,7 +29,7 @@ fm_git_identity fmtest fmtest@example.invalid
 unset FM_HOME FM_FRICTION_EVENT_ID FM_FRICTION_ATTEMPT_ID FM_FRICTION_OPERATION_ID FM_FRICTION_EPISODE_ID
 export FM_FRICTION_EXECUTION_KIND=test
 
-TEARDOWN="$ROOT/bin/fm-teardown.sh"
+TEARDOWN_REAL_REFRESH="$ROOT/bin/fm-teardown.sh"
 PR_CHECK="$ROOT/bin/fm-pr-check.sh"
 TMP_ROOT=$(fm_test_tmproot fm-teardown-tests)
 REAL_GIT_FOR_TEST=$(command -v git)
@@ -124,6 +124,45 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
 trap 'exit 131' QUIT
+
+# teardown_link_bin <dest>: link every bin/ entry of this checkout into <dest>
+# (a subdirectory becomes a directory of links). Unless
+# FM_TEST_REAL_SUMMARY_REFRESH=1, fm-home-summary-refresh.sh there is a script
+# that does nothing (see TEARDOWN below).
+teardown_link_bin() {
+  local dest=$1 f base s
+  mkdir -p "$dest" || return 1
+  for f in "$ROOT"/bin/*; do
+    base=${f##*/}
+    if [ -d "$f" ]; then
+      mkdir -p "$dest/$base" || return 1
+      for s in "$f"/*; do
+        ln -s "$s" "$dest/$base/${s##*/}" || return 1
+      done
+    elif [ "$base" = fm-home-summary-refresh.sh ] && [ "${FM_TEST_REAL_SUMMARY_REFRESH:-0}" != 1 ]; then
+      { printf '#!/bin/sh\nexit 0\n' > "$dest/$base" && chmod +x "$dest/$base"; } || return 1
+    else
+      ln -s "$f" "$dest/$base" || return 1
+    fi
+  done
+}
+
+# A completed close starts a detached home-summary refresh (bin/fm-teardown.sh)
+# that outlives the teardown. Nothing on disk names it when the teardown returns,
+# and its worker runs `mkdir -p` on the home's state directory, so it can write
+# into, or recreate, a case home while the EXIT cleanup removes it, and no wait
+# can fence that. Fixture teardowns therefore run, by default, from linked bin/
+# scripts of this checkout whose fm-home-summary-refresh.sh does nothing (as
+# tests/fixtures.sh fm_test_spawn_script does for spawn). A case that tests the
+# refresh runs the real one through run_teardown_awaiting_refresh; a process
+# that sources this file with FM_TEST_REAL_SUMMARY_REFRESH=1 gets it everywhere.
+if [ "${FM_TEST_REAL_SUMMARY_REFRESH:-0}" = 1 ]; then
+  TEARDOWN=$TEARDOWN_REAL_REFRESH
+else
+  teardown_link_bin "$TMP_ROOT/teardown-root/bin" \
+    || { printf 'fm-teardown-helpers: could not link the teardown scripts\n' >&2; exit 1; }
+  TEARDOWN="$TMP_ROOT/teardown-root/bin/fm-teardown.sh"
+fi
 export -f teardown_fixture_birth teardown_fixture_live
 cat > "$FM_TEARDOWN_FIXTURE_HELPERS" <<'PERL'
 sub fixture_birth {
@@ -840,6 +879,7 @@ add_lsof_no_holder() {
 #!/usr/bin/env bash
 case " $* " in
   *" -d cwd "*) exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -863,7 +903,7 @@ SH
 add_lsof_real_lock_queries() {
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
-case " $* " in *" -Fpn "*) exit 0 ;; esac
+case " $* " in *" -Fpn "*|*" -Fpfn "*) exit 0 ;; esac
 exec "${REAL_LSOF_FOR_TEST:?}" "$@"
 SH
   chmod +x "$1/fakebin/lsof"
@@ -970,6 +1010,25 @@ run_teardown() {
   NM_HOME="$case_dir/nm" \
   PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
     "$TEARDOWN" task-x1 "$@"
+}
+
+# run_teardown_awaiting_refresh <case-dir> [args...]: run_teardown with the real
+# home-summary refresh, then wait until every process the teardown left behind
+# has exited, so the detached refresh cannot write into the case home after the
+# case. Each such process inherits fd 9, the write end of a pipe, and the
+# pipe's reader reaches end-of-file only when the last of them has closed it.
+# The refresh's own no-progress limit bounds the wait. Returns the teardown's
+# exit status.
+run_teardown_awaiting_refresh() {
+  local fifo reader rc=0 TEARDOWN=$TEARDOWN_REAL_REFRESH
+  fifo=$(mktemp -u "$TMP_ROOT/refresh-holders.XXXXXX") || return 2
+  mkfifo "$fifo" || return 2
+  cat "$fifo" > /dev/null &
+  reader=$!
+  run_teardown "$@" 9> "$fifo" || rc=$?
+  wait "$reader" 2>/dev/null || true
+  rm -f "$fifo"
+  return "$rc"
 }
 
 # Seed a real backlog carrying task-x1 as In flight, so a teardown in this case
@@ -2278,19 +2337,8 @@ EOF
 # Symlinks keep the copy cheap; an unreadable case replaces one link with a
 # real mode-000 file so the probe is of the file itself.
 prepare_teardown_source_copy() {  # <case-dir>
-  local case_dir=$1 f base dest="$1/test-root/bin" s
-  mkdir -p "$dest/backends"
-  for f in "$ROOT"/bin/*; do
-    base=$(basename "$f")
-    if [ -d "$f" ]; then
-      mkdir -p "$dest/$base"
-      for s in "$f"/*; do
-        ln -s "$s" "$dest/$base/$(basename "$s")"
-      done
-    else
-      ln -s "$f" "$dest/$base"
-    fi
-  done
+  local case_dir=$1
+  teardown_link_bin "$1/test-root/bin"
   printf 'manual\n' > "$case_dir/config/backlog-backend"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
@@ -2813,6 +2861,9 @@ SH
 # stands in for Vernant's driver: it logs its directory and arguments, and with
 # FM_STUB_CLOSEOUT=ok unlocks and plainly removes only a copy under the scratch
 # root, as the real driver's cleanup does; any other value refuses with exit 3.
+# The slot also ignores .claude/bug-evidence/, where the driver writes its
+# archives, as a Vernant checkout does (bin/fm-merge-prune-lib.sh classifies it
+# as an ignored entry): the root dirt rule counts every other untracked file.
 # With FM_STUB_LOCK naming the shared project lock, it also records in
 # closeout.lock-state whether that lock is held while it runs.
 # vernant-python, the interpreter run_foreign_teardown names, runs it as a shell
@@ -2834,15 +2885,15 @@ make_foreign_copy_case() {
   add_lsof_no_holder "$case_dir"
   tmp_real=$(cd "$TMP_ROOT" && pwd -P)
   exclude=$(git -C "$NESTED_SLOT" rev-parse --path-format=absolute --git-path info/exclude)
-  printf '%s\n' scripts/ .venv/ >> "$exclude"
+  printf '%s\n' scripts/ .venv/ .claude/bug-evidence/ >> "$exclude"
   mkdir -p "$NESTED_SLOT/scripts/git-stability"
   cat > "$NESTED_SLOT/scripts/git-stability/closeout_pr.py" <<SH
-# A plan call (no --execute-cleanup) only answers; it is logged apart and never
-# counts as a release. FM_STUB_PLAN=refuse or =garbled makes it decline or
-# answer with no verdict. Under FM_STUB_CLOSEOUT=retained it answers as the real
-# driver does for a tree with unique ignored files: allowed, with
-# ignored_payload_disposition=archive_then_retain_tree.
-if [ "\${3:-}" != --execute-cleanup ]; then
+# A plan call (no --execute-cleanup, wherever a credit puts it) only answers; it
+# is logged apart and never counts as a release. FM_STUB_PLAN=refuse or =garbled
+# makes it decline or answer with no verdict. Under FM_STUB_CLOSEOUT=retained it
+# answers as the real driver does for a tree with unique ignored files: allowed,
+# with ignored_payload_disposition=archive_then_retain_tree.
+if [[ " \$* " != *" --execute-cleanup "* ]]; then
   printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout-plan.log"
   case "\${FM_STUB_PLAN:-ok}" in
     refuse) echo '{"allowed": false, "reason": "stub_plan_refusal"}'; exit 3 ;;
@@ -2866,11 +2917,36 @@ if [ "\${FM_STUB_CLOSEOUT:-ok}" = retained ]; then
   exec bash "$case_dir/retained-driver.sh" "\$@"
 fi
 if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
-  echo '{"allowed": false, "reason": "stub_refusal"}'
+  echo '{"allowed": false, "reason": "'"\${FM_STUB_REASON:-stub_refusal}"'"}'
   exit 3
 fi
-case "\$2" in "$tmp_real"/*) ;; *) echo "stub refuses a path outside the scratch root" >&2; exit 4 ;; esac
-git worktree unlock "\$2" && git worktree remove "\$2"
+# Models the real driver's argument gate and credit rule: --pr with
+# --bundle-record is rejected before either is read, and with FM_STUB_REQUIRE_CREDIT
+# set a copy whose commits no credit covers is refused as uncovered tracked
+# content. A record is copied to closeout.record so the test can read what teardown built.
+copy_arg=\$2
+credits=0
+for argument in "\$@"; do
+  case "\$argument" in --pr|--bundle-record) credits=\$((credits + 1)) ;; esac
+done
+if [ "\$credits" -gt 1 ]; then
+  echo "closeout_pr: failed: --bundle-record requires standalone normal --cleanup-worktree" >&2
+  exit 2
+fi
+while [ "\$#" -gt 0 ]; do
+  if [ "\$1" = --bundle-record ]; then
+    cp "\$2" "$case_dir/closeout.record" 2>/dev/null || { echo "closeout_pr: failed: bundle record not found" >&2; exit 2; }
+    credited=1
+  fi
+  [ "\$1" != --pr ] || credited=1
+  shift
+done
+if [ -n "\${FM_STUB_REQUIRE_CREDIT:-}" ] && [ "\${credited:-0}" != 1 ]; then
+  echo '{"allowed": false, "reason": "verification_stale_or_uncovered_paths"}'
+  exit 3
+fi
+case "\$copy_arg" in "$tmp_real"/*) ;; *) echo "stub refuses a path outside the scratch root" >&2; exit 4 ;; esac
+git worktree unlock "\$copy_arg" && git worktree remove "\$copy_arg"
 SH
   printf '#!/usr/bin/env bash\nexec bash "$@"\n' > "$case_dir/vernant-python"
   chmod +x "$case_dir/vernant-python"
@@ -2931,6 +3007,71 @@ retained_tar_count() {
 # The stand-in driver's --execute-cleanup calls so far.
 retained_call_count() {
   if [ -f "$FOREIGN_CASE/closeout.log" ]; then wc -l < "$FOREIGN_CASE/closeout.log" | tr -d ' '; else echo 0; fi
+}
+
+# A self-contained bundle of <copy> at <bundle> and a one-line preservation
+# record for task-x1, as the header of bin/fm-teardown.sh describes, with no
+# captain hold filed.
+record_fixture_bundle() {  # <case> <copy> <bundle> [revision...]
+  local case_dir=$1 copy=$2 bundle=$3 digest tips
+  shift 3
+  mkdir -p "${bundle%/*}" "$case_dir/data/task-x1"
+  git -C "$copy" bundle create "$bundle" "$@" 2>/dev/null || return 1
+  git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1 || return 1
+  digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
+  tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+  printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$case_dir/data/task-x1/preservation-bundles.tsv"
+}
+
+# A fake process table in the case's fakebin: <dead-pid> is absent, as macOS
+# reports a pid that is gone (empty stdout, exit 1), and every other query goes to
+# the real ps. With FM_FAKE_PS_UNREADABLE=1 a query for <dead-pid> fails as an
+# unreadable table does.
+add_fake_ps_table() {  # <case> <dead-pid>
+  local case_dir=$1 dead=$2
+  cat > "$case_dir/fakebin/ps" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -p ] && [ "\${2:-}" = $dead ]; then
+  if [ "\${FM_FAKE_PS_UNREADABLE:-0}" = 1 ]; then echo "ps: simulated unreadable process table" >&2; exit 2; fi
+  exit 1
+fi
+exec "\${REAL_PS_FOR_TEST:?}" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/ps"
+}
+
+# A git wrapper in the case's fakebin that records every worktree and removal
+# command's arguments in <case>/git-worktree.log, then runs the real git.
+add_git_worktree_log() {  # <case>
+  local case_dir=$1
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+args=("\$@")
+for argument in "\$@"; do
+  if [ "\$argument" = worktree ]; then printf '%s\n' "\$*" >> "$case_dir/git-worktree.log"; break; fi
+done
+exec "\${REAL_GIT_FOR_TEST:?}" "\${args[@]}"
+SH
+  chmod +x "$case_dir/fakebin/git"
+}
+
+# A case that sends a signal to a process it starts runs only where that is
+# allowed: CI (CI=true) or an explicit FM_TEST_SIGNALS=1. Elsewhere it reports
+# itself skipped, so a firstmate host never signals a process a test started.
+# A case this host or platform cannot run prints one named SKIP line, never an
+# "ok" line, so a log never counts a skipped case as passed.
+skip_case() {  # <case-name> <reason>
+  printf 'SKIP - %s: %s\n' "$1" "$2"
+}
+
+teardown_signal_case_allowed() {  # <label>
+  case "${FM_TEST_SIGNALS:-}" in
+    1) return 0 ;;
+    0) ;;
+    *) [ "${CI:-}" != true ] || return 0 ;;
+  esac
+  skip_case "$1" "CI-only on this host (it signals a process it starts); set FM_TEST_SIGNALS=1 to run"
+  return 1
 }
 
 # A pid that exited, so a creation lock naming it has no live launcher.
@@ -3303,6 +3444,7 @@ start_foreign_session_case() {
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) if kill -0 $FOREIGN_AGENT 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $FOREIGN_AGENT '$FOREIGN_SLOT'; fi; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH

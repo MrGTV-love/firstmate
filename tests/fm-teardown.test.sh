@@ -92,7 +92,7 @@ test_local_only_fork_remote_allows() {
   printf 'g1\t1\trelaunched\n' > "$case_dir/state/.session-end-handled-task-x1"
 
   rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  run_teardown_awaiting_refresh "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "fork-allow: teardown should succeed when HEAD is on a fork remote"
   ! grep -q REFUSED "$case_dir/stderr" || fail "fork-allow: teardown printed a REFUSED line"
@@ -143,16 +143,58 @@ test_teardown_does_not_wait_for_the_home_summary_refresh() {
   holder=$!
   fm_test_wait_until --while-alive "$holder" -- test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
   rc=0
-  FM_HOME_SUMMARY_TIMEOUT=20 run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  FM_HOME_SUMMARY_TIMEOUT=20 run_teardown_awaiting_refresh "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "teardown should succeed with a refresh in flight"
-  fm_test_wait_until --progress-file "$case_dir/state/.home-summary-refresh.pending" -- test -e "$case_dir/state/.home-summary-refresh.pending" \
+  [ -e "$case_dir/state/.home-summary-refresh.pending" ] \
     || { kill "$holder" 2>/dev/null; fail "the teardown trigger left no marker for the refresh in flight"; }
-  sleep 2
   kill "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
   [ ! -s "$case_dir/state/.home-summary-refresh.log" ] \
     || fail "teardown waited out a refresh and recorded a failure: $(cat "$case_dir/state/.home-summary-refresh.log")"
   pass "teardown does not wait for the home summary refresh"
+}
+
+# A fixture teardown must leave nothing running that can write into its home
+# once it returns: the detached home-summary refresh a completed close starts
+# would race the suite's EXIT cleanup, and its worker's `mkdir -p` can recreate
+# the home the cleanup just removed. Every process the teardown leaves behind
+# inherits fd 9, the write end of a pipe, and the fence stub holds a real refresh
+# worker at its fence until the home is gone, so a refresh that outlives the
+# teardown is seen whatever the timing. FM_TEST_REAL_SUMMARY_REFRESH=1 (the real
+# refresh by default) makes this case fail.
+test_fixture_teardown_leaves_no_detached_summary_refresh() {
+  local case_dir rc stub fifo reader worker=
+  case_dir=$(make_case summary-stub)
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "fix the thing"
+  add_fork_with_pushed_branch "$case_dir"
+  stub="$TMP_ROOT/summary-stub-fence"
+  fm_test_refresh_fence_stub "$stub" || fail "summary-stub: could not write the fence stub"
+  fifo="$TMP_ROOT/summary-stub-holders"
+  mkfifo "$fifo" || fail "summary-stub: could not make the holder pipe"
+  cat "$fifo" > /dev/null &
+  reader=$!
+  rc=0
+  (
+    export FM_TEST_FENCE_ACTION=await-removal FM_TEST_FENCE_HOME="$case_dir"
+    FM_TEARDOWN_TEST_PATH="$stub:$PATH" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  ) 9> "$fifo" || rc=$?
+  expect_code 0 "$rc" "summary-stub: teardown should complete the close: $(cat "$case_dir/stderr")"
+  # Either every process the teardown started has closed the pipe, so its reader
+  # ends, or a refresh worker waits at the fence for the home to go.
+  if fm_test_wait_until --while-alive "$reader" -- test -s "$case_dir/state/.test-fence-waiting"; then
+    worker=$(cat "$case_dir/state/.test-fence-waiting" 2>/dev/null) || worker=unknown
+  elif jobs -rp | grep -qx "$reader"; then
+    kill "$reader" 2>/dev/null || true
+    fail "summary-stub: a process the fixture teardown started is still running"
+  fi
+  # What the suite's EXIT cleanup does next: remove the home, then let anything
+  # still running finish.
+  fm_test_remove_tree "$case_dir"
+  wait "$reader" 2>/dev/null || true
+  [ -z "$worker" ] || fail "summary-stub: a fixture teardown left a detached home-summary refresh running (worker $worker)"
+  [ ! -e "$case_dir" ] || fail "summary-stub: a process the fixture teardown left behind recreated its removed home"
+  pass "a fixture teardown leaves no detached home-summary refresh that can write into its removed home"
 }
 
 test_teardown_closes_the_backlog_item_itself() {
@@ -965,22 +1007,27 @@ test_squash_merged_rebased_branch_allows() {
   pass "squash-merged task whose local branch followed the pipeline rebase is torn down"
 }
 
-# A Forgejo task whose default branch moved on after the squash merge, editing
-# the same lines, leaves the content check inconclusive, so only the forge's
-# merged record can prove the work landed. With the record merged teardown
+# A Forgejo task whose squash merge reworded the same lines leaves the copy's
+# content in no default-branch commit, so the content check cannot prove it
+# landed and only the forge's merged record can. With the record merged teardown
 # proceeds; with it unmerged the same history refuses.
 test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
-  local case_dir rc pr_head tmp merged expected
+  local case_dir rc pr_head tmp merged expected reworded
   for merged in true false; do
     case_dir=$(make_case "forgejo-merged-$merged")
     write_meta "$case_dir" no-mistakes ship
     pr_head=$(setup_squash_rebased_history "$case_dir" rebased)
+    # The maintainer reworded the change while squashing: the fixture's squash
+    # commit is replaced by one whose shared.txt is not the copy's.
     tmp="$case_dir/_main_later"
     git clone -q "$case_dir/origin.git" "$tmp"
+    git -C "$tmp" reset -q --hard HEAD~1
+    printf '%s\n' hello > "$tmp/feature.txt"
     printf '%s\n' base main-edit feature-edit-reworded > "$tmp/shared.txt"
-    git -C "$tmp" add -- shared.txt
-    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "main rewords shared"
-    git -C "$tmp" push -q origin main
+    git -C "$tmp" add -- feature.txt shared.txt
+    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "feat: squash, reworded (#7)"
+    git -C "$tmp" push -q -f origin main
+    reworded=$(git -C "$tmp" rev-parse HEAD)
     rm -rf "$tmp"
     printf '%s\n' \
       'pr=https://git.example.org/team/repo/pulls/7' \
@@ -994,6 +1041,12 @@ test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
     expected=1
     [ "$merged" = false ] || expected=0
     expect_code "$expected" "$rc" "forgejo-merged-$merged: teardown exit"$'\n'"$(cat "$case_dir/stderr")"
+    if [ "$merged" = false ]; then
+      # The refusal judged the reworded default branch, not a stale or failed fetch.
+      assert_equals "$reworded" "$(git -C "$case_dir/wt" rev-parse refs/remotes/origin/main)" \
+        "forgejo-merged-false: the copy did not see the reworded default branch"
+      assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" "forgejo-merged-false: the refusal was not the landing refusal"
+    fi
     grep -qF -- 'api --login fj --repo team/repo /repos/{owner}/{repo}/pulls/7' "$case_dir/tea.log" \
       || fail "forgejo-merged-$merged: teardown did not read the Forgejo pull request through tea"
   done
@@ -1623,6 +1676,104 @@ SH
     fi
   done
   pass "the content-landed fallback checks a task's recorded base branch, not the default branch"
+}
+
+# A fixture treehouse that succeeds, so the content cases reach removal.
+content_case_treehouse() {  # <case>
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$1/fakebin/treehouse"
+  chmod +x "$1/fakebin/treehouse"
+}
+
+# Content equal to the default branch counts as landed in every squash shape, with
+# the base it was compared with printed: the default branch moved on after the
+# squash, or edited the squashed lines again later (the recorded
+# d2-synthesis-id-producer-decision shape), whose content the squash commit's own
+# tree still holds. No PR record, hold or bundle is needed.
+test_squash_landed_content_counts_in_every_shape_and_prints_its_base() {
+  local case_dir rc shape
+  for shape in main-moved-on later-edit-same-lines later-edit-quoted-path; do
+    case_dir=$(make_case "content-shape-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    wt_commit_file "$case_dir" feature.txt hello "add feature"
+    land_on_origin_main "$case_dir" feature.txt hello
+    case "$shape" in
+      main-moved-on) land_on_origin_main "$case_dir" later.txt "main moved on" ;;
+      later-edit-same-lines) land_on_origin_main "$case_dir" feature.txt "hello, then edited on main" ;;
+      later-edit-quoted-path)
+        wt_commit_file "$case_dir" 'we"ird' quoted "add a path git quotes"
+        land_on_origin_main "$case_dir" 'we"ird' quoted
+        land_on_origin_main "$case_dir" 'we"ird' "quoted, then edited on main"
+        ;;
+    esac
+    content_case_treehouse "$case_dir"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "content-shape-$shape: equal content must count as landed: $(cat "$case_dir/stderr")"
+    assert_grep 'landed by content: every change of ' "$case_dir/stderr" "content-shape-$shape: the proof was not named"
+    case "$shape" in
+      main-moved-on) assert_grep ' is already in remotes/origin/main (' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed" ;;
+      later-edit-*) assert_grep ' is in a commit of remotes/origin/main after merge base ' "$case_dir/stderr" "content-shape-$shape: the base the proof used was not printed" ;;
+    esac
+    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "content-shape-$shape: an owner hold was printed"
+    assert_absent "$case_dir/state/task-x1.meta" "content-shape-$shape: the task record survived"
+  done
+  pass 'content already in the default branch, at its tip or in a squash commit main later edited, counts as landed with the compared base printed and no hold, bundle or PR record'
+}
+
+# Nothing that differs counts: copy content that no default-branch commit holds
+# (beside a squash main later edited, or at a path main only ever held other
+# content at), a tracked change, an untracked file, a staged-only change, and a
+# copy whose tree equals main only by coincidence on unrelated history.
+test_squash_landed_content_refuses_whatever_differs() {
+  local case_dir rc shape tmp
+  for shape in unique-beside-later-edit never-equal tracked-change untracked staged-only unrelated-history; do
+    case_dir=$(make_case "content-differs-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    wt_commit_file "$case_dir" feature.txt hello "add feature"
+    case "$shape" in
+      unique-beside-later-edit)
+        wt_commit_file "$case_dir" own.txt "only this copy holds this" "add unique work"
+        land_on_origin_main "$case_dir" feature.txt hello
+        land_on_origin_main "$case_dir" feature.txt "hello, then edited on main"
+        ;;
+      never-equal)
+        land_on_origin_main "$case_dir" feature.txt "main's own hello"
+        land_on_origin_main "$case_dir" feature.txt "main's hello, edited again"
+        ;;
+      tracked-change)
+        land_on_origin_main "$case_dir" feature.txt hello
+        printf 'edited\n' >> "$case_dir/wt/feature.txt"
+        ;;
+      untracked)
+        land_on_origin_main "$case_dir" feature.txt hello
+        printf 'stray\n' > "$case_dir/wt/stray.txt"
+        ;;
+      staged-only)
+        land_on_origin_main "$case_dir" feature.txt hello
+        printf 'staged\n' > "$case_dir/wt/staged.txt"
+        git -C "$case_dir/wt" add staged.txt
+        ;;
+      unrelated-history)
+        tmp="$case_dir/_land"
+        git clone -q "$case_dir/origin.git" "$tmp"
+        printf 'hello\n' > "$tmp/feature.txt"
+        git -C "$tmp" add -- feature.txt
+        git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m 'main gets the content'
+        git -C "$tmp" push -q origin HEAD:main
+        rm -rf "$tmp"
+        git -C "$case_dir/wt" fetch -q origin
+        tmp=$(git -C "$case_dir/wt" commit-tree "$(git -C "$case_dir/wt" rev-parse 'refs/remotes/origin/main^{tree}')" -m 'same tree, other history')
+        git -C "$case_dir/wt" reset -q --hard "$tmp"
+        ;;
+    esac
+    content_case_treehouse "$case_dir"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "content-differs-$shape: differing content counted as landed"
+    assert_no_grep 'landed by content' "$case_dir/stderr" "content-differs-$shape: the content proof accepted it"
+    assert_present "$case_dir/state/task-x1.meta" "content-differs-$shape: the task record was removed"
+  done
+  pass 'copy content no default-branch commit holds, a tracked change, an untracked file, a staged-only change and an unrelated-history coincidence are all refused'
 }
 
 test_content_fallback_refreshes_stale_origin_ref() {
@@ -2734,15 +2885,8 @@ test_fractional_legacy_retry_wait_refuses_without_arithmetic_error() {
 # Bundle fixtures use only this suite's temporary repositories and data.
 # The command sequence here is the supported recipe in fm-teardown.sh's header.
 record_preservation_bundle() {  # <case> <copy> <bundle> [revision...]
-  local case_dir=$1 copy=$2 bundle=$3 digest tips
-  shift 3
-  mkdir -p "${bundle%/*}" "$case_dir/data/task-x1"
-  git -C "$copy" bundle create "$bundle" "$@" 2>/dev/null || return 1
-  git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1 || return 1
-  digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
-  tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
-  printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$case_dir/data/task-x1/preservation-bundles.tsv"
-  hold_bundle_call "$case_dir"
+  record_fixture_bundle "$@" || return 1
+  hold_bundle_call "$1"
 }
 
 run_captain_hold() {  # <case> <arg>...
@@ -3248,16 +3392,30 @@ test_bundle_sources_and_durable_home_locations() {
     record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot create source fixture'
     rc=0
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
+    if [ "$shape" = source-copy ]; then
+      # The source left in the copy is an untracked file nothing else holds as
+      # it lies there, so the copy stays (Main 1681: removal refuses on any
+      # untracked byte; the copy proof counts it as work); the source bundle
+      # it keeps still restores the commits.
+      expect_code 1 "$rc" "bundle-location-$shape: an untracked source in the copy must keep it: $(grep -v '^●' "$case_dir/stderr" | tail -6)"
+      assert_present "$BUNDLE_PATH" "bundle-location-$shape: the untracked source in the copy was lost"
+      assert_present "$NESTED_COPY/.git" "bundle-location-$shape: the copy was removed"
+      restored="$case_dir/restored.git"
+      git init -q --bare "$restored"
+      git -C "$restored" fetch -q "$BUNDLE_PATH" "$head:refs/heads/recovered" || fail 'the kept source bundle cannot restore while the copy stays'
+      assert_equals 'recoverable work' "$(git -C "$restored" show "$head:work.txt")" 'the kept source bundle lost bytes'
+      continue
+    fi
     expect_code 0 "$rc" "bundle-location-$shape: safe storage must allow cleanup: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" 'copy not removed'
-    stored="$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle"
     rm -f "$BUNDLE_PATH"
     restored="$case_dir/restored.git"
     git init -q --bare "$restored"
     git -C "$restored" fetch -q "$stored" "$head:refs/heads/recovered" || fail 'stored copy cannot restore after source removal'
     assert_equals 'recoverable work' "$(git -C "$restored" show "$head:work.txt")" 'restored commit lost bytes'
   done
-  pass 'temporary sources and durable homes inside other worktrees or pool folders retain recoverable commits'
+  pass 'temporary sources and durable homes inside other worktrees or pool folders retain recoverable commits; a source left untracked in the copy keeps the copy'
 }
 
 # A bundle whose pack passes bundle verify and a connectivity-only fsck can still
@@ -3580,8 +3738,6 @@ test_bundle_kept_ship_keeps_its_row_held_for_the_captain() {
     expect_code 0 "$rc" "bundle-row-$shape: a verified bundle must allow ordinary teardown: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" "bundle-row-$shape: the preserved copy was not removed"
     assert_absent "$case_dir/state/task-x1.meta" "bundle-row-$shape: the task was not retired"
-    assert_grep "land-or-drop call for bundle $BUNDLE_PATH is held on task task-x1" "$case_dir/stderr" \
-      "bundle-row-$shape: teardown did not name the captain's call"
     shown=$(tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md") || fail "bundle-row-$shape: cannot read the row"
     [ "$(backlog_row_state "$case_dir")" != "done" ] || fail "bundle-row-$shape: the row was closed: $shown"
     printf '%s\n' "$shown" | grep -Eq '^  hold_kind: *captain$' || fail "bundle-row-$shape: the call is no longer held: $shown"
@@ -3627,105 +3783,95 @@ test_bundle_kept_ship_records_no_landing_in_the_ledger() {
   pass 'ledger on: a bundle-kept ship is retained, and its answered close records no landing evidence'
 }
 
-# The bundle route needs the captain's call already filed. Without it teardown
-# refuses, files nothing, and prints the exact command; running that command
-# lets a retry pass. A row already held on another question keeps its question
-# and the call is a separate held task.
-test_bundle_route_requires_the_captains_call() {
-  local shape case_dir rc command head tips tip id
-  for shape in unheld other-question absent; do
+# The bundle route no longer needs the captain's call filed: an attended
+# teardown of a copy whose every locally-only tip a verified bundle holds closes
+# on the bundle note, prints no hold command, and creates, changes or releases no
+# hold. A row already held on another question keeps its question and is
+# retained, as before, with no separate held task filed for the bundle.
+test_bundle_route_needs_no_captains_call() {
+  local shape case_dir rc head tips tip stored hash snapshot
+  for shape in unheld other-question; do
     make_bundle_copy_case "bundle-call-$shape"
     case_dir=$NESTED_CASE
     head=$(git -C "$NESTED_COPY" rev-parse HEAD)
     tips=$(cut -f3 "$case_dir/data/task-x1/preservation-bundles.tsv")
+    hash=$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv")
     case "$shape" in
       unheld)
         tasks-axi unhold task-x1 --file "$case_dir/data/backlog.md" >/dev/null || fail 'cannot release the fixture hold'
-        id=task-x1
         ;;
       other-question)
         run_captain_hold "$case_dir" hold task-x1 --owner captain --reason 'Merge PR 7 now?' >/dev/null \
           || fail 'cannot hold the row on another question'
-        id=task-x1-bundle
-        ;;
-      absent)
-        printf '%s\n' '# Backlog' '' '## In flight' '' '## Queued' '' '## Done' > "$case_dir/data/backlog.md"
-        id=task-x1
         ;;
     esac
-    cp "$case_dir/data/backlog.md" "$case_dir/backlog.before"
     rc=0
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 1 "$rc" "bundle-call-$shape: a bundle with no captain's call must refuse: $(cat "$case_dir/stderr")"
-    assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" "bundle-call-$shape: original refusal changed"
-    assert_present "$NESTED_COPY/work.txt" "bundle-call-$shape: copy was removed"
-    assert_present "$case_dir/state/task-x1.meta" "bundle-call-$shape: task record was removed"
-    cmp -s "$case_dir/backlog.before" "$case_dir/data/backlog.md" || fail "bundle-call-$shape: teardown changed the backlog"
-    command=$(sed -n -e 's/^Hold it for the captain, then retry ordinary teardown: //p' \
-      -e 's/^File the land-or-drop call as its own task, then retry ordinary teardown: //p' \
-      -e 's/^File the land-or-drop call as its row, then retry ordinary teardown: //p' "$case_dir/stderr")
-    [ -n "$command" ] || fail "bundle-call-$shape: no hold command printed: $(cat "$case_dir/stderr")"
-    if [ "$shape" = absent ]; then
-      [[ "$command" == 'bin/fm-captain-hold.sh hold task-x1 --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ task-x1 --repo project --owner captain --reason '* ]] \
-        || fail "bundle-call-$shape: the command is not the single hold-with-title form: $command"
-      [[ "$command" != *'&&'* && "$command" != *fm-tasks-axi.sh* ]] \
-        || fail "bundle-call-$shape: the command chains another step: $command"
-    else
-      [[ "$command" == "bin/fm-captain-hold.sh hold $id "* ]] || fail "bundle-call-$shape: the command holds the wrong task: $command"
-    fi
-    (
-      cd "$ROOT"
-      export FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
-        FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH"
-      eval "$command"
-    ) > "$case_dir/hold.out" 2>&1 || fail "bundle-call-$shape: the printed command failed: $command: $(cat "$case_dir/hold.out")"
-    decoded_backlog "$case_dir" > "$case_dir/backlog.decoded" || fail "bundle-call-$shape: cannot decode the hold reason"
-    assert_grep "unlanded commits of task-x1, tips $head:" "$case_dir/backlog.decoded" \
-      "bundle-call-$shape: the call does not name the copy's unlanded tip"
-    for tip in $tips; do
-      assert_grep "$tip" "$case_dir/backlog.decoded" "bundle-call-$shape: the call does not name recorded tip $tip"
-    done
-    rc=0
-    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 0 "$rc" "bundle-call-$shape: the filed call must let teardown pass: $(cat "$case_dir/stderr")"
+    expect_code 0 "$rc" "bundle-call-$shape: a verified bundle needs no filed captain call: $(cat "$case_dir/stderr")"
     assert_absent "$NESTED_COPY" "bundle-call-$shape: the preserved copy was not removed"
-    assert_grep "is held on task $id" "$case_dir/stderr" "bundle-call-$shape: teardown did not name the call's task"
-    tasks-axi show "$id" --full --file "$case_dir/data/backlog.md" | grep -Eq '^  hold_kind: *captain$' \
-      || fail "bundle-call-$shape: the call $id did not stay open and held"
-    tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md" | grep -Eq '^  hold_kind: *captain$' \
-      || fail "bundle-call-$shape: the work row did not stay held"
-    [ "$shape" != absent ] || tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md" | grep -Eq '^  repo: *project$' \
-      || fail "bundle-call-$shape: the filed call row lost the ship's project: $(tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md")"
-    [ "$shape" != other-question ] || assert_grep 'Merge PR 7 now?' "$case_dir/backlog.decoded" \
-      "bundle-call-$shape: the row's own question was replaced"
+    assert_absent "$case_dir/state/task-x1.meta" "bundle-call-$shape: the task was not retired"
+    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-call-$shape: a hold command was printed"
+    assert_no_grep 'land-or-drop' "$case_dir/stderr" "bundle-call-$shape: the captain was asked a land-or-drop question"
+    stored="$case_dir/data/task-x1/preserved-bundles/$hash.bundle"
+    assert_present "$stored" "bundle-call-$shape: the stored bundle is missing after the close"
+    assert_grep "preserved unlanded commits in bundle $stored sha256=$hash" "$case_dir/stderr" "bundle-call-$shape: the close did not name the stored bundle"
+    git -C "$case_dir/restored.git" init -q --bare 2>/dev/null || { rm -rf "$case_dir/restored.git"; git init -q --bare "$case_dir/restored.git"; }
+    git -C "$case_dir/restored.git" fetch -q "$stored" "$head:refs/heads/recovered" || fail "bundle-call-$shape: the stored bundle cannot restore the tip"
+    assert_equals 'recoverable work' "$(git -C "$case_dir/restored.git" show recovered:work.txt)" "bundle-call-$shape: the restored tip lost the work"
+    for tip in $tips; do
+      git -C "$case_dir/restored.git" cat-file -e "$tip^{commit}" 2>/dev/null || fail "bundle-call-$shape: recorded tip $tip does not restore"
+    done
+    case "$shape" in
+      unheld)
+        [ "$(backlog_row_state "$case_dir")" = 'done' ] || fail 'bundle-call-unheld: the row was not closed'
+        assert_grep "preserved in bundle $stored, not landed" "$case_dir/data/backlog.md" 'bundle-call-unheld: the close note is missing'
+        assert_no_grep 'hold_kind: *captain' "$case_dir/data/backlog.md" 'bundle-call-unheld: a captain hold exists'
+        snapshot=$(bundle_case_snapshot "$case_dir") || fail 'bundle-call-unheld: fleet snapshot failed'
+        assert_equals '[]' "$(bundle_case_landed_ids "$snapshot")" 'bundle-call-unheld: the bundle close is listed as landed'
+        ;;
+      other-question)
+        tasks-axi show task-x1 --full --file "$case_dir/data/backlog.md" | grep -Eq '^  hold_kind: *captain$' \
+          || fail 'bundle-call-other-question: the row lost its own hold'
+        decoded_backlog "$case_dir" > "$case_dir/backlog.decoded" || fail 'bundle-call-other-question: cannot decode'
+        assert_grep 'Merge PR 7 now?' "$case_dir/backlog.decoded" 'bundle-call-other-question: the row question was replaced'
+        tasks-axi show task-x1-bundle --file "$case_dir/data/backlog.md" >/dev/null 2>&1 \
+          && fail 'bundle-call-other-question: a separate held task was filed'
+        ;;
+    esac
   done
-  pass 'the bundle route refuses until the captain'"'"'s land-or-drop call is held, prints the command that files it, and passes once it is'
+  pass 'a verified bundle closes an attended teardown with no captain call, no hold command and a restorable stored bundle'
 }
 
-# A home whose backlog transition does not apply has no row that can hold the
-# captain's call: the bundle route refuses there and prints no command that
-# could not pass.
-test_bundle_route_refuses_where_no_row_can_hold_the_call() {
-  local shape case_dir rc
-  for shape in manual orca; do
-    make_bundle_copy_case "bundle-no-row-$shape"
-    case_dir=$NESTED_CASE
-    case "$shape" in
-      manual) printf 'manual\n' > "$case_dir/config/backlog-backend" ;;
-      orca) printf 'cleanup_recovery=orca\n' >> "$case_dir/state/task-x1.meta" ;;
-    esac
-    rc=0
-    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 1 "$rc" "bundle-no-row-$shape: the bundle route must refuse: $(cat "$case_dir/stderr")"
-    assert_grep "no backlog row can hold the captain's land-or-drop call in this home" "$case_dir/stderr" \
-      "bundle-no-row-$shape: the refusal does not name the missing row"
-    assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" "bundle-no-row-$shape: original refusal changed"
-    assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-no-row-$shape: a hold command that cannot pass was printed"
-    assert_no_grep 'fm-tasks-axi.sh add' "$case_dir/stderr" "bundle-no-row-$shape: an add command that cannot pass was printed"
-    assert_present "$NESTED_COPY/work.txt" "bundle-no-row-$shape: copy was removed"
-    assert_present "$case_dir/state/task-x1.meta" "bundle-no-row-$shape: task record was removed"
-  done
-  pass 'the bundle route refuses in a manual-backlog home and an Orca cleanup recovery, printing no command that cannot pass'
+# A home whose backlog transition does not apply has no row to close, and the
+# bundle route does not need one: the copy is preserved and removed there too.
+# An Orca cleanup recovery is an Orca-backed task, which the bundle route
+# refuses by name (Main 1843 (c)).
+test_bundle_route_passes_where_no_row_exists() {
+  local case_dir rc
+  make_bundle_copy_case bundle-no-row-manual
+  case_dir=$NESTED_CASE
+  printf 'manual\n' > "$case_dir/config/backlog-backend"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bundle-no-row-manual: the bundle route must pass without a backlog row: $(cat "$case_dir/stderr")"
+  assert_no_grep 'fm-captain-hold.sh hold' "$case_dir/stderr" "bundle-no-row-manual: a hold command was printed"
+  assert_no_grep 'fm-tasks-axi.sh add' "$case_dir/stderr" "bundle-no-row-manual: an add command was printed"
+  assert_absent "$NESTED_COPY" "bundle-no-row-manual: the preserved copy was not removed"
+  assert_present "$case_dir/data/task-x1/preserved-bundles/$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv").bundle" \
+    "bundle-no-row-manual: the stored bundle is missing after the close"
+
+  make_bundle_copy_case bundle-no-row-orca
+  case_dir=$NESTED_CASE
+  printf 'cleanup_recovery=orca\n' >> "$case_dir/state/task-x1.meta"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "bundle-no-row-orca: an Orca cleanup recovery must refuse the bundle route: $(cat "$case_dir/stderr")"
+  assert_grep 'land the commits; the bundle route is not admitted for an Orca-backed task (Main 1843 (c))' "$case_dir/stderr" \
+    'bundle-no-row-orca: the refusal does not name the Orca rule'
+  assert_present "$NESTED_COPY" 'bundle-no-row-orca: the copy was removed'
+  assert_present "$case_dir/state/task-x1.meta" 'bundle-no-row-orca: the task record was removed'
+  assert_present "$case_dir/data/task-x1/preservation-bundles.tsv" 'bundle-no-row-orca: the preservation record was removed'
+  pass 'the bundle route passes in a manual-backlog home, which has no row to hold a call; an Orca cleanup recovery refuses it by name and keeps the copy and the record'
 }
 
 # Work the ordinary landing proof accepts never needs the captain's call, even
@@ -3951,6 +4097,67 @@ test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files() {
   pass 'bundle admission refuses before sweeping anchored or landed prior copies with unique ignored bytes'
 }
 
+# R2 (Main 1681): the bundle that admitted the cleanup is rechecked before every
+# copy it removes, even one an anchor also holds. The task copy (held by the
+# bundle) and an anchored clean prior copy are removed in that order; while the
+# task copy is removed, the fixture truncates the bundle source and stored copy,
+# or rewrites the record so it no longer names the task copy's tip. The anchored
+# prior copy then stays. Unchanged, both close and the bundle restores.
+test_r4_anchored_copy_rechecks_the_admitting_bundle() {
+  local case_dir prior change rc head task_head hash stored line
+  for change in unchanged truncate record; do
+    make_nested_slot_case "r4-anchored-bundle-$change" enclosing nested/current
+    case_dir=$NESTED_CASE
+    printf 'task work\n' > "$NESTED_COPY/work.txt"
+    git -C "$NESTED_COPY" add work.txt
+    git -C "$NESTED_COPY" commit -qm 'unpublished task work'
+    task_head=$(git -C "$NESTED_COPY" rev-parse HEAD)
+    record_preservation_bundle "$case_dir" "$NESTED_COPY" "$case_dir/bundles/work.bundle" --all \
+      || fail 'cannot create bundle fixture'
+    prior="$NESTED_SLOT/nested/prior"
+    git -C "$case_dir/project" worktree add -q -b fm/task-x1-prior "$prior" main
+    printf 'prior work\n' > "$prior/prior.txt"
+    git -C "$prior" add prior.txt
+    git -C "$prior" commit -qm 'anchored prior work outside the bundle'
+    head=$(git -C "$prior" rev-parse HEAD)
+    git -C "$case_dir/project" update-ref "refs/fm/anchor/task-x1-$head" "$head"
+    printf 'prior_worktree=%s\n' "$prior" >> "$case_dir/state/task-x1.meta"
+    hash=$(cut -f2 "$case_dir/data/task-x1/preservation-bundles.tsv")
+    stored="$case_dir/data/task-x1/preserved-bundles/$hash.bundle"
+    line=$(printf '%s\t%s\t%s' "$case_dir/bundles/work.bundle" "$hash" "$head")
+    case "$change" in
+      unchanged) printf ':\n' ;;
+      truncate) printf ': > %q; : > %q\n' "$case_dir/bundles/work.bundle" "$stored" ;;
+      record) printf 'printf %%s\\\\n %q > %q\n' "$line" "$case_dir/data/task-x1/preservation-bundles.tsv" ;;
+    esac > "$case_dir/mutate.sh"
+    cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+"\${REAL_GIT_FOR_TEST:?}" "\$@"
+rc=\$?
+case " \$* " in
+  *" worktree remove "*"$NESTED_COPY "*|*" worktree remove "*"$NESTED_COPY")
+    [ -e '$case_dir/mutated' ] || { : > '$case_dir/mutated'; bash '$case_dir/mutate.sh'; } ;;
+esac
+exit \$rc
+SH
+    chmod +x "$case_dir/fakebin/git"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    assert_present "$case_dir/mutated" "$change: the task copy's removal did not run, so the mutation point was never reached: $(grep -v '^●' "$case_dir/stderr" | tail -4)"
+    if [ "$change" = unchanged ]; then
+      expect_code 0 "$rc" "$change: an unchanged bundle must close both copies: $(cat "$case_dir/stderr")"
+      assert_absent "$prior" "$change: the anchored prior copy survived"
+      git init -q --bare "$case_dir/restored.git"
+      git -C "$case_dir/restored.git" fetch -q "$stored" "$task_head:refs/heads/recovered" || fail "$change: the stored bundle does not restore the task commit"
+      continue
+    fi
+    expect_code 1 "$rc" "$change: a bundle changed before the anchored copy's removal must keep it: $(grep -v '^●' "$case_dir/stderr" | tail -6)"
+    assert_present "$prior/.git" "$change: the anchored prior copy was removed after the admitting bundle changed"
+    assert_present "$case_dir/state/task-x1.meta" "$change: the task record was removed"
+  done
+  pass 'an anchored copy is removed only while the bundle that admitted the cleanup still holds; unchanged, both close and the bundle restores'
+}
+
 # The task's current copy is already gone, so the bundle admits its branch ref.
 # A swept anchored prior's unique ignored bytes refuse before retire reaps.
 test_bundle_removed_copy_sweep_refuses_before_retire() {
@@ -3977,6 +4184,7 @@ test_bundle_removed_copy_sweep_refuses_before_retire() {
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) printf '%s\n' "\$*" >> "$case_dir/lsof-cwd.log"; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -4086,6 +4294,7 @@ SH
 #!/usr/bin/env bash
 case " \$* " in
   *" -d cwd "*) if kill -0 $pid 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi; exit 0 ;;
+  *" -Fpfn "*) exit 0 ;;
 esac
 exit 1
 SH
@@ -4129,6 +4338,7 @@ test_recorded_slot_lost_lease_still_refuses
 test_recorded_slot_intact_lease_completes
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
+test_fixture_teardown_leaves_no_detached_summary_refresh
 test_teardown_closes_the_backlog_item_itself
 test_teardown_records_task_closed_once
 test_teardown_closed_record_names_each_evidence_kind
@@ -4189,6 +4399,8 @@ test_pr_check_records_remote_head_when_local_lags
 test_content_in_default_fallback_allows
 test_teardown_removes_pr_ready_refusal_marker
 test_content_fallback_uses_recorded_base_branch
+test_squash_landed_content_counts_in_every_shape_and_prints_its_base
+test_squash_landed_content_refuses_whatever_differs
 test_content_fallback_refreshes_stale_origin_ref
 test_dirty_worktree_refuses
 test_untracked_only_refusal_diagnostic
@@ -4250,8 +4462,8 @@ test_unattended_teardown_refuses_bundle_only_copy
 test_bundle_close_note_is_not_removal_authority
 test_bundle_kept_ship_keeps_its_row_held_for_the_captain
 test_bundle_kept_ship_records_no_landing_in_the_ledger
-test_bundle_route_requires_the_captains_call
-test_bundle_route_refuses_where_no_row_can_hold_the_call
+test_bundle_route_needs_no_captains_call
+test_bundle_route_passes_where_no_row_exists
 test_landed_work_never_needs_the_captains_call
 test_bundle_hint_needs_unlanded_tips
 test_bundle_needs_the_copys_own_unlanded_tip
@@ -4260,6 +4472,7 @@ test_bundle_is_reverified_before_copy_removal
 test_bundle_does_not_excuse_dirty_copy
 test_bundle_does_not_excuse_nested_copy_ignored_files
 test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files
+test_r4_anchored_copy_rechecks_the_admitting_bundle
 test_bundle_removed_copy_sweep_refuses_before_retire
 test_foreign_bundle_sweep_keeps_anchored_prior_ignored_files
 test_foreign_bundle_preservation_keeps_other_proofs
