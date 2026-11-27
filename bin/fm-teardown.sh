@@ -3964,7 +3964,7 @@ teardown_child_copy_route() {  # <meta> <id> <kind> <backend> <project> <worktre
   elif [ -z "$6" ] || [ ! -d "$6" ]; then
     TEARDOWN_CHILD_ROUTE=none
   elif [ -n "$5" ] && [ -d "$5" ] && command -v treehouse >/dev/null 2>&1; then
-    TEARDOWN_CHILD_ROUTE=return
+    TEARDOWN_CHILD_ROUTE='return'
   else
     TEARDOWN_CHILD_ROUTE=remove
   fi
