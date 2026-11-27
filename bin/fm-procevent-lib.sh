@@ -758,6 +758,26 @@ fm_procevent_group_alive() {
   kill -0 -"$1" 2>/dev/null
 }
 
+# fm_procevent_runner_leader_proved <pid> <identity>
+# The one owner of the acceptance that a recorded runner may be stopped by its
+# group: 0 when <pid> is live with the recorded birth identity and leads its own
+# process group; 1 when it is gone or reused and no group with its id remains;
+# 2 when that cannot be proved (unreadable, a non-leader, or a leaderless group).
+# The sweep calls it before its first group signal, and teardown's pre-close
+# decision calls it to accept a home's runner, so the two cannot disagree.
+fm_procevent_runner_leader_proved() {
+  local pid=$1 identity=$2 state pgid
+  fm_procevent_pid_state "$pid" "$identity"
+  state=$?
+  case "$state" in
+    0) ;;
+    1) fm_procevent_group_alive "$pid" && return 2; return 1 ;;
+    *) return 2 ;;
+  esac
+  pgid=$(fm_procevent_proc pgid "$pid" | tr -d '[:space:]') || return 2
+  [ "$pgid" = "$pid" ] || return 2
+}
+
 # fm_procevent_pid_state <pid> <identity>
 # 0 live match, 1 stale, 2 uncertain, 3 ambiguous leaderless group.
 #

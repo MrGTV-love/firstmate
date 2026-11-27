@@ -3821,12 +3821,14 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
 # --if-reset-ref) cannot serve here: it also refuses untracked files and an
 # unlanded HEAD and never cleans, which forced cleanup needs. A holder arriving
 # between this scan and treehouse's own scan is a disclosed residual.
-# Succeeds when <pid> is a process-event runner of <home> whose claim is owned by
-# that home and whose recorded birth identity matches the live process now: the
-# same proof the home's sweep requires before its first signal, so the sweep
-# will stop it. A runner whose identity does not match (a reused pid), or any
-# member of its group, proves nothing. Both the forced-cleanup preflight and
-# the check right before the home's return use this rule.
+# Succeeds when <pid> is a process-event runner of <home>: its claim is owned by
+# that home, the pid its .runner file records is the claim's pid, and
+# fm_procevent_runner_leader_proved (the acceptance the home's sweep itself
+# requires before its first group signal: the recorded birth identity matches
+# and the runner leads its process group) holds. A reused pid, a non-leader, a
+# .runner naming another pid, or any member of the runner's group proves
+# nothing. Both the forced-cleanup preflight and the check right before the
+# home's return use this rule.
 teardown_home_runner_member() {  # <home> <pid>
   local live
   live=$(
@@ -3837,9 +3839,11 @@ teardown_home_runner_member() {  # <home> <pid>
       [ -f "$runner_file" ] && [ ! -L "$runner_file" ] || continue
       source_id=${runner_file##*/}
       source_id=${source_id%.runner}
+      runner_pid=$(sed -n 1p "$runner_file" 2>/dev/null | tr -d '[:space:]')
       fm_procevent_claim_load_locked "$source_id" 2>/dev/null || continue
       fm_procevent_claim_owned_by_state "$1/state" "$1" 2>/dev/null || continue
-      fm_procevent_pid_state "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY" 2>/dev/null || continue
+      [ -n "$runner_pid" ] && [ "$runner_pid" = "$FM_PROCEVENT_CLAIM_PID" ] || continue
+      fm_procevent_runner_leader_proved "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY" 2>/dev/null || continue
       printf '%s\n' "$FM_PROCEVENT_CLAIM_PID"
     done
   ) || return 1
@@ -3897,7 +3901,7 @@ teardown_with_anchor() {  # <backend> <target> <command...>
   local saved_pid=$TASK_ANCHOR_PID saved_identity=$TASK_ANCHOR_IDENTITY saved_note=$TASK_ANCHOR_NOTE rc=0
   BACKEND=$1 T=$2
   shift 2
-  [ "$BACKEND" != herdr ] || fm_backend_source herdr >/dev/null 2>&1 || true
+  case "$BACKEND" in herdr|tmux) fm_backend_source "$BACKEND" >/dev/null 2>&1 || true ;; esac
   TASK_ANCHOR_READ=0 TASK_ANCHOR_STATE='' TASK_ANCHOR_PID='' TASK_ANCHOR_IDENTITY='' TASK_ANCHOR_NOTE=''
   "$@" || rc=$?
   T=$saved_t BACKEND=$saved_backend TASK_ANCHOR_READ=$saved_read TASK_ANCHOR_STATE=$saved_state
@@ -4559,34 +4563,38 @@ conclude_task_no_mistakes_run() {  # <worktree>
 # tmux records no pane id, and a window selector answers an absent window from
 # the client's active window, so the pane is found by exact membership: the
 # panes of the exact session whose window name is exactly the recorded one. One
-# pane is proven; none (or no such session or server) is absent; several are
-# ambiguous, because closing that window would end panes nothing proves.
+# pane is proven; several are ambiguous, because closing that window would end
+# panes nothing proves. Absence is decided only by fm_backend_tmux_window_inventory
+# (the session or server is definitively absent, or the window is not listed);
+# any other failed read is unreadable.
 # Herdr names the recorded pane id, and its answer must name that pane; a pane
 # Herdr confirms gone is absent. Any other failed read is unreadable. A record
 # with no endpoint, or a backend that reports no pane shell, is absent.
 task_endpoint_shell_pid() {
-  local out pid='' session window rows count err
+  local out pid='' session window rows count inventory_rc
   [ -n "${T:-}" ] || { printf 'absent\n'; return 0; }
   case "${BACKEND:-}" in
     tmux)
       session=${T%%:*}
       window=${T#*:}
       [ -n "$session" ] && [ -n "$window" ] && [ "$window" != "$T" ] || { printf 'unreadable\n'; return 0; }
-      if ! out=$(tmux list-panes -s -t "=$session" -F $'#{window_name}\t#{pane_id}\t#{pane_pid}' 2>&1 </dev/null); then
-        err=$out
-        case "$err" in
-          # The target is an exact session, so tmux's "can't find" (it says
-          # window or session) and a missing server both mean it is absent.
-          *"can't find"*|*"no server running"*|*"error connecting to"*) printf 'absent\n' ;;
-          *) printf 'unreadable\n' ;;
-        esac
-        return 0
-      fi
+      # Presence is read through the tmux backend's own inventory, the one owner
+      # of which tmux answers mean absent; any other failed read is unreadable.
+      inventory_rc=0
+      out=$(fm_backend_tmux_window_inventory "=$session") || inventory_rc=$?
+      case "$inventory_rc" in
+        0) ;;
+        2) printf 'absent\n'; return 0 ;;
+        *) printf 'unreadable\n'; return 0 ;;
+      esac
+      printf '%s\n' "$out" | grep -Fxq -- "$window" || { printf 'absent\n'; return 0; }
+      out=$(tmux list-panes -s -t "=$session" -F $'#{window_name}\t#{pane_id}\t#{pane_pid}' 2>/dev/null </dev/null) \
+        || { printf 'unreadable\n'; return 0; }
       rows=$(printf '%s\n' "$out" | awk -F '\t' -v w="$window" 'NF == 3 && $1 == w')
       count=0
       [ -z "$rows" ] || count=$(printf '%s\n' "$rows" | wc -l | tr -d ' ')
       case "$count" in
-        0) printf 'absent\n'; return 0 ;;
+        0) printf 'unreadable\n'; return 0 ;;
         1) pid=${rows##*$'\t'} ;;
         *) printf 'ambiguous\n'; return 0 ;;
       esac

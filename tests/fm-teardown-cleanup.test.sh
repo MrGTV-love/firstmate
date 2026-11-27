@@ -504,6 +504,7 @@ test_forced_secondmate_teardown_holds_descendant_lifecycle_locks() {
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/kill.log"
 exit 0
 SH
@@ -2013,6 +2014,7 @@ test_teardown_ambiguous_window_refuses_before_any_close() {
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
 exit 0
 SH
@@ -2035,6 +2037,31 @@ SH
       || fail "ambiguous-$route: the refusal did not name the ambiguous endpoint: $(tail -3 "$case_dir/stderr")"
   done
   pass "two panes in the recorded window refuse before any close, with nothing in the roots, on the owned and the tasktmp-only route"
+}
+
+# Absence is decided only by the tmux backend's own inventory: an answer that is
+# not definitive, such as a socket the user cannot open, is an unreadable
+# endpoint and refuses before any close, even with nothing in the roots.
+test_teardown_unreadable_tmux_socket_refuses_before_any_close() {
+  local case_dir rc
+  case_dir=$(make_case ownership-tmux-unreadable)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"; exit 0 ;; esac
+case "\${1:-}" in list-*) echo "error connecting to /private/tmp/tmux-501/default (Permission denied)" >&2; exit 1 ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "tmux-unreadable: teardown must refuse: $(tail -3 "$case_dir/stderr")"
+  assert_absent "$case_dir/endpoint-close.log" "tmux-unreadable: the endpoint was closed: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
+  assert_present "$case_dir/state/task-x1.meta" "tmux-unreadable: the task record was removed"
+  grep -Eq "REFUSED: the endpoint firstmate:fm-task-x1 of task task-x1 cannot be closed safely: .*cannot be read" "$case_dir/stderr" \
+    || fail "tmux-unreadable: the refusal did not name the unreadable endpoint: $(tail -3 "$case_dir/stderr")"
+  pass "a tmux socket that cannot be opened is an unreadable endpoint and refuses with nothing closed"
 }
 
 # The process-group proof does not reach a process that leaves the group: a
@@ -2239,6 +2266,7 @@ test_tasktmp_only_route_names_an_unproven_holder_and_continues() {
       cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
 exit 0
 SH
@@ -2467,6 +2495,7 @@ test_process_refusal_has_no_close_replay_authority() {
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 if [ "\${1:-}" = list-windows ]; then
   echo "can't find session: firstmate" >&2
   exit 1
@@ -2560,6 +2589,7 @@ SH
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 if [ "\${1:-}" = kill-window ]; then
   printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log"
 fi
@@ -2889,6 +2919,7 @@ test_lsof_absent_refuses_without_signalling() {
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 if [ "\${1:-}" = display-message ] && [ "\${*: -1}" = '#{pane_pid}' ]; then
   printf '%s\n' '$pid'
 fi
@@ -3786,6 +3817,7 @@ test_docker_failed_lane_scan_names_its_cause() {
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in
   kill-window|kill-pane) : > "$case_dir/lane-scan-armed" ;;
 esac
@@ -4631,6 +4663,7 @@ test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup(
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/tmux.log"
 exit 0
 SH
@@ -6146,6 +6179,7 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
   cat > "$FOREIGN_CASE/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$FOREIGN_CASE/pane-rows" ]; then cat "$FOREIGN_CASE/pane-rows"; elif [ -f "$FOREIGN_CASE/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$FOREIGN_CASE/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$FOREIGN_CASE/pane-rows" ]; then cut -f1 "$FOREIGN_CASE/pane-rows" | sort -u; elif [ -f "$FOREIGN_CASE/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in
   kill-window)
     : > "$FOREIGN_CASE/closing"
@@ -7204,16 +7238,19 @@ SH
 }
 
 # The nested retire step rechecks, right before each signal, the support its
-# target's ownership rests on, and only a chain-proved support under its saved
-# pid and birth identity counts. M is chain-proved and leads process group G and
-# stays alive in it; A shares G with M but was never chain-proved. D is queued
-# with A as its support, once under A's live identity and once under a saved
-# identity A no longer has (a pid reused in the old group). Either way D is not
-# signalled, nothing further is, and the step refuses, while M, queued first
-# on its own proof, is signalled.
+# target's ownership rests on: it counts only as a chain-proved record whose pid
+# still has the recorded birth identity, read live. Three supports fail and the
+# queued descendant D is never signalled, nothing further is, and the step
+# refuses:
+#   group    A shares a process group with chain-proved M but was never itself
+#            chain-proved (M, queued first on its own proof, is signalled);
+#   reused   A's record in TASK_OWNED names a birth identity its pid no longer
+#            has, as when the support exited and its pid was reused;
+#   exited   A is chain-proved and queued first: its signal ends it, so when D's
+#            turn comes the cached record still matches but the live read fails.
 test_nested_retire_stops_when_a_support_proof_expires() {
-  local tmp m a d rc _ shape
-  for shape in live reused; do
+  local tmp m a d rc _ shape first
+  for shape in group reused exited; do
     tmp=$(fm_test_tmproot "nested-support-$shape")
     mkdir -p "$tmp/state" "$tmp/copy"
     # M is detached (reparented to init, so its exit is reaped at once) and leads
@@ -7239,7 +7276,6 @@ test_nested_retire_stops_when_a_support_proof_expires() {
     teardown_fixture_start "$tmp/copy" KILL sleep 300
     d=$TEARDOWN_FIXTURE_PID
     sleep 0.3
-    [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$a" | tr -d ' ')" = "$m" ] || fail "support-$shape: A is not in M's group"
     python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/reaper.sh" <<'PY' || fail "support-$shape: the reaper functions could not be extracted"
 import pathlib, sys
 source = pathlib.Path(sys.argv[1]).read_text()
@@ -7254,31 +7290,48 @@ PY
   STATE=$TMPX/state ID=support-expiry
   . "$TMPX/reaper.sh"
   mid=$(task_process_identity "$M") && aid=$(task_process_identity "$A") && did=$(task_process_identity "$D") || exit 8
-  TASK_OWNED=("$M""$TAB""$mid""$TAB""$M")
-  [ "$SHAPE" = live ] || aid="lstart=Thu Jan  1 00:00:00 1970"
-  TEARDOWN_FOREIGN_PROCS=("$M""$TAB""$mid""$TAB""$TMPX/copy""$TAB""$M""$TAB""$mid" "$D""$TAB""$did""$TAB""$TMPX/copy""$TAB""$A""$TAB""$aid")
+  case "$SHAPE" in
+    group)
+      TASK_OWNED=("$M""$TAB""$mid""$TAB""$M")
+      first=$M firstid=$mid
+      ;;
+    reused)
+      aid="lstart=Thu Jan  1 00:00:00 1970"
+      TASK_OWNED=("$M""$TAB""$mid""$TAB""$M" "$A""$TAB""$aid""$TAB""$M")
+      first=$M firstid=$mid
+      ;;
+    exited)
+      TASK_OWNED=("$A""$TAB""$aid""$TAB""$M")
+      first=$A firstid=$aid
+      ;;
+  esac
+  # first is queued on its own proof; D rests on A.
+  TEARDOWN_FOREIGN_PROCS=("$first""$TAB""$firstid""$TAB""$TMPX/copy""$TAB""$first""$TAB""$firstid" "$D""$TAB""$did""$TAB""$TMPX/copy""$TAB""$A""$TAB""$aid")
   # The ancestry proof before the first signal is not under test here.
   teardown_pid_is_task_own() { return 0; }
-  # Signal delivery is made synchronous for M, so its exit lands before the next
-  # target is judged, deterministically: the fixture waits for M to be gone.
+  # Signal delivery is made synchronous for the first target, so its exit lands
+  # before the next target is judged, deterministically.
   kill() {
     builtin kill "$@"
-    if [ "${2:-}" = "$M" ]; then
-      for _ in $(seq 100); do builtin kill -0 "$M" 2>/dev/null || return 0; sleep 0.05; done
+    if [ "${2:-}" = "$first" ]; then
+      for _ in $(seq 100); do builtin kill -0 "$first" 2>/dev/null || return 0; sleep 0.05; done
     fi
   }
   teardown_foreign_procs_retire
   ' > "$tmp/stdout" 2> "$tmp/stderr" || rc=$?
-    ownership_alive "$d" || fail "support-$shape: D was signalled after its support proof expired"
-    ownership_wait_dead "$m" || fail "support-$shape: M, whose own proof held, was not signalled: $(cat "$tmp/stderr")"
+    first=$m
+    [ "$shape" != exited ] || first=$a
+    ownership_alive "$d" || fail "support-$shape: D was signalled although its support no longer proved anything"
+    ownership_wait_dead "$first" || fail "support-$shape: the first target, whose own proof held, was not signalled: $(cat "$tmp/stderr")"
     expect_code 1 "$rc" "support-$shape: the retire step must refuse: $(cat "$tmp/stderr")"
-    assert_grep $'\tTERM\t'"$m"$'\t' "$tmp/state/support-expiry.teardown-processes" "support-$shape: M's signal was not audited"
+    assert_grep $'\tTERM\t'"$first"$'\t' "$tmp/state/support-expiry.teardown-processes" "support-$shape: the first target's signal was not audited"
     grep -Eq "REFUSED: the proof that process $d .*rested on process $a, whose ownership proof has expired; signalling nothing further" "$tmp/stderr" \
       || fail "support-$shape: the refusal did not name the unproven support: $(cat "$tmp/stderr")"
     teardown_fixture_stop "$d"
     teardown_fixture_stop "$a"
+    teardown_fixture_stop "$m"
   done
-  pass "a queued nested process whose support is only a shared group, live or under a reused pid, is not signalled, and nothing further is"
+  pass "a queued nested process is not signalled when its support is only a shared group, carries a reused pid's stale identity, or has exited since the scan"
 }
 
 # A live launcher outside the task's session keeps its copy untouched. One inside
@@ -9530,6 +9583,7 @@ test_teardown_tmux_anchor_needs_the_one_recorded_pane
 test_teardown_recycled_group_proves_nothing
 test_tasktmp_only_route_names_an_unproven_holder_and_continues
 test_teardown_ambiguous_window_refuses_before_any_close
+test_teardown_unreadable_tmux_socket_refuses_before_any_close
 test_leaked_tasktmp_process_is_reaped
 test_process_identity_is_recorded_before_term_and_kill
 test_process_audit_collection_exit_races

@@ -38,6 +38,7 @@ test_tasktmp_preserves_current_and_prior_reassociated_copies() {
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -116,6 +117,7 @@ test_secondmate_home_preserves_other_tasks_prior_copy() {
       cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -189,6 +191,7 @@ SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -251,6 +254,7 @@ SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -364,6 +368,7 @@ test_reservation_window_reassignment_reproves_own_landing() {
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -2579,6 +2584,7 @@ test_forced_nested_secondmate_admits_only_locked_current_copies() {
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in
   kill-*)
     printf '%s\n' "\$*" >> "$case_dir/kill.log"
@@ -2704,6 +2710,7 @@ test_forced_descendant_reassociated_copy_preserves_checkout_and_storage() {
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -2798,6 +2805,7 @@ test_cleanup_roots_preserve_foreign_copy_git_storage() {
         cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -2851,6 +2859,7 @@ test_tasktmp_preserves_reassociated_copy_git_storage() {
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
 exit 0
 SH
@@ -3122,15 +3131,19 @@ ownership_assert_unsignalled_pool() {  # <case-dir> <pid>
 #   runner   the secondmate home, returned through Treehouse, holds a process a
 #            stale process-event runner record names: the pid is live but its
 #            claim's recorded birth identity is not that process's (a reused pid);
+#   runner-nonleader  the claim's identity matches, but the process does not
+#            lead its process group, which the home's sweep requires;
+#   runner-content    the claim's identity matches a group leader, but the
+#            .runner file records another pid than the claim;
 #   group    a child worktree holds a process that only shares a process group
 #            with the child pane's chain-proved child, not descending from it.
 test_forced_cleanup_refuses_expiring_proofs_before_any_close() {
-  local shape case_dir home rc holder pane kid out claims i
-  for shape in runner group; do
+  local shape case_dir home rc holder pane kid out claims i leader='' identity
+  for shape in runner runner-nonleader runner-content group; do
     case_dir=$(make_case "forced-expiring-$shape")
     write_meta "$case_dir" local-only secondmate
     home="$case_dir/secondmate-home"
-    if [ "$shape" = runner ]; then
+    if [ "$shape" != group ]; then
       # The home is a Treehouse-style worktree of the code root, so it is
       # returned with treehouse return --force.
       rm "$case_dir/code-root/bin"
@@ -3149,6 +3162,7 @@ SH
     cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
 exit 0
 SH
@@ -3157,26 +3171,62 @@ SH
     out="$case_dir/fixture.pids"
     claims="$case_dir/claims"
     mkdir -p "$claims"
-    if [ "$shape" = runner ]; then
+    if [ "$shape" != group ]; then
+      # The holder leads a session and group of its own, with its cwd in the
+      # home; for runner-nonleader the holder is instead that leader's child,
+      # a member of the group that does not lead it.
       # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
       perl -MPOSIX -e '
-        my ($cwd, $out) = @ARGV;
+        my ($cwd, $out, $member) = @ARGV;
         my $first = fork(); die "fork" unless defined $first;
         if ($first) { waitpid($first, 0); exit 0; }
-        POSIX::setsid();
         my $second = fork(); die "fork" unless defined $second;
         POSIX::_exit(0) if $second;
+        POSIX::setsid() or die "setsid";
         chdir $cwd or die "chdir";
         open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
-        open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$\n"; close $fh; rename "$out.tmp", $out or die "rename";
-        exec "sleep", "300";' "$home" "$out"
+        my $pid = $$;
+        if ($member) {
+          $SIG{CHLD} = "IGNORE";
+          my $child = fork(); die "fork" unless defined $child;
+          if (!$child) { exec "sleep", "300"; }
+          $pid = $child;
+          chdir "/" or die "chdir";
+        }
+        open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$pid $$\n"; close $fh; rename "$out.tmp", $out or die "rename";
+        exec "sleep", "300" unless $member;
+        sleep 300 while 1;' "$home" "$out" "$([ "$shape" = runner-nonleader ] && echo 1 || true)"
       for i in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
-      read -r holder < "$out" || fail "forced-runner: the holder did not start"
+      read -r holder leader < "$out" || fail "forced-$shape: the holder did not start"
       teardown_fixture_track "$holder" KILL
+      [ "$leader" = "$holder" ] || teardown_fixture_track "$leader" KILL
+      if [ "$shape" = runner-nonleader ]; then
+        [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$holder" | tr -d ' ')" = "$leader" ] \
+          || fail "forced-runner-nonleader: the holder is not a member of its leader's group"
+      else
+        [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$holder" | tr -d ' ')" = "$holder" ] \
+          || fail "forced-$shape: the holder does not lead its group"
+      fi
       mkdir -p "$home/state/procevent"
-      printf '%s\n' "$holder" > "$home/state/procevent/fixture-runner.runner"
-      # The claim's recorded identity belongs to an earlier process at this pid.
-      printf '%s\n' "$home" "$holder" token1 "lstart=Thu Jan  1 00:00:00 1970" "" "" active > "$claims/fixture-runner.claim"
+      identity=$(bash -c '. "$1/bin/fm-wake-lib.sh" >/dev/null 2>&1; fm_pid_identity "$2"' _ "$ROOT" "$holder") \
+        || fail "forced-$shape: the holder's identity cannot be read"
+      case "$shape" in
+        runner)
+          # The claim's recorded identity belongs to an earlier process at this pid.
+          identity="lstart=Thu Jan  1 00:00:00 1970"
+          printf '%s\n' "$holder" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-nonleader)
+          # The identity matches, but the holder does not lead its group.
+          printf '%s\n' "$holder" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+        runner-content)
+          # The identity matches and the holder leads its group, but the .runner
+          # file records another pid than the claim does.
+          printf '%s\n' "$((holder + 100000))" > "$home/state/procevent/fixture-runner.runner"
+          ;;
+      esac
+      printf '%s\n' "$home" "$holder" token1 "$identity" "" "" active > "$claims/fixture-runner.claim"
     else
       # The child pane leads its own group, forks a chain-proved child K into
       # the child worktree, and double-forks H into it: H keeps the group but
@@ -3220,14 +3270,61 @@ SH
     grep -Eq "REFUSED: process $holder .*which the forced return would end, but nothing proves it belongs to task-x1" "$case_dir/stderr" \
       || fail "forced-$shape: the refusal did not name the holder: $(tail -3 "$case_dir/stderr")"
     assert_present "$home/state/child-a.meta" "forced-$shape: a child record was retired"
+    [ -z "${leader:-}" ] || [ "$leader" = "$holder" ] || kill -0 "$leader" 2>/dev/null \
+      || fail "forced-$shape: the holder's group leader was signalled"
     if [ "$shape" = group ]; then
       kill -0 "$kid" 2>/dev/null || fail "forced-group: the chain-proved child was signalled"
       kill -0 "$pane" 2>/dev/null || fail "forced-group: the child pane was signalled"
       teardown_fixture_stop "$kid"
     fi
     teardown_fixture_stop "$holder"
+    [ -z "${leader:-}" ] || [ "$leader" = "$holder" ] || teardown_fixture_stop "$leader"
+    leader=
   done
-  pass "a reused runner pid and a group-only child holder each refuse before any endpoint close, with every process left running"
+  pass "a reused runner pid, an identity-matched non-leader runner, a .runner naming another pid, and a group-only child holder each refuse before any endpoint close, with every process left running"
+}
+
+# fm_procevent_runner_leader_proved is the one owner of runner acceptance, used
+# by the home sweep and by teardown's pre-close decision: a live
+# identity-matched group leader is proved (0), a gone pid is stale (1), and a
+# non-leader or a mismatched identity cannot be proved (2).
+test_runner_leader_acceptance_is_one_shared_rule() {
+  local tmp out leader member got
+  tmp=$(fm_test_tmproot runner-acceptance)
+  out="$tmp/pids"
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  perl -MPOSIX -e '
+    my ($out) = @ARGV;
+    my $first = fork(); die "fork" unless defined $first;
+    if ($first) { waitpid($first, 0); exit 0; }
+    my $second = fork(); die "fork" unless defined $second;
+    POSIX::_exit(0) if $second;
+    POSIX::setsid() or die "setsid";
+    open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
+    $SIG{CHLD} = "IGNORE";
+    my $child = fork(); die "fork" unless defined $child;
+    if (!$child) { exec "sleep", "300"; }
+    open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $child\n"; close $fh; rename "$out.tmp", $out or die "rename";
+    sleep 300 while 1;' "$out"
+  for _ in $(seq 100); do [ -s "$out" ] && break; sleep 0.05; done
+  read -r leader member < "$out" || fail "runner-acceptance: setup did not start"
+  teardown_fixture_track "$leader" KILL
+  teardown_fixture_track "$member" KILL
+  [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$leader" | tr -d ' ')" = "$leader" ] || fail "runner-acceptance: the leader does not lead its group"
+  [ "$("$REAL_PS_FOR_TEST" -o pgid= -p "$member" | tr -d ' ')" = "$leader" ] || fail "runner-acceptance: the member is not in the leader's group"
+  got=$(ROOT=$ROOT L=$leader M=$member bash -c '
+    . "$ROOT/bin/fm-pr-lib.sh" >/dev/null 2>&1
+    . "$ROOT/bin/fm-wake-lib.sh" >/dev/null 2>&1
+    . "$ROOT/bin/fm-procevent-lib.sh" >/dev/null 2>&1 || exit 9
+    lid=$(fm_pid_identity "$L") && mid=$(fm_pid_identity "$M") || exit 8
+    fm_procevent_runner_leader_proved "$L" "$lid"; a=$?
+    fm_procevent_runner_leader_proved "$M" "$mid"; b=$?
+    fm_procevent_runner_leader_proved "$L" "lstart=Thu Jan  1 00:00:00 1970"; c=$?
+    printf "%s %s %s\n" "$a" "$b" "$c"')
+  assert_equals "0 2 2" "$got" "runner-acceptance: leader, non-leader and reused-identity verdicts"
+  teardown_fixture_stop "$member"
+  teardown_fixture_stop "$leader"
+  pass "runner acceptance proves only a live identity-matched group leader"
 }
 
 ownership_pool_descends() {  # <pid> <ancestor>
@@ -3251,6 +3348,7 @@ test_child_return_custody_refusal_keeps_non_pool_worktree() {
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
@@ -4383,6 +4481,7 @@ test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap() {
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 if [ -e "$case_dir/endpoint-stuck" ]; then
   case "\${1:-}" in
     kill-window) : > "$case_dir/kill-attempted"; exit 1 ;;
@@ -4464,6 +4563,7 @@ test_child_pool_return_custody_refusal_keeps_slot() {
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
@@ -5196,6 +5296,7 @@ test_return_missing_slot_reports_canonicalization_refusal
 test_child_return_custody_refusal_keeps_non_pool_worktree
 test_forced_child_return_refuses_an_unproven_holder
 test_forced_cleanup_refuses_expiring_proofs_before_any_close
+test_runner_leader_acceptance_is_one_shared_rule
 test_child_pool_return_custody_refusal_keeps_slot
 test_reassigned_dirty_slot_retires_only_finished_task
 test_reassigned_slot_unlanded_task_refuses

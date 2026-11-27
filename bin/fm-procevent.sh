@@ -2282,7 +2282,7 @@ runner_group_children_gone() {  # <live-runner-pid> <wait-seconds>
 }
 
 runner_group_signal() {  # <signal> <pid> <identity> [proved]
-  local signal=$1 pid=$2 identity=$3 proved=${4-} state pgid
+  local signal=$1 pid=$2 identity=$3 proved=${4-}
   if [ -n "$proved" ]; then
     # This shutdown proved ownership before TERM; only its own escalation may
     # reuse that proof in the same shutdown. Re-reading the leader as our signal
@@ -2293,15 +2293,9 @@ runner_group_signal() {  # <signal> <pid> <identity> [proved]
     # Before the first signal, require a live identity-matched group leader:
     # absent, unreadable, reused, or nonleader PIDs cannot prove ownership.
     # Launch pacing, leases, and reconcile cleanup remain the backstop.
-    fm_procevent_pid_state "$pid" "$identity"
-    state=$?
-    case "$state" in
-      0) ;;
-      1) fm_procevent_group_alive "$pid" && return 2; return 1 ;;
-      *) return 2 ;;
-    esac
-    pgid=$(fm_procevent_proc pgid "$pid" | tr -d '[:space:]') || return 2
-    [ "$pgid" = "$pid" ] || return 2
+    # fm_procevent_runner_leader_proved owns this acceptance (teardown's
+    # pre-close decision uses it too).
+    fm_procevent_runner_leader_proved "$pid" "$identity" || return $?
   fi
   # KNOWN LIMIT: portable shell cannot make this verification and signal atomic,
   # so the PID and group could be reused in the interval between them.

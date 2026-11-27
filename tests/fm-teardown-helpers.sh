@@ -216,6 +216,7 @@ SH
   cat > "$fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 exit 0
 SH
   printf '%s\n' "$$" > "$case_dir/pane-pid"
@@ -2229,6 +2230,7 @@ EOF
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in
   kill-window|kill-pane) exec "$case_dir/fakebin/child-boundary" "\$@" ;;
 esac
@@ -2473,6 +2475,7 @@ SH
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
 exit 0
 SH
@@ -2593,6 +2596,7 @@ nested_seed_task_files() {
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint.log" ;; esac
 exit 0
 SH
@@ -2790,6 +2794,7 @@ stuck_endpoint_tmux() {  # <case-dir>
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in *'#{pane_pid}'*) if [ -f "$case_dir/pane-rows" ]; then cat "$case_dir/pane-rows"; elif [ -f "$case_dir/pane-pid" ]; then printf 'fm-task-x1\t%%1\t%s\n' "\$(cat "$case_dir/pane-pid")"; fi ;; esac
+case "\${1:-}" in list-windows) if [ -f "$case_dir/pane-rows" ]; then cut -f1 "$case_dir/pane-rows" | sort -u; elif [ -f "$case_dir/pane-pid" ]; then echo fm-task-x1; fi ;; esac
 if [ -e "$case_dir/endpoint-stuck" ]; then
   case "\${1:-}" in
     kill-window) exit 1 ;;

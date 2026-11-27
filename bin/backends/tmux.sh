@@ -149,9 +149,18 @@ fm_backend_tmux_window_inventory() {  # <session-target>
     printf '%s\n' "$windows"
     return 0
   fi
-  case "$windows" in
+  fm_backend_tmux_answer_is_absent "$windows" && return 2
+  return 1
+}
+
+# fm_backend_tmux_answer_is_absent: the one owner of which tmux failure answers
+# are definitive that a session, or its whole server, is absent. Every other
+# answer (a permission-denied or unreadable socket, a timeout, a missing tmux)
+# proves nothing either way.
+fm_backend_tmux_answer_is_absent() {  # <tmux output>
+  case "$1" in
     *"can't find session:"*|*"no server running on "*|*"error connecting to "*" (No such file or directory)"|*"error connecting to "*" (Connection refused)")
-      return 2
+      return 0
       ;;
   esac
   return 1
