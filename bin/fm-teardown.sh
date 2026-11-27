@@ -852,6 +852,9 @@
 # never blocks cleanup.
 set -eu
 
+# The directory this run started in. A home, state, data or config folder given relative to it is
+# printed absolute in a completing command (teardown_refuse_copy), so the command works from any directory.
+TEARDOWN_START_PWD=$(pwd -P 2>/dev/null) || TEARDOWN_START_PWD=
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"

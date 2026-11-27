@@ -4182,10 +4182,10 @@ run_by_path() {  # <case> <teardown --copy arguments...>
 # Runs a printed completing command exactly as printed, from a shell that sets none of the three root
 # overrides: only the fixture's code root, nm home and fake tools are supplied, so a root the command
 # does not carry is a root the run does not reach.
-by_path_run_printed() {  # <case> <command text>
-  env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
+by_path_run_printed() {  # <case> <command text> [directory to run it from]
+  ( cd "${3:-.}" && env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
     FM_ROOT_OVERRIDE="$1/code-root" NM_HOME="$1/nm" \
-    PATH="$1/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" bash -c "$2"
+    PATH="$1/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" bash -c "$2" )
 }
 
 by_path_registered() {  # <clone> <copy>
@@ -5676,6 +5676,47 @@ test_by_path_preserves_claude_whole_and_removes_the_copy() {
   pass 'teardown --copy preserves .claude and .opencode whole and removes the copy, refuses when git does not ignore them, and keeps the copy when the preserve cannot publish'
 }
 
+# A home, state, data and config folder given relative to the directory a run starts in is printed in the
+# completing command as the absolute folder it named, so the printed text works from any directory: run from
+# another folder with none of the overrides, it completes against the folders the refused run used.
+test_by_path_completing_command_names_the_absolute_roots_of_relative_roots() {
+  local case_dir rc command want base root kept
+  make_by_path_case by-path-relative-roots
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  base=$(cd "$case_dir" && pwd -P)
+  mkdir -p "$BP_COPY/.claude" "$case_dir/data/pres-1" "$case_dir/elsewhere"
+  printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+  printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'a file where the preserve parent must be a directory\n' > "$case_dir/data/pres-1/nested-copy-preserved"
+  rc=0
+  ( cd "$case_dir" && env FM_HOME=home FM_STATE_OVERRIDE=state FM_DATA_OVERRIDE=data FM_CONFIG_OVERRIDE=config \
+    FM_ROOT_OVERRIDE="$case_dir/code-root" NM_HOME="$case_dir/nm" \
+    PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 ) \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-relative-roots: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be preserved' "$case_dir/stderr" 'by-path-relative-roots: no named reason'
+  command=$(sed -n 's/^completing-command: //p' "$case_dir/stderr")
+  [ -n "$command" ] || fail "by-path-relative-roots: no completing command: $(cat "$case_dir/stderr")"
+  printf -v want ' FM_HOME=%q ' "$base/home"
+  [[ "$command" == *"$want"* ]] || fail "by-path-relative-roots: the printed command does not name the absolute home$want: $command"
+  for root in state data config; do
+    printf -v want ' FM_%s_OVERRIDE=%q ' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$base/$root"
+    [[ "$command" == *"$want"* ]] || fail "by-path-relative-roots: the printed command does not name the absolute folder$want: $command"
+  done
+  case "$command" in *=state\ *|*=data\ *|*=config\ *|*FM_HOME=home\ *) fail "by-path-relative-roots: the printed command names a relative folder: $command" ;; esac
+  rm -f "$case_dir/data/pres-1/nested-copy-preserved"
+  rc=0
+  by_path_run_printed "$case_dir" "$command" "$case_dir/elsewhere" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-relative-roots: the printed command failed from another folder: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-relative-roots: the copy was not removed'
+  kept=$(find "$case_dir/data/pres-1/nested-copy-preserved" -type d -name files -print -quit 2>/dev/null)
+  [ -n "$kept" ] || fail 'by-path-relative-roots: nothing was preserved under the data folder the refused run used'
+  assert_equals 'unique settings' "$(cat "$kept/.claude/settings.local.json")" 'by-path-relative-roots: the preserved bytes differ'
+  assert_equals '' "$(ls -A "$case_dir/elsewhere")" 'by-path-relative-roots: the printed command wrote into the folder it was run from'
+  pass 'a teardown --copy completing command names absolute folders for relative roots and completes from another directory'
+}
+
 # A run whose state, data and config folders are the home's own defaults prints the completing command
 # it always printed, with no root override on it; the same refusal under a home whose roots differ
 # prints each differing root (test_by_path_preserves_claude_whole_and_removes_the_copy runs that text).
@@ -6025,6 +6066,7 @@ test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude
 test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
 test_by_path_preserves_claude_whole_and_removes_the_copy
 test_by_path_completing_command_prints_a_root_only_when_it_differs_from_the_home_default
+test_by_path_completing_command_names_the_absolute_roots_of_relative_roots
 test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read
 test_by_path_refuses_a_holder_that_starts_after_the_first_scan
 )

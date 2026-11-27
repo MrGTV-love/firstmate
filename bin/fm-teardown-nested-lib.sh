@@ -158,15 +158,43 @@ teardown_copy_question() {  # <rule> <copy>
   esac
 }
 
+# Prints the absolute form of <path>: the path itself when it is absolute,
+# otherwise the folder it names relative to the directory this run started in
+# (TEARDOWN_START_PWD; a caller that records none uses its current directory).
+# Fails when no absolute form can be made.
+teardown_absolute_root() {  # <path>
+  local base
+  case "$1" in
+    '') return 1 ;;
+    /*) printf '%s\n' "$1" ;;
+    *)
+      base=${TEARDOWN_START_PWD:-}
+      [ -n "$base" ] || base=$(pwd -P 2>/dev/null) || return 1
+      case "$base" in /*) ;; *) return 1 ;; esac
+      printf '%s/%s\n' "${base%/}" "${1#./}" ;;
+  esac
+}
+
+# <path> without trailing slashes, to compare two spellings of one folder.
+teardown_root_key() {  # <path>
+  local path=$1
+  while [ "$path" != / ] && [ "${path%/}" != "$path" ]; do path=${path%/}; done
+  printf '%s\n' "$path"
+}
+
 # One event per refused copy/predicate, not another event for the registered-copy
 # wrapper that repeats it. The command re-enters the existing proof/preservation
 # owner without force, so a forced or legacy-record run, which it could not
 # complete, gets a human-only exit instead. A new custody/disposition decision is
-# asked explicitly. The command carries the state, data and config roots the run
-# used whenever one differs from its FM_HOME default, so running it as printed,
-# from a shell that sets none of the overrides, reaches the same folders.
+# asked explicitly. The command names absolute folders only: FM_HOME, and the
+# state, data and config roots the run used whenever one differs from its default
+# under FM_HOME, each relative one taken relative to the directory the run
+# started in. Run as printed, from any directory and a shell that sets none of
+# the overrides, it reaches the same folders. A run that cannot make a root
+# absolute gets the human-only exit instead, naming that root.
 teardown_refuse_copy() {  # <rule> <missing> <copy>
-  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh} roots=
+  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh} roots='' why=''
+  local abs_home abs_state abs_data abs_config
   # An unavailable inspection is not a policy judgment. The later custody
   # wrapper repeats this diagnostic without manufacturing a policy event.
   if [ "$1" = inspection-unavailable ]; then
@@ -176,17 +204,26 @@ teardown_refuse_copy() {  # <rule> <missing> <copy>
   fi
   exit_text=$(teardown_copy_question "$1" "$3")
   if [ "$1" = ignored-bytes-preserved ] && [ "${FORCE:-}" != --force ] && [ "${LEGACY_RECORD_GIVEN:-0}" != 1 ]; then
-    kind=machine
-    [ "${STATE:-$FM_HOME/state}" = "$FM_HOME/state" ] || roots="$roots FM_STATE_OVERRIDE=$(printf '%q' "$STATE")"
-    [ "${DATA:-$FM_HOME/data}" = "$FM_HOME/data" ] || roots="$roots FM_DATA_OVERRIDE=$(printf '%q' "$DATA")"
-    [ "${CONFIG:-$FM_HOME/config}" = "$FM_HOME/config" ] || roots="$roots FM_CONFIG_OVERRIDE=$(printf '%q' "$CONFIG")"
-    if [ "${TEARDOWN_BY_PATH:-}" = 1 ]; then
-      printf -v command 'FM_HOME=%q%s bash %q --copy %q --record-id %q' "$FM_HOME" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$TEARDOWN_BY_PATH_COPY" "$ID"
+    abs_home=$(teardown_absolute_root "$FM_HOME") || why="the home folder ($FM_HOME)"
+    abs_state=$(teardown_absolute_root "${STATE:-$FM_HOME/state}") || why="${why:+$why, }the state folder (${STATE:-$FM_HOME/state})"
+    abs_data=$(teardown_absolute_root "${DATA:-$FM_HOME/data}") || why="${why:+$why, }the data folder (${DATA:-$FM_HOME/data})"
+    abs_config=$(teardown_absolute_root "${CONFIG:-$FM_HOME/config}") || why="${why:+$why, }the config folder (${CONFIG:-$FM_HOME/config})"
+    if [ -n "$why" ]; then
+      exit_text="No completing command is printed because $why is relative and the directory this run started in cannot be read, so a command naming it could not reach it from another directory. Once readable source and writable preservation storage are restored, re-run this teardown from the directory it started in."
+      missing="$missing Restore readable source and writable preservation storage, then re-run this teardown from the directory it started in."
     else
-      printf -v command 'FM_HOME=%q%s bash %q %q' "$FM_HOME" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
+      kind=machine
+      [ "$(teardown_root_key "$abs_state")" = "$(teardown_root_key "$abs_home")/state" ] || roots="$roots FM_STATE_OVERRIDE=$(printf '%q' "$abs_state")"
+      [ "$(teardown_root_key "$abs_data")" = "$(teardown_root_key "$abs_home")/data" ] || roots="$roots FM_DATA_OVERRIDE=$(printf '%q' "$abs_data")"
+      [ "$(teardown_root_key "$abs_config")" = "$(teardown_root_key "$abs_home")/config" ] || roots="$roots FM_CONFIG_OVERRIDE=$(printf '%q' "$abs_config")"
+      if [ "${TEARDOWN_BY_PATH:-}" = 1 ]; then
+        printf -v command 'FM_HOME=%q%s bash %q --copy %q --record-id %q' "$abs_home" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$TEARDOWN_BY_PATH_COPY" "$ID"
+      else
+        printf -v command 'FM_HOME=%q%s bash %q %q' "$abs_home" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
+      fi
+      exit_text=$command
+      missing="$missing Restore readable source and writable preservation storage, then run the completing command."
     fi
-    exit_text=$command
-    missing="$missing Restore readable source and writable preservation storage, then run the completing command."
   fi
   FM_HOME="$FM_HOME" FM_FRICTION_REVISION_FILE="$revision" \
     fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$missing" "$kind" "$exit_text" nested-copy "$3" "$ID"

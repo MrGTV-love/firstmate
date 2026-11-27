@@ -4559,6 +4559,49 @@ test_the_completing_command_of_a_default_home_close_carries_no_root_override() {
   pass 'the completing command of a default-home close carries no root override and completes the close when run as printed'
 }
 
+# A home, state, data and config folder given relative to the directory a run starts in is printed in the
+# completing command as the absolute folder it named, so the printed text works from any directory: run from
+# another folder with none of the overrides, it completes against the folders the refused run used.
+test_the_completing_command_names_the_absolute_roots_of_a_relative_roots_close() {
+  local rc exclude route line root want preserved base
+  dead_launcher_pid
+  make_own_locked_copy_case relative-roots-route enclosing "$FOREIGN_DEAD_PID"
+  base=$(cd "$FOREIGN_CASE" && pwd -P)
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'unique retained bytes\n' > "$FOREIGN_COPY/unique.dat"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FOREIGN_CASE/fakebin/cp"
+  chmod +x "$FOREIGN_CASE/fakebin/cp"
+  FOREIGN_RELATIVE_ROOTS=1
+  run_foreign_teardown rc
+  unset FOREIGN_RELATIVE_ROOTS
+  expect_code 1 "$rc" "relative-roots: failed preservation must keep refusing: $(cat "$FOREIGN_CASE/stderr")"
+  route=
+  while IFS= read -r line; do
+    case "$line" in 'completing-command: '*) route=${line#completing-command: } ;; esac
+  done < "$FOREIGN_CASE/stderr"
+  [ -n "$route" ] || fail "relative-roots: the refusal omitted its completing command: $(cat "$FOREIGN_CASE/stderr")"
+  printf -v want ' FM_HOME=%q ' "$base/home"
+  case "$route" in *"$want"*) ;; *) fail "relative-roots: the printed command does not name the absolute home$want: $route" ;; esac
+  for root in state data config; do
+    printf -v want ' FM_%s_OVERRIDE=%q ' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$base/$root"
+    case "$route" in *"$want"*) ;; *) fail "relative-roots: the printed command does not name the absolute folder$want: $route" ;; esac
+  done
+  case "$route" in *=state\ *|*=data\ *|*=config\ *|*FM_HOME=home\ *) fail "relative-roots: the printed command names a relative folder: $route" ;; esac
+  rm "$FOREIGN_CASE/fakebin/cp"
+  mkdir -p "$FOREIGN_CASE/elsewhere"
+  FOREIGN_REPLAY_DIR=$FOREIGN_CASE/elsewhere
+  run_printed_route "$route" rc
+  unset FOREIGN_REPLAY_DIR
+  expect_code 0 "$rc" "relative-roots: the printed command failed from another folder: $(cat "$FOREIGN_CASE/completed.stderr")"
+  assert_absent "$FOREIGN_COPY" 'relative-roots: the printed command did not retire the copy'
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" 'relative-roots: the printed command did not close the task of the refused run'
+  preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f)
+  assert_equals 'unique retained bytes' "$(cat "$preserved")" 'relative-roots: the printed command lost the ignored bytes'
+  assert_equals '' "$(ls -A "$FOREIGN_CASE/elsewhere")" 'relative-roots: the printed command wrote into the folder it was run from'
+  pass 'a completing command names absolute folders for relative roots and completes the close from another directory'
+}
+
 test_forced_preservation_refusal_prints_no_completing_command() {
   local ownership
   for ownership in own foreign; do
@@ -8889,6 +8932,7 @@ test_a_foreign_copy_with_durable_tac_state_is_held_and_tac_tmp_is_not_the_reason
 test_a_foreign_copy_whose_ignored_files_cannot_be_listed_is_refused_not_held
 test_typed_preservation_exit_completes_cleanup
 test_the_completing_command_of_a_default_home_close_carries_no_root_override
+test_the_completing_command_names_the_absolute_roots_of_a_relative_roots_close
 test_forced_preservation_refusal_prints_no_completing_command
 test_legacy_preservation_refusal_prints_no_completing_command
 test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal
