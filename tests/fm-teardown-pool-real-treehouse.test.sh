@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The real-Treehouse case of bin/fm-teardown.sh's release of skipped copies: a skipped-copies row naming any holder but
 # this task's own is never returned, with the pool and every return run by the installed treehouse binary.
-# The case is gated on `lease --path` (and jq), as it was before it moved here; without them the first output line is the
-# runner's gate skip and the script exits 0. The other pool-slot cases live in tests/fm-teardown-pool.test.sh.
+# The case needs jq and `get --lease`, which makes its two slots, and nothing else from Treehouse; without them the first
+# output line is the runner's gate skip naming what is missing, and the script exits 0. The other pool-slot cases live in tests/fm-teardown-pool.test.sh.
 # Shared fixtures: tests/fm-teardown-helpers.sh.
 # Usage: bash tests/fm-teardown-pool-real-treehouse.test.sh [test_function_name ...]
 
@@ -10,7 +10,7 @@ set -u
 
 # shellcheck source=tests/fm-teardown-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-teardown-helpers.sh"
-fm_test_require_real_treehouse lease-path
+fm_test_require_real_treehouse get-lease
 
 # A record row naming any holder but this task's own firstmate-skipped:<task> is never returned, even when the real pool
 # holds exactly that holder text (here the text a past spawn used as a sentinel). The REAL treehouse makes the pool and

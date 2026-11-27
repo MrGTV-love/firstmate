@@ -623,11 +623,13 @@ test_spawn_tree_follows_untracked_content() (
   pass "the private spawn tree changes when an untracked file with a non-ASCII name changes content"
 )
 
-# fm_test_require_real_treehouse skips a script only for a capability that script names. A host treehouse whose
-# `lease --help` has no --path still runs a get-only gate, and the skip line names exactly what is missing.
+# The real-treehouse gates skip only for what a script or case uses, and name exactly what is missing. A host treehouse
+# with get --lease but no lease --path runs a get-only script and every get-only case of a mixed script, leaving out only
+# the lease --path cases, which the first output line names. With no jq the skip line names jq, not a Treehouse
+# capability.
 test_real_treehouse_gate_skips_only_for_a_named_capability() (
-  local dir="$TMP_ROOT/real-treehouse-gate" caps out want
-  mkdir -p "$dir/fakebin"
+  local dir="$TMP_ROOT/real-treehouse-gate" caps out want d f name
+  mkdir -p "$dir/fakebin" "$dir/nojq"
   command -v jq >/dev/null 2>&1 || fail "jq is not installed, so this case cannot exercise the gate"
   cat >"$dir/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
@@ -643,12 +645,36 @@ SH
     out=$(PATH="$dir/fakebin:$PATH" bash "$dir/gate.sh" 2>&1) || fail "the gate script for '$caps' failed: $out"
     case "$caps" in
       get-lease) want=ran ;;
-      lease-path) want='skip: no Treehouse with lease --path on this host' ;;
-      *) want='skip: no Treehouse with lease --path and get --lease on this host' ;;
+      *) want='skip: no Treehouse with lease --path on this host' ;;
     esac
     [ "$out" = "$want" ] || fail "the gate for '$caps' printed '$out', not '$want'"
   done
-  pass "the real-treehouse gate skips only for a capability the script names, and names it"
+
+  # A mixed script: the get-only cases run, and the one lease --path case is left out by name on the first line.
+  printf '#!/usr/bin/env bash\n. %q\nfm_test_real_treehouse_case_plan "test_alpha get-lease" "test_beta get-lease lease-path" "test_gamma get-lease"\n' \
+    "$ROOT/tests/lib.sh" >"$dir/plan.sh"
+  out=$(PATH="$dir/fakebin:$PATH" bash "$dir/plan.sh" 2>&1) || fail "the case plan failed: $out"
+  want=$'skip: no Treehouse with lease --path on this host, so these cases did not run: test_beta\ntest_alpha\ntest_gamma'
+  [ "$out" = "$want" ] || fail "the case plan printed '$out', not '$want'"
+
+  # No jq: a PATH holding every tool this host has except jq.
+  for d in $(printf '%s' "$dir/fakebin:$PATH" | tr ':' ' '); do
+    [ -d "$d" ] || continue
+    for f in "$d"/*; do
+      name=${f##*/}
+      [ "$name" != jq ] && [ -x "$f" ] && [ ! -e "$dir/nojq/$name" ] || continue
+      ln -s "$f" "$dir/nojq/$name"
+    done
+  done
+  printf '#!/usr/bin/env bash\n. %q\nfm_test_require_real_treehouse get-lease\necho ran\n' "$ROOT/tests/lib.sh" >"$dir/gate.sh"
+  out=$(PATH="$dir/nojq" bash "$dir/gate.sh" 2>&1) || fail "the gate script without jq failed: $out"
+  [ "$out" = 'skip: no jq on this host' ] || fail "the gate without jq printed '$out', not 'skip: no jq on this host'"
+  out=$(PATH="$dir/nojq" bash "$dir/plan.sh" 2>&1) || fail "the case plan without jq failed: $out"
+  case "$out" in
+    'skip: no jq and no Treehouse with lease --path on this host, so these cases did not run: test_alpha, test_beta, test_gamma') ;;
+    *) fail "the case plan without jq printed '$out'" ;;
+  esac
+  pass "the real-treehouse gates skip only for what a script or case uses, and name jq or the missing capability"
 )
 
 test_duration_fixture_isolation || fail "Fixture duration isolation"

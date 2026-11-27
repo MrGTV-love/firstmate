@@ -3,15 +3,17 @@
 # recovered lease, another holder's lease, a foreign claim marker beside it, a pool state that fails the strict proof) is
 # passed over untouched and the next clean copy is taken, or the spawn refuses before any claim. Every pool, state file and
 # lease comes from the installed treehouse binary on one scratch TREEHOUSE_ROOT per case; only the pane is faked.
-# With no treehouse that has `lease --path` and `get --lease` (or no jq), the first output line is the runner's gate skip
-# and the script exits 0. The pooled-copy cases that need no Treehouse stay in tests/fm-spawn-pool-base-freshen.test.sh;
-# both files share tests/fm-spawn-pool-helpers.sh.
+# Every case needs jq and `treehouse get --lease`; without them the first output line is the runner's gate skip, naming
+# what is missing, and the script exits 0. Some cases also need `treehouse lease --path` (CASE_NEEDS below names each
+# case's needs); on a host without it those cases alone are left out, the first output line is the runner's gate skip
+# naming them, and every other case still runs. The pooled-copy cases that need no Treehouse stay in
+# tests/fm-spawn-pool-base-freshen.test.sh; both files share tests/fm-spawn-pool-helpers.sh.
 # Usage: bash tests/fm-spawn-real-treehouse.test.sh [test_function_name ...]
 set -u
 
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
-fm_test_require_real_treehouse
+fm_test_require_real_treehouse get-lease
 
 TMP_ROOT=$(fm_test_tmproot fm-spawn-real-treehouse)
 # Every spawn in this file runs with its detached home-summary refresh stubbed (tests/fixtures.sh fm_test_spawn_script).
@@ -1439,46 +1441,71 @@ SH
   pass "the after-clean-copy case rejects a spawn that restores the close"
 }
 
+# CASE_NEEDS: every case in run order, with the Treehouse capabilities it uses. lease-path marks a case that runs
+# `treehouse lease --path` itself or through the spawn (holding a copy in place); the rest run with get --lease alone.
+# The after-clean-copy control reruns its case, so it needs what that case needs.
+CASE_NEEDS=(
+  'test_a_copy_with_a_recovered_lease_is_left_alone_and_a_clean_copy_is_taken get-lease'
+  'test_a_copy_leased_by_another_holder_is_left_alone_and_a_clean_copy_is_taken get-lease lease-path'
+  'test_a_foreign_claim_marker_beside_a_passed_over_copy_is_never_touched get-lease'
+  'test_the_marker_case_rejects_a_direct_overwrite_and_restore_without_immutable_flags get-lease'
+  'test_a_known_doubt_copy_with_no_lease_is_still_leased_to_this_task get-lease lease-path'
+  'test_conflicting_pool_records_for_a_copy_refuse_the_whole_spawn get-lease'
+  'test_an_unreadable_or_conflicting_pool_state_on_a_clean_copy_refuses_before_any_claim get-lease lease-path'
+  'test_a_clean_unleased_copy_goes_on_to_the_claim_and_is_used get-lease'
+  'test_a_row_with_leased_false_is_unleased_and_the_copy_is_used get-lease'
+  'test_the_strict_state_proof_never_accepts_a_state_the_real_treehouse_cannot_read get-lease lease-path'
+  'test_a_state_with_a_wrong_field_type_is_never_read_as_another_holders_lease get-lease lease-path'
+  'test_a_clean_unleased_copy_in_a_state_that_fails_the_proof_is_never_claimed get-lease'
+  'test_a_copy_with_no_readable_state_is_refused_unless_the_named_pool_excludes_it get-lease lease-path'
+  'test_a_pool_slot_with_a_readable_state_is_classified_from_it_when_pool_dir_fails get-lease lease-path'
+  'test_the_acceptance_assertion_rejects_a_crlf_only_change_of_the_state_entry get-lease'
+  'test_the_acceptance_assertion_rejects_a_failed_git_read_with_changed_work get-lease'
+  'test_the_acceptance_assertion_rejects_a_raw_index_change get-lease'
+  'test_the_acceptance_assertion_rejects_a_write_that_restores_bytes_mode_and_mtime get-lease'
+  'test_a_failed_raw_index_checksum_fails_the_acceptance_assertion get-lease'
+  'test_the_acceptance_assertion_rejects_a_restored_rewrite_of_the_pool_state_file get-lease lease-path'
+  'test_the_acceptance_assertion_rejects_a_restored_rewrite_of_a_loose_ref_file get-lease'
+  'test_a_state_that_fails_the_proof_after_the_first_reading_refuses_before_any_claim get-lease lease-path'
+  'test_a_change_that_no_strict_reading_sees_never_classifies_the_copy get-lease lease-path'
+  'test_a_valid_change_to_another_row_between_the_two_readings_does_not_refuse get-lease lease-path'
+  'test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn get-lease'
+  'test_a_pool_of_only_refused_copies_refuses_once_and_names_each get-lease'
+  'test_a_refused_copy_handed_out_twice_does_not_loop get-lease'
+  'test_a_passed_over_pane_is_not_closed_on_abort get-lease'
+  'test_a_governed_refusal_after_a_pass_over_names_its_record get-lease'
+  'test_an_abort_after_a_clean_copy_is_reached_keeps_the_pane get-lease lease-path'
+  'test_the_after_clean_copy_case_rejects_a_restored_close get-lease lease-path'
+)
+
+# Run the selected cases, or every case, through fm_test_real_treehouse_case_plan: a case this host cannot run is left
+# out, and the plan's first line is then the runner's gate skip naming it.
+selected_needs=()
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
-    case "$selected_test" in
-      test_*) if declare -F "$selected_test" >/dev/null 2>&1; then "$selected_test"; else fail "unknown selected test: $selected_test"; fi ;;
-      *) fail "unknown selected test: $selected_test" ;;
-    esac
+    found=
+    for entry in "${CASE_NEEDS[@]}"; do
+      [ "${entry%% *}" = "$selected_test" ] && { found=$entry; break; }
+    done
+    [ -n "$found" ] && declare -F "$selected_test" >/dev/null 2>&1 || fail "unknown selected test: $selected_test"
+    selected_needs+=("$found")
   done
-  exit 0
+else
+  selected_needs=("${CASE_NEEDS[@]}")
 fi
+case_plan=$(fm_test_real_treehouse_case_plan "${selected_needs[@]}")
+planned_cases=()
+while IFS= read -r planned; do
+  case "$planned" in
+    skip:*) printf '%s\n' "$planned" ;;
+    test_*) planned_cases+=("$planned") ;;
+  esac
+done <<EOF
+$case_plan
+EOF
+for planned in "${planned_cases[@]+"${planned_cases[@]}"}"; do
+  "$planned"
+done
+[ "$#" -eq 0 ] || exit 0
 
-test_a_copy_with_a_recovered_lease_is_left_alone_and_a_clean_copy_is_taken
-test_a_copy_leased_by_another_holder_is_left_alone_and_a_clean_copy_is_taken
-test_a_foreign_claim_marker_beside_a_passed_over_copy_is_never_touched
-test_the_marker_case_rejects_a_direct_overwrite_and_restore_without_immutable_flags
-test_a_known_doubt_copy_with_no_lease_is_still_leased_to_this_task
-test_conflicting_pool_records_for_a_copy_refuse_the_whole_spawn
-test_an_unreadable_or_conflicting_pool_state_on_a_clean_copy_refuses_before_any_claim
-test_a_clean_unleased_copy_goes_on_to_the_claim_and_is_used
-test_a_row_with_leased_false_is_unleased_and_the_copy_is_used
-test_the_strict_state_proof_never_accepts_a_state_the_real_treehouse_cannot_read
-test_a_state_with_a_wrong_field_type_is_never_read_as_another_holders_lease
-test_a_clean_unleased_copy_in_a_state_that_fails_the_proof_is_never_claimed
-test_a_copy_with_no_readable_state_is_refused_unless_the_named_pool_excludes_it
-test_a_pool_slot_with_a_readable_state_is_classified_from_it_when_pool_dir_fails
-test_the_acceptance_assertion_rejects_a_crlf_only_change_of_the_state_entry
-test_the_acceptance_assertion_rejects_a_failed_git_read_with_changed_work
-test_the_acceptance_assertion_rejects_a_raw_index_change
-test_the_acceptance_assertion_rejects_a_write_that_restores_bytes_mode_and_mtime
-test_a_failed_raw_index_checksum_fails_the_acceptance_assertion
-test_the_acceptance_assertion_rejects_a_restored_rewrite_of_the_pool_state_file
-test_the_acceptance_assertion_rejects_a_restored_rewrite_of_a_loose_ref_file
-test_a_state_that_fails_the_proof_after_the_first_reading_refuses_before_any_claim
-test_a_change_that_no_strict_reading_sees_never_classifies_the_copy
-test_a_valid_change_to_another_row_between_the_two_readings_does_not_refuse
-test_forged_already_leased_text_without_the_pool_state_refuses_the_spawn
-test_a_pool_of_only_refused_copies_refuses_once_and_names_each
-test_a_refused_copy_handed_out_twice_does_not_loop
-test_a_passed_over_pane_is_not_closed_on_abort
-test_a_governed_refusal_after_a_pass_over_names_its_record
-test_an_abort_after_a_clean_copy_is_reached_keeps_the_pane
-test_the_after_clean_copy_case_rejects_a_restored_close
-
-echo "# all fm-spawn-real-treehouse tests passed"
+echo "# every fm-spawn-real-treehouse case this host can run passed"
