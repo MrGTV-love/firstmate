@@ -1,0 +1,11 @@
+=== unreadable: recorded holder pid 93634 (kill -0: alive); ps for holder: FAILS
+cursor park exit=0
+stdout: 
+lock now: 93634  (caller cursor-agent pid 94906)
+watcher arm ran: no
+=== dead: recorded holder pid 93637 (kill -0: gone); ps for holder: real
+cursor park exit=0
+stdout: 
+lock now: 96489  (caller cursor-agent pid 96502)
+watcher arm ran: no
+fixture removed

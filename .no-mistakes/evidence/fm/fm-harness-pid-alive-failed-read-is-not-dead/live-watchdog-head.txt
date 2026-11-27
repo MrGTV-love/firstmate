@@ -1,0 +1,16 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.iNO162  repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8DMW2J1VQGF3NPHWTC2G695
+=== unreadable: live harness holder pid 55261, stale beacon, ps for holder FAILS
+watchdog: unknown-session - lock holder cannot be read; no recovery run
+watchdog exit=0
+resume command runs: none
+watcher arm calls: none
+episode unchanged: yes
+watchdog.log tail: [2026-11-26T22:56:13-0600] verdict unknown-session; no recovery while the lock holder cannot be read|
+=== readable: live harness holder pid 55261, stale beacon, ps for holder works
+watchdog: recovered from stale-watcher
+watchdog exit=0
+resume command runs: stale-watcher 
+watcher arm calls: none
+episode unchanged: NO -> 
+watchdog.log tail: [2026-11-26T22:56:13-0600] running config/watchdog-resume for stale-watcher|[2026-11-26T22:56:13-0600] recovered from stale-watcher|
+lab torn down

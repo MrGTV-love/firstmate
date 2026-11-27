@@ -1,0 +1,22 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Xv7r3O  repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8DMW2J1VQGF3NPHWTC2G695
+=== B2 live REAL-SHAPED harness holder whose ps read fails (exit 2): holder pid 7841 (kill -0: alive; real ps comm: /tmp/fm-drv/fb.O79g/claude)
+error: cannot read process 7841; holder not proven dead; operate read-only until resolved
+fm-lock.sh exit=1
+caller chain pid=8545
+lock now holds: 7841  lock unchanged: yes
+=== F1 confined-worker ps (exit 126) for a live harness holder; fallback reader works: holder pid 7841 (kill -0: alive; real ps comm: /tmp/fm-drv/fb.O79g/claude)
+error: another live firstmate session holds the lock (pid 7841); operate read-only until resolved
+fm-lock.sh exit=1
+caller chain pid=9861
+lock now holds: 7841  lock unchanged: yes
+=== F2 confined-worker ps (exit 126) for a live non-harness holder; fallback reader works: holder pid 7845 (kill -0: alive; real ps comm: /bin/sleep)
+lock acquired: harness pid 12053
+fm-lock.sh exit=0
+caller chain pid=12053
+lock now holds: 12053  lock unchanged: NO
+=== F3 confined-worker ps (exit 126) for a live harness holder AND the fallback reader fails: holder pid 7841 (kill -0: alive; real ps comm: /tmp/fm-drv/fb.O79g/claude)
+error: cannot read process 7841; holder not proven dead; operate read-only until resolved
+fm-lock.sh exit=1
+caller chain pid=16030
+lock now holds: 7841  lock unchanged: yes
+lab torn down

@@ -1,0 +1,22 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.aEe5Zg  repo=/tmp/fm-base.Qkvf
+=== B unreadable live holder (kill -0 ok, ps fails for holder only): holder pid 37392 (kill -0: alive; real ps comm: /bin/sleep)
+lock acquired: harness pid 37464
+fm-lock.sh exit=0
+caller chain pid=37464
+lock now holds: 37464  lock unchanged: NO
+=== C live non-harness holder, working ps: holder pid 37392 (kill -0: alive; real ps comm: /bin/sleep)
+lock acquired: harness pid 39123
+fm-lock.sh exit=0
+caller chain pid=39123
+lock now holds: 39123  lock unchanged: NO
+=== D live verified-harness holder, working ps: holder pid 41265 (kill -0: alive; real ps comm: /tmp/fm-drv/fb.A05q/claude)
+error: another live firstmate session holds the lock (pid 41265); operate read-only until resolved
+fm-lock.sh exit=1
+caller chain pid=41844
+lock now holds: 41265  lock unchanged: yes
+=== E gone holder (kill -0 fails): holder pid 42988 (kill -0: gone; real ps comm: <none>)
+lock acquired: harness pid 43075
+fm-lock.sh exit=0
+caller chain pid=43075
+lock now holds: 43075  lock unchanged: NO
+lab torn down

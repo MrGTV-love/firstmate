@@ -1,0 +1,22 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.1wtLK8  repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8DMW2J1VQGF3NPHWTC2G695
+=== B unreadable live holder (kill -0 ok, ps fails for holder only): holder pid 31219 (kill -0: alive; real ps comm: /bin/sleep)
+error: cannot read process 31219; holder not proven dead; operate read-only until resolved
+fm-lock.sh exit=1
+caller chain pid=31354
+lock now holds: 31219  lock unchanged: yes
+=== C live non-harness holder, working ps: holder pid 31219 (kill -0: alive; real ps comm: /bin/sleep)
+lock acquired: harness pid 33425
+fm-lock.sh exit=0
+caller chain pid=33425
+lock now holds: 33425  lock unchanged: NO
+=== D live verified-harness holder, working ps: holder pid 35941 (kill -0: alive; real ps comm: /tmp/fm-drv/fb.xMJl/claude)
+error: another live firstmate session holds the lock (pid 35941); operate read-only until resolved
+fm-lock.sh exit=1
+caller chain pid=36643
+lock now holds: 35941  lock unchanged: yes
+=== E gone holder (kill -0 fails): holder pid 37860 (kill -0: gone; real ps comm: <none>)
+lock acquired: harness pid 37903
+fm-lock.sh exit=0
+caller chain pid=37903
+lock now holds: 37903  lock unchanged: NO
+lab torn down

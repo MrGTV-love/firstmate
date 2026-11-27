@@ -1,0 +1,15 @@
+=== unreadable: recorded holder pid 71618 (kill -0: alive); ps for holder: FAILS
+autoarm exit=2
+output: firstmate watcher auto-arm FAILED - the Stop-owned automatic supervision mechanism is broken after 2 bounded attempts, and no live watcher with a fresh beacon was verified.
+watcher: started pid=78856 (beacon fresh)
+Do not launch a manual background arm from this notice; investigate the automatic Stop hook and watcher startup before ending blind.
+lock now: 72922  (caller chain pid 72922)
+watcher arm ran: yes
+=== dead: recorded holder pid 71622 (kill -0: gone); ps for holder: real
+autoarm exit=2
+output: firstmate watcher auto-arm FAILED - the Stop-owned automatic supervision mechanism is broken after 2 bounded attempts, and no live watcher with a fresh beacon was verified.
+watcher: started pid=85726 (beacon fresh)
+Do not launch a manual background arm from this notice; investigate the automatic Stop hook and watcher startup before ending blind.
+lock now: 80394  (caller chain pid 80394)
+watcher arm ran: yes
+fixture removed

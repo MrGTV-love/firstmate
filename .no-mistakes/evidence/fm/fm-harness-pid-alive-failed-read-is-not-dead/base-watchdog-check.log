@@ -1,0 +1,12 @@
+ok - fresh state reads healthy and acts on nothing
+ok - a home with no work reads idle even with a stale beacon
+ok - a missing home reads idle and is not created
+ok - a bound rewake is healthy at 1000 seconds and stale at 3700 seconds
+ok - a stale watcher with a live session is resumed and recovers
+ok - a stale lock held by an unrelated live pid is cleared through the arm's home-scoped --stop only
+ok - an arming ledger with a dead owner reads dead-arm-owner and recovers
+ok - an arming ledger with a live owner is not called a dead arm owner
+ok - a dead session lock is resumed through the configured command
+ok - an absent session lock reads session-missing
+not ok - unreadable holder exit: expected exit 0, got 1
+exit=1

@@ -1,0 +1,22 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.aaIimU  repo=/tmp/fm-base.Qkvf
+=== B2 live REAL-SHAPED harness holder whose ps read fails (exit 2): holder pid 18107 (kill -0: alive; real ps comm: /tmp/fm-drv/fb.T730/claude)
+lock acquired: harness pid 18959
+fm-lock.sh exit=0
+caller chain pid=18959
+lock now holds: 18959  lock unchanged: NO
+=== F1 confined-worker ps (exit 126) for a live harness holder; fallback reader works: holder pid 18107 (kill -0: alive; real ps comm: /tmp/fm-drv/fb.T730/claude)
+error: another live firstmate session holds the lock (pid 18107); operate read-only until resolved
+fm-lock.sh exit=1
+caller chain pid=20840
+lock now holds: 18107  lock unchanged: yes
+=== F2 confined-worker ps (exit 126) for a live non-harness holder; fallback reader works: holder pid 18111 (kill -0: alive; real ps comm: /bin/sleep)
+lock acquired: harness pid 23349
+fm-lock.sh exit=0
+caller chain pid=23349
+lock now holds: 23349  lock unchanged: NO
+=== F3 confined-worker ps (exit 126) for a live harness holder AND the fallback reader fails: holder pid 18107 (kill -0: alive; real ps comm: /tmp/fm-drv/fb.T730/claude)
+lock acquired: harness pid 28209
+fm-lock.sh exit=0
+caller chain pid=28209
+lock now holds: 28209  lock unchanged: NO
+lab torn down

@@ -1,0 +1,16 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.znaxwc  repo=/tmp/fm-base.Qkvf
+=== unreadable: live harness holder pid 58322, stale beacon, ps for holder FAILS
+watchdog: session-missing - recovery failed (attempt 2)
+watchdog exit=1
+resume command runs: session-missing 
+watcher arm calls: none
+episode unchanged: NO -> attempts=2 last_attempt=1795755374 last_alarm=1795755374
+watchdog.log tail: [2026-11-26T22:56:14-0600] running config/watchdog-resume for session-missing|[2026-11-26T22:56:16-0600] recovery attempt 2 failed; verdict now session-missing|
+=== readable: live harness holder pid 58322, stale beacon, ps for holder works
+watchdog: recovered from stale-watcher
+watchdog exit=0
+resume command runs: stale-watcher 
+watcher arm calls: none
+episode unchanged: NO -> 
+watchdog.log tail: [2026-11-26T22:56:17-0600] running config/watchdog-resume for stale-watcher|[2026-11-26T22:56:17-0600] recovered from stale-watcher|
+lab torn down
