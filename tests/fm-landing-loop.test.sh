@@ -71,6 +71,26 @@ if len(args) >= 2 and args[0] == "api" and "/compare/" in args[1]:
             print(json.dumps(v))
             sys.exit(0)
     sys.exit(1)
+if len(args) >= 2 and args[0] == "api" and args[1] == "graphql":
+    kv = {}
+    for i, tok in enumerate(args):
+        if tok in ("-F", "-f") and i + 1 < len(args) and "=" in args[i + 1]:
+            k, v = args[i + 1].split("=", 1)
+            kv[k] = v
+    url = f"https://github.com/{kv.get('owner','')}/{kv.get('repo','')}/pull/{kv.get('number','')}"
+    entry = data["prs"].get(url)
+    if not entry:
+        sys.exit(1)
+    v = entry["view"]
+    cmp_tip = (data.get("compares", {}).get(v.get("headRefOid", "")) or {}).get("base_commit", {}).get("sha") or v.get("baseRefOid", "")
+    print(json.dumps({"data": {"repository": {"pullRequest": {
+        "state": v["state"],
+        "isDraft": v["isDraft"],
+        "baseRefName": v["baseRefName"],
+        "headRefOid": v["headRefOid"],
+        "baseRef": {"target": {"oid": cmp_tip}},
+    }}}}))
+    sys.exit(0)
 if len(args) >= 4 and args[0] == "api" and args[1] == "-X" and args[2] == "PUT" and args[3].endswith("/update-branch"):
     log_path = data.get("update_log")
     if log_path:

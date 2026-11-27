@@ -259,6 +259,34 @@ def gh_pr_view(url, timeout=GH_TIMEOUT):
     return data
 
 
+def gh_pr_live_snapshot(owner, repo, number, timeout=GH_TIMEOUT):
+    """Read state, isDraft, baseRefName, headRefOid, and the LIVE base branch ref tip in one GraphQL call."""
+    query = (
+        "query($owner:String!,$repo:String!,$number:Int!){"
+        "repository(owner:$owner,name:$repo){"
+        "pullRequest(number:$number){state isDraft baseRefName headRefOid baseRef{target{oid}}}"
+        "}}"
+    )
+    res = run(
+        ["gh", "api", "graphql", "-f", f"query={query}",
+         "-F", f"owner={owner}", "-F", f"repo={repo}", "-F", f"number={int(number)}"],
+        timeout=timeout,
+    )
+    if res.returncode != 0:
+        return None
+    try:
+        pr = (((json.loads(res.stdout) or {}).get("data") or {}).get("repository") or {}).get("pullRequest")
+    except ValueError:
+        return None
+    if not isinstance(pr, dict):
+        return None
+    live_base_tip = ((pr.get("baseRef") or {}).get("target") or {}).get("oid") or ""
+    if not SHA.fullmatch(str(pr.get("headRefOid", ""))) or not SHA.fullmatch(str(live_base_tip)):
+        return None
+    pr["liveBaseTip"] = live_base_tip
+    return pr
+
+
 def gh_compare(owner, repo, base, head):
     seg = urllib.parse.quote(base, safe="")
     res = run(["gh", "api", f"repos/{owner}/{repo}/compare/{seg}...{head}?per_page=1"], timeout=GH_TIMEOUT)
@@ -610,9 +638,10 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                 log_path.write_text(detail + "\n", encoding="utf-8")
             else:
                 logs = []
-                # Single atomic GraphQL snapshot of state, baseRefName, baseRefOid, and headRefOid
-                # immediately before PUT /update-branch (no second compare round-trip between them).
-                pre_view = gh_pr_view(pr_url)
+                # Single atomic GraphQL snapshot of state, isDraft, baseRefName, headRefOid,
+                # and live baseRef.target.oid immediately before PUT /update-branch (avoids
+                # both a second round-trip and stale PR baseRefOid caching).
+                pre_view = gh_pr_live_snapshot(owner, repo_name, number)
                 if not pre_view:
                     rc = 1
                     detail = f"could not re-verify live PR state and {base_name} tip before update-branch"
@@ -625,9 +654,9 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                 elif pre_view.get("headRefOid") != expected_head:
                     rc = 1
                     detail = f"PR head moved ({str(pre_view.get('headRefOid', ''))[:10]} != proved {expected_head[:10]}) before update-branch"
-                elif pre_view.get("baseRefOid") != base_tip:
+                elif pre_view.get("liveBaseTip") != base_tip:
                     rc = 1
-                    detail = f"live {base_name} advanced ({str(pre_view.get('baseRefOid', ''))[:10]} != proved {base_tip[:10]}) before update-branch"
+                    detail = f"live {base_name} advanced ({str(pre_view.get('liveBaseTip', ''))[:10]} != proved {base_tip[:10]}) before update-branch"
                 else:
                     endpoint = f"repos/{owner}/{repo_name}/pulls/{number}/update-branch"
                     cmd = ["gh", "api", "-X", "PUT", endpoint, "-f", f"expected_head_sha={expected_head}"]
