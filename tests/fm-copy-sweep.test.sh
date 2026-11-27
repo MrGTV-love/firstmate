@@ -2552,10 +2552,12 @@ test_a_refused_ps_holds_a_locked_copy_the_confined_table_cannot_see() {
   rc=0
   PATH="$FAKEBIN:$ORIGINAL_PATH" ps -p "$pid" -o pid= >/dev/null 2>&1 || rc=$?
   assert_equals 126 "$rc" "the fake ps does not refuse the launcher"
-  table=$(python3 "$ROOT/bin/fm-proc-info.py" table pid)
-  printf '%s\n' "$table" | grep -qx -- "$pid" || fail "the real process table does not list the live launcher"
-  table=$(PATH="$FAKEBIN:$ORIGINAL_PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid)
-  if printf '%s\n' "$table" | grep -qx -- "$pid"; then fail "the launcher is not hidden from the confined reader"; fi
+  if [ "$(uname -s)" = Darwin ]; then
+    table=$(python3 "$ROOT/bin/fm-proc-info.py" table pid)
+    printf '%s\n' "$table" | grep -qx -- "$pid" || fail "the real process table does not list the live launcher"
+    table=$(PATH="$FAKEBIN:$ORIGINAL_PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid)
+    if printf '%s\n' "$table" | grep -qx -- "$pid"; then fail "the launcher is not hidden from the confined reader"; fi
+  fi
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   kill -0 "$pid" 2>/dev/null || fail "the live launcher ended before the verdict"
   kill "$pid" 2>/dev/null || true

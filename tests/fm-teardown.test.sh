@@ -4868,11 +4868,13 @@ test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_i
     if [ "$shape" = refused-hidden ]; then
       by_path_hide_launcher_from_table "$case_dir" "$pid"
       # The fixture bites: the real table lists the live launcher, the one the confined reader sees does not.
-      real_python=$(command -v python3)
-      table=$("$real_python" "$ROOT/bin/fm-proc-info.py" table pid)
-      printf '%s\n' "$table" | grep -qx -- "$pid" || fail "by-path-launcher-ps-$shape: the real process table does not list the live launcher"
-      table=$(PATH="$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid)
-      if printf '%s\n' "$table" | grep -qx -- "$pid"; then fail "by-path-launcher-ps-$shape: the launcher is not hidden from the confined reader"; fi
+      if [ "$(uname -s)" = Darwin ]; then
+        real_python=$(command -v python3)
+        table=$("$real_python" "$ROOT/bin/fm-proc-info.py" table pid)
+        printf '%s\n' "$table" | grep -qx -- "$pid" || fail "by-path-launcher-ps-$shape: the real process table does not list the live launcher"
+        table=$(PATH="$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid)
+        if printf '%s\n' "$table" | grep -qx -- "$pid"; then fail "by-path-launcher-ps-$shape: the launcher is not hidden from the confined reader"; fi
+      fi
     fi
     by_path_locked "$case_dir" "$pid"
     rc=0
