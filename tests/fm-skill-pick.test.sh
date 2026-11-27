@@ -70,7 +70,8 @@ globalThis.fetch = async (url, init) => {
       answers[id] = { type: 'choice', choice: winner, confidence: probabilities[winner], probabilities };
     }
   }
-  return new Response(JSON.stringify({ model: `${provider}-jev-test`, answers, usage: { input_tokens: 1, output_tokens: 1 } }));
+  return new Response(JSON.stringify({ model: env.FAKE_SERVED_MODEL || `${provider}-jev-test`, answers,
+    usage: { input_tokens: 1, output_tokens: 1 } }), { headers: { 'x-typesafe-request-id': `fixture-id-${directCalls}` } });
 };
 JS
 
@@ -475,7 +476,7 @@ spawn_case() { # <id> -> sets SPAWN_HOME SPAWN_POOL SPAWN_PROJECT SPAWN_FAKEBIN
 reset
 spawn_case pick-ship
 printf 'TYPESAFE_API_KEY=ts-spawn-key\n' > "$SPAWN_HOME/.env"
-out=$(FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FAKE_PICK=alpha \
+out=$(FAKE_LOG="$LOG" NODE_OPTIONS="--import=$FAKE_FETCH" FAKE_PICK=alpha FAKE_SERVED_MODEL=jev-1.13.0 FM_JEV_ATTEMPT_CAPTURE=1 \
   fm_test_run_spawn "$SPAWN_HOME" "$SPAWN_POOL" "$SPAWN_FAKEBIN" pick-ship "$SPAWN_PROJECT" --mode no-mistakes --yolo off)
 assert_contains "$out" "spawned pick-ship" "the ship launches"
 assert_contains "$out" "skill selection for pick-ship: picked (alpha)" "the spawn reports the pick"
@@ -487,7 +488,26 @@ overlay=$(grep -n '^# Current no-mistakes intent contract$' "$launch" | cut -d: 
   || fail "the skill section precedes the intent overlay, so it never becomes --intent text"
 grep -qx 'skill_selection=picked' "$SPAWN_HOME/state/pick-ship.meta" || fail "the task record carries the status"
 grep -qx 'skill_selection_picked=alpha' "$SPAWN_HOME/state/pick-ship.meta" || fail "the task record carries the pick"
-assert_not_contains "$(cat "$launch" "$SPAWN_HOME/state/pick-ship.meta")" ts-spawn-key "the key never reaches the launch or the record"
+pick_gen=$(sed -n 's/^spawn_gen=//p' "$SPAWN_HOME/state/pick-ship.meta")
+usage_record="$SPAWN_HOME/data/pick-ship/skill-selection-usage.$pick_gen.json"
+[ -s "$usage_record" ] || fail "the launch retains numeric accounting under its own generation"
+jq -e --argjson count "$(requests)" '
+  $count > 0 and . == {client_calls:$count,transport_attempts:$count,input_tokens:$count,output_tokens:$count}
+' "$usage_record" >/dev/null || fail "the retained accounting matches the stubbed calls and tokens"
+attempt_record="$SPAWN_HOME/data/pick-ship/skill-selection-attempts.$pick_gen.jsonl"
+jq -es --argjson count "$(requests)" --arg gen "$pick_gen" '
+  .[0].kind == "opened" and .[0].stage == "skill-selection" and
+  .[0].version == 2 and .[0].spawn_gen == $gen and
+  .[-1] == {kind:"closed",client_calls:$count} and
+  ([.[] | select(.kind=="attempt_started") | .call] == [range(1;$count+1)]) and
+  ([.[] | select(.kind=="response_observed") | .request_id_sha256] |
+    length == $count and all(.[]; type=="string" and test("^[a-f0-9]{64}$")) and (unique | length)==$count) and
+  ([.[] | select(.kind=="reported_usage" and .served_model=="jev-1.13.0" and .input_tokens==1 and .output_tokens==1)] | length == $count)
+' "$attempt_record" >/dev/null || fail 'the launch retains joinable attempt metadata for every selector call'
+assert_not_contains "$(cat "$attempt_record")" ts-spawn-key 'the key never reaches the attempt journal'
+assert_not_contains "$(cat "$attempt_record")" 'Make the alpha report export faster.' 'the brief never reaches the attempt journal'
+compgen -G "$SPAWN_HOME/data/pick-ship/.skill-selection.record.*" >/dev/null && fail "the transient selector record remains"
+assert_not_contains "$(cat "$launch" "$SPAWN_HOME/state/pick-ship.meta" "$usage_record")" ts-spawn-key "the key never reaches the launch or the record"
 pass "a ship launch adds the pick to its instructions and task record"
 
 reset
@@ -499,6 +519,10 @@ assert_contains "$(cat "$SPAWN_HOME/data/nokey-scout/launch-brief.md")" "Skill s
 grep -qx 'skill_selection=unavailable' "$SPAWN_HOME/state/nokey-scout.meta" || fail "the task record says unavailable"
 grep -qx 'skill_selection_reason=no TypeSafe or OpenRouter key' "$SPAWN_HOME/state/nokey-scout.meta" || fail "the task record says why"
 assert_equals 0 "$(requests)" "nothing is sent without a key"
+nokey_gen=$(sed -n 's/^spawn_gen=//p' "$SPAWN_HOME/state/nokey-scout.meta")
+jq -e '. == {client_calls:0,transport_attempts:0,input_tokens:0,output_tokens:0}' \
+  "$SPAWN_HOME/data/nokey-scout/skill-selection-usage.$nokey_gen.json" >/dev/null \
+  || fail "the no-key launch retains affirmative evidence of no selector calls"
 pass "a launch with no key proceeds and records why nothing was picked"
 
 

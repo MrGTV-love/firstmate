@@ -23,6 +23,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import xml.etree.ElementTree as ET
 import html as htmllib
 from decimal import Decimal
 from pathlib import Path
@@ -112,11 +113,11 @@ class Rejected(FetchError):
 
 
 class Fetched:
-    """One page: its text, its real fetch time ('unknown' without a sidecar), and whether it
-    came from cache."""
+    """One parser view, its acquisition time, and the digest of the retained bytes."""
 
-    def __init__(self, text, ts, cached):
+    def __init__(self, text, ts, cached, retained):
         self.text, self.ts, self.cached = text, ts, cached
+        self.retained_sha256 = hashlib.sha256(retained).hexdigest()
 
 
 def utc_now():
@@ -206,12 +207,13 @@ def fetch_page(path, kind, requested, refresh=False, network=True, skip_legacy=F
         cache = found[0]
         ts_file = Path(str(cache) + ".ts")
         ts = ts_file.read_text(encoding="utf-8").strip() if ts_file.exists() else "unknown"
-        text = cache.read_text(encoding="utf-8", errors="replace")
+        retained = cache.read_bytes()
+        text = retained.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
         why = page_problem(kind, path, text, ts, requested)
         if why is not None:
             raise Rejected(path, why)
         FETCH_TS[path] = ts
-        return Fetched(text, ts, True)
+        return Fetched(text, ts, True, retained)
     if remembered_404(path):
         raise FetchError(path, 404, "remembered 404")
     if not network:
@@ -223,20 +225,23 @@ def fetch_page(path, kind, requested, refresh=False, network=True, skip_legacy=F
             req = urllib.request.Request(BASE + path, headers={"User-Agent": UA})
             # measured: value=60 date=2026-10-17 host=Mac-Studio margin=17x (110 live page fetches, slowest 3.45s, p50 1.05s)
             with _urlopen(req, timeout=60) as resp:
-                data = resp.read().decode("utf-8", errors="replace")
+                retained = resp.read()
+            data = retained.decode("utf-8", errors="replace")
+            if kind != "evaluation":
+                retained = data.encode("utf-8")
             now = utc_now()
             why = page_problem(kind, path, data, now, requested)
             if why is None:
                 RAW.mkdir(parents=True, exist_ok=True)
                 tmp = new.with_name(new.name + ".tmp")
-                tmp.write_text(data, encoding="utf-8")
+                tmp.write_bytes(retained)
                 os.replace(tmp, new)
                 Path(str(new) + ".ts").write_text(now, encoding="utf-8")
                 FETCH_TS[path] = now
             _sleep(DELAY)
             if why is not None:
                 raise Rejected(path, why)
-            return Fetched(data, now, False)
+            return Fetched(data, now, False, retained)
         except urllib.error.HTTPError as e:
             _sleep(DELAY)
             if e.code == 404:
@@ -531,7 +536,23 @@ def extract_model_catalog(page):
     return cat
 
 
-def discover(refresh=True, network=True):
+def sitemap_locations(text):
+    # Only accept loc elements owned by a sitemap url entry, never alternate links.
+    if "<!DOCTYPE" in text or "<!ENTITY" in text:
+        raise ValueError("unsupported sitemap declaration")
+    root = ET.fromstring(text)
+    ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}" if root.tag.startswith("{") else ""
+    if root.tag != ns + "urlset":
+        raise ValueError("not a sitemap urlset")
+    return [(loc.text or "").strip() for loc in root.findall(f"{ns}url/{ns}loc") if not len(loc)]
+
+
+def evaluation_slugs(locations):
+    pattern = re.compile(re.escape(BASE) + r"/evaluations/([A-Za-z0-9][A-Za-z0-9._-]{0,127})/?")
+    return {m[1] for url in locations if (m := pattern.fullmatch(url))}
+
+
+def discover(refresh=True, network=True, locations=None):
     """Dynamic per-run model universe from BOTH sources: the site's sitemap and the compare
     page's embedded selector catalog. Never a baked URL. Preserves EXACT URL path identifiers
     (dots, case, digits: 'qwen2.5-32b-instruct', 'QwQ-32B-Preview' are valid model IDs).
@@ -549,10 +570,11 @@ def discover(refresh=True, network=True):
             except FetchError:
                 raise e
 
-    xml = page("/sitemap.xml", "sitemap")
+    if locations is None:
+        locations = sitemap_locations(page("/sitemap.xml", "sitemap"))
     slugs = set()
-    for u in re.findall(r"<loc>([^<]+)</loc>", xml):
-        m = re.search(r"/models/([^/?#]+)/?$", u)
+    for u in locations:
+        m = re.fullmatch(re.escape(BASE) + r"/models/([^/?#]+)/?", u)
         if m and m.group(1) not in MODEL_NON_SLUGS:
             slugs.add(m.group(1))
     selector = page("/models/comparisons", "catalog")
@@ -610,6 +632,30 @@ def table_columns(table):
     return ([header[i] for i in keep], cols), None
 
 
+def family_page_variants():
+    table = json.loads(Path(__file__).with_name('routes.json').read_text())
+    for route in table['routes'].values():
+        for variant in route['projections'].values():
+            if variant.get('family_page'):
+                yield variant, table['families'][route['family']]['creator']
+
+
+def ingest_model_variant(text, ts, path, slug, name, creator):
+    """Read a publisher model-page variant, never the family page's default score."""
+    objects, why = embedded.extract_array(text, embedded.EVAL_MARKER)
+    if why:
+        return None, why
+    matches = [obj for obj in objects if isinstance(obj, dict) and obj.get('slug') == slug]
+    if len(matches) != 1:
+        return None, 'missing or duplicate exact variant'
+    accepted, rejects = embedded.check_objects(matches)
+    if rejects or accepted[0]['name'] != name or accepted[0]['creator']['name'] != creator:
+        return None, 'variant name or creator mismatch'
+    obj = accepted[0]
+    return {'attrs': embedded.model_attrs(obj), 'series': embedded.model_series(obj),
+            'table': {}, 'observed_at': ts, 'page': path, 'batch': [slug]}, None
+
+
 def ingest_compare_page(text, ts, path, requested=None):
     """One compare page -> ({slug: row}, None) or (None, reason). Identity is exact: the table
     header must equal the payload names in order (embedded.check_header), and when the URL's
@@ -650,7 +696,10 @@ def page_problem(kind, path, text, ts, requested):
             return None
         return "no table or payload"
     if kind == "sitemap":
-        return None if "<loc>" in text else "no <loc> entries"
+        try:
+            return None if sitemap_locations(text) else "no <loc> entries"
+        except (ET.ParseError, ValueError):
+            return "no valid sitemap urlset"
     if kind == "catalog":
         return None if extract_model_catalog(text) else "no model catalog"
     if kind == "cohort":
@@ -818,6 +867,7 @@ def canon_metric_id(label):
         "aintelligenceindex": "intelligence-index",
         "artificialanalysisopennessindex": "openness-index",
         "automationbenchaa": "automationbench-aa", "scicode": "scicode",
+        "frontiercodeaa20": "frontiercode-2-0", "frontiercode20": "frontiercode-2-0",
         "terminalbench40": "terminal-bench-4-0",
     }
     return aliases.get(c, c)
@@ -863,13 +913,20 @@ def compute_coverage(snapshot, eval_slugs):
     return cov, missing
 
 
-def write_coverage(cov, missing, path):
+def write_coverage(cov, missing, path, inventory):
     lines = ["# Coverage per metric/submetric (canonical IDs, count-based)", "",
              "Recomputed by compute_coverage() from raw rows on every run; never copied from a stored block.",
              "Missingness = zero observations, never key absence; aliased labels ('AA-Omniscience' =",
              "Omniscience Index) share one canonical series and a model counts once per series.",
              "A series seen only in the eval-page chart window (top 5 to 31 models) is partial, never complete.", "",
+             f"Evaluation targets: {len(inventory['configured'])} configured; "
+             f"{len(inventory['advertised'])} advertised by {inventory['source']} "
+             f"(as of {inventory['fetched_at'] or 'unavailable; static fallback'}).",
+             "Discovery and method differences are diagnostics, not evidence of score comparability.", "",
              "| series | sources | models with values | status |", "|---|---|---|---|"]
+    if inventory["problem"]:
+        lines[-2:-2] = [f"Evaluation discovery incomplete: {inventory['problem']}.",
+                        "Retained observations are not evidence that these evaluations are currently listed.", ""]
     for k in sorted(cov):
         v = cov[k]
         status = "not yet captured" if v["models"] == 0 else "partial: chart window only" if v.get("partial") else "captured"
@@ -1033,7 +1090,7 @@ def run_fetch_selftest():
                 "compare": ("/models/comparisons/m-p-vs-m-q", {"m-p", "m-q"}, _fake_page([_fake_obj("m-p"), _fake_obj("m-q")]),
                             _fake_page([_fake_obj("m-x"), _fake_obj("m-y")])),
                 "evaluation": ("/evaluations/sample", None, "<table><tr><td>1</td><td>Acme</td><td>M</td><td>5</td></tr></table>", None),
-                "sitemap": ("/sitemap.xml", None, "<urlset><loc>https://artificialanalysis.ai/models/m-p</loc></urlset>", None),
+                "sitemap": ("/sitemap.xml", None, "<urlset><url><loc>https://artificialanalysis.ai/models/m-p</loc></url></urlset>", None),
                 "catalog": ("/models/comparisons", None, '{"slug":"m-p","name":"M-P","deprecated":false,"releaseDate":"2026-01-01"}', None),
                 "cohort": ("/models/sample", None, ok(58), None),
             }
@@ -1257,20 +1314,76 @@ def _atomic_write(path, text):
     os.replace(tmp, path)
 
 
-def acquire_evals(snapshot, live, network):
+def evaluation_inventory(live, network, previous):
+    problem = None
+    sitemap = None
+    try:
+        sitemap = fetch_page("/sitemap.xml", "sitemap", None, refresh=live, network=network and live)
+    except FetchError as err:
+        problem = str(err)
+        if live:
+            try:
+                sitemap = fetch_page("/sitemap.xml", "sitemap", None, network=False)
+            except FetchError:
+                pass
+    locations = sitemap_locations(sitemap.text) if sitemap else []
+    advertised = evaluation_slugs(locations)
+    configured = set(EVAL_SLUGS)
+    if sitemap and not advertised and problem is None:
+        problem = "sitemap contains no canonical evaluation listings"
+    usable = problem is None and bool(advertised)
+    # A raw rebuild needs the retained discovery metadata only on fallback.
+    # The SQLite rebuild still parses values and acquisition times from raw pages.
+    if previous is None and not usable:
+        try:
+            snapshot = json.loads((HERE / "snapshot.json").read_text(encoding="utf-8"))
+            previous = snapshot.get("evaluation_inventory") if isinstance(snapshot, dict) else None
+        except (OSError, ValueError):
+            previous = None
+    previous = previous if isinstance(previous, dict) else {}
+    retained = previous.get("last_advertised")
+    prior = (evaluation_slugs(BASE + "/evaluations/" + slug for slug in retained if isinstance(slug, str))
+             if isinstance(retained, list) else configured)
+    return locations, {
+        "source": BASE + "/sitemap.xml", "fetched_at": sitemap.ts if sitemap else None,
+        "sha256": hashlib.sha256(sitemap.text.encode()).hexdigest() if sitemap else None,
+        "problem": problem, "configured": sorted(configured), "advertised": sorted(advertised),
+        "targets": sorted(configured | advertised | (set() if usable else prior)),
+        "last_advertised": sorted(advertised if usable else prior),
+        "newly_discovered": sorted(advertised - prior) if usable else [],
+        "missing_from_sitemap": sorted(prior - advertised) if usable else [],
+        "missing_pages": [], "changed_method_evidence": {},
+        "last_method_evidence": dict(previous.get("last_method_evidence", {})),
+    }
+
+
+def acquire_evals(snapshot, live, network, inventory):
     """Evaluation pages: leaderboard table, rendered second path, per-page reconciliation."""
     rendered_dir = RAW / "rendered"
     failed = []
-    for slug in EVAL_SLUGS:
+    for slug in inventory["targets"]:
         try:
-            page = fetch_page("/evaluations/" + slug, "evaluation", None, refresh=live, network=network).text
+            fetched = fetch_page("/evaluations/" + slug, "evaluation", None, refresh=live, network=network)
+            page = fetched.text
         except FetchError as e:
+            inventory["missing_pages"].append(slug)
             snapshot["reconciliation"].append({"slug": slug, "note": f"fetch failed: {e}"})
             failed.append(str(e))
             continue
         tables = extract_tables(page)
         labels = extract_chart_labels(page)
         ld = extract_ldjson(page)
+        # Structured method declarations only: score/leaderboard churn is not a method change.
+        fields = ("name", "description", "variableMeasured", "measurementTechnique")
+        datasets = sorted(json.dumps({k: d[k] for k in fields if k in d}, sort_keys=True)
+                          for d in ld if isinstance(d, dict) and d.get("@type") == "Dataset")
+        evidence = {"source": BASE + "/evaluations/" + slug, "fetched_at": fetched.ts,
+                    "page_sha256": fetched.retained_sha256,
+                    "datasets": [json.loads(d) for d in datasets]}
+        old = inventory["last_method_evidence"].get(slug)
+        if old and old["datasets"] != evidence["datasets"]:
+            inventory["changed_method_evidence"][slug] = {"before": old, "after": evidence}
+        inventory["last_method_evidence"][slug] = evidence
         rendered = {}
         rfile = rendered_dir / (slug + ".txt")
         if rfile.exists():
@@ -1329,9 +1442,9 @@ def acquire_cohort(snapshot, slugs, network):
     return failed
 
 
-def run_sweep(snapshot, live, network, stale_after_hours):
+def run_sweep(snapshot, live, network, stale_after_hours, locations):
     """Discover the universe, sweep it, and record the exit contract's evidence."""
-    found = discover(refresh=live, network=network)
+    found = discover(refresh=live, network=network, locations=locations)
     print(f"[sweep] discovered {len(found['slugs'])} model slugs (sitemap + selector catalog; "
           f"{'live' if live else 'cache-first' if network else 'cache only'})", flush=True)
     result = sweep_comparisons(found["slugs"], found["catalog"], found["creators"], network=network,
@@ -1357,8 +1470,9 @@ def run_sweep(snapshot, live, network, stale_after_hours):
 
 def report_coverage(view):
     """Recompute coverage from raw rows with compute_coverage() and write coverage.md."""
-    cov, missing = compute_coverage(view, EVAL_SLUGS)
-    write_coverage(cov, missing, HERE / "coverage.md")
+    _, inventory = evaluation_inventory(False, False, None)
+    cov, missing = compute_coverage(view, inventory["targets"])
+    write_coverage(cov, missing, HERE / "coverage.md", inventory)
     tracked = set(cov) | set(missing)
     observed = sum(1 for v in cov.values() if v["models"] > 0)
     partial = sorted(k for k, v in cov.items() if v["partial"])
@@ -1381,19 +1495,25 @@ def write_verdict(ran_at, line, **fields):
 
 
 def report_unread(raw, earlier, incomplete):
-    """Name the cached pages the loaders dropped. A compare page whose fetch time stamped rows in
-    the previous matrix (`earlier`) and no longer ingests drops its models from the new matrix, so it
-    makes the run incomplete."""
+    """Name dropped pages and flag possible loss of rows from the previous matrix.
+    For model-family payloads the cache timestamp alone does not bind a variant."""
     dropped = raw["quarantined"]
     why = lambda x: x["reason"] if isinstance(x["reason"], str) else x["reason"]["reason"]
-    print(f"[db] cached compare pages quarantined: {len(dropped)}"
-          + (": " + ", ".join(f"{x['file']} ({why(x)})" for x in dropped) if dropped else ""), flush=True)
+    for kind, pages in (("compare", [x for x in dropped if "slug" not in x]),
+                        ("model-family", [x for x in dropped if "slug" in x])):
+        print(f"[db] cached {kind} pages quarantined: {len(pages)}"
+              + (": " + ", ".join(f"{x['file']} ({why(x)})" for x in pages) if pages else ""), flush=True)
     if raw["skipped_evals"]:
         print(f"[db] evaluation pages not read: {len(raw['skipped_evals'])}: "
               + ", ".join(f"{x['slug']} ({x['reason']})" for x in raw["skipped_evals"]), flush=True)
+    stamps = {ts for ts, _ in earlier}
     for x in dropped:
-        if x["fetched_at"] in earlier:
-            incomplete.append(f"cached compare page {x['file']} stamped rows in the previous matrix and no longer ingests: {why(x)}")
+        if "slug" in x:
+            kind, prior = "model-family", (x["fetched_at"], x["slug"]) in earlier
+        else:
+            kind, prior = "compare", x["fetched_at"] in stamps
+        if prior:
+            incomplete.append(f"cached {kind} page {x['file']} stamped rows in the previous matrix and no longer ingests: {why(x)}")
 
 
 def build_db(incomplete):
@@ -1401,7 +1521,9 @@ def build_db(incomplete):
     verdict.json goes UNTRUSTED first: only the chart-diff that follows a rebuild can restore it."""
     write_verdict(utc_now(), "UNTRUSTED (matrix rebuilt without chart-diff)", reason="matrix rebuilt without chart-diff")
     conn = aadb.open_db(HERE / "aa.sqlite")
-    earlier = {r[0] for r in conn.execute("SELECT DISTINCT observed_at FROM observations WHERE source IN ('comparison-table', 'embedded')")}
+    earlier = set(conn.execute("""SELECT DISTINCT o.observed_at, m.slug FROM observations o
+                                JOIN models m ON m.id = o.model_id
+                                WHERE o.source IN ('comparison-table', 'embedded')"""))
     raw = aadb.load_raw()
     result = aadb.migrate(conn, raw=raw)
     print(f"[db] {HERE / 'aa.sqlite'}: {result['models']} models, {result['metrics']} metrics, "
@@ -1457,6 +1579,10 @@ def parse_args(argv):
 COHORT = ["claude-opus-5-5", "claude-sonnet-5-5", "gpt-6-1-sol", "gemini-4-argon", "kimi-k3", "deepseek-v4-1-flash"]
 
 
+def default_cohort():
+    return sorted(set(COHORT) | {v['family_page'] for v, _ in family_page_variants()})
+
+
 def main(argv=None):
     args = parse_args(sys.argv[1:] if argv is None else argv)
     global NEG_MAX_AGE
@@ -1490,11 +1616,15 @@ def main(argv=None):
         snapshot = {"collected_at": utc_now(), "source": BASE, "evals": {}, "models": prev.get("models", {}),
                     "reconciliation": [], "quarantine": {},
                     "run_mode": "cache-only" if not network else "live-revalidated" if live else "cache-replay"}
-        incomplete += acquire_evals(snapshot, live, network)
+        locations, inventory = evaluation_inventory(live, network, prev.get("evaluation_inventory", {}))
+        snapshot["evaluation_inventory"] = inventory
+        if inventory["problem"]:
+            incomplete.append(inventory["problem"])
+        incomplete += acquire_evals(snapshot, live, network, inventory)
         if not args.evals_only:
-            incomplete += acquire_cohort(snapshot, [s for s in args.models.split(",") if s] or COHORT, network)
+            incomplete += acquire_cohort(snapshot, [s for s in args.models.split(",") if s] or default_cohort(), network)
         if sweeping:
-            swept = run_sweep(snapshot, live, network, args.stale_after_hours)
+            swept = run_sweep(snapshot, live, network, args.stale_after_hours, locations)
             incomplete += swept["incomplete"]
             if swept["stopped"]:
                 incomplete.append(swept["stopped"])

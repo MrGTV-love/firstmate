@@ -104,6 +104,12 @@
 # authority and records it in the task record, and bin/fm-promote.sh honors it
 # the same way. Ship-only: a scout publishes nothing and a charter is not a
 # delivery contract.
+# --reconciled-source <declaration> records, for a local-only ship with no
+# --base-branch, the sha256 of the exact reconciled-successor declaration the
+# task starts from, as a `reconciled-source=` token on the Delivery contract line.
+# bin/fm-spawn.sh --reconciled-source judges the declaration and its approval
+# evidence (bin/fm-reconciled-source-lib.sh) and refuses unless the brief names
+# the same bytes. This scaffold only binds the identity; it approves nothing.
 # --project <dir> is the task's project directory, used to detect when a ship
 # brief would publish to firstmate's own repository: for such a task this
 # scaffold refuses a publishing mode that the home's role or recorded consent
@@ -254,6 +260,8 @@ SHAPE=
 SHAPE_SET=0
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
+RECONCILED_SOURCE=
+RECONCILED_SOURCE_COUNT=0
 PROJECT_DIR=
 PROJECT_DIR_SET=0
 POS=()
@@ -270,6 +278,7 @@ for a in "$@"; do
       forge) FORGE=$a; FORGE_SET=1 ;;
       shape) SHAPE=$a; SHAPE_SET=1 ;;
       upstream-consent) UPSTREAM_CONSENT=$a; UPSTREAM_CONSENT_SET=1 ;;
+      reconciled-source) RECONCILED_SOURCE=$a; RECONCILED_SOURCE_COUNT=$((RECONCILED_SOURCE_COUNT + 1)) ;;
       project) PROJECT_DIR=$a; PROJECT_DIR_SET=1 ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
@@ -293,6 +302,8 @@ for a in "$@"; do
     --shape=*) SHAPE=${a#--shape=}; SHAPE_SET=1 ;;
     --upstream-consent) want_value="upstream-consent" ;;
     --upstream-consent=*) UPSTREAM_CONSENT=${a#--upstream-consent=}; UPSTREAM_CONSENT_SET=1 ;;
+    --reconciled-source) want_value="reconciled-source" ;;
+    --reconciled-source=*) RECONCILED_SOURCE=${a#--reconciled-source=}; RECONCILED_SOURCE_COUNT=$((RECONCILED_SOURCE_COUNT + 1)) ;;
     --project) want_value="project" ;;
     --project=*) PROJECT_DIR=${a#--project=}; PROJECT_DIR_SET=1 ;;
     # yolo never reaches the worker: it is firstmate's merge authority, not a
@@ -388,6 +399,26 @@ if [ "$UPSTREAM_CONSENT_SET" -eq 1 ]; then
     exit 1
   }
   UPSTREAM_CONSENT=$(fm_role_scope_norm "$UPSTREAM_CONSENT")
+fi
+RECONCILED_SOURCE_SHA256=
+if [ "$RECONCILED_SOURCE_COUNT" -gt 0 ]; then
+  [ "$RECONCILED_SOURCE_COUNT" -eq 1 ] || {
+    echo "error: --reconciled-source was given $RECONCILED_SOURCE_COUNT times; pass exactly one declaration" >&2
+    exit 1
+  }
+  [ "$KIND" = ship ] && [ "$MODE" = local-only ] && [ "$BASE_BRANCH_SET" -eq 0 ] || {
+    echo "error: --reconciled-source applies only to a local-only ship brief without --base-branch" >&2
+    exit 1
+  }
+  [ -f "$RECONCILED_SOURCE" ] || {
+    echo "error: --reconciled-source declaration $RECONCILED_SOURCE is not a readable file" >&2
+    exit 1
+  }
+  RECONCILED_SOURCE_SHA256=$(shasum -a 256 <"$RECONCILED_SOURCE" | awk '{print $1}')
+  case $RECONCILED_SOURCE_SHA256 in
+  [0-9a-f]*) [ "${#RECONCILED_SOURCE_SHA256}" -eq 64 ] || { echo "error: could not hash $RECONCILED_SOURCE" >&2; exit 1; } ;;
+  *) echo "error: could not hash $RECONCILED_SOURCE" >&2; exit 1 ;;
+  esac
 fi
 ID=${POS[0]}
 # Self-repository pre-gate for a publishing ship brief: detectable only when
@@ -848,7 +879,7 @@ case "$MODE" in
     ;;
 esac
 RULE1=$(fm_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
-DOD=$(fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT" "$BRIEF") || exit 1
+DOD=$(fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT" "$BRIEF" "$RECONCILED_SOURCE_SHA256") || exit 1
 
 cat > "$BRIEF" <<EOF
 $DISPATCH_PROJECT

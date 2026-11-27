@@ -16,7 +16,8 @@ Start with the directory layout, then use the setting reference for the behavior
 | New work refused on a nearly full disk | [Disk free floor](#disk-free-floor-configdisk-free-floor) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
-| Automatic exact-head review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
+| Automatic review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
+| A program's own model roles, such as a Backpass pass | [Application model roles](#application-model-roles) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
@@ -85,7 +86,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Project and secondmate registries.
 - Captain preferences and optional shared captain preferences.
 - Learnings, backlog, briefs, scout reports, and the optional per-task no-mistakes pipeline-spend ledger.
-- Host-local command durations in `command-durations.jsonl`, produced by `bin/fm-duration.py`; its header and help own timing calibration and repeated-timeout work publication.
+- Host-local command durations in `command-durations.jsonl` and `run`'s stop-time process snapshots under `command-duration-trips/` beside it, produced by `bin/fm-duration.py`; its header and help own timing calibration, repeated-timeout work publication and snapshot contents and retention.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - The append-only held-copy record `held-foreign-copies.log`, written by `bin/fm-teardown.sh` once a task has closed beside foreign copies it leaves standing; it lists them and returns nothing, and [Agent control](agent-control.md)'s held-copy rule owns its fields.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
@@ -152,6 +153,46 @@ That record is short-lived and is not an archive: the merge poll in `bin/fm-watc
 [`bin/fm-merge-authority-lib.sh`](../bin/fm-merge-authority-lib.sh) owns its optional-line extension and backward-compatible reader; legacy records without the fact remain readable.
 A portable authenticated run-author evidence carrier needs a separate producer, transfer, trust and replay contract and is not provided by this relief.
 The regressions are [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh) and [`tests/fm-pr-merge.test.sh`](../tests/fm-pr-merge.test.sh).
+
+### Review carry-over across a base update
+
+The landing gate accepts an independent PASS only at the PR's live head, so taking in a newer base used to discard every read even when the PR's own change did not move.
+[`bin/fm-review-record.py`](../bin/fm-review-record.py)'s header owns the rule: when no review row names the live head, the newest review's head R carries to the live head H only if merging R into the base content H already holds (the merge base of the live forge base and H) with `git merge-tree --write-tree` gives a clean tree equal to H's tree.
+The reads at R are then judged by every existing rule, with authors derived at H; a captain-word never carries, and any read of H turns carry-over off.
+[`bin/fm-pr-auto-review.py`](../bin/fm-pr-auto-review.py) answers the protected-class question for a carried PASS from the review rows recorded at R, the head whose change H repeats.
+
+#### Guard harm-model reassessment
+
+The exact-head rule protects merge authority from code reaching the base that no independent different-family reader read.
+Carry-over judges that harm directly: an equal tree proves every byte H adds beyond base-branch content is a byte R added, so a merge or rebase of the base admits no unread line, and a missing object, a conflict or any difference refuses with the original head mismatch.
+A conflict resolution counts as new content even when it keeps the reviewed side, because a hand resolution is where an unread line most easily hides.
+The base content H holds comes from a commit on the base branch, so it passed that branch's own landing gate; a force-push of the base branch itself is outside this guard, as it is for every gate.
+The proof trusts `--base` to be a commit on the PR's base branch, which every caller takes from the live forge: GitHub `baseRefOid` and Forgejo `.base.sha` name the base branch's commit, and GitLab `diff_refs.base_sha` names GitLab's stored merge base of the source and target, which is on the target branch and is taken only when `diff_refs.head_sha` matches the live head.
+It also trusts the task worktree's object store for the commits' content, as author derivation already does.
+It does not trust that worktree's configuration or attributes, which the PR author's own worker can write: `git merge-tree` runs in an empty scratch repository that reads the task's objects through alternates and carries no configuration, attributes, replace refs or grafts, with the caller's `GIT_*` environment, system and global configuration and global attributes removed, so no merge driver or attribute can shape the merged tree and the task's store is unchanged.
+The scratch repository is made in the state directory that holds `state/review-records.jsonl`, not in the shared temporary directory, so a process that writes into it between `git init` and the merge could also append a review row.
+That includes the PR's own confined worker, because the confinement profile in "Worker OS write confinement" below leaves both the ledger and the rest of `state/` writable.
+The window between `git init` and the merge is therefore not closed: the proof, like the ledger, trusts that worker not to act against it on purpose.
+Only a single tree id on standard output is accepted as the merged tree; any other output refuses.
+Verify, both in this proof and in author derivation, ignores replace refs and `.git/info/grafts`, which could otherwise fake ancestry or hide commits.
+A `git merge-tree` failure other than a conflict is reported with git's own error text, `hint:` lines removed.
+A base older than the base content the live head holds refuses whenever the merged tree then differs from the live head's tree, which is usual; it carries when R already holds that newer base content or the newer commits changed nothing, which is safe because the live head adds no byte beyond R and base content.
+The record regressions are forge-agnostic; the end-to-end lane regression runs on the GitHub fake forge only.
+A carried PASS also requires that no review row names the live head and that every other head with a review row is an ancestor of R, so a read of any later version of the change, such as a FAIL at an earlier clean update, cannot be skipped in any row order; a FAIL fixed by commits on top of it leaves carry-over available.
+When `bin/fm-pr-auto-review.py` merges directly, its `merged` event in the lane's sidecar names the carried source head, and on the queue path its `queued` event does; each takes the carry from `bin/fm-pr-merge.sh`'s own verify output, so a captain word or exact-head PASS recorded after the lane's check is not reported as a carry.
+A merge the lane only observes after it queued the head names the carry as the basis the lane queued it on, because another path may have merged that head on its own basis; a head the lane saw leave the queue and still open names no carry when it is merged later; a merge through Main's `bin/fm-pr-merge.sh` call records no carry, and `state/review-records.jsonl` keeps its verdict rows but no row for the live head or the carry, so that a carry happened is not durably recorded on that path.
+Any reviewed head that a rebase, amend or squash leaves off R's ancestry, PASS or FAIL, turns carry-over off, so the next base update needs a fresh read; this is a false refusal, never a bypass.
+A rewrite of R that keeps its tree, such as an amended message or a squash, carries from R.
+Once such a rewrite is itself read, an update of either one refuses: the rewrite and the head it replaced both have review rows and neither builds on the other, so whichever of the two is the newest reviewed head, the other fails the ancestry rule.
+A later reviewed head that builds on both carries again while it is the newest reviewed head; a later read of either sibling makes that sibling the newest reviewed head, and the next update refuses again.
+A clean merge of a branch that is not on the base is unread content and refuses.
+The residual risk is an interaction between R and newer base content that the reader never saw together; required checks at the exact live head, which `bin/fm-pr-merge.sh` still demands, are the guard for that, as they were for any two PRs reviewed separately.
+Accepted carry-overs are disclosed as the fact `review carried from <R>` in verify's text output and as `carried_from` in `--json`.
+The regressions are in [`tests/fm-review-record.test.sh`](../tests/fm-review-record.test.sh).
+Their sensitivity controls remove only the tree comparison, the graft setting or the replace-ref setting, or run the proof unisolated in the task worktree, and show the matching unread change then carries: an unread line, a base graft, a replace ref, a worktree-config driver with a root `.gitattributes`, an environment driver with `.git/info/attributes`, and a global driver in `~/.gitconfig` or under `$XDG_CONFIG_HOME/git`.
+The scratch-repository control shows instead that a proof run in the worktree writes to the task's object store; it shows no acceptance.
+Global configuration and global attributes are each removed by two independent settings, so their control removes the whole isolation rather than one line.
+System configuration and system attributes are removed but not exercised, because a test cannot plant those files.
 
 ### Friction ledger
 
@@ -1005,7 +1046,7 @@ A row this actor's drain presented stays gated for this actor's current acknowle
 This boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake, whose drain still presents and gates every overdue row.
 An elapsed-time token that still reaches a stalled worker's evidence, such as one in its unmasked status declaration (`45s`, `3m 12s`, `1h 2m`), never counts as a change against a recorded action; any other evidence change does.
 On a `review_pass_not_merged` row or an escalation whose captain hold could not be verified, an action recorded since the row's current presentation answers it only within the actor's current handling turn and for at most four hours (a deferral until its recheck time), even if that turn never closes; reads within that turn preserve the answer, and a bound captain hold is reverified before acknowledgement.
-A refused acknowledgement is a read-only check, never a new presentation; only successful acknowledgement through every row the actor presented closes its handling turn.
+A refused acknowledgement presents nothing new; where the captain-note re-check refuses after the receipt window, inactive-outcome receipts may already be recorded; only successful acknowledgement through every row the actor presented closes its handling turn.
 A partial acknowledgement preserves the turn's receipts for its remaining rows.
 Only when the rows this drain presents for its actor include an `open-loop-ledger-resurface` wake does the drain include one `WAITING OPEN WORK` list of every overdue row that needs no action, with its current age, status, and last action's kind, evidence, and time; an escalation bound to a captain hold the captain has not answered has the status `escalated, waiting on the captain`, any other escalation has the status `escalated, no proof it reached the captain`, and with no such row the drain prints no list at all.
 A change wake presents in `OVERDUE` every row that still needs an action (new, changed, or no longer covered), never the full list.
@@ -1013,6 +1054,7 @@ Firstmate sends that list to the captain as one periodic update on the resurface
 A row is always either actionable at the gate or included in that list until it changes or fresh evidence resolves it; unpausing a lane requires no manual revert because new status, commit, or PR evidence changes its row.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
 The away-mode supervise daemon never records an action or escalation of its own, and acknowledges the wakes it handled without the ledger gate (`FM_WAKE_ACK_AWAY_DAEMON=1` while `state/.afk` exists), so one overdue row never retains an unrelated wake; the obligation stays in the ledger, and firstmate's own `--ack-through` keeps the change-gated check.
+The daemon does not acknowledge a captain inbox note wake: it stays queued until its note is acked (`--keep-unacked-notes`; the `bin/fm-wake-drain.sh` header owns that exemption).
 The daemon adds each overdue row still needing an action (new, changed, or no longer covered) to its escalation digest for firstmate once per row id and evidence identity, again only after `FM_OPEN_LOOPS_RESURFACE` seconds (normalized as for the watcher), as `state/.subsuper-open-work-forwarded` records; a row that no longer needs an action or leaves the ledger loses its entry and is forwarded again when it returns to the gate; and adds the `WAITING OPEN WORK` rows to the same digest only when the drain printed them for the periodic resurface wake.
 The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), per-actor `completed` sequence watermarks written after successful acknowledgement, `episodes` mapping row ids to the row digest, the row's obligation clock where its age is known, and the time its current overdue episode opened (when the row became overdue, at a materially changed row, at a restarted age clock, and at a recorded deferral), and `actions` mapping row ids to the action kind, evidence, action time, a steer's delivery time (`sent_epoch`), sequence, deferral count, row digest, the row's observed clock start (`clock_start`, when its age is known), delivery records already cited by a wait, and optional recheck time, captain-visible mark, `requires_followup` mark, and captain-hold binding (`hold`: the bound task and its hold marker).
 The single-row and JSONL batch action forms share the same evidence checks; one invocation caches its fleet snapshot, including a failed read, rather than rescanning for each row, and the `help:` line that presents overdue rows names the batch form.
@@ -1132,9 +1174,9 @@ Age limits are non-negative integer seconds for the categories above.
 `review_lanes` optionally maps case-insensitive GitHub `owner/repository` names to nonempty lists of local review task ids; no project-specific names or verdict sources are hard-coded.
 The map only names the local review task ids as a discovery hint for a repository, so a repository absent from it is not checked for review readiness; it supplies no verdict, model metadata, or PASS spelling.
 For a configured repository, the ledger asks `bin/fm-review-record.py verify --task <owning task> --base <live base sha> --review-only --json` once for an owned PR's exact live head and consumes that single atomic owner output; a PR no task owns is not checked.
-That owner is the only authority: it applies the merge gate's exact-head, derived-author coverage and FAIL rules without any captain-word, and also requires no escalation trigger on the newest PASS. Authors are derived again from the owning task's commits and launch evidence at every read, so a relaunch in the reader's family withdraws an earlier qualifying review, while the recorded review fields themselves are immutable.
-A missing, stale-head, FAIL, unknown-reader-family, or yes-trigger record, or any author family that the recorded reads leave uncovered under `bin/fm-review-record.py`'s coverage rule, is not-qualified and leaves an ordinary open obligation, while unreadable or corrupt record history, unreadable author evidence or invalid input degrades coverage instead of reading as unreviewed; a `captain-word` alone is never independent review.
-The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
+That owner is the only authority: it applies the merge gate's exact-head rules (including a PASS carried across a clean base update; see [Review carry-over across a base update](#review-carry-over-across-a-base-update)), derived-author coverage and FAIL rules without any captain-word, and also requires no escalation trigger on the newest PASS. Authors are derived again from the owning task's commits and launch evidence at every read, so a relaunch in the reader's family withdraws an earlier qualifying review, while the recorded review fields themselves are immutable.
+A missing, stale-head that carry-over does not cover, FAIL, unknown-reader-family, or yes-trigger record, or any author family that the recorded reads leave uncovered under `bin/fm-review-record.py`'s coverage rule, is not-qualified and leaves an ordinary open obligation, while unreadable or corrupt record history, unreadable author evidence or invalid input degrades coverage instead of reading as unreviewed; a `captain-word` alone is never independent review.
+The reviewed-green age begins at the later of that verdict and the reported checks' completion times (for a carried PASS the verdict is the earlier head's, and the live head's checks complete after the update), so a PR must be both reviewed and green for one check interval before it is overdue.
 Unreadable review or requirement sources disclose degraded coverage, never a merge-ready verdict.
 `command_timeout_seconds` selects each source command's no-output/no-process-tree-CPU interval, defaults to 900 seconds, and accepts integers from 1 through 900.
 Productive commands finish and contribute their results regardless of elapsed time; there is no overall collection alarm.
@@ -1283,6 +1325,50 @@ The same transitions retire that line to `Historical preserved in bundle <path>,
 Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
 A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
 A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
+
+## Application model roles
+
+Some firstmate work hands model choices to a program that runs its own model stages, such as a Backpass analysis, consolidation, or proposal pass.
+Those roles use the same intake boundary as a worker profile: [`dispatch-profile-intake`](../.agents/skills/dispatch-profile-intake/SKILL.md) owns the decision procedure, and [`model-and-effort.md`](../.agents/skills/harness-adapters/references/common/model-and-effort.md) owns discovery, effort precedence, and its accepted-set rule.
+No second selector, dispatch rule, typed brief, shadow-picker choice, or manufactured task identity supplies them.
+They have no configuration file of their own: each request resolves them again, so a program's own configuration default or a previously cached result never becomes the selection.
+The [fleet model index](#fleet-model-index-configmodel-indexjson) and [`config/crew-dispatch.json`](#crew-dispatch-profiles-configcrew-dispatchjson) keep their worker meanings, so a home with neither file resolves these roles through ordinary intake; their absence is discovery, not a policy vote.
+
+**One complete selection per role.** Firstmate classifies each model-calling role from the work itself and resolves a complete agent, provider-qualified model, and effective effort for it before that role's first model call.
+Pass every value the program's own default could otherwise decide, because an omitted argument is not a selection.
+A role the program reuses keeps the selection its stage inherits instead of acquiring a second one, and an earlier stage that produced no model call removes no requirement on a later one.
+
+**Backpass handoff.** Backpass reads its two production selections from its own command line: `--analysis-agent`, `--analysis-model`, and `--analysis-effort` for the per-transcript analysis pass, and `--synthesis-agent`, `--synthesis-model`, and `--synthesis-effort` for the proposal pass.
+Its consolidation pass between them runs on the analysis selection, so a full pass, or a proposal that reuses cached analysis, still needs the analysis selection complete before consolidation starts.
+`backpass analyze` reaches analysis only, `backpass propose` folds existing evidence and then consolidates and synthesizes, and `backpass` with no command runs the whole pass; Backpass's own `--help` owns the remaining commands, flags, and its project configuration precedence.
+Resolve the actual executable before reading that help or launching a pass.
+When this home has `data/tools/backpass/node_modules/.bin/backpass`, use that home-local file rather than a shared or global installation of the same name, and check that the resolved file exists and is executable instead of assuming an installation or a supported version.
+That local adoption belongs to this home and leaves the shared installation unchanged.
+Classify each role independently from the work and the applicable policy, so the two roles can legitimately land in the same class and neither inherits the other's classification or model.
+Resolve the requested effort through [`model-and-effort.md`](../.agents/skills/harness-adapters/references/common/model-and-effort.md) against Backpass's current accepted set, established by its own help or validation, rather than copying that capability list into fleet policy.
+An independent review keeps its own configured review runtime and never supplies a production role, and a selected Claude role still needs native TeamClaude, so an eligible permitted route takes precedence instead of selecting an unimplemented one and waiting.
+
+**Route and account.** A selection is usable only on the route and account it names: a GPT production call runs through omp's `openai-codex` provider, which needs no billing exception, while an `openai/*` or `openrouter/*` selector is API-billed and is never selected for one ([OMP fallback approvals](#omp-fallback-approvals-configomp-approved-fallback-chains) owns that route contract).
+A fallback chain, an ambient default, or a credentialed title or helper role that a program's invocation would otherwise inherit is not part of the selection.
+That invocation clears it for the call through existing invocation-scoped configuration, the way `bin/fm-spawn.sh` clears it for a worker, and the operator's own self-session configuration stays unchanged.
+Where permitted-only execution cannot be established that way, the route is ineligible for the role: name the missing capability and stop the affected call instead of running it on a route no selection authorized.
+Established pooled headroom comes from `bin/fm-dispatch-capacity.sh --harness omp --model <id> --json`, not from quota-axi's single Codex account, and its accounts, statuses, and reason are the capacity evidence a selection records.
+
+**Discovery and currentness.** Read the catalog through the single catalog owner, which is the same read the index and spawn checks perform, so intake and validation see one normalized surface:
+
+```sh
+bin/fm-model-index.sh catalog omp
+FM_MODEL_CATALOG_DIR=/path/to/exports bin/fm-model-index.sh catalog omp
+```
+
+The read prints the harness's normalized `{"models":[{"id":"..."}]}` catalog, needs no index, and exits 2 with a notice when the catalog cannot be read or holds no model, so unavailable or empty evidence never reads as a supported model.
+Select from the ids that catalog lists for the named provider and the classified reasoning class, and let the catalog decide which id is current: a newer eligible model of the same class takes the role with no configuration edit, and a candidate is superseded only when a newer model of the same class exists.
+`bin/fm-model-freshness.sh check <harness> <model>` owns that same-family comparison and marks a newer model of another tier, which never rejects or downgrades a class-correct candidate.
+An index notice, a silent freshness check, an unverified alias, a catalog id no call has served, and a catalog this environment cannot read each establish no currentness and no successful launch.
+
+**Provenance.** Keep the record with the run's own evidence so the selection can be re-derived: each role's agent and model, the requested effort with its winning source, the transformation and the value actually passed, the discovery command with its time and environment, and the catalog or freshness output that decided it.
+That record is per-run evidence, not a new configuration file, dispatch rule, role table, or home state.
+
 
 ## Model-picker benchmark data (FM_MODEL_PICKER_DATA)
 
@@ -2306,17 +2392,24 @@ Report raw counts and outcomes, not estimated savings from a single synthetic sm
 ### Commit attribution
 
 The optional local, gitignored `config/keep-ai-trailers` presence flag opts this home into keeping AI co-author trailers on its launched workers.
-With the flag absent, every Claude launch's inline `--settings` JSON carries `"attribution":{"commit":"","pr":"","sessionUrl":false}`, every Devin worker config sets `"attribution": false`, and every fleet launch receives a pane-scoped `GIT_CONFIG` `core.hooksPath` pointing at `state/<id>.git-hooks`, where git's `commit-msg` hook strips known AI trailers even when a runtime injects them after the typed message.
+With the flag absent, every Claude launch's inline `--settings` JSON carries `"attribution":{"commit":"","pr":"","sessionUrl":false}`, every Devin worker config sets `"attribution": false`, and every fleet launch carries the task Git hooks in `state/<id>.git-hooks`, whose `commit-msg` strip removes known AI trailers even when a runtime injects them after the typed message.
 When the flag is present, Claude launches omit those attribution-off settings, Devin worker configs keep the user config's `attribution` setting (Devin's default is on), and the task Git hooks omit only the commit-message strip.
 Fresh launches and supported same-task relaunches apply the current attribution choice without retaining that task's obsolete hook selection, including when `config/launch-env-allowlist` is enabled.
 Unrelated Git environment entries and explicit operator settings remain in the persistent pane; their inheritance by the worker is subject to the [launch environment filter](#worker-launch-environment-configlaunch-env-allowlist).
 Every fleet launch selects the task Git hooks for the [commit and push credential check](#jev-guard), independently of the attribution choice.
-`bin/fm-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs in either attribution posture.
-A repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
-The task hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the task hooks, which hold the credential checks and, unless trailers are kept, the strip; install a project's hooks from outside the pane, where the wrappers chain them.
+The launch carries them in one of two ways, chosen in the pane itself with the pane's own git:
+- The config carrier adds Git config-based hook rows (`hook.fm-strip` and `hook.fm-scan-commit` on `commit-msg`, `hook.fm-scan-push` on `pre-push`) to `GIT_CONFIG_PARAMETERS` and leaves the repository's own `core.hooksPath` in force, so every project hook, `reference-transaction` included, runs as it would outside the pane.
+  It needs Git 2.54 or later and is used only for harnesses proven to keep the rows in their tool shell; [runtime backend verification](verification/runtime-backends.md#task-git-hook-carrier-in-the-worker-tool-shell) records which.
+- The legacy carrier points a pane-scoped numbered `GIT_CONFIG` `core.hooksPath` at the task hooks directory, whose wrappers chain the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs; it does not chain `reference-transaction` or `post-index-change`.
+  Every other harness, and any pane whose git does not list the rows, uses it.
+A pane with no git on its PATH, a malformed `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS`, or a git that honours neither carrier refuses the launch, and the spawn fails naming the reason.
+Under the legacy carrier, a repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
+Under the legacy carrier the task hooks directory is git's hooks directory and is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the task hooks; install a project's hooks from outside the pane, where the wrappers chain them.
+Under the config carrier a hook manager installs into the repository's own hooks directory, and the task hook rows still run beside whatever it installs.
+`bin/fm-git-strip-ai-trailers.sh` owns the identities, the hook scripts and their rows.
 The flag is a home-wide attribution choice, independently owned by each home and not inherited into secondmate homes; the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract leaves each home's presence or absence unchanged.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Firstmate, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
-[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns launch-boundary reconciliation, with model-free real-tmux transition and preservation coverage in [`tests/fm-git-strip-ai-trailers.test.sh`](../tests/fm-git-strip-ai-trailers.test.sh).
+[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns carrier selection and launch-boundary reconciliation, with model-free real-tmux transition and preservation coverage in [`tests/fm-git-strip-ai-trailers.test.sh`](../tests/fm-git-strip-ai-trailers.test.sh) and staged-launch carrier coverage in [`tests/fm-spawn-git-hook-carrier.test.sh`](../tests/fm-spawn-git-hook-carrier.test.sh).
 
 ### Claude API key guard
 
@@ -2817,7 +2910,7 @@ The script header owns flags, the output block, and exit status.
 
 ## Automatic review and merge (config/review-runner)
 
-When a registered ship PR turns green, the watcher's housekeeping pass requests the independent exact-head read the standing merge rule needs and merges on a covering PASS.
+When a registered ship PR turns green, the watcher's housekeeping pass requests the independent exact-head read the standing merge rule needs and merges on a covering PASS, including one carried across a clean base update.
 `bin/fm-pr-auto-review.py`'s header owns the sequence, the counting rule and the report format; this section owns the setting and what it records.
 The merge poll is a static program that prints only `merged`, so it makes no request; the single caller is [`bin/fm-pr-ready-reconcile.sh`](../bin/fm-pr-ready-reconcile.sh), which adds no daemon, check or schedule.
 
@@ -2825,6 +2918,7 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 
 - `FM_REVIEW_RUNNER`, else the first non-comment line of `config/review-runner`, names an absolute path to the review lane's runner.
 - The runner is called as `<runner> <review-dir> <pr-url> <head> pr.diff <project-path> <model>`; `<review-dir>` holds `contract.md`, `pr.diff` and `ci-evidence.md`, and the runner writes `review.md` there.
+- When a new head follows a recorded `FAIL` on an earlier head of the same PR without an intervening `PASS` or captain merge word, `contract.md` opens with a closure-check header and the prior `FAIL` report, and `closure-diff.patch` in `<review-dir>` carries the incremental diff from that failed head when it is locally reachable.
 - `pr.diff` comes from `bin/fm-review-diff.sh` and is used only when the PR head it fetched is the head being read; otherwise the pack is not built.
 - The model that served the read is taken only from one runner stdout line exactly `served-model: <model id>`, never from prose notices or logs. With none, the read is not recorded, the head is held as `served model unknown` with the report path and the requested model, Main is woken, and no further read is requested for that head. Main's runner prints the line only when one model served every reply and no fallback was recorded, and prints nothing otherwise, so a read it cannot vouch for holds for Main.
 - No path is hardcoded in a tracked script, and the runner's own internals are out of scope.
@@ -2848,20 +2942,21 @@ The merge poll is a static program that prints only `merged`, so it makes no req
 - A PASS missing a fact, naming another head, from a reader whose family covers no author group, or one that cannot be recorded is not recorded and burns that reader for the head.
 - A FAIL from any reader is recorded as FAIL against every group it read; a FAIL that cannot be recorded still ends the head at `fail`. An INCOMPLETE is held and never recorded as PASS, and each tells Main through a check wake with the report path.
 - The runner asks the reader for one line exactly `Protected class: yes - <why>` or `Protected class: no - <why>`. `yes`, a missing line or a malformed one holds the merge and wakes Main; only `no` lets a covering PASS merge. `protected=<class>[,<class>]` in the task meta also holds it with that class named.
-- The decision counts every review recorded for the exact head, whoever recorded it and in whatever order: a yes, a missing or malformed answer, a report that is gone or changed since it was recorded, and a history that cannot be read each hold, and a later `no` never clears an earlier answer. A recorded routine PASS that `verify` accepts and whose every exact-head report answers `no` goes to the merge gate whether or not this lane requested it. The hold is read again on every pass and wakes Main once per distinct reason.
+- The decision counts every review recorded for the exact head (for a carried PASS, the head it was carried from), whoever recorded it and in whatever order: a yes, a missing or malformed answer, a report that is gone or changed since it was recorded, and a history that cannot be read each hold, and a later `no` never clears an earlier answer. A recorded routine PASS that `verify` accepts and whose every report counted above answers `no` goes to the merge gate whether or not this lane requested it. The hold is read again on every pass and wakes Main once per distinct reason.
 
 **Records**
 
 - The sidecar `state/.pr-auto-review/<task>.json` holds the request, the outstanding read, the recorded verdict, the merge attempt and the events already emitted; each request's review pack, lock and result sit under `state/.pr-auto-review/<task>.d/`.
 - A read runs detached under a lock, so a restart neither loses nor repeats it; a pass never waits for it.
 - Outcomes are sidecar events (read requested, verdict recorded, queued, merged with the full PR URL, fail, held with its reason, no eligible reader, runner unavailable), printed oldest first by `bin/fm-pr-auto-review.py events <task>`, and `bin/fm-pr-auto-review.py state <task>` prints `reading`, `waiting: <reason>` (the PR is not yet green), `queued`, `merged`, `fail`, `held: <reason>` or `idle`.
-- A check wake `check: pr-review <task>: ...` tells Main, once per head and reason, about a FAIL, an INCOMPLETE, a held protected class or missing protected-class answer, an unknown served model, an unknown author family, a missing reader or runner, a refused merge, a PR that left the merge queue and is still open, an unavailable verify or plan, a review record that leaves nothing to read yet does not qualify, a PASS that cannot be recorded, and a review pack that was not built. A wake that could not be appended is kept in the sidecar as pending, is not counted as emitted, and is retried by every later pass until it is delivered, once.
+- A check wake `check: pr-review <task>: ...` tells Main, once per head and reason, about a FAIL, an INCOMPLETE, a review loop cap hold, a held protected class or missing protected-class answer, an unknown served model, an unknown author family, a missing reader or runner, a refused merge, a PR that left the merge queue and is still open, an unavailable verify or plan, a review record that leaves nothing to read yet does not qualify, a PASS that cannot be recorded, and a review pack that was not built. A wake that could not be appended is kept in the sidecar as pending, is not counted as emitted, and is retried by every later pass until it is delivered, once.
 - A read still out for an older head never stops a newer head from being read on the normal cadence; once it ends it is marked returned and is never recorded, planned or reported, so it cannot displace the live head's verdict.
 - Nothing is written to the task's status log: a trailing `note:` there would replace the worker's `done:` as the latest event and change how `bin/fm-crew-state.sh` reads a ship whose PR is in review.
 - The merge is `bin/fm-pr-merge.sh <task> <url>` with no other argument, only after `verify` accepts an independent-review PASS for the live head; a refusal holds with its reason and is retried after ten minutes, and an away record is left to `bin/fm-pr-merge.sh`'s own away handling. A captain-word recorded for the head is left to Main.
 - When `bin/fm-pr-merge.sh` reports the PR queued, the state reads `queued` and nothing is called again while the forge reports it queued; a merged PR then reads `merged`. If the forge instead reports the PR open and out of the queue, for example because someone removed it or the queue ejected it, the head is held once with one check wake, `bin/fm-pr-merge.sh` is not called again for that head, and a new head is judged fresh.
 - The sidecar's next due time spaces each task's forge read; a task is swept with its meta.
 - `FM_PR_AUTO_REVIEW_INTERVAL` (seconds, default 120) spaces the forge read per task, and `FM_PR_AUTO_REVIEW_MERGE_RETRY` (seconds, default 600) spaces merge retries; both are cadences, not bounds on any work.
+- `FM_PR_AUTO_REVIEW_MAX_FAIL_ROUNDS` (default 3; `0` disables the cap) bounds consecutive distinct failed heads on one PR without an intervening `PASS` or captain merge word; once reached, a newer head is held once for Main instead of dispatching another automatic review.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
@@ -3460,7 +3555,8 @@ No current guard handler builds a screening request: shell calls, tool results a
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
 The service refuses a larger request with `RequestTooLargeError` before anything is sent; it plans no overlapping pieces.
 Write/edit content has no model-screening size limit and no model coverage audit.
-Credential checks run locally in the per-task `pre-commit` and `pre-push` hooks installed by [`bin/fm-git-strip-ai-trailers.sh`](../bin/fm-git-strip-ai-trailers.sh), for every launched harness and project, independently of `config/keep-ai-trailers` and Jev scope.
+Credential checks run locally in the per-task Git hooks installed by [`bin/fm-git-strip-ai-trailers.sh`](../bin/fm-git-strip-ai-trailers.sh), for every launched harness and project, independently of `config/keep-ai-trailers` and Jev scope: at commit and at push.
+Under the [config carrier](#commit-attribution) the commit check runs at `commit-msg`, which also covers merge commits; under the legacy carrier it runs at `pre-commit`.
 [`bin/fm-git-secrets.py`](../bin/fm-git-secrets.py) scans only added content: the lines the staged index adds against `HEAD`, after the repository's pre-commit hook succeeds, including changes that hook stages, not their working-copy counterparts.
 Existing and moved lines are not scanned again; only new lines are: within one diff, each removed copy of a line cancels one added copy of the same text in any file, so renaming, moving or splitting a file adds nothing new.
 A merge commit is scanned only for lines new relative to every parent, so content brought in from either side is not rescanned.
@@ -3479,6 +3575,7 @@ It reports affected file names only, never matching values, and refuses when ins
 Writing a credential to an ignored `.env` is allowed and stages nothing; force-adding that file still subjects it to the commit check.
 Placeholders such as `replace-me` pass, but an added placeholder shaped like one of the listed credentials can fail; unfamiliar or encoded credentials can be missed.
 This is a client-side check, not a security boundary against hook bypass, alternate Git object writers, or pushes made outside the task launch environment.
+Hook bypass includes `git commit --no-verify` and, under the config carrier, `git -c hook.fm-scan-commit.enabled=false` (or `.command=true`, or an empty `.event`) and `env -u GIT_CONFIG_PARAMETERS`; `git -c core.hooksPath=/dev/null` no longer bypasses the task hooks there, though it still skips the repository's own hooks.
 [`tests/fm-git-secrets.test.sh`](../tests/fm-git-secrets.test.sh) exercises staged credentials, ignored files, placeholders, edits beside existing fixtures, renamed and split files, conflicted merges, repeated and abandoned refusals, outgoing history, URL and new-remote pushes, squash and cherry-pick replays of a commit already on a remote, and complete 396,924-byte report writes through both write adapters without provider calls.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
 
@@ -4903,7 +5000,7 @@ The runner proves exactly one durability boundary: output that reached the runne
 The spoken interface in [`docs/voice-relay.md`](voice-relay.md) and the model-backed subcommands of `bin/fm-inbox.sh` reach a paid API in a named account, so no region, model id or AWS profile is shipped as a tracked default.
 Each is one line in a local, gitignored `config/` file, with an environment variable that overrides it for a single run, and a missing required value refuses with the path to write rather than falling back to a value that belongs to another home.
 
-That configuration is the whole opt-in: an unconfigured home cannot start the relay and cannot run `fm-inbox.sh say` or `ask`, while `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list` and `drain` need no configuration at all because they make no model call.
+That configuration is the whole opt-in: an unconfigured home cannot start the relay and cannot run `fm-inbox.sh say` or `ask`, while `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list`, `drain` and `pending` need no configuration at all because they make no model call.
 The voice handover depends on `note`, so it keeps working in a home that has configured nothing.
 
 | File | Environment | Holds |

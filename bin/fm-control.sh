@@ -3,7 +3,7 @@
 # lifecycle verbs addressed to an exact task id.
 #
 # Usage: fm-control.sh <task-id> interrupt
-#        fm-control.sh <task-id> exit
+#        fm-control.sh <task-id> exit [--require-idle-gen <generation>]
 #        fm-control.sh <task-id> stay
 #        fm-control.sh <task-id> adopt
 #        fm-control.sh <task-id> authorize-continuation
@@ -36,6 +36,11 @@
 # Before stopping the running agent, a governed relaunch also refuses an invalid
 # or missing scope and an assigned copy that cannot pass slot attestation, such
 # as one with uncommitted work; fm-spawn's own checks remain the final guard.
+# --require-idle-gen is exit-only for an OMP ship or scout.
+# It requires positive idle from the task's named busy generation, rechecks
+# the same record after inspecting the composer, and refuses without an
+# interrupt if the record is unavailable or changes.
+# This is not transport closeout, a billing receipt, or an atomic idle/stop.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -473,6 +478,7 @@ RELOCATE_SET=0
 control_want_value=
 RECOVER_LAUNCH=0
 OWNED_PATHS=()
+REQUIRE_IDLE_GEN=
 ALSO_IDS=()
 ALSO_COPIES=()
 # --also <task-id>=<replacement-copy>: another task reassociate re-points in the same call.
@@ -506,6 +512,10 @@ for control_arg in "$@"; do
       note) NOTE=$control_arg; NOTE_SET=1 ;;
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
       owned-path) OWNED_PATHS+=("$control_arg") ;;
+      require-idle-gen)
+        fm_busy_token_valid "$control_arg" || die "--require-idle-gen requires a valid busy generation"
+        REQUIRE_IDLE_GEN=$control_arg
+        ;;
       also) parse_also "$control_arg" ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
@@ -541,6 +551,7 @@ for control_arg in "$@"; do
       ;;
     --claude-debug) CLAUDE_DEBUG=1 ;;
     --recover-launch) RECOVER_LAUNCH=1 ;;
+    --require-idle-gen) control_want_value=require-idle-gen ;;
     --reconcile-only) RECONCILE_ONLY=1 ;;
     *) die "unexpected argument '$control_arg'" ;;
   esac
@@ -550,6 +561,7 @@ if [ -n "$control_want_value" ]; then
   die "--$control_want_value requires a value"
 fi
 
+[ -z "$REQUIRE_IDLE_GEN" ] || [ "$VERB" = exit ] || die "--require-idle-gen applies to 'exit' only"
 [ "${#ALSO_IDS[@]}" = 0 ] || [ "$VERB" = reassociate ] \
   || die "--also applies to 'reassociate' only"
 [ "${#OWNED_PATHS[@]}" = 0 ] || { [ "$VERB" = relaunch ] && [ "$RECOVER_LAUNCH" = 0 ]; } \
@@ -2037,12 +2049,29 @@ retire_busy_incarnation() {
   fi
 }
 
+omp_idle_record_for_exit() {
+  local record
+  [ "$(fm_meta_get "$META" busy_gen)" = "$REQUIRE_IDLE_GEN" ] || return 1
+  record=$(fm_busy_record_read "$STATE" "$ID") || return 1
+  [ "$(control_exit_gen)" = "$REQUIRE_IDLE_GEN" ] || return 1
+  case "$record" in
+    'idle omp-ext agent-end '*) printf '%s' "$record" ;;
+    *) return 1 ;;
+  esac
+}
+
 # do_exit: stop the running agent, preserving endpoint and worktree. Prints
 # `already-stopped`, `endpoint-gone`, or `stopped`.
 do_exit() {
-  local state cmd hazard verdict composer_state cancel absence interrupt_result=not-needed dialog pre_busy
+  local state cmd hazard verdict composer_state cancel absence interrupt_result=not-needed dialog pre_busy idle_record
   require_state_verified_backend exit
   state=$(agent_state)
+  if [ -n "$REQUIRE_IDLE_GEN" ]; then
+    if [ "$HARNESS" != omp ] || { [ "$KIND" != ship ] && [ "$KIND" != scout ]; }; then
+      die "--require-idle-gen is supported only for OMP ships and scouts"
+    fi
+    [ "$state" = alive ] || die "task $ID is not positively live; guarded exit did not verify a stop"
+  fi
   case "$state" in
     dead)
       printf 'already-stopped'
@@ -2090,7 +2119,13 @@ do_exit() {
   # A busy agent is interrupted first before the exit command is submitted.
   # The verdict is kept: exit_picker_answerable reads it, and it must be the one
   # taken before anything was sent.
-  pre_busy=$(busy_verdict)
+  if [ -n "$REQUIRE_IDLE_GEN" ]; then
+    idle_record=$(omp_idle_record_for_exit) \
+      || die "task $ID has no verified idle record for the requested OMP generation; no lifecycle input was sent"
+    pre_busy='idle omp-ext'
+  else
+    pre_busy=$(busy_verdict)
+  fi
   case "$pre_busy" in
     busy*)
       cancel=$(deliver_interrupt) || return $?
@@ -2152,8 +2187,14 @@ do_exit() {
   # SessionEnd deliberate when the agent outlives the exit wait and this
   # transaction dies before that retire. Relaunch calls this function too and
   # must not mark its own replacement stop as a deliberate exit.
+  if [ -n "$REQUIRE_IDLE_GEN" ]; then
+    state=$(agent_state)
+    [ "$state" = alive ] && require_live_task_attribution "$state" \
+      && [ "$(omp_idle_record_for_exit)" = "$idle_record" ] \
+      || die "task $ID's OMP idle or endpoint proof changed during exit preparation; nothing was typed"
+  fi
   if [ "$VERB" = exit ]; then
-    printf 'gen=%s\n' "$(control_exit_gen)" > "$STATE/$ID.control-exit" \
+    printf 'gen=%s\n' "${REQUIRE_IDLE_GEN:-$(control_exit_gen)}" > "$STATE/$ID.control-exit" \
       || die "could not record that this exit of $ID was deliberate; nothing was typed"
   fi
   verdict=$(fm_backend_send_text_submit "$BACKEND" "$T" "$cmd" "$EXIT_RETRIES" "$POLL" 1.2 "$LABEL") \
@@ -2718,8 +2759,8 @@ record_note() {
 
 do_relaunch() {
   local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0
-  local -a spawn_args
-  local owned_path
+  local -a spawn_args slot_scope
+  local owned_path slot_branch
 
   require_state_verified_backend relaunch
   if [ "$RECOVER_LAUNCH" = 1 ]; then
@@ -2829,8 +2870,31 @@ do_relaunch() {
   if [ "$slot_governed" = 1 ]; then
     [ "${#OWNED_PATHS[@]}" -gt 0 ] || grep -q '^slot_owned_path=' "$META" \
       || die "refused relaunch of governed task $ID: governed slot provisioning requires --owned-path <tracked-path> (repeatable); the running agent was not stopped"
-    fm_slot_check_copy "$slot_project" "$slot_copy" \
-      || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
+    if fm_slot_adopt_route "$META" "$RELOCATING"; then
+      # A relaunch is not a new scope declaration: the task's own recorded manifest is adopted, so the
+      # copy is judged by the record of what was admitted (lib header) and never by fresh-admission rules.
+      slot_branch=$(fm_meta_get "$META" branch)
+      [ -n "$slot_branch" ] || slot_branch=fm/$ID
+      slot_scope=()
+      while IFS= read -r owned_path; do slot_scope+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
+      fm_slot_adopt_check "$slot_project" "$slot_copy" "$ID" "$slot_branch" "$META" "$STATE" \
+        || die "refused relaunch of governed task $ID: its recorded slot manifest cannot be adopted for $slot_copy; preserve and reconcile it first; the running agent was not stopped"
+      fm_slot_drift_report "$slot_copy" "$ID" "$slot_branch" "$(fm_meta_get "$META" slot_base_sha)" "${slot_scope[@]}"
+    else
+      slot_branch=$(fm_meta_get "$META" branch)
+      [ -n "$slot_branch" ] || slot_branch=fm/$ID
+      slot_scope=(${OWNED_PATHS[@]+"${OWNED_PATHS[@]}"})
+      if [ "${#slot_scope[@]}" -eq 0 ]; then
+        while IFS= read -r owned_path; do slot_scope+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
+      fi
+      # Creating a manifest on a copy is a provisioning act: a clean copy another task holds is named before the stop
+      # (a relocation's destination is judged by its own route), and again by fm-spawn.sh before the provisioner runs and
+      # before the launch is delivered, with the adoption's custody owner.
+      [ "$RELOCATING" != 0 ] || fm_slot_provision_custody "$slot_project" "$slot_copy" "$ID" "$META" "$STATE" \
+        || die "refused relaunch of governed task $ID: its assigned copy $slot_copy is held by another record or claim; preserve and reconcile it first; the running agent was not stopped"
+      fm_slot_foresee_refusals "$slot_project" "$slot_copy" "$ID" "$slot_branch" "$META" "${slot_scope[@]}" \
+        || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
+    fi
   fi
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
@@ -2921,6 +2985,10 @@ do_relaunch() {
 
   journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
+  # The task's own successful relaunch ends its earlier session-end refusal episode, so a later death is a new cause
+  # (D6(d)); only this task's memory file is named, in a subshell so the library's shell options stay out of this script.
+  # shellcheck source=bin/fm-session-end-relaunch-lib.sh
+  ( . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh" && fm_session_end_refusal_clear "$STATE" "$ID" ) >/dev/null 2>&1 || true
   if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
     fm_status_append_line "$STATE/$ID.status" "$(printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}")" \
       || echo "warning: could not record the model-matrix fallback note in $STATE/$ID.status (exit $?)" >&2

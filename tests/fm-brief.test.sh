@@ -224,6 +224,37 @@ test_ship_modes_generate_clean_briefs() {
   pass "fm-brief.sh: no-mistakes/direct-PR/local-only briefs generate cleanly"
 }
 
+# --reconciled-source binds a local-only brief to the exact declaration bytes
+# bin/fm-spawn.sh --reconciled-source judges; it approves nothing itself.
+test_reconciled_source_token() {
+  local home decl out rc brief sha
+  home="$TMP_ROOT/rs-brief-home"
+  write_registry "$home"
+  decl="$TMP_ROOT/rs-declaration.json"
+  printf '{"version": 1}\n' > "$decl"
+  sha=$(shasum -a 256 < "$decl" | awk '{print $1}')
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-rs-a1 some-proj --mode local-only --reconciled-source "$decl" 2>&1); rc=$?
+  expect_code 0 "$rc" "a local-only brief with --reconciled-source must scaffold: $out"
+  brief="$home/data/brief-rs-a1/brief.md"
+  grep -qx "Delivery contract: mode=local-only reconciled-source=$sha" "$brief" \
+    || fail 'the brief did not bind the declaration sha256 on its contract line'
+  while IFS='|' read -r label args expect; do
+    [ -n "$label" ] || continue
+    # shellcheck disable=SC2086 # The row's arguments must split into words.
+    out=$(FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-rs-bad some-proj $args 2>&1); rc=$?
+    expect_code 1 "$rc" "$label must be refused"
+    assert_contains "$out" "$expect" "$label was refused without its reason"
+    [ ! -e "$home/data/brief-rs-bad/brief.md" ] || fail "$label left a brief behind"
+  done <<ROWS
+a publishing mode|--mode direct-PR --reconciled-source $decl|applies only to a local-only ship brief
+a base branch|--mode local-only --base-branch main --reconciled-source $decl|cannot ship mode=local-only
+a repeated declaration|--mode local-only --reconciled-source $decl --reconciled-source $decl|given 2 times
+a missing declaration|--mode local-only --reconciled-source $TMP_ROOT/absent.json|is not a readable file
+a scout|--scout --reconciled-source $decl|applies only to a local-only ship brief
+ROWS
+  pass "fm-brief.sh: --reconciled-source binds the declaration sha256 only on a local-only ship brief"
+}
+
 # --forge forgejo is the Forgejo value of the project's registered forge binding
 # (bin/fm-project-mode.sh --forge), passed at intake exactly like --mode. It
 # names tea instead of gh-axi in the ship brief's forge-CLI rule and in the
@@ -2038,6 +2069,7 @@ test_no_heredoc_in_command_substitution
 test_generated_verification_plan_command
 test_help_includes_entire_header
 test_ship_modes_generate_clean_briefs
+test_reconciled_source_token
 test_forge_selection_renders_correct_cli
 test_ship_mode_is_required_and_closed_set
 test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget

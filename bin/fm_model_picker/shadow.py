@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import sqlite3
@@ -262,7 +263,7 @@ def _profile_list(value):
     return []
 
 
-def routes_from_rules(rules_doc):
+def routes_from_rules(rules_doc, *, by_effort=False):
     """Every concrete route reachable from the dispatch rules: use, fallback, default and
     default_fallback. Deduplicated by harness:model; the first configured effort wins."""
     found = {}
@@ -282,9 +283,10 @@ def routes_from_rules(rules_doc):
         if not isinstance(profile.get("model"), str) or not profile["model"]:
             continue
         route = normalize_route(profile["harness"], profile["model"])
-        if route in found:
+        key = (route, profile.get("effort") or "") if by_effort else route
+        if key in found:
             continue
-        found[route] = {
+        found[key] = {
             "route": route,
             "harness": profile["harness"],
             "model": profile["model"],
@@ -293,14 +295,17 @@ def routes_from_rules(rules_doc):
     return found
 
 
-def resolver_assessment(result, route):
+def resolver_assessments(result, route, *, effort=...):
     for candidate in result.get("candidates") or []:
         if not isinstance(candidate, dict) or not isinstance(candidate.get("profile"), dict):
             continue
         profile = candidate["profile"]
-        if normalize_route(profile.get("harness"), profile.get("model")) == route:
-            return candidate
-    return None
+        if normalize_route(profile.get("harness"), profile.get("model")) == route and (effort is ... or profile.get("effort") == effort):
+            yield candidate
+
+
+def resolver_assessment(result, route, *, effort=...):
+    return next(resolver_assessments(result, route, effort=effort), None)
 
 
 def quota_lane(harness, model):
@@ -377,13 +382,14 @@ def quota_facts(entry, harness, model, quota_doc, assessment):
             "source": "quota-snapshot"}
 
 
-def build_candidates(rules_doc, table, data_root, quota_doc, result):
+def build_candidates(rules_doc, table, data_root, quota_doc, result, *, by_effort=False):
     """One candidate per concrete route. A route the table cannot map stays a candidate
     with its facts read as UNKNOWN: never dropped, never zero."""
-    routes = routes_from_rules(rules_doc)
+    routes = routes_from_rules(rules_doc, by_effort=by_effort)
     candidates = []
     for index, route in enumerate(sorted(routes), start=1):
         profile = routes[route]
+        route = profile["route"]
         entry = table_entry(table, route)
         candidate = {
             "id": "candidate_%d" % index, "route": route, "harness": profile["harness"],
@@ -416,7 +422,7 @@ def build_candidates(rules_doc, table, data_root, quota_doc, result):
         candidate["effort_note"] = chosen.get("effort_note")
         candidate["metrics"] = projection["metrics"]
         candidate["as_of"] = projection.get("as_of")
-        assessment = resolver_assessment(result, route)
+        assessment = resolver_assessment(result, route, effort=profile["effort"] if by_effort else ...)
         if assessment is not None:
             candidate["configured_eligible"] = bool(assessment.get("eligible"))
             reason = assessment.get("reason")
@@ -1059,20 +1065,268 @@ def never_send_path(args):
     return os.path.join(config_dir, "dispatch-never-send")
 
 
-def observe(args, key, helper, data_root):
+def registry_request(eligible, comparable, acceptance_tags, *, local_outcomes=None, incumbent=None,
+                     acceptance_sha256=None, panel_acceptance_sha256s=None,
+                     validation_policy_sha256=None, panel_validation_policy_sha256s=None,
+                     observation_configurations=None):
+    """Serialize a local preview; caller owns evidence admission and transport."""
+    fact_fields = {'metric', 'revision', 'unit', 'scale', 'direction', 'values', 'acceptance_tags', 'scope', 'provenance'}
+    ids = [c['id'] for c in eligible]
+    if (not 2 <= len(ids) <= 16 or not all(isinstance(i, str) and re.fullmatch(r'candidate_[1-9][0-9]?', i) for i in ids) or
+            len(set(ids)) != len(ids)):
+        raise ValueError('expected distinct opaque worker options')
+    options = {i: i for i in ids}
+
+    def bounded_tags(tags):
+        return (isinstance(tags, list) and 0 < len(tags) <= 16 and
+                all(isinstance(tag, str) and re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,63}', tag) and
+                    tag != 'unsafe_or_unreviewed_scope' for tag in tags))
+
+    def finite_score(n):
+        return type(n) is int and abs(n) < (1 << 53) or type(n) is float and math.isfinite(n)
+
+    if not bounded_tags(acceptance_tags):
+        raise ValueError('expected bounded acceptance tag IDs')
+    for fact in comparable:
+        if (not isinstance(fact, dict) or set(fact) != fact_fields or fact['scope'] != 'comparable' or
+                not isinstance(fact['values'], dict) or set(fact['values']) != set(options)):
+            raise ValueError('unexpected registry observation fields, scope or model coverage')
+        if (not isinstance(fact['metric'], str) or not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,63}', fact['metric']) or
+                not isinstance(fact['revision'], str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 .'&():%_-]{0,79}", fact['revision']) or
+                not bounded_tags(fact['acceptance_tags']) or fact['direction'] not in ('higher', 'lower') or
+                (fact['unit'], fact['scale']) not in ((None, 'fraction'), (None, 'raw'), ('elo', 'raw'),
+                                                     ('fraction', 'fraction'), ('points', 'raw'))):
+            raise ValueError('unbounded observation label, scale or direction')
+        if not all(finite_score(n) and (fact['scale'] != 'fraction' or 0 <= n <= 1) for n in fact['values'].values()):
+            raise ValueError('observation values must be finite numeric scores on the declared scale')
+        provenance = fact['provenance']
+        if (set(provenance) != {'evaluation', 'method_revision', 'rows'} or
+                not re.fullmatch(r'https://artificialanalysis\.ai/evaluations/[a-z0-9-]{1,80}', provenance['evaluation']) or
+                not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}', provenance['method_revision']) or
+                set(provenance['rows']) != set(options)):
+            raise ValueError('observation lacks bounded method and row provenance')
+        for row in provenance['rows'].values():
+            if (set(row) != {'source', 'observed_at'} or row['source'] not in aadb.SOURCES or
+                    not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', row['observed_at'])):
+                raise ValueError('observation lacks bounded source and acquisition time')
+    required = set(acceptance_tags)
+    covered = {tag for fact in comparable for tag in fact['acceptance_tags']}
+    if not covered <= required:
+        raise ValueError('registry evidence outside task acceptance')
+    request = {'model': 'jev-latest', 'state': {
+        'objective': 'Independently accepted deliveries per total lifecycle input and output token, preserving required quality.',
+        'acceptance_tags': sorted(required),
+        'uncovered_acceptance_tags': sorted(required - covered),
+        'lifecycle_token_estimates': {option: None for option in options},
+        'observations': comparable}, 'questions': {
+        'worker': {'type': 'choice', 'instructions': 'Compare workers against the acceptance requirements and total tokens for routing, work, retries, rework and independent validation. Validation remains outside this decision. Benchmark scores are not local acceptance probabilities. Uncovered acceptance tags lack comparable benchmark evidence. Null token estimates are unknown, not zero. Choose insufficient_evidence if any mandatory requirement or the token tradeoff is unsupported.', 'criteria': dict(options, insufficient_evidence='Insufficient evidence to prefer a worker')}}}
+    if local_outcomes is not None:
+        # The caller must independently verify custody and applicability. Require
+        # the whole reconciled panel to share the target's acceptance and validation policy.
+        if (not isinstance(acceptance_sha256, str) or not re.fullmatch(r'[0-9a-f]{64}', acceptance_sha256) or
+                panel_acceptance_sha256s != [acceptance_sha256]):
+            raise ValueError('local panel does not bind to the target acceptance contract')
+        if (not isinstance(validation_policy_sha256, str) or not re.fullmatch(r'[0-9a-f]{64}', validation_policy_sha256) or
+                panel_validation_policy_sha256s != [validation_policy_sha256]):
+            raise ValueError('local panel does not bind to the target validation policy')
+        fields = {'assignments', 'accepted', 'input_tokens', 'output_tokens'}
+        if not isinstance(local_outcomes, dict) or set(local_outcomes) != set(options) or incumbent not in options:
+            raise ValueError('local outcomes must cover the full eligible menu and identify the incumbent')
+        if comparable and observation_configurations != {c['id']: c.get('configuration') for c in eligible}:
+            raise ValueError('public observations do not bind to the same worker configurations')
+        counts_by_option = {}
+        seen_configurations = set()
+        for candidate in eligible:
+            option, configuration = candidate['id'], candidate.get('configuration')
+            local = local_outcomes[option]
+            if (not isinstance(local, dict) or set(local) != fields | {'configuration'} or
+                    not isinstance(configuration, str) or not configuration or
+                    configuration in seen_configurations or configuration != local['configuration']):
+                raise ValueError('local outcomes do not bind to the eligible configurations')
+            seen_configurations.add(configuration)
+            counts = {k: local[k] for k in sorted(fields)}
+            if (any(type(value) is not int or value < 0 for value in counts.values()) or
+                    not 0 <= counts['accepted'] <= counts['assignments'] or
+                    counts['input_tokens'] + counts['output_tokens'] == 0):
+                raise ValueError('invalid local outcome counts')
+            counts_by_option[option] = counts
+        base = counts_by_option[incumbent]
+        if not base['assignments'] or any(c['assignments'] != base['assignments'] for c in counts_by_option.values()):
+            raise ValueError('local outcome arms do not have the same assignment count')
+        if any(c['accepted'] < base['accepted'] for c in counts_by_option.values()):
+            raise ValueError('observed acceptance loss; retain incumbent, no chooser input')
+        state = request['state']
+        state['matched_local_outcomes'] = {'scope': 'Observed matched assignments only, not an estimate or a forecast.',
+                                           'incumbent_option': incumbent, 'counts': counts_by_option}
+        request['questions']['worker']['instructions'] += ' Use the matched local counts only within their stated scope; never extrapolate their observed yield as a forecast.'
+        if comparable:
+            request['questions']['worker']['instructions'] += (
+                ' Within the observed panel, matched local outcomes take precedence over benchmark rank.'
+                ' Use benchmarks to assess task relevance, not to replace measured acceptance or token counts.'
+                ' If their scope does not support the decision for this task, choose insufficient_evidence.')
+    elif incumbent is not None:
+        if incumbent not in options:
+            raise ValueError('incumbent option is outside the eligible menu')
+        request['state']['incumbent_option'] = incumbent
+    if len(json.dumps(request).encode()) > 8192:
+        raise ValueError('registry request too large')
+    return request
+
+
+def registry_observe(registry, path, task, candidates, table, result, mock_answer, row):
+    eligible, excluded, unmeasured, unverified = [], {}, {}, {}
+    incumbent = None
+    chosen = result.get('chosen')
+
+    def assessment_identity(assessment):
+        # The resolver annotates its diagnostic rows, not the chosen row.
+        return json.dumps({k: v for k, v in assessment.items() if k != 'comparison_member'}, sort_keys=True)
+
+    chosen_identity = (assessment_identity(chosen) if isinstance(chosen, dict) and
+                       chosen.get('comparison_member', True) is True else None)
+    candidate_keys = {(c['route'], c['effort_configured']) for c in candidates}
+    unjoined = set()
+    # Check the reverse join: a post-routing effort or fallback can be absent
+    # from the rules-side enumeration even though the resolver considered it.
+    for assessment in result.get('candidates') or []:
+        if (not isinstance(assessment, dict) or assessment.get('eligible') is not True or
+                assessment.get('comparison_member') is False):
+            continue
+        profile = assessment.get('profile')
+        if (not isinstance(profile, dict) or
+                any(not isinstance(profile.get(field), str) or not profile[field] for field in ('harness', 'model')) or
+                (profile.get('effort') is not None and not isinstance(profile['effort'], str))):
+            raise ValueError('eligible resolver row has no joinable profile')
+        key = (normalize_route(profile['harness'], profile['model']), profile.get('effort'))
+        if key not in candidate_keys:
+            unjoined.add(key)
+    for candidate in candidates:
+        route, effort = candidate['route'], candidate['effort_configured']
+        matches = list(resolver_assessments(result, route, effort=effort))
+        # Distinct accounts, qualifications, or JSON value types cannot collapse to
+        # one option just because the visible harness, model and effort match.
+        if len({json.dumps(item, sort_keys=True) for item in matches}) > 1:
+            unverified[candidate['id']] = [route, effort]
+            excluded[candidate['id']] = {'route': route, 'effort': effort, 'reason': 'conflicting resolver rows for this route and effort'}
+            continue
+        assessment = matches[0] if matches else {}
+        mapped = ((table_entry(table, route) or {}).get('projections') or {}).get(effort) or {}
+        if assessment.get('eligible') is not True:
+            excluded[candidate['id']] = {'route': route, 'effort': effort, 'reason': 'resolver did not affirm exact configuration'}
+            continue
+        membership = assessment.get('comparison_member')
+        if membership is False:
+            excluded[candidate['id']] = {'route': route, 'effort': effort, 'reason': 'outside resolver comparison menu'}
+            continue
+        if 'routing' in result and membership is not True:
+            unverified[candidate['id']] = [route, effort]
+            excluded[candidate['id']] = {'route': route, 'effort': effort, 'reason': 'resolver comparison membership unverified'}
+            continue
+        if assessment.get('short') is True:
+            excluded[candidate['id']] = {'route': route, 'effort': effort, 'reason': 'resolver found runway shorter than the task horizon'}
+            continue
+        if assessment.get('unknown', False) is not False:
+            unverified[candidate['id']] = [route, effort]
+            excluded[candidate['id']] = {'route': route, 'effort': effort, 'reason': 'resolver marked quota or capacity unverified'}
+            continue
+        if (not candidate['projection'] or effort not in effort_map_for(candidate['harness']) or
+                mapped.get('slug') != candidate['projection']['slug'] or mapped.get('effort_note') or
+                not registry.TOKEN.fullmatch(candidate['family'] or '')):
+            unmeasured[candidate['id']] = [route, effort]
+            excluded[candidate['id']] = {'route': route, 'effort': effort, 'reason': 'resolver affirmed, but no exact benchmark projection'}
+            continue
+        candidate['registry_condition'] = mapped.get('registry_condition')
+        eligible.append(candidate)
+        if chosen_identity is not None and assessment_identity(assessment) == chosen_identity:
+            incumbent = candidate['id']
+    if len(eligible) + len(unmeasured) + len(unverified) + len(unjoined) > 16:
+        raise ValueError('candidate bound exceeded')
+    facts, audit = registry.evidence(path, task, eligible)
+    if 'route_launch_binding_sha256' in result:
+        launch_binding = result['route_launch_binding_sha256']
+        if not isinstance(launch_binding, str) or not re.fullmatch(r'[a-f0-9]{64}', launch_binding):
+            raise ValueError('invalid router launch binding')
+        audit['route_launch_binding_sha256'] = launch_binding
+    audit['excluded_candidates'] = excluded
+    audit['unmeasured_eligible'] = unmeasured
+    audit['unverified_eligibility'] = unverified
+    audit['unjoined_resolver_members'] = [list(key) for key in sorted(unjoined, key=lambda key: (key[0], key[1] or ''))]
+    audit['routes'] = {c['id']: [c['route'], c['effort_configured']] for c in eligible}
+    audit['incumbent_option'] = incumbent
+    row['gates'] = {'registry': audit}
+    if unverified or unjoined:
+        row.update(picker_status='registry-unverified-menu', reject_reason='resolver comparison menu cannot be reconciled')
+        return
+    if unmeasured:
+        row.update(picker_status='registry-incomplete-menu', reject_reason='an eligible configuration has no exact benchmark projection')
+        return
+    if not facts or len(eligible) < 2:
+        row.update(picker_status='registry-insufficient', reject_reason='no task evidence or fewer than two eligible worker configurations')
+        return
+    comparable = [f for f in facts if f['scope'] == 'comparable']
+    if not comparable:
+        row.update(picker_status='registry-proxy-only', reject_reason='descriptive observations only; no chooser input')
+        return
+    covered = {tag for fact in comparable for tag in fact['acceptance_tags']}
+    audit['uncovered_acceptance_tags'] = sorted(set(audit['acceptance_tags']) - covered)
+    if audit['uncovered_acceptance_tags']:
+        row.update(picker_status='registry-incomplete-acceptance',
+                   reject_reason='a required acceptance tag lacks comparable evidence; retain incumbent')
+        return
+    if not any(len(set(fact['values'].values())) > 1 for fact in comparable):
+        row.update(picker_status='registry-no-discrimination',
+                   reject_reason='all comparable observations tie across the eligible menu; retain incumbent')
+        return
+    if 'routing' in result and incumbent is None:
+        row.update(picker_status='registry-unverified-incumbent',
+                   reject_reason='resolver chosen row does not match an eligible comparison member')
+        return
+    request = registry_request(eligible, comparable, audit['acceptance_tags'], incumbent=incumbent)
+    audit['offline_request'] = request
+    row.update(picker_status='registry-offline-replay', reject_reason='offline evidence only; no Jev call or nomination')
+    if mock_answer is None:
+        return
+    body = mock_answer(request)
+    row['jev_raw_payload'] = body
+    row.update(picker_status='invalid-response', reject_reason='invalid registry choice')
+    answers, row['jev_candidate_version'] = parse_answers(body, request)
+    if answers['worker']['choice'] == 'insufficient_evidence':
+        row.update(picker_status='registry-abstained', reject_reason='mock chooser reported insufficient evidence; retain incumbent')
+        return
+    by_id = {c['id']: c for c in eligible}
+    worker = by_id.get(answers['worker']['choice'])
+    if worker is None:
+        return
+    # The registry compares workers only. Independent validation is not an output of this replay.
+    problems = recheck(worker, None, worker['effort_configured'], set(), {'floor': 0, 'vetoes': []}, 0)
+    if problems:
+        row.update(picker_status='rejected', reject_reason='; '.join(problems))
+    else:
+        audit['simulated_worker'] = worker['id']
+        row.update(picker_status='registry-simulated', reject_reason='mock answer only; no nomination')
+
+
+def observe(args, key, helper, data_root, *, registry_mock=None):
     brief = args.get("brief")
+    registry = os.environ.get('FM_MODEL_PICKER_REGISTRY')
     task_text = ""
     if args.get("task_text"):
         try:
-            task_text = Path(args["task_text"]).read_text(encoding="utf-8", errors="replace")
-        except OSError:
+            path = Path(args["task_text"])
+            if registry is not None:
+                # The reviewed digest binds exact UTF-8 bytes, including line endings.
+                task_text = path.read_bytes().decode("utf-8")
+            else:
+                task_text = path.read_text(encoding="utf-8", errors="replace")
+        except (OSError, UnicodeDecodeError):
             task_text = ""
     status = args.get("status") or "clear"
     reason = args.get("reason") or None
     rules_doc = _load_optional(args.get("rules"))
     result = _load_optional(args.get("result"))
     quota_doc = _load_optional(args.get("quota"))
-    rule_profile = (result.get("chosen") or {}).get("profile") or {}
+    chosen = result.get("chosen")
+    rule_profile = (chosen.get("profile") or {}) if isinstance(chosen, dict) else {}
     rule = {"worker": None, "validator": None, "effort": None}
     launch = args.get("hook") == "spawn"
     if (launch or status not in ("withheld", "error")) and isinstance(rule_profile, dict) \
@@ -1115,6 +1369,11 @@ def observe(args, key, helper, data_root):
         record(simple_row("resolver-error", reason or "resolver error", task_key, rule))
         return 0
 
+    if registry is not None and (status != 'clear' or result.get('status') != 'clear'):
+        # Advisory candidate rows can accompany quota, ambiguity, or approval holds.
+        record(simple_row('registry-resolver-held', 'resolver did not clear this dispatch', task_key, rule))
+        return 0
+
     trusted, verdict_reason, _ = verdict_state(data_root)
     if not trusted:
         record(simple_row("no-trusted-snapshot", verdict_reason, task_key, rule,
@@ -1128,7 +1387,17 @@ def observe(args, key, helper, data_root):
         return 0
 
     det_complexity, det_components = deterministic_complexity(task_text, rules_doc)
-    candidates = build_candidates(rules_doc, table, data_root, quota_doc, result)
+    candidates = build_candidates(rules_doc, table, data_root, quota_doc, result, by_effort=registry is not None)
+    if registry is not None:
+        from . import registry_shadow
+        row = simple_row('registry-unavailable', 'registry input rejected', task_key, rule)
+        try:
+            registry_observe(registry_shadow, registry, task_text, candidates, table, result,
+                             registry_mock, row)
+        except (ValueError, TypeError, KeyError, AttributeError, OSError, EOFError):
+            warn('registry input rejected; dispatch unchanged')
+        record(row)
+        return 0
     request = classify_request(task_text, args.get("project"))
     body, error = jev_call(request, key, never_send_path(args), helper, args["scratch"])
     if error:
@@ -1474,7 +1743,7 @@ def main(argv):
     scratch = tempfile.mkdtemp(prefix="fm-model-picker-shadow.")
     args["scratch"] = scratch
     try:
-        return observe(args, read_key(), helper, data_root)
+        return observe(args, "" if "FM_MODEL_PICKER_REGISTRY" in os.environ else read_key(), helper, data_root)
     finally:
         for name in os.listdir(scratch):
             try:
