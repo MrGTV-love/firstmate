@@ -259,8 +259,10 @@ Launch gate:
     state/.wake-spill.<seq>, never over another producer's spill, and the next
     append to that queue, or the watcher's next start, replays it.
   - AGENT keeps stdin, stdout and stderr; SIGTERM, SIGINT and SIGHUP sent to the
-    gate are forwarded to it; its exit status is returned and a death by signal
-    is re-raised. A missing or non-executable AGENT returns 127 or 126. A
+    gate are forwarded to it; its exit status is returned. A death by signal is
+    re-raised when the gate can reset that signal on itself, and is otherwise
+    returned as 128 + the signal number (137 for SIGKILL), never as a refusal.
+    A missing or non-executable AGENT returns 127 or 126. A
     forked watcher, holding only a pipe the gate writes, SIGKILLs AGENT (and the
     process group the gate leads) if the gate dies without finishing; the agent's
     process execs only after the watcher holds its pid, so a gate that dies at
