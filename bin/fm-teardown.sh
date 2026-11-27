@@ -3442,15 +3442,59 @@ teardown_skipped_row() { # <copy> <reason> <holder> <epoch> <endpoint>
   if [ -n "$5" ]; then printf '%s\t%s\t%s\t%s\t%s\n' "$@"; else printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4"; fi
 }
 # teardown_acquisition_pane_note <pane> [<closed-suffix>]: what a skipped-copy notice may say about the spawn's
-# acquisition pane. Teardown closes the task's endpoint, which is that pane, before this pass; the note claims the close
-# only when it is established (TEARDOWN_ENDPOINT_CLOSED=1: the backend close succeeded, or Herdr confirmed the pane gone),
-# then appends <closed-suffix>. A close that failed and went on only under --force, or no close at all, may leave it live.
+# acquisition pane <pane>, the endpoint recorded in that row. It says teardown closed that window, then appends
+# <closed-suffix>, only when all three hold at print time: this teardown's own close of the task endpoint succeeded
+# (TEARDOWN_ENDPOINT_CLOSED=1), <pane> names that same endpoint (TEARDOWN_CLOSED_ENDPOINT_IDS, read before the close), and
+# a read through the backend's own inventory now shows <pane> absent. A close return alone never counts: some adapters
+# return success without closing. Anything else - a failed or skipped close, another endpoint, a backend with no
+# definitive absence read, or a read that fails - says the window may still be live.
 TEARDOWN_ENDPOINT_CLOSED=0
+TEARDOWN_CLOSED_ENDPOINT_IDS=()
 teardown_acquisition_pane_note() {  # <pane> [<closed-suffix>]
-  if [ "$TEARDOWN_ENDPOINT_CLOSED" = 1 ]; then
+  if [ "$TEARDOWN_ENDPOINT_CLOSED" = 1 ] && teardown_is_closed_endpoint "$1" && teardown_endpoint_read_absent "$1"; then
     printf 'acquisition pane %s of the spawn stood in it; teardown closed that window%s' "$1" "${2:-}"
   else
     printf 'acquisition pane %s of the spawn stood in it; teardown did not establish that its window closed, so it may still be live' "$1"
+  fi
+}
+
+# teardown_is_closed_endpoint <pane>: <pane> is one of the identifiers of the endpoint this teardown closed.
+teardown_is_closed_endpoint() {  # <pane>
+  local id
+  for id in "${TEARDOWN_CLOSED_ENDPOINT_IDS[@]+"${TEARDOWN_CLOSED_ENDPOINT_IDS[@]}"}"; do
+    [ -n "$id" ] && [ "$id" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# teardown_endpoint_read_absent <pane>: a read through the backend's own inventory shows <pane> absent. Only a definitive
+# answer counts: tmux's listing of every pane succeeded without it, or Herdr's structured presence read says dead. Every
+# other backend, and any read that fails, is not a definitive absence.
+teardown_endpoint_read_absent() {  # <pane>
+  local rc=0
+  case "$BACKEND" in
+    tmux)
+      fm_backend_source tmux || return 1
+      fm_backend_tmux_target_exists "$1" || rc=$?
+      [ "$rc" -eq 1 ]
+      ;;
+    herdr)
+      fm_backend_source herdr || return 1
+      declare -F fm_backend_herdr_endpoint_confirmed_gone >/dev/null 2>&1 || return 1
+      fm_backend_herdr_endpoint_confirmed_gone "$1"
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+# teardown_record_closed_endpoint_ids: before the task endpoint is closed, record every identifier a skipped-copies row
+# may name for it: the recorded target, and for tmux the stable window id the spawn recorded as its acquisition pane.
+teardown_record_closed_endpoint_ids() {
+  local wid
+  TEARDOWN_CLOSED_ENDPOINT_IDS=("$T")
+  if [ "$BACKEND" = tmux ] && [ "${T#*:}" != "$T" ]; then
+    wid=$(tmux display-message -p -t "=${T%%:*}:=${T#*:}" '#{window_id}' 2>/dev/null) || wid=
+    case "$wid" in @*) TEARDOWN_CLOSED_ENDPOINT_IDS+=("$wid") ;; esac
   fi
 }
 
@@ -7419,6 +7463,7 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
       "$WT/.fm-grok-turnend" "$WT/.fm-kimi-turnend"
   fi
   if [ -n "$T_ORCA" ]; then
+    teardown_record_closed_endpoint_ids
     fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
       || { endpoint_close_refusal "$ID" "$BACKEND" "$T" 0; exit 1; }
     TEARDOWN_ENDPOINT_CLOSED=1
@@ -7450,6 +7495,7 @@ fi
 
 if [ "$BACKEND" != herdr ] && [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS" != 1 ]; then
   # A close that failed and continues only under --force leaves the endpoint possibly live, so it is not closed.
+  teardown_record_closed_endpoint_ids
   if fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID"; then
     TEARDOWN_ENDPOINT_CLOSED=1
   else
@@ -7472,6 +7518,7 @@ if [ "$BACKEND" = herdr ]; then
     echo "error: herdr pane $T for $ID is not confirmed gone after its close was refused, skipped, or failed; retaining every durable task record - rerun teardown once the close can run under the session lock" >&2
     exit 1
   fi
+  TEARDOWN_CLOSED_ENDPOINT_IDS=("$T")
   TEARDOWN_ENDPOINT_CLOSED=1
 fi
 if [ "$KIND" != secondmate ]; then
