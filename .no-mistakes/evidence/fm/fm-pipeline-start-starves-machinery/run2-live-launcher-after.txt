@@ -1,0 +1,3 @@
+2026-11-27T09:57:54Z
+e93a04ddf9a22b530c9a0a3068a018190e220854aba7ece32c20b56892b9b6ae  /Users/charlesabrooker/.no-mistakes/bin/claude-teamclaude
+exec /Users/charlesabrooker/.local/bin/tc run "$@"

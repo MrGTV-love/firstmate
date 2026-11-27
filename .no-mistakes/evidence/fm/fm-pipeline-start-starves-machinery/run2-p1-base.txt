@@ -1,0 +1,17 @@
+# P1 on base d25e907c1 bin/ (git archive to /private/tmp/fmcp-run2/base), head fixture boundary, 2026-11-27T09:41:53Z
+=== [base] p1a: pipeline-start --priority machinery -- sh -c exit 3
+outcome: STILL WAITING after 25s (start held; sent SIGTERM)
+stderr:
+fm-cpu-pass: pipeline-start waiting: counted=11 need=88723286911 budget=40361946642 reservation=6195490324 slack=14377403023 runs_measured=4 priority=machinery
+
+=== [base] p1b: pipeline-start -- sh -c exit 0
+outcome: STILL WAITING after 25s (start held; sent SIGTERM)
+stderr:
+fm-cpu-pass: pipeline-start waiting: counted=12 need=94918777235 budget=47610228244 reservation=6195490324 slack=14377403023 runs_measured=4 priority=other
+
+control available (one page below fit) = 25871040512 bytes = 24.094 GiB
+=== [base] p1c: pipeline-start -- sh -c exit 0
+outcome: STILL WAITING after 12s (start held; sent SIGTERM)
+stderr:
+fm-cpu-pass: pipeline-start waiting: counted=12 need=94918777235 budget=46348463636 reservation=6195490324 slack=14377403023 runs_measured=4 priority=other
+

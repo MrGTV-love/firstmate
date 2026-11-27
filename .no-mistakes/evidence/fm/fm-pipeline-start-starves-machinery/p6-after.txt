@@ -1,0 +1,80 @@
+=== [head] fresh: fm-duration run K -- axi run --intent (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.8s
+client: client ran: no-mistakes axi run --intent goal
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[x:step-unknown:3221225472:unseen]
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[none] holding_only=[none] counted
+
+=== [head] fresh: fm-duration run K (no --) axi run --intent (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.5s
+client: client ran: no-mistakes axi run --intent goal
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[x:step-unknown:3221225472:unseen]
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[none] holding_only=[none] counted
+
+=== [head] fresh: fm-duration run K -- axi run --intent-file (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.2s
+client: client ran: no-mistakes axi run --intent-file /tmp/fmcp-drive/head6/admission-yq21x41i/intent.txt
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[x:step-unknown:3221225472:unseen]
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[none] holding_only=[none] counted
+
+=== [head] fresh: fm-mem-guard run -- axi run --intent=goal (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.2s
+client: client ran: no-mistakes axi run --intent=goal
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[x:step-unknown:3221225472:unseen]
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[none] holding_only=[none] counted
+
+=== [head] fresh: fm-mem-guard run -- axi run --intent - (stdin) (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.3s
+client: client ran: no-mistakes axi run --intent -
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[x:step-unknown:3221225472:unseen]
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[none] holding_only=[none] counted
+
+=== [head] fresh: PR-366 shape fm-duration -- env FM_HOME bash fm-mem-guard.sh run -- axi run --intent-file (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.6s
+client: client ran: no-mistakes axi run --intent-file /tmp/fmcp-drive/head6/admission-yq21x41i/intent.txt --verification-plan /tmp/fmcp-drive/head6/admission-yq21x41i/intent.txt
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[x:step-unknown:3221225472:unseen]
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[none] holding_only=[none] counted
+fm-cpu-pass: pipeline-start: this start was admitted by its enclosing start (pid 87084); not queued again
+
+=== [head] fresh: fm-mem-guard run -- no-mistakes rerun (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.2s
+client: client ran: no-mistakes rerun
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[x:step-unknown:3221225472:unseen]
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[none] holding_only=[none] counted
+
+=== [head] reattach: fm-mem-guard run -- axi run --wait 1m (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi run --wait 1m
+gate lines:
+  (none)
+
+=== [head] reattach: fm-duration run K -- axi run (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi run
+gate lines:
+  (none)
+
+=== [head] other: fm-mem-guard run -- axi respond --action approve (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi respond --action approve
+gate lines:
+  (none)
+
+=== [head] other: fm-mem-guard run -- axi status (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi status
+gate lines:
+  (none)
+
+=== [head] other: fm-mem-guard run -- true (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: (client never ran)
+gate lines:
+  (none)
+

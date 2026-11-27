@@ -1,0 +1,36 @@
+# P6 adversarial shapes and cross-wrapper class order on head 19e016c276f7b857f5a77a5e77e50198c1dedad2, 2026-11-27T09:56:57Z
+=== fresh: absolute client path via fm-mem-guard (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.3s
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 res
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 res
+
+=== fresh: reordered args (--verification-plan before --intent-file=) (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.3s
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 res
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 res
+
+=== fresh: wrapped in env + absolute path via fm-duration (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.4s
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 res
+fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 res
+
+=== reattach: absolute path axi run --wait via fm-duration (expected: no queue, run at once)
+outcome: ran at once, exit 0
+gate lines:
+  (none)
+
+=== no-intent axi run through fm-mem-guard, client exits 2 (expected: no queue, exit 2 passes through)
+exit=2 gate lines=(none)
+
+=== class order across wrappers (other queued first via fm-mem-guard; machinery second via fm-duration)
+exits: other=0 machinery=0
+client order:
+client ran: no-mistakes axi run --intent machinery-run
+client ran: no-mistakes axi run --intent other-run
+  a: fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 rea
+  a: fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 rea
+  b: fm-cpu-pass: pipeline-start waiting: counted=1 projected=11811160064 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 rea
+  b: fm-cpu-pass: pipeline-start admitted: counted=0 projected=8589934592 budget=10737418240 available=10737418240 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 rea

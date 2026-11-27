@@ -1,0 +1,51 @@
+# Launch gate via isolated launcher copy on head 19e016c276f7b857f5a77a5e77e50198c1dedad2, 2026-11-27T09:57:40Z
+launcher copy final line: exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8E1D7QY5TQFJE72NF01KKDN/bin/fm-cpu-pass.sh launch-gate -- /private/tmp/fmcp-run2/gate/admission-wqifu8qp/launcher/claude "$@"
+=== L1 ci fix launch fits -> admitted (expect exit 3 = agent exit)
+  exit=3
+  agent saw stdin='prompt on stdin' argv=['-p', '--output-format', 'stream-json'] cwd=/private/tmp/fmcp-run2/gate/admission-wqifu8qp/l1/wt-x
+  published<=unlocked: True; agent_started<=unlocked: True
+  fm-cpu-pass: launch-gate run=x branch=fm/x step=ci:running counted=yes agent_pid=None attempt=99547:1795773460635080000
+  fm-cpu-pass: launch-gate admitted: counted=1 projected=8589934592 budget=42949672960 available=42949672960 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[none] holding_only=[x:waiter:0:unseen] counted_runs=[x:0] base_need=none bas
+  start lock free after: True
+
+=== L2 review-step launch of counted run y -> passes through at once (expect exit 0, no hold)
+  exit=0 agent ran=True
+
+=== L3 unmapped worktree -> refused (expect exit 75, agent never starts, durable wake)
+  exit=75 agent ran=False
+  fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /private/tmp/fmcp-run2/gate/admission-wqifu8qp/l2/elsewhere, attempt 1975:1795773461624717000; no run records /private/tmp/fmcp-run2/gate/admission-wqifu8qp/l2/elsewhere; next action: launch the agent from a run worktree; a launch outside
+  wake: 1795773461	1	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /private/tmp/fmcp-run2/gate/admission-wqifu8qp/l2/elsewhere, attempt 1975:1795773461624717000; no run records /private/tmp/fmcp-run2/gate/admission-wqifu8qp/l2/elsewhere; next action: launch 
+
+=== L4 no room -> holds; capacity returns -> admitted by itself (expect exit 0)
+  held with agent not started: True
+  exit=0 agent ran=True
+  fm-cpu-pass: launch-gate run=x branch=fm/x step=ci:running counted=yes agent_pid=None attempt=3523:1795773462104360000
+  fm-cpu-pass: launch-gate waiting: counted=2 projected=11811160064 budget=1073741824 available=1073741824 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[y:active:3221225472:unseen] holding_only=[x:waiter:0:unseen] counted_runs=[x:0
+  fm-cpu-pass: launch-gate admitted: counted=2 projected=11811160064 budget=42949672960 available=42949672960 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[y:active:3221225472:unseen] holding_only=[x:waiter:0:unseen] counted_runs=[
+  wake: 1795773462	1	check	launch-gate-x	check: launch-gate: run x (fm/x) held for capacity before its ci agent starts, waited 0.02s so far: counted=2 projected=11811160064 budget=1073741824 available=1073741824 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_
+  wake: 1795773466	2	check	launch-gate-x	check: launch-gate: run x (fm/x) admitted after 4.14s held: counted=2 projected=11811160064 budget=42949672960 available=42949672960 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[y:active:32212254
+
+=== L5 budget 4s, CI-fix p99 1s, no room -> refused at bound (expect exit 75, no agent)
+  exit=75 agent ran=False lock free=True
+  fm-cpu-pass: launch-gate run=x branch=fm/x step=ci:running counted=yes agent_pid=None attempt=17965:1795773467394636000
+  fm-cpu-pass: launch-gate waiting: counted=2 projected=11811160064 budget=1073741824 available=1073741824 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_measured=1 reserved=[y:active:3221225472:unseen] holding_only=[x:waiter:0:unseen] counted_runs=[x:0
+  fm-cpu-pass: launch-gate refused: hold bound reached: run x; hold_bound=3s budget=4s round_elapsed=0s ci_fix_p99=1s n=1 held=0 ambiguous=0; held 3s; last reading: counted=2 projected=11811160064 budget=1073741824 available=1073741824 held=0 reservation=3221225472 active_term=1073741824 slack=8589934
+  wake: 1795773467	1	check	launch-gate-x	check: launch-gate: run x (fm/x) held for capacity before its ci agent starts, waited 0.03s so far: counted=2 projected=11811160064 budget=1073741824 available=1073741824 held=0 reservation=3221225472 active_term=1073741824 slack=8589934592 runs_measured=13 readings_
+  wake: 1795773470	2	check	launch-gate-x	check: launch-gate: launch-gate refused: hold bound reached: run x; hold_bound=3s budget=4s round_elapsed=0s ci_fix_p99=1s n=1 held=0 ambiguous=0; held 3s; last reading: counted=2 projected=11811160064 budget=1073741824 available=1073741824 held=0 reservation=3221225
+
+=== L6 group kill while agent runs (expect no agent left, lock free)
+  agent pid 28809 alive after: False
+  lock free=True
+
+=== L7 SIGKILL to the gate process alone (expect agent ends, lock free)
+  gate pid 30072 (the launcher exec'd into it); agent pid 30364 alive after: False (0.06s)
+  lock free=True
+
+=== L8 missing claude binary (expect 127, lock free)
+  exit=127 lock free=True
+  fm-cpu-pass: launch-gate run=x branch=fm/x step=ci:running counted=yes agent_pid=None attempt=31850:1795773472747807000
+  fm-cpu-pass: launch-gate: agent not found: /private/tmp/fmcp-run2/gate/admission-wqifu8qp/launcher/no-such-claude
+
+=== L9 SIGTERM to gate reaches agent (agent traps it, exits 0)
+  agent got TERM=True exit=0
+

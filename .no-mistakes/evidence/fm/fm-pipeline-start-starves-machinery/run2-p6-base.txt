@@ -1,0 +1,76 @@
+# P6 call shapes on base d25e907c1 bin/, 2026-11-27T09:44:51Z
+=== [base] fresh: fm-duration run K -- axi run --intent (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.2s
+client: client ran: no-mistakes axi run --intent goal
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 need=15032385536 budget=10737418240 reservation=3221225472 slack=8589934592 runs_measured=13 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=0 need=11811160064 budget=10737418240 reservation=3221225472 slack=8589934592 runs_measured=13 priority=other
+
+=== [base] fresh: fm-duration run K (no --) axi run --intent (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.6s
+client: client ran: no-mistakes axi run --intent goal
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 need=15032385536 budget=10737418240 reservation=3221225472 slack=8589934592 runs_measured=13 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=0 need=11811160064 budget=10737418240 reservation=3221225472 slack=8589934592 runs_measured=13 priority=other
+
+=== [base] fresh: fm-duration run K -- axi run --intent-file (expected: queue then admit)
+outcome: WAITING after 8 s; after counted run x completed: exit 0 in 0.7s
+client: client ran: no-mistakes axi run --intent-file /private/tmp/fmcp-run2/p6b/admission-9ql3dlk3/intent.txt
+gate lines:
+fm-cpu-pass: pipeline-start waiting: counted=1 need=15032385536 budget=10737418240 reservation=3221225472 slack=8589934592 runs_measured=13 priority=other
+fm-cpu-pass: pipeline-start admitted: counted=0 need=11811160064 budget=10737418240 reservation=3221225472 slack=8589934592 runs_measured=13 priority=other
+
+=== [base] fresh: fm-mem-guard run -- axi run --intent=goal (expected: queue then admit)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi run --intent=goal
+gate lines:
+  (none)
+
+=== [base] fresh: fm-mem-guard run -- axi run --intent - (stdin) (expected: queue then admit)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi run --intent -
+gate lines:
+  (none)
+
+=== [base] fresh: PR-366 shape fm-duration -- env FM_HOME bash fm-mem-guard.sh run -- axi run --intent-file (expected: queue then admit)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi run --intent-file /private/tmp/fmcp-run2/p6b/admission-9ql3dlk3/intent.txt --verification-plan /private/tmp/fmcp-run2/p6b/admission-9ql3dlk3/intent.txt
+gate lines:
+  (none)
+
+=== [base] fresh: fm-mem-guard run -- no-mistakes rerun (expected: queue then admit)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes rerun
+gate lines:
+  (none)
+
+=== [base] reattach: fm-mem-guard run -- axi run --wait 1m (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi run --wait 1m
+gate lines:
+  (none)
+
+=== [base] reattach: fm-duration run K -- axi run (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi run
+gate lines:
+  (none)
+
+=== [base] other: fm-mem-guard run -- axi respond --action approve (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi respond --action approve
+gate lines:
+  (none)
+
+=== [base] other: fm-mem-guard run -- axi status (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: client ran: no-mistakes axi status
+gate lines:
+  (none)
+
+=== [base] other: fm-mem-guard run -- true (expected: no queue, run at once)
+outcome: ran at once, exit 0
+client: (client never ran)
+gate lines:
+  (none)
+
