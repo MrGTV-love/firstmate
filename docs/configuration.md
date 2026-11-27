@@ -2398,9 +2398,13 @@ Unrelated Git environment entries and explicit operator settings remain in the p
 Every fleet launch selects the task Git hooks for the [commit and push credential check](#jev-guard), independently of the attribution choice.
 The launch carries them in one of two ways, chosen in the pane itself with the pane's own git:
 - The config carrier adds Git config-based hook rows (`hook.fm-strip` and `hook.fm-scan-commit` on `commit-msg`, `hook.fm-scan-push` on `pre-push`) to `GIT_CONFIG_PARAMETERS` and leaves the repository's own `core.hooksPath` in force, so every project hook, `reference-transaction` included, runs as it would outside the pane.
-  It needs Git 2.54 or later and is used only for harnesses proven to keep the rows in their tool shell; [runtime backend verification](verification/runtime-backends.md#task-git-hook-carrier-in-the-worker-tool-shell) records which.
+  It needs Git 2.54 or later and is used only for harnesses proven to keep the rows in their tool shell, apart from the unproven dsh exception below; [runtime backend verification](verification/runtime-backends.md#task-git-hook-carrier-in-the-worker-tool-shell) records which.
 - The legacy carrier points a pane-scoped numbered `GIT_CONFIG` `core.hooksPath` at the task hooks directory, whose wrappers chain the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs; it does not chain `reference-transaction` or `post-index-change`.
-  Every other harness, and any pane whose git does not list the rows, uses it.
+  Every other harness, and any pane whose git does not list the rows, uses it, except dsh (below).
+Both carriers also add one numbered `maintenance.pack-refs.enabled=false` `GIT_CONFIG` entry (see "Ship-branch folder protection"), so the inner and the outer selection leave exactly one; the dsh exception below carries that key as a `GIT_CONFIG_PARAMETERS` row instead.
+The `dsh` harness cannot use any numbered entry: its subprocess scrub drops every environment name that matches `KEY`, `PASSWORD`, `SECRET` or `TOKEN` (case-insensitively), so a numbered `GIT_CONFIG_KEY_n` vanishes while `GIT_CONFIG_COUNT` and `GIT_CONFIG_VALUE_n` stay and every git call in its tools fails.
+A dsh launch, and any raw launch command whose executable is `dsh` or `dsh-tui` by basename (a path or argument that merely contains `dsh` does not count), therefore always runs the config carrier, with the maintenance key and every numbered pane entry moved into `GIT_CONFIG_PARAMETERS` rows and no numbered entry left; a pane git without config hooks refuses a dsh launch.
+A live run proving those rows reach dsh's tool shell is pending (`tests/fm-git-hook-carrier-live-e2e.test.sh` has no dsh provider).
 A pane with no git on its PATH, a malformed `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS`, or a git that honours neither carrier refuses the launch, and the spawn fails naming the reason.
 Under the legacy carrier, a repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
 Under the legacy carrier the task hooks directory is git's hooks directory and is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the task hooks; install a project's hooks from outside the pane, where the wrappers chain them.
@@ -3720,6 +3724,18 @@ The locked session-start deferred network stage runs bootstrap's best-effort pro
 - It emits `FLEET_SYNC:` for skipped refreshes that may matter, recovered self-heals, and `STUCK:` alarms.
 - Normal completed runs keep local-only and no-origin skips silent.
 - If bootstrap kills a timed-out refresh, it replays any completed `fm-fleet-sync.sh` output before the aggregate timeout skip so no finished result is lost.
+- It also relays a `<label>: warning: could not set maintenance.pack-refs.enabled=false: <first git line>` line, which `fm-fleet-sync.sh` prints when the key write below failed for that clone.
+
+**Ship-branch folder protection**
+
+Git's own automatic maintenance, started by a commit, an amend, a fetch, an advancing `merge --ff-only` or a rebase once a clone holds 16 or more loose refs, runs `git pack-refs --all --prune --auto` and removes the then-empty `refs/heads/<prefix>` folder (the registered ship-branch prefix, `fm/` by default).
+A confined worker's profile has no grant to create that folder, so its next commit would fail with `unable to create directory for .../refs/heads/fm/<branch>`.
+`fm-fleet-sync.sh` is the single writer of `maintenance.pack-refs.enabled=false` in each project clone's own `.git/config`, and in the home repository in its whole-fleet form.
+It writes the key right after its clone-root check, before the registry, local-only, origin and fetch steps, so every clone root gets it whatever its delivery mode, remote or state; the whole-fleet form writes every clone root's key in one quick local pass before the first fetch, so a slow fetch or a bootstrap timeout cannot leave a later clone without it.
+It touches only that key, rewrites nothing when the key is already `false`, and leaves `maintenance.auto` alone, so automatic object garbage collection still runs.
+The worker launch carries the same key as one numbered `GIT_CONFIG` entry, or as a `GIT_CONFIG_PARAMETERS` row on a dsh launch, which can use no numbered entry (see the task Git hooks under the launch environment), because a carrier covers only processes that inherit it.
+`bin/fm-branch-ref-dirs-lib.sh` restores `refs/heads/<folder>` and `logs/refs/heads/<folder>` after the two firstmate deletes of a last loose ref, the gone-upstream prune in `fm-fleet-sync.sh` and the task-branch delete in `fm-teardown.sh`, by one non-recursive `mkdir` per component of the registered prefix up to its last slash (`fm/` gives `fm`, `team/fm-` gives `team`, `fm-` gives none) and of the deleted branch up to its last slash (a `fm/<id>` branch in a project that registers `fix/` gives `fm` too), that never follows a link, including a link at `refs`, `logs` or `logs/refs`.
+Not covered: an explicit `git pack-refs`, `git maintenance run --task=pack-refs`, a `git branch -D` typed by hand, any verb of the no-mistakes daemon, and a clone that `fm-fleet-sync.sh` has not yet visited.
 
 **Stale Git lock recovery**
 

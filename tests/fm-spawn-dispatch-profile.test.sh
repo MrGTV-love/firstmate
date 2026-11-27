@@ -1933,7 +1933,8 @@ assert child.returncode == 0, 'child Bash received a fake credential'
 expected = {'CODEX_HOME': '/synthetic/codex', 'SSH_AUTH_SOCK': '/synthetic/agent.sock',
             'HTTPS_PROXY': 'http://proxy.invalid:3128', 'TERM': 'xterm', 'FM_TASK_ID': '$id',
             'GIT_CONFIG_KEY_0': 'user.name', 'GIT_CONFIG_VALUE_0': 'synthetic user',
-            'GIT_CONFIG_KEY_1': 'core.hooksPath', 'DISABLE_AUTOUPDATER': '1', 'JAVA_HOME': '/synthetic/jdk',
+            'GIT_CONFIG_KEY_1': 'maintenance.pack-refs.enabled', 'GIT_CONFIG_VALUE_1': 'false',
+            'GIT_CONFIG_KEY_2': 'core.hooksPath', 'DISABLE_AUTOUPDATER': '1', 'JAVA_HOME': '/synthetic/jdk',
             'TRACEPARENT': '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01'}
 missing = [key for key, value in expected.items() if os.environ.get(key) != value]
 assert not missing, 'worker lost operational carriers: ' + ','.join(missing)

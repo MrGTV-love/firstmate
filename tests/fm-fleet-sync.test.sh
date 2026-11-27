@@ -40,15 +40,17 @@ set -u
 fm_git_identity fmtest fmtest@example.invalid
 
 TMP_ROOT=$(fm_test_tmproot fm-fleet-sync-tests)
-HOME_N=0
 
 # --- fixtures ---------------------------------------------------------------
 
 # new_home: fresh isolated FM_HOME with an empty projects/ dir. Each test gets its
 # own so the whole-fleet form never sees another test's clones.
 new_home() {
-  HOME_N=$((HOME_N + 1))
-  local h="$TMP_ROOT/home-$HOME_N"
+  # mktemp, not a counter: a counter incremented inside $(new_home) never reaches the caller,
+  # so every call would hand back the same directory and the whole-fleet form would see the
+  # clones of every earlier test.
+  local h
+  h=$(mktemp -d "$TMP_ROOT/home.XXXXXX")
   mkdir -p "$h/projects"
   printf '%s\n' "$h"
 }
@@ -884,6 +886,273 @@ test_non_signature_fetch_failure_is_not_retried() {
   pass "a non-packed-refs.lock fetch failure keeps today's behavior (no retry)"
 }
 
+# --- maintenance.pack-refs.enabled key (C2) ---------------------------------
+
+# pack_key <clone>: the clone's own value of the key, empty when unset.
+pack_key() { git -C "$1" config --local --get maintenance.pack-refs.enabled 2>/dev/null || true; }
+# other_config <clone>: every local config line except the key, in file order.
+other_config() { git -C "$1" config --local --list | grep -v '^maintenance.pack-refs.enabled=' || true; }
+
+test_key_is_written_for_every_clone_state() {
+  local home out a b c d e f g h i
+  home=$(new_home)
+  a=$(build_pair "$home" ka); b=$(build_pair "$home" kb); c=$(build_pair "$home" kc)
+  d=$(build_pair "$home" kd); e=$(build_pair "$home" ke); f=$(build_pair "$home" kf)
+  g=$(build_pair "$home" kg); h=$(build_pair "$home" kh)
+  mkdir -p "$home/data"
+  printf -- '- kd [local-only] - local project\n- kh [local-only forge=githb] - unresolvable posture\n' > "$home/data/projects.md"
+  git -C "$c" config maintenance.pack-refs.enabled true      # kc: a different value
+  advance_origin "$home" kb C1
+  git -C "$e" remote set-url origin "file://$home/remotes/does-not-exist.git"   # ke: fetch fails
+  git -C "$f" remote remove origin                          # kf: no origin
+  printf 'edit\n' >> "$g/file.txt"                           # kg: dirty
+  git -C "$h" checkout -q -b side                           # kh: off the default branch, registry refused
+  i=$(build_pair "$home" ki); git -C "$i" config user.neighbour kept
+  for clone in "$a" "$b" "$d" "$e" "$f" "$g" "$h" "$i"; do
+    assert_equals "" "$(pack_key "$clone")" "fixture $clone already carries the key before any run"
+  done
+  assert_equals true "$(pack_key "$c")" "fixture kc does not carry the true value"
+  local before_i; before_i=$(other_config "$i")
+
+  out=$(run_sync "$home")
+
+  assert_equals false "$(pack_key "$a")" "existing clone without the key was left without it"
+  assert_equals false "$(pack_key "$b")" "a behind clone was left without the key"
+  assert_equals false "$(pack_key "$c")" "a key set to true was not replaced by false"
+  assert_equals false "$(pack_key "$d")" "a local-only clone was left without the key"
+  assert_equals false "$(pack_key "$e")" "a clone whose fetch fails was left without the key"
+  assert_equals false "$(pack_key "$f")" "a no-origin clone was left without the key"
+  assert_equals false "$(pack_key "$g")" "a dirty clone was left without the key"
+  assert_equals false "$(pack_key "$h")" "an off-default clone with a refused registry entry was left without the key"
+  assert_contains "$out" "ke: skipped: fetch failed" "the fetch-failure clone no longer reports its skip"
+  assert_contains "$out" "kg: STUCK:" "the dirty clone no longer reports STUCK"
+  assert_contains "$out" "kd: skipped: local-only project" "the local-only skip changed"
+  assert_equals "$before_i" "$(other_config "$i")" "a neighbour config line changed"
+  for clone in "$a" "$b" "$c" "$d" "$e" "$f" "$g" "$h" "$i"; do
+    if git -C "$clone" config --get maintenance.auto >/dev/null 2>&1; then fail "maintenance.auto became set in $clone"; fi
+    assert_equals "file:.git/config" "$(git -C "$clone" config --show-origin --local --get maintenance.pack-refs.enabled | cut -f1)" \
+      "the key is not in the clone's own .git/config"
+  done
+  pass "the key is written to every clone root - existing, behind, true, local-only, fetch-failing, no-origin, dirty, off-default - whatever its state"
+}
+
+test_key_write_is_idempotent_and_touches_only_the_key() {
+  local home clone sum_before sum_after
+  home=$(new_home)
+  clone=$(build_pair "$home" kidem)
+  git -C "$clone" config user.neighbour kept
+  cp "$clone/.git/config" "$home/config-before"
+  run_sync "$home" kidem >/dev/null
+  assert_equals false "$(pack_key "$clone")" "first run did not write the key"
+  # Every other byte of .git/config is untouched: with the two lines the key adds removed, the file is the one before.
+  assert_equals "$(cat "$home/config-before")" "$(grep -vxE '\[maintenance "pack-refs"\]|[[:space:]]enabled = false' "$clone/.git/config")" \
+    "the key write changed a byte of .git/config besides its own two lines"
+  sum_before=$(cksum < "$clone/.git/config")
+  run_sync "$home" kidem >/dev/null
+  sum_after=$(cksum < "$clone/.git/config")
+  assert_equals "$sum_before" "$sum_after" "a second run changed a byte of .git/config"
+  assert_equals 1 "$(git -C "$clone" config --local --get-all maintenance.pack-refs.enabled | wc -l | tr -d ' ')" "the key is present more than once"
+  pass "a second run leaves .git/config byte-identical, and only the key is added"
+}
+
+test_single_name_form_writes_the_key_and_a_non_root_is_untouched() {
+  local home clone encl
+  home=$(new_home)
+  clone=$(build_pair "$home" ksingle)
+  run_sync "$home" projects/ksingle >/dev/null
+  assert_equals false "$(pack_key "$clone")" "the single-name form did not write the key"
+  encl=$(build_enclosing_home keynonroot)
+  mkdir -p "$encl/projects/not-a-clone/wt"
+  run_sync "$encl" not-a-clone >/dev/null
+  assert_equals "" "$(pack_key "$encl")" "a candidate that is not a clone root got the key written into the enclosing repository"
+  pass "the single-name form writes the key, and a candidate that is not a clone root is untouched"
+}
+
+test_home_repository_gets_the_key_in_the_whole_fleet_form_only() {
+  local encl plain out
+  encl=$(build_enclosing_home keyhome)
+  assert_equals "" "$(pack_key "$encl")" "the home fixture already carries the key"
+  run_sync "$encl" nothing-here >/dev/null
+  assert_equals "" "$(pack_key "$encl")" "the single-name form wrote the home repository's key"
+  run_sync "$encl" >/dev/null
+  assert_equals false "$(pack_key "$encl")" "the whole-fleet form did not write the home repository's key"
+  plain=$(new_home)
+  out=$(run_sync "$plain")
+  assert_not_contains "$out" "maintenance.pack-refs" "a home that is not a git repository was reported on"
+  [ ! -e "$plain/.git" ] || fail "a plain FM_HOME gained a .git"
+  pass "the home repository gets the key in the whole-fleet form, and a plain home is left alone"
+}
+
+test_unwritable_config_warns_and_the_sync_continues() {
+  local home clone out rc
+  home=$(new_home)
+  clone=$(build_pair "$home" klock)
+  advance_origin "$home" klock C1
+  : > "$clone/.git/config.lock"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" klock 2>/dev/null)
+  rc=$?
+  assert_equals 0 "$rc" "a failed key write stopped fleet-sync"
+  assert_contains "$out" "klock: warning: could not set maintenance.pack-refs.enabled=false: " "the failed write printed no warning on stdout"
+  assert_contains "$out" "klock: synced" "the rest of the sync did not continue after the failed write"
+  assert_equals "" "$(pack_key "$clone")" "the key appeared although config.lock blocked the write"
+  # Bootstrap relays that line, so a session start shows it.
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  assert_contains "$out" "FLEET_SYNC: klock: warning: could not set maintenance.pack-refs.enabled=false: " "bootstrap did not relay the warning"
+  pass "an unwritable .git/config warns on stdout, the sync continues, and bootstrap relays the warning"
+}
+
+test_the_whole_fleet_form_writes_every_key_before_the_first_fetch() {
+  local home first second fakebin log out
+  home=$(new_home)
+  first=$(build_pair "$home" kfirst)
+  second=$(build_pair "$home" ksecond)
+  fakebin="$home/fb-order"; mkdir -p "$fakebin"; log="$home/fetch-order.log"
+  cat > "$fakebin/git" <<'SH'
+#!/usr/bin/env bash
+# On every fetch, record which clones already carry the key.
+for a in "$@"; do
+  if [ "$a" = fetch ]; then
+    for c in "${FM_FAKE_PROJECTS:?}"/*; do
+      printf '%s=%s\n' "$(basename "$c")" "$("${REAL_GIT_FOR_TEST:?}" -C "$c" config --local --get maintenance.pack-refs.enabled 2>/dev/null)" >> "${FM_FAKE_ORDER_LOG:?}"
+    done
+    printf -- '--\n' >> "$FM_FAKE_ORDER_LOG"
+    break
+  fi
+done
+exec "${REAL_GIT_FOR_TEST:?}" "$@"
+SH
+  chmod +x "$fakebin/git"
+  out=$(PATH="$fakebin:$PATH" REAL_GIT_FOR_TEST="$(command -v git)" FM_FAKE_PROJECTS="$home/projects" FM_FAKE_ORDER_LOG="$log" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>/dev/null)
+  [ -s "$log" ] || fail "the fake git saw no fetch, so the case proves nothing: $out"
+  assert_equals "kfirst=false
+ksecond=false" "$(sed -n '1,2p' "$log")" "a clone still lacked the key when the first fetch began"
+  assert_equals false "$(pack_key "$first")" "first clone lost the key"
+  assert_equals false "$(pack_key "$second")" "second clone lost the key"
+  pass "the whole-fleet form writes every clone's key before the first fetch, so a slow fetch or a timeout cannot skip a later clone"
+}
+
+test_a_failing_git_root_lookup_skips_and_writes_nothing() {
+  local home clone fakebin out
+  home=$(new_home)
+  clone=$(build_pair "$home" knogit)
+  fakebin="$home/fb-nogit"; mkdir -p "$fakebin"
+  cat > "$fakebin/git" <<'SH'
+#!/usr/bin/env bash
+for a in "$@"; do [ "$a" = --show-toplevel ] && exit 1; done
+exec "${REAL_GIT_FOR_TEST:?}" "$@"
+SH
+  chmod +x "$fakebin/git"
+  out=$(PATH="$fakebin:$PATH" REAL_GIT_FOR_TEST="$(command -v git)" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" knogit 2>/dev/null)
+  assert_contains "$out" "knogit: skipped: not a git repo" "a failing root lookup was not skipped"
+  assert_equals "" "$(pack_key "$clone")" "a clone whose root could not be computed got the key"
+  pass "a failing clone-root lookup skips the candidate and writes nothing"
+}
+
+# --- branch-ref folder restore after the prune's last-ref delete (C4) --------
+
+# build_gone_clone <home> <name> <branch...>: a clone that holds each branch as a loose
+# local ref tracking an origin branch that origin then deletes, so fleet-sync's fetch
+# --prune marks it gone and the prune deletes it. A branch named keep-* stays on origin.
+build_gone_clone() {
+  local home=$1 name=$2 clone work b
+  shift 2
+  clone=$(build_pair "$home" "$name")
+  work="$home/work-$name"
+  for b in "$@"; do
+    git -C "$work" push -q origin "main:refs/heads/$b"
+    git -C "$clone" fetch -q origin
+    git -C "$clone" branch -q "$b" "origin/$b"
+  done
+  for b in "$@"; do
+    case "$b" in */keep*) ;; *) git -C "$work" push -q origin --delete "$b" ;; esac
+  done
+  printf '%s\n' "$clone"
+}
+
+test_prune_restores_the_branch_ref_folder_after_the_last_ref() {
+  local home clone out
+  home=$(new_home)
+  clone=$(build_gone_clone "$home" pruneA fm/gone1)
+  [ -f "$clone/.git/logs/refs/heads/fm/gone1" ] || fail "fixture: the reflog of fm/gone1 is missing"
+  out=$(run_sync "$home" pruneA)
+  assert_contains "$out" "pruneA: pruned fm/gone1" "the prune line changed or the branch was not pruned"
+  [ ! -e "$clone/.git/refs/heads/fm/gone1" ] || fail "the gone branch was not deleted"
+  [ -d "$clone/.git/refs/heads/fm" ] || fail "refs/heads/fm was not restored after the last loose ref was deleted"
+  [ -d "$clone/.git/logs/refs/heads/fm" ] || fail "logs/refs/heads/fm was not restored"
+  pass "the prune restores refs/heads/fm and logs/refs/heads/fm after deleting the last loose fm ref"
+}
+
+test_prune_changes_nothing_when_other_refs_remain() {
+  local home clone out
+  home=$(new_home)
+  clone=$(build_gone_clone "$home" pruneB fm/gone1 fm/keep1)
+  out=$(run_sync "$home" pruneB)
+  assert_contains "$out" "pruneB: pruned fm/gone1" "the prune line changed"
+  assert_equals "keep1" "$(ls "$clone/.git/refs/heads/fm")" "refs/heads/fm holds something other than the surviving ref"
+  assert_equals "keep1" "$(ls "$clone/.git/logs/refs/heads/fm")" "logs/refs/heads/fm holds something other than the surviving reflog"
+  pass "a prune that leaves another loose fm ref changes nothing beside the delete"
+}
+
+test_prune_restores_the_folder_when_the_deleted_ref_was_only_packed() {
+  local home clone out
+  home=$(new_home)
+  clone=$(build_gone_clone "$home" pruneC fm/gone1)
+  git -C "$clone" pack-refs --all --prune
+  [ ! -d "$clone/.git/refs/heads/fm" ] || fail "fixture: the folder survived the explicit pack"
+  out=$(run_sync "$home" pruneC)
+  assert_contains "$out" "pruneC: pruned fm/gone1" "the packed-only branch was not pruned"
+  [ -d "$clone/.git/refs/heads/fm" ] || fail "refs/heads/fm was not restored after a packed-only delete"
+  pass "a packed-only branch's prune leaves refs/heads/fm in place"
+}
+
+test_prune_restores_only_the_registered_prefix() {
+  local home clone out
+  home=$(new_home)
+  mkdir -p "$home/data"
+  printf -- '- pruneD [no-mistakes branch=fix/] - prefix fixture\n' > "$home/data/projects.md"
+  clone=$(build_gone_clone "$home" pruneD fix/gone1)
+  out=$(run_sync "$home" pruneD)
+  assert_contains "$out" "pruneD: pruned fix/gone1" "the prune line changed"
+  [ -d "$clone/.git/refs/heads/fix" ] || fail "the registered prefix folder fix was not restored"
+  [ -d "$clone/.git/logs/refs/heads/fix" ] || fail "the registered prefix reflog folder was not restored"
+  [ ! -e "$clone/.git/refs/heads/fm" ] || fail "a folder for the default prefix fm was made although the project registers fix/"
+  pass "the restore follows the registered prefix (fix/) and never the hard-coded fm"
+}
+
+test_prune_restores_the_deleted_branch_folder_under_another_prefix() {
+  local home clone out
+  home=$(new_home)
+  mkdir -p "$home/data"
+  printf -- '- pruneF [no-mistakes branch=fix/] - prefix fixture\n' > "$home/data/projects.md"
+  clone=$(build_gone_clone "$home" pruneF fm/gone1)
+  out=$(run_sync "$home" pruneF)
+  assert_contains "$out" "pruneF: pruned fm/gone1" "the prune line changed"
+  [ -d "$clone/.git/refs/heads/fm" ] || fail "the deleted fm/gone1 branch's folder fm was not restored in a project that registers fix/"
+  [ -d "$clone/.git/logs/refs/heads/fm" ] || fail "the deleted fm/gone1 branch's reflog folder fm was not restored"
+  [ -d "$clone/.git/refs/heads/fix" ] || fail "the registered prefix folder fix was not restored"
+  pass "the prune restores the deleted branch's own folder (fm) beside the registered prefix folder (fix)"
+}
+
+test_prune_never_follows_a_link_at_the_folder_path() {
+  local home clone out outside
+  home=$(new_home)
+  mkdir -p "$home/data"
+  printf -- '- pruneE [no-mistakes branch=team/fm/] - link fixture\n' > "$home/data/projects.md"
+  clone=$(build_gone_clone "$home" pruneE team/fm/gone1)
+  outside="$home/outside-target"
+  mkdir -p "$outside"
+  mv "$clone/.git/refs/heads/team" "$outside/team-real"
+  ln -s "$outside/team-real" "$clone/.git/refs/heads/team"
+  out=$(run_sync "$home" pruneE)
+  [ ! -e "$outside/team-real/fm" ] || fail "the restore followed the link and made fm inside its target"
+  assert_equals "team-real" "$(ls "$outside")" "the restore created something next to the link target"
+  [ -L "$clone/.git/refs/heads/team" ] || fail "the link at refs/heads/team was replaced"
+  assert_contains "$out" "pruneE: pruned team/fm/gone1" "the delete's own pruned line changed"
+  assert_not_contains "$out" "error" "the link case changed the sync's own output"
+  pass "a link at the folder path is never followed or replaced by the restore"
+}
+
 test_detached_clean_ancestor_recovers
 test_detached_unique_commit_is_stuck_untouched
 test_detached_clean_ancestor_with_diverged_local_default_is_stuck_untouched
@@ -915,3 +1184,16 @@ test_non_clone_dir_never_syncs_the_enclosing_repo
 test_non_clone_dir_named_directly_never_syncs_the_enclosing_repo
 test_symlinked_clone_still_syncs
 test_clone_root_named_by_another_spelling_still_syncs
+test_key_is_written_for_every_clone_state
+test_key_write_is_idempotent_and_touches_only_the_key
+test_single_name_form_writes_the_key_and_a_non_root_is_untouched
+test_home_repository_gets_the_key_in_the_whole_fleet_form_only
+test_unwritable_config_warns_and_the_sync_continues
+test_the_whole_fleet_form_writes_every_key_before_the_first_fetch
+test_a_failing_git_root_lookup_skips_and_writes_nothing
+test_prune_restores_the_branch_ref_folder_after_the_last_ref
+test_prune_changes_nothing_when_other_refs_remain
+test_prune_restores_the_folder_when_the_deleted_ref_was_only_packed
+test_prune_restores_only_the_registered_prefix
+test_prune_restores_the_deleted_branch_folder_under_another_prefix
+test_prune_never_follows_a_link_at_the_folder_path

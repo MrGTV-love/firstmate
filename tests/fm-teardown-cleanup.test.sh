@@ -852,6 +852,85 @@ PY
   pass "teardown records the task's pipeline spend before removing its branch and record"
 }
 
+# --- branch-ref folder restore after the task branch delete (C4) ------------
+
+# run_branch_dirs_teardown <name> [registry-line]: a landed pool-route ship teardown
+# whose task branch is the only (or one of the) loose refs under refs/heads/fm.
+# Prints the case dir; stdout and stderr are kept beside it.
+run_branch_dirs_teardown() {
+  local name=$1 registry=${2:-} extra=${3:-none} case_dir rc=0
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  [ -z "$registry" ] || printf '%s\n' "$registry" > "$case_dir/data/projects.md"
+  case "$extra" in
+    other) git -C "$case_dir/project" branch fm/other-task ;;
+    packed) git -C "$case_dir/project" pack-refs --all --prune ;;
+  esac
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  printf '%s\n' "$rc" > "$case_dir/rc"
+  printf '%s\n' "$case_dir"
+}
+
+branch_dirs_clean_output() {  # <case-dir> <file>
+  # The supervision guard's banner (lines opening with a bullet) depends on watcher timing, not on the delete.
+  sed "s#$1#CASE#g" "$1/$2" | grep -v '^$' | grep -v '^●' || true
+}
+
+test_teardown_restores_the_branch_ref_folder_after_the_last_ref() {
+  local case_dir other
+  case_dir=$(run_branch_dirs_teardown branchdirs-last)
+  assert_equals 0 "$(cat "$case_dir/rc")" "branchdirs-last: teardown failed: $(cat "$case_dir/stderr")"
+  ! git -C "$case_dir/project" show-ref --verify --quiet refs/heads/fm/task-x1 || fail "branchdirs-last: the task branch was kept"
+  [ -d "$case_dir/project/.git/refs/heads/fm" ] || fail "branchdirs-last: refs/heads/fm was not restored after the last loose ref was deleted"
+  [ -d "$case_dir/project/.git/logs/refs/heads/fm" ] || fail "branchdirs-last: logs/refs/heads/fm was not restored"
+  # The restore adds nothing to the delete's own result: a teardown that leaves another fm ref prints the same.
+  other=$(run_branch_dirs_teardown branchdirs-other "" other)
+  assert_equals 0 "$(cat "$other/rc")" "branchdirs-other: teardown failed"
+  assert_equals "other-task" "$(ls "$other/project/.git/refs/heads/fm")" "branchdirs-other: refs/heads/fm holds more or less than the surviving ref"
+  assert_equals "$(branch_dirs_clean_output "$other" stdout)" "$(branch_dirs_clean_output "$case_dir" stdout)" "the restore changed teardown's stdout"
+  assert_equals "$(branch_dirs_clean_output "$other" stderr)" "$(branch_dirs_clean_output "$case_dir" stderr)" "the restore changed teardown's stderr"
+  pass "teardown's pool route restores refs/heads/fm after the last loose ref and changes nothing when another remains"
+}
+
+test_teardown_restores_the_branch_ref_folder_after_a_packed_only_delete() {
+  local case_dir
+  case_dir=$(run_branch_dirs_teardown branchdirs-packed "" packed)
+  assert_equals 0 "$(cat "$case_dir/rc")" "branchdirs-packed: teardown failed: $(cat "$case_dir/stderr")"
+  ! git -C "$case_dir/project" show-ref --verify --quiet refs/heads/fm/task-x1 || fail "branchdirs-packed: the task branch was kept"
+  [ -d "$case_dir/project/.git/refs/heads/fm" ] || fail "branchdirs-packed: refs/heads/fm was not restored after a packed-only delete"
+  pass "teardown restores refs/heads/fm after deleting a packed-only task branch"
+}
+
+test_teardown_restores_the_registered_and_the_deleted_branch_folder_and_never_follows_a_link() {
+  local case_dir outside
+  case_dir=$(run_branch_dirs_teardown branchdirs-prefix "- project [no-mistakes branch=fix/] - prefix fixture")
+  assert_equals 0 "$(cat "$case_dir/rc")" "branchdirs-prefix: teardown failed: $(cat "$case_dir/stderr")"
+  [ -d "$case_dir/project/.git/refs/heads/fix" ] || fail "branchdirs-prefix: the registered folder fix was not restored"
+  [ -d "$case_dir/project/.git/refs/heads/fm" ] || fail "branchdirs-prefix: the deleted fm/task-x1 branch's folder fm was not restored beside the registered fix"
+  [ -d "$case_dir/project/.git/logs/refs/heads/fm" ] || fail "branchdirs-prefix: the deleted branch's reflog folder fm was not restored"
+  # A link at the first component of a two-segment prefix is never followed.
+  case_dir=$TMP_ROOT/branchdirs-link
+  outside="$TMP_ROOT/branchdirs-link-outside"
+  mkdir -p "$outside"
+  case_dir=$(
+    name=branchdirs-link
+    case_dir=$(make_case "$name")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    printf '%s\n' "- project [no-mistakes branch=team/fm/] - link fixture" > "$case_dir/data/projects.md"
+    ln -s "$outside" "$case_dir/project/.git/refs/heads/team"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    printf '%s\n' "$rc" > "$case_dir/rc"
+    printf '%s\n' "$case_dir"
+  )
+  assert_equals 0 "$(cat "$case_dir/rc")" "branchdirs-link: teardown failed: $(cat "$case_dir/stderr")"
+  assert_equals "" "$(ls -A "$outside")" "branchdirs-link: the restore made something behind the link at refs/heads/team"
+  [ -L "$case_dir/project/.git/refs/heads/team" ] || fail "branchdirs-link: the link was replaced"
+  pass "teardown restores the registered prefix folder and the deleted branch's own folder, and never follows a link at its folder path"
+}
+
 test_teardown_skips_pipeline_spend_when_disabled() {
   local case_dir rc=0
   case_dir=$(make_case pipeline-spend-disabled)
@@ -8638,6 +8717,9 @@ test_teardown_retains_v1_journal_when_projected_workspace_present
 test_teardown_retains_v1_journal_when_workspace_query_ambiguous
 test_teardown_records_the_task_pipeline_spend
 test_teardown_skips_pipeline_spend_when_disabled
+test_teardown_restores_the_branch_ref_folder_after_the_last_ref
+test_teardown_restores_the_branch_ref_folder_after_a_packed_only_delete
+test_teardown_restores_the_registered_and_the_deleted_branch_folder_and_never_follows_a_link
 test_teardown_records_unavailable_spend_for_a_gone_worktree
 test_parked_own_run_is_aborted_before_teardown
 test_parked_own_run_concludes_on_passed_with_override_after_abort

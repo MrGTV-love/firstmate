@@ -25,6 +25,8 @@ unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+# shellcheck source=tests/git-config-env-helpers.sh
+. "$(dirname "${BASH_SOURCE[0]}")/git-config-env-helpers.sh"
 # shellcheck source=bin/fm-backend.sh
 . "$ROOT/bin/fm-backend.sh"
 
@@ -872,6 +874,234 @@ test_verdict_bound_is_a_test_only_seam() {
   pass "the verdict bound is a test-only seam: unset FM_TEST_SEAM or a non-numeric value keeps the production bound, so a slow refusal is still reported"
 }
 
+# --- the maintenance key and the numbered GIT_CONFIG environment of every launch route (C3, C9) ---------------
+#
+# Git's automatic maintenance packs the loose refs of a clone that holds 16 or more and removes the then-empty
+# refs/heads/fm folder, which a confined worker cannot create again. bin/fm-spawn.sh therefore adds one
+# maintenance.pack-refs.enabled=false entry to the launch carrier. Every route below replays the real launch text
+# bin/fm-spawn.sh staged, records the environment the worker was started with (env -0), and runs one shared
+# check on it (git_config_env_problems in tests/git-config-env-helpers.sh): every n below GIT_CONFIG_COUNT has a KEY_n and a VALUE_n,
+# nothing sits at or above it, and a plain `git status` in that environment exits 0.
+# On macOS a claude or omp launch runs under write confinement (sandbox-exec), whose profile also denies the
+# folder creation; the replays of those two routes drop the sandbox-exec wrapper from the staged text in the
+# fixture copy only, so the carrier text itself is what runs, and the confined commit is not claimed.
+
+# write_pack_worker <path> <case-dir> <version-line>: records the launched environment, then makes one default-
+# config commit in the task worktree under GIT_TRACE2_EVENT and records what happened to refs/heads/fm.
+write_pack_worker() {
+  local path=$1 dir=$2 version=$3
+  cat > "$path" <<SH
+#!/bin/sh
+case "\${1-}" in --version) printf '%s\n' '$version'; exit 0 ;; esac
+dir='$dir'
+SH
+  cat >> "$path" <<'SH'
+run=$(cat "$dir/run")
+obs="$dir/obs/$run"
+mkdir -p "$obs"
+env -0 > "$obs/env0"
+export GIT_AUTHOR_NAME=worker GIT_AUTHOR_EMAIL=worker@example.invalid GIT_COMMITTER_NAME=worker GIT_COMMITTER_EMAIL=worker@example.invalid
+emit() { printf '%s=%s\n' "$1" "$2" >> "$obs/result"; }
+cd "$(cat "$dir/wt-path")" || exit 9
+branch=$(cat "$dir/branch")
+git checkout -q "$branch" 2>/dev/null || git checkout -q -b "$branch" || exit 8
+gd=$(git rev-parse --git-common-dir)
+emit loose_before "$(find "$gd/refs/heads/fm" -type f 2>/dev/null | wc -l | tr -d ' ')"
+printf 'x\n' > pack-probe
+git add pack-probe
+: > "$obs/trace2"
+GIT_TRACE2_EVENT="$obs/trace2" git commit -q -m pack-probe 2> "$obs/commit.err"
+emit commit_rc "$?"
+if [ -d "$gd/refs/heads/fm" ]; then emit folder present; else emit folder ABSENT; fi
+emit loose_after "$(find "$gd/refs/heads/fm" -type f 2>/dev/null | wc -l | tr -d ' ')"
+if grep '"event":"child_start"' "$obs/trace2" | grep -qF '"argv":["git","pack-refs"'; then emit packrefs_child yes; else emit packrefs_child no; fi
+if grep '"event":"child_start"' "$obs/trace2" | grep -qF '"argv":["git","maintenance","run"'; then emit maintenance_child yes; else emit maintenance_child no; fi
+emit done yes
+SH
+  chmod +x "$path"
+}
+
+# pack_case <name> <harness>: a spawn case whose project holds 20 loose refs/heads/fm/* beside main and the
+# other fixture branches (21 or more loose refs), a deterministic (foreground) maintenance run, and the
+# recording worker. CASE_ALLOWLIST, as in make_case, selects the allowlist route.
+pack_case() {
+  local name=$1 harness=$2 dir i
+  dir=$(make_case "$name" "$harness") || exit 1
+  git -C "$dir/project" config maintenance.autoDetach false
+  i=1
+  while [ "$i" -le 19 ]; do
+    git -C "$dir/project" branch "fm/o$i"
+    i=$((i + 1))
+  done
+  case "$harness" in
+    omp) write_pack_worker "$(cat "$dir/fakebin")/$harness" "$dir" omp/18.1.20 ;;
+    *) write_pack_worker "$(cat "$dir/fakebin")/$harness" "$dir" '2.1.300 (Claude Code)' ;;
+  esac
+  printf '%s\n' "$dir"
+}
+
+# without_sandbox <case-dir>: the staged launch text with its sandbox-exec wrapper removed (fixture copy only).
+without_sandbox() {
+  python3 -I - "$1/launch" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+text, count = re.subn(r"exec /usr/bin/sandbox-exec -f '[^']*' ", "exec ", text)
+sys.stdout.write(text)
+sys.stderr.write("sandbox-exec wrappers removed: %d\n" % count)
+PY
+}
+
+# replay_text <case-dir> <run> <launch-text-file> <pane-path> [extra env]: replay a launch text file the way
+# replay does, from the task worktree.
+replay_text() {
+  local dir=$1 run=$2 text=$3 pane_path=$4
+  shift 4
+  printf '%s' "$run" > "$dir/run"
+  rm -rf "${dir:?}/obs/$run"
+  (cd "$(cat "$dir/wt-path")" && env -i HOME="$dir/home/user-home" PATH="$pane_path" TERM=xterm \
+    GIT_CONFIG_GLOBAL="$GIT_CONFIG_GLOBAL" "$@" /bin/bash -c "$(cat "$text")" 3>&1 1>/dev/null 2>&3)
+}
+
+# route_entries <case-dir> <run> <key>: the values the launched environment carries for a git config key.
+route_entries() { git_config_entries "$1/obs/$2/env0" "$3"; }
+
+# assert_pack_key_route <case-dir> <run> <label> <expect-fetch-prune: yes|no> <expect-hooks: numbered|rows>
+assert_pack_key_route() {
+  local dir=$1 run=$2 label=$3 prune=$4 hooks=$5 env0 values
+  env0="$dir/obs/$run/env0"
+  [ -s "$env0" ] || fail "$label: the worker recorded no environment"
+  assert_git_config_env "$env0" "$(cat "$dir/wt-path")" "$label"
+  assert_equals false "$(route_entries "$dir" "$run" maintenance.pack-refs.enabled)" \
+    "$label: the launched environment does not hold exactly one maintenance.pack-refs.enabled=false entry"
+  if [ "$prune" = yes ]; then
+    assert_equals false "$(route_entries "$dir" "$run" fetch.prune)" "$label: the seatbelt fetch.prune=false entry did not survive"
+  else
+    assert_equals "" "$(route_entries "$dir" "$run" fetch.prune)" "$label: a fetch.prune entry appeared on a route that adds none"
+  fi
+  case "$hooks" in
+    numbered) assert_equals "$(cat "$dir/hooks-path")" "$(route_entries "$dir" "$run" core.hooksPath)" "$label: the numbered core.hooksPath entry did not survive" ;;
+    rows) assert_contains "$(sed -n 's/^GIT_CONFIG_PARAMETERS=//p' <<EOF
+$(tr '\0' '\n' < "$env0")
+EOF
+)" "hook.fm-scan-commit.event" "$label: the config hook rows did not survive" ;;
+  esac
+}
+
+assert_pack_commit_leaves_folder() {  # <case-dir> <run> <label>
+  local dir=$1 run=$2 label=$3
+  assert_equals yes "$(obs "$dir" "$run" "done")" "$label: the worker did not finish"
+  assert_equals 0 "$(obs "$dir" "$run" commit_rc)" "$label: the commit failed: $(cat "$dir/obs/$run/commit.err" 2>/dev/null)"
+  assert_equals yes "$(obs "$dir" "$run" maintenance_child)" "$label: git started no maintenance run, so the case proves nothing"
+  assert_equals no "$(obs "$dir" "$run" packrefs_child)" "$label: a git pack-refs child still ran"
+  assert_equals present "$(obs "$dir" "$run" folder)" "$label: refs/heads/fm is gone after the commit"
+  [ "$(obs "$dir" "$run" loose_after)" -ge 20 ] || fail "$label: the loose fm refs were packed away"
+}
+
+test_default_route_carries_the_key_and_a_commit_leaves_the_folder() {
+  local dir err
+  # A harness that is neither claude nor omp is neither confined nor on the config carrier: the plain
+  # default route (/usr/bin/env -i, the legacy numbered carrier).
+  dir=$(pack_case pk-default codex) || exit 1
+  err=$(replay "$dir" pk-default /bin/bash "$(pane_path "$dir")")
+  assert_pack_key_route "$dir" pk-default "default env -i route" no numbered
+  assert_pack_commit_leaves_folder "$dir" pk-default "default env -i route"
+  # The control: the same worker started without the launch carrier packs and loses the folder.
+  printf '%s' pk-control > "$dir/run"
+  git -C "$(cat "$dir/wt-path")" reset -q --hard HEAD~1   # the replay's own commit is undone so the worker commits again
+  (cd "$(cat "$dir/wt-path")" && env -i HOME="$dir/home/user-home" PATH="$(pane_path "$dir")" GIT_CONFIG_GLOBAL="$GIT_CONFIG_GLOBAL" \
+    "$(cat "$dir/fakebin")/codex") >/dev/null 2>&1
+  assert_equals yes "$(obs "$dir" pk-control packrefs_child)" "control: no git pack-refs child without the carrier key"
+  assert_equals ABSENT "$(obs "$dir" pk-control folder)" "control: the folder survived without the carrier key"
+  pass "the default env -i route carries one maintenance.pack-refs.enabled=false entry beside core.hooksPath, and its commit leaves refs/heads/fm (control: it vanishes without)"
+}
+
+test_allowlist_route_carries_the_key_and_a_commit_leaves_the_folder() {
+  local dir err
+  dir=$(CASE_ALLOWLIST='GIT_CONFIG_GLOBAL' pack_case pk-allow codex) || exit 1
+  err=$(replay "$dir" pk-allow /bin/bash "$(pane_path "$dir")")
+  assert_pack_key_route "$dir" pk-allow "allowlist route" no numbered
+  assert_pack_commit_leaves_folder "$dir" pk-allow "allowlist route"
+  pass "the allowlist route carries one maintenance.pack-refs.enabled=false entry, and its commit leaves refs/heads/fm"
+}
+
+test_seatbelt_routes_carry_the_key_in_the_staged_text() {
+  local harness dir text err hooks
+  [ "$(uname -s)" = Darwin ] || { printf 'skip: the seatbelt-v1 routes exist on macOS only\n'; return; }
+  for harness in claude omp; do
+    dir=$(pack_case "pk-sb-$harness" "$harness") || exit 1
+    grep -q 'sandbox-exec' "$dir/launch" || fail "seatbelt $harness: the staged text has no sandbox-exec wrapper, so this is not the seatbelt-v1 route"
+    text="$dir/launch.nosandbox"
+    without_sandbox "$dir" > "$text" 2>"$dir/strip.log"
+    assert_contains "$(cat "$dir/strip.log")" "removed: 1" "seatbelt $harness: the fixture could not remove the sandbox-exec wrapper"
+    err=$(replay_text "$dir" "pk-sb-$harness" "$text" "$(pane_path "$dir")")
+    hooks=numbered
+    [ "$harness" != claude ] || hooks=rows
+    [ "$harness" != claude ] || [ "$CONFIG_GIT" = 1 ] || hooks=numbered
+    assert_pack_key_route "$dir" "pk-sb-$harness" "seatbelt-v1 $harness" yes "$hooks"
+  done
+  printf 'pending: the confined commit of the seatbelt-v1 routes (no sandbox here): the supervisor runs it (evidence/c5-command.txt)\n'
+  pass "the seatbelt-v1 claude and omp launch texts carry one maintenance.pack-refs.enabled=false entry beside fetch.prune=false and the task hooks (the confined commit is pending)"
+}
+
+test_relaunch_and_double_selection_leave_exactly_one_key() {
+  local dir err values
+  dir=$(pack_case pk-twice codex) || exit 1
+  # The pane already holds the key with the other value and a stale copy: both selections must leave one false.
+  err=$(replay "$dir" pk-twice /bin/bash "$(pane_path "$dir")" \
+    GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=maintenance.pack-refs.enabled GIT_CONFIG_VALUE_0=true \
+    GIT_CONFIG_KEY_1=maintenance.pack-refs.enabled GIT_CONFIG_VALUE_1=true)
+  values=$(route_entries "$dir" pk-twice maintenance.pack-refs.enabled)
+  assert_equals false "$values" "pane entries holding the key as true were not replaced by exactly one false"
+  assert_git_config_env "$dir/obs/pk-twice/env0" "$(cat "$dir/wt-path")" "double selection"
+  pass "a pane that already holds the key leaves exactly one false entry after the outer and the inner selection"
+}
+
+# The helper itself: each of four mutations of a good environment must fail it, for its own reason.
+test_the_shared_environment_check_rejects_each_mutation() {
+  local dir good out
+  dir=$(pack_case pk-helper codex) || exit 1
+  replay "$dir" pk-helper /bin/bash "$(pane_path "$dir")" >/dev/null 2>&1
+  good="$dir/obs/pk-helper/env0"
+  git_config_env_problems "$good" "$(cat "$dir/wt-path")" >/dev/null || fail "the helper rejected an environment a real launch produced"
+  mutate() {  # <name> <python expression body over env dict>
+    python3 -I - "$good" "$dir/mut-$1" "$2" <<'PY'
+import sys
+src, dst, mode = sys.argv[1:4]
+env = {}
+for item in open(src, "rb").read().split(b"\0"):
+    if item:
+        k, _, v = item.decode("utf-8", "surrogateescape").partition("=")
+        env[k] = v
+if mode == "drop-key0":
+    del env["GIT_CONFIG_KEY_0"]
+elif mode == "drop-value0":
+    del env["GIT_CONFIG_VALUE_0"]
+elif mode == "count-high":
+    env["GIT_CONFIG_COUNT"] = str(int(env["GIT_CONFIG_COUNT"]) + 1)
+elif mode == "count-low":
+    env["GIT_CONFIG_COUNT"] = str(int(env["GIT_CONFIG_COUNT"]) - 1)
+open(dst, "wb").write(b"".join(("%s=%s" % (k, v)).encode("utf-8", "surrogateescape") + b"\0" for k, v in env.items()))
+PY
+  }
+  mutate drop-key0 drop-key0
+  out=$(git_config_env_problems "$dir/mut-drop-key0" "$(cat "$dir/wt-path")") && fail "the helper accepted an environment with GIT_CONFIG_KEY_0 dropped"
+  assert_contains "$out" "GIT_CONFIG_KEY_0 is missing" "KEY_0 dropped: the helper failed for another reason"
+  mutate drop-value0 drop-value0
+  out=$(git_config_env_problems "$dir/mut-drop-value0" "$(cat "$dir/wt-path")") && fail "the helper accepted an environment with GIT_CONFIG_VALUE_0 dropped"
+  assert_contains "$out" "GIT_CONFIG_VALUE_0 is missing" "VALUE_0 dropped: the helper failed for another reason"
+  mutate count-high count-high
+  out=$(git_config_env_problems "$dir/mut-count-high" "$(cat "$dir/wt-path")") && fail "the helper accepted a COUNT one too high"
+  assert_contains "$out" "is missing below GIT_CONFIG_COUNT" "COUNT one too high: the helper failed for another reason"
+  mutate count-low count-low
+  out=$(git_config_env_problems "$dir/mut-count-low" "$(cat "$dir/wt-path")") && fail "the helper accepted a COUNT one too low"
+  assert_contains "$out" "sits at or above GIT_CONFIG_COUNT" "COUNT one too low: the helper failed for another reason"
+  # The dsh-shaped environment the scout had: COUNT=1, VALUE_0 present, KEY_0 absent.
+  printf 'PATH=%s\0HOME=%s\0GIT_CONFIG_COUNT=1\0GIT_CONFIG_VALUE_0=/x\0' "$PATH" "$HOME" > "$dir/dsh-shaped"
+  out=$(git_config_env_problems "$dir/dsh-shaped" "$(cat "$dir/wt-path")") && fail "the helper accepted the dsh-shaped environment (COUNT=1, VALUE_0 set, KEY_0 absent)"
+  assert_contains "$out" "git status exited" "the dsh-shaped environment did not break git status"
+  pass "the shared check fails each of KEY_0 dropped, VALUE_0 dropped, COUNT one too high, COUNT one too low, and the dsh-shaped environment, each for its own reason"
+}
+
 tests=(
   test_listed_harness_runs_the_config_carrier
   test_git_without_config_hooks_falls_back_to_legacy
@@ -886,6 +1116,11 @@ tests=(
   test_relaunch_refusal_keeps_the_task
   test_herdr_fresh_refusal_closes_its_pane
   test_verdict_bound_is_a_test_only_seam
+  test_default_route_carries_the_key_and_a_commit_leaves_the_folder
+  test_allowlist_route_carries_the_key_and_a_commit_leaves_the_folder
+  test_seatbelt_routes_carry_the_key_in_the_staged_text
+  test_relaunch_and_double_selection_leave_exactly_one_key
+  test_the_shared_environment_check_rejects_each_mutation
 )
 fm_test_run_cases "${tests[@]}" -- "$@"
 

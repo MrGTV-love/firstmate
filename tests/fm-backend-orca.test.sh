@@ -1021,6 +1021,66 @@ test_scout_teardown_removes_orca_worktree_via_helper() {
   pass "fm-teardown.sh backend=orca: scout report gate then helper-backed worktree removal"
 }
 
+# run_orca_branch_dirs <variant: last|other|packed|prefix|link>: a scout Orca teardown (the
+# Orca-only route that deletes the task branch) over a project whose task branch
+# is the last loose ref under its ship-branch prefix. Sets BD_PROJ and BD_OUTSIDE.
+run_orca_branch_dirs() {
+  local variant=$1 proj wt data state config id out rc neutral registry=
+  id="orcabd$variant"
+  proj="$TMP_ROOT/orcabd-$variant-project"
+  wt="$TMP_ROOT/orcabd-$variant-wt"
+  data="$TMP_ROOT/orcabd-$variant-data"
+  state="$TMP_ROOT/orcabd-$variant-state"
+  config="$TMP_ROOT/orcabd-$variant-config"
+  BD_PROJ=$proj
+  BD_OUTSIDE="$TMP_ROOT/orcabd-$variant-outside"
+  fm_git_worktree "$proj" "$wt" "fm/$id"
+  mkdir -p "$data/$id" "$state" "$config" "$BD_OUTSIDE"
+  printf 'report\n' > "$data/$id/report.md"
+  touch "$state/.last-watcher-beat"
+  case "$variant" in
+    other) git -C "$proj" branch fm/other-task ;;
+    packed) git -C "$proj" pack-refs --all --prune ;;
+    prefix) registry="- $(basename "$proj") [no-mistakes branch=fix/] - prefix fixture" ;;
+    link)
+      registry="- $(basename "$proj") [no-mistakes branch=team/fm/] - link fixture"
+      ln -s "$BD_OUTSIDE" "$proj/.git/refs/heads/team"
+      ;;
+  esac
+  [ -z "$registry" ] || printf '%s\n' "$registry" > "$data/projects.md"
+  fm_write_meta "$state/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-bd-$variant" "worktree=$wt" "project=$proj" \
+    "harness=claude" "kind=scout" "mode=no-mistakes" "yolo=off" \
+    "backend=orca" "orca_worktree_id=wt-bd-$variant::/orca/wt-bd-$variant" \
+    "decisions_reviewed=1" "decision_keys="
+  orca_case "bd-$variant"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  rc=0
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
+    "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 ) || rc=$?
+  expect_code 0 "$rc" "Orca $variant teardown should succeed"$'\n'"$out"
+  ! git -C "$proj" show-ref --verify --quiet "refs/heads/fm/$id" || fail "Orca $variant teardown kept the task branch"
+}
+
+test_orca_teardown_restores_the_branch_ref_folder() {
+  run_orca_branch_dirs last
+  [ -d "$BD_PROJ/.git/refs/heads/fm" ] || fail "Orca last-ref teardown left refs/heads/fm absent"
+  [ -d "$BD_PROJ/.git/logs/refs/heads/fm" ] || fail "Orca last-ref teardown left logs/refs/heads/fm absent"
+  run_orca_branch_dirs other
+  assert_equals "other-task" "$(ls "$BD_PROJ/.git/refs/heads/fm")" "Orca other-ref teardown changed the surviving refs"
+  run_orca_branch_dirs packed
+  [ -d "$BD_PROJ/.git/refs/heads/fm" ] || fail "Orca packed-only teardown left refs/heads/fm absent"
+  run_orca_branch_dirs prefix
+  [ -d "$BD_PROJ/.git/refs/heads/fix" ] || fail "Orca teardown did not restore the registered prefix folder"
+  [ -d "$BD_PROJ/.git/refs/heads/fm" ] || fail "Orca teardown did not restore the deleted fm/ branch's folder beside the registered fix"
+  [ -d "$BD_PROJ/.git/logs/refs/heads/fm" ] || fail "Orca teardown did not restore the deleted fm/ branch's reflog folder"
+  run_orca_branch_dirs link
+  assert_equals "" "$(ls -A "$BD_OUTSIDE")" "Orca teardown made something behind the link at refs/heads/team"
+  [ -L "$BD_PROJ/.git/refs/heads/team" ] || fail "Orca teardown replaced the link"
+  pass "fm-teardown.sh backend=orca: the task-branch delete restores the registered and the deleted branch's branch-ref folders, and never follows a link"
+}
+
 test_teardown_skips_orca_worktree_when_path_missing() {
   local proj wt data state config id out rc neutral variant
   local -a teardown_args
@@ -1368,6 +1428,7 @@ test_peek_send_and_crew_state_route_through_orca_meta
 test_peek_and_crew_state_fail_closed_on_orca_error_json
 test_target_exists_rejects_orca_error_json
 test_scout_teardown_removes_orca_worktree_via_helper
+test_orca_teardown_restores_the_branch_ref_folder
 test_teardown_skips_orca_worktree_when_path_missing
 test_teardown_preserves_metadata_when_orca_remove_error_json
 test_scout_teardown_refuses_orca_missing_report_when_path_missing
