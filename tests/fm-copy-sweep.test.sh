@@ -518,6 +518,32 @@ test_a_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone() {
   pass 'a registration held by a link to nothing keeps every copy of its clone and is named, and a readable one lets the clean copy go'
 }
 
+# A registration whose name begins with a dot is read like any other: held by a link to nothing, it keeps every
+# copy of its clone and the sweep names it.
+test_a_dot_named_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone() {
+  local store name list rc
+  for name in .ghost ..ghost; do
+    make_world "dot-registration-$name"
+    add_copy reap
+    store=$SLOT/.git/worktrees
+    mkdir -p "$store/$name"
+    ln -s "$W/no-such-target" "$store/$name/gitdir"
+    [ -L "$store/$name/gitdir" ] && [ ! -e "$store/$name/gitdir" ] || fail "$name: the fixture did not make the registration a link to nothing"
+    rc=0
+    list=$(git -C "$SLOT" worktree list --porcelain 2>/dev/null) || rc=$?
+    [ "$rc" = 0 ] || fail "$name: the fixture does not bite: git exited $rc"
+    printf '%s\n' "$list" | grep -qxF "worktree $(copy_path reap)" || fail "$name: the fixture does not bite: git lost the readable registration"
+    run_sweep --apply
+    [ "$RC" = 0 ] || fail "$name: apply failed ($RC): $OUT"
+    assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed (registration " "$name: a clone with an unreadable registration was read"
+    assert_contains "$OUT" ".git/worktrees/$name/gitdir cannot be read)" "$name: the sweep did not name the registration it could not read"
+    assert_not_contains "$OUT" "REMOVED"$'\t' "$name: a copy of a clone with an unreadable registration was removed"
+    [ -e "$(copy_path reap)" ] || fail "$name: the clean copy of such a clone was removed"
+    registered reap || fail "$name: the clean copy of such a clone was unregistered"
+  done
+  pass 'a dot-named registration held by a link to nothing keeps every copy of its clone and is named'
+}
+
 test_apply_removes_only_the_reapable_copy() {
   make_matrix apply
   take_snapshots before "${HELD_NAMES[@]}"
@@ -3482,6 +3508,7 @@ test_a_new_youngest_copy_is_named_first_and_the_wake_stays_bounded
 test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 test_unreadable_registration_is_reported_without_walking_for_copies
 test_a_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone
+test_a_dot_named_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone
 test_apply_removes_only_the_reapable_copy
 test_recycled_launcher_lock_is_held
 test_dead_launcher_dirty_copy_is_held

@@ -5231,6 +5231,54 @@ test_by_path_refuses_while_another_registration_is_held_by_a_link_that_cannot_be
   pass 'teardown --copy refuses beside a readable registration while another is held by a link that cannot be checked, and still proceeds beside a registration folder with no gitdir'
 }
 
+# A registration whose name begins with a dot (`.ghost`, `..ghost`) is a registration like any other: the
+# scan reads every name under the store but `.` and `..`, so one held by a link to nothing, beside the
+# readable registration of the copy (or of a gone copy's stale registration), refuses, for a present copy and
+# for an audited gone copy, and the refusal names the registration that failed.
+test_by_path_refuses_while_a_dot_named_registration_is_held_by_a_link_to_nothing() {
+  local spec shape name scenario label case_dir rc store hidden list
+  for spec in gitdir-link-dangling:..ghost gitdir-link-dangling:.ghost entry-link-dangling:..ghost; do
+    shape=${spec%%:*}
+    name=${spec##*:}
+    for scenario in present gone; do
+      label="by-path-dot-$shape-$name-$scenario"
+      make_by_path_case "$label"
+      case_dir=$BP_CASE
+      BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+      store=$BP_CLONE/.git/worktrees
+      if [ "$scenario" = gone ]; then
+        rc=0
+        run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        expect_code 0 "$rc" "$label: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "$label: the copy was not removed"
+        git -C "$case_dir/project" worktree add -q -b "fm/stale-dot-$shape-${name//./}" "$BP_COPY" main
+        rm -rf "${BP_COPY:?}"
+      fi
+      by_path_hide_registration "$case_dir" "$store" "$name" "$shape" planted
+      hidden=$(by_path_hidden_part "$store" "$name" "$shape")
+      [ -L "$hidden" ] && [ ! -e "$hidden" ] || fail "$label: the fixture's link is not a link to nothing"
+      rc=0
+      list=$(git -C "$BP_CLONE" worktree list --porcelain 2>/dev/null) || rc=$?
+      if [ "$rc" != 0 ] || ! printf '%s\n' "$list" | grep -Fqx "worktree $BP_COPY"; then
+        fail "$label: the fixture does not bite: git exited $rc and does not list the readable registration"
+      fi
+      rc=0
+      run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 1 "$rc" "$label: a dot-named registration held by a link to nothing must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'could not be read' "$case_dir/stderr" "$label: the refusal does not say the registration could not be read"
+      assert_grep "$hidden" "$case_dir/stderr" "$label: the refusal does not name the registration $hidden"
+      if grep -Fq 'already gone' "$case_dir/stderr"; then fail "$label: a copy was reported done"; fi
+      if [ "$scenario" = present ]; then
+        by_path_assert_untouched "$case_dir" "$label"
+      else
+        assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "$label: the refused run changed the audit record"
+        assert_equals 1 "$(wc -l < "$case_dir/git-remove.log" | tr -d ' ')" "$label: the refused run called git worktree remove"
+      fi
+    done
+  done
+  pass 'teardown --copy reads registrations whose names begin with a dot, refusing for a present copy and a gone copy and naming the one that failed'
+}
+
 # Git repositories the copy's own clone does not register, such as a separate clone or a worktree of
 # another project under .claude/ (which the clean proof skips), would go with the copy and their
 # commits with them. Every one found is refused; the same copy goes once it holds none.
@@ -6057,6 +6105,7 @@ test_by_path_refuses_a_gone_copy_when_a_registration_list_cannot_be_read
 test_by_path_does_not_report_a_gone_copy_done_while_a_registration_cannot_be_read
 test_by_path_refuses_a_copy_whose_registration_is_held_by_a_link_that_cannot_be_checked
 test_by_path_refuses_while_another_registration_is_held_by_a_link_that_cannot_be_checked
+test_by_path_refuses_while_a_dot_named_registration_is_held_by_a_link_to_nothing
 test_by_path_refuses_an_unregistered_nested_repository_under_the_copy
 test_by_path_refuses_when_the_audit_record_cannot_be_written
 test_by_path_exception_to_the_held_task_rule_judges_each_harm_row

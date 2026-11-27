@@ -1136,7 +1136,7 @@ classify() {  # <copy> <clone> <pool> <container>
   fi
   if ! nested=$(list_nested "$clone"); then
     CLASS=HELD-DIRTY
-    REASON="its registered nested copies cannot be listed, so no inner copy is ruled out$(fm_task_copy_unreadable_registration_note "$clone")"
+    REASON="its registered nested copies cannot be listed, so no inner copy is ruled out$(fm_task_copy_unreadable_registration_note "$nested")"
     return 0
   fi
   while IFS= read -r inner; do
@@ -1351,7 +1351,7 @@ record_live_nested_copy() {  # <copy> <clone>
 scan_clone() {  # <pool> <container> <clone>
   local pool=$1 container=$2 clone=$3 copy nested
   if ! nested=$(list_nested "$clone"); then
-    add_note "clone $clone was not read: its registered worktrees cannot be listed$(fm_task_copy_unreadable_registration_note "$clone")"
+    add_note "clone $clone was not read: its registered worktrees cannot be listed$(fm_task_copy_unreadable_registration_note "$nested")"
     return 0
   fi
   # A dedicated descriptor keeps every command inside the loop off its input.
@@ -1867,7 +1867,7 @@ apply_removals() {
     fi
     if ! registered=$(list_nested "$clone"); then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved; no retention receipt was cleared$(fm_task_copy_unreadable_registration_note "$clone")"$'\n'
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved; no retention receipt was cleared$(fm_task_copy_unreadable_registration_note "$registered")"$'\n'
       continue
     fi
     if [ -e "$copy" ] || [ -L "$copy" ] || grep -qxF "$copy" <<< "$registered"; then
