@@ -1,0 +1,15 @@
+== A: rename '### Contract validation' heading (target of AGENTS.md and crew-brief-authoring pointers)
+fm-doc-audience-check: unresolved local anchor in .agents/skills/crew-brief-authoring/SKILL.md: ../firstmate-coding-guidelines/SKILL.md#contract-validation
+exit=1
+== B: rename '## Repo style rules' heading (target of the source-analysis scoping sentence)
+fm-doc-audience-check: unresolved local anchor in .agents/skills/firstmate-coding-guidelines/SKILL.md: #repo-style-rules
+exit=1
+== C: break the crew-brief-authoring path to the guide
+fm-doc-audience-check: unresolved local link in .agents/skills/crew-brief-authoring/SKILL.md: ../firstmate-coding-guideline/SKILL.md#contract-validation
+exit=1
+== D: unmodified copy (control)
+fm-doc-audience-check: ok surfaces=158 local_links=1834
+exit=0
+== E: misspell only the AGENTS.md section 13 pointer anchor
+fm-doc-audience-check: unresolved local anchor in AGENTS.md: .agents/skills/firstmate-coding-guidelines/SKILL.md#contract-validatoin
+exit=1
