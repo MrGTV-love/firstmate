@@ -29,25 +29,10 @@ if ! declare -F secondmate_registry_parse_line >/dev/null 2>&1; then
   . "$FM_TASK_COPY_LIB_DIR/fm-secondmate-registry-lib.sh"
 fi
 
-# Process observations are tri-state: 0 live, 1 absent, 2 unreadable. A confined
-# worker cannot execute setuid ps (126); reuse the test reaper's sysctl helper.
-# Only a complete, readable PID table proves absence there. No age or ancestry
-# exception releases a lock naming a live PID, including a recycled PID.
-fm_task_copy_confined_launcher_state() {  # <pid>
-  local pid=$1 table observed found=1
-  table=$(python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" table pid 2>/dev/null) || return 2
-  [ -n "$table" ] || return 2
-  while IFS= read -r observed; do
-    case "$observed" in ''|*[!0-9]*) return 2 ;; esac
-    [ "$observed" != "$pid" ] || found=0
-  done <<< "$table"
-  return "$found"
-}
-
 # Interpret one completed ps observation without executing a process probe.
 # Exit 1 proves absence only with empty stdout and either empty stderr or exactly
 # macOS's not-found line for this PID; any other diagnostic makes that failed read
-# unknown. The acquisition owner handles exit 126.
+# unknown, and so does any other exit, a refused ps (126) included.
 fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
   local pid=$1 rc=$2 observed=$3 diagnostic=$4
   case "$rc" in
@@ -65,20 +50,15 @@ fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
   esac
 }
 
-# A refused ps (126) goes to the confined reader unless the caller passes
-# <strict>: a caller that releases a copy on this answer must not accept a
-# table read made under the restriction that refused ps, which can see only part
-# of the table, so with <strict> a refused ps is unknown (2), never absence.
-fm_task_copy_launcher_state() {  # <pid> [strict]
-  local pid=$1 strict=${2:-} observed diagnostic diagnostic_file rc=0
+# Process observations are tri-state: 0 live, 1 absent, 2 unreadable. Only a
+# completed ps read proves absence: a ps that was refused (126) or failed is
+# unknown (2). No table read made under the restriction that refused ps stands in
+# for it, because such a read can see only part of the table. No age or ancestry
+# exception releases a lock naming a live PID, including a recycled PID.
+fm_task_copy_launcher_state() {  # <pid>
+  local pid=$1 observed diagnostic diagnostic_file rc=0
   diagnostic_file=$(mktemp "${TMPDIR:-/tmp}/fm-copy-ps.XXXXXX") || return 2
   observed=$(ps -p "$pid" -o pid= 2>"$diagnostic_file") || rc=$?
-  if [ "$rc" = 126 ]; then
-    rm -f -- "$diagnostic_file"
-    [ "$strict" != strict ] || return 2
-    fm_task_copy_confined_launcher_state "$pid"
-    return $?
-  fi
   # Retain even a whitespace-only diagnostic; failed reads are not absence.
   diagnostic=$(cat "$diagnostic_file" && printf '.') || {
     rm -f -- "$diagnostic_file"

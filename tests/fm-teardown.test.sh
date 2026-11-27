@@ -4884,7 +4884,7 @@ test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_i
     else
       expect_code 1 "$rc" "by-path-launcher-ps-$shape: a live launcher ps cannot prove gone must keep the copy: $(cat "$case_dir/stderr")"
       assert_grep 'rule=lock-launcher-owner' "$case_dir/stderr" "by-path-launcher-ps-$shape: no named rule"
-      assert_grep 'ps could not show that it is gone, so the copy is kept: end that process, or run this again where ps can answer for it' "$case_dir/stderr" "by-path-launcher-ps-$shape: the refusal does not name the next step"
+      assert_grep "ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid $pid; end that process only after you confirm pid $pid is the launcher named by the lock (a pid can be reused)" "$case_dir/stderr" "by-path-launcher-ps-$shape: the refusal does not name the next step"
       kill -0 "$pid" 2>/dev/null || fail "by-path-launcher-ps-$shape: the launcher is gone"
       by_path_assert_untouched "$case_dir" "by-path-launcher-ps-$shape"
       assert_absent "$case_dir/closeout.log" "by-path-launcher-ps-$shape: the driver executed a release"

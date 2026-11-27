@@ -256,23 +256,20 @@ teardown_pid_age_secs() {  # <pid>
 # started after the lock file was written cannot be the process that wrote it:
 # pids are recycled. A start time that cannot be read counts as live. Only a read
 # that proves the process absent counts as gone: a ps that failed, was refused or
-# said anything but "no such process" leaves the launcher possibly alive. A
-# refused ps is not sent to the confined reader (fm_task_copy_launcher_state's
-# strict mode): a table read made under the restriction that refused ps can see
-# only part of the table, so it never proves a launcher absent. When the read
-# proves nothing, TEARDOWN_LOCK_LAUNCHER_UNPROVED holds the next step for the
-# refusal to print. Returns 0 when it may be alive, 1 when it is gone or a
-# recycled pid.
+# said anything but "no such process" leaves the launcher possibly alive
+# (fm_task_copy_launcher_state). When the read proves nothing,
+# TEARDOWN_LOCK_LAUNCHER_UNPROVED holds the next step for the refusal to print.
+# Returns 0 when it may be alive, 1 when it is gone or a recycled pid.
 TEARDOWN_LOCK_LAUNCHER_UNPROVED=
 teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
   local pid=$1 lock=$2 age mtime now state=0
   TEARDOWN_LOCK_LAUNCHER_UNPROVED=
-  fm_task_copy_launcher_state "$pid" strict || state=$?
+  fm_task_copy_launcher_state "$pid" || state=$?
   case "$state" in
     0) ;;
     1) return 1 ;;
     *)
-      TEARDOWN_LOCK_LAUNCHER_UNPROVED="; ps could not show that it is gone, so the copy is kept: end that process, or run this again where ps can answer for it"
+      TEARDOWN_LOCK_LAUNCHER_UNPROVED="; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid $pid; end that process only after you confirm pid $pid is the launcher named by the lock (a pid can be reused)"
       return 0
       ;;
   esac

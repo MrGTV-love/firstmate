@@ -8,8 +8,8 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-copy-sweep-orphan)
 fm_git_identity
 
-make_squash_world() {
-  W="$TMP_ROOT/squash"
+make_squash_world() {  # [name]
+  W="$TMP_ROOT/${1:-squash}"
   HOMED="$W/home"
   CLONE="$HOMED/projects/example"
   mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
@@ -177,45 +177,69 @@ test_report_predicts_apply_after_later_main_edit() {
   pass 'after a later main edit to a squash-merged path, report and apply agree on every copy'
 }
 
-test_confined_launcher_observation() {
-  # The sourceable task-copy API performs no home scan. Test doubles below
-  # model unreadable/malformed helper responses, never ps output.
+test_refused_launcher_observation() {
+  # The sourceable task-copy API performs no home scan. The ps and python3
+  # doubles below model a sandbox that refuses ps and a process table read that
+  # would claim the launcher absent; neither may prove a launcher gone.
   # shellcheck source=bin/fm-task-copy-lib.sh
   . "$ROOT/bin/fm-task-copy-lib.sh"
-  local live rc=0
+  local live exited rc status
   sleep 60 &
   live=$!
-  if [ "$(uname -s)" = Darwin ]; then
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-  else
-    fm_task_copy_launcher_state "$live" || rc=$?
-  fi
-  # Always retire our fixture, including on an assertion failure.
+  sleep 0.1 &
+  exited=$!
+  wait "$exited" 2>/dev/null || true
+  for status in 126 2 127; do
+    # shellcheck disable=SC2329 # The python3 doubles stand for a table read that must not be asked.
+    (
+      ps() { printf 'ps: Operation not permitted\n' >&2; return "$status"; }
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was taken as an answer for a live launcher"
+      rc=0
+      fm_task_copy_launcher_state "$exited" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was taken as absence for an exited launcher"
+      python3() { return 1; }
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by a failed table read"
+      python3() { printf '%s\n' ''; }
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by an empty table read"
+      python3() { printf '%s\n' 1 unreadable; }
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by a partial table read"
+    ) || fail "a refused or failed ps was not kept unknown (exit $status)"
+  done
   kill "$live" 2>/dev/null || true
   wait "$live" 2>/dev/null || true
-  assert_equals 0 "$rc" 'live launcher was not positively observed'
-  rc=0
-  if [ "$(uname -s)" = Darwin ]; then
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-  else
-    fm_task_copy_launcher_state "$live" || rc=$?
-  fi
-  assert_equals 1 "$rc" 'exited launcher was not proved absent'
-  (
-    python3() { return 1; }
-    rc=0
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-    assert_equals 2 "$rc" 'failed helper was mistaken for absence'
-    python3() { printf '%s\n' ''; }
-    rc=0
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-    assert_equals 2 "$rc" 'empty observation was mistaken for absence'
-    python3() { printf '%s\n' 1 unreadable; }
-    rc=0
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-    assert_equals 2 "$rc" 'partial malformed observation was mistaken for absence'
-  ) || fail 'unknown launcher boundaries failed'
-  pass 'live launcher holds, exited launcher is absent, failed or incomplete observations remain unknown'
+  pass 'a refused or failed ps leaves a live or exited launcher unknown, whatever a table read would say'
+}
+
+# A sweep where ps refuses every launcher read keeps the clean, squash-landed,
+# Vernant-locked copy: the driver is never asked, and the copy stays registered
+# and locked. test_squash_orphans is the control where a readable ps reaps it.
+test_refused_ps_keeps_a_locked_copy() {
+  local real_ps
+  make_squash_world squash-refused-ps
+  real_ps=$(command -v ps)
+  cat > "$W/bin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  '-p '*' -o pid=') echo 'ps: Operation not permitted' >&2; exit 126 ;;
+esac
+exec "$real_ps" "\$@"
+SH
+  chmod +x "$W/bin/ps"
+  sweep --apply
+  assert_equals HELD-LOCKED "$(class_of "$CLEAN")" 'a refused ps did not hold the locked copy'
+  assert_contains "$OUT" 'cannot be observed; absence is not proved' 'the hold did not say the launcher cannot be observed'
+  assert_present "$CLEAN/feature.txt" 'a refused ps let the locked copy be removed'
+  git -C "$CLONE" worktree list --porcelain | grep -A4 -Fx "worktree $CLEAN" | grep -q '^locked' \
+    || fail 'a refused ps let the locked copy be unregistered or unlocked'
+  pass 'a refused ps keeps a clean Vernant-locked copy registered and locked'
 }
 
 make_preserved_world() {
@@ -691,15 +715,19 @@ test_ps_observation_diagnostics() {
   fm_task_copy_ps_observation_state 42 2 '' $'ps: process id too large: 42\n' || rc=$?
   assert_equals 2 "$rc" 'the not-found line on another exit must remain unknown'
   rc=0
-  fm_task_copy_launcher_state 999999 || rc=$?
-  assert_equals 1 "$rc" 'an impossible PID on this host must be proved absent'
+  ( ps() { return 126; }; fm_task_copy_launcher_state 999999 ) || rc=$?
+  assert_equals 2 "$rc" 'a refused ps must leave even an impossible PID unknown'
+  rc=0
+  ( ps() { return 1; }; fm_task_copy_launcher_state 999999 ) || rc=$?
+  assert_equals 1 "$rc" 'a ps that completes with no such process must prove absence'
   pass 'only the exact not-found line for this PID joins empty absence; every other diagnostic stays unknown'
 }
 
 fm_test_only
 test_squash_orphans
 test_report_predicts_apply_after_later_main_edit
-test_confined_launcher_observation
+test_refused_launcher_observation
+test_refused_ps_keeps_a_locked_copy
 test_preserved_classes
 test_regenerable_class
 test_regenerable_write_keeps_waiting
