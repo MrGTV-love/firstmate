@@ -181,11 +181,18 @@ teardown_absolute_root() {  # <var> <path>
   esac
 }
 
-# <path> without trailing slashes, to compare two spellings of one folder.
-teardown_root_key() {  # <path>
-  local path=$1
-  while [ "$path" != / ] && [ "${path%/}" != "$path" ]; do path=${path%/}; done
-  printf '%s\n' "$path"
+# Sets <var> to the one canonical spelling of absolute <path> that decides
+# whether two roots are the same folder: every empty and "." component dropped,
+# so a trailing slash, a repeated slash or a "./" part does not make a
+# different folder. It reads nothing, so it works for a folder not made yet.
+teardown_canonical_root() {  # <var> <absolute path>
+  local rest=$2 part out=''
+  while [ -n "$rest" ]; do
+    part=${rest%%/*}
+    if [ "$part" = "$rest" ]; then rest=''; else rest=${rest#*/}; fi
+    case "$part" in ''|.) ;; *) out+=/$part ;; esac
+  done
+  printf -v "$1" '%s' "${out:-/}"
 }
 
 # One event per refused copy/predicate, not another event for the registered-copy
@@ -195,7 +202,7 @@ teardown_root_key() {  # <path>
 # asked explicitly. The command names absolute folders only, each quoted with
 # printf %q so every byte of it survives on one line: FM_HOME, and each of the
 # state, data and config roots the run used that is a different folder from its
-# default under FM_HOME (compared without trailing slashes), each
+# default under FM_HOME (compared in teardown_canonical_root's spelling), each
 # relative one taken relative to the directory the run started in. Run as
 # printed, from any directory and a shell that sets none of the overrides, it
 # reaches the same folders. A run that cannot make a root absolute gets the
@@ -226,15 +233,15 @@ teardown_refuse_copy() {  # <rule> <missing> <copy>
       missing="$missing Restore readable source and writable preservation storage, then re-run this teardown from the directory it started in."
     else
       kind=machine
-      key_home=$(teardown_root_key "$abs_home")
+      teardown_canonical_root key_home "$abs_home"
       for root in state data config; do
         case "$root" in
           state) value=$abs_state ;;
           data) value=$abs_data ;;
           config) value=$abs_config ;;
         esac
-        key_root=$(teardown_root_key "$value")
-        [ "$key_root" = "$key_home/$root" ] && continue
+        teardown_canonical_root key_root "$value"
+        [ "$key_root" = "${key_home%/}/$root" ] && continue
         printf -v piece ' FM_%s_OVERRIDE=%q' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$value"
         roots+=$piece
       done

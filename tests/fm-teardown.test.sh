@@ -5864,6 +5864,43 @@ test_by_path_completing_command_keeps_every_byte_of_a_root() {
   pass 'a teardown --copy completing command carries a root byte-exact, a final newline included, or prints none and names why'
 }
 
+# Whether a root is a different folder from its default is decided from one canonical spelling, not from how
+# FM_HOME is spelled: with no override set, FM_HOME given with a trailing slash, two trailing slashes or a
+# repeated slash inside prints only FM_HOME, and the printed command completes against the same folders.
+test_by_path_completing_command_prints_no_override_for_any_spelling_of_a_default_home() {
+  local spelling case_dir rc command home
+  for spelling in trailing-slash double-trailing-slash inner-double-slash; do
+    make_by_path_case "by-path-home-$spelling"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    case "$spelling" in
+      trailing-slash) home=$BP_HOME/ ;;
+      double-trailing-slash) home=$BP_HOME// ;;
+      inner-double-slash) home=$case_dir//home ;;
+    esac
+    mkdir -p "$BP_COPY/.claude" "$BP_HOME/data/pres-1" "$BP_HOME/config"
+    printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+    printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'a file where the preserve parent must be a directory\n' > "$BP_HOME/data/pres-1/nested-copy-preserved"
+    rc=0
+    env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
+      FM_HOME="$home" FM_ROOT_OVERRIDE="$case_dir/code-root" NM_HOME="$case_dir/nm" \
+      PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-home-$spelling: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+    command=$(sed -n 's/^completing-command: FM_FRICTION_OPERATION_ID=[^ ]* FM_FRICTION_EPISODE_ID=[^ ]* //p' "$case_dir/stderr")
+    [ -n "$command" ] || fail "by-path-home-$spelling: no completing command: $(cat "$case_dir/stderr")"
+    case "$command" in *OVERRIDE*) fail "by-path-home-$spelling: a default home printed an override: $command" ;; esac
+    rm -f "$BP_HOME/data/pres-1/nested-copy-preserved"
+    rc=0
+    by_path_run_printed "$case_dir" "$command" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-home-$spelling: the printed command failed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-home-$spelling: the copy was not removed"
+    assert_present "$BP_HOME/data/pres-1/nested-copy-preserved" "by-path-home-$spelling: nothing was preserved under the home data folder"
+  done
+  pass 'a teardown --copy completing command prints no override for any spelling of a default home'
+}
+
 # A run whose state, data and config folders are the home's own defaults prints the completing command
 # it always printed, with no root override on it; the same refusal under a home whose roots differ
 # prints each differing root (test_by_path_preserves_claude_whole_and_removes_the_copy runs that text).
@@ -6218,6 +6255,7 @@ test_by_path_preserves_claude_whole_and_removes_the_copy
 test_by_path_completing_command_prints_a_root_only_when_it_differs_from_the_home_default
 test_by_path_completing_command_names_the_absolute_roots_of_relative_roots
 test_by_path_completing_command_keeps_every_byte_of_a_root
+test_by_path_completing_command_prints_no_override_for_any_spelling_of_a_default_home
 test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read
 test_by_path_refuses_a_holder_that_starts_after_the_first_scan
 )
