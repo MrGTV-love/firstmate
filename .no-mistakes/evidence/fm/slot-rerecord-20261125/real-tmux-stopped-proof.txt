@@ -1,0 +1,50 @@
+tmux resolved by the verb: /opt/homebrew/bin/tmux
+private TMUX_TMPDIR=/tmp/fmlab-tmux.pwIDO3
+
+===== real tmux inventory on the private socket =====
+fmses: 1 windows (created Fri Nov 27 01:35:19 2026)
+fmses:fm-rrt pane_current_command=claude pane_pid=73943
+
+===== A. agent alive in a real pane: rerecord-slot --check =====
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+manifest_sha256=95e757ec521ebd63b4294ac3dd5283d25f583f570163136c9a50ed4dd7fcda3e
+base=a89ff627cd5b7004816e65e18c80ae6f387c18b7 -> 2392af8ce332893f5a495146a6791ae4ec6eb847
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=agent_not_proven_stopped
+write_would=refuse:agent_not_proven_stopped
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha 95e757ec521ebd63b4294ac3dd5283d25f583f570163136c9a50ed4dd7fcda3e --note '<the ruling this carries out>'
+exit=0
+
+===== B. agent alive in a real pane: rerecord-slot write =====
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: agent_not_proven_stopped: the endpoint fmses:fm-rrt reads 'alive'; stop it with fm-control.sh <id> exit, then re-record; no record, manifest, copy or journal was changed
+exit=1
+ALIVE-REFUSAL-WROTE-NOTHING
+slot_base_sha=a89ff627cd5b7004816e65e18c80ae6f387c18b7
+slot_owned_path=src
+
+===== C. kill the real tmux server (agent gone), then rerecord-slot write =====
+no server running on /private/tmp/fmlab-tmux.pwIDO3/tmux-501/default
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base a89ff627cd5b7004816e65e18c80ae6f387c18b7 -> 2392af8ce332893f5a495146a6791ae4ec6eb847; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-control-relaunch.k9ycWv/rr-realtmux-31563/home/data/rrt/slot-rerecord/prior-meta.20261127T073537Z.9ee258b2495a.0
+exit=0
+slot_base_sha=2392af8ce332893f5a495146a6791ae4ec6eb847
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+20261127T073537Z.9ee258b2495a.0.record
+prior-meta.20261127T073537Z.9ee258b2495a.0

@@ -1,0 +1,140 @@
+fixture: M0=b10d14a7178fe9ab81c480f6725116b50d9c5c20 M1=9de26eadd54e5197f78162304447f859fbe48905 branch HEAD=3542a3f0ca1dce308585e4b8f5c434b64b5bd30a
+merge-base origin/main HEAD = 9de26eadd54e5197f78162304447f859fbe48905
+--- task record slot lines (state/rrt.meta):
+slot_base_sha=b10d14a7178fe9ab81c480f6725116b50d9c5c20
+slot_owned_path=src
+--- durable manifest base_sha / owned_paths:
+base_sha=9de26eadd54e5197f78162304447f859fbe48905
+owned_paths=src,lib,tools/x.sh
+--- data/rrt/slot-rerecord/:
+(absent)
+
+===== 1. relaunch before rerecord-slot (record is stale) =====
+error: slot adoption refused: base_mismatch: manifest base is '9de26eadd54e5197f78162304447f859fbe48905', the recorded base is 'b10d14a7178fe9ab81c480f6725116b50d9c5c20'; no manifest, scope, record or copy was changed
+error: refused relaunch of governed task rrt: its recorded slot manifest cannot be adopted for /Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/wt; preserve and reconcile it first (a base_mismatch or scope_mismatch after the durable slot record was renewed is re-recorded with fm-control.sh rrt rerecord-slot --check, then without --check); the running agent was not stopped
+exit=1
+--- journal after the refused relaunch:
+(no journal)
+
+===== 2. rerecord-slot with no note and no --manifest-sha =====
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: note_required: a write needs --note (or --note-file) naming the ruling it carries out; no record, manifest, copy or journal was changed
+exit=1
+
+===== 3. rerecord-slot --check =====
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+manifest_sha256=7d6b6c968d7c5c8e1edbc18617705f41d5d2ce918116c6f18b0490d26ae1448e
+base=b10d14a7178fe9ab81c480f6725116b50d9c5c20 -> 9de26eadd54e5197f78162304447f859fbe48905
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=pass
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha 7d6b6c968d7c5c8e1edbc18617705f41d5d2ce918116c6f18b0490d26ae1448e --note '<the ruling this carries out>'
+exit=0
+CHECK-WROTE-NOTHING: record, archives, audits and temporaries unchanged
+
+===== 4. write with a wrong --manifest-sha =====
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: manifest_sha_mismatch: the manifest sha256 is 7d6b6c968d7c5c8e1edbc18617705f41d5d2ce918116c6f18b0490d26ae1448e, but --manifest-sha names 0000000000000000000000000000000000000000000000000000000000000000; review the manifest again and bind the digest fm-control.sh <id> rerecord-slot --check prints; no record, manifest, copy or journal was changed
+exit=1
+REFUSAL-WROTE-NOTHING
+
+===== 5. write with the reviewed --manifest-sha 7d6b6c968d7c5c8e1edbc18617705f41d5d2ce918116c6f18b0490d26ae1448e =====
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: base b10d14a7178fe9ab81c480f6725116b50d9c5c20 -> 9de26eadd54e5197f78162304447f859fbe48905; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/home/data/rrt/slot-rerecord/prior-meta.20261127T073323Z.06c6e06d6270.0
+exit=0
+--- task record slot lines (state/rrt.meta):
+slot_base_sha=9de26eadd54e5197f78162304447f859fbe48905
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh
+--- durable manifest base_sha / owned_paths:
+base_sha=9de26eadd54e5197f78162304447f859fbe48905
+owned_paths=src,lib,tools/x.sh
+--- data/rrt/slot-rerecord/:
+20261127T073323Z.06c6e06d6270.0.record
+prior-meta.20261127T073323Z.06c6e06d6270.0
+--- audit record:
+v1
+result=published
+archive=/Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/home/data/rrt/slot-rerecord/prior-meta.20261127T073323Z.06c6e06d6270.0
+task=rrt
+prior_sha256=06c6e06d6270ad64f9b414e75b94c178121ff97e1bcdb9965692d4b32012dba1
+staged=/Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/home/state/.rrt.meta.rerecord.CYnpP9
+staged_sha256=2df830e352455c28e84cc825c203f767686d3668d762d4c047deadf0c101b50a
+prior_block_sha256=5d5dbf0af4db43cd09ba73f82e6e662f1079c24df415a861f24ec254fa486cc3
+staged_block_sha256=9a225da965a99862baa4657c43b86e1aaaa571f7ccdcd93b5262cc21f0263ddd
+manifest=/Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/manifests/manifest.json
+manifest_sha256=7d6b6c968d7c5c8e1edbc18617705f41d5d2ce918116c6f18b0490d26ae1448e
+old_base=b10d14a7178fe9ab81c480f6725116b50d9c5c20
+new_base=9de26eadd54e5197f78162304447f859fbe48905
+head=3542a3f0ca1dce308585e4b8f5c434b64b5bd30a
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+note="Main 2345 ruling: re-record the renewed slot after the authorized forward merge"
+--- archive sha equals prior record sha: yes
+--- non-slot lines of the record unchanged vs archive: yes
+
+===== 6. second write run (expect no-op) =====
+added_uncommitted_newly_covered=0
+scope_split=prior:3 changed:0 ancestor:0
+rerecord-slot rrt: already recorded
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+exit=0
+SECOND-RUN-RECORD-UNCHANGED
+20261127T073323Z.06c6e06d6270.0.record
+prior-meta.20261127T073323Z.06c6e06d6270.0
+
+===== 7. relaunch after rerecord-slot (expect adoption) =====
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+error: configured backend 'tmux' is not herdr; refusing to replace task rrt's proven-gone tmux endpoint
+error: the replacement agent for rrt could not be launched on claude
+error: rrt's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/wt
+exit=1
+phase=failed:launching
+rollback=prior-record-kept
+provisioner sentinel size: 0 (0 = adopted, provisioner not run)
+(the server-dead tmux endpoint is replaced only on Herdr; suite case E1 stages the relaunch on a dead pane instead)
+
+===== 8. relaunch after rerecord-slot on a dead pane (as suite case E1) =====
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/home/data/rrt/launch-brief.md records no ship branch; defaulting to legacy branch fm/rrt
+warning: /Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/home/data/rrt/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunch drift report for rrt: no out-of-scope path changed by this task's own work; the recorded scope is unchanged
+  a relaunch is not a new scope declaration: Vernant's push-time owned_paths gate stays the enforcement point, and a pool slot another task claims refuses the relaunch by name unless that task's record places its copy inside the slot
+skill selection for rrt: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+relaunched rrt harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-rrt worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.G9BIZ5/rr-arc-12294/wt
+exit=0
+phase=complete
+pane command now: claude
+provisioner sentinel size: 0 (0 = adopted, provisioner not run)
+--- record slot lines after relaunch:
+slot_base_sha=9de26eadd54e5197f78162304447f859fbe48905
+slot_owned_path=src
+slot_owned_path=lib
+slot_owned_path=tools/x.sh

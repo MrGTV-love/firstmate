@@ -1,0 +1,140 @@
+ORACLE	pass	rec_inventory catches a same-byte rewrite and a created-then-deleted archive
+JOURNAL-CLASSES	pass	every class of fm_control_relaunch_journal_verdict
+L1	pass	exit 0; slot_lines are M1 and the manifest scope; one archive equal to the prior record; audit published; labels as frozen
+L2	pass	exit 0 as L1; journal bytes unchanged
+L3	pass	second exit 0 already recorded; rec_inventory unchanged; one archive and one audit record
+L4	pass	--check exit 0 with the frozen lines; rec_inventory, journal and manifest unchanged; send-keys empty
+L4b	pass	--check with a live spawn-lock holder exits 0 advisory: launch_proof=launch_in_progress, write_would=refuse:launch_in_progress; holder keeps the lock
+L5	pass	exit 0; released_scope=src printed and in the audit record
+L6	pass	side_branch_only=tools/y.sh paths=1/1 and side_branch_mixed=lib paths=1/2 in --check and in the audit record; none for tools/x.sh or src
+L7	pass	exit 0; added_scope=tools/sub rule=c
+L8	pass	exit 0 already recorded; rec_inventory unchanged; no archive or audit record
+L9	pass	--check and write exit 0 already recorded with journal_proof=failed-open and stopped_proof=ok; nothing written
+L9b	pass	--check and write exit 0 already recorded with journal_proof=complete and stopped_proof=agent_not_proven_stopped; --check predicts write_would=already recorded; nothing written; send-keys empty
+L10	pass	exit 0 as L1; journal and .meta-prior unchanged; published lines are the renewal's
+L11	pass	uncommitted_newly_covered=1 and added_uncommitted_newly_covered=1 in the output and audit record; copy unchanged
+L12	pass	exit 0 as L10 over a dead holder's spawn lock; no spawn lock remains
+L13	pass	pending untouched-staged audit, HEAD moved inside scope: --check prints write_would=reconcile-pending naming the audit record, the verdict_basis line, the digest and the command, and writes nothing; the write then rolls the crash back and publishes
+L14	pass	pending untouched-staged audit, HEAD moved, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines, writes nothing; the write rolls the crash back, then refuses agent_not_proven_stopped and its tail names the rolled-back audit and the restored record
+L15	pass	pending untouched-staged audit, manifest and HEAD unchanged, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines; the write recovers the crash and exits 0 already recorded
+L16	pass	pending superseded-new audit, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines; the write relabels the audit superseded-new and exits 0 already recorded
+L17	pass	a snapshot error after step 3 rolled a crash back names the rolled-back audit and the restored record, not 'nothing was changed'; with no pending audit the same error says nothing was changed
+L18	pass	the audit record cannot be rewritten: the record is restored, the audit stays pending, and the refusal tail says it could not be closed as rolled-back
+L19	pass	an already-recorded run after a recovered crash names the audit: not closed and still pending when the audit cannot be rewritten, closed as published-recovered when it can
+E1-server-dead	observation	relaunch on the frozen server-dead endpoint after rerecord: exit 1; error: configured backend 'tmux' is not herdr; refusing to replace task rrt's proven-gone tmux endpoint error: the replacement agent for rrt could not be launched on claude 
+E1	pass	relaunch after rerecord exits 0, journal complete, new agent alive, no adoption refusal, manifest unchanged, sentinel empty (relaunch staged on a dead pane rather than server-dead; see report)
+E2	pass	relaunch on F refuses base_mismatch; record unchanged; sentinel empty
+RP1-refused	pass	refuses scope_entry_not_own_work: docs.txt is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added;; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+RP1	pass	on one renewed manifest the replay gives the write's verdict: ok with the write's report lines, and the write's refusal reason and detail
+RP2-write	pass	refuses manifest_unreadable: the verdict could not be computed;; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+RP2	pass	a stand-in identity verdict that prints ok and exits 2 is refused manifest_unreadable by the replay (exit 1) and by the write, which changes nothing
+H1	pass	refuses owner_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H2	pass	refuses worktree_path_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H3	pass	refuses base_not_forward; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H4	pass	refuses base_not_on_default; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H5	pass	refuses base_not_merge_base; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H6	pass	refuses scope_entry_not_own_work: docs.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H7	pass	refuses scope_entry_not_own_work: tools; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H8	pass	refuses scope_uncovered_change: tools/x.sh; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H9	pass	refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H9b	pass	refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H9c	pass	refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H9d	pass	refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H9e	pass	refuses scope_release_strands_work: src/sp ace.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H10	pass	refuses manifest_shadowed; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H11	pass	refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H12	pass	refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H12b	pass	refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H13a	pass	refuses actor_not_main; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H13b	pass	refuses session_lock_not_owned; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H13c	pass	refuses note_required; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H14	pass	refuses manifest_sha_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H15	pass	refuses local_only_source_unsupported; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H17	pass	refuses scope_entry_not_own_work: tools; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H18	pass	refuses base_not_merge_base; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H19	pass	refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H19b	pass	refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H20	pass	refuses launch_in_progress; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H21	pass	refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+H22	pass	refuses backlog_close_pending; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N1	pass	refuses not_ship_or_scout; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N2	pass	refuses not_recorded; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N3	pass	refuses not_adoption_route; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N4	pass	refuses manifest_missing; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N5	pass	refuses lifecycle_state_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N6	pass	refuses branch_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N7	pass	refuses repository_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N8	pass	refuses not_isolated; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N9	pass	refuses operation_in_progress; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N10	pass	refuses default_branch_unreadable; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N11	pass	refuses base_ref_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N12	pass	refuses base_invalid; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N13	pass	refuses base_not_in_head; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N14	pass	refuses scope_invalid; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N15	pass	refuses scope_not_canonical; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N16	pass	refuses scope_not_tracked; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N17	pass	refuses actor_not_main; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+N18	pass	refuses manifest_unreadable; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+OPTIONS	pass	each refused option prints its own parse refusal (exit 1, never a proof refusal), and --check or --manifest-sha on another verb names rerecord-slot; nothing written
+R1a	pass	input_changed_during_rerecord; record inventory unchanged; audit refused
+R1b	pass	input_changed_during_rerecord; record inventory unchanged; audit refused
+R4	pass	input_changed_during_rerecord; the record is the prior bytes plus the appended line; audit refused
+R2	pass	nonzero; record restored to P; archive kept with sha P; audit exactly rolled-back
+R3	pass	adopt_postcheck_failed; rolled back to P; archive kept; audit rolled-back
+R5	pass	adopt_precheck_failed; rec_inventory unchanged; no archive, no staged file, no audit record
+R5b	pass	adopt_precheck_failed; rec_inventory unchanged; no archive, no staged file, no audit record
+R6a	pass	after the kill: staged bytes and pending; second run exit 0 already recorded; published-recovered; one archive; audit_agrees
+R6b	pass	second run rolls the crashed write back (record P, first audit rolled-back), then refuses manifest_sha_mismatch and its tail names the rolled-back audit and the restored record
+R6c	pass	second exit 0 already recorded; record is staged plus the appended line; first audit superseded-new; no rollback
+R6f	pass	a crashed write superseded by a record with the prior slot block closes superseded-prior; the run then publishes
+R6g	pass	a crashed write superseded by a record with another slot block closes superseded-other; the run then publishes
+R6d	pass	after the kill: record P, audit rolling-back; second run: first rolled-back, second published, two archives, audit_agrees
+R6e	pass	after the kill: staged bytes, rolling-back, a leftover restore file; second run: first rolled-back, second published, no leftover
+R7	pass	after the kill: record P and a leftover staged file; second run: first abandoned, no leftover, second published
+R8	pass	nonzero; record inode and sha256 unchanged; no staged file; audit refused
+L21	pass	TERM in step 5 after step 3 abandoned a crashed write: the trap names that audit once; with no step 3 entries it names none
+R9a	pass	exit 143 under TERM in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+R9b	pass	exit 129 under HUP in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+R9c	pass	exit 130 under INT in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+R9d	pass	first run exit 143 (TERM runs the trap at once: 1); staged bytes, pending, no restore; second run already recorded, published-recovered, one archive, audit_agrees
+R9e	pass	first run exit 143; staged bytes, audit published by the late rename, no restore, audit_agrees; second run unchanged, one archive
+L22	pass	TERM during a step 3 restore rename (immediate trap: 1): the trap keeps it and names the rolling-back audit record once
+R10	pass	archive_unverified; record unchanged; no audit record; no staged file; the unverified archive kept
+R11	pass	rerecord_audit_unreadable naming the file; record unchanged; after moving it aside the rerun publishes
+SF4-head	pass	HEAD moved after the rebind returned: adopt_postcheck_failed, rolled back to P, audit rolled-back; the refusal says the run published and then restored the prior record
+SF4-head-reconciled	pass	a crashed earlier write is abandoned in step 3, then HEAD moves after the rebind: the refusal says the run published and restored the prior record and names the abandoned audit
+SF4-head-unrestored	pass	the restore after a failed post-publish check cannot stage: the run says it published, that the prior record could not be restored, and names the archive; the record holds the staged bytes
+SF4-head-restore-publish	pass	the restore publish after a failed post-publish check fails: the rollback names its error, and the run's outcome line is printed once
+L20	pass	step 3 closes a first audit as superseded-other, then the second's resumed restore fails: the stop names the first audit
+SF4-owner	pass	manifest owner_id changed after the rebind returned: adopt_postcheck_failed, rolled back, audit rolled-back
+SF5	pass	TERM to fm-control relaunch: journal failed:launching, control lock free, fm-spawn (pid 65352) still holds the spawn lock, rerecord refuses launch_in_progress naming it
+S1a	pass	H1 under the allow: the other-owner manifest's base and scope were published, audit published
+S1b	pass	H2, N5 and N6 under the allows: the foreign-copy, released and other-branch manifests were published
+S2	pass	H10 under the allow: the shadowed pointer's base and scope were published
+S3	pass	H3, H4, H5, N11, N12 and N13 under the allow: each wrong base was published
+S4	pass	H6, H7, H8, H17, N14, N15 and N16 under the allow: each wrong scope was published
+S5	pass	H11, H19 and H19b under the allow: written under a live agent; send-keys still empty and the agent still alive
+S6	pass	H14 under the allow: published against bytes the operator never named
+S7	pass	R1a: base M1 published while the fixture's merge-base is 1dcad0db407ac74c58b37f50f4c522a09d368a62 and docs.txt is uncovered; R4: the appended line is gone
+S7-R1b	observation	R1b under S7: the rebind's digest binding refused manifest_sha_mismatch before publish (audit refused); defense in depth, not an S7 result
+S8	pass	R2, R3, R6b and R9a with a no-op rollback: the new record stays published after the failure or signal
+S9	pass	R5: an archive exists and audit rolled-back from adopt_postcheck_failed; R5b: the altered model= line was published
+S10	pass	H13a, H13b and N17 under the allow: published by a worker, by a session without the lock, and by the supervision branch
+S11	pass	H13c under the allow: published with an empty note in the audit record
+S12	pass	H12, H12b and H21 under the allow: published during an in-flight or unreadable journal; journal bytes unchanged
+S13	pass	H15, N1 and N3 under the allow: the local-only, double-kind and refused-provisioning records were rewritten
+S14a	pass	L6 with every changed path on the own line: no side-branch line printed or recorded (L6's assertion fails)
+S14b	pass	L6 with an empty own line: tools/x.sh is listed as side-branch-only (L6's assertion fails)
+S15	pass	with a no-op reconciliation: R6b stays published against the changed manifest, R6d and R6e stay rolling-back, R7 stays pending with its staged file, R9d stays pending
+S16	pass	R6c with every record read as untouched-staged: the post-publish check fails, the rollback restores P and the other writer's line is gone
+S17	pass	H9 and H9b under the allow: the narrowing is published and src/other.txt's uncommitted edit lies outside the new scope
+S18	pass	H20 under the allow: published while the live helper holds the spawn lock
+S19	pass	R10 with the read-back comparison removed: published while the archive's sha256 is not P
+S20	pass	R9d with publishing mapped to rollback: the trap rolls back, the pending mv lands, staged bytes stand under a rolled-back audit record
+S21	pass	H22 under the allow: published while the backlog close is pending
+S22	pass	R9e with committing mapped to rollback: the trap restores P, the late commit rename lands, P stands under a published audit record
+SF4c	pass	SF4-head with only the post-publish comparison removed: published with a stale HEAD; audit published
+SF4-owner-reread	pass	owner changed after the rebind, post-publish comparison removed: the owner re-read alone refuses adopt_postcheck_failed naming the lease (owner_mismatch); rolled back, audit rolled-back
+SF4o	pass	SF4-owner-reread with the owner re-read also removed: published while the live manifest names another owner (adoption never compares owner); audit published
+S23	pass	L13 with the pending names dropped: --check claims write_would=already recorded with no digest or command, while the write rolls the crash back and publishes
+S24	pass	L15 with the refusal suffix injected: --check claims write_would=reconcile-pending:<audit>;refuse:agent_not_proven_stopped while the write recovers the crash and exits 0 already recorded

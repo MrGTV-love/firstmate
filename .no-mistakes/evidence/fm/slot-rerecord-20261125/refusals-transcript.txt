@@ -1,0 +1,26 @@
+[H1 owner] exit=1 record=unchanged
+  error: slot rerecord refused: owner_mismatch: manifest owner is 'other-task', the task is 'rrt'; no record, manifest, copy or journal was changed
+[H2 copy-path] exit=1 record=unchanged
+  error: slot rerecord refused: worktree_path_mismatch: manifest names '/Users/charlesabrooker/tmp/fm-control-relaunch.itvYNs/rr-H2-21696/wt2', the task copy is '/Users/charlesabrooker/tmp/fm-control-relaunch.itvYNs/rr-H2-21696/wt'; no record, manifest, copy or journal was changed
+[N6 branch] exit=1 record=unchanged
+  error: slot rerecord refused: branch_mismatch: manifest branch is 'fm/other', the task branch is 'fm/rrt'; no record, manifest, copy or journal was changed
+[H3 base-backwards] exit=1 record=unchanged
+  error: slot rerecord refused: base_not_forward: the recorded base 044121def03c56ce393ab99b8094b355bb04e885 is not an ancestor of the manifest base d185f797ee40019e1230cda6c8f0ee290196fcab; no record, manifest, copy or journal was changed
+[H4 base-off-default] exit=1 record=unchanged
+  error: slot rerecord refused: base_not_on_default: the manifest base 4c8b3c1f260b4bba9be47a4b2e796837dda57667 is not on origin/main (7dd4121968129544151f05998a3105e0fb5f0306); no record, manifest, copy or journal was changed
+[H5 base-not-merge-base] exit=1 record=unchanged
+  error: slot rerecord refused: base_not_merge_base: the manifest base ab74116209c7aa9d208439ff5c553dcfdf6db1ef is not merge-base(origin/main, HEAD) = 16677b31c2466a61a3a805b9bf528b558366815d; renew the durable record against the current merge-base (this verb never fetches: if origin/main is stale, fetch it in the primary clone first); no record, manifest, copy or journal was changed
+[H6 scope-untouched-file] exit=1 record=unchanged
+  error: slot rerecord refused: scope_entry_not_own_work: docs.txt is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added; no record, manifest, copy or journal was changed
+[H7 scope-untouched-dir] exit=1 record=unchanged
+  error: slot rerecord refused: scope_entry_not_own_work: tools is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added; no record, manifest, copy or journal was changed
+[H8 scope-uncovered-change] exit=1 record=unchanged
+  error: slot rerecord refused: scope_uncovered_change: tools/x.sh; no record, manifest, copy or journal was changed
+[H9 scope-release-strands-work] exit=1 record=unchanged
+  error: slot rerecord refused: scope_release_strands_work: src/other.txt; no record, manifest, copy or journal was changed
+[H11 agent-alive] exit=1 record=unchanged
+  error: slot rerecord refused: agent_not_proven_stopped: the endpoint fmses:fm-rrt reads 'alive'; stop it with fm-control.sh <id> exit, then re-record; no record, manifest, copy or journal was changed
+[H13c no-note] exit=1 record=unchanged
+  error: slot rerecord refused: note_required: a write needs --note (or --note-file) naming the ruling it carries out; no record, manifest, copy or journal was changed
+[H14 manifest-sha] exit=1 record=unchanged
+  error: slot rerecord refused: manifest_sha_mismatch: the manifest sha256 is 1a1bb1b716b0a65346d53f907aeb1e584bcc1da2f099e3ee9e33c03e391c68b3, but --manifest-sha names 1ae6f3176746f8d52306b11d5597cde3b82a2b7aa69f775721342ba52113d4b4; review the manifest again and bind the digest fm-control.sh <id> rerecord-slot --check prints; no record, manifest, copy or journal was changed
