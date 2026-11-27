@@ -2549,17 +2549,18 @@ SH
   chmod +x "$FAKEBIN/ps"
 }
 
-# A python3 in this world whose `fm-proc-info.py table pid` answer leaves <pid>
-# out and passes every other call to the real one: the partial process table a
-# confined reader sees when the sandbox that refused ps also hides processes.
-sweep_hide_launcher_from_table() {  # <pid>
+# A python3 in this world whose `fm-proc-info.py table pid` answer is a process table built here, never
+# read from the real one (which reads only Darwin's sysctl, so on Linux it is empty): the test shell's own
+# pid and pid 1, which leaves the live launcher out. It is the partial table a confined reader sees when
+# the sandbox that refused ps also hides processes from it. Every other call goes to the real python3.
+sweep_serve_partial_table() {
   local real_python
   real_python=$(command -v python3)
   cat > "$FAKEBIN/python3" <<SH
 #!/usr/bin/env bash
 for last; do :; done
 if [ "\$#" -ge 3 ] && [ "\${@: -2:1}" = table ] && [ "\$last" = pid ]; then
-  "$real_python" "\$@" | grep -vx -- "$1"
+  printf '%s\n' $$ 1
   exit 0
 fi
 exec "$real_python" "\$@"
@@ -2567,28 +2568,38 @@ SH
   chmod +x "$FAKEBIN/python3"
 }
 
-# A refused ps is no proof that a Vernant launcher is gone, even when the
-# confined table read made under the same restriction leaves it out: the copy is
+# On every platform: the table the code under test is served is nonempty, lists only pids, lists at
+# least one other live pid, and leaves the live launcher out, while the launcher itself is alive.
+sweep_assert_partial_table() {  # <launcher-pid>
+  local table listed other_live=
+  table=$(PATH="$FAKEBIN:$ORIGINAL_PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid) || fail "the served process table could not be read"
+  [ -n "$table" ] || fail "the served process table is empty"
+  if printf '%s\n' "$table" | grep -qv '^[0-9][0-9]*$'; then fail "the served process table holds a line that is not a pid"; fi
+  if printf '%s\n' "$table" | grep -qx -- "$1"; then fail "the served process table lists the live launcher"; fi
+  for listed in $table; do
+    [ "$listed" = "$1" ] || ! kill -0 "$listed" 2>/dev/null || other_live=$listed
+  done
+  [ -n "$other_live" ] || fail "the served process table lists no other live pid"
+  kill -0 "$1" 2>/dev/null || fail "the launcher is not alive"
+}
+
+# A refused ps is no proof that a Vernant launcher is gone, even when a
+# table read made under the same restriction leaves it out: the copy is
 # held and the driver is never asked. A readable ps that shows the launcher gone
 # still sends the same kind of copy to the driver.
 test_a_refused_ps_holds_a_locked_copy_the_confined_table_cannot_see() {
-  local admin before table rc pid
+  local admin before rc pid
   make_locked_copy_case refused-ps-hidden live
   install_driver "$SLOT" "$W"
   pid=$LIVE_PID
   admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
   before=$(shasum -a 256 "$admin/locked")
   sweep_fake_launcher_ps "$pid" refused
-  sweep_hide_launcher_from_table "$pid"
+  sweep_serve_partial_table
   rc=0
   PATH="$FAKEBIN:$ORIGINAL_PATH" ps -p "$pid" -o pid= >/dev/null 2>&1 || rc=$?
   assert_equals 126 "$rc" "the fake ps does not refuse the launcher"
-  if [ "$(uname -s)" = Darwin ]; then
-    table=$(python3 "$ROOT/bin/fm-proc-info.py" table pid)
-    printf '%s\n' "$table" | grep -qx -- "$pid" || fail "the real process table does not list the live launcher"
-    table=$(PATH="$FAKEBIN:$ORIGINAL_PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid)
-    if printf '%s\n' "$table" | grep -qx -- "$pid"; then fail "the launcher is not hidden from the confined reader"; fi
-  fi
+  sweep_assert_partial_table "$pid"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   kill -0 "$pid" 2>/dev/null || fail "the live launcher ended before the verdict"
   kill "$pid" 2>/dev/null || true

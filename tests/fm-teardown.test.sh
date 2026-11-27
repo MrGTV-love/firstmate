@@ -4835,22 +4835,40 @@ SH
   chmod +x "$1/fakebin/ps"
 }
 
-# A python3 whose `fm-proc-info.py table pid` answer leaves <pid> out and passes every other call to the
-# real one: the partial process table a confined reader sees when the sandbox that refused ps also hides
-# processes from it.
-by_path_hide_launcher_from_table() {  # <case> <pid>
+# A python3 whose `fm-proc-info.py table pid` answer is a process table built here, never read from the
+# real one (which reads only Darwin's sysctl, so on Linux it is empty): the test shell's own pid and pid 1,
+# which leaves the live launcher out. It is the partial table a confined reader sees when the sandbox that
+# refused ps also hides processes from it. Every other call goes to the real python3.
+by_path_serve_partial_table() {  # <case>
   local real_python
   real_python=$(command -v python3)
   cat > "$1/fakebin/python3" <<SH
 #!/usr/bin/env bash
 for last; do :; done
 if [ "\$#" -ge 3 ] && [ "\${@: -2:1}" = table ] && [ "\$last" = pid ]; then
-  "$real_python" "\$@" | grep -vx -- "$2"
+  printf '%s\n' $$ 1
   exit 0
 fi
 exec "$real_python" "\$@"
 SH
   chmod +x "$1/fakebin/python3"
+}
+
+# On every platform: the table the code under test is served is nonempty, lists only pids, lists at least
+# one other live pid, and leaves the live launcher out, while the launcher itself is alive.
+by_path_assert_partial_table() {  # <case> <launcher-pid> <label>
+  local table pid listed other_live=
+  table=$(PATH="$1/fakebin:$PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid) || fail "$3: the served process table could not be read"
+  [ -n "$table" ] || fail "$3: the served process table is empty"
+  if printf '%s\n' "$table" | grep -qv '^[0-9][0-9]*$'; then fail "$3: the served process table holds a line that is not a pid"; fi
+  if printf '%s\n' "$table" | grep -qx -- "$2"; then fail "$3: the served process table lists the live launcher"; fi
+  for listed in $table; do
+    [ "$listed" != "$2" ] || continue
+    pid=$listed
+    if kill -0 "$pid" 2>/dev/null; then other_live=$pid; fi
+  done
+  [ -n "$other_live" ] || fail "$3: the served process table lists no other live pid"
+  kill -0 "$2" 2>/dev/null || fail "$3: the launcher is not alive"
 }
 
 # Only a proven absence counts as a launcher gone: a ps that was refused, failed or said something
@@ -4859,7 +4877,7 @@ SH
 # table read made under the same restriction (refused-hidden: the launcher is alive but the table the
 # confined reader sees leaves it out), because such a table is only part of the table.
 test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_it_proves_gone() {
-  local shape case_dir rc pid real_python table
+  local shape case_dir rc pid
   for shape in refused refused-hidden error diagnostic absent; do
     make_by_path_case "by-path-launcher-ps-$shape"
     case_dir=$BP_CASE
@@ -4874,15 +4892,8 @@ test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_i
     fi
     by_path_fake_launcher_ps "$case_dir" "$pid" "${shape%-hidden}"
     if [ "$shape" = refused-hidden ]; then
-      by_path_hide_launcher_from_table "$case_dir" "$pid"
-      # The fixture bites: the real table lists the live launcher, the one the confined reader sees does not.
-      if [ "$(uname -s)" = Darwin ]; then
-        real_python=$(command -v python3)
-        table=$("$real_python" "$ROOT/bin/fm-proc-info.py" table pid)
-        printf '%s\n' "$table" | grep -qx -- "$pid" || fail "by-path-launcher-ps-$shape: the real process table does not list the live launcher"
-        table=$(PATH="$case_dir/fakebin:$PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid)
-        if printf '%s\n' "$table" | grep -qx -- "$pid"; then fail "by-path-launcher-ps-$shape: the launcher is not hidden from the confined reader"; fi
-      fi
+      by_path_serve_partial_table "$case_dir"
+      by_path_assert_partial_table "$case_dir" "$pid" "by-path-launcher-ps-$shape"
     fi
     by_path_locked "$case_dir" "$pid"
     rc=0

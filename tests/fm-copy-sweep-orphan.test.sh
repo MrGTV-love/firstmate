@@ -218,6 +218,40 @@ test_refused_launcher_observation() {
   pass 'a refused or failed ps leaves a live or exited launcher unknown, whatever a table read would say'
 }
 
+# A valid, nonempty process table that lists live pids (pid 1 and this test shell) and leaves the
+# launcher out is the shape a confined reader sees when the restriction that refused ps also hides
+# processes. It is only part of the table, so it proves nothing about the launcher, live or exited:
+# a refused or failed ps stays unknown (2) whatever such a table says.
+test_a_refused_ps_is_not_settled_by_a_valid_partial_process_table() {
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local live exited rc status
+  sleep 60 &
+  live=$!
+  sleep 0.1 &
+  exited=$!
+  wait "$exited" 2>/dev/null || true
+  for status in 126 2 127; do
+    # shellcheck disable=SC2329 # The doubles stand for a refused ps and the table read it must not trust.
+    (
+      ps() { printf 'ps: Operation not permitted\n' >&2; return "$status"; }
+      python3() { printf '%s\n' 1 "$$"; }
+      [ -n "$(python3)" ] || fail "the partial table is empty"
+      python3 | grep -qx -- "$live" && fail "the partial table lists the live launcher"
+      kill -0 "$live" 2>/dev/null || fail "the launcher is not alive"
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by a valid partial table that omits a live launcher"
+      rc=0
+      fm_task_copy_launcher_state "$exited" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by a valid partial table that omits an exited launcher"
+    ) || fail "a refused or failed ps was settled by a valid partial table (exit $status)"
+  done
+  kill "$live" 2>/dev/null || true
+  wait "$live" 2>/dev/null || true
+  pass 'a refused or failed ps stays unknown when a valid, nonempty process table leaves the launcher out'
+}
+
 # A sweep where ps refuses every launcher read keeps the clean, squash-landed,
 # Vernant-locked copy: the driver is never asked, and the copy stays registered
 # and locked. test_squash_orphans is the control where a readable ps reaps it.
@@ -727,6 +761,7 @@ fm_test_only
 test_squash_orphans
 test_report_predicts_apply_after_later_main_edit
 test_refused_launcher_observation
+test_a_refused_ps_is_not_settled_by_a_valid_partial_process_table
 test_refused_ps_keeps_a_locked_copy
 test_preserved_classes
 test_regenerable_class
