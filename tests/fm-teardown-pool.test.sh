@@ -3304,55 +3304,71 @@ SH
   pass "a reused runner pid, an identity-matched non-leader runner, a .runner that is not exactly one line naming the claim's pid, and a group-only child holder each refuse before any endpoint close, with every process left running"
 }
 
-# A forced secondmate teardown decides every child endpoint before it closes
-# any, whether or not the child's recorded home folder is there: a secondmate
-# child whose home is missing and whose window holds two panes, or cannot be
-# read, refuses before any endpoint is closed, naming that child. (The home
-# check that runs before the decision already refuses a missing child home, so
-# the decision's own endpoint check for such a child is a second guard.)
+# The forced-holders preflight decides every child endpoint before it looks at
+# the child's home: a secondmate child whose recorded home folder is missing and
+# whose window holds two panes, or cannot be read, refuses with the endpoint's
+# own refusal; with one pane it passes. The real teardown entry cannot reach the
+# preflight with a missing child home (its home checks refuse first, and its
+# lock collection creates the child's state folder), so this drives
+# teardown_forced_holders_preflight itself, with the teardown functions it runs.
 test_forced_cleanup_decides_a_homeless_secondmate_child_endpoint() {
-  local shape case_dir home rc
-  for shape in two-panes unreadable; do
-    case_dir=$(make_case "forced-homeless-child-$shape")
-    write_meta "$case_dir" local-only secondmate
-    home="$case_dir/secondmate-home"
-    configure_secondmate_with_tmux_children "$case_dir"
+  local shape tmp home rc
+  tmp=$(fm_test_tmproot homeless-child-preflight)
+  mkdir -p "$tmp/fakebin"
+  python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/fn.sh" <<'PY' || fail "homeless-child: the preflight functions could not be extracted"
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+out = []
+for name in ("meta_value", "teardown_child_copy_route", "teardown_child_route_returns",
+             "teardown_forced_holders_preflight", "teardown_with_anchor", "teardown_endpoint_closable",
+             "task_endpoint_shell_pid", "task_process_identity", "task_anchor_load"):
+    head = name + "() {"
+    assert source.count("\n" + head) == 1, name
+    start = source.index("\n" + head) + 1
+    end = source.index("\n}\n", start) + 3
+    out.append(source[start:end])
+pathlib.Path(sys.argv[2]).write_text("".join(out))
+PY
+  cat > "$tmp/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'#{pane_pid}'*) cat "$tmp/pane-rows" ;; esac
+case "\${1:-}" in list-windows) { cut -f1 "$tmp/pane-rows"; cat "$tmp/extra-windows" 2>/dev/null; } | sort -u ;; esac
+exit 0
+SH
+  chmod +x "$tmp/fakebin/tmux"
+  for shape in two-panes unreadable one-pane; do
+    home="$tmp/$shape/home"
+    mkdir -p "$home/state"
     fm_write_meta "$home/state/child-sm.meta" \
       'window=firstmate:fm-child-sm' 'endpoint_task_id=child-sm' \
-      "worktree=$case_dir/child-sm-home" "project=$case_dir/project" \
-      'kind=secondmate' 'mode=local-only' "home=$case_dir/child-sm-home"
-    : > "$home/state/child-sm.status"
-    cat > "$case_dir/fakebin/treehouse" <<SH
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
-exit 0
-SH
-    cat > "$case_dir/fakebin/tmux" <<SH
-#!/usr/bin/env bash
-case "\$*" in *'#{pane_pid}'*) cat "$case_dir/pane-rows" ;; esac
-case "\${1:-}" in list-windows) { cut -f1 "$case_dir/pane-rows"; cat "$case_dir/extra-windows" 2>/dev/null; } | sort -u ;; esac
-case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/endpoint-close.log" ;; esac
-exit 0
-SH
-    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
-    printf 'fm-task-x1\t%%1\t%s\n' "$$" > "$case_dir/pane-rows"
+      "worktree=$tmp/$shape/child-sm-home" "project=$tmp/$shape/project" \
+      'kind=secondmate' 'mode=local-only' "home=$tmp/$shape/child-sm-home"
+    rm -f "$tmp/extra-windows"
     case "$shape" in
-      two-panes) printf 'fm-child-sm\t%%5\t%s\nfm-child-sm\t%%6\t%s\n' "$$" "$$" >> "$case_dir/pane-rows" ;;
+      two-panes) printf 'fm-child-sm\t%%5\t%s\nfm-child-sm\t%%6\t%s\n' "$$" "$$" > "$tmp/pane-rows" ;;
       # The window is listed but no pane row names it, so it cannot be read.
-      unreadable) printf 'fm-child-sm\n' > "$case_dir/extra-windows" ;;
+      unreadable) : > "$tmp/pane-rows"; printf 'fm-child-sm\n' > "$tmp/extra-windows" ;;
+      one-pane) printf 'fm-child-sm\t%%5\t%s\n' "$$" > "$tmp/pane-rows" ;;
     esac
+    [ ! -e "$tmp/$shape/child-sm-home" ] || fail "homeless-child-$shape: the child home exists"
     rc=0
-    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    [ "$rc" -ne 0 ] || fail "homeless-child-$shape: teardown did not refuse"
-    assert_absent "$case_dir/endpoint-close.log" "homeless-child-$shape: an endpoint was closed: $(cat "$case_dir/endpoint-close.log" 2>/dev/null)"
-    assert_absent "$case_dir/treehouse.log" "homeless-child-$shape: treehouse was asked to return something"
-    grep -Eq "REFUSED: .*child-sm" "$case_dir/stderr" \
-      || fail "homeless-child-$shape: the refusal did not name the child: $(tail -3 "$case_dir/stderr")"
-    assert_present "$home/state/child-sm.meta" "homeless-child-$shape: the secondmate child record was retired"
-    assert_present "$home/state/child-a.meta" "homeless-child-$shape: a child record was retired"
+    PATH="$tmp/fakebin:$PATH" ROOT=$ROOT F="$tmp/fn.sh" H="$home" bash -c '
+      . "$ROOT/bin/fm-backend.sh" >/dev/null 2>&1 || exit 9
+      . "$ROOT/bin/fm-nm-run-lib.sh" >/dev/null 2>&1 || exit 9
+      . "$F"
+      ID=task-x1 T= BACKEND=tmux
+      TASK_ANCHOR_READ=0 TASK_ANCHOR_STATE= TASK_ANCHOR_PID= TASK_ANCHOR_IDENTITY= TASK_ANCHOR_NOTE=
+      firstmate_home_has_treehouse_slot() { return 1; }
+      teardown_forced_holders_preflight "$H"' > "$tmp/$shape.stdout" 2> "$tmp/$shape.stderr" || rc=$?
+    if [ "$shape" = one-pane ]; then
+      expect_code 0 "$rc" "homeless-child-one-pane: a provable child endpoint must pass: $(cat "$tmp/$shape.stderr")"
+    else
+      expect_code 1 "$rc" "homeless-child-$shape: the preflight must refuse: $(cat "$tmp/$shape.stderr")"
+      grep -Eq "REFUSED: the endpoint firstmate:fm-child-sm of child child-sm cannot be closed safely: no single live pane shell could be read from the task's endpoint firstmate:fm-child-sm \((its window holds several panes|it cannot be read)\)" "$tmp/$shape.stderr" \
+        || fail "homeless-child-$shape: the refusal was not the child endpoint's: $(cat "$tmp/$shape.stderr")"
+    fi
   done
-  pass "a forced secondmate teardown refuses a homeless secondmate child whose window holds two panes or cannot be read, before any endpoint is closed"
+  pass "the forced-holders preflight refuses a homeless secondmate child whose window holds two panes or cannot be read, and passes one with a single pane"
 }
 
 # The forced-holders preflight checks a child copy only when the child cleanup's

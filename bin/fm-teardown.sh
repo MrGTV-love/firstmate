@@ -4630,7 +4630,7 @@ conclude_task_no_mistakes_run() {  # <worktree>
 
 # Fix 2 ownership anchor (see script header): classifies the task's validated
 # endpoint ($T) and prints one line, "proven <pane shell pid>", "absent",
-# "ambiguous" or "unreadable".
+# "ambiguous", "unreadable" or "noreader".
 # tmux records no pane id, and a window selector answers an absent window from
 # the client's active window, so the pane is found by exact membership: the
 # panes of the exact session whose window name is exactly the recorded one. One
