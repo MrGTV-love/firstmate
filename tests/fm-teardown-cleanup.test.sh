@@ -1761,7 +1761,7 @@ path = pathlib.Path(sys.argv[1])
 text = path.read_text()
 head = "task_pid_proved_own() {  # <pid> <identity>\n"
 assert text.count(head) == 1
-fault = head + "  TASK_OWNED+=(\"$1\"$'\\t'\"$2\"$'\\t'0); return 0  # injected fault: the old cwd-only verdict\n"
+fault = head + "  TASK_OWNED+=(\"$1\"$'\\t'\"$2\"); return 0  # injected fault: the old cwd-only verdict\n"
 path.write_text(text.replace(head, fault))
 PY
   OWN_FAULT_TEARDOWN=$case_dir/code-root/bin/fm-teardown.sh
@@ -1927,6 +1927,43 @@ test_teardown_without_a_provable_pane_refuses_a_root_process() {
   expect_code 0 "$rc" "anchor-quiet: a copy nobody holds must close without a pane: $(cat "$case_dir/stderr")"
   assert_absent "$case_dir/state/task-x1.meta" "anchor-quiet: the quiet task did not close"
   pass "an absent, forged or dead pane proves nothing, so a root process refuses unsignalled, while a quiet copy still closes"
+}
+
+# A backend with no pane-shell reader (here zellij) can prove no process at a
+# task root: the agent still running there refuses unsignalled, and the reason
+# names the backend and says to stop that agent and rerun, never that the
+# endpoint is absent.
+test_teardown_noshell_backend_names_the_backend_when_a_root_process_refuses() {
+  local case_dir rc pid
+  case_dir=$(make_case ownership-noshell-zellij)
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    "window=zs:3" \
+    "endpoint_task_id=task-x1" \
+    "worktree=$case_dir/wt" \
+    "project=$case_dir/project" \
+    "kind=ship" \
+    "mode=no-mistakes" \
+    "backend=zellij" \
+    "zellij_session=zs" \
+    "zellij_tab_id=1" \
+    "zellij_pane_id=3" \
+    "spawn_gen=teardown-test-task-x1"
+  land_shippable_commit "$case_dir"
+  ownership_detached "$case_dir/wt" setsid
+  pid=$OWN_DETACHED_PID
+  ownership_alive "$pid" || fail "noshell-zellij: setup agent did not start"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  ownership_alive "$pid" || fail "noshell-zellij: teardown signalled a process no pane could prove"
+  expect_code 1 "$rc" "noshell-zellij: teardown must refuse: $(tail -3 "$case_dir/stderr")"
+  assert_present "$case_dir/wt" "noshell-zellij: the copy was removed"
+  assert_present "$case_dir/state/task-x1.meta" "noshell-zellij: the task record was removed"
+  ownership_assert_unsignalled "$case_dir" "$pid" noshell-zellij
+  grep -Eq "REFUSED: process $pid .*nothing proves it belongs to task-x1: the zellij backend has no pane-shell reader, so no process can be proved to descend from the pane of the task's endpoint [^ ]+; stop that agent and rerun teardown" "$case_dir/stderr" \
+    || fail "noshell-zellij: the refusal did not name the backend and the remedy: $(tail -3 "$case_dir/stderr")"
+  assert_no_grep "it is absent" "$case_dir/stderr" "noshell-zellij: the refusal called the endpoint absent"
+  teardown_fixture_stop "$pid"
+  pass "a backend with no pane-shell reader refuses a root process unsignalled, naming the backend and telling the operator to stop that agent and rerun"
 }
 
 # A process proved through the pane keeps its proof after the reap ends the
@@ -3734,8 +3771,10 @@ test_symlinked_nm_launch_agent_plist_is_judged_through_its_target() {
       grep -Eq "REFUSED: no-mistakes launch agent $NM_AGENT_PREFIX.5e11a1ed .*no record of task-x1 proves the task created it" "$case_dir/stderr" \
         || fail "symlinked-nm-agent-$shape: the refusal did not name the agent: $(tail -3 "$case_dir/stderr")"
     else
-      grep -Eq "REFUSED: no-mistakes launch agent plist .*$label.plist is a symbolic link whose target cannot be read or parsed" "$case_dir/stderr" \
-        || fail "symlinked-nm-agent-dangling: the refusal did not name the link: $(tail -3 "$case_dir/stderr")"
+      assert_grep "REFUSED: no-mistakes launch agent plist $case_dir/launchagents/$label.plist is a symbolic link to $case_dir/plist-store/missing.plist whose target cannot be read or parsed" "$case_dir/stderr" \
+        "symlinked-nm-agent-dangling: the refusal did not name the link and its target"
+      assert_grep "Repair or remove the link $case_dir/launchagents/$label.plist, then rerun teardown." "$case_dir/stderr" \
+        "symlinked-nm-agent-dangling: the refusal did not say to repair or remove that link"
     fi
   done
   pass "a symlinked plist is judged through its target: rooted in the copy or unreadable, it refuses with nothing booted out or moved"
@@ -7339,27 +7378,26 @@ SH
   pass "an unproven daemon at the slot root beside a proved nested launcher refuses with nothing signalled"
 }
 
-# The nested retire step rechecks, right before each signal, the support its
-# target's ownership rests on: it counts only as a chain-proved record whose pid
-# still has the recorded birth identity, read live. Three supports fail and the
-# queued descendant D is never signalled, nothing further is, and the step
-# refuses:
-#   group    A shares a process group with chain-proved M but was never itself
-#            chain-proved (M, queued first on its own proof, is signalled);
-#   reused   A's record in TASK_OWNED names a birth identity its pid no longer
-#            has, as when the support exited and its pid was reused;
-#   exited   A is chain-proved and queued first: its signal ends it, so when D's
-#            turn comes the cached record still matches but the live read fails.
-test_nested_retire_stops_when_a_support_proof_expires() {
-  local tmp m a d rc _ shape first
-  for shape in group reused exited; do
-    tmp=$(fm_test_tmproot "nested-support-$shape")
+# A queued nested-copy target keeps the proof decided for it: the decision
+# records it in TASK_OWNED by pid and birth identity, and retire signals it on
+# that record without walking its chain again. Root process A is chain-proved,
+# its child S is a tool shell, and S's child B runs in a foreign nested copy:
+#   support-exited  S exits after the decision and B is reparented: B is still
+#                   signalled and audited, and retire succeeds;
+#   reused          B's pid no longer has the recorded birth identity, as when
+#                   it exited and its pid was reused: the live process at that
+#                   pid is not signalled or audited, it is reported gone, and
+#                   retire succeeds.
+test_nested_retire_keeps_the_proof_decided_for_a_queued_target() {
+  local tmp a s b rc _ shape
+  for shape in support-exited reused; do
+    tmp=$(fm_test_tmproot "nested-decided-$shape")
     mkdir -p "$tmp/state" "$tmp/copy"
-    # M is detached (reparented to init, so its exit is reaped at once) and leads
-    # group G; its child A stays in G.
+    # A is detached (reparented to init) and reaps S at once; S's child B
+    # sleeps in the copy.
     # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
     perl -MPOSIX -e '
-      my ($out) = @ARGV;
+      my ($out, $cwd) = @ARGV;
       my $first = fork(); die "fork" unless defined $first;
       if ($first) { waitpid($first, 0); exit 0; }
       my $second = fork(); die "fork" unless defined $second;
@@ -7367,18 +7405,28 @@ test_nested_retire_stops_when_a_support_proof_expires() {
       setpgrp(0, 0) or die "setpgrp";
       open STDIN, "<", "/dev/null"; open STDOUT, ">", "/dev/null"; open STDERR, ">", "/dev/null";
       $SIG{CHLD} = "IGNORE";
-      my $a = fork(); die "fork" unless defined $a;
-      if (!$a) { exec "sleep", "300"; }
-      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $a\n"; close $fh; rename "$out.tmp", $out or die "rename";
-      sleep 300 while 1;' "$tmp/ma.pid"
-    for _ in $(seq 100); do [ -s "$tmp/ma.pid" ] && break; sleep 0.05; done
-    read -r m a < "$tmp/ma.pid" || fail "support-$shape: setup did not start"
-    teardown_fixture_track "$m" KILL
+      pipe(my $r, my $w) or die "pipe";
+      my $s = fork(); die "fork" unless defined $s;
+      if (!$s) {
+        close $r;
+        my $b = fork(); die "fork" unless defined $b;
+        if (!$b) { chdir $cwd or die "chdir"; exec "sleep", "300"; }
+        print {$w} "$b\n"; close $w;
+        sleep 300 while 1;
+      }
+      close $w;
+      my $b = <$r>; chomp $b;
+      open my $fh, ">", "$out.tmp" or die "open"; print {$fh} "$$ $s $b\n"; close $fh; rename "$out.tmp", $out or die "rename";
+      sleep 300 while 1;' "$tmp/asb.pid" "$tmp/copy"
+    for _ in $(seq 100); do [ -s "$tmp/asb.pid" ] && break; sleep 0.05; done
+    read -r a s b < "$tmp/asb.pid" || fail "decided-$shape: setup did not start"
     teardown_fixture_track "$a" KILL
-    teardown_fixture_start "$tmp/copy" KILL sleep 300
-    d=$TEARDOWN_FIXTURE_PID
+    teardown_fixture_track "$s" KILL
+    teardown_fixture_track "$b" KILL
     sleep 0.3
-    python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/reaper.sh" <<'PY' || fail "support-$shape: the reaper functions could not be extracted"
+    [ "$("$REAL_PS_FOR_TEST" -o ppid= -p "$b" | tr -d ' ')" = "$s" ] || fail "decided-$shape: B does not descend from S"
+    [ "$("$REAL_PS_FOR_TEST" -o ppid= -p "$s" | tr -d ' ')" = "$a" ] || fail "decided-$shape: S does not descend from A"
+    python3 -I - "$ROOT/bin/fm-teardown.sh" "$tmp/reaper.sh" <<'PY' || fail "decided-$shape: the reaper functions could not be extracted"
 import pathlib, sys
 source = pathlib.Path(sys.argv[1]).read_text()
 start = source.index("pids_with_cwd_under() {")
@@ -7386,54 +7434,46 @@ end = source.index("\n}\n", source.index("reap_task_worktree_processes() {", sta
 pathlib.Path(sys.argv[2]).write_text(source[start:end])
 PY
     rc=0
-    SHAPE=$shape TAB=$'\t' TMPX=$tmp ROOT=$ROOT M=$m A=$a D=$d bash -c '
+    SHAPE=$shape TAB=$'\t' TMPX=$tmp ROOT=$ROOT A=$a S=$s B=$b bash -c '
   set +e
   for l in fm-tasks-axi-lib fm-backlog-transition-lib fm-nm-run-lib fm-task-copy-lib fm-lock-lib fm-refuse-lib fm-teardown-nested-lib; do . "$ROOT/bin/$l.sh" || exit 9; done
-  STATE=$TMPX/state ID=support-expiry
+  STATE=$TMPX/state ID=decided-proof
   . "$TMPX/reaper.sh"
-  mid=$(task_process_identity "$M") && aid=$(task_process_identity "$A") && did=$(task_process_identity "$D") || exit 8
+  aid=$(task_process_identity "$A") && bid=$(task_process_identity "$B") || exit 8
+  # A is the chain-proved process at a scan root the decision found.
+  TASK_OWNED=("$A""$TAB""$aid")
+  TEARDOWN_OWN_SCAN=$(printf "%s\t%s\t%s\n" "$A" "$TMPX/copy" "$aid")
+  TEARDOWN_OWN_SCANNED=1
+  teardown_foreign_proc_prove_and_record "$B" || exit 7
+  task_owned_contains "$B" "$bid" || exit 6
   case "$SHAPE" in
-    group)
-      TASK_OWNED=("$M""$TAB""$mid""$TAB""$M")
-      first=$M firstid=$mid
+    support-exited)
+      builtin kill -TERM "$S"
+      for _ in $(seq 100); do [ "$(ps -o ppid= -p "$B" | tr -d " ")" != "$S" ] && break; sleep 0.05; done
+      [ "$(ps -o ppid= -p "$B" | tr -d " ")" != "$S" ] || exit 5
       ;;
     reused)
-      aid="lstart=Thu Jan  1 00:00:00 1970"
-      TASK_OWNED=("$M""$TAB""$mid""$TAB""$M" "$A""$TAB""$aid""$TAB""$M")
-      first=$M firstid=$mid
-      ;;
-    exited)
-      TASK_OWNED=("$A""$TAB""$aid""$TAB""$M")
-      first=$A firstid=$aid
+      TEARDOWN_FOREIGN_PROCS=("$B""$TAB""lstart=Thu Jan  1 00:00:00 1970""$TAB""$TMPX/copy")
       ;;
   esac
-  # first is queued on its own proof; D rests on A.
-  TEARDOWN_FOREIGN_PROCS=("$first""$TAB""$firstid""$TAB""$TMPX/copy""$TAB""$first""$TAB""$firstid" "$D""$TAB""$did""$TAB""$TMPX/copy""$TAB""$A""$TAB""$aid")
-  # The ancestry proof before the first signal is not under test here.
-  teardown_pid_is_task_own() { return 0; }
-  # Signal delivery is made synchronous for the first target, so its exit lands
-  # before the next target is judged, deterministically.
-  kill() {
-    builtin kill "$@"
-    if [ "${2:-}" = "$first" ]; then
-      for _ in $(seq 100); do builtin kill -0 "$first" 2>/dev/null || return 0; sleep 0.05; done
-    fi
-  }
   teardown_foreign_procs_retire
   ' > "$tmp/stdout" 2> "$tmp/stderr" || rc=$?
-    first=$m
-    [ "$shape" != exited ] || first=$a
-    ownership_alive "$d" || fail "support-$shape: D was signalled although its support no longer proved anything"
-    ownership_wait_dead "$first" || fail "support-$shape: the first target, whose own proof held, was not signalled: $(cat "$tmp/stderr")"
-    expect_code 1 "$rc" "support-$shape: the retire step must refuse: $(cat "$tmp/stderr")"
-    assert_grep $'\tTERM\t'"$first"$'\t' "$tmp/state/support-expiry.teardown-processes" "support-$shape: the first target's signal was not audited"
-    grep -Eq "REFUSED: the proof that process $d .*rested on process $a, whose ownership proof has expired; signalling nothing further" "$tmp/stderr" \
-      || fail "support-$shape: the refusal did not name the unproven support: $(cat "$tmp/stderr")"
-    teardown_fixture_stop "$d"
+    expect_code 0 "$rc" "decided-$shape: retire must not refuse a target the decision accepted: $(cat "$tmp/stderr")"
+    if [ "$shape" = support-exited ]; then
+      ownership_wait_dead "$b" || fail "decided-$shape: B was not signalled after its support exited: $(cat "$tmp/stderr")"
+      assert_grep $'\tTERM\t'"$b"$'\t' "$tmp/state/decided-proof.teardown-processes" "decided-$shape: B's signal was not audited"
+    else
+      ownership_alive "$b" || fail "decided-$shape: the process now at the queued pid was signalled"
+      [ ! -f "$tmp/state/decided-proof.teardown-processes" ] \
+        || assert_no_grep $'\t'"$b"$'\t' "$tmp/state/decided-proof.teardown-processes" "decided-$shape: a signal was audited for the reused pid"
+      assert_grep "queued process $b (lstart=Thu Jan  1 00:00:00 1970) of decided-proof is gone; nothing was signalled for it" "$tmp/stderr" \
+        "decided-$shape: the gone target was not reported"
+    fi
+    teardown_fixture_stop "$b"
+    teardown_fixture_stop "$s"
     teardown_fixture_stop "$a"
-    teardown_fixture_stop "$m"
   done
-  pass "a queued nested process is not signalled when its support is only a shared group, carries a reused pid's stale identity, or has exited since the scan"
+  pass "a queued nested target keeps its decided proof: it is signalled after its support exits, and a pid whose birth identity changed is reported gone and never signalled"
 }
 
 # A live launcher outside the task's session keeps its copy untouched. One inside
@@ -9678,6 +9718,7 @@ test_teardown_reaps_a_leaked_child_of_the_task_pane
 test_teardown_ownership_fault_control_kills_the_detached_daemon
 test_teardown_mixed_copy_signals_nothing
 test_teardown_without_a_provable_pane_refuses_a_root_process
+test_teardown_noshell_backend_names_the_backend_when_a_root_process_refuses
 test_teardown_proof_survives_the_parent_the_reap_ends
 test_teardown_refuses_an_orphan_it_cannot_prove
 test_teardown_grace_child_that_leaves_the_group_is_refused
@@ -9802,7 +9843,7 @@ test_task_own_session_as_lock_launcher_does_not_block_release
 test_unrelated_or_stubborn_lock_launcher_keeps_its_foreign_copy
 test_a_detached_process_at_the_slot_root_does_not_make_its_child_teardowns_own
 test_a_mixed_slot_refuses_before_signalling_the_proved_nested_launcher
-test_nested_retire_stops_when_a_support_proof_expires
+test_nested_retire_keeps_the_proof_decided_for_a_queued_target
 test_process_in_foreign_copy_keeps_it
 test_task_own_process_inside_foreign_copy_is_ended_and_released
 test_two_foreign_copies_are_released_together_or_not_at_all

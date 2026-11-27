@@ -99,10 +99,9 @@ TEARDOWN_RET_PAYLOAD=
 TEARDOWN_PRESERVE_DIR=
 # One "pid<TAB>birth identity<TAB>cwd" entry per live lock launcher or process
 # running in a copy that was proved to be this teardown's own; cwd is that of the
-# own process it was chosen through.
+# own process it was chosen through. Each entry is also recorded in TASK_OWNED.
 TEARDOWN_FOREIGN_PROCS=()
 TEARDOWN_OWN_CWD=
-TEARDOWN_OWN_ANCHOR=
 TEARDOWN_OWN_SCAN=
 TEARDOWN_OWN_SCANNED=0
 TEARDOWN_FOREIGN_WHY=
@@ -287,20 +286,17 @@ teardown_own_scan() {
 
 # Is <pid> a process this teardown ends itself: one in TEARDOWN_OWN_SCAN, or a
 # descendant of one by parent chain? Sets TEARDOWN_OWN_CWD to the cwd of the
-# process it was found through, and TEARDOWN_OWN_ANCHOR to that process's
-# "pid<TAB>birth identity", the support its ownership rests on. A scan that
-# fails says no, so the process then counts as foreign. Callers reset
-# TEARDOWN_OWN_SCANNED to read the process table afresh.
+# process it was found through. A scan that fails says no, so the process then
+# counts as foreign. Callers reset TEARDOWN_OWN_SCANNED to read the process
+# table afresh.
 teardown_pid_is_task_own() {  # <pid>
   local pid=$1 owned_pid owned_path owned_identity hops=0
   TEARDOWN_OWN_CWD=
-  TEARDOWN_OWN_ANCHOR=
   [ "$TEARDOWN_OWN_SCANNED" = 1 ] || teardown_own_scan || return 1
   while [ -n "$pid" ] && [ "$pid" -gt 1 ] && [ "$hops" -lt 64 ]; do
     while IFS=$'\t' read -r owned_pid owned_path owned_identity; do
       [ "$owned_pid" != "$pid" ] || {
         TEARDOWN_OWN_CWD=$owned_path
-        TEARDOWN_OWN_ANCHOR=$owned_pid$'\t'$owned_identity
         return 0
       }
     done <<< "$TEARDOWN_OWN_SCAN"
@@ -313,13 +309,16 @@ teardown_pid_is_task_own() {  # <pid>
 # Proves <pid> teardown's own and queues it for the retire phase to signal. Its
 # birth identity is read before the ancestry proof and rechecked after it, so a
 # pid that exited and was reused during the proof is never queued: an unreadable
-# or changed identity is unproven.
+# or changed identity is unproven. The proof is recorded in TASK_OWNED by pid
+# and birth identity, so it cannot expire when the process it was proved
+# through exits.
 teardown_foreign_proc_prove_and_record() {  # <pid>
   local identity
   identity=$(task_process_identity "$1") || return 1
   teardown_pid_is_task_own "$1" || return 1
   task_process_identity_matches "$1" "$identity" || return 1
-  TEARDOWN_FOREIGN_PROCS+=("$1"$'\t'"$identity"$'\t'"$TEARDOWN_OWN_CWD"$'\t'"$TEARDOWN_OWN_ANCHOR")
+  TEARDOWN_FOREIGN_PROCS+=("$1"$'\t'"$identity"$'\t'"$TEARDOWN_OWN_CWD")
+  task_owned_contains "$1" "$identity" || TASK_OWNED+=("$1"$'\t'"$identity")
 }
 
 # Graft's generated output at the root of <copy>: the exact .ignore overlay graft
@@ -1520,29 +1519,23 @@ teardown_held_copies_record() {
 # process running in a copy that teardown_pid_is_task_own proved to be this
 # teardown's own, and waits briefly for them to exit. It runs before the cwd
 # sweep, which refuses a process inside a nested copy and does not reach a
-# descendant whose cwd lies outside its roots. Each signal is audited first, as
-# the sweep's are; a recorded process that has gone or no longer has its recorded
-# birth identity is skipped. No KILL is sent: a process still alive after the
-# wait is refused by pid, by the sweep when it is in the copy and by the release
-# proof otherwise.
+# descendant whose cwd lies outside its roots. Each target's proof was recorded
+# by pid and birth identity when it was decided, so it is not walked again: a
+# target that still has that identity is signalled, and one that has gone or
+# whose pid another process now holds is reported gone and never signalled.
+# Each signal is audited first, as the sweep's are. No KILL is sent: a process
+# still alive after the wait is refused by pid, by the sweep when it is in the
+# copy and by the release proof otherwise.
 teardown_foreign_procs_retire() {
-  local record pid identity cwd anchor_pid anchor_identity i
+  local record pid identity cwd i
   local -a signalled_pids=() signalled_identities=()
-  # Every queued proof is taken again from one fresh scan before the first
-  # signal; a live process that lost it is unproven and nothing is signalled.
-  TEARDOWN_OWN_SCANNED=0
   for record in ${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]}"}; do
-    IFS=$'\t' read -r pid identity cwd _ _ <<< "$record"
-    task_process_identity_matches "$pid" "$identity" || continue
-    if ! teardown_pid_is_task_own "$pid" || ! task_process_identity_matches "$pid" "$identity"; then
-      echo "REFUSED: process $pid ($identity) lost its proof of belonging to $ID before any signal; preserving the worktree without signalling anything." >&2
-      return 1
-    fi
-  done
-  for record in ${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]}"}; do
-    IFS=$'\t' read -r pid identity cwd anchor_pid anchor_identity <<< "$record"
+    IFS=$'\t' read -r pid identity cwd <<< "$record"
     case " ${signalled_pids[*]-} " in *" $pid "*) continue ;; esac
-    task_process_identity_matches "$pid" "$identity" || continue
+    if ! task_process_identity_matches "$pid" "$identity"; then
+      echo "teardown: queued process $pid ($identity) of $ID is gone; nothing was signalled for it." >&2
+      continue
+    fi
     TASK_SCAN_PIDS=("$pid")
     TASK_PID_CWDS=("$cwd")
     if task_record_process_signal "$pid" "$identity" TERM; then
@@ -1552,18 +1545,9 @@ teardown_foreign_procs_retire() {
       echo "REFUSED: cannot durably record process $pid identity for $ID; preserving the worktree without signalling it." >&2
       return 1
     fi
-    task_process_identity_matches "$pid" "$identity" || continue
-    # Right before the signal, the support this target's ownership rests on -
-    # the root process it was proved through - must be a chain-proved process
-    # under exactly the pid and birth identity saved with the target, and that
-    # pid must still have that birth identity now, read live with the same
-    # task_process_identity the proof used. A cached record alone never counts:
-    # a support that exited, or whose pid another process now holds, proves
-    # nothing, and nothing further is signalled.
-    if [ -z "$anchor_pid" ] || ! task_owned_contains "$anchor_pid" "$anchor_identity" \
-       || ! task_process_identity_matches "$anchor_pid" "$anchor_identity"; then
-      echo "REFUSED: the proof that process $pid ($identity) belongs to $ID rested on process ${anchor_pid:-<none>}, whose ownership proof has expired; signalling nothing further and preserving the worktree. Every remaining queued process is unproven." >&2
-      return 1
+    if ! task_process_identity_matches "$pid" "$identity"; then
+      echo "teardown: queued process $pid ($identity) of $ID is gone; nothing was signalled for it." >&2
+      continue
     fi
     kill -TERM "$pid" 2>/dev/null || true
     signalled_pids+=("$pid")

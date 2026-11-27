@@ -1675,10 +1675,14 @@ start_owner_guard() {  # <source-id>
 # matches on a script name, a command line, or a process name: those are shared
 # by every home running the same adapter, and a live source in another home
 # proves its own lifetime authorization in that home's state root.
+#
+# It works from /, before it reports ready, so it never holds a home folder as
+# its working directory; every path it reads is absolute.
 cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file> <state-device> <state-inode>
   local id=${1-} pid=${2-} identity=${3-} ready=${4-} state_device=${5-} state_inode=${6-}
   local lease tick half misses=0 pid_state state_identity current_device current_inode standing=0 adapter
   [ "$#" -eq 6 ] || usage
+  cd / || die "owner guard cannot leave its inherited working directory"
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   case "$pid" in ''|*[!0-9]*) die "runner pid must be a positive integer: $pid" ;; esac
   [ -n "$identity" ] || die "runner identity is required"

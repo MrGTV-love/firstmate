@@ -758,7 +758,7 @@
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: no-mistakes launch agent plist $plist is a symbolic link whose target cannot be read or parsed, so whether its agent is rooted in $ID's copy cannot be decided; teardown neither unloads nor archives it and keeps the copy. Repair or remove the link, then rerun teardown.\" >&2"
+          "match": "echo \"REFUSED: no-mistakes launch agent plist $plist is a symbolic link to $(readlink \"$plist\" 2>/dev/null || printf '<unreadable>') whose target cannot be read or parsed, so whether its agent is rooted in $ID's copy cannot be decided; teardown neither unloads nor archives it and keeps the copy. Repair or remove the link $plist, then rerun teardown.\" >&2"
         }
       ]
     },
@@ -2443,7 +2443,7 @@
       "invariant": "Process reaping preserves any process whose task-copy custody cannot be proved.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:3b8c73e3b6",
-      "trigger": "refuses process reaping and preserves worktree/tasktmp when a matched process sits in a nested lane or descendant cwd whose ownership is unproven, a process at a task root, or anywhere in a copy a forced treehouse return would reset, is not proved the task's (the validated endpoint pane shell, its descendant by parent chain, a descendant of a proved process, or a member of a group that still holds a live chain-proved process) before any signal or return, leaked processes cannot be enumerated or identified, or survive 3 reap passes",
+      "trigger": "refuses process reaping and preserves worktree/tasktmp when a matched process sits in a nested lane or descendant cwd whose ownership is unproven, a process at a task root, or anywhere in a copy a forced treehouse return would reset, is not proved the task's (the validated endpoint pane shell, its descendant by parent chain, or a descendant of a proved process; in a returned firstmate home also a member of the process group led by that home's proved process-event runner) before any signal or return, leaked processes cannot be enumerated or identified, or survive 3 reap passes",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2510,16 +2510,12 @@
           "match": "echo \"REFUSED: cannot prove every process under ${TASK_PIDS_FAILED_DIR:-<missing>} belongs to $ID ($TASK_PIDS_ERROR); nothing was signalled and the worktree/tasktmp is preserved.\" >&2"
         },
         {
-          "file": "bin/fm-teardown-nested-lib.sh",
-          "match": "echo \"REFUSED: process $pid ($identity) lost its proof of belonging to $ID before any signal; preserving the worktree without signalling anything.\" >&2"
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: leaked process $pid has no recorded parent-chain proof that it belongs to $ID before its signal; preserving the worktree/tasktmp without signalling it.\" >&2"
         },
         {
           "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without signalling it.\" >&2"
-        },
-        {
-          "file": "bin/fm-teardown.sh",
-          "match": "echo \"REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without force-killing it.\" >&2"
+          "match": "echo \"REFUSED: leaked process $pid has no recorded parent-chain proof that it belongs to $ID before its signal; preserving the worktree/tasktmp without force-killing it.\" >&2"
         },
         {
           "file": "bin/fm-teardown.sh",
@@ -2528,10 +2524,6 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: the endpoint ${T:-<none>} of $1 cannot be closed safely: $TASK_ANCHOR_NOTE. Teardown closes and signals nothing; every durable task record is kept.\" >&2"
-        },
-        {
-          "file": "bin/fm-teardown-nested-lib.sh",
-          "match": "echo \"REFUSED: the proof that process $pid ($identity) belongs to $ID rested on process ${anchor_pid:-<none>}, whose ownership proof has expired; signalling nothing further and preserving the worktree. Every remaining queued process is unproven.\" >&2"
         }
       ]
     },

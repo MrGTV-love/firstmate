@@ -696,9 +696,11 @@
 #     close, run abort or signal: the task's endpoint, then for a secondmate
 #     every child endpoint and child copy (each proved against that child's own
 #     pane) and the home it returns, and for any other task the roots its route
-#     sweeps and their launch agents. A home's process-event runner counts only
-#     when its claim's recorded birth identity matches the live process, the
-#     check its sweep makes before its first signal; its group members do not.
+#     sweeps and their launch agents. A process in a returned home counts as the
+#     home's own only when its process group is led by a process-event runner of
+#     that home whose claim's recorded birth identity matches the live leader,
+#     the proof its sweep makes before it signals that whole group; any other
+#     process in the home does not.
 #     Any process the decision cannot prove refuses before anything is closed or
 #     signalled, even with --force, naming its pid, birth identity and
 #     executable (never its arguments), and the copy and task stay. The later
@@ -736,9 +738,12 @@
 #     each only when the ancestry test proved it teardown's own (it is, or
 #     descends by parent chain from, a process whose cwd is exactly a scan root
 #     and that the ownership proof above shows is the task's), whatever its own
-#     cwd. It waits a bounded time and sends no KILL; one still
-#     alive refuses, named by its pid, and a process that fails the test is never
-#     signalled and refuses.
+#     cwd. That proof is recorded by pid and birth identity when it is decided,
+#     so retire does not walk the chain again: a queued process that still has
+#     its birth identity is signalled, and one that has exited or whose pid was
+#     reused is reported gone and never signalled. It waits a bounded time and
+#     sends no KILL; one still alive refuses, named by its pid, and a process
+#     that fails the test is never queued or signalled and refuses.
 #     A missing lsof refuses too: without the scan no target can be audited, so
 #     no unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
@@ -3821,17 +3826,19 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
 # --if-reset-ref) cannot serve here: it also refuses untracked files and an
 # unlanded HEAD and never cleans, which forced cleanup needs. A holder arriving
 # between this scan and treehouse's own scan is a disclosed residual.
-# Succeeds when <pid> is a process-event runner of <home>: its claim is owned by
-# that home, its .runner file is exactly one line of digits naming the claim's
-# pid, and
+# Succeeds when <pid> is a member of the process group a process-event runner
+# of <home> leads, the group the home's sweep signals: its process group id is
+# the pid of a runner whose claim is owned by that home, whose .runner file is
+# exactly one line of digits naming the claim's pid, and for which
 # fm_procevent_runner_leader_proved (the acceptance the home's sweep itself
 # requires before its first group signal: the recorded birth identity matches
-# and the runner leads its process group) holds. A reused pid, a non-leader, a
-# .runner naming another pid, or any member of the runner's group proves
-# nothing. Both the forced-cleanup preflight and the check right before the
-# home's return use this rule.
+# and the runner leads its process group) holds at this same check. A group
+# whose leader is a reused pid, a non-leader, or a pid another .runner line
+# names proves nothing, and neither does a process outside every such group.
+# Both the forced-cleanup preflight and the check right before the home's
+# return use this rule.
 teardown_home_runner_member() {  # <home> <pid>
-  local live
+  local live pgid
   live=$(
     set +e
     # shellcheck source=bin/fm-procevent-lib.sh
@@ -3858,7 +3865,9 @@ teardown_home_runner_member() {  # <home> <pid>
       printf '%s\n' "$FM_PROCEVENT_CLAIM_PID"
     done
   ) || return 1
-  printf '%s\n' "$live" | grep -Fxq -- "$2"
+  pgid=$(LC_ALL=C ps -o pgid= -p "$2" 2>/dev/null | tr -d '[:space:]') || return 1
+  case "$pgid" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$live" | grep -Fxq -- "$pgid"
 }
 
 teardown_return_holders_proven() {  # <dir> <label>
@@ -3920,15 +3929,68 @@ teardown_with_anchor() {  # <backend> <target> <command...>
   return "$rc"
 }
 
+# The one owner of the route forced secondmate cleanup takes with a child's
+# copy, shared by teardown_forced_holders_preflight and
+# cleanup_firstmate_home_children. TEARDOWN_CHILD_ROUTE is home (a secondmate
+# child's home), orca, keep (a reassociated copy that stays), reassigned (a pool
+# slot another task claimed, left untouched), pool (a pool slot the child still
+# owns), return (a copy returned with treehouse return --force), remove (a copy
+# removed without a return) or none (no copy). TEARDOWN_CHILD_OWNER_RC is the
+# slot-owner verdict of a pool slot: 0 or TEARDOWN_SLOT_REASSIGNED_RC. Fails,
+# naming the claim, when that claim cannot be read.
+teardown_child_copy_route() {  # <meta> <id> <kind> <backend> <project> <worktree>
+  TEARDOWN_CHILD_ROUTE=
+  TEARDOWN_CHILD_OWNER_RC=0
+  if [ "$3" != secondmate ] && fm_treehouse_pool_slot "$5" "$6"; then
+    require_owned_worktree_slot_record "$2" "$6" 2>/dev/null || TEARDOWN_CHILD_OWNER_RC=$?
+    case "$TEARDOWN_CHILD_OWNER_RC" in
+      0|"$TEARDOWN_SLOT_REASSIGNED_RC") ;;
+      *)
+        TEARDOWN_CHILD_OWNER_RC=0
+        require_owned_worktree_slot_record "$2" "$6" || return 1
+        ;;
+    esac
+  fi
+  if [ "$3" = secondmate ]; then
+    TEARDOWN_CHILD_ROUTE=home
+  elif [ "$4" = orca ]; then
+    TEARDOWN_CHILD_ROUTE=orca
+  elif teardown_preserves_reassociated_copy "$1" "$3" "$4" "$5" "$6"; then
+    TEARDOWN_CHILD_ROUTE=keep
+  elif [ "$TEARDOWN_CHILD_OWNER_RC" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+    TEARDOWN_CHILD_ROUTE=reassigned
+  elif fm_treehouse_pool_slot "$5" "$6"; then
+    TEARDOWN_CHILD_ROUTE=pool
+  elif [ -z "$6" ] || [ ! -d "$6" ]; then
+    TEARDOWN_CHILD_ROUTE=none
+  elif [ -n "$5" ] && [ -d "$5" ] && command -v treehouse >/dev/null 2>&1; then
+    TEARDOWN_CHILD_ROUTE=return
+  else
+    TEARDOWN_CHILD_ROUTE=remove
+  fi
+}
+
+# Whether the route teardown_child_copy_route chose ends in a forced treehouse
+# return of the child's copy.
+teardown_child_route_returns() {
+  case "$TEARDOWN_CHILD_ROUTE" in
+    return) return 0 ;;
+    pool) command -v treehouse >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Forced secondmate cleanup closes each child endpoint and then returns the
 # child's copy, and finally the home, with forced returns that end every process
 # in them. Decide every one of those returns first: before any child endpoint is
-# closed, every process in each child copy must be that child's own (its pane
+# closed, every child endpoint must be closable, every process in each child
+# copy whose route ends in a forced return must be that child's own (its pane
 # shell or a descendant) or this task's, and every process in a home that will
-# be returned must be this task's, a child's, or the home's own process-event
-# runner (whose sweep stops it) or a member of that runner's process group.
-# Any other holder refuses with no endpoint closed and nothing signalled. The
-# check right before each return still runs.
+# be returned must be this task's, a child's, or the home's own: a member of the
+# process group whose leader is a process-event runner of that home and passes
+# fm_procevent_runner_leader_proved at that same check, the group the home's
+# sweep signals. Any other holder refuses with no endpoint closed and nothing
+# signalled. The check right before each return still runs.
 teardown_forced_holders_preflight() {  # <home>
   local home=$1 sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend child_t
   sub_state="$home/state"
@@ -3946,17 +4008,16 @@ teardown_forced_holders_preflight() {  # <home>
       else
         child_t=$(fm_backend_target_of_meta "$child_meta")
       fi
-      if [ "$child_kind" = secondmate ]; then
+      teardown_with_anchor "$child_backend" "$child_t" teardown_endpoint_closable "child $child_id" || return 1
+      teardown_child_copy_route "$child_meta" "$child_id" "$child_kind" "$child_backend" "$child_proj" "$child_wt" || return 1
+      if [ "$TEARDOWN_CHILD_ROUTE" = home ]; then
         child_home=$(meta_value "$child_meta" home)
         [ -n "$child_home" ] || child_home=$child_wt
         [ -n "$child_home" ] && [ -d "$child_home" ] || continue
-        teardown_with_anchor "$child_backend" "$child_t" teardown_endpoint_closable "child $child_id" || return 1
         teardown_with_anchor "$child_backend" "$child_t" teardown_forced_holders_preflight "$child_home" || return 1
         continue
       fi
-      teardown_with_anchor "$child_backend" "$child_t" teardown_endpoint_closable "child $child_id" || return 1
-      [ -n "$child_wt" ] && [ -d "$child_wt" ] || continue
-      ! teardown_preserves_reassociated_copy "$child_meta" "$child_kind" "$child_backend" "$child_proj" "$child_wt" || continue
+      teardown_child_route_returns || continue
       teardown_with_anchor "$child_backend" "$child_t" \
         teardown_return_holders_proven "$child_wt" "child $child_id worktree" || return 1
     done
@@ -4012,7 +4073,6 @@ teardown_tasktmp_only_decision() {
   task_pids_under_roots "$TASK_TMP" && return 0
   task_anchor_load
   if [ "${TASK_PIDS_HOLDER_UNPROVEN:-0}" = 1 ] && [ "$TASK_ANCHOR_STATE" = proven ]; then
-    TEARDOWN_TASKTMP_LEAVE=1
     return 0
   fi
   echo "REFUSED: the tasktmp sweep for $ID refused and $(if [ "$TASK_ANCHOR_STATE" != proven ]; then printf '%s' "$TASK_ANCHOR_NOTE"; else printf 'the refusal was not an unproven holder'; fi), so teardown stops before any endpoint close or signal; every durable task record is kept." >&2
@@ -4580,7 +4640,8 @@ conclude_task_no_mistakes_run() {  # <worktree>
 # any other failed read is unreadable.
 # Herdr names the recorded pane id, and its answer must name that pane; a pane
 # Herdr confirms gone is absent. Any other failed read is unreadable. A record
-# with no endpoint, or a backend that reports no pane shell, is absent.
+# with no endpoint is absent. Any other backend has no pane-shell reader and is
+# noreader, which closes like absent but names the backend in every refusal.
 task_endpoint_shell_pid() {
   local out pid='' session window rows count inventory_rc
   [ -n "${T:-}" ] || { printf 'absent\n'; return 0; }
@@ -4631,7 +4692,7 @@ task_endpoint_shell_pid() {
         return 0
       fi
       ;;
-    *) printf 'absent\n'; return 0 ;;
+    *) printf 'noreader\n'; return 0 ;;
   esac
   case "$pid" in ''|*[!0-9]*) printf 'unreadable\n'; return 0 ;; esac
   [ "$pid" -gt 1 ] || { printf 'unreadable\n'; return 0; }
@@ -4706,11 +4767,12 @@ task_pid_list_contains() {  # <pid-list> <pid>
 # Fix 2 ownership proof (see script header). TASK_ANCHOR_STATE is the endpoint's
 # classification (proven, absent, ambiguous or unreadable) and
 # TASK_ANCHOR_PID/IDENTITY its pane shell, read once per teardown. TASK_OWNED
-# holds every "pid<TAB>birth identity<TAB>process group" proved by parent chain.
-# Only such a proof is accepted, because it cannot expire: a proved process
-# keeps it by its recorded pid and birth identity after the reap ends the shell
-# it descended from. A shared process group proves nothing (its proved members
-# can leave and its id can be reused).
+# holds every "pid<TAB>birth identity" proved by parent chain, and each queued
+# nested-copy target proved through such a process. Only such a proof is
+# accepted, because it cannot expire: a proved process keeps it by its recorded
+# pid and birth identity after the reap ends the shell it descended from. A
+# shared process group proves nothing (its proved members can leave and its id
+# can be reused).
 TASK_ANCHOR_READ=0
 TASK_ANCHOR_STATE=
 TASK_ANCHOR_PID=
@@ -4719,7 +4781,7 @@ TASK_ANCHOR_NOTE=
 TASK_OWNED=()
 
 task_anchor_load() {
-  local line
+  local line noreader=0
   [ "$TASK_ANCHOR_READ" = 0 ] || return 0
   TASK_ANCHOR_READ=1
   TASK_ANCHOR_PID=
@@ -4727,6 +4789,7 @@ task_anchor_load() {
   line=$(task_endpoint_shell_pid) || line=unreadable
   case "$line" in
     proven\ *) TASK_ANCHOR_STATE=proven; TASK_ANCHOR_PID=${line#proven } ;;
+    noreader) TASK_ANCHOR_STATE=absent; noreader=1 ;;
     *) TASK_ANCHOR_STATE=${line:-unreadable} ;;
   esac
   case "$TASK_ANCHOR_STATE" in proven|absent|ambiguous|unreadable) ;; *) TASK_ANCHOR_STATE=unreadable ;; esac
@@ -4736,7 +4799,13 @@ task_anchor_load() {
   fi
   case "$TASK_ANCHOR_STATE" in
     proven) TASK_ANCHOR_NOTE="it does not descend from the task's pane shell $TASK_ANCHOR_PID ($TASK_ANCHOR_IDENTITY) or from a process proved the task's" ;;
-    absent) TASK_ANCHOR_NOTE="no single live pane shell could be read from the task's endpoint ${T:-<none>} (it is absent)" ;;
+    absent)
+      if [ "$noreader" = 1 ]; then
+        TASK_ANCHOR_NOTE="the ${BACKEND:-<none>} backend has no pane-shell reader, so no process can be proved to descend from the pane of the task's endpoint $T; stop that agent and rerun teardown"
+      else
+        TASK_ANCHOR_NOTE="no single live pane shell could be read from the task's endpoint ${T:-<none>} (it is absent)"
+      fi
+      ;;
     ambiguous) TASK_ANCHOR_NOTE="no single live pane shell could be read from the task's endpoint ${T:-<none>} (its window holds several panes)" ;;
     *) TASK_ANCHOR_NOTE="no single live pane shell could be read from the task's endpoint ${T:-<none>} (it cannot be read)" ;;
   esac
@@ -4747,7 +4816,7 @@ task_anchor_load() {
 task_owned_contains() {  # <pid> <identity>
   local entry
   for entry in ${TASK_OWNED[@]+"${TASK_OWNED[@]}"}; do
-    case "$entry" in "$1"$'\t'"$2"$'\t'*) return 0 ;; esac
+    [ "$entry" != "$1"$'\t'"$2" ] || return 0
   done
   return 1
 }
@@ -4755,27 +4824,25 @@ task_owned_contains() {  # <pid> <identity>
 # Succeeds when the process <pid>, whose birth identity is <identity>, is the
 # task's own, read from one process table: already proved, or the anchor itself
 # or a descendant, by parent chain, of the anchor or of a proved process that
-# still has its recorded birth identity. A proof is recorded with the group.
+# still has its recorded birth identity. A proof is recorded by pid and birth
+# identity.
 task_pid_proved_own() {  # <pid> <identity>
-  local pid=$1 identity=$2 table member entry pgid
+  local pid=$1 identity=$2 table member entry
   task_owned_contains "$pid" "$identity" && return 0
   task_anchor_load
-  table=$(ps -axo pid=,ppid=,pgid= 2>/dev/null) || return 1
+  table=$(ps -axo pid=,ppid= 2>/dev/null) || return 1
   [ -n "$table" ] || return 1
-  pgid=$(printf '%s\n' "$table" | awk -v p="$pid" '$1 == p { print $3; exit }')
-  case "$pgid" in ''|*[!0-9]*) return 1 ;; esac
   while IFS= read -r member; do
     [ -n "$member" ] || continue
     if [ -n "$TASK_ANCHOR_PID" ] && [ "$member" = "$TASK_ANCHOR_PID" ] \
        && task_process_identity_matches "$member" "$TASK_ANCHOR_IDENTITY"; then
-      TASK_OWNED+=("$pid"$'\t'"$identity"$'\t'"$pgid")
+      TASK_OWNED+=("$pid"$'\t'"$identity")
       return 0
     fi
     for entry in ${TASK_OWNED[@]+"${TASK_OWNED[@]}"}; do
       [ "${entry%%$'\t'*}" = "$member" ] || continue
-      entry=${entry#*$'\t'}
-      task_process_identity_matches "$member" "${entry%%$'\t'*}" || continue
-      TASK_OWNED+=("$pid"$'\t'"$identity"$'\t'"$pgid")
+      task_process_identity_matches "$member" "${entry#*$'\t'}" || continue
+      TASK_OWNED+=("$pid"$'\t'"$identity")
       return 0
     done
   done < <(printf '%s\n' "$table" | awk -v p="$pid" '
@@ -5127,10 +5194,10 @@ EOF
           return 1
         fi
         task_process_identity_matches "$pid" "$identity" || continue
-        # The ownership proof is checked last, right before the signal: a group
-        # proof whose live chain-proved member is gone has expired.
+        # The ownership proof is checked last, right before the signal: only a
+        # recorded parent-chain proof of this pid and birth identity counts.
         if ! task_owned_contains "$pid" "$identity"; then
-          echo "REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without signalling it." >&2
+          echo "REFUSED: leaked process $pid has no recorded parent-chain proof that it belongs to $ID before its signal; preserving the worktree/tasktmp without signalling it." >&2
           return 1
         fi
         kill -TERM "$pid" 2>/dev/null || true
@@ -5173,10 +5240,10 @@ EOF
             return 1
           fi
           task_process_identity_matches "$pid" "$identity" || continue
-          # The ownership proof is checked last, right before the signal: a group
-          # proof whose live chain-proved member is gone has expired.
+          # The ownership proof is checked last, right before the signal: only a
+          # recorded parent-chain proof of this pid and birth identity counts.
           if ! task_owned_contains "$pid" "$identity"; then
-            echo "REFUSED: leaked process $pid lost its ownership proof for $ID before its signal (its process group no longer holds a process proved the task's); preserving the worktree/tasktmp without force-killing it." >&2
+            echo "REFUSED: leaked process $pid has no recorded parent-chain proof that it belongs to $ID before its signal; preserving the worktree/tasktmp without force-killing it." >&2
             return 1
           fi
           kill -KILL "$pid" 2>/dev/null || true
@@ -5323,7 +5390,7 @@ retire_task_private_nm_launch_agents() {  # <worktree>
     # read or parsed cannot be shown to point outside the copy, so it refuses.
     if ! fields=$(nm_launch_agent_fields "$plist"); then
       if [ -L "$plist" ]; then
-        echo "REFUSED: no-mistakes launch agent plist $plist is a symbolic link whose target cannot be read or parsed, so whether its agent is rooted in $ID's copy cannot be decided; teardown neither unloads nor archives it and keeps the copy. Repair or remove the link, then rerun teardown." >&2
+        echo "REFUSED: no-mistakes launch agent plist $plist is a symbolic link to $(readlink "$plist" 2>/dev/null || printf '<unreadable>') whose target cannot be read or parsed, so whether its agent is rooted in $ID's copy cannot be decided; teardown neither unloads nor archives it and keeps the copy. Repair or remove the link $plist, then rerun teardown." >&2
         return 1
       fi
       echo "teardown: leaving unreadable no-mistakes launch agent $plist as found; its root cannot be proven to be $ID's" >&2
@@ -6190,7 +6257,9 @@ teardown_nested_slot() {  # prove | landed | decide | retire | reprove | return
       # decision just before this fixed (teardown_decide_before_any_close runs
       # it, and nothing runs between). The reaper's own scans apply the same
       # holder rule again before its signals; the nested copies' queued
-      # processes are proved again before theirs.
+      # processes keep the proof recorded when they were decided, so one that
+      # still has its birth identity is signalled and one that has gone is
+      # reported gone.
       [ "${TEARDOWN_SWEPT_SET:-0}" = 1 ] || teardown_nested_slot decide || exit 1
       swept=(${TEARDOWN_SWEPT[@]+"${TEARDOWN_SWEPT[@]}"})
       for root in ${swept[@]+"${swept[@]}"}; do
@@ -7183,7 +7252,7 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
 }
 
 cleanup_firstmate_home_children() {
-  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i child_copy_mode child_keep_copy child_pool_return child_project_lock child_leased child_pool_slot
+  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i child_copy_mode child_route child_pool_return child_project_lock child_leased child_pool_slot
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
@@ -7200,10 +7269,6 @@ cleanup_firstmate_home_children() {
     [ -n "$child_kind" ] || child_kind=ship
     child_backend=$(fm_backend_of_meta "$child_meta")
     child_pool_return=0
-    child_keep_copy=0
-    if teardown_preserves_reassociated_copy "$child_meta" "$child_kind" "$child_backend" "$child_proj" "$child_wt"; then
-      child_keep_copy=1
-    fi
     child_copy_mode=1
     [ "$child_kind" != secondmate ] || child_copy_mode=home
     if [ "$child_kind" != secondmate ] && [ "$child_backend" != orca ] \
@@ -7223,14 +7288,9 @@ cleanup_firstmate_home_children() {
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       fi
     fi
-    child_owner_rc=0
-    if [ "$child_kind" != secondmate ] && fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
-      require_owned_worktree_slot_record "$child_id" "$child_wt" 2>/dev/null || child_owner_rc=$?
-    fi
-    if [ "$child_owner_rc" -ne 0 ] && [ "$child_owner_rc" -ne "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
-      require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
-      child_owner_rc=0
-    fi
+    teardown_child_copy_route "$child_meta" "$child_id" "$child_kind" "$child_backend" "$child_proj" "$child_wt" || return 1
+    child_route=$TEARDOWN_CHILD_ROUTE
+    child_owner_rc=$TEARDOWN_CHILD_OWNER_RC
     if [ -n "$child_t" ]; then
       if [ "$child_backend" = herdr ]; then
         fm_backend_herdr_parse_target "$child_t" || return 1
@@ -7264,41 +7324,35 @@ cleanup_firstmate_home_children() {
     else
       teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 0 || return 1
     fi
-    if [ "$child_kind" = secondmate ]; then
-      if [ -n "$child_home" ] && [ -d "$child_home" ]; then
-        cleanup_firstmate_home_children "$child_home" || return $?
-        remove_firstmate_home "$child_home" "child firstmate home" "$child_id" "$home/data/secondmates.md" || return $?
-      fi
-      remove_secondmate_registry_entry "$child_id" "$home/data/secondmates.md" || return 1
-    elif [ "$child_backend" = orca ]; then
-      if [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
-        validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
-        rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
-          "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
-        fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
-      fi
-    elif [ "$child_keep_copy" = 1 ]; then
-      :
-    elif [ "$child_owner_rc" -eq 0 ] && fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
-      child_pool_return=1
-      validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
-      rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
-        "$child_wt/.opencode/plugins/fm-busy-state.js" \
-        "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
-    elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
-      # The same ownership determination as the parent's own slot: a child
-      # slot reassigned to another task is not this child's to kill, reset,
-      # or return, so only its records are cleaned up. The preflight above
-      # already named the reassignment under project custody; this records-only
-      # route still returns nothing after that custody has been released.
-      if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
-        :
-      else
+    case "$child_route" in
+      home)
+        if [ -n "$child_home" ] && [ -d "$child_home" ]; then
+          cleanup_firstmate_home_children "$child_home" || return $?
+          remove_firstmate_home "$child_home" "child firstmate home" "$child_id" "$home/data/secondmates.md" || return $?
+        fi
+        remove_secondmate_registry_entry "$child_id" "$home/data/secondmates.md" || return 1
+        ;;
+      orca)
+        if [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
+          validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
+          rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
+            "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
+          fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
+        fi
+        ;;
+      pool)
+        child_pool_return=1
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
           "$child_wt/.opencode/plugins/fm-busy-state.js" \
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
-        if [ -n "$child_proj" ] && [ -d "$child_proj" ] && command -v treehouse >/dev/null 2>&1; then
+        ;;
+      return|remove)
+        validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
+        rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
+          "$child_wt/.opencode/plugins/fm-busy-state.js" \
+          "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
+        if [ "$child_route" = return ]; then
           teardown_scrub_scratch_copy "$child_wt" "$child_id" || return $?
           child_pool_slot=0
           fm_treehouse_pool_slot "$child_proj" "$child_wt" && child_pool_slot=1
@@ -7316,8 +7370,13 @@ cleanup_firstmate_home_children() {
         else
           safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
         fi
-      fi
-    fi
+        ;;
+      # A reassociated copy stays. A child slot reassigned to another task is
+      # not this child's to end, reset, or return, so only its records are
+      # cleaned up, and this records-only route still returns nothing after
+      # the project custody has been released.
+      keep|reassigned|none) ;;
+    esac
     remove_grok_turnend_auth "$sub_state" "$child_id" || return 1
     remove_kimi_turnend_auth "$sub_state" "$child_id" || return 1
     remove_pr_poll_artifacts "$sub_state" "$child_id" || return 1
@@ -7712,10 +7771,9 @@ if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
 elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
     && [ -d "$WT" ] && [ "$(fm_task_copy_canonical_dir "$WT")" != "$TEARDOWN_SHARED_SLOT" ]; then
   # Shared custody protects the slot root, not this retiring task's own
-  # nested runtime. Keep the ordinary identity proofs on this copy only, and
-  # decide every scan before anything is aborted or signalled.
-  retire_task_private_nm_launch_agents "$WT" || exit 1
-  task_reap_preflight "$WT" "$TASK_TMP" || exit 1
+  # nested runtime. The ordinary identity proofs stay on this copy only, and
+  # teardown_decide_before_any_close above decided every scan before anything
+  # is aborted or signalled.
   conclude_task_no_mistakes_run "$WT" || exit 1
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
   require_worktree_teardown_safety
