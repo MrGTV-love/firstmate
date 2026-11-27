@@ -177,11 +177,17 @@ fm_task_inbox_seq_of() {  # <basename>
 # Next unused sequence, scanning the inbox root AND handled/ so an
 # acknowledged sequence is never reissued. Caller must hold .seq.lock.
 fm_task_inbox_next_seq() {  # <inbox-dir>
+  # No command substitution per record: an inbox that has seen ~1700 records (a long-lived
+  # secondmate) made the old per-record subshell the bulk of the sequence lock's hold time.
+  # The rule is fm_task_inbox_seq_of's: a name ending .msg whose stem is all digits.
   local dir=$1 max=0 d f n
   for d in "$dir" "$dir/handled"; do
     for f in "$d"/*.msg; do
       [ -e "$f" ] || continue
-      n=$(fm_task_inbox_seq_of "${f##*/}") || continue
+      n=${f##*/}
+      n=${n%.msg}
+      case "$n" in ''|*[!0-9]*) continue ;; esac
+      n=$((10#$n))
       [ "$n" -le "$max" ] || max=$n
     done
   done
@@ -239,6 +245,63 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
   printf '%s' "$rec"
 }
 
+# Candidate records for the dedup scan, as array elements in scan order (inbox
+# records first, then handled/, each in name order). A record can only equal the
+# new body when it contains the body's first line, so a fixed-string grep names a
+# superset of the matches and the exact byte comparison below runs on those few
+# files instead of forking awk, cat and cmp for every record ever written (a
+# 1772-record inbox took 36 s here under load, past the remote steer's 30 s
+# budget, and left the sequence lock and temp files behind when it was killed).
+# An empty first line, or any grep failure, returns every record, which is the
+# full scan this replaced, so the filter can only skip files that cannot match.
+# The worker acknowledges a record by moving it from the inbox into handled/
+# WITHOUT holding .seq.lock, so the two trees are read in two separate passes, the
+# inbox first and handled/ second: a record moved between the passes is read in
+# the second one, and a record moved before the first is already there. One
+# recursive grep over both trees would read them in the directory's own order,
+# and a record moved after it read handled/ but before it read the inbox would
+# be in neither list. Each pass names only the .msg files directly inside its own
+# directory (the two record sets the full scan always covered), never a nested
+# directory's files.
+# Names travel as array elements and NUL-terminated records, never as newline-separated text, so a state
+# directory whose path contains a newline still finds its records.
+_fm_task_inbox_grep_dir() {  # <dir> <first-line> <out-file> : appends NUL-terminated names of the matching direct .msg files; 2 on a grep error
+  local d=$1 first=$2 out=$3 f r rc=0 chunk=()
+  for f in "$d"/*.msg; do
+    [ -e "$f" ] || continue
+    chunk+=("$f")
+    if [ "${#chunk[@]}" -ge 500 ]; then
+      LC_ALL=C grep -lF --null -e "$first" -- "${chunk[@]}" >> "$out" 2>/dev/null; r=$?
+      [ "$r" -le 1 ] || rc=2
+      chunk=()
+    fi
+  done
+  if [ "${#chunk[@]}" -gt 0 ]; then
+    LC_ALL=C grep -lF --null -e "$first" -- "${chunk[@]}" >> "$out" 2>/dev/null; r=$?
+    [ "$r" -le 1 ] || rc=2
+  fi
+  return "$rc"
+}
+
+# Fills the array _fm_task_inbox_cands (the caller's loop reads it) with the candidate record paths, inbox first.
+_fm_task_inbox_dedup_candidates() {  # <inbox-dir> <text> <scratch-file>
+  local dir=$1 text=$2 scratch=$3 first=${2%%$'\n'*} f
+  _fm_task_inbox_cands=()
+  if [ -n "$first" ]; then
+    : > "$scratch"
+    if _fm_task_inbox_grep_dir "$dir" "$first" "$scratch" && _fm_task_inbox_grep_dir "$dir/handled" "$first" "$scratch"; then
+      while IFS= read -r -d '' f; do
+        _fm_task_inbox_cands+=("$f")
+      done < "$scratch"
+      return 0
+    fi
+    _fm_task_inbox_cands=()
+  fi
+  for f in "$dir"/*.msg "$dir/handled"/*.msg; do
+    _fm_task_inbox_cands+=("$f")
+  done
+}
+
 # Durably enqueue one steer at most once: when a record with the exact same
 # body already exists - unhandled or already acknowledged in handled/ - no new
 # record is written and the existing record's path is printed instead.
@@ -251,14 +314,16 @@ fm_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # local plane keeps plain fm_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
 fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
-  local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have f rec='' status=0
+  local state=$1 task=$2 text=$3 delivery_mode=${4:-} dir lock want have cand f rec='' status=0
   dir=$(fm_task_inbox_dir "$state" "$task")
   mkdir -p "$dir/handled" || return 1
   lock="$dir/.seq.lock"
   fm_task_inbox_lock_acquire "$lock" || return 1
-  if want=$(mktemp "$dir/.dedup.XXXXXX") && have=$(mktemp "$dir/.dedup.XXXXXX"); then
+  if want=$(mktemp "$dir/.dedup.XXXXXX") && have=$(mktemp "$dir/.dedup.XXXXXX") && cand=$(mktemp "$dir/.dedup.XXXXXX"); then
     if printf '%s' "$text" > "$want"; then
-      for f in "$dir"/*.msg "$dir/handled"/*.msg; do
+      _fm_task_inbox_dedup_candidates "$dir" "$text" "$cand"
+      for f in ${_fm_task_inbox_cands[@]+"${_fm_task_inbox_cands[@]}"}; do
+        [ -n "$f" ] || continue
         if [ ! -e "$f" ]; then
           case "$f" in
             "$dir"/*.msg)
@@ -290,9 +355,9 @@ fm_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mod
     else
       status=1
     fi
-    rm -f "$want" "$have"
+    rm -f "$want" "$have" "$cand"
   else
-    rm -f "${want:-}" 2>/dev/null || true
+    rm -f "${want:-}" "${have:-}" "${cand:-}" 2>/dev/null || true
     status=1
   fi
   if [ "$status" -eq 0 ] && [ -z "$rec" ]; then
