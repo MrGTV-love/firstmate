@@ -1,0 +1,41 @@
+## Round 2 copy sweep (report), pool root isolated to /Users/charlesabrooker/tmp/fm-lab.MIQXVM/treehouse-empty; 261 task records; locked launcher pid 92603 is dead
+$ FM_HOME=$LAB FM_COPY_SWEEP_TREEHOUSE_ROOT=$TH bin/fm-copy-sweep.sh
+copy-sweep: mode=report containers=1 copies=3
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/landed	clean, no process, no record, HEAD contained in a remote branch
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/live	task t-live's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:92603 launcher=92603 (launcher 92603 is gone; only Vernant's closeout driver releases it); closeout driver or interpreter unavailable
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.MIQXVM: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+exit=0
+
+## Same, ps refused (fake ps on PATH exits 126)
+copy-sweep: mode=report containers=1 copies=3
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/landed	clean, no process, no record, HEAD contained in a remote branch
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/live	task t-live's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:92603 launcher=92603 (launcher 92603 cannot be observed; absence is not proved)
+
+## --apply (lab only)
+copy-sweep: mode=apply containers=1 copies=2
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/live	task t-live's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:92603 launcher=92603 (launcher 92603 is gone; only Vernant's closeout driver releases it); closeout driver or interpreter unavailable
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/landed	branch fm/landed at 59276bc7572e, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=1
+budget container /Users/charlesabrooker/tmp/fm-lab.MIQXVM: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=3 GiB=0.00 reaped=1 freed=0.00
+exit=0
+after apply:
+/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo                          59276bc [main]
+/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/live   59276bc [fm/live]
+/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/locked 59276bc [fm/locked] locked

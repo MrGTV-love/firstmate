@@ -1,0 +1,19 @@
+## Round 2 merge check (#461 walk x #469 array reader): 300 task records; record 290 names the copy as prior_worktree
+records in state:      300
+$ ulimit -n 64; FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/many
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.MIQXVM
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=active-record-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/many is not removed: task task-290's active record names it as its prior_worktree.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/many (task task-290's active record names it as its prior_worktree)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/many did not pass every proof (rule=active-record-owner): task task-290's active record names it as its prior_worktree; nothing was removed.
+exit=1
+elapsed=13s
+  copy present: yes  registered: 1
+
+## Same 300 records, record 290 no longer names the copy
+prior_worktree=/Users/charlesabrooker/tmp/fm-lab.MIQXVM/data/w-290
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.MIQXVM
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/many from pool slot /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/many (HEAD 59276bc7572e43e82b2dda2f6f0a1932e0adaa08, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/data/record-less-copy-removals.log
+exit=0
+elapsed=27s
+  copy present: NO  registered: 0

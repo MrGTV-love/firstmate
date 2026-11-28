@@ -1,0 +1,43 @@
+## Round 2 harm refusals at e68c41b7e
+### Dirty: tracked edit
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 is not removed: it has uncommitted or untracked-unignored changes.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 did not pass every proof (rule=copy-preserved): it has uncommitted or untracked-unignored changes; nothing was removed.
+exit=
+  copy present: yes  registered: 1  audit lines: 2
+### A process has the copy as its cwd (never signalled)
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 is in use: process 83145 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 through cwd (processes holding it: 83145); nothing was removed.
+exit=
+  copy present: yes  registered: 1  audit lines: 2
+  holder 83145 alive after run: yes
+### A process holds a file open in the copy
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 is in use: process 3359 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2/a.txt through 0 (processes holding it: 3359); nothing was removed.
+exit=
+  copy present: yes  registered: 1  audit lines: 2
+  holder pid: 3359
+### Unlanded commit, no bundle
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.MIQXVM/data/copy-b3dd117ec1234dfe/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.MIQXVM/data/copy-b3dd117ec1234dfe/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; run the same teardown --copy command again.
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 is not removed: its HEAD 34ef629de3f6 is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 (its HEAD 34ef629de3f6 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 did not pass every proof (rule=copy-landed): its HEAD 34ef629de3f6 is not proved landed; nothing was removed.
+exit=
+  copy present: yes  registered: 1  audit lines: 2
+  work.txt still there: work
+### Argument guards
+error: teardown --copy takes no --force: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+exit=2 : --force
+error: invalid teardown request
+exit=2 : --drop-file /tmp/x
+error: teardown --copy takes no --legacy-record: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+exit=2 : --legacy-record
+error: teardown --copy needs an absolute path, not .claude/worktrees/stray2
+exit=2 : relative path
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
+exit= : the clone itself
+  copy present: yes  registered: 1  audit lines: 2
+### Control: harms cleared, same copy removed
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 from pool slot /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray2 (HEAD 59276bc7572e43e82b2dda2f6f0a1932e0adaa08, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/data/record-less-copy-removals.log
+exit=
+  copy present: NO  registered: 0  audit lines: 3

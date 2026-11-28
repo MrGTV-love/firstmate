@@ -1,0 +1,8 @@
+### bash tests/fm-teardown-scan-bounds.test.sh test_a_foreign_copy_walk_past_its_deadline_refuses_in_the_final_return_window
+ok - window 3 (held/peers branch): the foreign-copy ownership walk past its deadline refuses, leaves the window's entry state, frees the lock, and a retry finishes
+# all fm-teardown-scan-bounds tests passed
+exit=0
+### bash tests/fm-teardown-scan-bounds.test.sh test_mutant_without_the_foreign_copy_deadline_the_walk_is_not_refused
+ok - held walk (nested-hand-over): without the deadline the walk past 4 s is not refused (rc 0), so the refusal case tests the deadline
+# all fm-teardown-scan-bounds tests passed
+exit=0

@@ -1,0 +1,27 @@
+## Round 2 (target e68c41b7e, after merging #469/#473): landed record-less copy is removed by path
+$ git -C projects/demo worktree list
+/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo                         59276bc [main]
+/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray 59276bc [fm/stray]
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.MIQXVM
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray (HEAD 59276bc7572e43e82b2dda2f6f0a1932e0adaa08, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/data/record-less-copy-removals.log
+exit=0
+( FM_HOME=$LAB bin/fm-teardown.sh --copy $C 2>&1; echo "exit=$?"; )  12.47s user 3.07s system 93% cpu 16.571 total
+$ ls copy
+ls: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray: No such file or directory
+$ git worktree list
+/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo 59276bc [main]
+$ cat data/record-less-copy-removals.log
+2026-11-28T03:46:06Z	copy-7cc3f996a0d2b9f2	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo	/Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray	59276bc7572e43e82b2dda2f6f0a1932e0adaa08	landed
+
+## Rerun on the removed copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.MIQXVM
+teardown: /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/stray is already gone, and this run removed nothing: the audit record in /Users/charlesabrooker/tmp/fm-lab.MIQXVM/data/record-less-copy-removals.log shows its removal was authorized at 2026-11-28T03:46:06Z for HEAD 59276bc7572e43e82b2dda2f6f0a1932e0adaa08 (proof: landed).
+exit=0
+audit lines:        1
+branch kept:   fm/stray
+## Adversarial: a gone path no audit line names
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.MIQXVM
+REFUSED: there is no copy at /Users/charlesabrooker/tmp/fm-lab.MIQXVM/projects/demo/.claude/worktrees/never-existed, and no audit record in /Users/charlesabrooker/tmp/fm-lab.MIQXVM/data/record-less-copy-removals.log names it; nothing was removed.
+exit=1

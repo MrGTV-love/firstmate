@@ -1,0 +1,25 @@
+## Ordinary teardown by task id with no record still refuses first
+$ FM_HOME=$LAB bin/fm-teardown.sh no-such-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.MIQXVM
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.MIQXVM/state/no-such-task.meta
+exit=1
+
+## #465 docs-only change: doc audience check
+$ bin/fm-doc-audience-check.sh
+fm-doc-audience-check: ok surfaces=158 local_links=1840
+exit=0
+
+## Train integrity: PR heads 486adcbbf0 (#465) and 30fa8cfa6f (#461) are ancestors of the target
+486adcbbf0: ancestor of HEAD
+30fa8cfa6f: ancestor of HEAD
+c4a207ac3: ancestor of HEAD
+932cb0bf2: ancestor of HEAD
+## The #465 and #461 file changes survive the merge with main (no diff vs the PR head for these files):
+(empty above = identical)
+## Any conflict markers left in the tree?
+count=0
+## bash -n on the changed scripts
+bin/fm-teardown.sh: parses
+bin/fm-teardown-nested-lib.sh: parses
+bin/fm-task-copy-lib.sh: parses
+bin/fm-copy-sweep.sh: parses

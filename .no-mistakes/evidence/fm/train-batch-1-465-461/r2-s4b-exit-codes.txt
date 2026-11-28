@@ -1,0 +1,10 @@
+## Exit-code recheck under bash (zsh dropped PIPESTATUS above)
+dirty copy: exit=1
+cwd holder: exit=1
+bash: line 5: 37131 Terminated: 15          ( cd $C && exec sleep 300 )
+unlanded commit: exit=1
+error: teardown --copy takes no --drop-file: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+--drop-file: exit=2
+clone itself: exit=1
+copy still present: yes
+control (clean, landed): exit=0 present=NO

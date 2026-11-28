@@ -1,0 +1,9 @@
+### bash tests/fm-teardown.test.sh test_by_path_refuses_a_holder_that_starts_after_the_first_scan
+ok - teardown --copy refuses a holder that starts after the first scan: a late cwd by the reused proof, a late open file by the scan repeated before the removal
+exit=0
+### bash tests/fm-teardown.test.sh test_by_path_removes_a_bundle_held_copy_only_when_the_captains_call_is_filed
+ok - teardown --copy removes a bundle-held copy only once an open captain-held row names the bundle and every tip
+exit=0
+### bash tests/fm-teardown.test.sh test_by_path_two_simultaneous_runs_on_one_copy_let_one_proceed
+ok - two simultaneous teardown --copy runs on one copy: one proceeds, the other refuses and changes nothing
+exit=0
