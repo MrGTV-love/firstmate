@@ -2720,10 +2720,12 @@ fm_wake_append() {
 # fm_wake_pending_settle: make the in-flight fm_wake_append row durable without
 # waiting. It is appended when the queue lock is free now; otherwise, or while
 # this process already holds that lock, it is spilled to STATE/.wake-spill.<seq>
-# (temp file plus rename, sequence order). Returns 1 only when the row is
-# neither appended nor spilled.
+# (temp file, then a hard link that never replaces an existing spill: a
+# failed link moves this row to the next sequence and tries again, whether or
+# not the contested spill was replayed away before the failure returned).
+# Returns 1 only when the row is neither appended nor spilled.
 fm_wake_pending_settle() {
-  local status=1 f n seq=0 tmp current held=''
+  local status=1 f n seq=0 tmp current held='' tries=0
   local _fm_lock_observation_only=1
   [ -n "$FM_WAKE_PENDING_KIND" ] || return 0
   set -- "$FM_WAKE_PENDING_KIND" "$FM_WAKE_PENDING_KEY" "$FM_WAKE_PENDING_PAYLOAD"
@@ -2744,13 +2746,18 @@ fm_wake_pending_settle() {
     n=$((10#${f##*.}))
     [ "$n" -le "$seq" ] || seq=$n
   done
-  printf -v n '%010d' $((seq + 1))
   tmp="$STATE/.wake-spill.tmp.$$"
   if { printf '%s\n' "$1" && printf '%s' "$2" | fm_wake_clean_field && printf '\n' \
-      && printf '%s' "$3" | fm_wake_clean_field && printf '\n'; } > "$tmp" \
-    && mv -f "$tmp" "$STATE/.wake-spill.$n"; then
-    FM_WAKE_PENDING_KIND=
-    return 0
+      && printf '%s' "$3" | fm_wake_clean_field && printf '\n'; } > "$tmp"; then
+    while [ "$tries" -lt 64 ]; do
+      seq=$((seq + 1)) tries=$((tries + 1))
+      printf -v n '%010d' "$seq"
+      if ln "$tmp" "$STATE/.wake-spill.$n" 2>/dev/null; then
+        rm -f "$tmp"
+        FM_WAKE_PENDING_KIND=
+        return 0
+      fi
+    done
   fi
   rm -f "$tmp"
   return 1

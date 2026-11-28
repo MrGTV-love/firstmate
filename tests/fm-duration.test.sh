@@ -149,9 +149,11 @@ cancel_out, cancel_err = cancel.communicate()
 assert cancel.returncode == 143 and cancel_out == '', (cancel.returncode, cancel_out, cancel_err)
 
 # A measured p99 x 3 is an advisory, not a kill: healthy slow work that keeps
-# making progress runs to completion and the excess is reported.
+# making progress runs to completion and the excess is reported. The work runs
+# 3 s past the 3 s ceiling, so the about-1 s observation loop cannot step over
+# the notice when one tree sample is slow on a loaded host.
 write_rows([sample('advisory', 1000) for _ in range(5)])
-slow = cli('run', 'advisory', '--', sys.executable, '-c', 'import time; time.sleep(4)')
+slow = cli('run', 'advisory', '--', sys.executable, '-c', 'import time; time.sleep(6)')
 assert 'slower_than_usual' in slow.stderr and 'measured_ceiling=' in slow.stderr, slow.stderr
 assert rows()[-1]['key'] == 'advisory' and rows()[-1]['exit'] == 0
 assert not any(r.get('event') == 'timeout' and r['key'] == 'advisory' for r in rows())

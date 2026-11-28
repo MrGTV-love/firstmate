@@ -78,7 +78,7 @@ if len(sys.argv) > 1 and os.path.basename(sys.argv[1]) in ('fm-cpu-pass.py', 'fm
         _sleep = _time.sleep
         def _logged(seconds):
             frame = sys._getframe(1)
-            if frame.f_code.co_name == 'cmd_pipeline_start':
+            if frame.f_code.co_name == 'wait_for_admission':
                 with open(os.environ['CASE_ADMISSION_LOG'], 'a') as log:
                     log.write(str(frame.f_locals.get('reason', '?')) + '\\n')
             _sleep(seconds)
@@ -1085,17 +1085,29 @@ def facts(folder, available=40 * GIB, total=128 * GIB):
     (fixture / 'processes.json').write_text(json.dumps([dict(pid=101, ppid=1, comm='daemon', started='s101', rss_bytes=GIB, fleet=False, run=None)]))
 
 
+def host_database(folder):
+    """An empty host run database with the daemon's tables the admission census reads, so every fact reads and none is unknown."""
+    import sqlite3
+    database = folder / 'state.sqlite'
+    with sqlite3.connect(database) as connection:
+        # The same columns as tests/fm_cpu_pass_fixture.py's case(): the daemon's columns this owner reads.
+        connection.execute("CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT, worktree_dir TEXT, branch TEXT, intent TEXT, created_at INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER)), launch_nonce TEXT, head_sha TEXT, submitted_head_sha TEXT)")
+        connection.execute('CREATE TABLE step_results (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_name TEXT NOT NULL, step_order INTEGER NOT NULL, status TEXT NOT NULL, agent_pid INTEGER, round_started_at INTEGER)')
+        connection.execute('CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL)')
+        connection.execute("CREATE TABLE agent_invocations (id TEXT PRIMARY KEY, run_id TEXT, step_name TEXT, purpose TEXT,"
+                           " started_at INTEGER, completed_at INTEGER, duration_ms INTEGER, exit_status TEXT, session_key TEXT,"
+                           " agent TEXT DEFAULT 'claude')")
+    return database
+
+
 def case_soak():
     """H7 a: lanes repeatedly submit heavy, brief-route and light requests while pass-less burners keep the sandbox busy."""
-    import sqlite3
     case = Case('H7a', 'sandbox soak: %d lanes x %d rounds, pool size %d, %d pass-less burners, forced load 500' % (LANES, ROUNDS, N, BURNERS))
     world = World('soak')
     p = N // 2
     names = isolated_scripts(4)
     path = runner_repo(world, names, WORK)
-    database = world.folder / 'state.sqlite'
-    with sqlite3.connect(database) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT)')
+    database = host_database(world.folder)
     (world.folder / 'load.json').write_text(json.dumps([500, 500, 500]))
     (world.folder / 'procs.json').write_text(json.dumps(dict(count=100, limit=10666, error=False)))
     (world.folder / 'fmhome').mkdir()
@@ -1125,7 +1137,9 @@ def case_soak():
                     run, [pyshim, tool('fm-duration.py'), 'run', 'test.soak.lane%d.r%d.%d' % (index, round_, which), '--'] + world.work('brief%d' % index, WORK))
                     for which in range(2)]
                 heavy, briefs = heavy_future.result(), [future.result() for future in brief_futures]
-            light = run(['bash', tool('fm-cpu-pass.sh'), 'pipeline-start', '--', 'true'])
+            # A pending admitted start counts toward the fallback limit (cores // 3), so the light starts get room for
+            # every lane's start at once; the pool size stays N, since pipeline-start reads cores only for that limit.
+            light = run(['bash', tool('fm-cpu-pass.sh'), 'pipeline-start', '--', 'true'], dict(CASE_CORES=str(3 * LANES)))
             with lock:
                 for kind, done in [('heavy', heavy)] + [('brief', done) for done in briefs] + [('light', light)]:
                     if done.returncode == 0:
@@ -1187,12 +1201,9 @@ def case_soak():
 
 def case_wait_cause_control():
     """H7 a control: the soak's recorder does name a short wait for capacity, so a soak that finds none is not blind."""
-    import sqlite3
     case = Case('H7a control', 'a light start held back by a process pile-up for about a second is recorded with a capacity cause')
     world = World('cause-control')
-    database = world.folder / 'state.sqlite'
-    with sqlite3.connect(database) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT)')
+    database = host_database(world.folder)
     (world.folder / 'fmhome').mkdir()
     facts(world.folder)
     procs = world.folder / 'procs.json'
@@ -1252,12 +1263,9 @@ def case_sampler_control():
 
 def case_same_class_order():
     """H5: pipeline starts of one class are admitted in arrival order, and a higher class that arrives later goes first."""
-    import sqlite3
     case = Case('H5 start order', 'three same-class starts and one later machinery start wait behind a pile-up, then run in class and arrival order')
     world = World('start-order')
-    database = world.folder / 'state.sqlite'
-    with sqlite3.connect(database) as connection:
-        connection.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, ci_ready_at INTEGER, awaiting_agent_since INTEGER, repo_id TEXT)')
+    database = host_database(world.folder)
     (world.folder / 'fmhome').mkdir()
     facts(world.folder)
     procs = world.folder / 'procs.json'
