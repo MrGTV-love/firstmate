@@ -66,18 +66,30 @@ herdr_forget_inherited_pane
 # canonicalized project and backend cwd comparisons in the worktree-discovery
 # poll.
 TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-e2e.XXXXXX")
+# shellcheck source=tests/treehouse-test-safety.sh
+. "$ROOT/tests/treehouse-test-safety.sh"
 SESSION="fm-lab-herdr-e2e-$$"
 export HERDR_SESSION="$SESSION"
-WT1=; WT2=
+CLEANED=0
 cleanup_all() {
-  [ -n "$WT1" ] && command -v treehouse >/dev/null 2>&1 && treehouse return --force "$WT1" >/dev/null 2>&1
-  [ -n "$WT2" ] && command -v treehouse >/dev/null 2>&1 && treehouse return --force "$WT2" >/dev/null 2>&1
-  herdr_safe_stop_and_delete "$SESSION"
+  local status=0
+  [ "$CLEANED" = 0 ] || return 0
+  CLEANED=1
+  herdr_safe_stop_and_delete "$SESSION" || status=$?
+  fm_test_treehouse_cleanup || [ "$status" != 0 ] || status=1
   # Spawn leaves each state/<id>.git-hooks strip dir read-only.
   find "$TMP_ROOT" -type d -exec chmod u+rwx {} + 2>/dev/null
   rm -rf "$TMP_ROOT"
+  return "$status"
 }
-trap cleanup_all EXIT
+on_exit() {
+  local status=$?
+  cleanup_all || status=$?
+  trap - EXIT
+  exit "$status"
+}
+trap on_exit EXIT
+fm_test_treehouse_init "$TMP_ROOT" || fail "could not isolate Treehouse"
 fm_herdr_lab_prepare "$SESSION" || fail "could not prepare isolated Herdr lab session"
 
 # shellcheck source=/dev/null
@@ -122,7 +134,8 @@ make_scratch_project() {  # <dir>
   mkdir -p "$dir"
   git -C "$dir" init -q
   printf '# scratch\n' > "$dir/README.md"
-  git -C "$dir" add README.md
+  fm_test_treehouse_project "$dir" || fail "could not configure isolated Treehouse"
+  git -C "$dir" add README.md treehouse.toml
   git -C "$dir" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
   git clone --quiet --bare "$dir" "$dir.origin.git"
   git -C "$dir" remote add origin "file://$dir.origin.git"
@@ -143,7 +156,10 @@ rc=$?
 CM1_META="$PRIMARY_HOME/state/cm1.meta"
 [ -f "$CM1_META" ] || fail "no meta written for cm1"
 assert_contains_local "$(cat "$CM1_META")" "backend=herdr" "cm1 meta missing backend=herdr"
-WT1=$(grep '^worktree=' "$CM1_META" | cut -d= -f2-)
+case "$(grep '^worktree=' "$CM1_META" | cut -d= -f2-)" in
+  "$FM_TEST_TREEHOUSE_ROOT"/.treehouse/*) : ;;
+  *) fail "primary allocation escaped the disposable Treehouse root" ;;
+esac
 CM1_PANE=$(grep '^herdr_pane_id=' "$CM1_META" | cut -d= -f2-)
 [ -n "$CM1_PANE" ] || fail "cm1 meta missing herdr_pane_id"
 pass "real herdr E2E: a primary-shaped home spawns a crewmate on the herdr backend"
@@ -198,7 +214,10 @@ rc=$?
 CM2_META="$SM_HOME/state/cm2.meta"
 [ -f "$CM2_META" ] || fail "no meta written for cm2 (recorded in the SECONDMATE's own state dir - it did its own spawning)"
 assert_contains_local "$(cat "$CM2_META")" "backend=herdr" "cm2 meta missing backend=herdr"
-WT2=$(grep '^worktree=' "$CM2_META" | cut -d= -f2-)
+case "$(grep '^worktree=' "$CM2_META" | cut -d= -f2-)" in
+  "$FM_TEST_TREEHOUSE_ROOT"/.treehouse/*) : ;;
+  *) fail "secondmate allocation escaped the disposable Treehouse root" ;;
+esac
 CM2_PANE=$(grep '^herdr_pane_id=' "$CM2_META" | cut -d= -f2-)
 [ -n "$CM2_PANE" ] || fail "cm2 meta missing herdr_pane_id"
 pass "real herdr E2E: a crewmate spawns successfully FROM a secondmate-shaped home's own fm-spawn.sh process"
@@ -244,7 +263,6 @@ fi
 if ! herdr pane get "$CM2_PANE" --session "$SESSION" >/dev/null 2>&1; then
   fail "tearing down cm1 must not have closed cm2's pane (wrong tab closed)"
 fi
-WT1=
 pass "real herdr E2E: tearing down cm1 closes only its own tab - the secondmate's and cm2's tabs survive untouched"
 
 TD2_OUT="$TMP_ROOT/td2.out"
@@ -260,10 +278,9 @@ fi
 if ! herdr pane get "$SM_PANE" --session "$SESSION" >/dev/null 2>&1; then
   fail "tearing down cm2 must not have closed the secondmate's OWN pane (wrong tab closed)"
 fi
-WT2=
 pass "real herdr E2E: tearing down cm2 closes only its own tab - the secondmate's own tab (same workspace) survives untouched"
 
 fm_backend_herdr_kill "$SESSION:$SM_PANE"
 
-cleanup_all
+cleanup_all || fail "isolated lab or Treehouse cleanup failed"
 trap - EXIT
