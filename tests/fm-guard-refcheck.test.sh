@@ -156,6 +156,15 @@ for ctl in '\u0000' '\u0001'; do
   assert_fails_with "a registry test path holding $ctl fails" "$CTL" "MISSING \"tests/gguard.${ctl}test.sh\" registration=registry:gguard"
 done
 
+# An owner field holding a newline between two existing paths must fail rather than split into two paths.
+OWN_NL=$(fixture owner-newline)
+: >"$OWN_NL/bin/other.sh"
+jq '.guards[0].owner = "bin/wired.sh\nbin/other.sh"' "$OWN_NL/docs/guards/registry.json" >"$OWN_NL/registry.tmp"
+mv "$OWN_NL/registry.tmp" "$OWN_NL/docs/guards/registry.json"
+$GIT "$OWN_NL" add -A
+$GIT "$OWN_NL" -c user.email=t@example.invalid -c user.name=t commit -qm "owner newline"
+assert_fails_with "a registry owner holding a newline between two existing paths fails" "$OWN_NL" 'MISSING "bin/wired.sh\nbin/other.sh" registration=registry:gguard'
+
 REGSPEC=$(fixture regspec)
 jq '.spec = "docs/guard-spec.md"' "$REGSPEC/docs/guards/registry.json" >"$REGSPEC/registry.tmp"
 mv "$REGSPEC/registry.tmp" "$REGSPEC/docs/guards/registry.json"

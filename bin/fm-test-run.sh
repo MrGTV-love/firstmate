@@ -1778,20 +1778,28 @@ moved_cases_script() {  # <basename>
   esac
 }
 
-# add_script_with_moved_cases <path>: add_script, plus the script holding any cases moved out of <path>. A moved script
-# not otherwise selected is recorded in INHERITED_SCRIPTS: under an explicit --jobs it is not refused for lacking a
-# concurrency proof, because the caller did not name it; it runs in the serial phase after every concurrent phase.
-add_script_with_moved_cases() {  # <path>
-  local moved p existing
-  add_script "$1"
-  moved=$(moved_cases_script "$(basename "$1")")
-  [ -n "$moved" ] && [ -f "tests/$moved" ] || return 0
-  p=$(normalize_script_path "tests/$moved")
+# add_inherited_script <path>: add <path> to SCRIPTS as inherited-only (if not already selected), so under an explicit
+# --jobs it runs in the serial phase after every concurrent phase instead of being refused. A later add_script call
+# promotes it to directly selected.
+add_inherited_script() {  # <path>
+  local p existing
+  p=$(normalize_script_path "$1")
   for existing in "${SCRIPTS[@]+"${SCRIPTS[@]}"}"; do
     [ "$existing" = "$p" ] && return 0
   done
   SCRIPTS+=("$p")
   INHERITED_SCRIPTS+=("$p")
+}
+
+# add_script_with_moved_cases <path>: add_script, plus the script holding any cases moved out of <path>. A moved script
+# not otherwise selected is recorded in INHERITED_SCRIPTS: under an explicit --jobs it is not refused for lacking a
+# concurrency proof, because the caller did not name it; it runs in the serial phase after every concurrent phase.
+add_script_with_moved_cases() {  # <path>
+  local moved
+  add_script "$1"
+  moved=$(moved_cases_script "$(basename "$1")")
+  [ -n "$moved" ] && [ -f "tests/$moved" ] || return 0
+  add_inherited_script "tests/$moved"
 }
 
 select_family() {
@@ -2566,7 +2574,13 @@ select_changed() {
     while IFS= read -r s; do
       [ -n "$s" ] || continue
       if [ "$(family_for_basename "$(basename "$s")")" = "$f" ]; then
-        add_script_with_moved_cases "$s"
+        if [ "$f" = real-treehouse ]; then
+          # Entered only via a former owner's changed-path mapping (moved real-Treehouse cases);
+          # if a real-treehouse test script itself changed, wanted_scripts below promotes it via add_script.
+          add_inherited_script "$s"
+        else
+          add_script_with_moved_cases "$s"
+        fi
       fi
     done < <(all_repo_tests)
   done

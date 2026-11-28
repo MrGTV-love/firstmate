@@ -128,16 +128,23 @@ registry_missing=0
 if [ -f "$REGISTRY" ]; then
   while IFS= read -r entry; do
     id=$(printf '%s' "$entry" | jq -r '.id // ""')
-    owner=$(printf '%s' "$entry" | jq -r '.owner // ""')
-    for f in $(printf '%s\n' "$owner" | tr ',' '\n' | tr '+' '\n'); do
-      f=$(printf '%s' "$f" | tr -d ' \t')
-      [ -n "$f" ] || continue
-      if [ ! -e "$ROOT/$f" ]; then
-        registry_missing=$((registry_missing + 1))
-        [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"
-        printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
-      fi
-    done
+    owner_items=$(printf '%s' "$entry" | jq -r '
+      (.owner // "") | (if type == "string" then . else tojson end)
+      | split(",") | map(split("+")) | flatten
+      | map(sub("^[ \t]+"; "") | sub("[ \t]+$"; ""))
+      | map(select(length > 0))
+      | .[]
+      | if (explode | any(. < 32 or . == 127)) then "invalid\t" + tojson else "path\t" + . end') || owner_items=$'invalid\t(the owner field cannot be read)'
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      f=${line#*$'\t'}
+      [ "${line%%$'\t'*}" != path ] || [ ! -e "$ROOT/$f" ] || continue
+      registry_missing=$((registry_missing + 1))
+      [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"
+      printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
+    done <<EOF
+$owner_items
+EOF
     # bin/fm-guard-registry-lib.sh owns how the test field is read. Each item must exist exactly as written; a field
     # that cannot be read, names no item, or holds an item with a control character proves nothing about the guard.
     if ! test_items=$(fm_guard_registry_test_items "$entry"); then

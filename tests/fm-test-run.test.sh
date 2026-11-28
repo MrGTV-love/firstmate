@@ -516,6 +516,25 @@ PY
     assert_grep "--jobs 2 refused: tests/$moved.test.sh is not in the proven-isolated set" "$tmp/err" \
       "naming $moved directly did not keep the explicit --jobs refusal"
   done
+  # A --changed --jobs 2 run for a former owner (bin/fm-teardown.sh) must also admit inherited real-treehouse scripts
+  # into the serial phase, while changing a real-treehouse script itself keeps the explicit --jobs refusal.
+  : >"$repo/bin/fm-teardown.sh"
+  git -C "$repo" init -q
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm inherited-changed-fixture
+  printf '\n' >>"$repo/bin/fm-teardown.sh"
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD --jobs 2) >"$tmp/out" 2>"$tmp/err" || rc=$?
+  [ "$rc" -eq 0 ] || fail "--changed --jobs 2 for bin/fm-teardown.sh refused or failed: $(cat "$tmp/err")"
+  assert_grep "ok - fm-teardown-pool ran" "$tmp/out" "--changed --jobs 2 for bin/fm-teardown.sh did not run fm-teardown-pool"
+  assert_grep "ok - fm-teardown-pool-real-treehouse ran" "$tmp/out" "--changed --jobs 2 for bin/fm-teardown.sh did not run inherited real-treehouse"
+  git -C "$repo" checkout -q -- bin/fm-teardown.sh
+  printf '\n' >>"$repo/tests/fm-teardown-pool-real-treehouse.test.sh"
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD --jobs 2) >"$tmp/out" 2>"$tmp/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "--changed --jobs 2 when real-treehouse script itself changed was not refused"
+  assert_grep "--jobs 2 refused: tests/fm-teardown-pool-real-treehouse.test.sh is not in the proven-isolated set" "$tmp/err" \
+    "direct change to real-treehouse script did not keep explicit --jobs refusal"
   rm -rf "$tmp"
   pass "an inherited moved-case script runs in the serial phase under an explicit --jobs, and a directly named one is still refused"
 }
