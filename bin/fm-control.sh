@@ -1541,6 +1541,7 @@ reassociate_check() {  # <record-index>
 # record names. Anything else would leave two tasks with the same bytes.
 reassociate_group_check() {
   local i j k line field path real target label
+  local -a rec_lines=()
   for ((i=0; i<${#RA_IDS[@]}; i++)); do
     for ((j=0; j<${#RA_IDS[@]}; j++)); do
       [ "$i" != "$j" ] || continue
@@ -1548,7 +1549,11 @@ reassociate_group_check() {
       if [ "$i" -lt "$j" ] && fm_task_copy_paths_overlap "${RA_NEWWT[i]}" "${RA_NEWWT[j]}"; then
         die "task ${RA_IDS[i]}'s replacement copy ${RA_NEWWT[i]} and task ${RA_IDS[j]}'s replacement copy ${RA_NEWWT[j]} overlap, so neither task would own its copy alone; give each task its own copy; nothing was changed"
       fi
-      while IFS= read -r line; do
+      # Pure-bash read, no process substitution per ordered pair of records
+      # (bin/fm-task-copy-lib.sh, fm_task_copy_record_paths_to).
+      fm_task_copy_record_paths_to "${RA_METAS[j]}"
+      rec_lines=(${FM_TASK_COPY_RECORD_PATHS[@]+"${FM_TASK_COPY_RECORD_PATHS[@]}"})
+      for line in ${rec_lines[@]+"${rec_lines[@]}"}; do
         field=${line%% *}
         path=${line#* }
         [ -n "$path" ] || continue
@@ -1571,7 +1576,7 @@ reassociate_group_check() {
           fi
           die "the $label $target is also task ${RA_IDS[j]}'s recorded $field, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh ${RA_IDS[i]}; bin/fm-crew-state.sh ${RA_IDS[j]}) before reassociating"
         done
-      done < <(fm_task_copy_record_paths "${RA_METAS[j]}")
+      done
     done
   done
 }

@@ -2421,12 +2421,12 @@ test_portable_serial_packing_budget_boundary() {
   # and seed the script so the shard sums to exactly the target, then one
   # millisecond above it. The seeded script is the shard's largest, and the
   # shard is still more than that script, so the packed edge is the target.
-  # Unhinted members weigh nothing here, so the count of unhinted production
-  # scripts cannot push the unseeded shard past the target.
+  # Unmeasured members also take the filler weight, so new unhinted suites
+  # cannot outweigh the seeded script as the shard's largest.
   shard_fixture_init "$repo" 1
   sed -i.bak \
     -e 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=1/' \
-    -e 's/^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=.*/PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=0/' \
+    -e 's/^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=.*/PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=1/' \
     "$repo/bin/fm-test-run.sh"
   out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) \
     || fail "one-shard fixture must pass coverage before seeding: $out"
@@ -2437,7 +2437,7 @@ test_portable_serial_packing_budget_boundary() {
     shard_fixture_init "$repo" "$weight"
     sed -i.bak \
       -e 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=1/' \
-      -e 's/^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=.*/PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=0/' \
+      -e 's/^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=.*/PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=1/' \
       "$repo/bin/fm-test-run.sh"
     out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
     if [ "$over" -eq 0 ]; then
@@ -3444,7 +3444,7 @@ test_aggregate_json
 # group file defines is registered by that file or run as a command from another
 # line of it (the omp adoption cases), and no case is registered by two groups.
 test_control_relaunch_groups_partition_one_inventory() {
-  assert_partition_exact control-relaunch array-nested control_relaunch_test_cases '' fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends fm-control-relaunch-adopt fm-control-relaunch-provision fm-disk-floor-relaunch fm-control-successor fm-control-successor-scott
+  assert_partition_exact control-relaunch array-nested control_relaunch_test_cases '' fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends fm-control-relaunch-adopt fm-control-relaunch-provision fm-disk-floor-relaunch
   pass "the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it"
 }
 

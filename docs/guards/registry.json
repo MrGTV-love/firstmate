@@ -170,6 +170,7 @@
     "home-state-write",
     "spawn-reconciled-source",
     "backpass-core-role-inputs",
+    "main-checkout-commit",
     "disk-free-floor"
   ],
   "guards": [
@@ -3777,6 +3778,35 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: task $record_id's cleanup target $canonical overlaps Git common-dir storage $copy_common for task $(basename \"$other_meta\" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the copy-clearance scan for task $1 ran past its ${2}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: $2 ran past its ${1}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it stopped before the next step and released the lock; nothing more was changed; retry the teardown\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "[ \"$1\" -le 0 ] || [ \"$SECONDS\" -lt \"$1\" ] || teardown_scan_deadline_refuse \"$2\" \"$3\""
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "teardown_clearance_deadline_refuse \"$record_id\" \"$scan_limit\"",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "[ \"$released\" != 3 ] || teardown_scan_deadline_refuse \"$scan_limit\" \"the peer walk for task $ID\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "3) teardown_scan_deadline_refuse \"$scan_limit\" \"the ownership walk for foreign copy $(fm_refuse_text \"$copy\") in task $ID's pool slot\" ;;"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $record_id's copy-clearance scan could not create its scratch file under ${TMPDIR:-/tmp}, so no other holder of $canonical is proved absent; nothing was changed; fix the directory (or TMPDIR) and retry the teardown\" >&2"
         }
       ]
     },
@@ -7858,6 +7888,44 @@
       "exemptions": [],
       "instrumented": false,
       "status": "active"
+    },
+    {
+      "id": "main-checkout-commit",
+      "version": "1",
+      "owner": "bin/fm-main-checkout-hook.sh",
+      "emitters": [
+        "bin/fm-main-checkout-hook.sh"
+      ],
+      "invariant": "Direct commits or merges never land in a repository's primary checkout when the managed hook is installed.",
+      "layer": "runtime-block",
+      "source": "git rev-parse --path-format=absolute --git-dir and --git-common-dir physical path comparison, plus hook marker inspection and git rev-parse --path-format=absolute --git-path hooks on install/remove/status",
+      "trigger": "git invokes the installed pre-commit or pre-merge-commit hook in the primary checkout without FM_ALLOW_MAIN_COMMIT=1, or worktree identity cannot be resolved, or the hook's guard script is missing, or install/remove encounters an unmanaged or symlinked hook, a core.hooksPath that redirects hooks away from the common dir, or (install only) a linked-worktree copy with no executable primary-checkout copy",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Commit from an isolated worktree via bin/fm-spawn.sh or treehouse get --base main -b fm/<topic>, or pass FM_ALLOW_MAIN_COMMIT=1 for an emergency primary-checkout commit.",
+      "budget": 1,
+      "budget_reason": "One refusal per attempted primary-checkout commit or merge; clearing requires switching to a linked worktree or explicitly setting FM_ALLOW_MAIN_COMMIT=1.",
+      "telemetry": "state/guard-events.jsonl; one main-checkout-commit event per check decision with guard, decision, source_ok, and override.",
+      "test": "tests/fm-main-checkout-hook.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-main-checkout-hook.sh",
+          "match": "fm-main-checkout-hook: refused:",
+          "count": 15
+        },
+        {
+          "file": "bin/fm-main-checkout-hook.sh",
+          "match": "fm-guard-event.sh\" main-checkout-commit"
+        }
+      ]
     }
   ],
   "excluded": [
