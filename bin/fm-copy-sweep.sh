@@ -542,6 +542,7 @@ emit_clone() {  # <pool> <container> <clone>
 LIVE_TASK_COPIES=
 read_live_task_copies() {
   local state_dir meta kind field path line
+  local -a rec_lines=()
   LIVE_TASK_COPIES=
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
@@ -549,12 +550,15 @@ read_live_task_copies() {
       scan_out_of_time && return
       kind=$(fm_meta_get "$meta" kind)
       case "${kind:-ship}" in ship|scout) ;; *) continue ;; esac
-      while IFS= read -r line; do
+      # Pure-bash read, no process substitution per record (bin/fm-task-copy-lib.sh).
+      fm_task_copy_record_paths_to "$meta"
+      rec_lines=(${FM_TASK_COPY_RECORD_PATHS[@]+"${FM_TASK_COPY_RECORD_PATHS[@]}"})
+      for line in ${rec_lines[@]+"${rec_lines[@]}"}; do
         field=${line%% *}
         case "$field" in worktree|prior_worktree) ;; *) continue ;; esac
         path=$(fm_task_copy_canonical_dir "${line#* }") || continue
         LIVE_TASK_COPIES="$LIVE_TASK_COPIES$path"$'\t'"${meta##*/}"$'\n'
-      done < <(fm_task_copy_record_paths "$meta")
+      done
     done
   done
 }
