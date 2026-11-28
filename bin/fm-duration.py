@@ -1037,7 +1037,12 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
     if pid and not gone:
         cpu, runnable = tree_cpu(pid, observed)
         if cpu is None:
-            warn_blind_telemetry()
+            # A root reaped after the process table was read fails its native
+            # CPU read too. Like a root absent from the table, that is no
+            # verdict, not blind telemetry.
+            table = ps_table()
+            if table is None or pid in table:
+                warn_blind_telemetry()
             return 0
         if not any(child == pid for child, _ in observed):
             return 0

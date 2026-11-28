@@ -2526,7 +2526,10 @@ run_owned_capture() {
   trap 'FM_CHECK_SIGNAL_PENDING=1' HUP INT TERM
   set -m
   check_started=$SECONDS
-  (
+  # Every branch below sends the check's own stderr elsewhere, so the group's
+  # stderr is discarded before the fork for the same bash 3.2 setpgid race as
+  # watcher_capture.
+  { (
     eval "exec $FM_CHECK_WAIT_FD<&-"
     # Only the watcher retains this writer. SIGKILL therefore gives the shared
     # guardian an independent owner-loss signal even when EXIT cannot run.
@@ -2538,7 +2541,7 @@ run_owned_capture() {
     else
       "$@" 2>&1
     fi
-  ) > "$FM_CHECK_OUTPUT" &
+  ) > "$FM_CHECK_OUTPUT" & } 2>/dev/null
   FM_ACTIVE_CHECK_PID=$!
   FM_ACTIVE_CHECK_PGID=$FM_ACTIVE_CHECK_PID
   FM_ACTIVE_CHECK_GRACE=$capture_grace

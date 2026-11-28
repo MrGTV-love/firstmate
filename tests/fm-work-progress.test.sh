@@ -465,6 +465,31 @@ def darwin_root_native_failure():
                 f'complete truly idle tree was not stopped: {code} {errors}')
 case('darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle', darwin_root_native_failure)
 
+def darwin_root_reaped_during_sample():
+    import contextlib
+    import io
+    from unittest.mock import patch
+
+    home, _ = fixture('darwin-root-reaped-during-sample')
+    spec = importlib.util.spec_from_file_location('root_reaped_duration', home / 'bin/fm-duration.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    record = home / 'state/progress.json'
+    # The first table still lists the root; it is reaped before its native
+    # read, so that read fails and the next table no longer lists it.
+    tables = iter([{100: (1, 0.0, ('root-start',), False)}, {}])
+    errors = io.StringIO()
+    with patch.object(module, 'proc_table', return_value=None), \
+         patch.object(module, 'ps_table', side_effect=lambda: next(tables)), \
+         patch.object(module, 'darwin_cpu_reader', return_value=lambda pid: None), \
+         patch.object(sys, 'platform', 'darwin'), \
+         patch.object(sys, 'argv', ['fm-duration.py', 'progress-check', str(record), '100', '1']), \
+         contextlib.redirect_stderr(errors):
+        code = module.main()
+    require(code == 0 and not errors.getvalue() and not record.exists(),
+            f'a root reaped during its sample was reported as blind telemetry: {code} {errors.getvalue()}')
+case('darwin_root_reaped_during_sample_is_no_verdict_and_not_blind_telemetry', darwin_root_reaped_during_sample)
+
 def default_run_root_native_failure():
     import io
     import resource
