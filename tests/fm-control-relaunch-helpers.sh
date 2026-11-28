@@ -58,12 +58,56 @@ relaunch_cleanup() {
 # The same lifecycle-modelling tmux stub as tests/fm-control.test.sh: the
 # harness's exit command stops the agent, and a launch-brief literal starts the
 # harness named in `becomes`.
+# A legacy record (published before launch proofs existed) has no launch_proof
+# line at all; an empty value is no record (Main 1709 ruling 2).
+drop_launch_proof() { # <meta>
+  grep -v '^launch_proof=' "$1" > "$1.next" && mv "$1.next" "$1"
+}
+
 make_process_table_stub() { # <case-dir>
   local real_python
   real_python=$(command -v python3)
   cat > "$1/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+# A natively restored claude: the harness is the attributed foreground process.
+# With claude-wrapper it is the recorded d1 shape instead: the TeamClaude launcher
+# is the foreground process and the harness its direct child in its group.
+if [ -f "$D/claude-restore" ]; then
+  uuid=$(cat "$D/claude-restore")
+  claude_args="claude --resume $uuid"
+  if [ -f "$D/claude-wrapper" ]; then
+    case "$*" in
+      '-axo pid=,ppid=') printf '2000000000 1\n2000000001 2000000000\n'; exit 0 ;;
+      '-axo pid=,ppid=,pgid=') printf '2000000000 1 2000000000\n2000000001 2000000000 2000000000\n'; exit 0 ;;
+      '-p 2000000000 -o comm=') printf 'node\n'; exit 0 ;;
+      '-p 2000000000 -o args=') printf 'node /host/nvm/bin/teamclaude run -- --resume %s\n' "$uuid"; exit 0 ;;
+      '-p 2000000001 -o comm=') printf '2.1.316\n'; exit 0 ;;
+      '-p 2000000001 -o args=') printf '%s\n' "$claude_args"; exit 0 ;;
+      '-p 2000000000 -o lstart='|'-p 2000000001 -o lstart=') printf 'Mon Oct 27 16:58:42 2026\n'; exit 0 ;;
+    esac
+  else
+    case "$*" in
+      '-axo pid=,ppid=') printf '2000000000 1\n'; exit 0 ;;
+      '-axo pid=,ppid=,pgid=') printf '2000000000 1 2000000000\n'; exit 0 ;;
+      '-p 2000000000 -o comm=') printf '2.1.316\n'; exit 0 ;;
+      '-p 2000000000 -o args=') printf '%s\n' "$claude_args"; exit 0 ;;
+      '-p 2000000000 -o lstart=') printf 'Mon Oct 27 16:58:42 2026\n'; exit 0 ;;
+    esac
+  fi
+fi
+# The process-group table a claude refusal check reads: each fake agent leads
+# its own group, then whatever the real table lists (Main 1709 ruling 1).
+if [ "$*" = '-axo pid=,ppid=,pgid=' ]; then
+  [ ! -f "$D/recovery-pid" ] || printf '%s 1 %s\n' "$(cat "$D/recovery-pid")" "$(cat "$D/recovery-pid")"
+  [ -f "$D/recovery-pid" ] || [ ! -f "$D/recovery-case-id" ] || printf '2000000000 1 2000000000\n'
+  for env_file in "$D"/herdr-managed-env-*; do
+    [ -f "$env_file" ] || continue
+    printf '%s 1 %s\n' "${env_file##*-}" "${env_file##*-}"
+  done
+  /bin/ps -axo pid=,ppid=,pgid= 2>/dev/null
+  exit 0
+fi
 # The one process a case stages as holding the task's worktree.
 if [ -f "$D/holder-pid" ] && [ "${1:-}" = -p ] && [ "${2:-}" = "$(cat "$D/holder-pid")" ]; then
   case "${3:-} ${4:-}" in
@@ -93,7 +137,8 @@ if [ "$#" = 2 ] && [ "$1" = - ]; then
   if [ -f "$D/herdr-pids/$pid" ]; then D=$(cat "$D/herdr-pids/$pid"); fi
   expected=2000000000
   [ ! -f "$D/recovery-pid" ] || expected=$(cat "$D/recovery-pid")
-  if [ -f "$D/recovery-case-id" ] && [ "$pid" = "$expected" ]; then
+  if [ -f "$D/recovery-case-id" ] \
+    && { [ "$pid" = "$expected" ] || { [ -f "$D/claude-wrapper" ] && [ "$pid" = "$((expected + 1))" ]; }; }; then
     [ ! -f "$D/recovery-env-unreadable" ] || exit 1
     printf 'PATH=/test\n'
     if [ -f "$D/launched-command" ]; then
@@ -126,17 +171,49 @@ SH
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
-if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
-  [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
-  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
-  exit 0
-fi
+# Real lsof escapes backslashes and nonprinting bytes in a name, even with -F0.
 encode_cwd() {
   local path=$1
   path=${path//\\/\\\\}
   path=${path//$'\xc3\xa9'/\\xc3\\xa9}
   printf '%s' "$path"
 }
+if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
+  [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
+  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(encode_cwd "$(cat "$D/adoption-cwd")")"
+  exit 0
+fi
+# The kernel cwd a claude refusal check reads for a fake agent (Main 1709
+# ruling 1): agent-cwd-<pid> when a case stages one, else the recovery case's
+# recorded worktree, else the directory the fake Herdr opened the agent's pane
+# in, else the case's staged fake/cwd.
+if [ "${*: -1}" = pn0 ]; then
+  agent=
+  record=
+  prev=
+  for a in "$@"; do [ "$prev" != -p ] || agent=$a; prev=$a; done
+  cwd=
+  if [ -f "$D/agent-cwd-$agent" ]; then
+    cwd=$(cat "$D/agent-cwd-$agent")
+  elif [ -f "$D/recovery-case-id" ]; then
+    # The record sits in this home's state, or in a host verb's state override.
+    for record in "${FM_STATE_OVERRIDE:-$FM_HOME/state}" "$FM_HOME/state"; do
+      record="$record/$(cat "$D/recovery-case-id").meta"
+      [ -f "$record" ] || continue
+      cwd=$(grep '^worktree=' "$record" | tail -1 | cut -d= -f2-)
+      break
+    done
+  elif [ -n "$agent" ] && [ "$agent" -ge 2100000000 ] 2>/dev/null; then
+    for f in "$D"/herdr-cwd-*; do
+      [ -f "$f" ] && [ "${f##*[!0-9]}" = "$((agent - 2100000000))" ] && cwd=$(cat "$f")
+    done
+    # A case without a pane directory stages the agent's directory as fake/cwd.
+    [ -n "$cwd" ] || [ ! -f "$D/cwd" ] || cwd=$(cat "$D/cwd")
+  fi
+  [ -n "$cwd" ] || exit 1
+  printf 'p%s\0\nfcwd\0n%s\0\n' "$agent" "$(encode_cwd "$cwd")"
+  exit 0
+fi
 excluded=
 while [ "$#" -gt 0 ]; do
   if [ "$1" = -p ]; then excluded=${2:-}; shift; fi
@@ -942,6 +1019,15 @@ case "${1:-} ${2:-}" in
       '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}'
     exit 0 ;;
   'agent get')
+    # Main 1946: a one-shot record rewrite at the agent-state read, which the
+    # control plane makes after its startup read and before its launch judge.
+    # The file names the record and the harness line to append (last wins).
+    if [ -f "$D/rewrite-harness-on-agent-get" ]; then
+      IFS=$'\t' read -r rewrite_meta rewrite_harness < "$D/rewrite-harness-on-agent-get"
+      rm -f "$D/rewrite-harness-on-agent-get"
+      printf 'harness=%s\n' "$rewrite_harness" >> "$rewrite_meta"
+      printf '%s' "$rewrite_harness" > "$D/recovery-harness"
+    fi
     if [ -f "$D/recovery-inspection-interrupt" ]; then
       : > "$D/recovery-inspection-entered"
       kill -TERM "$(cat "$D/recovery-inspection-interrupt")"
@@ -979,6 +1065,21 @@ case "${1:-} ${2:-}" in
         if [ -f "$D/recovery-foreign-foreground" ]; then
           printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"python3","argv":["python3","-c","input()"],"cmdline":"python3 -c input()"}]}}}\n' \
             "$(cat "$D/herdr-pane")" "$pid"
+          exit 0
+        fi
+        if [ -f "$D/claude-wrapper" ]; then
+          jq -nc --arg pane "$(cat "$D/herdr-pane")" \
+            '{result:{type:"pane_process_info",process_info:{pane_id:$pane,shell_pid:4242,
+              foreground_process_group_id:2000000000,
+              foreground_processes:[{pid:2000000000,name:"node",argv0:"node"},
+                {pid:2000000001,name:"2.1.316",argv0:"claude"}]}}}'
+          exit 0
+        fi
+        if [ -f "$D/claude-restore" ]; then
+          jq -nc --arg pane "$(cat "$D/herdr-pane")" \
+            '{result:{type:"pane_process_info",process_info:{pane_id:$pane,shell_pid:4242,
+              foreground_process_group_id:2000000000,
+              foreground_processes:[{pid:2000000000,name:"2.1.316",argv0:"claude"}]}}}'
           exit 0
         fi
         harness=omp
@@ -1028,8 +1129,8 @@ case "${1:-} ${2:-}" in
     case "$payload" in
       ". '"*"'") staged=${payload#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || payload=$(cat "$staged") ;;
     esac
-    if [ -f "$D/recovery-case-id" ] && [ "$payload" = /quit ]; then
-      : > "$D/exit-pending"
+    if [ -f "$D/recovery-case-id" ] && { [ "$payload" = /quit ] || [ "$payload" = /exit ]; }; then
+      printf '%s' "$payload" > "$D/exit-pending"
     fi
     case "$payload" in
       *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
@@ -1058,8 +1159,10 @@ case "${1:-} ${2:-}" in
     exit 0 ;;
   'pane read')
     if [ -f "$D/recovery-case-id" ]; then
-      if [ -f "$D/exit-pending" ]; then
-        printf '╭── π > recovery╮\n╰─ /quit ─╯\n'
+      if [ -f "$D/exit-picker" ]; then
+        printf ' Background work is running\n\n ❯ 1. Exit and stop tasks\n   2. Keep working\n\n Enter to confirm · Esc to cancel\n'
+      elif [ -f "$D/exit-pending" ]; then
+        printf '╭── π > recovery╮\n╰─ %s ─╯\n' "$(cat "$D/exit-pending")"
       elif [ -f "$D/recovery-pending" ]; then
         printf '╭── π > recovery╮\n╰─ %s ─╯\n' "$(cat "$D/recovery-pending")"
       else
@@ -1074,9 +1177,20 @@ case "${1:-} ${2:-}" in
           '!'*|'$'*) : > "$D/recovery-pending" ;;
         esac
       fi
-      if [ "${4:-}" = ctrl+d ] \
-        || { [ "${4:-}" = enter ] && [ -f "$D/exit-pending" ]; }; then
-        rm -f "$D/herdr-agent-live" "$D/exit-pending"
+      # picker-on-exit: the Enter that submits /exit opens Claude's
+      # background-task picker instead of stopping the agent, and the pane's
+      # launch proof changes as it does (unpinned or unreadable), so the control
+      # plane's picker-time attribution recheck is what decides.
+      if [ "${4:-}" = enter ] && [ -f "$D/exit-pending" ] && [ -f "$D/picker-on-exit" ] && [ ! -f "$D/exit-picker" ]; then
+        : > "$D/exit-picker"
+        rm -f "$D/exit-pending"
+        case "$(cat "$D/picker-on-exit")" in
+          unreadable) : > "$D/recovery-env-unreadable" ;;
+          unpinned) rm -f "$D/recovery-spawn-gen" ;;
+        esac
+      elif [ "${4:-}" = ctrl+d ] \
+        || { [ "${4:-}" = enter ] && { [ -f "$D/exit-pending" ] || [ -f "$D/exit-picker" ]; }; }; then
+        rm -f "$D/herdr-agent-live" "$D/exit-pending" "$D/exit-picker"
       fi
     fi
     exit 0 ;;

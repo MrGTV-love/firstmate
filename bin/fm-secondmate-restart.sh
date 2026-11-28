@@ -51,6 +51,11 @@
 # request text, the bound, the failure vocabulary, and this report are all
 # computed here in the primary and are identical for both.
 #
+# Before any effect (pending-reply record, persistence request, fallback nudge),
+# a Herdr mate whose agent is not positively stopped and not attributed to its
+# task by the launch-proof owner (read on the host for a remote mate) is
+# reported unreached and receives none; the decision is made again right before
+# a fallback nudge.
 # Nothing here forces, stashes, or discards anything. bin/fm-control.sh owns the
 # restart transaction, its checkpoint, its journal, and its rollback; a refusal
 # before the agent is stopped leaves the mate running exactly as it was.
@@ -72,7 +77,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
-  sed -n '2,65{s/^# \{0,1\}//;p;}' "$0"
+  sed -n '2,70{s/^# \{0,1\}//;p;}' "$0"
 }
 
 case "${1:-}" in
@@ -144,17 +149,42 @@ first_reported_line() {  # <text>
 
 # Send the ordinary re-read steer to a mate this pass will not restart, and say
 # plainly which it was. A nudge is a partial reload and is never reported as more.
-fall_back_to_nudge() {  # <id> <reason>
-  local id=$1 reason=$2 out
-  if out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+fall_back_to_nudge() {  # <id> <reason> [<array-index>]
+  local id=$1 reason=$2 i=${3:-} out line withheld
+  local -a route_env=()
+  # The pane may have changed hands since the first decision (the persistence
+  # wait can last minutes): decide again on this mate's own record right now.
+  if ! fm_secondmate_restart_attribution_now "$STATE/$id.meta"; then
+    report_unreached "$id" "$reason; at the fallback nudge, $FM_SECONDMATE_RESTART_REASON"
+    return
+  fi
+  # One compared route per mate (Main 1777 (2), Main 1807 (6)): the fresh
+  # decision must name the route the first decision compared, on every path.
+  # A mate whose first decision kept no route has nothing to compare: refuse.
+  if [ -z "$i" ] || [ -z "${ROUTE_PLACEMENT[i]:-}" ] \
+    || ! fm_secondmate_restart_route_is "${ROUTE_PLACEMENT[i]}" "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" \
+      "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}"; then
+    report_unreached "$id" "$reason; at the fallback nudge, its route is no longer the one its first decision compared"
+    return
+  fi
+  # A remote nudge travels only over the route this decision compared.
+  while IFS= read -r line; do route_env+=("$line"); done < <(fm_secondmate_restart_route_env)
+  if out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     "$SCRIPT_DIR/fm-send.sh" "$id" --answers-none "$FM_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
     nudged_count=$((nudged_count + 1))
-    printf 'nudged: %s: %s\n' "$id" "$reason"
+    withheld=$(withheld_doorbell "$out")
+    printf 'nudged: %s: %s%s\n' "$id" "$reason" "${withheld:+; the re-read message is recorded, but $withheld}"
   else
     unreached_count=$((unreached_count + 1))
     printf 'unreached: %s: %s; the re-read message could not be delivered either: %s\n' \
       "$id" "$reason" "$(first_reported_line "$out")"
   fi
+}
+
+# The send's own "doorbell withheld" report (Main 1874 (i)), flattened to one
+# line, or nothing: the steer was recorded but its doorbell was not rung.
+withheld_doorbell() {  # <send-output>
+  printf '%s\n' "$1" | sed -n '/doorbell withheld/{s/^fm-send: //;s/^notice: //;s/[[:space:]]\{1,\}/ /g;p;q;}'
 }
 
 report_unreached() {  # <id> <reason>
@@ -166,12 +196,20 @@ restart_mate() {  # <array-index>
   local i=$1 id restart_out restart_rc restart_reason ran_on
   id=${IDS[$i]}
   if [ "${PLACEMENT[i]}" = remote ]; then
+    # The relaunch crosses only the route this mate's decision compared: fm-on
+    # refuses before ssh when its resolved route differs (Main 1777 (2)), and
+    # the host refuses an endpoint other than the compared target (Main 1809).
     restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+      FM_ON_EXPECTED_HOST="${ROUTE_HOST[i]}" FM_ON_EXPECTED_ROOT="${ROUTE_ROOT[i]}" \
+      FM_ON_EXPECTED_HOME="${ROUTE_HOME[i]}" FM_REMOTE_RELAUNCH_EXPECTED_TARGET="${ROUTE_TARGET[i]}" \
       "$SCRIPT_DIR/fm-remote-secondmate-relaunch.sh" \
       "$id" "${HARNESS[i]}" "${MODEL[i]:-default}" "${EFFORT[i]:-default}" < /dev/null 2>&1)
     restart_rc=$?
   else
+    # The control plane relaunches only the endpoint this mate's decision
+    # compared (Main 1856 F3).
     restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+      FM_CONTROL_EXPECTED_ENDPOINT="${ROUTE_TARGET[i]}" \
       "$SCRIPT_DIR/fm-control.sh" "$id" relaunch 2>&1)
     restart_rc=$?
   fi
@@ -259,14 +297,46 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   HARNESS[i]=""
   MODEL[i]=""
   EFFORT[i]=""
+  ROUTE_PLACEMENT[i]="" ROUTE_HOST[i]="" ROUTE_ROOT[i]="" ROUTE_HOME[i]="" ROUTE_TARGET[i]=""
   if ! fm_secondmate_restart_capable "$STATE/$id.meta"; then
     REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
+      PLAN[i]="refused"
+      REASON[i]="${REASON[i]}; $FM_SECONDMATE_RESTART_REASON"
+    else
+      # The fallback nudge must use this first compared route (Main 1807 (6)).
+      ROUTE_PLACEMENT[i]=$FM_SECONDMATE_RESTART_ROUTE_PLACEMENT ROUTE_HOST[i]=$FM_SECONDMATE_RESTART_ROUTE_HOST
+      ROUTE_ROOT[i]=$FM_SECONDMATE_RESTART_ROUTE_ROOT ROUTE_HOME[i]=$FM_SECONDMATE_RESTART_ROUTE_HOME
+      ROUTE_TARGET[i]=$FM_SECONDMATE_RESTART_ROUTE_TARGET
+    fi
     i=$((i + 1))
     continue
   fi
   PLACEMENT[i]=$FM_SECONDMATE_RESTART_PLACEMENT
   HOST[i]=$FM_SECONDMATE_RESTART_HOST
   HARNESS[i]=$FM_SECONDMATE_RESTART_HARNESS
+  CAPABLE_BYTES=$FM_SECONDMATE_RESTART_CAPABLE_BYTES
+  # Attribution is decided before any effect reaches the pane: an agent that is
+  # not positively this task's own gets no request, no record and no nudge.
+  if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
+    PLAN[i]="refused"
+    REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    i=$((i + 1))
+    continue
+  fi
+  # The capability and attribution decisions must rest on the same record
+  # bytes (Main 1874 rule S), so the placement and host the relaunch branches
+  # on are the route the attribution compared.
+  if [ -z "$CAPABLE_BYTES" ] || [ "$FM_SECONDMATE_RESTART_RECORD_BYTES" != "$CAPABLE_BYTES" ]; then
+    PLAN[i]="refused"
+    REASON[i]="its record changed between its capability and attribution decisions, so no request, record or nudge was sent to it"
+    i=$((i + 1))
+    continue
+  fi
+  # Keep the one route this decision compared for the request and the relaunch.
+  ROUTE_PLACEMENT[i]=$FM_SECONDMATE_RESTART_ROUTE_PLACEMENT
+  ROUTE_HOST[i]=$FM_SECONDMATE_RESTART_ROUTE_HOST ROUTE_ROOT[i]=$FM_SECONDMATE_RESTART_ROUTE_ROOT
+  ROUTE_HOME[i]=$FM_SECONDMATE_RESTART_ROUTE_HOME ROUTE_TARGET[i]=$FM_SECONDMATE_RESTART_ROUTE_TARGET
   if [ "${PLACEMENT[i]}" = remote ]; then
     # A local relaunch re-resolves this home's durable secondmate pin on its own,
     # which is the one owner of that resolution. A remote one cannot: it runs in
@@ -295,20 +365,50 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     fi
   fi
 
+  # No pending-reply expectation exists before every check that can refuse
+  # (Main 1777 (3), Main 1807 (7)): a check-only decision runs now, asking a
+  # remote mate's host again (its endpoint and its agent), and must name the
+  # same compared route; only then is the expectation created.
+  if ! fm_secondmate_restart_attribution "$STATE/$id.meta"; then
+    PLAN[i]="refused"
+    REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    i=$((i + 1))
+    continue
+  fi
+  if ! fm_secondmate_restart_route_is "${ROUTE_PLACEMENT[i]}" "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" \
+    "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}" || [ "$FM_SECONDMATE_RESTART_RECORD_BYTES" != "$CAPABLE_BYTES" ]; then
+    PLAN[i]="refused"
+    REASON[i]="its route or record changed after its first decision, so no request, record or nudge was sent to it"
+    i=$((i + 1))
+    continue
+  fi
   if ! corr=$(fm_pending_reply_create "$FM_HOME" "$STATE" "$id" \
     "$FM_SECONDMATE_PERSIST_REQUEST"); then
     REASON[i]="its answer about the open work cannot be tracked, so a clean reload could not be proven"
     i=$((i + 1))
     continue
   fi
-  if ! send_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  # A remote request travels only over the route this mate's decision compared.
+  route_env=()
+  while IFS= read -r route_line; do route_env+=("$route_line"); done < <(fm_secondmate_restart_route_env \
+    "${ROUTE_PLACEMENT[i]}" "${ROUTE_HOST[i]}" "${ROUTE_ROOT[i]}" "${ROUTE_HOME[i]}" "${ROUTE_TARGET[i]}")
+  if ! send_out=$(env "${route_env[@]+"${route_env[@]}"}" FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SCRIPT_DIR/fm-send.sh" "$id" --answers-none "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
-    fm_pending_reply_discard_undelivered "$STATE" "$corr" >/dev/null 2>&1 || true
-    REASON[i]="the request to write down its open work could not be delivered: $(first_reported_line "$send_out")"
+    # A refused or failed send is this mate's final outcome for the pass (Main
+    # 1860, Main 1874 finding 6): it is refused, phase B sends it nothing, and a
+    # pending-reply record that cannot be discarded is reported, never hidden.
+    PLAN[i]="refused"
+    REASON[i]="the request to write down its open work was not delivered, so nothing else was sent to it: $(first_reported_line "$send_out")"
+    if ! discard_out=$(fm_pending_reply_discard_undelivered "$STATE" "$corr" 2>&1); then
+      REASON[i]="${REASON[i]}; its pending-reply record $corr could not be discarded (it is marked delivered or could not be removed${discard_out:+: $(first_reported_line "$discard_out")}), so Main inspects $(fm_pending_reply_path "$STATE" "$corr") by hand"
+    fi
     i=$((i + 1))
     continue
   fi
+  # A request recorded without its doorbell is still delivered; say so now.
+  withheld=$(withheld_doorbell "$send_out")
+  [ -z "$withheld" ] || printf 'notice: %s: the request to write down its open work is recorded, but %s\n' "$id" "$withheld"
   CORR[i]=$corr
   DEADLINE[i]=$(($(date +%s) + PERSIST_WAIT))
   PLAN[i]="persisted-pending"
@@ -328,8 +428,11 @@ i=0
 while [ "$i" -lt "${#IDS[@]}" ]; do
   if [ "${PLAN[i]}" = persisted-pending ]; then
     pending_count=$((pending_count + 1))
+  elif [ "${PLAN[i]}" = refused ]; then
+    report_unreached "${IDS[$i]}" "${REASON[i]}"
+    PLAN[i]="done"
   else
-    fall_back_to_nudge "${IDS[$i]}" "${REASON[i]}"
+    fall_back_to_nudge "${IDS[$i]}" "${REASON[i]}" "$i"
     PLAN[i]="done"
   fi
   i=$((i + 1))
@@ -364,7 +467,7 @@ while [ "$((pending_count + restart_active_count))" -gt 0 ]; do
         launch_restart "$i"
       else
         fall_back_to_nudge "${IDS[$i]}" \
-          "it did not confirm within ${PERSIST_WAIT}s that its open work is written down, so its conversation was not spent"
+          "it did not confirm within ${PERSIST_WAIT}s that its open work is written down, so its conversation was not spent" "$i"
         PLAN[i]="done"
         pending_count=$((pending_count - 1))
       fi

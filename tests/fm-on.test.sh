@@ -662,4 +662,33 @@ set -e
 [ "$(grep -c mutation "$REMOTE_HOME/mutations")" -eq 1 ] || fail "ambiguous mutation did not execute exactly once"
 pass "unreachable and ambiguous transport failures are surfaced without retry"
 
+# Main 1709 ruling 3 and Main 1714 (a): an expected route, when set, must equal
+# the route fm-on resolves, or it refuses before ssh; unset leaves fm-on as it was.
+route_calls() { wc -l < "$TMP_ROOT/connect.calls" 2>/dev/null | tr -d ' '; }
+: > "$TMP_ROOT/connect.calls"
+connect_probe ios fm-probe-two.sh >/dev/null 2>&1 || fail "an unset expected route changed fm-on"
+[ "$(route_calls)" -eq 1 ] || fail "an unset expected route did not reach ssh"
+FM_ON_EXPECTED_HOST=remote-mac FM_ON_EXPECTED_ROOT="$REMOTE_ROOT" FM_ON_EXPECTED_HOME="$REMOTE_HOME" \
+  connect_probe ios fm-probe-two.sh >/dev/null 2>&1 || fail "a matching expected route was refused"
+[ "$(route_calls)" -eq 2 ] || fail "a matching expected route did not reach ssh"
+for field in host root home; do
+  host=remote-mac root=$REMOTE_ROOT home=$REMOTE_HOME
+  case "$field" in host) host=other-mac ;; root) root=/other/root ;; home) home=/other/home ;; esac
+  set +e
+  out=$(FM_ON_EXPECTED_HOST=$host FM_ON_EXPECTED_ROOT=$root FM_ON_EXPECTED_HOME=$home \
+    connect_probe ios fm-probe-two.sh 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "an expected route with another $field was accepted"
+  assert_contains "$out" "not the expected route" "an expected route with another $field did not name the route"
+  [ "$(route_calls)" -eq 2 ] || fail "an expected route with another $field reached ssh"
+done
+set +e
+out=$(FM_ON_EXPECTED_HOST=remote-mac connect_probe ios fm-probe-two.sh 2>&1)
+rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "a partly set expected route was accepted"
+[ "$(route_calls)" -eq 2 ] || fail "a partly set expected route reached ssh"
+pass "an expected route refuses before ssh unless the resolved host, root and home equal it; unset is unchanged"
+
 echo "ALL TESTS PASSED"

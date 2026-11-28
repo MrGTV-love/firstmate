@@ -165,6 +165,7 @@
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
     "teardown-entry-preflight",
+    "secondmate-restart-attribution",
     "guard-lint-touched-registry",
     "home-state-write",
     "spawn-reconciled-source",
@@ -942,17 +943,17 @@
       "id": "omp-adopt-launch-proof",
       "version": "1",
       "owner": "bin/fm-launch-proof-lib.sh",
-      "invariant": "Omp adoption changes a session binding only after proving the exact unpinned replacement process.",
+      "invariant": "No session record is repaired and no agent without its launch pin is adopted: the adopt verb refuses every task and changes nothing (Main 1874, Main 1901).",
       "layer": "runtime-block",
-      "source": "the recorded task endpoint, unique foreground PID, process identity, launch generation and absolute session-file registration; existing decision points: site:bin/fm-control.sh:0dfe8ac0db, site:bin/fm-launch-proof-lib.sh:d457d36dad",
-      "trigger": "adopt (rewrite an omp session record) unless the recorded PID is not the live one, not a live omp, and the live process is provably unpinned / fm-control adopt of a live omp process as a task's agent unless all proofs hold: one recorded window, readable pane, one unique foreground pid, pid is omp, not pinned to another spawn_gen, readable absolute session-file registration matching the task session",
+      "source": "the adopt verb itself, which has no adoption route left for any harness (Main 1637 for claude, Main 1874 and Main 1901 for omp); an unpinned omp agent is unmanaged in bin/fm-launch-proof-lib.sh and every lifecycle consumer refuses it with its named cause",
+      "trigger": "fm-control <task> adopt, for any task",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "Preserve both session records; establish the exact unpinned live omp process before retrying FM_HOME=<home> bash bin/fm-control.sh <task> adopt.",
+      "remedy": "Stop the agent by hand in its pane and relaunch it with bin/fm-control.sh <task> relaunch, or decide the lane by hand.",
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
-      "test": "tests/fm-control-relaunch-recovery.test.sh",
+      "test": "tests/fm-control-relaunch-backends.test.sh",
       "tier": "B",
       "harm": "irreversible",
       "proxy": false,
@@ -964,47 +965,7 @@
       "sites": [
         {
           "file": "bin/fm-control.sh",
-          "match": "echo \"adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed\" >&2"
-        },
-        {
-          "file": "bin/fm-control.sh",
-          "match": "|| die \"adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates\""
-        },
-        {
-          "file": "bin/fm-control.sh",
-          "match": "|| die \"adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed\""
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "*) echo 'adopt refused: session proof needs an absolute omp session-file registration' >&2; return 1 ;;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: endpoint proof needs one recorded window' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: endpoint proof needs the recorded pane to exist and be readable' >&2; return 1"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: generation proof needs the live process not to be pinned to another launch generation' >&2; return 1"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: process proof needs the resolved foreground process to be a readable omp process' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "echo 'adopt refused: session proof needs a readable omp session-file registration on the recorded pane' >&2; return 1;"
-        },
-        {
-          "file": "bin/fm-launch-proof-lib.sh",
-          "match": "print(f\"adopt refused: {message}\", file=sys.stderr)"
+          "match": "die \"adopt refused: there is no adoption route (Main 1901): no session record is repaired and no agent without its launch pin is adopted;"
         }
       ]
     },
@@ -3815,7 +3776,7 @@
       "owner": "bin/fm-control.sh",
       "invariant": "Lifecycle input targets a live agent positively attributed to this task.",
       "layer": "runtime-block",
-      "source": "the task metadata and launch proof, selected verified harness/backend capabilities, current screen/composer state and recovery journal; existing decision points: site:bin/fm-control.sh:c46aa9a752",
+      "source": "the task metadata and launch proof, bound to the one endpoint every delivery uses, which every caller must name (Main 1856 F2, Main 1874 finding 2) (for a versioned record of any harness, a matching launch token only after the process-group, descendant, working-directory and claim refusal checks in bin/fm-launch-proof-lib.sh pass; a record that is not one readable record with at most one launch_proof refuses), selected verified harness/backend capabilities, current screen/composer state and recovery journal; existing decision points: site:bin/fm-control.sh:c46aa9a752",
       "trigger": "lifecycle input (interrupt/exit/stay/relaunch) into an endpoint whose state is not positively classified or whose live Herdr agent is not attributed to this task's launch proof",
       "decision": "deny",
       "fail_direction": "closed",
@@ -3847,12 +3808,20 @@
         },
         {
           "file": "bin/fm-control.sh",
-          "match": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\"",
+          "match": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}\"",
           "count": 3
         },
         {
           "file": "bin/fm-control.sh",
-          "match": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input\""
+          "match": "|| die \"task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}\""
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "printf 'its launch record no longer names the endpoint this action targets (%s); refusing; retry once the record is settled, or decide the lane by hand' \"$2\""
+        },
+        {
+          "file": "bin/fm-launch-proof-lib.sh",
+          "match": "printf 'no endpoint was named to bind the launch proof to, so nothing proves the agent the action would reach; refusing'"
         }
       ]
     },
@@ -4017,7 +3986,7 @@
         },
         {
           "file": "bin/fm-control.sh",
-          "match": "|| refuse_blocking_prompt \"$dialog\" \"It was left as it was because the live agent cannot be positively attributed to this task.\""
+          "match": "|| refuse_blocking_prompt \"$dialog\" \"It was left as it was because the live agent cannot be positively attributed to this task${ATTRIBUTION_REFUSAL:+: $ATTRIBUTION_REFUSAL}.\""
         }
       ]
     },
@@ -7685,6 +7654,93 @@
         }
       ],
       "layer_note": "Registers the existing per-line protection, not a new refusal or permission. test_malformed_check_events_keep_delivery_and_cadence drives the real watcher with missing delimiters, invalid identities, valid events and ordinary state; it checks malformed payload exclusion and reported counts while valid delivery, coalescing and cadence continue. The site mapping preserves S1/S2 visibility rather than removing refusal vocabulary from the scan."
+    },
+    {
+      "id": "secondmate-restart-attribution",
+      "version": "1",
+      "owner": "bin/fm-secondmate-restart.sh",
+      "invariant": "The secondmate restart sends no request, record or nudge to a live Herdr agent that is not positively attributed to the task.",
+      "layer": "runtime-block",
+      "source": "the one launch-proof verdict owner (fm_launch_proof_herdr_refusal) read from the mate's own record (even after an early capability refusal) before the restart's pending-reply record, persistence request and fallback nudge, and read again on the mate's own record right before a fallback nudge; for a mate whose record names a remote_host, the same owner read on its host by the read-only fm-remote-secondmate-control.sh attribution verb whatever its capability verdict, only when the registry route's host, root and home equal the recorded remote_host, remote_root and home, the record names a remote_target, and the host's own endpoint target equals it, whose exact bytes attribution=proceed plus one newline with a zero transport status are the only accepted answer, and a remote_backend other than herdr refuses; the restart keeps one compared route per mate (placement, and for a remote mate host, root, home and target, for a local mate its endpoint), including after an early capability refusal, and before it creates any pending-reply expectation it runs a check-only decision again (for a remote mate a second host ask, which compares the host endpoint and re-reads its agent) that must name the same route; its persistence request, fallback nudge and relaunch carry that route, bin/fm-send.sh refuses a send whose resolved placement or endpoint differs for every backend, the host relaunch verb refuses an endpoint other than the compared target and passes it to the control plane, which refuses another (FM_CONTROL_EXPECTED_ENDPOINT, also set for a local relaunch; Main 1856 F3), the host send verb and bin/fm-send.sh re-check the agent's attribution right before the write (Main 1856 F4, Main 1860), and a send that fails or refuses is the mate's final outcome for the pass, with a failed discard of its expectation reported (Main 1874 finding 6); the whole decision rests on one read of the mate's record, its endpoint validation on a private copy of those bytes and its proof bound to the endpoint its route keeps, the capability check reads the record once too, and its bytes, the first decision's and the check-only decision's must be equal (Main 1874 rule S and finding 2); the host send verb's endpoint load reads its record once and each of its attribution decisions must rest on bytes with that digest, the host attribution verb's proof must read bytes with its own endpoint load's digest, and bin/fm-send.sh's remote final validation and route checks take every field from one snapshot (Main 1928); after the write, the doorbell rings only while the checked record bytes and decision still hold, else it is withheld and the steer waits in the inbox (Main 1874 (i)), so bin/fm-on.sh refuses before ssh when the route it resolves differs (FM_ON_EXPECTED_HOST, FM_ON_EXPECTED_ROOT, FM_ON_EXPECTED_HOME), bin/fm-send.sh refuses before any pending-reply record when the record's route differs, and the host send verb refuses an endpoint other than the expected target; a pane whose agent is positively dead or missing stays with the control plane's own stopped-agent proofs",
+      "trigger": "restart of a local Herdr secondmate whose live agent is not managed by the launch-proof owner (unmanaged, pinned elsewhere, contested or unreadable), or whose Herdr backend does not load, endpoint does not validate, or agent state is neither alive nor positively dead or missing, at the first effect or at a later fallback nudge; restart of a remote Herdr secondmate whose registry route or target differs from its record, or whose host answers anything but attribution=proceed (a refusal, no answer, an unreachable host, or a code root without the verb); and a delivery to it whose registry route, record or host endpoint changed after that decision",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Leave the agent running; an unpinned restored claude has no launch record proof and nothing can authorize it, so stop it by hand in its pane and relaunch it with bin/fm-control.sh <task> relaunch, or decide the lane by hand, then rerun the restart; for a remote mate, reconcile its registry row with its record, sync its host so its code has the attribution verb and the expected-target send, read the printed host cause, and decide the lane on its host.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-control-relaunch-backends.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-secondmate-restart.sh",
+          "match": "PLAN[i]=\"refused\"",
+          "count": 6
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: no endpoint record for %s on this host\\n' \"$id\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: the recorded target is empty or not printable\\n'"
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf \"attribution=refuse: this host's endpoint for %s is '%s', not the recorded route's '%s'\\n\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: %s\\n' \"$REMOTE_ENDPOINT_ERROR\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "*) printf \"attribution=refuse: its Herdr agent state reads '%s' rather than a positively classified state\\n\" \"$state\"; return 0 ;;"
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: its live Herdr agent cannot be positively attributed to this task%s\\n' \"${cause:+: $cause}\""
+        },
+        {
+          "file": "bin/fm-on.sh",
+          "match": "|| die \"remote route '$ROUTE' resolves to host '$HOST', root '$ROOT', home '$HOME_PATH', not the expected route (host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before ssh\""
+        },
+        {
+          "file": "bin/fm-send.sh",
+          "match": "echo \"error: steer not sent to ${TARGET_REMOTE_ID:-$RAW_TARGET}: its resolved route is not the expected route (placement '${FM_SEND_EXPECTED_PLACEMENT:-}', endpoint '${FM_SEND_EXPECTED_ENDPOINT:-${FM_SEND_EXPECTED_REMOTE_TARGET:-}}', host '${FM_ON_EXPECTED_HOST:-}', root '${FM_ON_EXPECTED_ROOT:-}', home '${FM_ON_EXPECTED_HOME:-}'); refusing before anything is recorded or sent\" >&2"
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "die \"this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected'; refusing before the record is written\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "die \"this host's endpoint for $id is '$REMOTE_ENDPOINT_TARGET', not the expected target '$expected_target'; refusing before the relaunch is dispatched\""
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "|| die \"task $ID's endpoint is '$1', not the compared endpoint '$FM_CONTROL_EXPECTED_ENDPOINT'; refusing before any lifecycle step\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "die \"the agent at this host's endpoint for $id is no longer attributed to this task (${decision#attribution=refuse: }); refusing before the record is written\""
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "printf 'attribution=refuse: its record changed after this send read it\\n'"
+        },
+        {
+          "file": "bin/fm-remote-secondmate-control.sh",
+          "match": "decision='attribution=refuse: its record could not be read'"
+        }
+      ]
     },
     {
       "id": "guard-lint-touched-registry",
