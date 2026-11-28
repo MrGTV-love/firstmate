@@ -1,0 +1,28 @@
+#!/bin/sh
+# Fake df for the suite (tests/lib.sh puts this directory first on PATH).
+# bin/fm-disk-floor-lib.sh measures with exactly `df -Pk <path>`; this fake answers
+# only that form, so the sandbox never fills or reads the real disk, and hands any
+# other form to the real df.
+#   FM_FAKE_DF_AVAIL_KB  available 1024-byte blocks to print (default 1 TiB)
+#   FM_FAKE_DF_MODE      plenty (default), fail (df error), empty (no output),
+#                        garbage (an unparseable line), failafter (a valid table
+#                        for FM_FAKE_DF_AVAIL_KB, then exit 1)
+#   FM_FAKE_DF_LOG       file that receives the path of every answered call
+# Like the real df, it fails for a path that does not exist.
+if [ "${1:-}" = "-Pk" ] && [ "$#" -eq 2 ]; then
+  [ -z "${FM_FAKE_DF_LOG:-}" ] || printf '%s\n' "$2" >> "$FM_FAKE_DF_LOG"
+  if [ ! -e "$2" ]; then
+    echo "df: $2: No such file or directory" >&2
+    exit 1
+  fi
+  case "${FM_FAKE_DF_MODE:-plenty}" in
+    fail) echo "df: cannot read table of mounted file systems" >&2; exit 1 ;;
+    empty) exit 0 ;;
+    garbage) echo "not a df table"; exit 0 ;;
+  esac
+  printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+  printf '/dev/fake 2147483648 1073741824 %s 50%% /\n' "${FM_FAKE_DF_AVAIL_KB:-1073741824}"
+  [ "${FM_FAKE_DF_MODE:-plenty}" != failafter ] || exit 1
+  exit 0
+fi
+exec /bin/df "$@"

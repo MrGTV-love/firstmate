@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "id": "aa-lcr",
+      "task_bound": true,
+      "binding_kind": "design-fixture",
+      "sources": [
+        "data/jev-roi-design/design.md:31-37",
+        "data/jev-roi-design/design.md:43"
+      ],
+      "acceptance_check": "QA links distant manual passages to independently keyed facts and locatable citations.",
+      "contrast": "A long prompt processed without synthesis is merely a capacity requirement."
+    },
+    {
+      "id": "terminal-bench-4-0",
+      "task_bound": true,
+      "binding_kind": "design-fixture",
+      "sources": [
+        "data/jev-roi-design/design.md:31-35",
+        "data/jev-roi-design/design.md:43"
+      ],
+      "acceptance_check": "Lab repair requires actual terminal execution with tested postconditions. Version 2.1 is a separately reviewed family analogue, not the 4.0 fixture observation. Do not transfer values or count both.",
+      "contrast": "Advice about shell commands without an execution check does not satisfy the fixture."
+    }
+  ],
+  "catalog_sha256": "aacb8bf350124fd48d448ef79c9b4a943902fcf4cf0bc351b737e7f17057bbd2",
+  "semantic_review_sha256": "2625b843f4677981c3c641fc028ab6198ab8a3bfee7a1f2f01bd91703275b0cf"
+}

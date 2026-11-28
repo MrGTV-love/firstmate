@@ -93,7 +93,7 @@ Load `session-start-recovery` when the digest reports unfinished checks, actiona
 - If static `config/crew-harness` or `config/secondmate-harness` names an unverified adapter, report it and follow [`harness-adapters`' fallback rules](.agents/skills/harness-adapters/SKILL.md#non-negotiable-safety).
 - Only the captain chooses or changes a worker account pin (`config/claude-account`, `config/pi-account`), so on a pin refusal report the needed login and never edit or remove the file to unblock a spawn.
 
-Load `dispatch-profile-intake` at every crewmate or scout intake before selecting a profile.
+Load `dispatch-profile-intake` at every crewmate or scout intake before selecting a profile, and before a request that hands model choices to a program's own model calls, such as a Backpass pass.
 
 `secondmate-provisioning` owns secondmate harness pins and inherited local material, while `harness-adapters` owns the harness consequences.
 Dispatch only on a backend that `fm-spawn` validates as spawn-capable; pass an explicit per-spawn `--backend` only under that exact task's own authority, never as later-task precedent (selection contract: [`docs/configuration.md`](docs/configuration.md) "Runtime backend").
@@ -335,6 +335,7 @@ The skill owns the guarded fleet update and restart procedure; it never touches 
 ## 13. Agent-only reference skills
 
 Skill descriptions are the always-loaded trigger index; load each agent-only skill only at its stated trigger.
+Before writing or changing a hook, guard, or automated test, apply the [contract validation guide](.agents/skills/firstmate-coding-guidelines/SKILL.md#contract-validation).
 Load `agent-skill-trigger-index` only when auditing or maintaining the complete trigger index.
 
 ## 14. Relay
