@@ -66,6 +66,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`fm-github-accounting.py`](../bin/fm-github-accounting.py) | Record standing GitHub quota and `gh`/`gh-axi` caller observations in private state, without controlling callers or proving attribution ([operator contract](configuration.md#standing-github-caller-accounting)) |
 | `fm-ensure-agents-md.sh` | Manually initialize project agent-memory files (see the helper's header and help) |
 | `fm-guard.sh`            | Warn on primary-checkout tangles, main-session pending wakes, and unhealthy supervision |
+| [`fm-drift-check.sh`](../bin/fm-drift-check.sh) | Read-only repository drift audit for primary-checkout state, local branches too far ahead or stale without an origin ref, and stray or prunable worktrees; its header owns the flags |
+| [`fm-main-checkout-hook.sh`](../bin/fm-main-checkout-hook.sh) | Opt-in Git `pre-commit` and `pre-merge-commit` guard blocking direct commits or merges in the primary checkout while permitting linked worktrees; its header owns `install`, `remove`, `status`, and the override |
 | `fm-guard-lint.sh`       | Validate the guard registry against the nine spec rules, require every refusal site to map to a guard, and enforce the shrink-only allowlist ([spec](guard-spec.md)) |
 | `fm-guard-sites.py`      | Enumerate every refusal site in the runtime code and map each to a registry entry for `fm-guard-lint.sh` ([signatures](guard-spec.md#refusal-sites)) |
 | `fm-guard-refcheck.sh`   | Prove every wired hook path resolves, every registry path exists, and no retired guard is referenced live |
