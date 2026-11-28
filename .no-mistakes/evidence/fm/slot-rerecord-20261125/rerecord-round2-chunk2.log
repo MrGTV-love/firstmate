@@ -1,0 +1,36 @@
+ok - H8: refuses scope_uncovered_change: tools/x.sh; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9: refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9b: refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9c: refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9d: refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9e: refuses scope_release_strands_work: src/sp ace.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H10: refuses manifest_shadowed; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H11: refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H12: refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H12b: refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H13a: refuses actor_not_main; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H13b: refuses session_lock_not_owned; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H13c: refuses note_required; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H14: refuses manifest_sha_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H15: refuses local_only_source_unsupported; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H17: refuses scope_entry_not_own_work: tools; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H18: refuses base_not_merge_base; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H19: refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H19b: refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H20: refuses launch_in_progress; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H21: refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H22: refuses backlog_close_pending; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N1: refuses not_ship_or_scout; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N2: refuses not_recorded; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N3: refuses not_adoption_route; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N4: refuses manifest_missing; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N5: refuses lifecycle_state_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N6: refuses branch_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N7: refuses repository_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N8: refuses not_isolated; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N9: refuses operation_in_progress; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N10: refuses default_branch_unreadable; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N11: refuses base_ref_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N12: refuses base_invalid; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N13: refuses base_not_in_head; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N14: refuses scope_invalid; rec_inventory, manifest inventory, sentinel and send-keys log unchanged

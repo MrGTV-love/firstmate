@@ -1,0 +1,35 @@
+ok - L20: step 3 closes a first audit as superseded-other, then the second's resumed restore fails: the stop names both audits, each once
+ok - TS4: a TERM right after L20's rc 2 outcome is stored, while the closing marker names the second audit: the printed stop names both audits, each once
+ok - SF4-owner: manifest owner_id changed after the rebind returned: adopt_postcheck_failed, rolled back, audit rolled-back
+ok - SF5: TERM to fm-control relaunch: journal failed:launching, control lock free, fm-spawn (pid 38552) still holds the spawn lock, rerecord refuses launch_in_progress naming it
+ok - S1a: H1 under the allow: the other-owner manifest's base and scope were published, audit published
+ok - S1b: H2, N5 and N6 under the allows: the foreign-copy, released and other-branch manifests were published
+ok - S2: H10 under the allow: the shadowed pointer's base and scope were published
+ok - S3: H3, H4, H5, N11, N12 and N13 under the allow: each wrong base was published
+ok - S4: H6, H7, H8, H17, N14, N15 and N16 under the allow: each wrong scope was published
+ok - S5: H11, H19 and H19b under the allow: written under a live agent; send-keys still empty and the agent still alive
+ok - S6: H14 under the allow: published against bytes the operator never named
+ok - S7: R1a: base M1 published while the fixture's merge-base is 19dfbae586650a8fc86095c0bae9085f90888622 and docs.txt is uncovered; R4: the appended line is gone
+ok - S7-R1b: defense-in-depth observation recorded
+ok - S8: R2, R3, R6b and R9a with a no-op rollback: the new record stays published after the failure or signal
+ok - S9: R5: an archive exists and audit rolled-back from adopt_postcheck_failed; R5b: the altered model= line was published
+ok - S10: H13a, H13b and N17 under the allow: published by a worker, by a session without the lock, and by the supervision branch
+ok - S11: H13c under the allow: published with an empty note in the audit record
+ok - S12: H12, H12b and H21 under the allow: published during an in-flight or unreadable journal; journal bytes unchanged
+ok - S13: H15, N1 and N3 under the allow: the local-only, double-kind and refused-provisioning records were rewritten
+ok - S14a: L6 with every changed path on the own line: no side-branch line printed or recorded (L6's assertion fails)
+ok - S14b: L6 with an empty own line: tools/x.sh is listed as side-branch-only (L6's assertion fails)
+ok - S15: with a no-op reconciliation: R6b stays published against the changed manifest, R6d and R6e stay rolling-back, R7 stays pending with its staged file, R9d stays pending
+ok - S16: R6c with every record read as untouched-staged: the post-publish check fails, the rollback restores P and the other writer's line is gone
+ok - S17: H9 and H9b under the allow: the narrowing is published and src/other.txt's uncommitted edit lies outside the new scope
+ok - S18: H20 under the allow: published while the live helper holds the spawn lock
+ok - S19: R10 with the read-back comparison removed: published while the archive's sha256 is not P
+ok - S20: R9d with publishing mapped to rollback: the trap rolls back, the pending mv lands, staged bytes stand under a rolled-back audit record
+ok - S21: H22 under the allow: published while the backlog close is pending
+ok - S22: R9e with committing mapped to rollback: the trap restores P, the late commit rename lands, P stands under a published audit record
+ok - SF4c: SF4-head with only the post-publish comparison removed: published with a stale HEAD; audit published
+ok - SF4-owner-reread: owner changed after the rebind, post-publish comparison removed: the owner re-read alone refuses adopt_postcheck_failed naming the lease (owner_mismatch); rolled back, audit rolled-back
+ok - SF4o: SF4-owner-reread with the owner re-read also removed: published while the live manifest names another owner (adoption never compares owner); audit published
+ok - S23: L13 with the pending names dropped: --check claims write_would=already recorded with no digest or command, while the write rolls the crash back and publishes
+ok - S24: L15 with the refusal suffix injected: --check claims write_would=reconcile-pending:<audit>;refuse:agent_not_proven_stopped while the write recovers the crash and exits 0 already recorded
+ok - S25: S7/R1b, S20 and S22 each fail with the once-check message when one outcome line is planted twice, and pass without it

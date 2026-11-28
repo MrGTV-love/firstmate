@@ -1,0 +1,7 @@
+ok - ORACLE: rec_inventory catches a same-byte rewrite and a created-then-deleted archive
+ok - JOURNAL-CLASSES: every class of fm_control_relaunch_journal_verdict
+ok - L1: exit 0; slot_lines are M1 and the manifest scope; one archive equal to the prior record; audit published; labels as frozen
+ok - L3: second exit 0 already recorded; rec_inventory unchanged; one archive and one audit record
+ok - L4: --check exit 0 with the frozen lines; rec_inventory, journal and manifest unchanged; send-keys empty
+ok - E1: relaunch after rerecord exits 0, journal complete, new agent alive, no adoption refusal, manifest unchanged, sentinel empty (relaunch staged on a dead pane rather than server-dead; see report)
+ok - E2: relaunch on F refuses base_mismatch; record unchanged; sentinel empty

@@ -1,0 +1,40 @@
+ok - L2: exit 0 as L1; journal bytes unchanged
+ok - L4b: --check with a live spawn-lock holder exits 0 advisory: launch_proof=launch_in_progress, write_would=refuse:launch_in_progress; holder keeps the lock
+ok - L5: exit 0; released_scope=src printed and in the audit record
+ok - L6: side_branch_only=tools/y.sh paths=1/1 and side_branch_mixed=lib paths=1/2 in --check and in the audit record; none for tools/x.sh or src
+ok - L7: exit 0; added_scope=tools/sub rule=c
+ok - L8: exit 0 already recorded; rec_inventory unchanged; no archive or audit record
+ok - L9: --check and write exit 0 already recorded with journal_proof=failed-open and stopped_proof=ok; nothing written
+ok - L9b: --check and write exit 0 already recorded with journal_proof=complete and stopped_proof=agent_not_proven_stopped; --check predicts write_would=already recorded; nothing written; send-keys empty
+ok - L10: exit 0 as L1; journal and .meta-prior unchanged; published lines are the renewal's
+ok - L11: uncommitted_newly_covered=1 and added_uncommitted_newly_covered=1 in the output and audit record; copy unchanged
+ok - L12: exit 0 as L10 over a dead holder's spawn lock; no spawn lock remains
+ok - L13: pending untouched-staged audit, HEAD moved inside scope: --check prints write_would=reconcile-pending naming the audit record, the verdict_basis line, the digest and the command, and writes nothing; the write then rolls the crash back and publishes
+ok - L14: pending untouched-staged audit, HEAD moved, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines, writes nothing; the write rolls the crash back, then refuses agent_not_proven_stopped and its tail names the rolled-back audit and the restored record
+ok - L15: pending untouched-staged audit, manifest and HEAD unchanged, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines; the write recovers the crash and exits 0 already recorded
+ok - L16: pending superseded-new audit, agent alive: --check prints only write_would=reconcile-pending:<audit> with stopped_proof and verdict_basis lines; the write relabels the audit superseded-new and exits 0 already recorded
+ok - L17: a snapshot error after step 3 rolled a crash back names the rolled-back audit and the restored record, not 'nothing was changed'; with no pending audit the same error says nothing was changed
+ok - L18: the audit record cannot be rewritten: the record is restored, the audit stays pending, and the refusal tail says it could not be closed as rolled-back
+ok - L19: an already-recorded run after a recovered crash names the audit: not closed and still pending when the audit cannot be rewritten, closed as published-recovered when it can
+ok - RP1-refused: refuses scope_entry_not_own_work: docs.txt is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added;; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - RP1: on one renewed manifest the replay gives the write's verdict: ok with the write's report lines, and the write's refusal reason and detail
+ok - RP2-write: refuses manifest_unreadable: the verdict could not be computed;; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - RP2: a stand-in identity verdict that prints ok and exits 2 is refused manifest_unreadable by the replay (exit 1) and by the write, which changes nothing
+ok - RP3-write: refuses manifest_unreadable: the verdict printed a malformed ok line;; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - RP3-unterminated: refuses manifest_unreadable: the verdict printed a malformed ok line;; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - RP3: a stand-in identity verdict printing ok<TAB>x, or ok with no newline, is refused manifest_unreadable and the record, manifest, copy and journal are unchanged; printing exactly ok, the same run publishes
+ok - RP4: a stand-in identity verdict printing ok and a blank line passes the identity step but fails the whole-output owner re-read: adopt_postcheck_failed, rolled back to the prior record
+ok - RB1: a restore publish that fails after its rename lands: the run fails, says the prior record was restored and names the publisher's error
+ok - RB2: a restore publish that leaves no readable record: both the rollback's error and the run's outcome say whether it was restored is not known and that the record could not be read
+ok - RB3: a restore publish that leaves other bytes: both lines say whether the prior record was restored is not known and name the bytes as neither
+ok - RB4: a restore publish that returns success, then other bytes before the read-back: both lines say the publisher returned success and the record did not read back, and that whether it was restored is not known
+ok - TS1: a TERM right after a step 3 audit rename, before its entry is recorded: the trap reads the audit back and names it once
+ok - TS3: a TERM right after a refusal is stored while the closing marker names an audit whose rename landed: the refusal names that audit once
+ok - TS2: a TERM right after the success lines are stored: the trap prints them once and nothing else
+ok - H1: refuses owner_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H2: refuses worktree_path_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H3: refuses base_not_forward; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H4: refuses base_not_on_default; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H5: refuses base_not_merge_base; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H6: refuses scope_entry_not_own_work: docs.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H7: refuses scope_entry_not_own_work: tools; rec_inventory, manifest inventory, sentinel and send-keys log unchanged

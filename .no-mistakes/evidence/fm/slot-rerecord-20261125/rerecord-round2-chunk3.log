@@ -1,0 +1,36 @@
+ok - N15: refuses scope_not_canonical; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N16: refuses scope_not_tracked; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N17: refuses actor_not_main; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - N18: refuses manifest_unreadable; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - OPTIONS: each refused option prints its own parse refusal (exit 1, never a proof refusal), and --check or --manifest-sha on another verb names rerecord-slot; nothing written
+ok - R1a: input_changed_during_rerecord; record inventory unchanged; audit refused
+ok - R1b: input_changed_during_rerecord; record inventory unchanged; audit refused
+ok - R4: input_changed_during_rerecord; the record is the prior bytes plus the appended line; audit refused
+ok - R2: nonzero; record restored to P; archive kept with sha P; audit exactly rolled-back
+ok - R3: adopt_postcheck_failed; rolled back to P; archive kept; audit rolled-back
+ok - R5: adopt_precheck_failed; rec_inventory unchanged; no archive, no staged file, no audit record
+ok - R5b: adopt_precheck_failed; rec_inventory unchanged; no archive, no staged file, no audit record
+ok - R6a: after the kill: staged bytes and pending; second run exit 0 already recorded; published-recovered; one archive; audit_agrees
+ok - R6b: second run rolls the crashed write back (record P, first audit rolled-back), then refuses manifest_sha_mismatch and its tail names the rolled-back audit and the restored record
+ok - R6c: second exit 0 already recorded; record is staged plus the appended line; first audit superseded-new; no rollback
+ok - R6f: a crashed write superseded by a record with the prior slot block closes superseded-prior; the run then publishes
+ok - R6g: a crashed write superseded by a record with another slot block closes superseded-other; the run then publishes
+ok - R6d: after the kill: record P, audit rolling-back; second run: first rolled-back, second published, two archives, audit_agrees
+ok - R6e: after the kill: staged bytes, rolling-back, a leftover restore file; second run: first rolled-back, second published, no leftover
+ok - R7: after the kill: record P and a leftover staged file; second run: first abandoned, no leftover, second published
+ok - R8: nonzero; record inode and sha256 unchanged; no staged file; audit refused
+ok - L21: TERM in step 5 after step 3 abandoned a crashed write: the trap names that audit once; with no step 3 entries it names none
+ok - R9a: exit 143 under TERM in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - R9b: exit 129 under HUP in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - R9c: exit 130 under INT in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - R9d: first run exit 143 (TERM runs the trap at once: 1); staged bytes, pending, no restore; second run already recorded, published-recovered, one archive, audit_agrees
+ok - R9e: first run exit 143; staged bytes, audit published by the late rename, no restore, audit_agrees; second run unchanged, one archive
+ok - R9f: exit 143 under TERM in stage published; rolled back; archive P; audit rolled-back; audit_agrees; the trap says the run published and restored the prior record (BASH_VERSION 3.2.57(1)-release)
+ok - R9g: backgrounded child stayed alive while caller stdout/stderr pipe reached EOF immediately
+ok - L22: TERM during a step 3 restore rename (immediate trap: 1): the trap keeps it and names the rolling-back audit record once
+ok - R10: archive_unverified; record unchanged; no audit record; no staged file; the unverified archive kept
+ok - R11: rerecord_audit_unreadable naming the file; record unchanged; after moving it aside the rerun publishes
+ok - SF4-head: HEAD moved after the rebind returned: adopt_postcheck_failed, rolled back to P, audit rolled-back; the refusal says the run published and then restored the prior record
+ok - SF4-head-reconciled: a crashed earlier write is abandoned in step 3, then HEAD moves after the rebind: the refusal says the run published and restored the prior record and names the abandoned audit
+ok - SF4-head-unrestored: the restore after a failed post-publish check cannot stage: the run says it published, that the prior record could not be restored, and names the archive; the record holds the staged bytes
+ok - SF4-head-restore-publish: the restore publish after a failed post-publish check fails: the rollback names its error, and the run's outcome line is printed once
