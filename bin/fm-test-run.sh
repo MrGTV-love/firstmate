@@ -284,7 +284,7 @@ PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=25
+PORTABLE_SERIAL_SHARDS=27
 
 # How many scripts each portable-parallel job is modeled to run at once. The
 # lane membership is exactly the proven-isolated set, whose recorded four-way
@@ -355,10 +355,11 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # now split into separately packed groups (docs/fm-test-portable-shards.md,
 # "Split watch-triage-waits and control-relaunch").
 # The shard count is the fewest that pass and leave lane slack of at least one
-# target. After the 2026-10-29 hint refresh the table sums to 28352649 ms, so
-# twenty-four shards pass with only 447351 ms of slack and are refused by that
-# rule; twenty-five leave 1647351 ms and pack at serial_max_ms 1134269 ms
-# (docs/fm-test-portable-shards.md, "Portable serial CI shards").
+# target. On 2026-11-28 the 365 serial members sum to 30080793 ms, so
+# twenty-five shards fail (shard 1 packs 1203012 ms above the target) and
+# twenty-six pass with only 1119207 ms of slack and are refused by that rule;
+# twenty-seven leave 2319207 ms and pack at serial_max_ms 1114460 ms
+# (docs/fm-test-portable-shards.md, "Verification inputs").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
@@ -1088,6 +1089,7 @@ tests/fm-project-origin.test.sh 690
 tests/fm-public-followup.test.sh 531543
 tests/fm-quota-array-dispatch-live-e2e.test.sh 645
 tests/fm-quota-choose.test.sh 4494
+tests/fm-record-paths-scan.test.sh 60000
 tests/fm-remote-backlog-handoff.test.sh 158878
 tests/fm-remote-delta-read.test.sh 6830
 tests/fm-remote-doctor.test.sh 52399
@@ -1188,6 +1190,7 @@ tests/fm-teamclaude-launch.test.sh 13609
 tests/fm-teardown-cleanup.test.sh 1005601
 tests/fm-teardown-endpoint-safety.test.sh 89444
 tests/fm-teardown-pool.test.sh 520244
+tests/fm-teardown-scan-bounds.test.sh 180000
 tests/fm-teardown.test.sh 321463
 tests/fm-test-fixture-cleanup.test.sh 4736
 tests/fm-test-fixtures.test.sh 18329

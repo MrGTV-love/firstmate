@@ -1128,16 +1128,82 @@ teardown_preserve_ignored() {  # <copy> [all|releasable]
   }
 }
 
+# The seconds a read-only walk of the task records may run while this teardown holds the
+# shared Treehouse project lock, written to the variable named by <var>:
+# FM_TEARDOWN_SCAN_DEADLINE_SECS, read each time, and 600 when it is empty, not a number or 0
+# (leading zeros are decimal, not octal). bin/fm-teardown.sh's copy-clearance scan and the
+# ownership walk below share it.
+teardown_scan_limit_to() {  # <var>
+  local _tl_value=${FM_TEARDOWN_SCAN_DEADLINE_SECS:-600}
+  case "$_tl_value" in
+    ''|*[!0-9]*) _tl_value=600 ;;
+    *) _tl_value=$((10#$_tl_value)); [ "$_tl_value" -gt 0 ] || _tl_value=600 ;;
+  esac
+  printf -v "$1" '%s' "$_tl_value"
+}
+
+# Whether this process holds ANY Treehouse project lock. This is the one fact every scan bound keys
+# on, and it is derived from the records the lock acquire and release code keeps, not from a
+# per-window flag: TREEHOUSE_PROJECT_LOCK_HELD (the teardown's own lock: set by
+# teardown_acquire_project_lock, cleared by teardown_release_project_lock and the EXIT trap) and
+# DESCENDANT_TREEHOUSE_LOCK_PATHS (the child project locks a forced secondmate teardown takes: each
+# is appended right after fm_project_lock_try / teardown_project_lock_wait succeeds, and the array
+# is emptied by teardown_release_descendant_project_locks and the EXIT trap). A forced secondmate
+# teardown holds only the second kind, with TREEHOUSE_PROJECT_LOCK_HELD still 0. A script that
+# sources this library and takes neither record (bin/fm-copy-sweep.sh, bin/fm-merge-prune.sh) holds
+# no lock in this sense, so its walks stay unbounded, as before.
+teardown_project_lock_held() {
+  [ "${TREEHOUSE_PROJECT_LOCK_HELD:-0}" = 1 ] || [ -n "${DESCENDANT_TREEHOUSE_LOCK_PATHS[*]+held}" ]
+}
+
+# Bounds a read-only walk of the task records. Every such walk of bin/fm-teardown.sh that can run
+# while a Treehouse project lock is held asks teardown_scan_window_to once, before its first record,
+# and teardown_scan_deadline_check before each record. While a lock is held (teardown_project_lock_held)
+# <end-var> is the SECONDS value the walk must end by; otherwise it is 0 and the walk is unbounded,
+# as before.
+teardown_scan_window_to() {  # <limit-var> <end-var>
+  local _tw_limit=0 _tw_end=0
+  if teardown_project_lock_held; then
+    teardown_scan_limit_to _tw_limit
+    _tw_end=$((SECONDS + _tw_limit))
+  fi
+  printf -v "$1" '%s' "$_tw_limit"
+  printf -v "$2" '%s' "$_tw_end"
+}
+# Past the end, prints the refusal and ends the teardown with status 1 at once, through the EXIT
+# trap that releases the lock, so no later step removes, returns or re-leases anything. The walk
+# only reads and signals nothing; steps that ran earlier in the teardown are not undone, and a retry
+# is safe.
+teardown_scan_deadline_refuse() {  # <limit> <what>
+  echo "REFUSED: $2 ran past its ${1}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it stopped before the next step and released the lock; nothing more was changed; retry the teardown" >&2
+  exit 1
+}
+teardown_scan_deadline_check() {  # <end> <limit> <what>
+  [ "$1" -le 0 ] || [ "$SECONDS" -lt "$1" ] || teardown_scan_deadline_refuse "$2" "$3"
+}
+
 # Does an active record, a running process, or a live lock launcher outside this
 # teardown own <copy>? Returns 1 with TEARDOWN_FOREIGN_WHY set when so or when
 # that cannot be told.
+#
+# The walk of the task records is bounded while this teardown holds any project lock (the
+# caller's own fact, teardown_project_lock_held, handed to the library as a limit): past
+# the deadline, checked before each record, it prints a refusal and ends the teardown with
+# status 1 at once, through the EXIT trap that releases the lock, so no later step of the
+# window removes, returns or re-leases anything. The walk only reads and signals nothing;
+# steps that ran earlier in the teardown are not undone, and a retry is safe. Without the
+# lock the walk is unbounded, as before.
 teardown_foreign_copy_unowned() {  # <copy>
-  local copy=$1 rc=0 pids pid
+  local copy=$1 rc=0 pids pid scan_limit=0
   TEARDOWN_OWN_SCANNED=0
   TEARDOWN_FOREIGN_PID=
+  ! teardown_project_lock_held || teardown_scan_limit_to scan_limit
+  FM_TASK_COPY_SCAN_LIMIT_SECS=$scan_limit
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
   fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
+  FM_TASK_COPY_SCAN_LIMIT_SECS=0
   case "$rc" in
+    3) teardown_scan_deadline_refuse "$scan_limit" "the ownership walk for foreign copy $(fm_refuse_text "$copy") in task $ID's pool slot" ;;
     0)
       TEARDOWN_FOREIGN_RULE=active-record-owner
       TEARDOWN_FOREIGN_WHY="task $FM_TASK_COPY_OTHER_ID's active record names it as its $FM_TASK_COPY_OTHER_FIELD"
