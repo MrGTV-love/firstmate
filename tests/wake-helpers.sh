@@ -393,6 +393,22 @@ watch_polls_file() {  # <state> <watcher-pid>
   printf '%s/.test-poll-completed-%s\n' "$1" "$2"
 }
 
+# Return just after the watcher has begun a fresh poll sleep, so no prelude step is in
+# flight: a take-over (bin/fm-watch-arm.sh --take-over) attaches to a watcher inside its
+# prelude instead of stopping it, so a case that needs the take-over to stop the watcher
+# and own a fresh cycle waits here first. The watcher must run under count_watch_polls
+# with an FM_POLL long enough that its sleep outlasts the arm's check.
+wait_for_idle_poll() {  # <state> <watcher-pid>
+  local f first i=0
+  f=$(watch_polls_file "$1" "$2")
+  while [ "$i" -lt 300 ] && [ ! -s "$f" ]; do sleep 0.1; i=$((i + 1)); done
+  [ -s "$f" ] || fail "no poll sleep was announced by watcher $2"
+  first=$(cat "$f")
+  i=0
+  while [ "$i" -lt 300 ] && [ "$(cat "$f" 2>/dev/null)" = "$first" ]; do sleep 0.1; i=$((i + 1)); done
+  [ "$(cat "$f" 2>/dev/null)" != "$first" ] || fail "watcher $2 never began another poll sleep"
+}
+
 # Return a watcher fixture to a clean cycle boundary. A watcher stopped mid-cycle
 # leaves its resumable-cycle markers behind (.prelude-progress, .prelude-deferred)
 # and may leave its downtime marker, so the next watcher launched against the

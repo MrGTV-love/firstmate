@@ -119,7 +119,8 @@ EOF
   fi
   if [ -n "$state_output" ]; then
     reason="check: $check: $state_output"
-    fm_wake_append check "$check" "$reason" || return 1
+    # The watcher's sweep names an appender that skips a row already queued (bin/fm-watch.sh).
+    "${FM_CHECK_APPEND:-fm_wake_append}" check "$check" "$reason" || return 1
     [ -n "$FM_CHECK_WAKE_REASON" ] || FM_CHECK_WAKE_REASON=$reason
   fi
   return 0

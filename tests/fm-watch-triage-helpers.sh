@@ -2494,17 +2494,25 @@ SH
       [ "$(grep -Fc "$(printf 'check\t%s\tcheck: %s: late check completed' "$state/late.check.sh" "$state/late.check.sh")" "$state/.wake-queue")" -eq 1 ] \
         || fail "marker-store failure lost the completed one-shot check row"
       rmdir "$state/.watch-late-signals"
+      # Main acknowledges the signal wake, which presented the queued check row with it.
+      ack_stopped_cycle "$state" || fail "Main could not drain the marker-failure wake"
       next_out="$dir/recovery.out"
+      # An open sweep resumes whatever the age of .last-check; the long interval keeps a fresh sweep from
+      # opening after the close, so the run count below covers the resumed sweep only.
       watch_bg "$state" "$fakebin" "$next_out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
-        FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=1
+        FM_WATCH_HANDLING_SUCCESSOR=1 FM_CHECK_INTERVAL=300
       pid=$!
+      # The sweep keeps a record per finished check (docs/watcher-continuity.md "Check sweep records"), so the
+      # successor does not rerun the check that finished before the marker failure, and it does not print
+      # that check's wake again once Main has acknowledged its row.
       wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "successor did not finish the interrupted checks: $(cat "$next_out")"; }
       [ ! -s "$next_out" ] || { reap "$pid"; fail "marker failure caused a duplicate signal wake"; }
       [ ! -e "$state/.prelude-progress" ] || { reap "$pid"; fail "successor left completed maintenance owed"; }
-      [ "$(wc -l < "$state/late-check-runs" | tr -d '[:space:]')" -ge 2 ] \
-        || { reap "$pid"; fail "successor did not rerun the one-shot check"; }
-      [ "$(grep -Fc "$(printf 'check\t%s\tcheck: %s: late check completed' "$state/late.check.sh" "$state/late.check.sh")" "$state/.wake-queue")" -eq 1 ] \
-        || { reap "$pid"; fail "successor duplicated or lost the one-shot check row"; }
+      [ ! -e "$state/.sweep-open" ] || { reap "$pid"; fail "successor left the sweep open"; }
+      [ "$(wc -l < "$state/late-check-runs" | tr -d '[:space:]')" -eq 1 ] \
+        || { reap "$pid"; fail "successor reran a check that finished in the open sweep"; }
+      [ "$(grep -Fc "$(printf 'check\t%s\tcheck: %s: late check completed' "$state/late.check.sh" "$state/late.check.sh")" "$state/.wake-queue")" -eq 0 ] \
+        || { reap "$pid"; fail "successor queued the acknowledged one-shot check row again"; }
       reap "$pid"
       continue
     fi
