@@ -4,7 +4,8 @@
 # FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
 # The late, laterexit, earlyexit, clock and gone cases read the pane's foreground process and run on tmux only.
 # FM_TEST_ACQUISITION_CASES=cleanup-writer leaves a detached child writing during this script's own cleanup.
-# FM_TEST_ACQUISITION_CASES=lab-teardown runs only the lab teardown case, and lab-primary only the lab primary case (tmux).
+# FM_TEST_ACQUISITION_CASES=lab-teardown runs only the lab teardown case, lab-primary only the lab primary case, and
+# lab-recycled only the recycled session leader case (tmux).
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -83,6 +84,10 @@ cleanup_acquisition() {
   if [ -n "${LAB_PRIMARY_SOCKET:-}" ]; then
     TMUX_TMPDIR="$LAB_PRIMARY_SOCKET" "$REAL_TMUX" -L fm-lab kill-server 2>/dev/null || true
     "$LAB_HOME_HELPER" teardown "$LAB_PRIMARY_HOME" >/dev/null 2>&1 || rc=1
+  fi
+  if [ -n "${LAB_RECYCLED_HOME:-}" ]; then
+    rm -f "$LAB_RECYCLED_HOME/state/.fm-lab-launches"
+    "$LAB_HOME_HELPER" teardown "$LAB_RECYCLED_HOME" >/dev/null 2>&1 || rc=1
   fi
   if [ -n "$HERDR_LAB_SESSION" ]; then
     "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || rc=1
@@ -532,10 +537,104 @@ SH
   LAB_PRIMARY_SOCKET=
   pass 'a lab primary whose session cannot be recorded never runs its command'
 }
+# A recycled session leader: the launch record names a session whose leader has exited, and the id
+# now belongs to a session outside the lab (cwd and environment outside it) whose members outlived
+# their own leader, the orphan shape the lab leaves. The teardown must signal none of them and
+# fail naming each pid, and the only processes the test ends are the ones it recorded.
+run_lab_recycled_case() {
+  local case_dir="$TMP_ROOT/case-lab-recycled" lab socket env_out out rc leader pid name
+  mkdir -p "$case_dir/outside"
+  env_out=$(TMPDIR="$case_dir" "$LAB_HOME_HELPER" env 2>"$case_dir/env.err") || fail "lab env failed: $(cat "$case_dir/env.err")"
+  lab=$(printf '%s\n' "$env_out" | sed -n "s/^export FM_HOME=//p")
+  socket=$(printf '%s\n' "$env_out" | sed -n "s/^export TMUX_TMPDIR=//p")
+  [ -d "$lab" ] && [ -d "$socket" ] || fail "lab env printed no usable exports: $env_out"
+  LAB_RECYCLED_HOME=$lab
+  env -u TMUX -u TMUX_TMPDIR -u FM_HOME python3 -c "$(cat <<'PY'
+import os, signal, sys, time
+cwd, out = sys.argv[1], sys.argv[2]
+if os.fork():
+    sys.exit(0)
+os.setsid()
+os.chdir(cwd)
+def note(signum, _frame):
+    with open(out + "/recycled.signals", "a") as log:
+        log.write("%d %d\n" % (os.getpid(), signum))
+for index in (1, 2):
+    if os.fork() == 0:
+        for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM, signal.SIGCONT, signal.SIGUSR1):
+            signal.signal(signum, note)
+        open(out + "/member%d.pid" % index, "w").write("%d\n" % os.getpid())
+        deadline = time.time() + 600
+        while time.time() < deadline:
+            time.sleep(0.2)
+        os._exit(0)
+open(out + "/leader.pid", "w").write("%d\n" % os.getpid())
+deadline = time.time() + 600
+while not os.path.exists(out + "/leader.go") and time.time() < deadline:
+    time.sleep(0.02)
+os._exit(0)
+PY
+)" "$case_dir/outside" "$case_dir" </dev/null >/dev/null 2>&1
+  for name in leader member1 member2; do
+    for _ in $(seq 1 500); do
+      [ ! -s "$case_dir/$name.pid" ] || break
+      /bin/sleep 0.02
+    done
+    pid=$(cat "$case_dir/$name.pid" 2>/dev/null) || fail "the outside stand-in $name never started"
+    fm_test_record_process "$case_dir/$name.proc" "$pid" || fail "cannot record the outside stand-in $name"
+    fm_test_track_process "$case_dir/$name.proc" python
+  done
+  read -r leader _ < "$case_dir/leader.proc"
+  out=$("$LAB_HOME_HELPER" record-launch "$lab" recycled "$leader" 2>&1) || fail "record-launch refused the stand-in leader: $out"
+  : > "$case_dir/leader.go"
+  for _ in $(seq 1 500); do
+    lab_case_alive "$case_dir/leader.proc" || break
+    /bin/sleep 0.02
+  done
+  ! lab_case_alive "$case_dir/leader.proc" || fail 'precondition: the outside stand-in leader did not exit'
+  for name in member1 member2; do
+    read -r pid _ < "$case_dir/$name.proc"
+    lab_case_alive "$case_dir/$name.proc" || fail "precondition: the outside stand-in $name is not running"
+    [ "$(lab_case_sid "$pid")" = "$leader" ] || fail "precondition: the outside stand-in $name left the recorded session $leader"
+  done
+
+  out=$(cd / && "$LAB_HOME_HELPER" teardown "$lab" 2>&1)
+  rc=$?
+  [ ! -s "$case_dir/recycled.signals" ] \
+    || fail "the lab teardown signalled processes outside the lab in a recycled session (pid signal): $(tr '\n' ' ' < "$case_dir/recycled.signals")"
+  for name in member1 member2; do
+    lab_case_alive "$case_dir/$name.proc" || fail "the lab teardown ended the outside stand-in $name"
+  done
+  expect_code 1 "$rc" "a teardown that cannot prove a recycled session's members belong to the lab must fail: $out"
+  assert_contains "$out" 'were not signalled' 'the recycled-session teardown must say why it failed'
+  for name in member1 member2; do
+    read -r pid _ < "$case_dir/$name.proc"
+    assert_contains "$out" "  $pid " "the recycled-session teardown must name the outside stand-in $name"
+  done
+  assert_present "$lab/state/.fm-lab-launches" 'a refused recycled-session teardown must keep the launch record'
+  assert_present "$socket" 'a refused recycled-session teardown must keep the private socket directory'
+
+  for name in member1 member2; do
+    read -r pid _ < "$case_dir/$name.proc"
+    ! lab_case_alive "$case_dir/$name.proc" || kill -KILL "$pid" 2>/dev/null || true
+  done
+  for name in member1 member2; do
+    for _ in $(seq 1 500); do
+      lab_case_alive "$case_dir/$name.proc" || break
+      /bin/sleep 0.02
+    done
+    ! lab_case_alive "$case_dir/$name.proc" || fail "cannot end the outside stand-in $name"
+  done
+  out=$("$LAB_HOME_HELPER" teardown "$lab" 2>&1) || fail "the teardown after the outside stand-ins ended still failed: $out"
+  assert_absent "$socket" 'the retried teardown kept the private socket directory'
+  LAB_RECYCLED_HOME=
+  pass 'lab teardown never signals a recycled session outside the lab, and fails naming each of its pids'
+}
 LAB_CASE_HOME=
 LAB_CASE_SOCKET=
 LAB_PRIMARY_HOME=
 LAB_PRIMARY_SOCKET=
+LAB_RECYCLED_HOME=
 if [ "$BACKEND" = tmux ] && case "${FM_TEST_ACQUISITION_CASES:-all}" in all|lab-teardown) true ;; *) false ;; esac; then
   run_lab_teardown_case
   [ "${FM_TEST_ACQUISITION_CASES:-all}" != lab-teardown ] || exit 0
@@ -543,6 +642,10 @@ fi
 if [ "$BACKEND" = tmux ] && case "${FM_TEST_ACQUISITION_CASES:-all}" in all|lab-primary) true ;; *) false ;; esac; then
   run_lab_primary_case
   [ "${FM_TEST_ACQUISITION_CASES:-all}" != lab-primary ] || exit 0
+fi
+if [ "$BACKEND" = tmux ] && case "${FM_TEST_ACQUISITION_CASES:-all}" in all|lab-recycled) true ;; *) false ;; esac; then
+  run_lab_recycled_case
+  [ "${FM_TEST_ACQUISITION_CASES:-all}" != lab-recycled ] || exit 0
 fi
 
 if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then

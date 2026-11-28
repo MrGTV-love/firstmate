@@ -52,7 +52,8 @@
 # the pane's shell. record-launch is the single writer of state/.fm-lab-launches,
 # one `launch<TAB><task-id><TAB><pid><TAB><start time>` line for the process
 # that leads an endpoint's session, the start time as `ps -o lstart=` prints it,
-# which an exec does not change. bin/fm-spawn.sh calls it for every tmux
+# or on Linux the kernel start ticks (/proc stat field 22), which a wall-clock
+# step does not change; an exec changes neither. bin/fm-spawn.sh calls it for every tmux
 # endpoint in a marked lab home before it types anything there, and refuses the
 # launch when the record cannot be written.
 # primary is the single entry point for the lab primary: it runs
@@ -64,24 +65,26 @@
 # command never runs unrecorded. When the record fails, primary stops the
 # session and the holding shell and exits 1.
 # teardown keeps the stopped-server proof above, then ends the lab's processes:
-# every live process whose session id is a recorded pid, plus each live
-# descendant of one. A recorded pid that a live process now holds with another
-# start time is a reused pid, so that session is skipped. A recorded leader that
-# is gone is taken to have left its session behind; this assumes the kernel
-# never hands out a pid that is still a live session id (unverified here), and a
-# record that outlives every member of its session could match a later session
-# that reuses the id once its own leader has also exited. Process names, paths
-# and parents never decide. This process, its ancestors and its descendants are
-# never signalled. Each target gets CONT and TERM, then KILL once 2 seconds
-# have passed, each signal only while the target's identity matches the one
-# first read; a process that joins a recorded session meanwhile gets the same.
-# A lab process still alive once 5 more seconds have passed, or a process list
-# or session id that cannot be read, makes teardown exit 1 naming each pid, with
-# the socket directory and the launch record kept for a retry. Each round also
-# rereads the process table and every target's identity, so a large lab takes
-# that much longer than 7 seconds. A complete reap removes the launch record,
-# so a later teardown signals nothing; a lab with no launch record gets the
-# stopped-server proof alone.
+# every live process in a recorded session the lab is proven to own, plus each
+# live descendant of one. A recorded pid that a live process now holds with
+# another start time is a reused pid, so that session is skipped. While a
+# recorded leader lives with its recorded start time, its whole session is the
+# lab's. Once the leader is gone, its id could have been reused by a session
+# outside the lab, so a member is the lab's only when its TMUX environment
+# value names a socket in the lab's private socket directory, which tmux sets
+# in every lab pane; any other member of that session is never signalled and
+# makes teardown exit 1 naming its pid. Process names, cwds and parents never
+# decide. This process, its ancestors and its descendants are never signalled.
+# Each target gets CONT and TERM, then KILL once 2 seconds have passed, each
+# signal only while the target's start time matches the one the membership
+# read's process table gave; a process that joins a recorded session meanwhile
+# gets the same. A lab process still alive once 5 more seconds have passed, or a
+# process list or session id that cannot be read, makes teardown exit 1 naming
+# each pid, with the socket directory and the launch record kept for a retry.
+# Each round also rereads the process table and every target's start time, so a
+# large lab takes that much longer than 7 seconds. A complete reap removes the
+# launch record, so a later teardown signals nothing; a lab with no launch
+# record gets the stopped-server proof alone.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -103,13 +106,8 @@ fm_lab_home_launch_record() { printf '%s/state/.fm-lab-launches' "$1"; }
 fm_lab_home_marked() {
   [ -f "$1/.fm-lab-home" ] && [ -d "$1/state" ]
 }
-fm_lab_home_wake_lib() {
-  command -v fm_pid_identity >/dev/null 2>&1 && return 0
-  # shellcheck source=bin/fm-wake-lib.sh
-  FM_STATE_OVERRIDE="$1/state" . "$SCRIPT_DIR/fm-wake-lib.sh"
-}
-# fm_lab_home_start <pid>: the process's start time, as `ps -o lstart=` prints it.
-fm_lab_home_start() {
+# fm_lab_home_lstart <pid>: the process's start time, as `ps -o lstart=` prints it.
+fm_lab_home_lstart() {
   local start rc
   start=$(LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null)
   rc=$?
@@ -122,8 +120,20 @@ fm_lab_home_start() {
   [ -n "$start" ] || return 1
   printf '%s\n' "$start"
 }
+# fm_lab_home_start <pid>: the start time a launch record holds, the kernel's
+# start ticks (/proc stat field 22) on Linux, where a wall-clock step changes lstart.
+fm_lab_home_start() {
+  local stat
+  [ "$(uname -s)" = Linux ] || { fm_lab_home_lstart "$1"; return; }
+  stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+  # shellcheck disable=SC2086 # The fields after the command name split on purpose.
+  set -- ${stat##*)}
+  case "${20:-}" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "${20}"
+}
 
-# fm_lab_home_sessions <dir>: print the recorded session ids the lab still owns.
+# fm_lab_home_sessions <dir>: print each recorded session id the lab still owns
+# as <id>:live while its recorded leader lives, or <id>:gone once it has exited.
 fm_lab_home_sessions() {
   local record tag id pid start current seen=' '
   record=$(fm_lab_home_launch_record "$1")
@@ -132,29 +142,65 @@ fm_lab_home_sessions() {
     [ "$tag" = launch ] && [ -n "$id" ] && [ -n "$start" ] || return 1
     case "$pid" in ''|*[!0-9]*|0|1) return 1 ;; esac
     case "$seen" in *" $pid "*) continue ;; esac
-    seen="$seen$pid "
     if current=$(fm_lab_home_start "$pid"); then
       [ "$current" = "$start" ] || continue
+      printf '%s:live\n' "$pid"
+    else
+      printf '%s:gone\n' "$pid"
     fi
-    printf '%s\n' "$pid"
+    seen="$seen$pid "
   done < "$record"
 }
 
-# The session reader: argv[1] holds the session ids, argv[2] this script's pid,
-# stdin a `pid ppid stat` table. It prints every non-zombie member of those
-# sessions and each live descendant of one, never this script, an ancestor or a
-# descendant of it, and exits 1 when the table or a session id cannot be read.
+# The session reader: argv[1] holds the <id>:<live|gone> sessions, argv[2] this
+# script's pid, argv[3] the lab's private socket directory (may be empty), stdin
+# a `pid ppid stat lstart` table. It prints `+ <pid> <lstart>` for every
+# non-zombie member of a live session, every member of a gone session whose TMUX
+# names a socket in that directory, and each live descendant of one, and
+# `? <pid>` for every other member of a gone session. It never prints this
+# script, an ancestor or a descendant of it, and exits 1 when the table or a
+# session id cannot be read.
 IFS= read -r -d '' FM_LAB_HOME_MEMBERS_PY <<'PY' || true
-import errno, os, sys
-sessions = {int(s) for s in sys.argv[1].split()}
+import ctypes, errno, os, struct, sys
+sessions = dict(s.split(":") for s in sys.argv[1].split())
+sessions = {int(k): v for k, v in sessions.items()}
 me = int(sys.argv[2])
-parent, zombie, children = {}, set(), {}
+lab = os.path.realpath(sys.argv[3]) if sys.argv[3] else None
+libc = ctypes.CDLL(None, use_errno=True)
+def environ(pid):
+    if os.path.isdir("/proc/self"):
+        with open("/proc/%d/environ" % pid, "rb") as f:
+            return f.read().split(b"\0")
+    mib = (ctypes.c_int * 3)(1, 49, pid)
+    size = ctypes.c_size_t(0)
+    if libc.sysctl(mib, 3, None, ctypes.byref(size), None, 0):
+        raise OSError(ctypes.get_errno(), "sysctl")
+    buf = ctypes.create_string_buffer(size.value)
+    if libc.sysctl(mib, 3, buf, ctypes.byref(size), None, 0):
+        raise OSError(ctypes.get_errno(), "sysctl")
+    data = buf.raw[:size.value]
+    argc = struct.unpack_from("i", data, 0)[0]
+    return data[4:].split(b"\0", 1)[1].lstrip(b"\0").split(b"\0")[argc:]
+def in_lab(pid):
+    if lab is None:
+        return False
+    try:
+        words = environ(pid)
+    except (OSError, LookupError, struct.error, IndexError):
+        return False
+    for word in words:
+        if word.startswith(b"TMUX="):
+            socket = os.fsdecode(word[5:].split(b",", 1)[0])
+            return os.path.dirname(os.path.dirname(socket)) == lab
+    return False
+parent, zombie, children, start = {}, set(), {}, {}
 for line in sys.stdin:
     f = line.split()
-    if len(f) < 3 or not f[0].isdigit() or not f[1].isdigit():
+    if len(f) < 8 or not f[0].isdigit() or not f[1].isdigit():
         continue
     pid, ppid = int(f[0]), int(f[1])
     parent[pid] = ppid
+    start[pid] = " ".join(f[3:8])
     children.setdefault(ppid, []).append(pid)
     if f[2].startswith("Z"):
         zombie.add(pid)
@@ -170,18 +216,24 @@ while stack:
         if child not in protected:
             protected.add(child)
             stack.append(child)
-members = set()
+def sid_of(pid):
+    try:
+        return os.getsid(pid)
+    except OSError as exc:
+        if exc.errno == errno.ESRCH:
+            return None
+        sys.exit(1)
+members, unproven = set(), set()
 for pid in parent:
     if pid in protected or pid in zombie or pid <= 1:
         continue
-    try:
-        sid = os.getsid(pid)
-    except OSError as exc:
-        if exc.errno == errno.ESRCH:
-            continue
-        sys.exit(1)
-    if sid in sessions:
+    sid = sid_of(pid)
+    if sid not in sessions:
+        continue
+    if sessions[sid] == "live" or in_lab(pid):
         members.add(pid)
+    elif sid_of(pid) == sid:
+        unproven.add(pid)
 stack = list(members)
 while stack:
     for child in children.get(stack.pop(), []):
@@ -189,23 +241,25 @@ while stack:
             members.add(child)
             stack.append(child)
 for pid in sorted(members):
-    print(pid)
+    print("+ %d %s" % (pid, start[pid]))
+for pid in sorted(unproven - members):
+    print("? %d" % pid)
 PY
 
-# fm_lab_home_members <session-ids>: print the live lab processes; fails when the
-# process list or a session id cannot be read.
+# fm_lab_home_members <sessions> <socket-dir>: print the session reader's lines;
+# fails when the process list or a session id cannot be read.
 fm_lab_home_members() {
   local table rc
-  table=$(LC_ALL=C ps -A -o pid=,ppid=,stat= 2>/dev/null)
+  table=$(LC_ALL=C ps -A -o pid=,ppid=,stat=,lstart= 2>/dev/null)
   rc=$?
   if [ "$rc" -eq 126 ]; then
     # A confined caller's sandbox refuses setuid ps; fm-proc-info.py reads sysctl.
-    table=$(python3 "$SCRIPT_DIR/fm-proc-info.py" table pid,ppid,stat 2>/dev/null) || return 1
+    table=$(python3 "$SCRIPT_DIR/fm-proc-info.py" table pid,ppid,stat,lstart 2>/dev/null) || return 1
   elif [ "$rc" -ne 0 ]; then
     return 1
   fi
   [ -n "$table" ] || return 1
-  printf '%s\n' "$table" | python3 -I -c "$FM_LAB_HOME_MEMBERS_PY" "$1" "$$"
+  printf '%s\n' "$table" | python3 -I -c "$FM_LAB_HOME_MEMBERS_PY" "$1" "$$" "$2"
 }
 
 # measured: value=2 date=2026-11-24 host=Mac-Studio margin=625 (a reproduced lab launcher exited at most 0.0032 s after TERM over 20 trials; a real agent's TERM shutdown was not measured, and 2 s matches bin/fm-test-reap-orphans.sh's grace)
@@ -213,49 +267,62 @@ FM_LAB_HOME_TERM_SECONDS=2
 # measured: value=5 date=2026-11-24 host=Mac-Studio margin=1064 (the TERM-ignoring treehouse subshell exited at most 0.0047 s after KILL over 20 trials; only a process KILL cannot end waits this long)
 FM_LAB_HOME_KILL_SECONDS=5
 
-# fm_lab_home_alive <index>: the tracked target still has the identity first read.
+# fm_lab_home_alive <index>: the tracked target still has the start time first read.
 fm_lab_home_alive() {
-  [ -n "${REAP_IDENTS[$1]}" ] && [ "$(fm_pid_identity "${REAP_PIDS[$1]}" 2>/dev/null || true)" = "${REAP_IDENTS[$1]}" ]
+  [ "$(fm_lab_home_lstart "${REAP_PIDS[$1]}" 2>/dev/null || true)" = "${REAP_IDENTS[$1]}" ]
+}
+
+# fm_lab_home_describe <pid>...: one `pid ppid command` line per pid.
+fm_lab_home_describe() {
+  local pid line
+  for pid in $(printf '%s\n' "$@" | sort -un); do
+    line=$(LC_ALL=C ps -o pid=,ppid=,command= -p "$pid" 2>/dev/null) ||
+      line="$pid $(python3 "$SCRIPT_DIR/fm-proc-info.py" ppid "$pid" 2>/dev/null) $(python3 "$SCRIPT_DIR/fm-proc-info.py" args "$pid" 2>/dev/null)"
+    printf '\n  %s' "$(printf '%s' "$line" | sed 's/^[[:space:]]*//' | cut -c1-200)"
+  done
 }
 
 # fm_lab_home_reap <dir>: end every process in a session the lab recorded (header).
 fm_lab_home_reap() {
-  local dir=$1 sessions members pid i phase=soft deadline survivors line details=''
+  local dir=$1 sessions socket='' out members unproven pid start i phase=soft deadline survivors rc=0
   REAP_PIDS=()
   REAP_IDENTS=()
   [ -e "$(fm_lab_home_launch_record "$dir")" ] || return 0
-  fm_lab_home_wake_lib "$dir" || { fm_lab_home_error "refusing teardown: cannot load the process identity reader"; return 1; }
   sessions=$(fm_lab_home_sessions "$dir") || {
     fm_lab_home_error "refusing teardown: the lab launch record $(fm_lab_home_launch_record "$dir") is unreadable"
     return 1
   }
   sessions=$(printf '%s' "$sessions" | tr '\n' ' ')
   [ -n "${sessions// /}" ] || { rm -f "$(fm_lab_home_launch_record "$dir")"; return 0; }
+  [ ! -f "$(fm_lab_home_tmux_record "$dir")" ] || socket=$(cat "$(fm_lab_home_tmux_record "$dir")")
   deadline=$((SECONDS + FM_LAB_HOME_TERM_SECONDS))
   while :; do
-    members=$(fm_lab_home_members "$sessions") || {
+    out=$(fm_lab_home_members "$sessions" "$socket") || {
       fm_lab_home_error "refusing teardown: cannot read the process list or session ids, so the lab's processes cannot be proven ended (recorded sessions: $sessions)"
       return 1
     }
-    for pid in $members; do
+    members=$(printf '%s\n' "$out" | sed -n 's/^+ \([0-9]*\) .*/\1/p')
+    unproven=$(printf '%s\n' "$out" | sed -n 's/^? //p')
+    while read -r pid start; do
+      [ -n "$pid" ] || continue
       i=0
-      while [ "$i" -lt "${#REAP_PIDS[@]}" ] && [ "${REAP_PIDS[$i]}" != "$pid" ]; do i=$((i + 1)); done
+      while [ "$i" -lt "${#REAP_PIDS[@]}" ] && [ "${REAP_PIDS[$i]} ${REAP_IDENTS[$i]}" != "$pid $start" ]; do i=$((i + 1)); done
       [ "$i" -eq "${#REAP_PIDS[@]}" ] || continue
       REAP_PIDS+=("$pid")
-      REAP_IDENTS+=("$(fm_pid_identity "$pid" 2>/dev/null || true)")
+      REAP_IDENTS+=("$start")
       fm_lab_home_alive "$i" || continue
       kill -CONT "$pid" 2>/dev/null || true
       if fm_lab_home_alive "$i"; then
         if [ "$phase" = soft ]; then kill -TERM "$pid" 2>/dev/null || true; else kill -KILL "$pid" 2>/dev/null || true; fi
       fi
-    done
+    done <<< "$(printf '%s\n' "$out" | sed -n 's/^+ //p')"
     survivors=
     i=0
     while [ "$i" -lt "${#REAP_PIDS[@]}" ]; do
       ! fm_lab_home_alive "$i" || survivors="$survivors ${REAP_PIDS[$i]}"
       i=$((i + 1))
     done
-    [ -n "$survivors$members" ] || { rm -f "$(fm_lab_home_launch_record "$dir")"; return 0; }
+    [ -n "$survivors$members" ] || break
     if [ "$phase" = soft ] && [ "$SECONDS" -ge "$deadline" ]; then
       phase=hard
       deadline=$((SECONDS + FM_LAB_HOME_KILL_SECONDS))
@@ -265,17 +332,20 @@ fm_lab_home_reap() {
         i=$((i + 1))
       done
     elif [ "$phase" = hard ] && [ "$SECONDS" -ge "$deadline" ]; then
+      # shellcheck disable=SC2086 # Each pid is one word.
+      fm_lab_home_error "refusing teardown: lab processes did not exit after TERM and KILL (pid ppid command):$(fm_lab_home_describe $survivors $members)"
+      rc=1
       break
     fi
     sleep 0.2
   done
-  for pid in $(printf '%s %s' "$survivors" "$members" | tr ' ' '\n' | sort -un); do
-    line=$(LC_ALL=C ps -o pid=,ppid=,command= -p "$pid" 2>/dev/null) ||
-      line="$pid $(python3 "$SCRIPT_DIR/fm-proc-info.py" ppid "$pid" 2>/dev/null) $(python3 "$SCRIPT_DIR/fm-proc-info.py" args "$pid" 2>/dev/null)"
-    details="$details"$'\n'"  $(printf '%s' "$line" | sed 's/^[[:space:]]*//' | cut -c1-200)"
-  done
-  fm_lab_home_error "refusing teardown: lab processes did not exit after TERM and KILL (pid ppid command):$details"
-  return 1
+  if [ -n "$unproven" ]; then
+    # shellcheck disable=SC2086 # Each pid is one word.
+    fm_lab_home_error "refusing teardown: these processes hold a recorded session whose leader is gone, but their TMUX names no socket in the lab's private socket directory, so they were not signalled (pid ppid command):$(fm_lab_home_describe $unproven)"
+    rc=1
+  fi
+  [ "$rc" -ne 0 ] || rm -f "$(fm_lab_home_launch_record "$dir")"
+  return "$rc"
 }
 
 case "${1:-}" in

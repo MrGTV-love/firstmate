@@ -5225,8 +5225,8 @@
       "owner": "bin/fm-lab-home.sh",
       "invariant": "Lab socket storage and its launch record remain until every process in a recorded lab session has ended.",
       "layer": "runtime-block",
-      "source": "state/.fm-lab-launches session leaders with their recorded identity digests, the live process table and each process's kernel session id",
-      "trigger": "teardown while a process in a recorded session survives TERM and KILL, or while the launch record, process table or a session id cannot be read",
+      "source": "state/.fm-lab-launches session leaders with their recorded start times, the live process table with each process's start time, each process's kernel session id, and, once a recorded leader is gone, each member's TMUX environment value against the lab's private socket directory",
+      "trigger": "teardown while a process in a recorded session survives TERM and KILL, while a member of a recorded session whose leader is gone has a TMUX value naming no socket in the lab's private socket directory, or while the launch record, process table or a session id cannot be read",
       "remedy": "Preserve the lab home and its socket directory, end or explain each named process with its owner, then retry bash bin/fm-lab-home.sh teardown <lab-home>; a fresh lab comes from bash bin/fm-lab-home.sh env.",
       "decision": "deny",
       "fail_direction": "closed",
@@ -5245,10 +5245,6 @@
       "sites": [
         {
           "file": "bin/fm-lab-home.sh",
-          "match": "fm_lab_home_error \"refusing teardown: cannot load the process identity reader\""
-        },
-        {
-          "file": "bin/fm-lab-home.sh",
           "match": "fm_lab_home_error \"refusing teardown: the lab launch record $(fm_lab_home_launch_record \"$dir\") is unreadable\""
         },
         {
@@ -5257,7 +5253,11 @@
         },
         {
           "file": "bin/fm-lab-home.sh",
-          "match": "fm_lab_home_error \"refusing teardown: lab processes did not exit after TERM and KILL (pid ppid command):$details\""
+          "match": "fm_lab_home_error \"refusing teardown: lab processes did not exit after TERM and KILL (pid ppid command):"
+        },
+        {
+          "file": "bin/fm-lab-home.sh",
+          "match": "fm_lab_home_error \"refusing teardown: these processes hold a recorded session whose leader is gone"
         }
       ]
     },
