@@ -46,6 +46,29 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 TMP_ROOT=$(fm_test_tmproot fm-send-remote-delivery)
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
 
+# A remote steer's last step rings the secondmate's doorbell through the herdr
+# adapter (fm_task_inbox_ring in bin/fm-task-inbox-lib.sh asks the recorded pane
+# for its agent and composer state with `status --json`, `pane get` and
+# `agent get`). The fixture has no herdr server, so this file owns a fake client
+# that reports an unreachable server, and it points every herdr lookup at that
+# fake and at scratch values. No call can reach a real herdr client, socket or
+# pane. The fake logs each call so a test can name what the doorbell asked.
+FAKE_HERDR_DIR="$TMP_ROOT/herdr-fake"
+FAKE_HERDR_LOG="$TMP_ROOT/herdr-fake.calls"
+mkdir -p "$FAKE_HERDR_DIR"
+: > "$FAKE_HERDR_LOG"
+cat > "$FAKE_HERDR_DIR/herdr" <<SH
+#!/bin/sh
+printf '%s\n' "\$*" >> "$FAKE_HERDR_LOG"
+echo 'error: herdr server is not running (test fixture)' >&2
+exit 1
+SH
+chmod +x "$FAKE_HERDR_DIR/herdr"
+unset HERDR_ENV HERDR_SESSION HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_CLIENT_SESSION FM_HERDR_RUNTIME SSH_AUTH_SOCK
+export HERDR_SOCKET_PATH="$TMP_ROOT/no-such-herdr.sock" HERDR_PANE_ID="scratch-pane"
+export FM_BACKEND_HERDR_BIN="$FAKE_HERDR_DIR/herdr"
+export PATH="$FAKE_HERDR_DIR:$PATH"
+
 # Stub tmux for the local typed-plane legs: logs literal typed text to
 # FM_SEND_LOG. The default composer reads empty (clean submit);
 # FM_FAKE_TMUX_PENDING=1 keeps a proven pending composer with no busy footer,
@@ -230,6 +253,14 @@ assert_one_remote_record_body() {
   cmp -s "$want" "$got" || fail "$4: the remote record's body is not, byte for byte, the request with correlation $2: $(od -c "$got" | head -5)"
 }
 
+# assert_record_body_is <record> <expected-body-file> <what>: the record's body
+# (every byte after its -- line) is exactly the bytes in the expected file.
+assert_record_body_is() {
+  local got="$TMP_ROOT/record-got.$$"
+  fm_task_inbox_body "$1" > "$got" || fail "$3: the record has no body: $(cat "$1")"
+  cmp -s "$2" "$got" || fail "$3: the record's body is not, byte for byte, the expected body: $(od -c "$got" | head -5)"
+}
+
 # The single non-dot pending-reply record in <home>, or empty.
 pending_record() {  # <home>
   find "$1/state/pending-replies" -maxdepth 1 -type f ! -name '.*' 2>/dev/null | head -1
@@ -276,8 +307,12 @@ test_remote_steer_lands_in_remote_inbox() {
     *"$FM_FROMFIRST_MARK"*) : ;;
     *) fail "the remote record must carry the from-firstmate marker: $body" ;;
   esac
-  # The doorbell could not reach the fixture pane (no herdr CLI here); that
-  # never fails the send, and the notice still names the durable record.
+  # The doorbell asked the fake herdr (unreachable server) and only read state;
+  # it never typed into a pane. That never fails the send, and the notice still
+  # names the durable record.
+  [ -s "$FAKE_HERDR_LOG" ] || fail "the doorbell should have asked the fixture's herdr client about the pane"
+  ! grep -Evq '^(status --json|pane get|agent get) ' "$FAKE_HERDR_LOG" \
+    || fail "the doorbell may only read state from herdr: $(cat "$FAKE_HERDR_LOG")"
   assert_contains "$err" "durably recorded" \
     "a failed doorbell must be reported as a notice on a durably sent steer"
   assert_not_contains "$err" "error:" "a durably recorded steer must not carry an error report"
@@ -871,6 +906,114 @@ test_remote_transport_loss_preserves_expectation() {
   pass "fm-send remote: ssh 255 fails with resend-safe guidance and preserves the expectation"
 }
 
+# A remote inbox that already holds a large acknowledged history must not slow
+# the idempotent enqueue past the remote budget: the steer lands within the
+# default FM_SEND_REMOTE_BUDGET (deliberately not set here) and a same-id resend
+# still dedups onto that record.
+test_remote_steer_lands_behind_a_large_handled_folder() {
+  local dir fb ssh_log home rhome inbox rc err i f delivery count pend corr probe_home before
+  dir="$TMP_ROOT/remote-large-handled"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-large-handled)
+  home=$(setup_remote_parent_home remote-large-handled "$rhome")
+  inbox="$rhome/state/parent-route/rsm.inbox"; mkdir -p "$inbox/handled"
+  i=0
+  while [ "$i" -lt 1600 ]; do
+    i=$((i + 1))
+    printf -v f '%s/handled/%04d.msg' "$inbox" "$i"
+    printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\n--\nacknowledged steer %s\nsecond line\n' "$i" > "$f"
+  done
+  delivery=ddddeeeeffff0000
+
+  # Delivered means the leg finished inside the default budget, which kills a
+  # slower leg before it writes. The record is the next sequence slot after the
+  # history and holds exactly the marked request.
+  rc=0
+  send_env "$fb" "$home" "$ssh_log" "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
+  err=$(cat "$dir/err")
+  [ "$rc" -eq 0 ] || fail "a steer behind 1600 handled records did not deliver (rc $rc): $err"
+  count=$(remote_inbox_records "$rhome" | grep -c . || true)
+  [ "$count" = 1 ] || fail "the steer behind 1600 handled records left $count unhandled records, not 1"
+  [ -f "$inbox/1601.msg" ] || fail "the steer behind 1600 handled records did not land as 1601.msg: $(ls "$inbox")"
+  pend=$(pending_record "$home")
+  [ -n "$pend" ] || fail "the marked steer behind 1600 handled records kept no pending-reply expectation"
+  corr=$(fm_pending_reply_get "$pend" corr_id)
+  assert_one_remote_record_body "$rhome" "$corr" "please rename the metric" "the steer behind 1600 handled records"
+  [ -z "$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' \))" ] || fail "the remote leg left a temp file or work directory"
+
+  # What the same fire-and-forget steer writes into an empty remote inbox is the
+  # expected record for it; the same delivery id resent behind the history lands
+  # once, as that record, and is not rewritten by the resend.
+  probe_home=$(setup_remote_secondmate_home remote-large-handled-probe)
+  send_env "$fb" "$(setup_remote_parent_home remote-large-handled-probe "$probe_home")" "$ssh_log" \
+    "$SEND" rsm --fire-and-forget "$delivery" "reconcile your own books" >"$dir/probe.out" 2>"$dir/probe.err" \
+    || fail "the probe steer failed: $(cat "$dir/probe.err")"
+  fm_task_inbox_body "$(remote_inbox_records "$probe_home")" > "$dir/faf-want" || fail "the probe record has no body"
+  send_env "$fb" "$home" "$ssh_log" \
+    "$SEND" rsm --fire-and-forget "$delivery" "reconcile your own books" \
+    >"$dir/faf.out" 2>"$dir/faf.err" || fail "the fire-and-forget steer behind 1600 handled records failed: $(cat "$dir/faf.err")"
+  [ -f "$inbox/1602.msg" ] || fail "the fire-and-forget steer did not land as 1602.msg: $(ls "$inbox")"
+  before=$(cat "$inbox/1602.msg")
+  send_env "$fb" "$home" "$ssh_log" \
+    "$SEND" rsm --fire-and-forget "$delivery" "reconcile your own books" \
+    >"$dir/faf2.out" 2>"$dir/faf2.err" || fail "the same-id resend behind 1600 handled records failed: $(cat "$dir/faf2.err")"
+  count=$(remote_inbox_records "$rhome" | grep -c . || true)
+  [ "$count" = 2 ] || fail "a same-id resend behind 1600 handled records did not dedup, found $count records"
+  [ "$(cat "$inbox/1602.msg")" = "$before" ] || fail "the same-id resend rewrote the record it deduplicated onto"
+  assert_record_body_is "$inbox/1602.msg" "$dir/faf-want" "the fire-and-forget steer behind 1600 handled records"
+  grep -qF "delivery=$delivery" "$inbox/1602.msg" || fail "the fire-and-forget record omitted its delivery identity"
+  [ -z "$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' \))" ] || fail "the resend left a temp file or work directory"
+  pass "fm-send remote: a steer lands within the default budget behind 1600 handled records and a same-id resend dedups"
+}
+
+# The marked secondmate request puts the same from-firstmate marker and
+# correlation token at the head of its first line, so a history can hold many
+# records that share the new steer's first line and differ only further down.
+# Those records must not slow the enqueue either: the steer lands within the
+# default budget and a same-id resend still dedups onto it.
+test_remote_steer_lands_behind_handled_records_sharing_its_first_line() {
+  local dir fb ssh_log home rhome inbox i f delivery first count probe_home probe_rec rc=0 after_first=
+  dir="$TMP_ROOT/remote-same-first-line"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-same-first-line)
+  home=$(setup_remote_parent_home remote-same-first-line "$rhome")
+  inbox="$rhome/state/parent-route/rsm.inbox"; mkdir -p "$inbox/handled"
+  delivery=ddddeeeeffff0000
+  # The wire first line is whatever fm-send really writes for this steer, so a
+  # probe send into a scratch remote home supplies it.
+  probe_home=$(setup_remote_secondmate_home remote-same-first-line-probe)
+  send_env "$fb" "$(setup_remote_parent_home remote-same-first-line-probe "$probe_home")" "$ssh_log" \
+    "$SEND" rsm --fire-and-forget "$delivery" $'shared first line\nnew tail' >"$dir/probe.out" 2>"$dir/probe.err" \
+    || fail "the probe steer failed: $(cat "$dir/probe.err")"
+  probe_rec=$(remote_inbox_records "$probe_home")
+  [ -n "$probe_rec" ] || fail "the probe steer wrote no remote record"
+  first=$(fm_task_inbox_body "$probe_rec" | head -1)
+  case "$first" in *"shared first line") ;; *) fail "the probe record's first line is not the steer's: $first" ;; esac
+  i=0
+  while [ "$i" -lt 1600 ]; do
+    i=$((i + 1))
+    printf -v f '%s/handled/%04d.msg' "$inbox" "$i"
+    printf 'schema=fm-task-inbox.v1\nat=2026-11-18T00:00:00Z\ndelivery=fire-and-forget\n--\n%s\nold tail %s\n' "$first" "$i" > "$f"
+  done
+
+  for _ in 1 2; do
+    rc=0
+    send_env "$fb" "$home" "$ssh_log" \
+      "$SEND" rsm --fire-and-forget "$delivery" $'shared first line\nnew tail' \
+      >"$dir/out" 2>"$dir/err" || rc=$?
+    [ "$rc" -eq 0 ] || fail "a steer behind 1600 handled records sharing its first line did not deliver (rc $rc): $(cat "$dir/err")"
+    [ -n "${after_first:-}" ] || after_first=$(cat "$inbox/1601.msg" 2>/dev/null)
+  done
+  count=$(remote_inbox_records "$rhome" | grep -c . || true)
+  [ "$count" = 1 ] || fail "the steer and its same-id resend left $count unhandled records, not 1"
+  [ -f "$inbox/1601.msg" ] || fail "the steer did not land as 1601.msg: $(ls "$inbox")"
+  fm_task_inbox_body "$probe_rec" > "$dir/probe-body" || fail "the probe record has no body"
+  assert_record_body_is "$inbox/1601.msg" "$dir/probe-body" "the steer behind 1600 handled records sharing its first line"
+  [ "$(cat "$inbox/1601.msg")" = "$after_first" ] || fail "the same-id resend rewrote the record it deduplicated onto"
+  [ -z "$(find "$inbox" -maxdepth 1 \( -name '.dedup.*' -o -name '.staging.*' -o -name '.work.*' \))" ] || fail "the remote leg left a temp file or work directory"
+  pass "fm-send remote: a steer lands within the default budget behind 1600 handled records that share its first line"
+}
+
 test_remote_send_budget_bounds_busy_lane() {
   local dir fb ssh_log home rhome rc err began elapsed count pend delivery corr ssh_before
   dir="$TMP_ROOT/remote-budget"; mkdir -p "$dir"
@@ -1144,6 +1287,8 @@ test_remote_slash_rides_inbox
 test_remote_real_failure_still_fails
 test_remote_exit3_no_longer_delivered
 test_remote_transport_loss_preserves_expectation
+test_remote_steer_lands_behind_a_large_handled_folder
+test_remote_steer_lands_behind_handled_records_sharing_its_first_line
 test_remote_send_budget_bounds_busy_lane
 test_local_typed_resend_with_correlation_meets_the_choice_rule
 test_local_pending_reports_delivered_unconfirmed
