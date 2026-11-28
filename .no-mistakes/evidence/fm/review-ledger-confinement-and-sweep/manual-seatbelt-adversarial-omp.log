@@ -1,0 +1,20 @@
+ALLOWED  control: write own state/task.status
+ALLOWED  control: write in task worktree
+REFUSED  append forged row to review-records.jsonl
+REFUSED  truncate review-records.jsonl
+REFUSED  rename forged file over review-records.jsonl
+REFUSED  rename review-records.jsonl away
+REFUSED  delete review-records.jsonl
+REFUSED  hard link review-records.jsonl into worktree
+REFUSED  symlink review-records.jsonl into worktree then write
+REFUSED  mkdir new .review-carry-777-evil
+REFUSED  plant symlink .review-carry-778-evil
+REFUSED  tamper inside existing scratch proof.git
+REFUSED  add hook file to existing scratch
+REFUSED  delete existing scratch dir
+REFUSED  rename existing scratch dir
+REFUSED  forge row via real fm-review-record.py captain-word
+### confined (omp profile):
+error: [Errno 1] Operation not permitted: '/private/tmp/fm-wc-adv.Ldb4IA/home/state/review-records.jsonl'; inspect review-records.jsonl in the PR task home before retrying
+rc=1
+ledger lines:        1

@@ -1,0 +1,4 @@
+ok - the proof's scratch repository is made beside the review records and removed afterwards
+ok - carry-over sweeps dead-PID and aged legacy scratch directories while preserving live ones
+ok - a state directory that takes no scratch repository refuses carry-over with its reason
+ok - once a same-tree rewrite is itself read, updates of either sibling refuse until a reviewed head builds on both

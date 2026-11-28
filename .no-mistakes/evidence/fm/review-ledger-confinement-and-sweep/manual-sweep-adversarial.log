@@ -1,0 +1,22 @@
+before:
+drwxr-xr-x@  3 charlesabrooker  staff   96 Nov 27 20:49 .review-carry-0-zero
+drwxr-xr-x@  3 charlesabrooker  staff   96 Jan  1  2020 .review-carry-1-launchd
+drwxr-xr-x@  3 charlesabrooker  staff   96 Nov 27 20:49 .review-carry-64529-dead
+-rw-r--r--@  1 charlesabrooker  staff    2 Nov 27 20:49 .review-carry-64529-plainfile
+lrwxr-xr-x@  1 charlesabrooker  staff   73 Nov 27 20:49 .review-carry-64529-symlink -> /Users/charlesabrooker/tmp/fm-review-record-tests.99HdIa/adv-sweep/victim
+drwxr-xr-x@  3 charlesabrooker  staff   96 Jan  1  2020 .review-carry-64545-liveold
+drwxr-xr-x@  3 charlesabrooker  staff   96 Jan  1  2020 .review-carry-999999999999999999999-old
+lrwxr-xr-x@  1 charlesabrooker  staff   73 Jan  1  2020 .review-carry-legacylink -> /Users/charlesabrooker/tmp/fm-review-record-tests.99HdIa/adv-sweep/victim
+drwxr-xr-x@  2 charlesabrooker  staff   64 Nov 27 20:49 .review-carryX-64529-other
+verify rc=0
+review: PASS
+review: review carried from 649e630bf501a844be2e09fcac5df5fd429a91a4: the live head is that reviewed change merged cleanly with its base
+after:
+drwxr-xr-x@  3 charlesabrooker  staff   96 Nov 27 20:49 .review-carry-0-zero
+drwxr-xr-x@  3 charlesabrooker  staff   96 Jan  1  2020 .review-carry-1-launchd
+-rw-r--r--@  1 charlesabrooker  staff    2 Nov 27 20:49 .review-carry-64529-plainfile
+lrwxr-xr-x@  1 charlesabrooker  staff   73 Nov 27 20:49 .review-carry-64529-symlink -> /Users/charlesabrooker/tmp/fm-review-record-tests.99HdIa/adv-sweep/victim
+drwxr-xr-x@  3 charlesabrooker  staff   96 Jan  1  2020 .review-carry-64545-liveold
+lrwxr-xr-x@  1 charlesabrooker  staff   73 Jan  1  2020 .review-carry-legacylink -> /Users/charlesabrooker/tmp/fm-review-record-tests.99HdIa/adv-sweep/victim
+drwxr-xr-x@  2 charlesabrooker  staff   64 Nov 27 20:49 .review-carryX-64529-other
+ok - adversarial sweep: only dead-PID and aged no-PID real dirs removed; symlink targets, files, EPERM and live PIDs kept
