@@ -1132,6 +1132,51 @@ assert_treehouse_unchanged() {
     || fail "$2: $(cat "$1/treehouse.log")"
 }
 
+# assert_treehouse_log_probe_only <log> <message>: the recorded Treehouse calls are
+# exactly the read-only capability probe. The check fails closed: a log that is
+# missing, is not a readable regular file, is empty, or holds any other line, or a
+# grep that cannot read it, is a failure, because an unreadable record cannot show
+# that no pool call was made.
+assert_treehouse_log_probe_only() {
+  local log=$1 message=$2 rc=0
+  [ -f "$log" ] && [ -r "$log" ] && [ -s "$log" ] \
+    || fail "$message: the Treehouse call log is missing, empty or not a readable file: $log"
+  grep -qxv 'capabilities --json' "$log" 2>/dev/null || rc=$?
+  case "$rc" in
+    1) ;;
+    0) fail "$message: Treehouse was called beyond the capability probe: $(tr '\n' '|' < "$log")" ;;
+    *) fail "$message: the Treehouse call log could not be read (grep exit $rc)" ;;
+  esac
+}
+
+# The probe-only assertion rejects what the former negated grep let through. Each
+# refusal runs in its own subshell because a failed assertion exits.
+test_probe_only_log_assertion_fails_closed() {
+  local dir out
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-probe-log.XXXXXX") || fail "cannot create a scratch directory"
+  printf 'capabilities --json\n' > "$dir/probe-only.log"
+  printf 'capabilities --json\nreturn --force /slot\n' > "$dir/extra-call.log"
+  printf 'capabilities --json\nstatus --json\n' > "$dir/extra-read.log"
+  : > "$dir/empty.log"
+  mkdir "$dir/directory.log"
+  printf 'capabilities --json\n' > "$dir/unreadable.log"
+  chmod 000 "$dir/unreadable.log"
+  # control: the probe alone passes
+  ( assert_treehouse_log_probe_only "$dir/probe-only.log" control ) >/dev/null 2>&1 \
+    || { rm -rf "$dir"; fail "the probe-only log was refused"; }
+  for name in extra-call extra-read empty directory missing unreadable; do
+    if [ "$name" = unreadable ] && [ -r "$dir/unreadable.log" ]; then
+      continue # a reader that ignores file modes (root) cannot be given an unreadable file
+    fi
+    out=$( ( assert_treehouse_log_probe_only "$dir/$name.log" "$name" ) 2>&1 ) \
+      && { chmod 600 "$dir/unreadable.log"; rm -rf "$dir"; fail "$name: the assertion accepted a log it must refuse"; }
+    case "$out" in *"not ok"*|*"$name:"*) ;; *) chmod 600 "$dir/unreadable.log"; rm -rf "$dir"; fail "$name: the refusal did not name its cause: $out" ;; esac
+  done
+  chmod 600 "$dir/unreadable.log"
+  rm -rf "$dir"
+  pass "the probe-only assertion fails closed on a missing, empty, directory, unreadable or extra-call Treehouse log and accepts the probe alone"
+}
+
 run_case_teardown() {  # <case-dir> <id>
   local dir=$1 id=$2 tb="$1/teardown-bin" tool
   shift 2
@@ -1311,7 +1356,16 @@ test_shared_slot_cleanup_then_reassociate_preserves_all_copies() {
     copy_fingerprint "$nested" | cmp -s - "$dir/nested-before" || fail "$shape: reassociation changed unlanded work"
     git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
       || fail "$shape: reassociation changed branches"
-    [ ! -e "$dir/treehouse.log" ] || fail "$shape: reassociation invoked Treehouse"
+    # Only the nested scouts reach the capability probe: a scout copy nested in the
+    # unclaimed slot (named by its prior copy or, with no history, by the slot that
+    # encloses its copy) makes that read-only call before its teardown decides
+    # whether a conditional return is planned. Every other shape must not call
+    # Treehouse at all.
+    if [ "$shape" = nested-scout ] || [ "$shape" = nested-scout-prior ]; then
+      assert_treehouse_log_probe_only "$dir/treehouse.log" "$shape: reassociation"
+    else
+      [ ! -e "$dir/treehouse.log" ] || fail "$shape: reassociation invoked Treehouse"
+    fi
     cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$shape: recovery changed Treehouse's lease"
 
   done
@@ -2884,6 +2938,7 @@ test_teardown_after_a_joint_reassociation_finishes_a_removed_copy_and_leaves_a_r
 
 fm_test_only
 
+test_probe_only_log_assertion_fails_closed
 test_shared_root_without_pr_proves_its_own_branch
 test_non_github_pr_reassociation_refuses
 

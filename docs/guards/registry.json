@@ -531,6 +531,10 @@
         {
           "file": "bin/fm-teardown-nested-lib.sh",
           "match": "teardown_refuse_copy ignored-bytes-preserved \"the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed.\" \"$copy\""
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "holds ignored files that could not be preserved in $DATA/$ID/nested-copy-preserved, and removing the copy would lose them"
         }
       ]
     },
@@ -1068,7 +1072,15 @@
         },
         {
           "file": "bin/fm-task-copy-lib.sh",
-          "match": "remedy=\"treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)\""
+          "match": "remedy=\"Upgrade treehouse to a build whose 'treehouse capabilities --json' reports persistent_recovered_leases: true and a recovered_quarantine_holder, then retry;"
+        , "count": 2},
+        {
+          "file": "bin/fm-task-copy-lib.sh",
+          "match": "remedy=\"Run the provider's cutover adoption first, then retry: it moves the entry to the protected holder"
+        },
+        {
+          "file": "bin/fm-bootstrap.sh",
+          "match": "echo \"BOOTSTRAP_INFO: treehouse $FM_TASK_COPY_RECOVERED_CAPABILITY_REASON;"
         }
       ]
     },
@@ -2500,7 +2512,7 @@
       "invariant": "A proved held-close or slot-return route cannot silently change before removal.",
       "layer": "runtime-block",
       "source": "the task's current metadata, ownership/copy/process inventory, pending outcomes and lock-bound cleanup proofs; existing decision points: site:bin/fm-teardown.sh:feccb8ae4f",
-      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies, or the slot-return route has no resolved pool slot or its durable lease is lost under custody, or a slot a return-pending record names is still claimed and unreturned when the task record would be retired",
+      "trigger": "refuses when the held-close vs slot-return route changed between proof and removal, or a peer left the slot so the peer route no longer applies, or the slot-return route has no resolved pool slot or its durable lease is lost under custody, or a slot a return-pending record names is still claimed and unreturned when the task record would be retired, or the unclaimed-slot route finds its slot entry still on the old recovered holder before it binds or retires anything",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Preserve the task and its records; have the owner satisfy the named custody or completion prerequisite, then retry FM_HOME=<home> bash bin/fm-teardown.sh <task> without force.",
@@ -2529,6 +2541,10 @@
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies. $TEARDOWN_PROOF_OUTCOME.\" >&2"
         },
+        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot $TEARDOWN_UNCLAIMED_SLOT, which encloses task $ID's nested copy and carries no slot claim, $outcome"},
+        {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: pool slot ${TEARDOWN_UNCLAIMED_SLOT:-$TEARDOWN_RECORD_SLOT}, which encloses task $ID's nested copy and carries no slot claim, was not returned"},
+        {"file": "bin/fm-teardown.sh", "match": "teardown_unclaimed_note \"treehouse refused the exact conditional return"},
+        {"file": "bin/fm-teardown.sh", "match": "teardown_unclaimed_refuse_old_holder", "count": 2},
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents\" >&2"
@@ -6526,7 +6542,12 @@
       "owner": "bin/fm-teardown.sh",
       "sites": [
         {"file":"bin/fm-teardown.sh","match":"teardown-unlanded bypass"},
-        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 6},
+        {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 9},
+        {"file": "bin/fm-teardown.sh", "match": "REFUSED: git would not remove task $ID's nested copy"},
+        {"file": "bin/fm-teardown.sh", "match": "REFUSED: the lease recorded in task $ID's return-pending marker"},
+        {"file": "bin/fm-teardown.sh", "match": "REFUSED: pool slot $slot is not in the state task $ID's interrupted teardown proved"},
+        {"file": "bin/fm-teardown.sh", "match": "REFUSED: task $ID's nested copy $WT sits in pool slot $slot, which carries no slot claim"},
+        {"file": "bin/fm-teardown.sh", "match": "REFUSED: task $ID's copy $WT sits in pool slot $slot, whose entry reads"},
         {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
         {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2},
