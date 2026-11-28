@@ -1,0 +1,3 @@
+ok - lab teardown ends the lab primary and what it started after kill-server, and nothing outside the lab
+ok - a lab primary whose session cannot be recorded never runs its command
+rc=0

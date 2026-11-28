@@ -1,0 +1,4 @@
+21:For tmux-based lab primaries, `bin/fm-lab-home.sh` owns the short private socket directory; do not place `TMUX_TMPDIR` under the lab home or worktree.
+22-Use `LAB_HOME_HELPER='/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8FCS29G4AQGSPZ5VK1TSQGS/bin/fm-lab-home.sh'`, then `LAB_TMUX_DIR=$("$LAB_HOME_HELPER" tmux-dir "$FM_HOME")`, and start the lab primary only with `"$LAB_HOME_HELPER" primary "$FM_HOME" <cli>`, never with tmux new-session yourself: it starts `<cli>` as session `primary` on the `fm-lab` socket in `LAB_TMUX_DIR` and records it first, so the teardown can end everything it starts; address that server only as `TMUX_TMPDIR="$LAB_TMUX_DIR" tmux -L fm-lab ...`.
+23-Your single EXIT cleanup trap must kill only the server addressed through `TMUX_TMPDIR="$LAB_TMUX_DIR"`, call `"$LAB_HOME_HELPER" teardown "$FM_HOME"`, and call the Herdr teardown below; do not install a second trap that replaces either cleanup.
+24-

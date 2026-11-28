@@ -1,0 +1,2 @@
+not ok - the lab teardown left the lab standin running (pid 69747)
+rc=1

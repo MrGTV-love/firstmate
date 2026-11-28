@@ -1,0 +1,2 @@
+ok - lab teardown never signals a recycled session outside the lab, and fails naming each of its pids
+rc=0

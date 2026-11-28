@@ -1,0 +1,2 @@
+not ok - the lab teardown signalled processes outside the lab in a recycled session (pid signal): 3271 19 3271 15 3296 19 3296 15 
+rc=1

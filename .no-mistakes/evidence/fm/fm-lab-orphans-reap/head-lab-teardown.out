@@ -1,0 +1,4 @@
+ok - lab teardown ends every process its spawned worker left after kill-server, and nothing outside the lab
+ok - record-launch refuses an unreadable, init or dead endpoint pid and an unmarked directory
+ok - lab teardown exits 1 on an unreadable process table or a lab process that survives TERM and KILL, and a retry ends it
+rc=0

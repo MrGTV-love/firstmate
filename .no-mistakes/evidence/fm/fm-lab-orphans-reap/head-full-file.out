@@ -1,0 +1,22 @@
+ok - lab teardown ends every process its spawned worker left after kill-server, and nothing outside the lab
+ok - record-launch refuses an unreadable, init or dead endpoint pid and an unmarked directory
+ok - lab teardown exits 1 on an unreadable process table or a lab process that survives TERM and KILL, and a retry ends it
+ok - lab teardown ends the lab primary and what it started after kill-server, and nothing outside the lab
+ok - a lab primary whose session cannot be recorded never runs its command
+ok - lab teardown never signals a recycled session outside the lab, and fails naming each of its pids
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+ok - tmux a get that outlasts the old 60-poll window is accepted
+ok - tmux laterexit refusal returns its slot and ends its get subshell
+ok - tmux earlyexit refusal returns its slot and ends its get subshell
+ok - tmux clock refusal returns its slot and ends its get subshell
+ok - tmux gone refusal returns its slot and ends its get subshell
+ok - tmux cleanup stops its writing child before removing the socket directory
+ok - tmux provisioning runs in the acquired shell ancestry before admitting its worker
+ok - tmux busy provisioning wait is bounded and stops only its own helper before restoring the copy
+ok - tmux stalled provisioning wait is bounded and stops only its own helper before restoring the copy
+ok - tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior work
+rc=0

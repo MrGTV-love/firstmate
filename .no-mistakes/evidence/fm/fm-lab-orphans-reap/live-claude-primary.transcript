@@ -1,0 +1,34 @@
+$ eval "$(bin/fm-lab-home.sh env)"
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.7rnfUD
+export TMUX_TMPDIR=/tmp/fml.nMFWHB
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8FCS29G4AQGSPZ5VK1TSQGS/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.7rnfUD && rm -rf /Users/charlesabrooker/tmp/fm-lab.7rnfUD
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.7rnfUD TMUX_TMPDIR=/tmp/fml.nMFWHB
+outside decoy pid 13665 sid 13665
+$ bin/fm-lab-home.sh primary "$FM_HOME" claude
+lab primary started: pane pid 15757, session primary on /tmp/fml.nMFWHB/tmux-501/fm-lab
+rc=0
+$ cat $FM_HOME/state/.fm-lab-launches
+launch	primary	15757	Fri Nov 27 19:58:56 2026
+$ tmux -L fm-lab capture-pane -p -t primary  (first 25 lines)
+ ▐▛███▛█   Claude Code v2.1.332
+▝▜██████▀  New sessions: Opus 5.5 · high effort
+[trimmed: the rest of the pane listed the operator's unrelated Claude sessions and paths]
+--- processes in the primary pane session 15757 (pid ppid lstart command):
+=== part 2 (the first script was stopped at its time limit during a slow per-pid sweep; resumed by hand) ===
+new outside decoy pid 86428 (own session, cwd in lab home, exits by itself after 90 s)
+--- processes in lab primary session 15757 (pid ppid command):
+15757 15740 claude
+server pid: 15740
+$ TMUX_TMPDIR=/tmp/fml.nMFWHB tmux -L fm-lab kill-server
+rc=0
+server 15740: gone
+--- session 15757 members after kill-server:
+(end)
+$ (cd / && /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8FCS29G4AQGSPZ5VK1TSQGS/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.7rnfUD)
+rc=0
+outside decoy 86428: alive
+decoy signals: []
+socket dir removed
+launch record removed
+$ rm -rf /Users/charlesabrooker/tmp/fm-lab.7rnfUD
+lab home removed
