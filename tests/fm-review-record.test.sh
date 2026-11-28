@@ -1147,6 +1147,186 @@ PY2
   pass "the proof ignores a replace ref that would pass unread side work off as base content"
 }
 
+test_zhipu_glm_family_covers_other_families_and_blocks_self_review() {
+  local case_dir out rc
+  # 1. Legitimate case: zai/glm-5.4 PASS covers an anthropic author group and plan reports zero owed families.
+  case_dir=$(make_case zhipu-covers-anthropic claude-opus-5-5)
+  record_review "$case_dir" "$HEAD1" PASS zai/glm-5.4 '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record zai/glm-5.4 PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 0 "$rc" "zai/glm-5.4 PASS must cover anthropic author group: $out"
+  "$JQ_BIN" -e '.ok == true and .reader_family == "zhipu" and .author_groups.ship[0].family == "anthropic"' \
+    <<<"$out" >/dev/null || fail "expected reader_family=zhipu covering anthropic: $out"
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "plan failed after zai/glm-5.4 PASS"
+  "$JQ_BIN" -e '.uncovered == []' <<<"$out" >/dev/null || fail "plan must report no uncovered groups: $out"
+
+  # 1b. Ordinary ASCII uppercase spellings still resolve to zhipu.
+  case_dir=$(make_case zhipu-covers-anthropic-upper claude-opus-5-5)
+  record_review "$case_dir" "$HEAD1" PASS ZAI/GLM-5.4 '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record ZAI/GLM-5.4 PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 0 "$rc" "ZAI/GLM-5.4 PASS must cover anthropic author group: $out"
+  "$JQ_BIN" -e '.ok == true and .reader_family == "zhipu"' <<<"$out" >/dev/null \
+    || fail "expected reader_family=zhipu for ASCII uppercase ZAI/GLM-5.4: $out"
+
+  # 2. Harmful case (same family): glm/zhipu reader MUST NOT cover a glm/zhipu author across route spellings.
+  case_dir=$(make_case zhipu-blocks-self openrouter/z-ai/glm-5.4)
+  record_review "$case_dir" "$HEAD1" PASS zai/glm-5.4 '{"ship":["openrouter/z-ai/glm-5.4"]}' >/dev/null \
+    || fail "record same-family glm PASS"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "zai/glm-5.4 PASS must refuse same-family openrouter/z-ai/glm-5.4 author: $out"
+  expect_not_qualified "$out" "zhipu" "same-family zhipu self-review"
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "plan failed on same-family zhipu"
+  "$JQ_BIN" -e '.uncovered | length == 1 and .[0].families == ["zhipu"]' <<<"$out" >/dev/null \
+    || fail "plan must keep zhipu uncovered after same-family PASS: $out"
+
+  # 3. Unknown boundary: unrecognized models, punctuation-mangled ids, bare provider
+  # routes, prefix collisions, and non-ASCII case-folding lookalikes (U+017F long s)
+  # stay unknown and refuse coverage.
+  local bad_id long_s_id
+  long_s_id=$(python3 -c 'print("zai/glm-5.4\u017f")')
+  for bad_id in 'z-ai/mystery-1' 'glimpse-1' 'glm!!!' 'glm---' 'glm-5.4---' 'zai???' 'zai' 'zai/glm!!!' "$long_s_id"; do
+    case_dir=$(make_case "zhipu-unknown-$(printf '%s' "$bad_id" | cksum | awk '{print $1}')" claude-opus-5-5)
+    record_review "$case_dir" "$HEAD1" PASS "$bad_id" '{"ship":["claude-opus-5-5"]}' >/dev/null \
+      || fail "record unknown-model PASS for $bad_id"
+    rc=0
+    out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+    expect_code 1 "$rc" "$bad_id must remain unknown and refuse coverage: $out"
+    expect_not_qualified "$out" "unknown" "$bad_id unknown reader"
+  done
+
+  # 4. Pipeline DB provider boundary: exact lowercase zai/z-ai normalize to zhipu
+  # only when model is empty or agrees, never promoting a non-empty malformed/unknown
+  # model (glm!!!, glm-5.4\u017f, mystery-12) out of unknown; non-Zhipu model aliases (gpt) and
+  # non-canonical case/Unicode spellings (OpenAI, moonſhot) stay no-mistakes:unknown.
+  local nm_prov="$TMP_ROOT/zhipu-provider-db"
+  mkdir -p "$nm_prov"
+  python3 - "$nm_prov/state.sqlite" "$URL" <<'PY2' || fail "seed provider db"
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.executescript("""
+CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT);
+CREATE TABLE runs (id TEXT PRIMARY KEY, pr_url TEXT, branch TEXT, repo_id TEXT);
+CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);
+""")
+db.execute("INSERT INTO runs VALUES ('r-prov', ?, 'fm/fixture', 'repo1')", (sys.argv[2],))
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-9', 'gpt')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-10', 'OpenAI')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-11', 'moon\u017fhot')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm!!!', 'zai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm-5.4\u017f', 'zai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-12', 'z-ai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm---', 'openai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm-5.4\u017f-2', 'anthropic')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'z\u00e4i/glm-5.4', 'openai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'zai/glm-5.4/', 'openai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'z\u00e4i/glm-5.4/', 'anthropic')")
+db.commit()
+PY2
+  case_dir=$(make_case zhipu-provider-no-widening claude-opus-5-5)
+  record_review "$case_dir" "$HEAD1" PASS zai/glm-5.4 '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record provider-boundary PASS"
+  out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "plan failed on non-zhipu provider alias db"
+  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] | length == 11' <<<"$out" >/dev/null \
+    || fail "gpt/OpenAI/moonshot-long-s and malformed/non-ASCII/trailing-slash zhipu models under any provider must all stay no-mistakes:unknown: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:openai"] == null and .groups["no-mistakes:anthropic"] == null and .groups["no-mistakes:moonshot"] == null and .groups["no-mistakes:zhipu"] == null' \
+    <<<"$out" >/dev/null || fail "malformed models and non-Zhipu providers must not widen attribution: $out"
+
+  # 5. Positive sensitivity control: removing zhipu/glm makes zai/glm-5.4 refuse as unknown.
+  local copy="$TMP_ROOT/zhipu-control-bin"
+  cp -R "$ROOT/bin" "$copy"
+  python3 - "$copy/fm-review-record.py" <<'PY2' || fail "plant positive sensitivity control"
+import sys
+p = sys.argv[1]
+s = open(p).read()
+needle = '            "zhipu": "zhipu", "glm": "zhipu"}'
+assert s.count(needle) == 1, "zhipu family line not found"
+open(p, "w").write(s.replace(needle, '}'))
+PY2
+  case_dir=$(make_case zhipu-control claude-opus-5-5)
+  RECORD="$copy/fm-review-record.py" record_review "$case_dir" "$HEAD1" PASS zai/glm-5.4 '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record control PASS"
+  rc=0
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$copy/fm-review-record.py" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "control: without zhipu mapping zai/glm-5.4 must refuse as unknown: $out"
+  expect_not_qualified "$out" "unknown" "zhipu positive control refusal"
+
+  # 6. Protection sensitivity controls: each guard is mutated in its own copy so
+  # weakening ASCII/tail validation, widening PROVIDER_FAMILIES, dropping the
+  # Zhipu empty-model fill guard, or dropping zhipu_rejected in provider fill is
+  # independently proven observable by our negative probes.
+  local weak_model_copy="$TMP_ROOT/zhipu-weak-model-control-bin"
+  cp -R "$ROOT/bin" "$weak_model_copy"
+  python3 - "$weak_model_copy/fm-review-record.py" <<'PY2' || fail "plant model sensitivity control"
+import sys
+p = sys.argv[1]
+s = open(p).read()
+n1 = '    if family == "zhipu" and zhipu_rejected(value):\n        return "unknown"\n'
+assert s.count(n1) == 1, "model zhipu_rejected line not found"
+open(p, "w").write(s.replace(n1, ''))
+PY2
+  case_dir=$(make_case zhipu-weak-tail claude-opus-5-5)
+  RECORD="$weak_model_copy/fm-review-record.py" record_review "$case_dir" "$HEAD1" PASS "$long_s_id" '{"ship":["claude-opus-5-5"]}' >/dev/null \
+    || fail "record weak-tail control PASS"
+  rc=0
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$weak_model_copy/fm-review-record.py" verify --pr "$URL" \
+    --head "$HEAD1" --task task-x1 --base "$BASE" --review-only --json) || rc=$?
+  expect_code 0 "$rc" "protection control: dropping ASCII/tail validation alone must let $long_s_id pass, or this test observes nothing: $out"
+
+  local weak_prov_copy="$TMP_ROOT/zhipu-weak-prov-control-bin"
+  cp -R "$ROOT/bin" "$weak_prov_copy"
+  python3 - "$weak_prov_copy/fm-review-record.py" <<'PY2' || fail "plant provider lookup sensitivity control"
+import sys
+p = sys.argv[1]
+s = open(p).read()
+n2 = 'provider_family = PROVIDER_FAMILIES.get(provider)'
+assert s.count(n2) == 1, "provider lookup line not found"
+open(p, "w").write(s.replace(n2, 'provider_family = FAMILIES.get(provider.casefold())'))
+PY2
+  out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_prov_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "weak provider control plan failed"
+  "$JQ_BIN" -e '(.groups["no-mistakes:openai"] | map(.model) | index("mystery-9") != null and index("mystery-10") != null) and .groups["no-mistakes:moonshot"] != null' <<<"$out" >/dev/null \
+    || fail "protection control: widening PROVIDER_FAMILIES alone must attribute gpt/OpenAI/long-s: $out"
+
+  local weak_fill_copy="$TMP_ROOT/zhipu-weak-fill-control-bin"
+  cp -R "$ROOT/bin" "$weak_fill_copy"
+  python3 - "$weak_fill_copy/fm-review-record.py" <<'PY2' || fail "plant empty-model fill sensitivity control"
+import sys
+p = sys.argv[1]
+s = open(p).read()
+n3 = '                                if (provider_family != "zhipu" or not exact_model) and not zhipu_rejected(exact_model):\n                                    item["family"] = provider_family\n'
+assert s.count(n3) == 1, "empty-model fill guard not found"
+open(p, "w").write(s.replace(n3, '                                if not zhipu_rejected(exact_model):\n                                    item["family"] = provider_family\n'))
+PY2
+  out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_fill_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "weak fill control plan failed"
+  "$JQ_BIN" -e '.groups["no-mistakes:zhipu"] != null' <<<"$out" >/dev/null \
+    || fail "protection control: dropping Zhipu empty-model fill guard alone must promote malformed zai/z-ai rows to no-mistakes:zhipu: $out"
+
+  local weak_nonzhipu_copy="$TMP_ROOT/zhipu-weak-nonzhipu-control-bin"
+  cp -R "$ROOT/bin" "$weak_nonzhipu_copy"
+  python3 - "$weak_nonzhipu_copy/fm-review-record.py" <<'PY2' || fail "plant non-zhipu fill sensitivity control"
+import sys
+p = sys.argv[1]
+s = open(p).read()
+n4 = '                                if (provider_family != "zhipu" or not exact_model) and not zhipu_rejected(exact_model):\n                                    item["family"] = provider_family\n'
+assert s.count(n4) == 1, "non-zhipu fill guard not found"
+open(p, "w").write(s.replace(n4, '                                if provider_family != "zhipu" or not exact_model:\n                                    item["family"] = provider_family\n'))
+PY2
+  out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_nonzhipu_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "weak non-zhipu fill control plan failed"
+  "$JQ_BIN" -e '.groups["no-mistakes:openai"] != null and .groups["no-mistakes:anthropic"] != null' <<<"$out" >/dev/null \
+    || fail "protection control: dropping zhipu_rejected guard alone must let openai/anthropic fill malformed/non-ASCII glm rows: $out"
+  pass "zhipu/glm family covers other families, refuses same-family self-review, and keeps unknown ids and non-Zhipu provider aliases closed"
+}
+
 conflicted_driver_case() {  # <name>; prints the case dir; sets TRUNK and LIVE to a driver-resolved update
   local case_dir
   case_dir=$(make_carry_case "$1")
@@ -1306,6 +1486,7 @@ test_carry_over_refuses_after_a_rewrite_was_itself_read() {
 }
 
 fm_test_run_cases \
+  test_zhipu_glm_family_covers_other_families_and_blocks_self_review \
   test_carry_over_ignores_global_config_and_global_attributes \
   test_carry_over_scratch_lives_beside_the_review_records \
   test_carry_over_refuses_when_the_state_directory_takes_no_scratch \

@@ -44,7 +44,10 @@ recorded delivery mode is no-mistakes (an unrecorded mode counts as
 no-mistakes); a direct-PR or local-only task without either has no pipeline
 group. When a subject starts no-mistakes( but no matching run recorded any
 invocation, the pipeline group is absent unknown.
-A recorded provider can resolve an otherwise unknown model alias; conflicting
+A recorded provider, matched exactly as a canonical family name or a Zhipu
+route name, can resolve an otherwise unknown model alias, except that a Zhipu
+provider fills zhipu only for an empty model and a malformed or non-ASCII
+Zhipu-family model id stays unknown under every provider; conflicting
 provider/model families are unreadable unknown. An invocation that records no
 model and no provider is absent unknown unless its agent is exactly claude. Every invocation counts, including
 cancelled and errored ones. An invocation with an empty model takes a family
@@ -132,10 +135,13 @@ under the state directory, beside the review records, so no worktree config,
 attribute or merge driver shapes it; see docs/configuration.md 'Review
 carry-over across a base update' for the harm-model reassessment.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
-xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
-kimi, llama, and the exact native Claude names opus, sonnet, haiku, which are
-deliberately anthropic because Claude records bare model names); route prefixes
-ending in / are dropped. Stored typed family fields
+xai, moonshot, meta, zhipu (aliases claude, gpt, chatgpt, codex, oN, gemini,
+gemma, grok, kimi, llama, glm, and the exact native Claude names opus,
+sonnet, haiku, which are deliberately anthropic because Claude records bare
+model names); route prefixes ending in / are dropped, and zai/z-ai are
+recognized only as Zhipu pipeline provider names, never as bare model ids.
+A zhipu-family id containing any non-ASCII character or whose last segment is
+not ASCII alphanumeric runs joined by single . _ : or - stays unknown. Stored typed family fields
 never decide independence. Uncovered-group refusals name each uncovered family,
 reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
@@ -224,7 +230,12 @@ FAMILIES = {"anthropic": "anthropic", "claude": "anthropic",
             "openai": "openai", "gpt": "openai", "chatgpt": "openai", "codex": "openai",
             "google": "google", "gemini": "google", "gemma": "google",
             "deepseek": "deepseek", "xai": "xai", "grok": "xai",
-            "moonshot": "moonshot", "kimi": "moonshot", "meta": "meta", "llama": "meta"}
+            "moonshot": "moonshot", "kimi": "moonshot", "meta": "meta", "llama": "meta",
+            "zhipu": "zhipu", "glm": "zhipu"}
+# Only canonical provider names plus explicit Zhipu provider route spellings
+# map from agent_invocations.model_provider; model aliases (e.g. gpt, sonnet)
+# are never trusted as provider names.
+PROVIDER_FAMILIES = {family: family for family in set(FAMILIES.values())} | {"zai": "zhipu", "z-ai": "zhipu"}
 RECORDED_FAMILIES = set(FAMILIES.values()) | {"unknown"}
 
 
@@ -246,13 +257,32 @@ def nonempty(value, field):
     return value
 
 
+def zhipu_rejected(value):
+    if not isinstance(value, str) or not value:
+        return False
+    segments = value.casefold().split("/")
+    if not any(FAMILIES.get(re.match(r"([a-z]*)", seg).group(1)) == "zhipu" for seg in segments):
+        return False
+    tail = segments[-1]
+    tail_family = FAMILIES.get(re.match(r"([a-z]*)", tail).group(1))
+    return (
+        tail_family != "zhipu"
+        or not value.isascii()
+        or not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail)
+    )
+
+
 def model(value, field):
     if not isinstance(value, str) or not re.fullmatch(r"[^\s\x00]+", value):
         raise RecordError(f"{field} must be an exact model id")
-    name = re.match(r"([a-z]*)(\d*)", value.casefold().rsplit("/", 1)[-1])
+    tail = value.casefold().rsplit("/", 1)[-1]
+    name = re.match(r"([a-z]*)(\d*)", tail)
     if name.group(1) == "o" and name.group(2):
         return "openai"
-    return FAMILIES.get(name.group(1), "unknown")
+    family = FAMILIES.get(name.group(1), "unknown")
+    if family == "zhipu" and zhipu_rejected(value):
+        return "unknown"
+    return family
 
 
 def modelled(value, field):
@@ -487,10 +517,15 @@ def derived_authors(home, pr, head, task, base):
                         item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
-                        if provider in RECORDED_FAMILIES - {"unknown"}:
+                        # Never let a Zhipu provider promote a non-empty malformed
+                        # or unrecognized model id, and never let any provider fill
+                        # a malformed or non-ASCII Zhipu-family model id.
+                        provider_family = PROVIDER_FAMILIES.get(provider) if isinstance(provider, str) else None
+                        if provider_family:
                             if item["family"] == "unknown":
-                                item["family"] = provider
-                            elif item["family"] != provider:
+                                if (provider_family != "zhipu" or not exact_model) and not zhipu_rejected(exact_model):
+                                    item["family"] = provider_family
+                            elif item["family"] != provider_family:
                                 item["family"] = "unknown"
                         models.append(item)
     except (sqlite3.Error, OSError):
