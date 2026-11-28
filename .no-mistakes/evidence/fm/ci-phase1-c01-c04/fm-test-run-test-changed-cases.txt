@@ -1,0 +1,22 @@
+# tests/fm-test-run.test.sh: every case this change added or modified, one FM_TEST_ONLY run each, load: load averages: 69.77 66.08 65.38
+== test_changed_selection_reaches_suites_through_sourced_helper exit=0 duration_ms=9515
+ok - a path named only by a sourced or nested helper selects every suite that sources it
+== test_changed_watch_helpers_select_runnable_consumers exit=0 duration_ms=22589
+ok - watch JavaScript helpers select runnable consumers and the loader regression is gated
+== test_herdr_ci_family_run_has_a_step_timeout exit=0 duration_ms=7259
+ok - Herdr CI family-run step times out at 60 min under a 120 min job backstop
+== test_portable_serial_packing_budget_boundary exit=0 duration_ms=127239
+ok - serial packing accepts a lone script above the target, accepts a packed shard at it, and refuses one a millisecond above
+== test_portable_shard_union_and_coverage_guard exit=0 duration_ms=41217
+ok - portable shard union, disjointness, and coverage guard hold
+== test_supervision_groups_share_coverage_and_changed_selection exit=0 duration_ms=10449
+ok - both supervision groups retain family coverage and direct/transitive changed selection
+ok - both triage groups retain watcher coverage and direct/transitive changed selection
+== test_teardown_groups_register_each_case_once exit=0 duration_ms=10494
+ok - the teardown groups are a duplicate-free cover, each case registered by the file that defines it
+== test_teardown_groups_share_helper_and_stay_selectable exit=0 duration_ms=11819
+ok - every teardown group stays independently selectable, the shared and git lock helpers select its pr-forge family, and pr-forge keeps them
+== test_aggregate_json exit=0 duration_ms=7085
+ok - aggregate-json merges lane timing artifacts
+load after: load averages: 111.07 84.14 72.59
+done

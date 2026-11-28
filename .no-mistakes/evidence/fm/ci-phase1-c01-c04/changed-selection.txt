@@ -1,0 +1,41 @@
+$ edit bin/fm-slack-lib.sh ; bin/fm-test-run.sh --list --changed --base HEAD~1   (base=d23870535)
+tests/fm-slack-watch.test.sh
+tests/fm-slack-watch-edge.test.sh
+tests/fm-slack-watch-intake.test.sh
+  (total selected:        8)
+
+$ edit bin/fm_slack_watch.py ; bin/fm-test-run.sh --list --changed --base HEAD~1   (base=d23870535)
+tests/fm-slack-watch.test.sh
+tests/fm-slack-watch-edge.test.sh
+tests/fm-slack-watch-intake.test.sh
+  (total selected:        8)
+
+$ edit .omp/fm-worker-overlay.yml ; bin/fm-test-run.sh --list --changed --base HEAD~1   (base=d23870535)
+tests/fm-slack-watch-edge.test.sh
+tests/fm-slack-watch-intake.test.sh
+tests/fm-slack-watch.test.sh
+tests/fm-omp-harness-extensions.test.sh
+tests/fm-omp-harness-watch.test.sh
+tests/fm-omp-harness.test.sh
+  (total selected:      258)
+
+$ edit .omp/extensions/fm-primary-omp-watch.ts ; bin/fm-test-run.sh --list --changed --base HEAD~1   (base=d23870535)
+tests/fm-omp-harness-extensions.test.sh
+tests/fm-omp-harness-watch.test.sh
+tests/fm-omp-harness.test.sh
+  (total selected:      161)
+
+# base-commit comparison for bin/fm-tasks-axi.sh at 2440b75c6:
+tests/fm-slack-watch.test.sh
+# Fails-before-fix proof for review finding changed-drops-slack-split-consumers
+$ [at 2440b75c6] edit bin/fm-tasks-axi.sh ; bin/fm-test-run.sh --list --changed --base HEAD~1 | grep slack-watch
+tests/fm-slack-watch.test.sh
+
+$ [at 7df07148a] edit bin/fm-tasks-axi.sh ; bin/fm-test-run.sh --list --changed --base HEAD~1 | grep slack-watch
+  (no slack-watch test selected)
+
+$ [at d23870535] edit bin/fm-tasks-axi.sh ; bin/fm-test-run.sh --list --changed --base HEAD~1 | grep slack-watch
+tests/fm-slack-watch-edge.test.sh
+tests/fm-slack-watch-intake.test.sh
+tests/fm-slack-watch.test.sh
+

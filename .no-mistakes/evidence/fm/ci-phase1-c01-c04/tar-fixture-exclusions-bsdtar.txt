@@ -1,0 +1,15 @@
+# host tar: bsdtar 3.5.3 - libarchive 3.7.4 zlib/1.2.12 liblzma/5.4.3 bz2lib/1.0.8 
+# fixtures.sh exclusion set (tests/fixtures.sh), run from repo root into a scratch stage
+repo size: 41124 KiB; stage size: 18380 KiB
+tests                                absent
+graft                                absent
+.git                                 absent
+docs/supervision-protocols           present
+docs/review-rubric.md                present
+.agents/skills/bearings/assets       present
+bin                                  present
+.omp                                 present
+bearings assets html in stage:        2 (repo:        2)
+docs files in stage:       77 (repo tracked:       77)
+nested .agents/skills/hyper-jev/templates/starter/tests: absent
+bin files in stage vs repo:      365 vs      367

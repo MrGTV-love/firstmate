@@ -1,0 +1,7 @@
+# what the round-1 failure wrote: /tmp archive of HEAD, bin/fm-watch.sh set to HEAD~1 (pre-fix), test line 1297 edited only to print watch.err; loop until a failure;  3:11  up 2 days, 17:20, 1 user, load averages: 57.77 70.06 65.60
+run1 exit=0
+run2 exit=0
+run3 exit=0
+run4 exit=0
+run5 exit=1
+not ok - concurrent watcher observed a partial artifact error: [/tmp/fm-errprobe.d2Ks/bin/fm-watch.sh: child setpgid (93954 to 93954): Operation not permitted]

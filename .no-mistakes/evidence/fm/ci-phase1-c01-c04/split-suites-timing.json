@@ -1,0 +1,130 @@
+{
+  "families": [
+    {
+      "count": 2,
+      "duration_ms": 3024008,
+      "failed": 1,
+      "name": "pr-forge"
+    },
+    {
+      "count": 3,
+      "duration_ms": 1792917,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 1,
+      "duration_ms": 225954,
+      "failed": 0,
+      "name": "standalone"
+    },
+    {
+      "count": 3,
+      "duration_ms": 3344642,
+      "failed": 0,
+      "name": "unclassified"
+    }
+  ],
+  "finished_at": "2026-11-28T05:46:59Z",
+  "run_id": "fm-test-run-1795838152277-59388",
+  "scripts": [
+    {
+      "cpu_ms": 121820,
+      "duration_ms": 379079,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-omp-harness-watch.test.sh"
+    },
+    {
+      "cpu_ms": 345430,
+      "duration_ms": 694054,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-omp-harness-extensions.test.sh"
+    },
+    {
+      "cpu_ms": 387870,
+      "duration_ms": 719784,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-omp-harness.test.sh"
+    },
+    {
+      "cpu_ms": 426020,
+      "duration_ms": 660799,
+      "exit": 1,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pr-check-security.test.sh"
+    },
+    {
+      "cpu_ms": 1350430,
+      "duration_ms": 2363209,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-teardown-closeout.test.sh"
+    },
+    {
+      "cpu_ms": 69440,
+      "duration_ms": 225954,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-secondmate-parent-binding.test.sh"
+    },
+    {
+      "cpu_ms": 505950,
+      "duration_ms": 796418,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-slack-watch.test.sh"
+    },
+    {
+      "cpu_ms": 1522960,
+      "duration_ms": 2125920,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-slack-watch-edge.test.sh"
+    },
+    {
+      "cpu_ms": 285010,
+      "duration_ms": 422304,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-slack-watch-intake.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=4",
+  "started_at": "2026-11-28T03:55:52Z",
+  "summary": {
+    "duration_ms": 6667232,
+    "failed": 1,
+    "skipped_gate": 0,
+    "total": 9
+  }
+}

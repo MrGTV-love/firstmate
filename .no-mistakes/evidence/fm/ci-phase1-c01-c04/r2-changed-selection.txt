@@ -1,0 +1,42 @@
+$ append comment to bin/fm-tasks-axi.sh ; bin/fm-test-run.sh --list --changed --base HEAD   (head 111197ddb)
+tests/fm-omp-harness-extensions.test.sh
+tests/fm-omp-harness-watch.test.sh
+tests/fm-omp-harness.test.sh
+tests/fm-pr-check-security.test.sh
+tests/fm-slack-watch-edge.test.sh
+tests/fm-slack-watch-intake.test.sh
+tests/fm-slack-watch.test.sh
+tests/fm-watch-open-loops.test.sh
+tests/fm-work-progress.test.sh
+  (total selected: 296)
+
+$ append comment to bin/fm-slack-lib.sh ; bin/fm-test-run.sh --list --changed --base HEAD   (head 111197ddb)
+tests/fm-slack-watch-edge.test.sh
+tests/fm-slack-watch-intake.test.sh
+tests/fm-slack-watch.test.sh
+  (total selected: 8)
+
+$ append comment to .omp/fm-worker-overlay.yml ; bin/fm-test-run.sh --list --changed --base HEAD   (head 111197ddb)
+tests/fm-omp-harness-extensions.test.sh
+tests/fm-omp-harness-watch.test.sh
+tests/fm-omp-harness.test.sh
+tests/fm-slack-watch-edge.test.sh
+tests/fm-slack-watch-intake.test.sh
+tests/fm-slack-watch.test.sh
+  (total selected: 258)
+
+$ append comment to bin/fm-duration.py ; bin/fm-test-run.sh --list --changed --base HEAD   (head 111197ddb)
+  (total selected: 9)
+
+$ append comment to bin/fm-watch.sh ; bin/fm-test-run.sh --list --changed --base HEAD   (head 111197ddb)
+tests/fm-watch-open-loops.test.sh
+tests/fm-work-progress.test.sh
+  (total selected: 33)
+
+# base 2440b75c6 comparison (throwaway clone in /tmp), same probe edits:
+$ [base] append comment to bin/fm-duration.py ; --list --changed --base HEAD
+  (total selected: 9)
+$ [base] append comment to bin/fm-watch.sh ; --list --changed --base HEAD
+tests/fm-watch-open-loops.test.sh
+tests/fm-work-progress.test.sh
+  (total selected: 33)

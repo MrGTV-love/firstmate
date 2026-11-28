@@ -1,0 +1,14 @@
+# tests/fm-test-run.test.sh cases for helper-reference propagation, shard union/coverage and serial packing, FM_TEST_ONLY each; head 111197ddb;  2:45  up 2 days, 16:54, 1 user, load averages: 94.60 81.83 70.51
+== test_changed_selection_reaches_suites_through_sourced_helper exit=0 secs=6
+ok - a path named only by a sourced or nested helper selects every suite that sources it
+== test_changed_watch_helpers_select_runnable_consumers exit=0 secs=20
+ok - watch JavaScript helpers select runnable consumers and the loader regression is gated
+== test_portable_shard_union_and_coverage_guard exit=0 secs=47
+ok - portable shard union, disjointness, and coverage guard hold
+== test_portable_serial_packing_budget_boundary exit=0 secs=179
+ok - serial packing accepts a lone script above the target, accepts a packed shard at it, and refuses one a millisecond above
+== test_teardown_groups_share_helper_and_stay_selectable exit=0 secs=12
+ok - every teardown group stays independently selectable, the shared and git lock helpers select its pr-forge family, and pr-forge keeps them
+== test_supervision_groups_share_coverage_and_changed_selection exit=0 secs=10
+ok - both supervision groups retain family coverage and direct/transitive changed selection
+ok - both triage groups retain watcher coverage and direct/transitive changed selection

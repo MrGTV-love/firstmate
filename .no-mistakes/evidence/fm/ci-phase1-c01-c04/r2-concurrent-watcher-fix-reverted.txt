@@ -1,0 +1,8 @@
+# bin/fm-watch.sh temporarily reverted to HEAD~1 (d23870535, no stderr discard around run_owned_capture fork); same single case, 6 runs;  2:09  up 2 days, 16:19, 1 user, load averages: 62.37 58.55 55.60
+run1 exit=0 secs=24: ok - concurrent watchers observe only complete private poll publications 
+run2 exit=0 secs=24: ok - concurrent watchers observe only complete private poll publications 
+run3 exit=0 secs=25: ok - concurrent watchers observe only complete private poll publications 
+run4 exit=1 secs=27: not ok - concurrent watcher observed a partial artifact error 
+run5 exit=0 secs=25: ok - concurrent watchers observe only complete private poll publications 
+run6 exit=1 secs=19: not ok - concurrent watcher observed a partial artifact error 
+# after:  2:12  up 2 days, 16:21, 1 user, load averages: 40.08 51.38 53.18

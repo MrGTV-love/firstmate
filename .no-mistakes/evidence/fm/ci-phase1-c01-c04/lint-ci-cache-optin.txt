@@ -1,0 +1,164 @@
+# A: CI=true, cache dir set, no opt-in flag -> must stay uncached
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FSRCC6PE6AVVGWP04QNDS1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit= cache files:        0
+
+# B: CI=true + FM_LINT_ALLOW_CI_CACHE=1 + cache dir -> first run fills cache
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FSRCC6PE6AVVGWP04QNDS1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+cache files:        2
+# B2: second run reuses cache
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-open-loops-validate-lib.sh
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FSRCC6PE6AVVGWP04QNDS1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+--- telemetry A
+format	fm-lint-telemetry-v1
+git_head	d23870535df5585a1f0836ae0a3b3f750425923c
+content_cksum	705270904-50
+shellcheck_version	0.11.0
+analysis_mode	full
+partition	all
+jobs	1
+root_bounds_enforced	0
+root_deadline_seconds	unbounded
+root_kill_grace_seconds	unbounded
+root_memory_limit_kib	unbounded
+root_timing_mechanism	none
+root_count	1
+direct_lines	29
+direct_bytes	1519
+source_directives	0
+source_boundary_directives	0
+source_followed_directives	0
+source_target_count	0
+shard_1_weight_bytes	1519
+shard_2_weight_bytes	0
+wall_seconds	3
+worker_wall_sum_seconds	0.48
+max_worker_wall_seconds	0.46
+user_seconds	0.14
+system_seconds	0.12
+max_worker_rss_kib	22368
+worker_rss_sum_kib	25376
+shellcheck_processes_start	2
+shellcheck_processes_end	2
+load_average_start	66.67/63.25/58.79
+load_average_end	66.67/63.25/58.79
+aggregate_cpu_percent_start	727.60
+aggregate_cpu_percent_end	673.70
+result_exit	0
+--- telemetry B1
+format	fm-lint-telemetry-v1
+git_head	d23870535df5585a1f0836ae0a3b3f750425923c
+content_cksum	705270904-50
+shellcheck_version	0.11.0
+analysis_mode	full
+partition	all
+jobs	1
+root_bounds_enforced	0
+root_deadline_seconds	unbounded
+root_kill_grace_seconds	unbounded
+root_memory_limit_kib	unbounded
+root_timing_mechanism	none
+root_count	1
+direct_lines	29
+direct_bytes	1519
+source_directives	0
+source_boundary_directives	0
+source_followed_directives	0
+source_target_count	0
+shard_1_weight_bytes	1519
+shard_2_weight_bytes	0
+wall_seconds	3
+worker_wall_sum_seconds	1.09
+max_worker_wall_seconds	1.07
+user_seconds	0.55
+system_seconds	0.16
+max_worker_rss_kib	69776
+worker_rss_sum_kib	72816
+shellcheck_processes_start	1
+shellcheck_processes_end	2
+load_average_start	62.61/62.47/58.54
+load_average_end	62.61/62.47/58.54
+aggregate_cpu_percent_start	867.80
+aggregate_cpu_percent_end	724.90
+result_exit	0
+--- telemetry B2
+format	fm-lint-telemetry-v1
+git_head	d23870535df5585a1f0836ae0a3b3f750425923c
+content_cksum	705270904-50
+shellcheck_version	0.11.0
+analysis_mode	full
+partition	all
+jobs	1
+root_bounds_enforced	0
+root_deadline_seconds	unbounded
+root_kill_grace_seconds	unbounded
+root_memory_limit_kib	unbounded
+root_timing_mechanism	none
+root_count	1
+direct_lines	29
+direct_bytes	1519
+source_directives	0
+source_boundary_directives	0
+source_followed_directives	0
+source_target_count	0
+shard_1_weight_bytes	1519
+shard_2_weight_bytes	0
+wall_seconds	3
+worker_wall_sum_seconds	0.43
+max_worker_wall_seconds	0.42
+user_seconds	0.31
+system_seconds	0.07
+max_worker_rss_kib	69776
+worker_rss_sum_kib	72864
+shellcheck_processes_start	2
+shellcheck_processes_end	2
+load_average_start	61.28/62.20/58.46
+load_average_end	61.28/62.20/58.46
+aggregate_cpu_percent_start	674.10
+aggregate_cpu_percent_end	548.60
+result_exit	0
+
+# C: opt-in flag but no FM_LINT_CACHE_DIR -> must stay uncached (HOME cache untouched)
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FSRCC6PE6AVVGWP04QNDS1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+xdg cache files:       11
+format	fm-lint-telemetry-v1
+git_head	d23870535df5585a1f0836ae0a3b3f750425923c
+content_cksum	705270904-50
+shellcheck_version	0.11.0
+analysis_mode	full
+partition	all
+jobs	1
+root_bounds_enforced	0
+root_deadline_seconds	unbounded
+root_kill_grace_seconds	unbounded
+root_memory_limit_kib	unbounded
+root_timing_mechanism	none
+root_count	1
+direct_lines	29
+direct_bytes	1519
+source_directives	0
+source_boundary_directives	0
+source_followed_directives	0
+source_target_count	0
+shard_1_weight_bytes	1519
+shard_2_weight_bytes	0
+wall_seconds	2
+worker_wall_sum_seconds	0.49
+max_worker_wall_seconds	0.48
+user_seconds	0.14
+system_seconds	0.12
+max_worker_rss_kib	22416
+worker_rss_sum_kib	25456
+shellcheck_processes_start	1
+shellcheck_processes_end	2
+load_average_start	61.28/62.20/58.46
+load_average_end	59.50/61.81/58.35
+aggregate_cpu_percent_start	532.30
+aggregate_cpu_percent_end	690.80
+result_exit	0
+# case C note: XDG cache got only lint-slots admission files; no firstmate/lint result cache dir

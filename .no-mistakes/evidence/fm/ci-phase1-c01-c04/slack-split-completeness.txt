@@ -1,0 +1,17 @@
+# Slack split completeness: 'ok - X' markers in base tests/fm-slack-watch.test.sh vs union of the head split files + helpers
+base markers:       86  head markers:       84
+markers in base but not head:
+ok - DOD-06
+ok - DOD-16
+ok - intake refusals hold
+ok - scan redacted
+markers in head but not base:
+ok - Slack watch core checks
+ok - Slack watch edge checks
+base standalone suite invocations (removed DOD-06/DOD-16 duplicates):
+200:assert_contains "$(bash "$ROOT/tests/fm-slack-intake-unchanged.test.sh")" 'ok - intake refusals hold' "DOD-06"
+431:assert_contains "$(bash "$ROOT/tests/fm-slack-secret-scan.test.sh")" 'ok - scan redacted' "DOD-16"
+ok lines observed in live head run: 90
+portable-serial-1of12: tests/fm-slack-intake-unchanged.test.sh
+portable-serial-10of12: tests/fm-slack-secret-scan.test.sh
+# omp split completeness: invoked test_ cases (bare-name lines) base vs head union

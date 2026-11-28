@@ -1,0 +1,46 @@
+$ bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=420 parallel=31 parallel_max_ms=3088788 parallel_imbalance_ms=26570 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1030514 parallel_budget_ms=1200000 family_parallel=154 family_parallel_shards=8 family_parallel_jobs=3 serial=216 serial_shards=12 serial_unhinted=19 serial_max_ms=965405 serial_budget_ms=1200000 serial_indivisible_ms=681931 herdr=19 herdr_shards=3
+exit=0
+
+$ bin/fm-test-run.sh --list --all | wc -l
+     420
+$ ls tests/*.test.sh | wc -l
+     420
+
+$ bin/fm-test-run.sh --list-concurrent-safe-families
+watcher-wake-lock
+pure-contract-unit
+pr-forge
+secondmate
+session-bootstrap
+standalone
+
+$ bin/fm-test-run.sh --list-lanes
+portable-parallel-1
+portable-parallel-2
+portable-family-parallel
+portable-family-parallel-1of8
+portable-family-parallel-2of8
+portable-family-parallel-3of8
+portable-family-parallel-4of8
+portable-family-parallel-5of8
+portable-family-parallel-6of8
+portable-family-parallel-7of8
+portable-family-parallel-8of8
+portable-serial
+portable-serial-1of12
+portable-serial-2of12
+portable-serial-3of12
+portable-serial-4of12
+portable-serial-5of12
+portable-serial-6of12
+portable-serial-7of12
+portable-serial-8of12
+portable-serial-9of12
+portable-serial-10of12
+portable-serial-11of12
+portable-serial-12of12
+real-herdr-gated
+real-herdr-gated-1of3
+real-herdr-gated-2of3
+real-herdr-gated-3of3

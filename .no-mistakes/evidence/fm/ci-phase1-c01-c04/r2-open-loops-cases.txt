@@ -1,0 +1,9 @@
+# head 111197ddb: bash tests/fm-watch-open-loops.test.sh <case> (real fm-watch.sh daemon + sourced bin/fm-open-loops-validate-lib.sh);  2:49  up 2 days, 16:59, 1 user, load averages: 52.35 62.02 64.69
+== test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery exit=0 secs=28
+ok - fresh corrupt ledgers preserve continuous-outage and overdue cooldowns while valid degraded reports rearm stale incidents
+== test_overdue_row_wakes_with_a_durable_row exit=0 secs=6
+ok - an overdue ledger row wakes firstmate and leaves a durable queue row
+== test_unchanged_overdue_set_stays_quiet_then_new_row_wakes exit=0 secs=35
+ok - unchanged evidence stays quiet; new rows and changed evidence wake immediately
+== test_blocked_publication_does_not_commit_cooldown exit=0 secs=17
+ok - overdue and stale publication wait for their queue lock before committing cooldown

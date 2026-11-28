@@ -1,0 +1,31 @@
+# head 111197ddb
+$ bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=420 parallel=31 parallel_max_ms=3088788 parallel_imbalance_ms=26570 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1030514 parallel_budget_ms=1200000 family_parallel=154 family_parallel_shards=8 family_parallel_jobs=3 serial=216 serial_shards=12 serial_unhinted=19 serial_max_ms=965405 serial_budget_ms=1200000 serial_indivisible_ms=681931 herdr=19 herdr_shards=3
+exit=0
+
+$ bin/fm-test-size-guard.sh
+FM_TEST_SIZE_GUARD ok total=420 max_lines=1000 grandfathered=114
+exit=0
+tests/fm-work-progress.test.sh lines (grew +25 in this round):      914
+
+$ bash tests/fm-test-size-guard.test.sh
+ok - exact 1000-line file and shrinking grandfathered file pass
+ok - new test file exceeding 1000 lines is refused
+ok - grandfathered test file growing past its ratchet ceiling is refused
+ok - stale budget entry is flagged so the ratchet burns down
+ok - live repository satisfies the 1000-line test file ratchet
+exit=0
+
+$ bash tests/fm-ci-workflow.test.sh
+ok - both pull_request workflows upload the actual checked merge tree and parent for the run attempt
+ok - CI matrices cover every executable serial lane and canonical lint root exactly once
+ok - a newer push to one PR supersedes that PR's in-flight CI
+ok - distinct PRs get distinct concurrency groups
+ok - main pushes share one group per branch and never cancel the running run
+ok - every ci.yml job carries a finite timeout
+ok - every ci.yml job belongs to one of the three timeout tiers
+ok - fast tier jobs share one 5 minute tripwire
+ok - normal tier jobs share one 60 minute budget
+ok - Herdr keeps a 60 minute step tripwire under a 120 minute job backstop
+ok - portable parallel and family-parallel jobs pass the modeled concurrency
+exit=0

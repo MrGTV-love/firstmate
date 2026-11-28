@@ -1,0 +1,14 @@
+# bsdtar remote-seed exclusion set (tests/fm-remote-secondmate-*.test.sh): tracked files dropped outside top-level tests/
+   1 .agents/skills
+  15 .agents/skills/hyper-jev/templates/starter/tests
+   1 .claude
+   4 .claude/mods/firstmate-calm/tests
+   2 .pi/extensions/lib
+   2 bin/ten-levels/tests
+total dropped outside tests/:       25
+
+# same set at base 2440b75c6 exclusions (--exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config):
+   1 .agents/skills
+   1 .claude
+   2 .pi/extensions/lib
+   1 tests/fixtures/slack/config

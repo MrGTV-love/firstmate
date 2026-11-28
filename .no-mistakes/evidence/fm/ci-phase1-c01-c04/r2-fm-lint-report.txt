@@ -1,0 +1,17 @@
+$ bash tests/fm-lint-report.test.sh   # head 111197ddb;  2:51  up 2 days, 17:01, 1 user, load averages: 44.06 56.26 62.11
+ok - SKIP (host cannot enforce the bounded envelope): fallback deadline check
+ok - explicit memory evidence outranks findings and signal reasons (modes: 0)
+ok - OOM words in a source excerpt or a root path never classify a root as memory
+ok - FM_LINT_REQUIRE_BOUNDS refuses missing enforcement and proceeds when enforceable
+ok - SKIP (host cannot enforce the bounded envelope): pinned memory-envelope check
+ok - the roots sidecar and telemetry record the run's final exit status
+ok - the retained sidecar records each root's lifecycle with a mode, reason, and duration
+ok - jointly sourced dispatcher, adapter, production-owner, and test-local diagnostics preserve parity
+ok - CI=true checks the complete uncached inventory even with an empty diff
+ok - fm-lint.sh forces a full lint when HEAD is on main
+ok - fm-lint.sh explicit paths bypass changed-file mode selection
+ok - an explicit leading-dash root retains real ShellCheck findings
+ok - fm-lint.sh exits 0 with a note when the local branch has no changed lint targets
+ok - fm-lint.sh CI keeps source following without the local exclusion list
+ok - fm-lint.sh on main keeps source following without the local exclusion list
+exit=124

@@ -1,0 +1,8 @@
+# single case test_concurrent_watcher_sees_only_complete_publication, interleaved head vs base, load: load averages: 53.04 46.96 61.43
+head d23870535 run1: not ok - concurrent watcher observed a partial artifact error  exit=1 duration_ms=20906
+base 2440b75c6 run1: not ok - concurrent watcher observed a partial artifact error  exit=1 duration_ms=12358
+head d23870535 run2: not ok - concurrent watcher observed a partial artifact error  exit=1 duration_ms=14575
+base 2440b75c6 run2: ok - concurrent watchers observe only complete private poll publications  exit=0 duration_ms=25948
+head d23870535 run3: ok - concurrent watchers observe only complete private poll publications  exit=0 duration_ms=30578
+base 2440b75c6 run3: not ok - concurrent watcher observed a partial artifact error  exit=1 duration_ms=15568
+load after: load averages: 62.50 51.89 60.93

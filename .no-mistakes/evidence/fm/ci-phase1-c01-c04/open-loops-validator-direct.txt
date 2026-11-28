@@ -1,0 +1,14 @@
+valid                              rc=0 out=["a","c","s","o","n","e"]|["b","c","s","o","n","e","0123456789abcdef01234567"]|
+not-json                           rc=5 out=|
+two-docs                           rc=5 out=|
+array                              rc=5 out=|
+wrong-schema                       rc=5 out=|
+epoch-string                       rc=5 out=|
+home-empty                         rc=5 out=|
+complete-string                    rc=5 out=|
+rows-object                        rc=5 out=|
+row-not-object                     rc=5 out=|
+id-empty                           rc=5 out=|
+overdue-string                     rc=5 out=|
+identity-bad                       rc=5 out=|
+empty-file                         rc=5 out=|

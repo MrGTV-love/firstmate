@@ -1,0 +1,5 @@
+# live: 120 real short-lived 'sleep 0.05-0.29' roots each sampled by real 'fm-duration.py progress-check REC PID 1' while exiting; count of cpu_telemetry_unavailable warnings;  2:16  up 2 days, 16:26, 1 user, load averages: 46.57 46.41 50.28
+HEAD~1 warnings: 13
+HEAD   warnings: 0
+# control: long-lived root sampled by HEAD
+exit=0 (any stderr shown above)

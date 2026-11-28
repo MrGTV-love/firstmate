@@ -1,0 +1,27 @@
+$ bin/fm-test-run.sh --jobs 1 --fail-on-gate-skip 'herdr not found' tests/fm-spawn-acquisition-herdr-e2e.test.sh tests/fm-spawn-acquisition-herdr-on-e2e.test.sh  # load: load averages: 95.86 109.36 138.16
+FM_TEST_BEGIN 2026-11-28T06:54:09Z tests/fm-spawn-acquisition-herdr-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+FM_TEST_END 2026-11-28T07:07:31Z tests/fm-spawn-acquisition-herdr-e2e.test.sh exit=0 duration_ms=801744 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FSRCC6PE6AVVGWP04QNDS1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-28T07:07:31Z tests/fm-spawn-acquisition-herdr-on-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+FM_TEST_END 2026-11-28T07:19:20Z tests/fm-spawn-acquisition-herdr-on-e2e.test.sh exit=0 duration_ms=709000 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FSRCC6PE6AVVGWP04QNDS1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=1518791
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=2 duration_ms=1510744 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-herdr-e2e.test.sh duration_ms=801744
+FM_TEST_SLOWEST rank=2 script=tests/fm-spawn-acquisition-herdr-on-e2e.test.sh duration_ms=709000
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M8FSRCC6PE6AVVGWP04QNDS1/herdr-acquisition-split-timing.json
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FSRCC6PE6AVVGWP04QNDS1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0

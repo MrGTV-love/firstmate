@@ -1,0 +1,18 @@
+# head 111197ddb: the 9 cases after the 590s cut of the full run, each via FM_TEST_ONLY=<case> bash tests/fm-pr-check-security.test.sh;  2:28  up 2 days, 16:38, 1 user, load averages: 40.18 46.65 48.31
+test_device_rerecord_refuses_tampered_artifacts exit=1 secs=33: ok - a renumbered registration is never re-recorded around a tampered artifact: swapped-check altered-check swapped-sidecar altered-sidecar altered-template-hash wrong-mode hardlinked-check split-device (foreign-device not exercisable on Darwin), or a pending retirement not ok - test_device_rerecord_refuses_tampered_artifacts changed errexit (set -e); a case must leave it as it found it 
+ok - a renumbered registration is never re-recorded around a tampered artifact: swapped-check altered-check swapped-sidecar altered-sidecar altered-template-hash wrong-mode hardlinked-check split-device (foreign-device not exercisable on Darwin), or a pending retirement
+not ok - test_device_rerecord_refuses_tampered_artifacts changed errexit (set -e); a case must leave it as it found it
+test_device_rerecord_serializes_direct_rearm exit=0 secs=7: ok - direct re-arm publication waits without replacing an armed poll 
+test_device_rerecord_serializes_rerecord exit=0 secs=11: ok - device re-record publication waits without rewriting its registration 
+test_postrename_poll_validation_revokes_and_retries exit=0 secs=17: ok - post-rename poll validation faults revoke both names and allow a clean retry 
+test_bootstrap_leaves_unauthenticated_checks exit=0 secs=5: ok - bootstrap does not rewrite unauthenticated checks or emit retired migration diagnostics 
+test_custom_snapshot_cleanup_on_signal exit=0 secs=9: ok - a signaled watcher stops its custom check and cleans private state (responsive launcher) 
+test_custom_snapshot_cleanup_with_stopped_launcher exit=0 secs=12: ok - a signaled watcher stops its custom check and cleans private state (stopped launcher) 
+test_returned_custom_check_descendants_are_drained exit=0 secs=9: ok - returned custom check descendants are drained before the next check runs 
+test_teardown_removes_poll_artifacts exit=1 secs=19: ok - teardown removes safe poll artifacts and refuses directory-shaped check files without traversal not ok - test_teardown_removes_poll_artifacts changed errexit (set -e); a case must leave it as it found it 
+ok - teardown removes safe poll artifacts and refuses directory-shaped check files without traversal
+not ok - test_teardown_removes_poll_artifacts changed errexit (set -e); a case must leave it as it found it
+# after:  2:30  up 2 days, 16:40, 1 user, load averages: 51.02 47.59 48.37
+# base 2440b75c6 (git archive to a temp dir), same single-case mode for the 2 errexit-flagged cases
+base test_device_rerecord_refuses_tampered_artifacts exit=1: ok - a renumbered registration is never re-recorded around a tampered artifact: swapped-check altered-check swapped-sidecar altered-sidecar altered-template-hash wrong-mode hardlinked-check split-device (foreign-device not exercisable on Darwin), or a pending retirement not ok - test_device_rerecord_refuses_tampered_artifacts changed errexit (set -e); a case must leave it as it found it 
+base test_teardown_removes_poll_artifacts exit=1: ok - teardown removes safe poll artifacts and refuses directory-shaped check files without traversal not ok - test_teardown_removes_poll_artifacts changed errexit (set -e); a case must leave it as it found it 

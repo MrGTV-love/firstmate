@@ -1,0 +1,27 @@
+# cleanup_run: two concurrent probe scripts each leave a 0555 dir under their worker TMPDIR ($RUN_TMP/wN/tmp)
+## head d23870535 runner: exit=0
+ok - left read-only /tmp/fm-changed.TEN0/rt/fm-test-run.QWJ4YX/w1/tmp/ro-probe.ZlWa/seed/.git-hooks
+ok - left read-only /tmp/fm-changed.TEN0/rt/fm-test-run.QWJ4YX/w2/tmp/ro-probe.UOpe/seed/.git-hooks
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=5621
+run: no matches found: /tmp/fm-changed.TEN0/rt/fm-test-run.*
+leftover fm-test-run.* dirs:        0
+
+## parent d23870535~1 (pre-fix) runner: exit=1
+ok - left read-only /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w1/tmp/ro-probe.LgsB/seed/.git-hooks
+ok - left read-only /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w2/tmp/ro-probe.gP7n/seed/.git-hooks
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=6021
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w2/tmp/ro-probe.gP7n/seed/.git-hooks/pre-push: Permission denied
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w2/tmp/ro-probe.gP7n/seed/.git-hooks: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w2/tmp/ro-probe.gP7n/seed: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w2/tmp/ro-probe.gP7n: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w2/tmp: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w2: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w1/tmp/ro-probe.LgsB/seed/.git-hooks/pre-push: Permission denied
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w1/tmp/ro-probe.LgsB/seed/.git-hooks: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w1/tmp/ro-probe.LgsB/seed: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w1/tmp/ro-probe.LgsB: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w1/tmp: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6/w1: Directory not empty
+rm: /tmp/fm-changed.TEN0/rt/fm-test-run.9qXLB6: Directory not empty
+leftover fm-test-run.* dirs:        1
+

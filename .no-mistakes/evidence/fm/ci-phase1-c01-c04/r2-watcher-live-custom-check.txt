@@ -1,0 +1,10 @@
+# live: real bin/fm-watch.sh one-shot runs, disposable FM_HOME=$H=/tmp/fm-watch-live.5TeT, one registered custom check (stdout 'probe says ready', stderr 'probe-stderr-noise'); wake lines tallied by kind;  2:36  up 2 days, 16:45, 1 user, load averages: 96.16 77.03 61.82
+## HEAD 111197ddb bin/fm-watch.sh
+   8 rc=0 check: $H/state/probe.check.sh: probe says ready
+   7 rc=0 check: rearm-resurface
+  runs=15 nonempty_watcher_stderr=0
+## HEAD~1 bin/fm-watch.sh (no stderr discard around the check fork)
+   7 rc=0 check: $H/state/probe.check.sh: probe says ready
+   8 rc=0 check: rearm-resurface
+  runs=15 nonempty_watcher_stderr=0
+# after:  2:38  up 2 days, 16:48, 1 user, load averages: 80.99 79.54 65.25

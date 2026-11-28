@@ -1,0 +1,8 @@
+# head 111197ddb: FM_TEST_ONLY=test_concurrent_watcher_sees_only_complete_publication bash tests/fm-pr-check-security.test.sh, 6 runs;  2:06  up 2 days, 16:15, 1 user, load averages: 59.67 53.54 53.53
+run1 exit=0 secs=37: ok - concurrent watchers observe only complete private poll publications 
+run2 exit=0 secs=43: ok - concurrent watchers observe only complete private poll publications 
+run3 exit=0 secs=25: ok - concurrent watchers observe only complete private poll publications 
+run4 exit=0 secs=32: ok - concurrent watchers observe only complete private poll publications 
+run5 exit=0 secs=27: ok - concurrent watchers observe only complete private poll publications 
+run6 exit=0 secs=26: ok - concurrent watchers observe only complete private poll publications 
+# after:  2:09  up 2 days, 16:19, 1 user, load averages: 67.91 59.37 55.83

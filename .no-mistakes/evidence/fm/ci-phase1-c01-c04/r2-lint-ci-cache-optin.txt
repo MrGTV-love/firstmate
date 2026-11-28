@@ -1,0 +1,18 @@
+# fm-lint.sh behavior under CI=true on one root (bin/fm-open-loops-validate-lib.sh), private cache dirs under /tmp; head 111197ddb
+## A: CI=true + FM_LINT_CACHE_DIR, no FM_LINT_ALLOW_CI_CACHE -> uncached
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+exit= cache files: 0
+## B: CI=true + FM_LINT_ALLOW_CI_CACHE=1 + FM_LINT_CACHE_DIR -> fills cache
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+exit= cache files: 2
+## B2: same opt-in again -> cache hit
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-open-loops-validate-lib.sh
+exit=
+## C: opt-in flag but no FM_LINT_CACHE_DIR -> uncached
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+exit= firstmate/lint result cache files: 0

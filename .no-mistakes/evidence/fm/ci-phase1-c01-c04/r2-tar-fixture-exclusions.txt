@@ -1,0 +1,12 @@
+# host tar: bsdtar 3.5.3 - libarchive 3.7.4 zlib/1.2.12 liblzma/5.4.3 bz2lib/1.0.8 ; exclusion set copied verbatim from tests/fixtures.sh:397, run from repo root into a scratch stage; head 111197ddb
+tests                                    absent
+graft                                    absent
+.git                                     absent
+docs/supervision-protocols               present
+docs/review-rubric.md                    present
+.agents/skills/bearings/assets           present
+bin                                      present
+.omp                                     present
+bin/fm-open-loops-validate-lib.sh        present
+bearings assets html: stage=2 repo=2
+docs files: stage=77 repo-tracked=77

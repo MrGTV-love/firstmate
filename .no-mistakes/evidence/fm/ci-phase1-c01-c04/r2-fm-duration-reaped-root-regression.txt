@@ -1,0 +1,5 @@
+# same body as tests/fm-work-progress.test.sh case darwin_root_reaped_during_sample (root listed in first table, reaped before native read)
+## fm-duration.py at HEAD~1 (before fix):
+exit=0 stderr='cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"' record_exists=False
+## fm-duration.py at HEAD (after fix):
+exit=0 stderr='' record_exists=False

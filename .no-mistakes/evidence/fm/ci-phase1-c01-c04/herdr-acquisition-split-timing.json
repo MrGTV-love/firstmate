@@ -1,0 +1,42 @@
+{
+  "families": [
+    {
+      "count": 2,
+      "duration_ms": 1510744,
+      "failed": 0,
+      "name": "real-herdr-gated"
+    }
+  ],
+  "finished_at": "2026-11-28T07:19:20Z",
+  "run_id": "fm-test-run-1795848842328-51075",
+  "scripts": [
+    {
+      "cpu_ms": 330800,
+      "duration_ms": 801744,
+      "exit": 0,
+      "expected_gate_skip": "herdr",
+      "family": "real-herdr-gated",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-acquisition-herdr-e2e.test.sh"
+    },
+    {
+      "cpu_ms": 249150,
+      "duration_ms": 709000,
+      "exit": 0,
+      "expected_gate_skip": "herdr",
+      "family": "real-herdr-gated",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-acquisition-herdr-on-e2e.test.sh"
+    }
+  ],
+  "selection": "scripts;fail-on-gate-skip=herdr not found;jobs=1",
+  "started_at": "2026-11-28T06:54:02Z",
+  "summary": {
+    "duration_ms": 1518791,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 2
+  }
+}

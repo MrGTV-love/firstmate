@@ -1,0 +1,331 @@
+$ bin/fm-test-run.sh --json /Users/charlesabrooker/.no-mistakes/evidence/01M8FSRCC6PE6AVVGWP04QNDS1/split-suites-timing.json tests/fm-omp-harness.test.sh tests/fm-omp-harness-extensions.test.sh tests/fm-omp-harness-watch.test.sh tests/fm-teardown-closeout.test.sh tests/fm-pr-check-security.test.sh tests/fm-remote-secondmate-parent-binding.test.sh tests/fm-slack-watch.test.sh tests/fm-slack-watch-edge.test.sh tests/fm-slack-watch-intake.test.sh
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8FSRCC6PE6AVVGWP04QNDS1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-11-28T03:56:02Z tests/fm-omp-harness-watch.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-28T03:56:02Z tests/fm-omp-harness-extensions.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-28T03:56:02Z tests/fm-omp-harness.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - .omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement
+ok - omp explicit shutdown logs its retirement expiry; readiness has no wall-clock cutoff
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (boundary)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (note)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (archived)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (diagnostic)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (restore-boundary)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (restore-diagnostic)
+ok - .omp watch extension: a redelivered merged wake keeps every host line (rows)
+ok - .omp watch extension: a redelivered merged wake keeps every host line (empty)
+ok - .omp watch extension: a handoff host mark follows the empty-queue rule (diagnostic)
+ok - .omp watch extension: a handoff host mark follows the empty-queue rule (boundary)
+ok - .omp watch extension: a host close split across stream chunks reaches main as one whole follow-up
+ok - .omp watch extension: legacy operational handoffs load and watcher records collapse into a queue-read mark
+ok - .omp watch extension: one idle queue-read boundary covers partial acknowledgements, recovery, replacement, token release, failures and slow queries
+ok - .omp extensions: a descendant omp session neither records itself as the loaded session nor arms a watcher
+ok - .omp extensions: a descendant omp neither rebinds nor clears its local secondmate's task-session proof
+ok - .omp extensions: a local secondmate publishes its task-session proof with the lock missing, its own, or naming an unrelated live pid
+ok - .omp turn-end guard: the loaded marker follows the lock owner at turn boundaries instead of only at load
+ok - .omp watch extension: a generation stopped without a successor heals once; a real successor or arm call never double-arms
+ok - .omp watch extension: a double load keeps one live generation, one arm, and forwards the superseded tool
+ok - .omp watch extension: a dead arm owner is replaced and reported started, a live one is left alone
+ok - .omp watch extension: an ended-unreaped arm owner is labelled so, not killed, and replaced
+ok - .omp watch extension: an arm exit held open by a descendant is observed, retried, and its wake delivered with no repair call
+ok - .omp watch extension: a helper session never takes the home or the wakes, and a wake reaches the primary
+ok - .omp watch extension: a rebound primary keeps the home and the instance it replaced gets nothing
+ok - .omp watch extension: a failed session bind is surfaced and the bounded self-heal arms without a repair call
+ok - .omp watch extension: a slow but progressing successor is not dropped and a live starting child is not replaced
+ok - .omp watch extension: publication failure retains the wake and permits tool, command, and factory repair
+FM_TEST_END 2026-11-28T04:02:21Z tests/fm-omp-harness-watch.test.sh exit=0 duration_ms=379079 gate_skip=false
+ok - .omp watch extension: other restoration has its own failure reason and arm count
+ok - .omp watch extension: missing restoration has its own failure reason and arm count
+ok - .omp watch extension: exhausted restoration has its own failure reason and arm count
+ok - .omp watch extension: controlled pending delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled rejected delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled replay delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled foreign-late delivery preserves continuity and wake ownership
+ok - .omp watch extension: controlled foreign-never delivery preserves continuity and wake ownership
+ok - fm-spawn: an omp launch with no model refuses a missing or unlisted default role and names the remedy
+ok - fm-spawn: global role inspection is read-only, unlayered, and honors PI_CODING_AGENT_DIR
+ok - fm-spawn: raw omp launches validate the default only without an effective model override
+ok - fm-spawn: raw role and catalog inspection honor the actual launch directory and uncertain evidence passes through
+ok - fm-spawn: omp profile flags, assignments, and invoking environment pass through without default-role catalog probes
+ok - fm-spawn: any expanded raw token passes through unchanged without evaluating it or probing the default-role catalog
+ok - fm-spawn: unquoted, single-quoted, and double-quoted literal evidence still refuses invalid defaults
+ok - fm-spawn: a real omp secondmate launch loads only the busy -e and auto-discovers its primary extensions
+ok - fm-spawn: the config/secondmate-harness model pin is validated against the omp catalog before launch
+ok - fm-spawn: contradictory omp DeepSeek secondmate profiles refuse before launch
+ok - omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification, jev-guard tool_call hook installed, no tool_result hook
+ok - control, composer, and supervision-model tables carry omp's verified values
+ok - fm-wake-lib: the omp ownership proof is keyed on its own extensions and gates the hand-off tolerance
+ok - .omp turn-end guard: digest delivery, seatbelt block, one compelled continuation, flagged stop stands down
+ok - .omp watch extension: fm_watch_arm_omp arms once, repeats as a no-op, and delivers an actionable close as one follow-up
+ok - .omp primary extensions: a task worker copy stays clean and keeps the arm seatbelt, a home still writes its four paths
+ok - .omp watch extension: decision, merge and multiline payloads come from the queue; unqueued closes inject nothing
+ok - .omp watch extension: an opted-in home runs the supervision host and relays every host line (away record)
+ok - .omp watch extension: an opted-in home runs the supervision host and relays every host line (quiet record)
+ok - .omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm
+ok - .omp watch extension: an unqueued host hand-back is delivered once (outcome)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (away-return)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (busy)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (stuck)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (rejected)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (unrestored)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (refused)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (stuck-refused)
+FM_TEST_END 2026-11-28T04:07:36Z tests/fm-omp-harness-extensions.test.sh exit=0 duration_ms=694054 gate_skip=false
+ok - fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch
+ok - launch-model history preserves both families across relaunch
+ok - omp ship native fallback stand-ins are ship author evidence
+ok - default fallback overlay matches pre-change bytes
+ok - fixed-family empties native chains, survives relaunch, and is dropped on promotion
+ok - fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op
+ok - fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry
+ok - session lock and tmux liveness: omp is anchored, decoys stay out
+ok - fm-spawn refuses omp openai and openrouter routes before any worker launches
+ok - raw omp model flags refuse API billing and preserve subscription and non-model arguments
+ok - fallback admission excludes API-billed destinations from selection and native chains
+ok - fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension
+ok - ordinary OMP launch: opt-in native journal is pinned to a fresh launch and opt-out ignores an ambient destination
+ok - no-helper posture rejects other runtimes and supervisor sessions before publishing or launching
+ok - no-helper launch, emptied fallback, record, relaunch inheritance and invalid-record refusal hold
+ok - no-helper omp launch refuses ultra effort before publishing or launching
+ok - every canonical omp ship and scout launch and relaunch disables titles and routes smol and tiny to the worker's own model with scalar roles only
+ok - omp ship and scout launches select replace edit mode only in the worker process
+ok - real omp spawns give firstmate alone, without no-helpers, native find, and a judge credential, and no write sends a guard request
+ok - launch preserves healthy pooled accounts and uses only the selected rule's stand-in
+ok - native chains preserve fallback order and shared launch policy
+ok - retired fallback refusal covers launch-time selection and runtime chains
+ok - typed route class and effort constrain launch stand-ins while manual routes are unchanged
+ok - stale unrelated dispatch rules do not block a launch
+ok - strongest-model exhaustion neither spends saved resets nor weakens or discards the task
+ok - fm-spawn: omp model validation is scoped to providers the listing can prove
+FM_TEST_END 2026-11-28T04:08:02Z tests/fm-omp-harness.test.sh exit=0 duration_ms=719784 gate_skip=false
+FM_TEST_BEGIN 2026-11-28T04:08:02Z tests/fm-pr-check-security.test.sh family=pr-forge expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-28T04:08:02Z tests/fm-teardown-closeout.test.sh family=pr-forge expected_gate_skip=none
+ok - raw-byte parser accepts canonical URLs and rejects the complete adversarial matrix
+ok - GitLab merge requests are followed on any instance and never wake falsely
+ok - Forgejo poll reads one pull request by number through tea api and wakes only on merged true
+ok - Forgejo login match parses tea's JSON in every line shape, in the helper and the static poll
+ok - the Gerrit watch wakes only on an explicit merged status and never on submittability
+ok - Gerrit arming records no patch set revision and the merge path refuses to submit
+ok - Gerrit arming accepts a published HEAD only by the change's current patch set tree
+ok - a no-mistakes Gerrit ready report requires the pipeline's fixes recovered into the published copy
+ok - validated merged polls notify once and retire before the next watcher cycle
+ok - a repeat identical merged poll for an already-notified task is absorbed, never queued as a main-blocking row
+ok - a failed upward merge report keeps its poll armed for repair and retry
+ok - staged self-merge and poll interleavings are never silent
+ok - queued merges retain their away authority after captain return
+ok - poll distinguishes attended authorization from external landing
+ok - accepted merge authority refuses rebound task metadata
+ok - accepted merge authority persists under the lifecycle lock
+ok - teardown cannot race merged-poll authority consumption
+ok - poll retirement preserves a replacement authority record
+ok - a merge detected by the poll is reported upward from a secondmate home exactly once
+ok - a different merged PR for the same task gets its own first notification
+ok - a merged poll on a persistent secondmate retires silently: no outcome, marker, or wake, and every lifecycle artifact preserved
+ok - queue, receipt, and every fixed-path removal crash point recover without loss or repeated execution
+ok - open/red, closed-unmerged, malformed, and forge errors remain armed until an exact merged transition
+ok - replacement, nonterminal, tampered, and custom results receive no deletion authority
+ok - queue failure and untrusted receipts preserve canonical poll evidence
+ok - GitHub and GitLab exact merged results share one retirement path
+ok - PR and teardown entrypoints reject invalid arguments before every side effect
+ok - arming refuses a draft pull request, naming it, and arms a ready or unreadable one
+ok - fm-pr-check refuses to record a PR or arm a merge watch on a secondmate record
+ok - fm-pr-check refuses to register a PR whose named head is only in the worker copy
+ok - fm-pr-check refuses a direct-PR registration while a later commit is only in the copy
+ok - fm-pr-check registration refuses a multi-PR task's local-only head; only a merge call judges the PR's head
+ok - registration revalidates worktree and branch before metadata and poll publication for every forge
+ok - valid direct and merge flows record exact metadata and reject multiline head metadata
+ok - rejected metacharacter bytes remain inert at generation and watcher time
+no_progress: "pid=36724 no CPU or watched-file progress for 1.3s"
+ok - static poll is silent except for one merged line and remains watcher-bounded
+ok - a merge seen by the poll arms the pool-copy prune without running it under the poll's lock
+ok - interrupted atomic preparation cleans private temporaries and publishes nothing
+not ok - concurrent watcher observed a partial artifact error
+FM_TEST_END 2026-11-28T04:19:03Z tests/fm-pr-check-security.test.sh exit=1 duration_ms=660799 gate_skip=false
+ok - a foreign copy whose landing could not be checked is refused with nothing removed and no record line, and a rerun releases a landed copy and holds an unlanded one
+ok - a failure after the task record and own copies are gone still leaves the held notice and one record line, and the foreign copy untouched
+ok - --force waives nothing: it never holds a foreign copy and still refuses
+ok - a slot with no foreign copy closes and returns exactly as before and writes no held-copy record
+ok - a foreign copy that another active record names through a symlink alias is refused
+ok - a half-removed registered foreign copy refuses with the same custody refusal and nothing changes
+ok - a live pid that started after the creation lock was written is a recycled pid and does not own the copy
+ok - a live launcher that started before its creation lock keeps its foreign copy
+ok - a lock launcher that is the task's own session, or a descendant the cwd sweep cannot reach, is ended by retire and released with the slot
+ok - a live lock launcher outside the task's session, or one that outlives retire's signal, keeps its foreign copy and is named by pid
+ok - a foreign copy with a process outside the task running in it is refused and the process is left alone
+ok - a task-own process running inside a foreign copy is ended by retire and the copy is released, and one that outlives the signal keeps the copy by pid
+ok - a slot's foreign copies are all proved before any is removed, and then all are released
+ok - a foreign copy nested in another foreign copy is removed before the copy that holds it
+ok - the closeout driver runs before the shared project lock is taken, and the slot return still runs under it
+ok - without FM_TEARDOWN_VERNANT_PYTHON the driver runs under the slot's own .venv interpreter
+ok - a Vernant-locked copy whose closeout driver or interpreter is missing is refused at entry and stays
+ok - a driver refusal or a lock that is not Vernant's leaves the foreign copy, the slot and the record in place
+ok - a landed, clean own nested copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an own copy whose lock names a pid that started after the lock was written is released by the same driver path
+ok - a live lock launcher outside the task keeps a locked own copy and is named by pid
+ok - a locked own copy with unlanded commits, unsaved files, or a lock that is not Vernant's is refused and nothing changes
+ok - a locked own copy's unique ignored file is preserved with its SHA-256 and the copy is released
+ok - a foreign copy that is still refused keeps the locked own copy, the slot and the record in place
+ok - the closeout driver releases a locked own copy before the shared project lock is taken, and the slot return still runs under it
+ok - own and foreign closeout refusals show the tail and save byte-identical full output; short output stays complete and successful output stays silent without a durable log
+ok - a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place
+ok - a valid kept answer is recorded once with the answer and the state, closes around the unchanged copy, and is judged again on the next run without the driver
+ok - a kept answer with an empty path, an archive whose hash does not match, an archive inside the copy or a wrong path count is recorded once and refused, and two unchanged retries ask the driver nothing
+ok - a record folder that cannot be written, a record that cannot be read and a copy whose repository cannot be read each refuse before the driver, and the repaired state asks it once
+ok - a refused kept copy is judged again from its record without the driver: it stays refused while its cause holds and closes once the cause has gone
+ok - on a retry whose record matches, the retire step concludes, retires and reaps every root but the kept copy
+ok - on a retry whose record matches, the kept copy's proof runs but queues nothing for the retire signal, and another copy's queue stays
+ok - a retained receipt that is not a regular readable file is never stale and another home's such receipt holds the copy, while a matching receipt holds and a gone copy's receipt is stale
+ok - a retry of a closed kept-copy task says it is already closed, names the record and asks the driver nothing
+ok - a damaged task record, one removed after a refused close and a pending backlog close are never reported as already closed; a completed close is
+ok - an unwritable retained record refuses every unchanged retry before the driver with a refusal record, and the close follows with one call once it is writable
+ok - a retry of a task closed around a kept copy says it is already closed, names the record and looks up no copy, and a damaged or present task record, a pending backlog close or an unmarked record does not
+ok - a changed kept copy is preserved beside its earlier preserve, with new .claude and .opencode entries, tab names and a newline-ended link target, and no earlier preserved byte is ever overwritten or removed
+ok - a kept copy with nothing selected gets one preserve when its payload is copied in, and later runs reuse it with the record unchanged
+ok - on the released route each distinct selected state keeps one preserve directory in the next free name, an equal state reuses its directory, and no earlier directory changes
+ok - on the kept route each distinct selected state keeps one preserve directory in the next free name and the task closes from its record without the driver
+ok - an own locked copy whose plan keeps the tree reaches the kept route and closes, every other plan refusal refuses at entry, and a matching record asks for no plan
+ok - a kept copy whose record cannot be written refuses with a durable refusal record, unchanged retries ask the driver nothing, and once writable the next run asks once, closes and deletes the refusal record
+ok - every driver-named path is judged as written and checked against the copy: mismatches, late changes, lost preserved files and names that are not objects inside the copy refuse, a lacking named file is copied in, and in-copy links and a trailing-slash directory close
+ok - a file changed after it was preserved is never released unpreserved: it refuses before the driver and is preserved by the next run, the unchanged copy is released with its bytes held, and a preserve that loses bytes during the release is caught
+ok - root files named copy-path and SHA256SUMS are preserved byte for byte in files/ and the kept copy closes, and an ordinary copy uses the same files/ and meta/ layout
+ok - a landed task whose own copy the driver keeps closes: the copy, the slot and its lease are untouched, the driver's verified archive and the task's preserve hold the unique files, and one record names the copy and the answer
+ok - a retry of an unchanged kept copy makes no driver call, writes no tar, no saved output and no second record, and closes once the slot can be leased
+ok - a kept copy whose ignored files, tracked status or HEAD changed is assessed afresh: still-eligible goes to the driver again, failing a proof refuses before any driver call
+ok - a kept-copy close in a slot a peer still works in refuses with the copy and its record named, and its retry asks the driver nothing
+ok - each other state of an own copy the driver keeps refuses with its cause and the same disposition with and without --force, and the clean input closes the same way with --force
+ok - a kept copy refused from the driver's recorded answer (an empty path, an archive hash that does not match, no unique list, another repository, a forced unlanded or dirty copy) asks the driver once across two retries
+ok - a kept copy whose cause went (preserved again beside the preserve that lost a file, which is left as it is) closes from its record without the driver
+ok - a kept copy with only .claude ignored files closes, its widened preserve built, when the preserve parent is on another filesystem from the run directory
+ok - the task's preserve, every tar and every saved output that existed before the close keep their bytes through the close and later runs
+ok - the default interpreter and the explicit override close the kept-copy task the same way, and a missing default interpreter refuses with nothing removed
+ok - a copy that already holds driver tars is asked once on the first teardown, with one more tar, and later runs add none
+ok - a move of HEAD alone asks the driver exactly once more, with one more tar, and the next unchanged run adds none
+ok - each change of the ignored payload causes exactly one driver call and one tar, a return to an earlier payload counts as a change, and the same payload never asks again
+ok - a replaced creation lock of a kept copy asks the driver exactly once more and its retry asks nothing
+ok - a kept copy with an anchored but unlanded commit or an untracked .claude file is refused, with and without --force, and its retry asks the driver nothing
+ok - an anchor-only prior copy passes the ordinary proof, is refused by the kept route after the driver's one call and one tar with its answer recorded, and two retries, with and without --force, ask the driver nothing
+ok - the retained record states why the copy is kept, that teardown changes nothing in it, that the driver's --execute-cleanup writes another archive and that removing it depends on Vernant's driver
+ok - two overlapping teardowns of one kept copy ask the driver once and write one tar (first rc 0, second rc 0; the second waited on: state/.fm-lease-command-task-x1.lock )
+ok - a unique ignored file created in the copy while the driver runs refuses the close and stays in the copy
+ok - a record 400 days old (its time fields and every file time) of an unchanged kept copy still asks the driver nothing, before and after the close
+FM_TEST_END 2026-11-28T04:47:25Z tests/fm-teardown-closeout.test.sh exit=0 duration_ms=2363209 gate_skip=false
+FM_TEST_BEGIN 2026-11-28T04:47:26Z tests/fm-remote-secondmate-parent-binding.test.sh family=standalone expected_gate_skip=none
+ok - remote provisioning publishes durable parent state before its completion marker
+/Users/charlesabrooker/tmp/fm-test-run.fKSPix/w6/tmp/fm-remote-parent-binding.ayhLwB/remote-root/bin/fm-remote-job-worker.sh: child setpgid (89333 to 89333): Operation not permitted
+ok - a remote secondmate's finished worker cleans up when the remote code root's own .env looked relay-active
+ok - a remote secondmate's finished worker cleans up when only an ambient exported token looked relay-active
+ok - a remote secondmate's finished worker cleans up with no relay signal anywhere
+ok - a remote secondmate's own committed relay token still refuses cleanup
+ok - remote secondmate publication refuses targets outside its home
+ALL TESTS PASSED
+FM_TEST_END 2026-11-28T04:51:12Z tests/fm-remote-secondmate-parent-binding.test.sh exit=0 duration_ms=225954 gate_skip=false
+FM_TEST_BEGIN 2026-11-28T04:51:12Z tests/fm-slack-watch.test.sh family=unclassified expected_gate_skip=none
+..........................................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 202 tests in 24.400s
+
+OK
+ok - HELPERS
+ok - DOD-01
+ok - DOD-02
+ok - DOD-03
+ok - DOD-04
+ok - DOD-05
+ok - DOD-07
+ok - DOD-08
+ok - DOD-09
+ok - DOD-10
+ok - DOD-12
+ok - DOD-13
+ok - DOD-14
+ok - DOD-15
+ok - DOD-17
+ok - S1
+ok - S2
+ok - S3
+ok - Slack watch core checks
+FM_TEST_END 2026-11-28T05:04:29Z tests/fm-slack-watch.test.sh exit=0 duration_ms=796418 gate_skip=false
+FM_TEST_BEGIN 2026-11-28T05:04:29Z tests/fm-slack-watch-edge.test.sh family=unclassified expected_gate_skip=none
+ok - X1
+ok - X2
+ok - X3
+ok - X4
+ok - X5
+ok - X6
+ok - X7
+ok - X8
+ok - X9
+ok - X10
+ok - X11
+ok - X12
+ok - X13
+ok - X14
+ok - X15
+ok - X16
+ok - X17
+ok - X18
+ok - X19
+ok - X20
+ok - X21
+ok - X22
+ok - X23
+ok - X24
+ok - X25
+ok - X26
+ok - X27
+ok - X28
+ok - X29
+ok - X30
+ok - X31
+ok - X32
+ok - X33
+ok - X34
+ok - X35
+ok - X36
+ok - X37
+ok - X38
+ok - X39
+ok - X40
+ok - X41
+ok - X42
+ok - X43
+ok - X44
+ok - X45
+ok - X46
+ok - X47
+ok - X48
+ok - X49
+ok - Slack watch edge checks
+FM_TEST_END 2026-11-28T05:39:56Z tests/fm-slack-watch-edge.test.sh exit=0 duration_ms=2125920 gate_skip=false
+FM_TEST_BEGIN 2026-11-28T05:39:56Z tests/fm-slack-watch-intake.test.sh family=unclassified expected_gate_skip=none
+ok - INTAKE-1
+ok - INTAKE-2
+ok - INTAKE-3
+ok - INTAKE-4
+ok - INTAKE-5
+ok - INTAKE-6
+ok - INTAKE-7
+ok - INTAKE-8
+ok - INTAKE-9
+ok - INTAKE-10
+ok - INTAKE-11
+ok - INTAKE-12
+ok - INTAKE-13
+ok - INTAKE-14
+ok - all Slack watch checks
+FM_TEST_END 2026-11-28T05:46:59Z tests/fm-slack-watch-intake.test.sh exit=0 duration_ms=422304 gate_skip=false
+FM_TEST_SUMMARY total=9 failed=1 skipped_gate=0 duration_ms=6667232
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=2 duration_ms=3024008 failed=1
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=3 duration_ms=1792917 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=225954 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=3 duration_ms=3344642 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-teardown-closeout.test.sh duration_ms=2363209
+FM_TEST_SLOWEST rank=2 script=tests/fm-slack-watch-edge.test.sh duration_ms=2125920
+FM_TEST_SLOWEST rank=3 script=tests/fm-slack-watch.test.sh duration_ms=796418
+FM_TEST_SLOWEST rank=4 script=tests/fm-omp-harness.test.sh duration_ms=719784
+FM_TEST_SLOWEST rank=5 script=tests/fm-omp-harness-extensions.test.sh duration_ms=694054
+FM_TEST_SLOWEST rank=6 script=tests/fm-pr-check-security.test.sh duration_ms=660799
+FM_TEST_SLOWEST rank=7 script=tests/fm-slack-watch-intake.test.sh duration_ms=422304
+FM_TEST_SLOWEST rank=8 script=tests/fm-omp-harness-watch.test.sh duration_ms=379079
+FM_TEST_SLOWEST rank=9 script=tests/fm-remote-secondmate-parent-binding.test.sh duration_ms=225954
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M8FSRCC6PE6AVVGWP04QNDS1/split-suites-timing.json
+exit=1

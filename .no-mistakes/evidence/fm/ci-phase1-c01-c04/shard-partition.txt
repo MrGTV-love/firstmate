@@ -1,0 +1,10 @@
+family-parallel shards union:      154 unique:      154
+family-parallel lane:      154
+6 concurrent-safe families:      182
+shards == lane: yes
+serial shards:      216 unique      216 lane      216
+serial shards == lane: yes
+herdr shards       19 lane       19
+herdr shards == lane: yes
+tests/fm-spawn-acquisition-herdr-e2e.test.sh
+tests/fm-spawn-acquisition-herdr-on-e2e.test.sh

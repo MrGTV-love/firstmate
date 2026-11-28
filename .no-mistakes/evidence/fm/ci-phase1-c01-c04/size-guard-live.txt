@@ -1,0 +1,24 @@
+$ bin/fm-test-size-guard.sh   # real repo
+FM_TEST_SIZE_GUARD ok total=420 max_lines=1000 grandfathered=114
+exit=0
+
+# adversarial 1: add a brand-new 1001-line tests/fm-new-thing.test.sh to a scratch copy of the repo
+fm-test-size-guard: tests/fm-new-thing.test.sh: 1001 lines exceeds the 1000-line cap for new test files (split into focused suites <= 1000 lines)
+exit=1
+
+# adversarial 2: grow split file tests/fm-teardown-closeout.test.sh 1 line past its 2432 ceiling
+tests/fm-teardown-closeout.test.sh	2432
+    2433
+fm-test-size-guard: tests/fm-teardown-closeout.test.sh: 2433 lines exceeds grandfathered ceiling 2432 (split the file instead of growing legacy debt)
+exit=1
+
+# adversarial 3: shrink grandfathered tests/fm-slack-watch-intake.test.sh to 900 lines (stale entry)
+fm-test-size-guard: tests/fm-slack-watch-intake.test.sh: 900 lines is now <= 1000; remove stale entry from docs/guards/test-file-line-budget.tsv
+exit=1
+
+# decision check: shrink tests/fm-slack-watch-edge.test.sh to 1100 lines (still >1000, ceiling kept, must pass)
+FM_TEST_SIZE_GUARD ok total=420 max_lines=1000 grandfathered=114
+exit=0
+
+# helper file out of scope: tests/fm-omp-harness-helpers.sh lines
+    1228

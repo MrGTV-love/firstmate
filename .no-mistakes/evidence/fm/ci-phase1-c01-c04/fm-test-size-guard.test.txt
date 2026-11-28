@@ -1,0 +1,7 @@
+ok - exact 1000-line file and shrinking grandfathered file pass
+ok - new test file exceeding 1000 lines is refused
+ok - grandfathered test file growing past its ratchet ceiling is refused
+ok - stale budget entry is flagged so the ratchet burns down
+ok - live repository satisfies the 1000-line test file ratchet
+bash tests/fm-test-size-guard.test.sh  1.24s user 2.82s system 39% cpu 10.322 total
+exit=0
