@@ -94,6 +94,7 @@ It never admits by load average; in measured mode it admits by the memory the co
 A counted run is a `runs` row with `status = 'running' AND ci_ready_at IS NULL AND awaiting_agent_since IS NULL`; both of those columns are facts the daemon records.
 A CI-ready run that is only monitoring its PR, and a run parked waiting for its agent, are still `running` but are not counted.
 A run that leaves `running`, reaches CI-ready or parks for its agent releases its count implicitly; no daemon-lifetime lease or watcher is installed.
+Before it queues, `pipeline-start` asks the [free-disk floor](configuration.md#disk-free-floor-configdisk-free-floor); below it the start exits 75 and is never queued.
 
 ### Admission rule
 

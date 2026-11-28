@@ -13,6 +13,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [status log size bounds](#status-log-size-bounds-fm_status_cap_bytes), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
+| New work refused on a nearly full disk | [Disk free floor](#disk-free-floor-configdisk-free-floor) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Automatic review and merge of a green PR | [Automatic review and merge](#automatic-review-and-merge-configreview-runner) |
@@ -2561,6 +2562,45 @@ When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record,
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
 
+## Disk free floor (config/disk-free-floor)
+
+A new heavy step starts only while the volume it writes to holds at least 20 GiB free.
+A nearly full disk makes every new worker, pipeline run and stack worse, so the check refuses the start instead of making it worse.
+[`bin/fm-disk-floor-lib.sh`](../bin/fm-disk-floor-lib.sh) owns the measurement, the floor, the message and the exit statuses.
+
+The optional local, gitignored `config/disk-free-floor` holds one line with a positive whole number of GiB, at most six digits and no leading zero, to replace the default of 20.
+An absent file means 20.
+A malformed file refuses the start with exit 2 and an `error:` line naming the file, and never defers, because retrying cannot repair it.
+Secondmate homes inherit the file from the primary like other inheritable config.
+
+The meter is `df -Pk` on the nearest existing ancestor of the path the step writes to, so a copy that does not exist yet is measured on the volume it will be created on.
+The available kilobytes are divided by 1048576 in integer arithmetic, which is the 1,024-based whole-GiB figure `df -g` prints on macOS, rounded down.
+Exactly the floor admits, and one kilobyte below it refuses.
+
+The check runs where new work starts:
+
+- A fresh `bin/fm-spawn.sh` ship, scout or new secondmate spawn, beside the memory admission and before any copy, record or brief exists; it measures the project clone, or the secondmate's home.
+- A fresh no-mistakes run start through `bin/fm-mem-guard.sh run`, and through `bin/fm-cpu-pass.sh pipeline-start`, which `bin/fm-duration.py run --pipeline-priority <class>` uses for a fresh run or an authorized rerun; both measure the starting directory.
+- `bin/fm-stack-start.sh -- <start command...>` for a task's Docker, Compose or Supabase stack; it measures the current directory, or `--path <dir>`, exits 75 below the floor without running the command, and otherwise runs the command unchanged with its own exit status.
+  The generated worker brief (rule 10) names it as the way to start a stack, but this is an entry point the briefs name, not an enforcement point, because a project's own start script can still bypass it.
+
+Below the floor, the start exits 75, which means deferred and never failed, and prints one line naming the free GiB, the floor, the path measured and `config/disk-free-floor`.
+A deferred spawn leaves no record, brief, copy or terminal call behind, and its backlog item stays queued, so Firstmate dispatches it again once space is freed.
+A deferred run start never queues in the CPU pass pool and never runs its command.
+
+Recovery is never refused.
+A relaunch of an existing worker, through `bin/fm-control.sh relaunch` or `bin/fm-spawn.sh --relaunch`, reuses its copy and allocates nothing.
+A respawn of a secondmate whose record the home still holds is the same recovery.
+Every teardown and cleanup path never asks the floor, because freeing space is what a full disk needs.
+Reattaching to an existing no-mistakes run starts nothing new and is never refused.
+The floor refuses new starts only; it never kills or slows running work.
+
+When `df` fails or prints nothing usable, the step is admitted with one `warning:` line, so an unreadable meter cannot stop recovery.
+Each decision is recorded as the `disk-free-floor` guard in `state/guard-events.jsonl`: `deny` below the floor, `warn` for an unreadable meter, and `allow` otherwise.
+`bin/fm-disk-floor-lib.sh free <path>` prints the whole GiB the guard reads for a path.
+
+`tests/fm-disk-floor.test.sh` (including the stack start), `tests/fm-disk-floor-relaunch.test.sh` and the disk-floor cases of `tests/fm-cpu-pass-admission.py` cover these behaviors with a fake `df` first on `PATH`.
+
 ## Host memory admission
 
 On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
@@ -5096,6 +5136,7 @@ FM_TEARDOWN_NM_STALL_SECS=900   # no-output/no-process-tree-CPU seconds per read
 FM_CREW_STATE_RUNS_LIMIT=200  # plain runs-ledger rows scanned for fallback attribution; does not change the CLI's AXI overview window (selection owner: bin/fm-nm-run-lib.sh)
 FM_CREW_STATE_NM_CACHE=on   # off makes every no-mistakes read inside fm-crew-state.sh fresh; on keeps only a finished run's reads until its run id changes and reads everything else fresh every time (contract owner: bin/fm-nm-read-cache-lib.sh)
 FM_DOD_NM_STALL_SECS=900   # no-output/no-process-tree-CPU seconds per no-mistakes status read in the completion gate (bin/fm-dod-lib.sh; when unset, FM_CREW_STATE_NM_TIMEOUT inside fm-crew-state.sh, 120 inside a bin/fm-inactive-reconcile.sh scan, and the repo-wide quiet interval elsewhere); a silent read leaves the gate unknown (status 2, `state: unknown` in crew-state, exit 75 from bin/fm-pr-check.sh), never a refusal, and makes later status reads in the same process unknown at once; a secondmate's ledger delivery of a child's ship `done:` is then kept for the next poll, and teardown keeps the child's records and exits 75 (retried by the sweeps, never a refusal), except that a --force teardown delivers it marked `(acceptance unknown: no-mistakes read stalled)`, never as accepted
+FM_TEARDOWN_SCAN_DEADLINE_SECS=600   # seconds each read-only walk of the task records in fm-teardown.sh may run while it holds ANY Treehouse project lock, its own or a child project lock that a forced secondmate teardown takes: the copy-clearance scan (and the inner pass of its released-root proof), the shared-slot, peer, registered-lane, docker-stack and misdirected-lease walks, the foreign-copy ownership walk, and the loop over the children of a forced secondmate teardown, checked before each child (read each time; 0 or a non-number means the default; leading zeros are decimal); checked before each task record, so a walk that runs past it refuses with exit 1 and a message naming the scan deadline, releases the lock through the EXIT trap, runs no later step of the teardown, signals nothing, and a retry is safe (steps that ran before the walk are not undone); a walk with no project lock held is not bounded
 FM_TEARDOWN_NM_RUNS_LIMIT=200  # recent no-mistakes run rows scanned to prove an unresolved-head parked run belongs to teardown's task
 FM_TEARDOWN_VERNANT_PYTHON=     # interpreter for Vernant's closeout driver; default <slot>/.venv/bin/python, and the driver step is skipped (and its copy refuses) when it is absent
 FM_CREW_STATE_BIN=bin/fm-crew-state.sh   # test override for the current-state reader used by watcher triage: the working/paused classification, and the wedge timer's parked-gate wait evidence; `fm-control exit` reads it too for the finished-task check on Claude's exit picker

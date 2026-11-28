@@ -280,9 +280,16 @@ Activation:
     with no pid) is queued, or the pool cannot be used or written; on success
     it prints the record.
 
+Disk floor:
+  - Before it queues, `pipeline-start` asks bin/fm-disk-floor-lib.sh whether the volume holding
+    the current directory still has the free-disk floor. Below it, nothing is queued and the
+    status is 75 (deferred, never a failure) with the library's one `deferred:` line; a malformed
+    config/disk-free-floor returns 2; an unreadable meter admits with a warning. A command that
+    --only-fresh passes through unqueued is not checked.
+
 Exit status of `run`, `pipeline-start` and `launch-gate`: COMMAND's own status; 126 when
-COMMAND cannot be executed, 127 when it is not found, 125 for a usage error; launch-gate
-returns 75 when it refuses.
+COMMAND cannot be executed, 127 when it is not found, 125 for a usage error; 75 when the
+disk floor defers a start; launch-gate returns 75 when it refuses.
 """
 
 import argparse
@@ -2955,6 +2962,17 @@ def cmd_exec_intercept(args: argparse.Namespace) -> int:
         priority=priority if priority in PIPELINE_PRIORITIES else "other"))
 
 
+def disk_floor_status(step: str) -> int:
+    """Run the free-disk floor for a NEW start: 0 admits, anything else is the status to return."""
+    library = Path(__file__).resolve().parent / "fm-disk-floor-lib.sh"
+    try:
+        return subprocess.run(["bash", str(library), "admit", step, os.getcwd()], check=False).returncode
+    except OSError as exc:
+        # An unreadable meter must not stop a start (the library's own rule).
+        log(2, "warning: disk free floor not enforced for %s: %s; admitted" % (step, exc))
+        return 0
+
+
 def cmd_pipeline_start(args: argparse.Namespace) -> int:
     command = list(args.command)
     if command[:1] == ["--"]:
@@ -2973,6 +2991,10 @@ def cmd_pipeline_start(args: argparse.Namespace) -> int:
             _restore_exec_signals()
             return exec_direct(command, without_intercept(environment) if intercepted is None else intercepted, 2)
         unplaced = True  # the interception cannot be placed (said once above): the command is held as one start
+    # Every start that queues first meets the free-disk floor; a nearly full disk queues nothing.
+    refused = disk_floor_status("no-mistakes run start")
+    if refused:
+        return refused
     # An admitted command that runs the client directly cannot begin a second run, so its client runs past the
     # interception; any other admitted command keeps the interception, so each further fresh client in it is
     # admitted on its own while the admitted client claims its own pending reservation (claim_pending).

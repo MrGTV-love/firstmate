@@ -678,6 +678,39 @@ if name == 'outer':
     child = launch(duration + ['axi', 'run'], env, folder / 'reattach')
     finish(child)
     assert (folder / 'reattach.started').exists()
+    # Free-disk floor (bin/fm-disk-floor-lib.sh): a NEW start below the floor is
+    # deferred with 75 before it queues, on the pool route and on the
+    # fm-duration.py route; exactly the floor admits; a reattachment and an
+    # unreadable meter are admitted. The fake df is tests/assets/fake-bin/df.
+    folder, db, env = case('disk-floor', cores=3, running=0)
+    kb = lambda gib, extra=0: str(gib * 1048576 + extra)
+    floor_env = lambda free, **more: dict(env, FM_FAKE_DF_AVAIL_KB=free, FM_FAKE_DF_LOG=str(folder / 'df.log'), **more)
+    marker = folder / 'floor-below.marker'
+    child = launch(cli + ['pipeline-start', '--', 'touch', str(marker)], floor_env(kb(19, 1048575)), folder / 'floor-below')
+    finish(child, 75)
+    below = (folder / 'floor-below.stderr').read_text()
+    assert 'deferred: disk free floor refused no-mistakes run start: 19 GiB free on the volume holding' in below, below
+    assert 'below the floor of 20 GiB' in below and 'pipeline-start admitted' not in below, below
+    assert not marker.exists() and not list((folder / 'pool').glob('pipeline-waiter-*')), 'a deferred start queued or ran'
+    marker = folder / 'floor-exact.marker'
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(marker)], floor_env(kb(20)), folder / 'floor-exact'))
+    assert marker.exists() and 'disk free floor' not in (folder / 'floor-exact.stderr').read_text()
+    marker = folder / 'floor-unreadable.marker'
+    finish(launch(cli + ['pipeline-start', '--', 'touch', str(marker)], floor_env(kb(1), FM_FAKE_DF_MODE='fail'), folder / 'floor-unreadable'))
+    unreadable = (folder / 'floor-unreadable.stderr').read_text()
+    assert marker.exists() and 'warning: disk free floor not enforced for no-mistakes run start' in unreadable, unreadable
+    # The fm-duration.py route: a fresh run and a rerun are deferred before the
+    # fake no-mistakes starts; a reattachment (no --intent) is recovery and runs.
+    for tag, tail in (('fresh', ['axi', 'run', '--intent', 'floor-fresh']), ('rerun', ['rerun'])):
+        child = launch(duration + tail, floor_env(kb(1)), folder / ('floor-duration-' + tag))
+        finish(child, 75)
+        text = (folder / ('floor-duration-' + tag + '.stderr')).read_text()
+        assert 'deferred: disk free floor refused no-mistakes run start: 1 GiB free' in text, text
+        assert not (folder / 'floor-fresh.started').exists() and not (folder / 'rerun.started').exists()
+    assert not (folder / 'reattach.started').exists(), 'a deferred rerun started the fake no-mistakes'
+    finish(launch(duration + ['axi', 'run'], floor_env(kb(1)), folder / 'floor-reattach'))
+    assert (folder / 'reattach.started').exists()
+    assert 'disk free floor' not in (folder / 'floor-reattach.stderr').read_text()
     # Every genuinely new run joins the one queue, whatever its command formatting; reattachment,
     # responses and status reads never queue. The fake client follows the real CLI's facts: a
     # rerun or an axi run with an intent input starts a run; axi run without one reattaches an

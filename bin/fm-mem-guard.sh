@@ -11,7 +11,10 @@
 # that result. baseline derives the alarm envelope from recorded healthy root
 # probe readings; the engine header owns every record's contents and derivation.
 # run checks once and execs a NEW run only; reattach/respond directly so pressure
-# cannot prevent supervising existing work. admit, run and sample only record a
+# cannot prevent supervising existing work. run first asks fm-disk-floor-lib.sh
+# whether the volume holding the current directory still has the free-disk floor
+# and exits 75 below it, so a nearly full disk starts no new run on either OS.
+# admit, run and sample only record a
 # reading in the invoking home's state. After that check, run hands COMMAND to
 # fm-cpu-pass.py pipeline-start --only-fresh: a command that begins a new
 # no-mistakes run (its engine's fresh_pipeline_start) queues there in class
@@ -43,6 +46,9 @@ esac
 if [ "$mode" = run ]; then
   [ "${1:-}" = -- ] && [ "$#" -gt 1 ] || { echo 'usage: fm-mem-guard.sh run -- <new-run command...>' >&2; exit 2; }
   shift
+  disk_rc=0
+  "$SCRIPT_DIR/fm-disk-floor-lib.sh" admit 'no-mistakes run start' "$PWD" || disk_rc=$?
+  [ "$disk_rc" -eq 0 ] || exit "$disk_rc"
 else
   [ "$#" -eq 0 ] || { echo 'unexpected memory guard arguments' >&2; exit 2; }
 fi
