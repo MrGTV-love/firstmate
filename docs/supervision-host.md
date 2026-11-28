@@ -421,7 +421,7 @@ Each arm owner's own suite covers its host mode against a stub host.
 | `tests/fm-claude-stop-autoarm.test.sh` | The Claude arm owner's host mode against a stub host. |
 | `tests/fm-cursor-primary.test.sh` | The Cursor arm owner's host mode against a stub host. |
 | `tests/fm-pi-watch-extension.test.sh` | The OpenCode plugin's host mode against a stub host. |
-| `tests/fm-omp-harness.test.sh` | The omp arm owner's host mode against a stub host. |
+| `tests/fm-omp-harness-extensions.test.sh`, `tests/fm-omp-harness-watch.test.sh` | The omp arm owner's host mode against a stub host. |
 | `tests/fm-dsh-primary.test.sh` | The DSH plugin's host mode against a stub host, gated by the real `bin/fm-dsh-primary.sh inspect` verdict. |
 | `tests/fm-watch-checkpoint.test.sh` | The Codex checkpoint's host mode against a stub host. |
 | `tests/fm-supervision-instructions.test.sh` | The rendered protocol, including Grok's arm command. |

@@ -1843,10 +1843,11 @@ ROOT_GRACE=${FM_LINT_ROOT_GRACE:-5}
 # cap's ~5.33 GiB wall caught bin/fm-spawn.sh, bin/fm-teardown.sh,
 # tests/fm-pending-reply.test.sh, and
 # tests/fm-launch-prompt-signals-live-e2e.test.sh. CI runs up to FM_LINT_JOBS=2
-# workers per lint job (with ShellCheck cache opt-in via FM_LINT_ALLOW_CI_CACHE=1),
-# staying inside the 16 GiB hosted runner. Local lint also defaults to two workers;
-# caps allow ~16 GiB resident plus host overhead, so use FM_LINT_JOBS=1 on
-# smaller local machines. A root that exceeds its cap fails by name.
+# workers per lint job (with ShellCheck cache opt-in via FM_LINT_ALLOW_CI_CACHE=1):
+# two of those measured 5.5-6 GiB roots fit the 16 GiB hosted runner. Local lint
+# also defaults to two workers; two such caps allow ~16 GiB resident plus host
+# overhead, so use FM_LINT_JOBS=1 on smaller local machines. A root that exceeds
+# its cap fails by name.
 # Never drop diagnostic rules or leave a source owner unchecked to fit a root
 # under its cap. The roots sidecar records peak RSS even without bounds; roots
 # peaking above about 3 GiB resident remain source-graph reduction candidates.

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Post-close cleanup for bin/fm-teardown.sh: leaked processes and the bounded
-# reap, foreign and held copies with their closeout driver, private no-mistakes
-# launch agents, Docker stacks and their retained records, Herdr projection
-# journals, and secondmate delivery and retirement.
+# reap, parked no-mistakes runs, forced teardowns, Herdr projection journals,
+# and secondmate delivery and retirement. Closeout, Docker, and held-copy cases
+# live in the closeout, docker, and retained tests/fm-teardown-*.test.sh groups.
 # The landed-work proof matrix lives in tests/fm-teardown.test.sh; pool slots
 # and returns live in tests/fm-teardown-pool.test.sh. Shared fixtures:
 # tests/fm-teardown-helpers.sh.

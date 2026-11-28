@@ -44,7 +44,7 @@ Add required status checks with `strict_required_status_checks_policy: false`; a
 Bind the checks to the GitHub Actions app already producing them, rather than accepting the same context from any integration.
 No new app installation or manual runner setup is needed for that setting.
 
-Require the actual job contexts: `Lint 1` through `Lint 3`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable serial 1` through `Behavior portable serial 25`, `Behavior tests (Herdr)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
+Require the actual job contexts: `Lint 1` through `Lint 3`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable family-parallel 1` through `Behavior portable family-parallel 8`, `Behavior portable serial 1` through `Behavior portable serial 12`, `Behavior tests (Herdr 1)` through `Behavior tests (Herdr 3)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
 The last name is the compliance job context, not its workflow title; its existing automation exceptions remain unchanged.
 The timing aggregate is not a substitute for individual jobs because it can succeed while collecting evidence from a failed run.
 
@@ -69,9 +69,9 @@ Coordinate any workflow rollback with its required-check names so a retired chec
 - Shell helper scripts in `bin/` are plain bash.
   Each starts with a usage header comment; keep it accurate when you change behavior.
   Test scripts and helpers in `tests/` are plain bash too.
-  Teardown real-process regressions in `tests/fm-teardown-cleanup.test.sh` use the suite-local fixture helpers in `tests/fm-teardown-helpers.sh`; preserve their identity-checked cleanup, replacement-readiness synchronization, audit-collection exit/live-failure controls, and exempt-retry close-replay checks when extending those cases.
+  Teardown real-process regressions in `tests/fm-teardown-cleanup.test.sh` and `tests/fm-teardown-docker.test.sh` use the suite-local fixture helpers in `tests/fm-teardown-helpers.sh`; preserve their identity-checked cleanup, replacement-readiness synchronization, audit-collection exit/live-failure controls, and exempt-retry close-replay checks when extending those cases.
   `bin/fm-lint.sh` must pass: it is the single owner of the lint definition (the shellcheck file set, config, pinned shellcheck version, pinned actionlint workflow lint, and the backend-purity check rejecting direct Beads CLI calls in core `bin/` scripts).
-  CI checks its full canonical partitions without cache reuse; the no-mistakes pre-push gate uses the context-selected default.
+  CI checks its full canonical partitions and reuses the successful-result cache only through its explicit `FM_LINT_ALLOW_CI_CACHE=1` opt-in; the no-mistakes pre-push gate uses the context-selected default.
   `docs/fm-test-portable-shards.md` owns partition verification and performance evidence.
   Its header and `--help` output own the exact local lint modes, dependency selection, cache behavior, and analysis flags.
   A malformed `.github/workflows/*.yml`, including a self-broken `ci.yml`, fails that local lint path before merge because a broken workflow cannot report its own breakage.
@@ -117,9 +117,9 @@ bin/fm-test-run.sh --changed   # normal changed-file-informed path with automati
 bin/fm-test-run.sh --changed --jobs 1   # explicit serial override
 bin/fm-test-run.sh --changed --max-wall-ms 300000   # same automatic path with a post-run five-minute result check
 bin/fm-test-run.sh --proven-isolated --jobs 4   # explicit local parallel of the individually proven set
-bin/fm-test-run.sh --lane portable-serial   # portable serial remainder (watcher/AFK/tmux/stateful)
+bin/fm-test-run.sh --lane portable-serial   # portable serial remainder (AFK/tmux/unproven stateful)
 bin/fm-test-run.sh --list-lanes   # discover exact lane names, including the current CI serial shards
-bin/fm-test-run.sh --check-coverage   # prove portable shards + serial + serial shards + Herdr equal the full inventory
+bin/fm-test-run.sh --check-coverage   # prove portable shards + family-parallel + serial + their shards + Herdr equal the full inventory
 bin/fm-test-run.sh --all   # deliberate complete regression (optional local full walk; not no-mistakes Test)
 bin/fm-test-isolation-proof.sh --list   # proven portable parallel candidate set
 bin/fm-test-isolation-proof.sh --jobs 4 --json /tmp/fm-isolation-proof.json   # re-run the portable candidate proof
@@ -137,7 +137,7 @@ Its header and `--help` own the flags, family labels, lanes, and changed-file ma
 `bin/fm-test-isolation-proof.sh` remains the single owner of the portable candidate proof and reusable family proof harness; see `docs/fm-test-isolation-proof.md`.
 Portable shard balance evidence lives in `docs/fm-test-portable-shards.md`.
 Family selection is the ordinary local path; `--all` is deliberate full regression only.
-CI owns broad regression across required portable parallel shards, the portable serial lane's separate-runner shards, the Herdr lane, lint, invariants, the coverage guard, and stock macOS Bash compatibility in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+CI owns broad regression across required portable parallel shards, the portable family-parallel and portable serial lanes' separate-runner shards, the Herdr lane's shards, lint, invariants, the coverage and test-file size guards, and stock macOS Bash compatibility in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 Pushing a new head to a pull request cancels that pull request's still-running CI so only the current head is validated; pushes to `main` coalesce so a newer push replaces a still-pending main run but never cancels the running one, and the workflow owns that contract and its rationale.
 Use `bin/fm-test-run.sh --list-lanes` for exact lane names and `--help` for `--jobs` rules and required gate-skip flags when reproducing a lane locally.
 Leave the `sleep 0.1` cadence in the suites' bounded condition waits alone.
@@ -145,6 +145,7 @@ Those sleeps look like recoverable overhead - `fm-watch-triage.test.sh` alone is
 Sampling less often does not remove that wait, it only delays detection: raising the interval to 0.5s and charging each sample proportionally measured `fm-watch-triage.test.sh` at 435s and 440s against 390s and 393s for the unchanged script, back to back on 2026-09-03, because each of its ~40 poll-cycle waits and ~73 process-exit waits paid up to half a second more.
 Some of those loops are also catching a transient rather than waiting for a settled condition, so a coarser sample can step over the state they assert on.
 Discover tests by listing `tests/*.test.sh`: each is a self-contained bash script named `<subject>.test.sh`, and its header comment describes what it covers, so pass one to `bin/fm-test-run.sh` to focus on a subject with canonical timing output.
+Keep a new `tests/*.test.sh` at or under 1,000 lines; `bin/fm-test-size-guard.sh` enforces that cap and the grandfathered ceilings, and its header owns the policy.
 Shared test helpers live in `tests/lib.sh` (reporters, temp roots, git fixtures, captured-launch execution, and Claude environment/NUL-delimited argv recording), `tests/fixtures.sh` (fake toolchain and spawn-world builders), `tests/wake-helpers.sh`, `tests/secondmate-helpers.sh`, and `tests/git-config-helpers.sh` (fixture Git isolation from the host's global and system configuration and from an inherited repository location such as `GIT_DIR`, already sourced by `tests/lib.sh` and `tests/herdr-test-safety.sh`; a suite that sources neither must source it itself before its first Git operation so a direct invocation stays isolated).
 Source those instead of copying a fake toolchain into a new suite.
 A test file that can run one case by name (`FM_TEST_ONLY=<test_function>` or positional test names) selects it through `fm_test_only` or `fm_test_run_cases` in `tests/lib.sh`, never a bare `"$FM_TEST_ONLY"` call.

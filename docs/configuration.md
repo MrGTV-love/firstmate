@@ -246,7 +246,7 @@ An omitted event remains missing evidence, not a guarded-operation failure.
 The Jev guard records each pre-tool refusal as a `blocked` event with `guard_id` `FM-JEV-GUARD` right after the refusal's own `state/jev-guard.jsonl` audit row is appended: `rule_id` is that row's typed `branch` value, `subject.kind` is its hook and tool, and the task and subject identities are the writer's digests.
 A refusal whose audit row could not be written is not mirrored, and the audit's `AuditUnavailableError` behavior is unchanged.
 The mirror is bounded by a short telemetry timeout and never changes the guard's allow or deny: a writer that ran prints its own `fm-friction:` diagnostic, and a writer that could not start or was stopped at that timeout is reported by one guard-side `fm-friction:` line, both on the guard process's stderr, which the Claude hook wrapper discards with every other stderr line.
-[`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
+[`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown-docker.test.sh`](../tests/fm-teardown-docker.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
 
 ### Format and lifecycle references
 
@@ -3951,7 +3951,7 @@ Every allowlist token must match `[UW][A-Z0-9]{8,}`; names, email addresses, par
 Typed messages carrying a bot marker (`bot_id`, `app_id`, or `bot_profile`) are refused even when their user id is allowlisted; a Slack message subtype alone, such as `thread_broadcast` for a thread reply also sent to the main window, does not refuse an allowlisted owner's reply.
 Reaction authors also require a read-only user lookup proving they are not a bot or app user.
 `FM_SLACK_NO_NETWORK` (any value) is a test and verification value, read from the process environment only, never from `.env`: with it set, a run that has no `--replay` transcript fails with `network_closed` before any socket exists.
-The replay suites of this plane (`tests/fm-slack-watch.test.sh`, `tests/fm_slack_watch_test.py`, `tests/fm-slack-secret-scan.test.sh`) set it.
+The replay suites of this plane (`tests/fm-slack-watch.test.sh`, `tests/fm-slack-watch-edge.test.sh`, `tests/fm-slack-watch-intake.test.sh`, `tests/fm_slack_watch_test.py`, `tests/fm-slack-secret-scan.test.sh`) set it.
 `FM_SLACK_FAULT` is a test-only crash-injection value (`after-stage`, `after-post`, `after-delivery`, `after-answer`, `after-ack`, `after-cursor`, `after-notice-post`, or `before-emit`, each a commit point named for what is already done) read from the process environment only, never from `.env`; unset means normal operation.
 The value `record-write` is the one that does not stop the process: it makes the write of a request's whole-text record fail, so that the failure path can be tested where the record's place cannot be obstructed.
 
@@ -4137,7 +4137,7 @@ A missing reaction scope is reported once per change in the missing set, not on 
 Each Slack API request keeps its own 10-second socket timeout, and no budget is shared across the requests of one run; `bin/fm-watch.sh` owns the standing check's no-progress and absolute bounds.
 The standing check writes one `slack: request finished` line to stderr after each JSON reply, because a check that waits on slow replies uses almost no CPU and the watcher counts check stderr as progress; a hung or trickling request writes nothing, so the no-progress bound still stops it.
 
-`tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and signing secret and scans for both.
+`tests/fm-slack-watch.test.sh`, `tests/fm-slack-watch-edge.test.sh`, and `tests/fm-slack-watch-intake.test.sh` drive checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and signing secret and scans for both.
 Re-notification, a periodic digest, quiet hours, and old-thread cleanup are intentionally not part of this first step.
 
 ## Relay (.env)

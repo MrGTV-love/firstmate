@@ -10,6 +10,8 @@
 #   fm-test-run.sh --changed [--base <git-ref>]
 #   fm-test-run.sh --lane portable-parallel-1|portable-parallel-2|portable-serial
 #   fm-test-run.sh --lane portable-serial-<k>of<n>   (one CI serial shard)
+#   fm-test-run.sh --lane portable-family-parallel[-<k>of<n>]   (concurrent-safe families)
+#   fm-test-run.sh --lane real-herdr-gated[-<k>of<n>]   (real-Herdr family)
 #   fm-test-run.sh --proven-isolated
 #   fm-test-run.sh tests/<name>.test.sh [more scripts...]
 #
@@ -211,6 +213,13 @@
 # largest script, so only a shard holding one script alone may exceed it.
 # None of these figures is an execution timeout or proof of observed headroom:
 # refresh growing files from CI measurements.
+# portable-family-parallel holds the remaining members of
+# list_concurrent_safe_families; its CI shards (portable-family-parallel-<k>of<n>)
+# run at PORTABLE_FAMILY_PARALLEL_JOBS, each family in its own concurrent phase.
+# real-herdr-gated-<k>of<n> splits the real-Herdr family across serial runners.
+# This script owns both <n> values the same way, and --check-coverage reports
+# family_parallel, family_parallel_shards, family_parallel_jobs, herdr, and
+# herdr_shards (member and shard counts).
 # --changed is conservative: it over-selects related families rather than
 # under-selecting, and never expands to the complete suite unless --all. One
 # place it is deliberately narrow is a bin/ path with no curated family: a test
@@ -365,10 +374,11 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # now split into separately packed groups (docs/fm-test-portable-shards.md,
 # "Split watch-triage-waits and control-relaunch").
 # The shard count is the fewest that pass and leave lane slack of at least one
-# target. After the 2026-10-29 hint refresh the table sums to 28352649 ms, so
-# twenty-four shards pass with only 447351 ms of slack and are refused by that
-# rule; twenty-five leave 1647351 ms and pack at serial_max_ms 1134269 ms
-# (docs/fm-test-portable-shards.md, "Portable serial CI shards").
+# target. The 2026-10-29 hint refresh set twenty-five shards; moving the
+# concurrent-safe families to the portable family-parallel lane left 216 serial
+# members whose hints and defaults sum to 11582904 ms, and twelve shards pack at
+# serial_max_ms 965405 ms (docs/fm-test-portable-shards.md, "Portable serial CI
+# shards").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.

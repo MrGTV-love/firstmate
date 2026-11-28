@@ -10,8 +10,9 @@ Fixture homes were created with `tests/fixtures/slack/make-home.sh <scenario> <t
 
 ## Environment and commands
 
-The canonical suite is `tests/fm-slack-watch.test.sh`, run as a single process under `nice -n 20`.
-It invokes the real `fm-captain-hold.sh` intake and `tasks-axi` against each disposable home.
+The canonical suites are `tests/fm-slack-watch.test.sh` (DOD and S cases), `tests/fm-slack-watch-edge.test.sh` (X cases), and `tests/fm-slack-watch-intake.test.sh` (INTAKE cases), which share `tests/fm-slack-watch-helpers.sh`.
+The dated runs below predate that split and ran the combined `tests/fm-slack-watch.test.sh` as a single process under `nice -n 20`.
+Each suite invokes the real `fm-captain-hold.sh` intake and `tasks-axi` against each disposable home.
 No repository-wide test run is claimed; each section below records the targeted command and observed result for one guarantee.
 The 2026-10-22 targeted replay refresh ran `bash /Users/charlesabrooker/firstmate/bin/fm-proc-budget.sh -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/fm-slack-watch.test.sh -- nice -n 20 bash bin/fm-test-run.sh tests/fm-slack-watch.test.sh --jobs 1`.
 It printed `ok - all Slack watch checks` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1444534`.

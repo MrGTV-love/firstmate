@@ -75,7 +75,7 @@ omp starts no turn for an explicit follow-up that reaches an idle session unless
 The latest context is retained across shutdown and transferred to a replacement extension factory, so missing-successor recovery can still start an idle wake's turn.
 Arm commands and tools refresh that context when supplied; each delivery rechecks live idle state rather than caching an idle verdict across recovery.
 The prompt flow never touches the composer, so an operator draft stays unsent, and it also flushes any follow-up already stranded in omp's queue.
-`tests/fm-omp-harness.test.sh` covers idle delivery behind an advisor tail with an empty composer and with a draft, plus holding for an unreadable idle state; historical live evidence is recorded in [omp idle wake behind an advisor note](verification/runtime-backends.md#2026-10-08-omp-idle-wake-behind-an-advisor-note).
+`tests/fm-omp-harness-watch.test.sh` covers idle delivery behind an advisor tail with an empty composer and with a draft, plus holding for an unreadable idle state; historical live evidence is recorded in [omp idle wake behind an advisor note](verification/runtime-backends.md#2026-10-08-omp-idle-wake-behind-an-advisor-note).
 
 ### Stopped generations and duplicate loads
 

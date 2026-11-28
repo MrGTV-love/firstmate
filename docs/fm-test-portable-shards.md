@@ -185,7 +185,7 @@ No case body, assertion, or `ok -` line was shortened or removed.
 ## Teardown groups
 
 The former combined `tests/fm-teardown.test.sh` was an indivisible member: serial shard 2 of [run 39838628417](https://github.com/MrGTV-love/firstmate/actions/runs/39838628417) held it alone, its script time was 1587660 ms, and that job finished 26 minutes 49 seconds after the workflow started against the 1200000 ms packing target.
-Its 338 cases now run exactly once across three independently runnable files:
+Its 338 cases first ran exactly once across three independently runnable files:
 
 | File | Area |
 |---|---|
@@ -193,12 +193,14 @@ Its 338 cases now run exactly once across three independently runnable files:
 | `tests/fm-teardown-pool.test.sh` | pool slots, leases, custody, and returns: reservation before cleanup, proved landing after a wait, return-pending records across a refusal, reassigned and enclosing slots, reassociated and prior copies, nested slots, and subordinate cleanup custody |
 | `tests/fm-teardown-cleanup.test.sh` | post-close cleanup: the bounded process reap, foreign and held copies with the closeout driver, private no-mistakes launch agents, Docker stacks with their retained records, Herdr projection journals, and secondmate delivery and retirement |
 
-All three source `tests/fm-teardown-helpers.sh`, which owns every fixture and assertion helper plus the working tree's temporary root, the birth-identity fixture registry, and the EXIT cleanup.
+`tests/fm-teardown-cleanup.test.sh` later split into itself plus `tests/fm-teardown-closeout.test.sh`, `tests/fm-teardown-docker.test.sh`, and `tests/fm-teardown-retained.test.sh`, and `tests/fm-teardown-pool.test.sh` into itself plus `tests/fm-teardown-pool-nested.test.sh`, so the areas in the last two rows now span those files.
+
+Every group file sources `tests/fm-teardown-helpers.sh`, which owns every fixture and assertion helper plus the working tree's temporary root, the birth-identity fixture registry, and the EXIT cleanup.
 Each invocation owns its temporary root, its registered cleanup, and its own process inspection, so the final `ok -` line appears once per file.
 Every case still builds and tears down its own sandbox through `make_case`, and selecting one case by name still works in the file that owns it.
-The three files stay serial in the CI lanes: `bin/fm-test-isolation-proof.sh` lists them beside the landing and lock-race reason, which keeps them out of the mixed PORTABLE pool.
-A local `--family pr-forge` run at an admitted job count runs them concurrently with the family, and [fm-test-isolation-proof.md](fm-test-isolation-proof.md#pr-forge-admitted) records the 2026-10-22 proof of that membership.
-`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` judges the three group files by the partition rules in the comment above `partition_problems` there and pins no case total, so adding a test needs no edit there, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep all three.
+`bin/fm-test-isolation-proof.sh` lists `fm-teardown`, `fm-teardown-pool`, `fm-teardown-cleanup`, and `fm-teardown-real-treehouse` beside the landing and lock-race reason, which keeps them out of the mixed PORTABLE pool.
+The group files run concurrently with the rest of the admitted `pr-forge` family, both in a local `--family pr-forge` run at an admitted job count and in the [portable family-parallel lane](#portable-family-parallel-lane), and [fm-test-isolation-proof.md](fm-test-isolation-proof.md#pr-forge-admitted) records the 2026-10-22 proof of that membership.
+`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` judges the group files by the partition rules in the comment above `partition_problems` there and pins no case total, so adding a test needs no edit there, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep every group.
 
 On the pre-rebase 332-case inventory, the intact suite and the three groups reported the same 335 `ok -` lines and no failures in a local Ubuntu 26.04 container, which is the behavior-parity evidence for the split.
 The rebase then added upstream's `test_closeout_refusal_reports_tail_and_preserves_complete_output`, taken verbatim into `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 333; the 2026-10-22 pr-forge isolation proof ran all three group files to exit 0 on that 333-case head.
@@ -266,7 +268,7 @@ The second group (49) is the GitLab, Forgejo, reporting, and backlog cases, plus
 The third group (50) is the check-run, rollup, waiver, and away-authority matrix.
 Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` judges that cover by the partition rules above `partition_problems` in `tests/fm-test-run.test.sh`, without pinning a case total.
 Only `tests/fm-pr-merge.test.sh` stays in the proven-isolated parallel set, with its hint first apportioned from the former hint by case share (370000 ms) pending the first measured artifact for it; the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced that estimate with a measured 401410 ms.
-`tests/fm-pr-merge-forges.test.sh` and `tests/fm-pr-merge-checks.test.sh` stay in the `pr-forge` family but run in the portable serial remainder, because the 2026-10-24 portable-pool proof that would admit them did not pass cleanly ([isolation proof](fm-test-isolation-proof.md#fm-pr-merge-split-re-check)); their serial hints were apportioned estimates pending measurement, so the packer did not model them at the 45000 ms default, and the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced them with measured 196785 ms and 282357 ms.
+`tests/fm-pr-merge-forges.test.sh` and `tests/fm-pr-merge-checks.test.sh` stay in the `pr-forge` family but out of the proven-isolated parallel set, because the 2026-10-24 portable-pool proof that would admit them did not pass cleanly ([isolation proof](fm-test-isolation-proof.md#fm-pr-merge-split-re-check)); they first ran in the portable serial remainder and now run with their family in the [portable family-parallel lane](#portable-family-parallel-lane); their serial hints were apportioned estimates pending measurement, so the packer did not model them at the 45000 ms default, and the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced them with measured 196785 ms and 282357 ms.
 Both derive from 461903 ms, the former file's serial-era measurement in [run 39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843), where the parallel jobs ran their scripts serially: `fm-pr-merge-forges` takes its 49-of-148 case share, from before the former file's 149th case landed (152927 ms, rounded to 153000), and `fm-pr-merge-checks` takes its share of the three groups' 2026-10-24 portable-proof time, 302702 of 730151 ms (191493 ms, rounded to 191000), because its cases run longer than the case count suggests.
 With those hints the serial corpus had 318 members, 313 of them hinted with hints that summed to 23810727 ms, and the unchanged twenty-one serial shards passed `--check-coverage` at `serial_max_ms` 1144838 with `serial_unhinted=5`, the five result-delivery retirement tests then at the default weight.
 With the two groups out of the parallel set, the lanes summed 2123043 ms and 2894605 ms, 26.7 percent apart, so `tests/fm-captain-hold-cleanup.test.sh` (366226 ms) moved from lane 2 to lane 1.
@@ -408,7 +410,8 @@ Replaying each run's recorded script durations through the twenty-four-shard mem
 This is a replay of recorded durations, not a measured CI run.
 The refreshed serial hints sum to 28352649 ms, so twenty-four shards still pass `--check-coverage` (`serial_shards=24 serial_unhinted=0 serial_max_ms=1181663 serial_budget_ms=1200000`) but leave only 447351 ms of lane slack (24 x 1200000 - 28352649), less than one 1200000 ms target, and the [shard-count rule](#portable-serial-ci-shards) refuses them.
 Twenty-five leave 1647351 ms and pass (`serial_shards=25 serial_unhinted=0 serial_max_ms=1134269 serial_budget_ms=1200000`), so twenty-five is the fewest serial shards that pass and keep one target of slack.
-`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-five.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` then all named twenty-five.
+The six concurrent-safe families then moved into the [portable family-parallel lane](#portable-family-parallel-lane), which holds 154 scripts, and those three places now name twelve serial shards; read the current packing from `--check-coverage`.
 The same scripts run, so serial-script minutes do not change, but the twenty-fifth shard adds one job's setup; the twenty-five-shard assignment has not been replayed.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
@@ -435,7 +438,7 @@ Measure native-Windows-only scripts through the focused Git Bash runner and reta
 
 `bin/fm-test-run.sh --check-coverage` verifies that both parallel lanes partition the proven-isolated set.
 It also verifies that the parallel lanes, portable family-parallel lane, portable serial lane, and real-Herdr family are disjoint and cover every `tests/*.test.sh` script.
-It separately verifies that the portable family-parallel and portable serial CI shards are non-empty, disjoint, and together equal their lanes.
+It separately verifies that the portable family-parallel, portable serial, and real-Herdr CI shards are non-empty, disjoint, and together equal their lanes.
 Its hint-coverage and modeled-budget checks are described in [Portable serial CI shards](#portable-serial-ci-shards); neither replaces inspection of actual CI timing artifacts.
 
 Merge-integration fixtures preserve teardown's completion and custody prerequisites: capacity releases an unfinished worker only through retained captain-authorized discard words, and a missing-copy spend case records its merged PR before ordinary completion. Neither fixture bypasses process auditing or local-slot ownership.
@@ -451,7 +454,7 @@ The bearings Perl-timeout fixture includes `uname` for the PR library's cached p
 
 ## Timing artifacts
 
-Portable shards, each portable serial shard, and the Herdr lane upload runner-generated timing JSON.
+Portable shards, each portable family-parallel and portable serial shard, and each Herdr shard upload runner-generated timing JSON.
 `bin/fm-test-run.sh --aggregate-json` creates the combined summary artifact.
 `.github/workflows/ci.yml` owns the exact artifact names and aggregation wiring.
 Each script record carries `duration_ms` and, when the host-wide slot gate wrapped the script, `cpu_ms`.
@@ -525,7 +528,7 @@ The bounds sit at true extremes, far above healthy duration, so a loaded runner 
 | Tier | Jobs | Bound | Rationale |
 |---|---|---|---|
 | Fast | coverage guard, repo invariants, timing aggregate | 5 minutes | Seconds-long local work, so the tripwire only catches a hung runner. |
-| Normal | lint partitions, portable parallel shards, portable serial shards, macOS stock Bash | 60 minutes, one value shared by every job in the tier | One shared hang tripwire keeps every ordinary test and lint lane on the same policy instead of allowing per-lane packing estimates or one-off caps to set the bound. |
+| Normal | lint partitions, portable parallel shards, portable family-parallel shards, portable serial shards, macOS stock Bash | 60 minutes, one value shared by every job in the tier | One shared hang tripwire keeps every ordinary test and lint lane on the same policy instead of allowing per-lane packing estimates or one-off caps to set the bound. |
 | Heavy | Herdr | family-run step 60 minutes under a 120-minute job-level last-resort backstop | Across the last 30 completed `ci.yml` runs (run numbers 425 to 454), the 29 successful family-run steps took 13m51s to 17m12s. Three times the longest is 51m36s, so the step is capped at 60 minutes, an extreme hang tripwire a loaded runner does not reach. It fails a wedged suite while the `always()` cleanup and timing upload still run, and the job cap only catches a hang outside that step. |
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) holds the executable values and names each job's tier beside its `timeout-minutes`.

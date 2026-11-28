@@ -105,9 +105,10 @@ jobs:
             ${{ runner.temp }}/fm-lint/partition-${{ matrix.partition }}.roots.tsv
           if-no-files-found: warn
 
-  # Deterministic proof that portable parallel shards + portable serial + Herdr
-  # equal the complete tests/*.test.sh inventory with no missing or duplicates,
-  # and that the portable serial CI shards partition that serial lane exactly.
+  # Deterministic proof that portable parallel shards + portable family-parallel
+  # + portable serial + Herdr equal the complete tests/*.test.sh inventory with
+  # no missing or duplicates, and that the family-parallel, serial, and Herdr CI
+  # shards partition their lanes exactly.
   test-coverage:
     name: Test coverage guard
     runs-on: ubuntu-latest
@@ -399,7 +400,7 @@ jobs:
           path: ${{ runner.temp }}/fm-test/fm-test-timing-portable-serial-${{ matrix.shard }}.json
           if-no-files-found: warn
 
-  # Required real-Herdr lane: pinned install, serial real-herdr-gated family,
+  # Required real-Herdr lane: pinned install, real-herdr-gated family in serial shards,
   # hard-fail on missing Herdr or tasks-axi. Starts on Linux x86_64; if a genuine
   # platform invariant fails (focus, cleanup, default-session tripwire), keep
   # the failure evidence and move the job to macOS rather than skip assertions.

@@ -1720,7 +1720,7 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
   Rendered delivery-busy readers recognize both the spinner-bearing box border and the `⎋ Waiting …` row, including when no harness identity is available.
   An empty working editor remains readable as `empty`, but the away-mode daemon defers injection until the turn is idle.
 
-`tests/fm-omp-harness.test.sh` carries restored-wake editor recovery, descendant sessions, and marker self-repair; `tests/fm-composer-lib.test.sh` carries working-box fixtures captured during this verification; backend submit regressions carry dropped-Enter and stale-frame reread protections, and `tests/fm-wake-queue.test.sh` carries the ordinary stalled-loop alarm and idle-ring boundaries.
+`tests/fm-omp-harness-watch.test.sh` carries restored-wake editor recovery, descendant sessions, and marker self-repair; `tests/fm-composer-lib.test.sh` carries working-box fixtures captured during this verification; backend submit regressions carry dropped-Enter and stale-frame reread protections, and `tests/fm-wake-queue.test.sh` carries the ordinary stalled-loop alarm and idle-ring boundaries.
 
 The live guard that refreshes this entry submits real prompts and stays opt-in.
 Because production no longer queues watcher work while busy, a fixture-only wrapper captures a real idle wake and queues the same tracked text through omp's vendor follow-up API during a running turn.
@@ -3243,7 +3243,7 @@ This guard does not modify remote secondmates, unrelated panes, shared worktree 
 Its kernel-environment probes are identity-registered and remain alive until cleanup, rather than expiring while a slow host is still reading them.
 Its `test_launch_proof_pinned_personal_switch` case changes only the active session proof and verifies that a same-PID personal-session switch loses managed authority.
 `test_reboot_recovery_inspects_without_native_attribution` in `tests/fm-control-relaunch-backends.test.sh` covers inspection without lifecycle input or task-record mutation.
-`tests/fm-omp-harness.test.sh` covers activation, cancelled and rolled-back transitions, shutdown, and child-event preservation with both minimum-runtime and newer context shapes.
+`tests/fm-omp-harness-watch.test.sh` covers activation, cancelled and rolled-back transitions, shutdown, and child-event preservation with both minimum-runtime and newer context shapes.
 Profile and raw-shell launch regressions assert successful execution with unrelated missing or unlisted defaults and preserved shell effects; they do not require zero harness calls, because the supported-version preflight may invoke `omp --version` before launch.
 The token-free installed-runtime refresh for the production proof extension is:
 

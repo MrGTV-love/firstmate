@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Pool slots, leases, custody, and returns for bin/fm-teardown.sh's destructive
-# Treehouse return: reservation before cleanup, proved landing after a wait,
-# return-pending records across a refusal, reassigned and enclosing slots,
-# reassociated and prior copies, nested slots, and subordinate cleanup custody.
+# Pool slots, leases, custody, and returns for bin/fm-teardown.sh, split from
+# tests/fm-teardown-pool.test.sh: skipped copies that stay leased or are
+# released, return-pending records and their retries, the nested re-run matrix,
+# project-custody waits, and subordinate cleanup custody.
 # The landed-work proof matrix and refusal diagnostics live in
 # tests/fm-teardown.test.sh; post-close cleanup lives in
 # tests/fm-teardown-cleanup.test.sh. Shared fixtures: tests/fm-teardown-helpers.sh.

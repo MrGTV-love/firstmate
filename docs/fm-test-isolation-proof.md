@@ -78,7 +78,7 @@ The two failing candidates were not the new paths.
 `tests/fm-backend-herdr.test.sh` exited 1 in `fm_backend_herdr_container_ensure`: Herdr server startup refused with `socket absence is unknown: AF_UNIX path too long`, because the proof's worker root under this host's `TMPDIR` made the socket path longer than the Unix-socket limit.
 `tests/fm-pi-primary-types.test.sh` gate-skipped because `tsc` is not installed on this host, which the harness counts as a failure.
 All three fm-pr-merge groups exited 0, at 302702 ms for `fm-pr-merge-checks`, 211479 ms for `fm-pr-merge-forges`, and 215970 ms for `fm-pr-merge`.
-Because the run is not a clean 31-path pass, the two new paths are not admitted: they are absent from the candidate set above, from `bin/fm-test-isolation-proof.sh --list`, and from the portable parallel lanes, and they run in the portable serial remainder while staying in the `pr-forge` family.
+Because the run is not a clean 31-path pass, the two new paths are not admitted: they are absent from the candidate set above, from `bin/fm-test-isolation-proof.sh --list`, and from the portable parallel lanes, and they stay in the `pr-forge` family, which now runs in the portable family-parallel lane.
 A clean portable-pool run of the 31-path proposal on a host with `tsc` and a short enough `TMPDIR` is what admits them.
 
 ## fm-lint split re-check

@@ -735,7 +735,7 @@
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
-      "test": "tests/fm-teardown-cleanup.test.sh",
+      "test": "tests/fm-teardown-docker.test.sh",
       "tier": "B",
       "harm": "reversible",
       "proxy": false,
@@ -4464,7 +4464,7 @@
       "budget": 1,
       "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
       "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
-      "test": "tests/fm-teardown-cleanup.test.sh",
+      "test": "tests/fm-teardown-retained.test.sh",
       "tier": "B",
       "harm": "reversible",
       "proxy": false,
@@ -6548,7 +6548,7 @@
       "trigger": "a slot that must stay held is not in the project's current Treehouse pool, and the installed treehouse has no lease --path or its lease by path cannot be proved",
       "remedy": "install treehouse v3.1.7-fm or later, which has treehouse lease --path, or, when its lease by path cannot be proved, run the printed treehouse lease --path <slot> --lease-holder <task> from the project, and rerun bin/fm-teardown.sh <task>",
       "budget": 1,
-      "test": "tests/fm-teardown-cleanup.test.sh",
+      "test": "tests/fm-teardown-retained.test.sh",
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture",
@@ -7292,10 +7292,10 @@
       "trigger": "bin/fm-slack-check.sh retarget runs after FM_SLACK_DM_USER changed while the pending journal still holds an answer, notice, or request for a thread in the old DM, or when the retarget's own read of an old thread stages one, or while the old DM still holds an owner request, or a recorded request thread still holds an owner follow-up, that no poll has taken in (dm_user_changed_with_unread_requests)",
       "remedy": "restore BOTH old settings, the old FM_SLACK_DM_USER and the old FM_SLACK_ALLOWED_AUTHORS (or the old allowlist in the home configuration file), and run bin/fm-slack-poll.sh with them until it drains the old DM, then set the new values, then run bin/fm-slack-check.sh disarm, bin/fm-slack-check.sh retarget, bin/fm-slack-check.sh arm (restoring only the old owner loses requests: a poll takes in a request only from an author on the allowlist that is set when it runs); if retarget refuses with dm_user_changed_with_pending_work or dm_user_changed_with_unread_requests, restore both old settings and poll again, or run bin/fm-slack-check.sh resolve <ts> for each open failed request the poll lists; last resort, when a pending row can never drain because its thread or channel is gone: run bin/fm-slack-check.sh disarm, check the pending rows by hand, then remove state/slack-watch/ to start a fresh DM, which can re-read replies that were already answered; the same last resort covers an old thread that retarget can never read or judge (a hold id that can never be probed, a tapper whose users.info lookup keeps failing, a deleted card): first read that thread in Slack by hand and record any answer with bin/fm-captain-hold.sh answer, then disarm and remove state/slack-watch/, which abandons that thread's unread reply",
       "budget": 1,
-      "test": "tests/fm-slack-watch.test.sh",
+      "test": "tests/fm-slack-watch-edge.test.sh",
       "tier": "C",
       "harm": "irreversible",
-      "layer_note": "added by the Slack watch activation-readiness change; deny without a guard event: retarget exits non-zero with slack: refused: dm_user_changed_with_pending_work (raised in Watch.retarget in bin/fm_slack_watch.py) and changes the journal only by the rows its own read of the old threads staged; without the guard, answers pending on the old DM would be lost or misrouted after a retarget; the two bin/fm-slack-check.sh help lines document the refusal and its remedy; test X26 proves the refusal on a journal that already holds work and the retarget that succeeds once the journal is empty; test X41 proves the refusal after the retarget read stages an unread reply, that only that row is added, and the retarget that succeeds once it drains; retarget also exits non-zero with slack: refused: dm_user_changed_with_unread_requests (raised in Watch.retarget through Watch.unread_requests) while the old DM still holds an owner request newer than its starting point that no poll has taken in, and it only looks and never takes a request or a follow-up in itself; the INTAKE-5 drain scenario in tests/fm-slack-watch.test.sh proves the refusal after a capped poll and the retarget that succeeds once polling has delivered every request, and the retarget unit tests in tests/fm_slack_watch_test.py prove that messages which are not requests do not block it"
+      "layer_note": "added by the Slack watch activation-readiness change; deny without a guard event: retarget exits non-zero with slack: refused: dm_user_changed_with_pending_work (raised in Watch.retarget in bin/fm_slack_watch.py) and changes the journal only by the rows its own read of the old threads staged; without the guard, answers pending on the old DM would be lost or misrouted after a retarget; the two bin/fm-slack-check.sh help lines document the refusal and its remedy; test X26 proves the refusal on a journal that already holds work and the retarget that succeeds once the journal is empty; test X41 proves the refusal after the retarget read stages an unread reply, that only that row is added, and the retarget that succeeds once it drains; retarget also exits non-zero with slack: refused: dm_user_changed_with_unread_requests (raised in Watch.retarget through Watch.unread_requests) while the old DM still holds an owner request newer than its starting point that no poll has taken in, and it only looks and never takes a request or a follow-up in itself; the INTAKE-5 drain scenario in tests/fm-slack-watch-intake.test.sh proves the refusal after a capped poll and the retarget that succeeds once polling has delivered every request, and the retarget unit tests in tests/fm_slack_watch_test.py prove that messages which are not requests do not block it"
     },
     {
       "decision": "deny",
@@ -7326,10 +7326,10 @@
       "trigger": "bin/fm-slack-check.sh resolve <request-ts> names a ts with no pending request row (no_pending_request), a request row that is not failed (request_not_failed), or the state cannot be read or written",
       "remedy": "run bin/fm-slack-poll.sh and pass bin/fm-slack-check.sh resolve <request-ts> one ts from a slack: request <ts> not acknowledged (failed, owner Main) line it prints; a request that is not failed needs no resolve, because polling acknowledges and delivers it",
       "budget": 1,
-      "test": "tests/fm-slack-watch.test.sh",
+      "test": "tests/fm-slack-watch-intake.test.sh",
       "tier": "C",
       "harm": "reversible",
-      "layer_note": "added by the Slack main-window intake change; deny without a guard event: resolve exits non-zero with one slack: refused: line on stderr, printed through the run's one writer (no_pending_request or request_not_failed, raised in Watch.close_request in bin/fm_slack_watch.py, or local_state_or_response_error), makes no Slack call and leaves the journal unchanged; the bin/fm-slack-check.sh help line documents the refusal; the INTAKE-3 [resolve] scenario in tests/fm-slack-watch.test.sh proves the refusal for an unknown ts and a request that is not failed and the resolve that closes the failed row, and test_resolve_closes_only_a_failed_request_and_makes_no_slack_call in tests/fm_slack_watch_test.py proves the same at the unit level"
+      "layer_note": "added by the Slack main-window intake change; deny without a guard event: resolve exits non-zero with one slack: refused: line on stderr, printed through the run's one writer (no_pending_request or request_not_failed, raised in Watch.close_request in bin/fm_slack_watch.py, or local_state_or_response_error), makes no Slack call and leaves the journal unchanged; the bin/fm-slack-check.sh help line documents the refusal; the INTAKE-3 [resolve] scenario in tests/fm-slack-watch-intake.test.sh proves the refusal for an unknown ts and a request that is not failed and the resolve that closes the failed row, and test_resolve_closes_only_a_failed_request_and_makes_no_slack_call in tests/fm_slack_watch_test.py proves the same at the unit level"
     },
     {
       "decision": "deny",
@@ -7524,10 +7524,10 @@
       "trigger": "bin/fm-captain-hold.sh unbind <source> runs while state/decision-bindings exists and cannot be examined or opened",
       "remedy": "restore access to the state/decision-bindings folder and run the unbind again",
       "budget": 1,
-      "test": "tests/fm-slack-watch.test.sh",
+      "test": "tests/fm-slack-watch-intake.test.sh",
       "tier": "C",
       "harm": "reversible",
-      "layer_note": "added by the Slack main-window intake change; deny without a guard event: unbind exits non-zero with one fm-captain-hold: line on stderr and no unbound: line, the binding is unchanged, and the wait has no override; the INTAKE-6 [unbind inaccessible state] scenario in tests/fm-slack-watch.test.sh proves the refusal, and [unbind wait], [unbind no override] and [unbind slow] prove that a delivery under way is waited for with no time limit and one alarm line after 60 seconds"
+      "layer_note": "added by the Slack main-window intake change; deny without a guard event: unbind exits non-zero with one fm-captain-hold: line on stderr and no unbound: line, the binding is unchanged, and the wait has no override; the INTAKE-6 [unbind inaccessible state] scenario in tests/fm-slack-watch-intake.test.sh proves the refusal, and [unbind wait], [unbind no override] and [unbind slow] prove that a delivery under way is waited for with no time limit and one alarm line after 60 seconds"
     },
     {
       "decision": "deny",
