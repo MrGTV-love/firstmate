@@ -355,10 +355,11 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # now split into separately packed groups (docs/fm-test-portable-shards.md,
 # "Split watch-triage-waits and control-relaunch").
 # The shard count is the fewest that pass and leave lane slack of at least one
-# target. After the 2026-10-29 hint refresh the table sums to 28352649 ms, so
-# twenty-four shards pass with only 447351 ms of slack and are refused by that
-# rule; twenty-five leave 1647351 ms and pack at serial_max_ms 1134269 ms
-# (docs/fm-test-portable-shards.md, "Portable serial CI shards").
+# target. On 2026-11-28 the 365 serial members sum to 30080793 ms, so
+# twenty-five shards fail (shard 1 packs 1203012 ms above the target) and
+# twenty-six pass with only 1119207 ms of slack and are refused by that rule;
+# twenty-seven leave 2319207 ms and pack at serial_max_ms 1114460 ms
+# (docs/fm-test-portable-shards.md, "Verification inputs").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
