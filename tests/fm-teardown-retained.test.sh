@@ -1807,7 +1807,7 @@ test_preserve_parent_and_metadata_boundaries
 test_preserve_parent_on_another_filesystem_refuses_at_entry
 )
 
-# Restore errexit before the first case of this slice to match the original combined run.
+# Restore errexit at the first case the original combined run ran with errexit on.
 errexit_restored=false
 fm_test_before_case() {
   if [ "$errexit_restored" = false ] && [ "$1" = test_a_held_copy_keeps_its_unique_ignored_files_and_none_are_preserved ]; then

@@ -2427,10 +2427,10 @@ test_docker_container_arriving_during_resource_cleanup_blocks_retirement
 test_teardown_retires_the_dsh_launch_state
 )
 
-# Restore errexit before the first case of this slice to match the original combined run.
+# Restore errexit at the first case the original combined run ran with errexit on.
 errexit_restored=false
 fm_test_before_case() {
-  if [ "$errexit_restored" = false ] && [ "$1" = test_teardown_never_holds_up_a_steer_to_another_task ]; then
+  if [ "$errexit_restored" = false ] && [ "$1" = test_top_level_pipeline_discovery_failures_remain_best_effort ]; then
     set -e
     errexit_restored=true
   fi

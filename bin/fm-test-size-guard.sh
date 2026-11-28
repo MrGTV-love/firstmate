@@ -3,19 +3,19 @@
 # ratchet on tests/*.test.sh.
 #
 # Usage:
-#   bin/fm-test-size-guard.sh [--root <dir>] [--max-lines <n>] [--budget <tsv>] [--write-budget]
+#   bin/fm-test-size-guard.sh [--root <dir>]
 #
 # Policy:
-# - Every new tests/*.test.sh file must be at most --max-lines (default 1000).
+# - Every new tests/*.test.sh file must be at most 1000 lines.
 # - Existing grandfathered files listed in docs/guards/test-file-line-budget.tsv
 #   ("<path>\t<max_lines>") may stay at or below their recorded ceiling, and may
 #   never grow past it.
 # - Entries in the budget file whose test file no longer exists or has already
-#   shrunk to <= --max-lines are reported as stale so the ratchet burns down.
+#   shrunk to <= 1000 lines are reported as stale so the ratchet burns down.
 #
 # Recorded user decisions:
 # - A ceiling is a baseline, not a moving limit: a grandfathered file that
-#   shrinks but stays above --max-lines keeps its ceiling, so concurrent PRs do
+#   shrinks but stays above 1000 lines keeps its ceiling, so concurrent PRs do
 #   not conflict on the budget file.
 # - Files produced by splitting a grandfathered monolith stay grandfathered at
 #   their split ceilings, and sourced tests/*-helpers.sh files are not
@@ -24,8 +24,6 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 MAX_LINES=1000
-BUDGET_PATH=
-WRITE_BUDGET=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -34,22 +32,8 @@ while [ "$#" -gt 0 ]; do
       ROOT=$2
       shift 2
       ;;
-    --max-lines)
-      [ "$#" -ge 2 ] || { printf 'fm-test-size-guard: --max-lines requires an integer\n' >&2; exit 2; }
-      MAX_LINES=$2
-      shift 2
-      ;;
-    --budget)
-      [ "$#" -ge 2 ] || { printf 'fm-test-size-guard: --budget requires a path\n' >&2; exit 2; }
-      BUDGET_PATH=$2
-      shift 2
-      ;;
-    --write-budget)
-      WRITE_BUDGET=1
-      shift
-      ;;
     -h|--help)
-      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,/^set -euo pipefail$/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -59,41 +43,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-case "$MAX_LINES" in
-  ''|0*|*[!0-9]*)
-    printf 'fm-test-size-guard: --max-lines must be a positive integer, got %s\n' "$MAX_LINES" >&2
-    exit 2
-    ;;
-esac
-
-if [ -z "$BUDGET_PATH" ]; then
-  BUDGET_PATH="$ROOT/docs/guards/test-file-line-budget.tsv"
-fi
-
-if [ "$WRITE_BUDGET" -eq 1 ]; then
-  mkdir -p "$(dirname "$BUDGET_PATH")"
-  tmp=$(mktemp "${TMPDIR:-/tmp}/fm-test-size-budget.XXXXXX")
-  trap 'rm -f "$tmp"' EXIT
-  python3 - "$ROOT" "$MAX_LINES" "$tmp" <<'PY'
-import glob, os, sys
-root, max_lines, out_path = sys.argv[1], int(sys.argv[2]), sys.argv[3]
-rows = []
-for full in sorted(glob.glob(os.path.join(root, 'tests', '*.test.sh'))):
-    rel = os.path.relpath(full, root).replace(os.sep, '/')
-    with open(full, 'rb') as fh:
-        count = sum(1 for _ in fh)
-    if count > max_lines:
-        rows.append((rel, count))
-with open(out_path, 'w', encoding='utf-8') as out:
-    out.write(f'# Grandfathered test-file line ceilings (>{max_lines} lines). Burn-down ratchet: files may shrink, never grow.\n')
-    for rel, count in sorted(rows):
-        out.write(f'{rel}\t{count}\n')
-PY
-  chmod 644 "$tmp"
-  mv -f "$tmp" "$BUDGET_PATH"
-  printf 'FM_TEST_SIZE_BUDGET written path=%s max_lines=%s\n' "$BUDGET_PATH" "$MAX_LINES"
-  exit 0
-fi
+BUDGET_PATH="$ROOT/docs/guards/test-file-line-budget.tsv"
 
 if [ ! -f "$BUDGET_PATH" ]; then
   printf 'fm-test-size-guard: budget file not found: %s\n' "$BUDGET_PATH" >&2

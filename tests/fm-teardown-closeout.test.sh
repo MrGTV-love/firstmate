@@ -2421,7 +2421,7 @@ test_a_file_created_in_the_copy_while_the_driver_runs_is_not_closed_over
 test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing
 )
 
-# Restore errexit before the first case of this slice to match the original combined run.
+# Restore errexit at the first case the original combined run ran with errexit on.
 errexit_restored=false
 fm_test_before_case() {
   if [ "$errexit_restored" = false ] && [ "$1" = test_a_foreign_copy_whose_landing_could_not_be_checked_is_not_held ]; then

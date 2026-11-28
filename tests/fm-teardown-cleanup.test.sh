@@ -2249,7 +2249,7 @@ test_ordinary_descendant_process_is_not_reaped
 test_process_audit_failure_refuses_before_signal
 )
 
-# Restore errexit before the first case of this slice to match the original combined run.
+# Restore errexit at the first case the original combined run ran with errexit on.
 errexit_restored=false
 fm_test_before_case() {
   if [ "$errexit_restored" = false ] && [ "$1" = test_local_only_force_overrides_unpushed ]; then

@@ -78,7 +78,8 @@ thread_field() {
   local sf
   sf=$(state_file)
   jq -r --arg k "$1" --arg f "$2" '
-    first((.threads // {}) | .[] | select(.key == $k)) | .[$f]
+    (first((.threads // {}) | .[] | select(.key == $k)) // error("no thread with key \($k)"))
+    | if has($f) then .[$f] else error("thread \($k) has no field \($f)") end
     | if . == true then "True" elif . == false then "False" elif . == null then "None" else tostring end
   ' "$sf"
 }

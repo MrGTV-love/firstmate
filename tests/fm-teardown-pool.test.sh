@@ -2209,7 +2209,7 @@ test_tasktmp_checks_all_other_copy_fields_in_both_directions
 test_secondmate_home_preserves_other_tasks_prior_copy
 )
 
-# Restore errexit before the first case of this slice to match the original combined run.
+# Restore errexit at the first case the original combined run ran with errexit on.
 errexit_restored=false
 fm_test_before_case() {
   if [ "$errexit_restored" = false ] && [ "$1" = test_reassigned_dirty_slot_retires_only_finished_task ]; then

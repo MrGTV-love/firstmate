@@ -2862,10 +2862,10 @@ test_a_user_config_base_branch_is_ignored_when_the_repo_has_a_treehouse_toml
 test_a_skipped_copy_whose_run_record_is_locked_stays_leased_and_teardown_still_completes
 )
 
-# Restore errexit before the first case of this slice to match the original combined run.
+# Restore errexit at the first case the original combined run ran with errexit on.
 errexit_restored=false
 fm_test_before_case() {
-  if [ "$errexit_restored" = false ] && [ "$1" = test_vernant_slot_manifest_retirement ]; then
+  if [ "$errexit_restored" = false ] && [ "$1" = test_nested_slot_return_concludes_runs_and_agents_on_the_slot ]; then
     set -e
     errexit_restored=true
   fi

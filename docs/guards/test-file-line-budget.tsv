@@ -103,8 +103,9 @@ tests/fm-teardown-endpoint-safety.test.sh	1652
 tests/fm-teardown-pool-nested.test.sh	2873
 tests/fm-teardown-pool.test.sh	2220
 tests/fm-teardown-retained.test.sh	1818
+tests/fm-teardown-scan-bounds.test.sh	1035
 tests/fm-teardown.test.sh	4268
-tests/fm-test-run.test.sh	3544
+tests/fm-test-run.test.sh	3552
 tests/fm-tool-update-check.test.sh	1128
 tests/fm-turnend-guard.test.sh	3192
 tests/fm-voice-relay.test.sh	4785
