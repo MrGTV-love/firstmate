@@ -164,6 +164,7 @@
     "check-event-output-integrity",
     "slack-call-fields-hold-a-plane-value",
     "slack-command-refusal-line",
+    "successor-branch-admission",
     "teardown-entry-preflight",
     "guard-lint-touched-registry",
     "home-state-write",
@@ -5759,6 +5760,90 @@
       "status": "active"
     },
     {
+      "id": "successor-branch-admission",
+      "version": "1",
+      "owner": "bin/fm-successor-branch-lib.sh",
+      "emitters": [
+        "bin/fm-control.sh",
+        "bin/fm-promote.sh",
+        "bin/fm-spawn.sh"
+      ],
+      "invariant": "a task's next launch gets write access to one recorded successor branch only when that branch is in the task's name family, no other task records it, it is checked out in no other work tree, and its history contains a commit of the task's own (an archive tip of the task or a commit of its recorded branch, in either case one that the default and base branches do not contain, so an archive branch pointed at shared history such as the first commit proves nothing), and at its first admission that commit is the --tip Main read itself: a submitted or pipeline head from the task's run record, which the worker cannot write, or, on the weaker checked-out route, the recorded branch's tip Main observed, which the worker can move, so that route proves only Main's observation; and no other task's spawn or relaunch, reassociation or promotion takes a ref a task records as its successor",
+      "layer": "runtime-block",
+      "source": "the task record's branch=, successor_branch= and successor_proved_tip= lines, the --tip <sha> Main passes at a first admission (read by Main from the task's no-mistakes run record or recorded branch), the project's ref store and worktree list, the task's own archive/<task>-(submitted|pipeline)-<8 hex> branches and every local home's task records, read by fm_successor_name_refusal and fm_successor_proof in bin/fm-successor-branch-lib.sh",
+      "trigger": "bin/fm-control.sh successor (recording, or repeating a recorded successor), bin/fm-control.sh relaunch before it stops the worker, or bin/fm-spawn.sh relaunching a ship whose record names successor_branch= finds the name outside the task's name family (the recorded branch name, '-', then letters, digits, '.', '_' or '-'), not a plain valid branch name, equal to the recorded, base or default branch (case ignored), another task's branch or successor (case ignored), missing, checked out in another work tree, proved at a first admission by neither the checked-out route (the recorded branch's tip is the --tip) nor the archive-tip route (its history contains the --tip, which is the task's own archive tip), including a first admission with no --tip, or, once recorded, no longer containing the successor_proved_tip= its admission recorded or with a proved tip that is not the task's own; or bin/fm-control.sh relaunch, before it stops the running agent, or bin/fm-spawn.sh spawning or relaunching a ship or a scout (a slot-governed scout takes fm/<id>) whose branch, before it reaches a slot preparation, the task record or the write profile, is one another task records as its successor_branch=, or bin/fm-control.sh reassociate re-pointing a task, or bin/fm-promote.sh promoting a scout to a ship, onto a branch another task records as its successor_branch=; or bin/fm-control.sh successor finds the task slot-governed (its record names slot_manifest=, or its project or copy has scripts/git-stability/provision_existing_slot.py), whose launch adopts or provisions its copy on the recorded branch alone; or bin/fm-control.sh relaunch, before it stops the running agent, or bin/fm-spawn.sh relaunching, before it writes a task record or a write profile, finds a slot-governed task that is not relocated and whose record names successor_branch=",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "preserve the task's worktree and record; read the refusal for the proof that fails, make the successor branch contain its recorded successor_proved_tip= again or remove successor_branch= and successor_proved_tip= from the task record, then run bash bin/fm-control.sh <task-id> relaunch --note <why>",
+      "budget": 1,
+      "budget_reason": "one refusal per invocation; no retry loop and no fallback to an unproved or unconfined launch; Main owns repairing the branch or the record",
+      "telemetry": "state/guard-events.jsonl; one allow event at record time and one at the launch that applies the grant, each with guard, rule, task, decision, successor and route, and one deny event per refusal with guard, rule (one-successor, name, proof, recorded, homes, slot-governed, relaunch, launch, spawn, reassociate or promote), task, decision and successor, a missing or unmatched --tip being a proof refusal; every event is best-effort, so a log that cannot take it changes neither the refusal, the record nor the launch; the kernel's enforcement of the profile text is not instrumented per decision",
+      "test": "tests/fm-control-successor.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-control.sh",
+          "match": "successor_refuse ",
+          "count": 9
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "successor-branch-admission deny",
+          "count": 5
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "die \"$2; refused before stopping the running agent"
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "die \"relaunch refused: task $claimant records refs/heads/$branch as its successor branch"
+        },
+        {
+          "file": "bin/fm-control.sh",
+          "match": "die \"relaunch refused: task $ID is slot-governed and records successor branch"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "successor_launch_refuse ",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "spawn_refuse_claimed_branch \"",
+          "count": 5
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "successor-branch-admission deny",
+          "count": 3
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: spawn refused: task $claimant records refs/heads/$branch as its successor branch"
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"error: relaunch refused: task $ID is slot-governed and records successor branch"
+        },
+        {
+          "file": "bin/fm-promote.sh",
+          "match": "successor-branch-admission deny"
+        },
+        {
+          "file": "bin/fm-promote.sh",
+          "match": "echo \"error: promotion refused: task $promote_successor_claimant records refs/heads/$BRANCH as its successor branch"
+        }
+      ]
+    },
+    {
       "id": "spawn-write-confinement",
       "version": "1",
       "owner": "bin/fm-write-confinement.py",
@@ -5825,6 +5910,7 @@
       "emitters": ["bin/fm-spawn.sh"],
       "invariant": "a macOS omp or Claude task worker launches with writes to every named protected asset denied",
       "layer": "impossible-by-construction",
+      "layer_note": "The profile is impossible-by-construction only for the refs a launch does not name. One task-recorded successor branch is granted as four literal paths. That grant is a runtime-block decision made by bin/fm-control.sh successor and made again at every launch that applies it (guard successor-branch-admission); the kernel enforces the profile text, not the admission.",
       "source": "uname -s, resolved home/config/projects/data/state paths, git worktree lists of every project and of the home, local Firstmate homes from strict fm_local_firstmate_state_dirs, task ids from every local home's state/<id>.meta, /tmp/fm-<id>, /private/tmp/claude-<uid> and ~/tmp entries, $NM_HOME/repos gate names, harness config homes and measured runtime state, the minted Claude session id, omp project-scope hash, the raw launch command's root selectors, final launch-bound FM_WRITE_CONFINEMENT and task audit routing in bin/ten-levels/extensions/report.ts",
       "trigger": "fm-spawn launches or relaunches an omp or claude ship/scout on Darwin",
       "decision": "deny",

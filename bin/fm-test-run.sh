@@ -359,7 +359,11 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # twenty-five shards fail (shard 1 packs 1203012 ms above the target) and
 # twenty-six pass with only 1119207 ms of slack and are refused by that rule;
 # twenty-seven leave 2319207 ms and pack at serial_max_ms 1114460 ms
-# (docs/fm-test-portable-shards.md, "Verification inputs").
+# (docs/fm-test-portable-shards.md, "Verification inputs"). With the three
+# branch-succession suites hinted, the table sums to 30382121 ms: twenty-six
+# shards pass with only 817879 ms of slack and are refused, and twenty-seven
+# leave 2017879 ms and pack at serial_max_ms 1125621 ms
+# (docs/fm-test-portable-shards.md, "Portable serial CI shards").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
@@ -557,6 +561,7 @@ family_for_basename() {
     fm-control.test.sh|fm-control-relaunch.test.sh|\
     fm-control-relaunch-recovery.test.sh|fm-control-relaunch-backends.test.sh|\
     fm-control-reassociate.test.sh|\
+    fm-control-successor.test.sh|fm-control-successor-scott.test.sh|\
     fm-launch-proof.test.sh|\
     fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
@@ -951,6 +956,8 @@ tests/fm-control-reassociate.test.sh 395783
 tests/fm-control-relaunch-backends.test.sh 681931
 tests/fm-control-relaunch-recovery.test.sh 550782
 tests/fm-control-relaunch.test.sh 340032
+tests/fm-control-successor-scott.test.sh 50296
+tests/fm-control-successor.test.sh 244566
 tests/fm-control.test.sh 186185
 tests/fm-copy-sweep.test.sh 438967
 tests/fm-cpu-pass.test.sh 26583
@@ -1231,6 +1238,7 @@ tests/fm-watcher-lock.test.sh 209816
 tests/fm-work-progress.test.sh 177361
 tests/fm-worker-account-live-e2e.test.sh 4839
 tests/fm-worker-account.test.sh 183909
+tests/fm-write-confinement-successor.test.sh 6466
 tests/fm-write-confinement.test.sh 889
 EOF
 }

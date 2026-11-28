@@ -1156,6 +1156,8 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-successor-branch-lib.sh
+. "$SCRIPT_DIR/fm-successor-branch-lib.sh"
 # shellcheck source=bin/fm-status-cap-lib.sh
 . "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # shellcheck source=bin/fm-project-lock-lib.sh
@@ -1229,6 +1231,11 @@ BACKEND_ARG=
 MODE=
 YOLO=
 BRANCH=
+# The one successor branch a ship's record names (successor_branch=) and the tip
+# its admission proved it descends from (successor_proved_tip=), read on a
+# relaunch only; bin/fm-control.sh successor is the only writer of that record.
+SUCCESSOR_BRANCH=
+SUCCESSOR_PROVED_TIP=
 BRANCH_PREFIX=fm/
 TRACEPARENT_ARG=
 HARNESS_SET=0
@@ -2474,12 +2481,38 @@ fm_task_id_creation_valid "$ID" || {
   echo "error: invalid task id" >&2
   exit 2
 }
+# No spawn or relaunch takes a branch another task records as its successor: the
+# points where a launch first fixes its branch, and one final point before the branch
+# reaches a task record or a write profile, ask here. A refusal clears BRANCH so no
+# cleanup record carries the claimed ref. fm-control.sh relaunch runs the same check
+# before it stops the running agent, so on a relaunch this one is the final check.
+spawn_refuse_claimed_branch() {  # <branch>
+  local branch=$1 claimant remedy
+  fm_local_firstmate_state_dirs "$STATE" tolerant
+  claimant=$(fm_successor_claimant "$branch" "$STATE/$ID.meta" "${FM_LOCAL_FIRSTMATE_STATES[@]}") || return 0
+  BRANCH=
+  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule spawn --task "$ID" \
+    --source-ok true --successor "$branch" 2>/dev/null || true
+  remedy="Spawn this task under another id or --branch-prefix, or let Main end task $claimant's succession first"
+  if [ "$RELAUNCH" -eq 1 ]; then
+    remedy="Ask Main to end task $claimant's succession before relaunching task $ID"
+    [ "$KIND" != ship ] || remedy="Ask Main to end task $claimant's succession, or reassociate task $ID onto another branch, before relaunching it"
+  fi
+  echo "error: spawn refused: task $claimant records refs/heads/$branch as its successor branch, so task $ID may not take that branch; this launch wrote no task record, no refs/heads/$branch and no write profile. $remedy" >&2
+  exit 1
+}
+# A slot-governed launch whose record names no branch takes fm/<id>.
+spawn_take_slot_branch() {
+  BRANCH=${BRANCH:-fm/$ID}
+  spawn_refuse_claimed_branch "$BRANCH"
+}
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
   BRANCH="$BRANCH_PREFIX$ID"
   if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
     echo "error: --branch-prefix and task id must form a valid git branch (got '$BRANCH')" >&2
     exit 1
   fi
+  spawn_refuse_claimed_branch "$BRANCH"
 fi
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   fm_backlog_directory_present "$STATE" "state directory" || {
@@ -2845,6 +2878,13 @@ if [ "$RELAUNCH" -eq 1 ]; then
       echo "error: task $ID has an invalid recorded ship branch '$BRANCH'" >&2
       exit 1
     fi
+    if [ "$(grep -c '^successor_branch=' "$RELAUNCH_META" 2>/dev/null || true)" -gt 1 ] \
+      || [ "$(grep -c '^successor_proved_tip=' "$RELAUNCH_META" 2>/dev/null || true)" -gt 1 ]; then
+      echo "error: task $ID records more than one successor branch or proved tip" >&2
+      exit 1
+    fi
+    SUCCESSOR_BRANCH=$(fm_meta_get "$RELAUNCH_META" successor_branch)
+    SUCCESSOR_PROVED_TIP=$(fm_meta_get "$RELAUNCH_META" successor_proved_tip)
   fi
   RELAUNCH_WT=$(fm_meta_get "$RELAUNCH_META" worktree)
   if [ "$RELOCATE_SET" -eq 1 ]; then
@@ -4596,6 +4636,9 @@ else
   PROJ_ABS="$(cd "$(resolve_project_dir_arg "$PROJ")" && pwd)"
   WT=""
   BRIEF="$DATA/$ID/brief.md"
+  if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = scout ] && fm_slot_required "$PROJ_ABS" ""; then
+    spawn_refuse_claimed_branch "fm/$ID"
+  fi
 fi
 # Resolve consent before provisioning, never from a live worker's first refusal.
 # The TypeScript policy owner also validates the runtime backstop's grant.
@@ -7029,6 +7072,7 @@ SLOT_FRESH_BASE=0
 SLOT_ADOPT=0
 if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
   if fm_slot_required "$PROJ_ABS" "$WT"; then
+    spawn_refuse_claimed_branch "${BRANCH:-fm/$ID}"
     fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1 || {
       SLOT_GOVERNED=1
       BRANCH=${BRANCH:-fm/$ID}
@@ -7059,11 +7103,17 @@ if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
 fi
 if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
   SLOT_GOVERNED=1
+  if [ "$RELAUNCH" -eq 1 ] && [ "$RELAUNCH_RELOCATING" = 0 ] && [ -n "$SUCCESSOR_BRANCH" ]; then
+    "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule relaunch --task "$ID" \
+      --source-ok true --successor "$SUCCESSOR_BRANCH" 2>/dev/null || true
+    echo "error: relaunch refused: task $ID is slot-governed and records successor branch $SUCCESSOR_BRANCH, and a slot-governed launch adopts or provisions its copy on its recorded branch alone, so it cannot apply the successor; this launch wrote no task record and no write profile. Repair: preserve task $ID's worktree and record, then remove its successor_branch= and successor_proved_tip= lines from the record and run bash bin/fm-control.sh $ID relaunch --note <why>" >&2
+    exit 1
+  fi
   if [ "$RELAUNCH" -eq 1 ]; then
     while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$RELAUNCH_META")
   fi
+  spawn_take_slot_branch
   fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
-  BRANCH=${BRANCH:-fm/$ID}
   if [ "$RELAUNCH" -eq 0 ]; then
     SLOT_FRESH_BASE=1
     fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
@@ -7117,11 +7167,12 @@ done
 # Keep early governance sticky (including when freshness removes its owner),
 # but require the same explicit scope and preparation for a newly governed copy.
 if [ "$KIND" != secondmate ] && [ "$SLOT_GOVERNED" = 0 ] && fm_slot_required "$PROJ_ABS" "$WT"; then
+  spawn_take_slot_branch
   SLOT_GOVERNED=1
   fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || spawn_slot_refused
-  BRANCH=${BRANCH:-fm/$ID}
   fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
 fi
+[ -z "${BRANCH:-}" ] || spawn_refuse_claimed_branch "$BRANCH"
 # Stop this attempt's own helper before any checkout restore, lock release or
 # refusal record. The attempt directory is private to this spawn: the claim is
 # created exclusively, so a helper that has not started can never start, and a
@@ -7593,6 +7644,16 @@ confinement_refuse() {
   "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok "$source_ok" \
     --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" 2>/dev/null || true
 }
+# A recorded successor branch that fails its re-admission refuses the launch under
+# its own guard, successor-branch-admission, with the repair that fits a record.
+successor_launch_refuse() {
+  local source_ok=$1
+  shift
+  echo "error: $*" >&2
+  echo "repair: preserve this task's worktree and record; make the successor branch contain its recorded successor_proved_tip= again, or remove its successor_branch= and successor_proved_tip= lines from the task record, then run bash bin/fm-control.sh $ID relaunch --note <why>" >&2
+  "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission deny --rule launch --source-ok "$source_ok" \
+    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --successor "$SUCCESSOR_BRANCH" 2>/dev/null || true
+}
 if [ "$KIND" != secondmate ]; then
   confinement_os=$(uname -s) || { confinement_refuse false "cannot identify worker OS"; exit 1; }
   case "$confinement_os:$HARNESS" in
@@ -7637,6 +7698,25 @@ if [ "$KIND" != secondmate ]; then
       confinement_args=()
       [ -z "$confinement_agent" ] || confinement_args=(--agent-dir "$confinement_agent")
       [ -z "${BRANCH:-}" ] || confinement_args+=(--branch "$BRANCH")
+      confinement_successor_route=
+      if [ -n "${SUCCESSOR_BRANCH:-}" ]; then
+        # The re-admission fm-control.sh successor and relaunch apply runs again at
+        # every launch that would apply the grant: the name rule, then the proof
+        # that the branch still contains the tip proved at its admission. A record
+        # edited by hand, or a branch reset since it was recorded, that fails
+        # either never reaches the profile; the generator then re-checks that the
+        # name is one exact literal in the task's name family.
+        if ! fm_local_firstmate_state_dirs "$STATE"; then
+          successor_launch_refuse false "cannot list the local Firstmate homes to check the recorded successor branch against: $FM_LOCAL_FIRSTMATE_ERROR"
+          exit 1
+        fi
+        if ! confinement_successor_proof=$(fm_successor_recorded_proof "$ID" "$BRANCH" "$BASE_BRANCH" "$STATE/$ID.meta" "$PROJ_ABS" "$WT" "$SUCCESSOR_BRANCH" "$SUCCESSOR_PROVED_TIP" "${FM_LOCAL_FIRSTMATE_STATES[@]}"); then
+          successor_launch_refuse true "$confinement_successor_proof"
+          exit 1
+        fi
+        confinement_successor_route=$(printf '%s\n' "$confinement_successor_proof" | sed -n 's/^route=//p')
+        confinement_args+=(--successor-branch "$SUCCESSOR_BRANCH")
+      fi
       # Each Claude launch gets a fresh session id: Claude refuses to start a
       # new conversation under an id that is already in use.
       if [ "$HARNESS" = claude ]; then
@@ -7677,6 +7757,11 @@ if [ "$KIND" != secondmate ]; then
       fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
+      if [ -n "${SUCCESSOR_BRANCH:-}" ]; then
+        "$SCRIPT_DIR/fm-guard-event.sh" successor-branch-admission allow --rule launch --source-ok true \
+          --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed \
+          --route "$confinement_successor_route" --successor "$SUCCESSOR_BRANCH" 2>/dev/null || true
+      fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-shell-startup-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
       ;;

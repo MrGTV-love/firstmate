@@ -46,6 +46,8 @@ set -u
 
 # shellcheck source=tests/fixtures.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
+# shellcheck source=tests/fm-control-successor-helpers.sh disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/fm-control-successor-helpers.sh"
 
 CONTROL="$ROOT/bin/fm-control.sh"
 CREW_STATE="$ROOT/bin/fm-crew-state.sh"
@@ -111,6 +113,7 @@ new_case() {  # <name> <id>
   local dir="$TMP_ROOT/$1" id=$2
   mkdir -p "$dir/home/state" "$dir/home/data/$id" "$dir/fake"
   make_fakebin "$dir"
+  successor_ps_fallback "$dir"
   printf '%s\n' "$$" > "$dir/fake/primary-pid"
   printf '%s\n' "$$" > "$dir/home/state/.lock"
   : > "$dir/fake/endpoint-calls"
@@ -2914,7 +2917,95 @@ test_record_containment_refusals_preserve_both_copies
 test_slot_claim_containment_refusals_preserve_both_copies
 test_refusals_change_nothing
 test_finished_relaunch_journal_does_not_block_reassociation
+# A recorded successor branch is bound to the task's branch: reassociation onto a
+# copy on that successor ends the succession and drops both successor lines.
+test_reassociation_onto_the_recorded_successor_drops_the_successor_record() {
+  local id=reassoc-succ dir new out rc=0 new_real tip
+  dir=$(new_case succ "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  new_real=$(cd "$new" && pwd -P)
+  tip=$(git -C "$dir/old" rev-parse HEAD)
+  printf 'successor_branch=fm/%s-v2\nsuccessor_proved_tip=%s\n' "$id" "$tip" >> "$dir/home/state/$id.meta"
+  snapshot_case "$dir"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "moved onto the successor") || rc=$?
+  expect_code 0 "$rc" "reassociation onto the recorded successor should succeed"$'\n'"$out"
+  assert_contains "$out" "reassociated $id worktree=$new_real branch=fm/$id-v2 dropped_successor_branch=fm/$id-v2 prior=$dir/old slot=none" \
+    "reassociate did not report the dropped successor"
+  assert_equals "fm/$id-v2" "$(meta_field "$dir" "$id" branch)" "branch= did not follow the successor copy"
+  assert_equals 0 "$(grep -c -e '^successor_branch=' -e '^successor_proved_tip=' "$dir/home/state/$id.meta")" "the successor lines must be dropped"
+  grep -v -e '^worktree=' -e '^branch=' -e '^prior_worktree=' "$dir/home/state/$id.meta" > "$dir/after.rest"
+  grep -v -e '^worktree=' -e '^branch=' -e '^successor_branch=' -e '^successor_proved_tip=' "$dir/before/state/$id.meta" > "$dir/before.rest"
+  cmp -s "$dir/before.rest" "$dir/after.rest" || fail "reassociate changed fields it does not own"
+  assert_line "Ship branch: fm/$id-v2" "$dir/home/data/$id/brief.md" "the brief's Ship branch line did not follow the record"
+  pass "reassociation onto the recorded successor branch makes it the task's branch and drops the successor lines"
+}
+
+# While a successor is recorded, reassociation onto any other branch refuses, names
+# the successor and changes nothing.
+test_reassociation_onto_another_branch_refuses_while_a_successor_is_recorded() {
+  local id=reassoc-succ-other dir new out rc=0 tip
+  dir=$(new_case succ-other "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v3"
+  tip=$(git -C "$dir/old" rev-parse HEAD)
+  printf 'successor_branch=fm/%s-v2\nsuccessor_proved_tip=%s\n' "$id" "$tip" >> "$dir/home/state/$id.meta"
+  snapshot_case "$dir"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "moved elsewhere") || rc=$?
+  expect_code 1 "$rc" "reassociation onto another branch while a successor is recorded must refuse"$'\n'"$out"
+  assert_contains "$out" "records successor branch fm/$id-v2" "the refusal must name the recorded successor"
+  assert_contains "$out" "nothing was changed" "the refusal must say nothing changed"
+  assert_case_unchanged "$dir" "the successor refusal"
+  pass "reassociation onto a branch other than the recorded successor refuses, names the successor and changes nothing"
+}
+
+# Another task's recorded successor ref is not free: reassociation onto a copy on it
+# refuses, names that task and the ref, writes a deny event and changes nothing.
+test_reassociation_onto_another_tasks_recorded_successor_refuses() {
+  local id=reassoc-claimed dir new out rc=0
+  dir=$(new_case claimed "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/owner-$id-v2"
+  printf 'kind=ship\nbranch=fm/owner-%s\nsuccessor_branch=fm/owner-%s-v2\n' "$id" "$id" > "$dir/home/state/owner-$id.meta"
+  snapshot_case "$dir"
+  : > "$FM_GUARD_EVENT_LOG"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "onto a claimed ref") || rc=$?
+  expect_code 1 "$rc" "reassociation onto another task's recorded successor must refuse"$'\n'"$out"
+  assert_contains "$out" "refs/heads/fm/owner-$id-v2, which task owner-$id records as its successor branch" "the refusal must name the ref and the recording task"
+  assert_case_unchanged "$dir" "the claimed-ref refusal"
+  [ -n "$(jq -c --arg b "fm/owner-$id-v2" 'select(.guard == "successor-branch-admission" and .rule == "reassociate" and .decision == "deny" and .successor == $b)' "$FM_GUARD_EVENT_LOG")" ] \
+    || fail "the refusal wrote no successor-branch-admission deny event naming the ref"
+  pass "reassociation onto another task's recorded successor ref refuses, names it and changes nothing"
+}
+
+# A task with no recorded successor publishes exactly the record and receipt it
+# always did: worktree= and branch= re-pointed, one prior_worktree= appended, and
+# every other byte unchanged.
+test_reassociation_without_a_successor_publishes_the_unchanged_record() {
+  local id=reassoc-nosucc dir new out rc=0 new_real
+  dir=$(new_case nosucc "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  new_real=$(cd "$new" && pwd -P)
+  snapshot_case "$dir"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "a plain move") || rc=$?
+  expect_code 0 "$rc" "reassociation without a successor should succeed"$'\n'"$out"
+  assert_equals "reassociated $id worktree=$new_real branch=fm/$id-v2 prior=$dir/old slot=none" \
+    "$(printf '%s\n' "$out" | grep '^reassociated ')" "the receipt of a task without a successor changed"
+  awk -v wt="$new_real" -v br="fm/$id-v2" -v prior="$dir/old" '
+    /^worktree=/ { print "worktree=" wt; next }
+    /^branch=/ { print "branch=" br; next }
+    { print }
+    END { print "prior_worktree=" prior }' "$dir/before/state/$id.meta" > "$dir/expected.meta"
+  cmp -s "$dir/expected.meta" "$dir/home/state/$id.meta" \
+    || fail "the record of a task without a successor changed: $(diff "$dir/expected.meta" "$dir/home/state/$id.meta")"
+  pass "reassociation of a task without a successor publishes the record it always did"
+}
 test_failed_publication_keeps_brief_recovery_until_restored
+test_reassociation_onto_the_recorded_successor_drops_the_successor_record
+test_reassociation_onto_another_branch_refuses_while_a_successor_is_recorded
+test_reassociation_onto_another_tasks_recorded_successor_refuses
+test_reassociation_without_a_successor_publishes_the_unchanged_record
 test_unchanged_ship_branch_requires_consistent_brief
 test_dirty_current_copy_refuses_without_publication
 test_provider_reset_preserves_spawned_copy_commits_via_anchor

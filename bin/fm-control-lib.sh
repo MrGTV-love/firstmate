@@ -50,6 +50,7 @@ exit
 relaunch
 authorize-continuation
 reassociate
+successor
 adopt
 stay
 EOF
@@ -57,7 +58,7 @@ EOF
 
 fm_control_verb_allowed() {  # <verb>
   case "${1-}" in
-    interrupt|exit|relaunch|authorize-continuation|reassociate|adopt|stay) return 0 ;;
+    interrupt|exit|relaunch|authorize-continuation|reassociate|successor|adopt|stay) return 0 ;;
   esac
   return 1
 }
