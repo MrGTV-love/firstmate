@@ -473,7 +473,7 @@ family_for_basename() {
     fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|\
     fm-watch-triage-waits-declared.test.sh|fm-watch-triage-waits-pauses.test.sh|\
     fm-watch-triage-waits-away.test.sh|\
-    fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-watch-github-accounting.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-watch-scratch-reaper.test.sh|fm-watch-github-accounting.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-work-progress.test.sh|\
     fm-status-runaway-guard.test.sh)
       printf '%s\n' watcher-wake-lock
@@ -2073,6 +2073,10 @@ families_for_changed_path() {
     bin/fm-typesafe-health.sh)
       printf '%s\n' "__script__:fm-typesafe-health.test.sh"
       printf '%s\n' "__script__:fm-watch-typesafe-health.test.sh"
+      ;;
+    bin/fm-scratch-reaper.sh|tests/scratch-reaper-helpers.sh)
+      printf '%s\n' "__script__:fm-scratch-reaper.test.sh"
+      printf '%s\n' "__script__:fm-watch-scratch-reaper.test.sh"
       ;;
     bin/fm-skill-pick.sh|bin/fm-skill-pick.mjs|\
     .agents/skills/hyper-jev/templates/starter/src/core/*.ts)

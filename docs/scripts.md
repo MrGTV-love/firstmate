@@ -127,6 +127,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-watch-checkpoint.sh` | Run one bounded foreground watcher checkpoint for Codex-style supervision            |
 | `fm-watch.sh`            | Singleton-safe watcher: absorb benign wakes, detect stalled local-secondmate wake queues, and exit on actionable ones |
 | `fm-inactive-reconcile.sh` | Reconcile long-inactive direct crewmate terminal outcomes without forge access |
+| [`fm-scratch-reaper.sh`](../bin/fm-scratch-reaper.sh) | Remove aged unused scratch directories from `/private/tmp` and `~/tmp` after archiving their small logs, on the watcher's schedule ([operator contract](configuration.md#scratch-reaper-configscratch-reaper)) |
 | `fm-idle-session-reap.sh` | Report parked sessions with their reasons and ask `fm-teardown.sh` to clean up idle finished tasks whose work landed |
 | `fm-idle-reap-lib.sh` | Shared automatic-reap eligibility for scan and locked teardown admission |
 | `fm-merge-prune.sh` | Prune a merged task's pool copy right after its PR merges: run teardown unforced, remove the copy teardown returns, retry transient refusals, and keep or remove a refused copy only on live proof |
