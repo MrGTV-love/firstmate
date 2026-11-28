@@ -9,8 +9,9 @@ import copy
 import json
 import os
 from pathlib import Path
+import threading
 
-from fm_slack import SecretCollision, SlackError, refuse_outbound, value_hits
+from fm_slack import SecretCollision, SlackError, answer_error, refuse_outbound, value_hits
 
 # The scope Slack requires for each method the plane calls. A transcript that sets
 # "enforce_scopes" fails a call whose scope its "scopes" list lacks, as Slack does; one that sets
@@ -64,9 +65,28 @@ class Replay:
             }
             self.save()
         self.scopes = set(self.transcript.get('scopes', []))
+        # Slack's own clock, as the real transport records it from the Date of each reply: here the transcript's `slack_clock` (seconds since the epoch), set only
+        # after a call that succeeds, and left None when the transcript has none, so that a test can order it against this host's clock as it likes.
+        self.server_time = None
+        # Called with Slack's clock each time a reply reports it, as the real transport does.
+        self.on_date = None
 
     def save(self):
         self.state_path.write_text(json.dumps(self.state, ensure_ascii=False))
+
+    def clock_reading(self, start):
+        """Slack's clock as this reply reports it. With `slack_clock_step` in the transcript the clock moves on by that many seconds with every successful call
+        (counted in the replay state, so it keeps moving across runs); with `slack_clock_whole` it is reported in whole seconds, as an HTTP Date is."""
+        value = start
+        step = self.transcript.get('slack_clock_step')
+        if isinstance(step, (int, float)) and not isinstance(step, bool) and step:
+            calls = int(self.state.get('clock_calls', 0))
+            value += step * calls
+            self.state['clock_calls'] = calls + 1
+            self.save()
+        if self.transcript.get('slack_clock_whole'):
+            value = float(int(value // 1))
+        return value
 
     @staticmethod
     def append_line(path, line):
@@ -119,11 +139,24 @@ class Replay:
 
     def call(self, method, **fields):
         """One replayed call. The fields are checked first, as the real transport checks them, before any record of the attempt exists; a call that
-        a log refuses part-way (a value that the log's own lines form) leaves the replayed conversation as it was."""
+        a log refuses part-way (a value that the log's own lines form) leaves the replayed conversation as it was. One call at a time (Main 3345 (a): the
+        second person's pass makes a post and a thread read at once): the replayed conversation and its logs change in one call's turn."""
+        with self.__dict__.setdefault('_turn', threading.RLock()):
+            return self.one_call(method, **fields)
+
+    def one_call(self, method, **fields):
         refuse_outbound(fields, wire=True)
         snapshot = copy.deepcopy(self.state)
         try:
-            return self.replayed(method, **fields)
+            result = self.replayed(method, **fields)
+            clock = self.transcript.get('slack_clock')
+            if isinstance(clock, (int, float)) and not isinstance(clock, bool):
+                self.server_time = self.clock_reading(float(clock))
+                if self.on_date:
+                    self.on_date(self.server_time)
+            else:
+                self.server_time = None
+            return result
         except SecretCollision:
             self.state = snapshot
             self.save()
@@ -144,7 +177,14 @@ class Replay:
             self.log({'method': method, 'error': 'missing_scope', 'scope': needed})
             raise SlackError('missing_scope')
         rule = self.fail(method, fields.get('ts'), fields.get('timestamp'), fields.get('thread_ts'))
-        if rule:
+        answered = None
+        if rule and 'answer_error' in rule:
+            # A Slack answer {"ok": false, "error": <answer_error>}, named as the real transport names it; with "applied" Slack carried the call out first
+            # (a post it stored although its answer was an error). An "error" beside a "status" stays a label of the HTTP failure below.
+            answered = SlackError(answer_error(str(rule['answer_error'])))
+            if not rule.get('applied'):
+                raise answered
+        elif rule:
             status = int(rule.get('status', 503))
             if status == 429:
                 raise SlackError('rate_limited')
@@ -154,9 +194,9 @@ class Replay:
                     'user_id': self.transcript.get('bot_user', 'UBOT0123456')}
         elif method == 'conversations.open':
             target = fields.get('users')
-            # The configured owner, or one whose DM this conversation already opened (a retarget reads the DM it leaves).
+            # The configured owner or second person, or one whose DM this conversation already opened (a retarget reads the DM it leaves).
             opened = self.state.setdefault('opened', [])
-            if target != os.environ.get('FM_SLACK_DM_USER') and target not in opened:
+            if target not in (os.environ.get('FM_SLACK_DM_USER'), os.environ.get('FM_SLACK_SECOND_USER')) and target not in opened:
                 raise SlackError('target_mismatch')
             if target not in opened:
                 opened.append(target)
@@ -277,6 +317,8 @@ class Replay:
         else:
             raise SlackError('unsupported_replay_method')
         self.save()
+        if answered is not None:
+            raise answered
         return data
 
     def pages(self, method, field, **fields):

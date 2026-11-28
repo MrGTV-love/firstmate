@@ -3,6 +3,7 @@
 # Slow replies must not read as no progress to the real watcher.
 # Fake HTTP responses and a local socketpair exercise the real shell check.
 # Drives bin/fm-slack-check.sh, bin/fm_slack_watch.py and bin/fm_slack.py through tests/fm_slack_deadline_test.py.
+# The real watcher capture and stop (bin/fm-watch.sh) around a check whose second-person calls are held must keep the owner's wake.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

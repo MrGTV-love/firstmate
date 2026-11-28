@@ -405,6 +405,95 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 
+usage() {
+  awk '
+    NR == 1 { next }
+    /^#/ { sub(/^# ?/, ""); print; next }
+    { exit }
+  ' "$0"
+}
+
+fail() {
+  printf 'fm-captain-hold: %s\n' "$*" >&2
+  exit 1
+}
+
+validate_slug() {  # <label> <value>
+  local label=$1 value=$2
+  case "$value" in
+    ''|*[!A-Za-z0-9._-]*) fail "$label must be a non-empty privacy-safe slug: $value" ;;
+  esac
+}
+
+# The legacy any-origin binding marker. Slug validation rejects parentheses, so
+# no real origin id or task id can collide with it.
+BINDING_ANY='(any)'
+
+BINDING_DIR="$STATE/decision-bindings"
+BINDING_SCHEMA=fm-decision-binding.v1
+
+validate_source_id() {  # <source-id>
+  validate_slug source-id "$1"
+  [ "${#1}" -le 64 ] || fail "source-id must be at most 64 characters: $1"
+}
+
+binding_path() { printf '%s/%s.origin\n' "$BINDING_DIR" "$1"; }
+
+# The stored binding value, or empty when the source is unbound. An unreadable
+# or wrong-schema record is a hard error rather than a silent "unbound":
+# feeding nothing is the safe direction only when it is a deliberate choice,
+# never when it is a corrupted record.
+read_binding() {  # <source-id>
+  local path
+  path=$(binding_path "$1")
+  perl -MErrno=ENOENT -MFcntl=S_ISREG -e '
+    use strict; use warnings;
+    my ($path, $expected_schema, $any_origin) = @ARGV;
+    my @stat = lstat $path;
+    unless (@stat) {
+      exit 0 if $! == ENOENT;
+      die "fm-captain-hold: decision binding cannot be checked: $path: $!\n";
+    }
+    S_ISREG($stat[2]) or die "fm-captain-hold: decision binding is unsafe: $path\n";
+    open my $file, "<", $path or do {
+      exit 0 if $! == ENOENT;
+      die "fm-captain-hold: decision binding cannot be read: $path: $!\n";
+    };
+    my ($schema, $origin);
+    $! = 0;
+    while (my $line = <$file>) {
+      chomp $line;
+      $schema = $1 if !defined($schema) && $line =~ /^schema=(.*)$/;
+      $origin = $1 if !defined($origin) && $line =~ /^origin=(.*)$/;
+    }
+    die "fm-captain-hold: decision binding cannot be read: $path: $!\n" if $!;
+    close $file or die "fm-captain-hold: decision binding cannot be read: $path: $!\n";
+    defined($schema) && $schema eq $expected_schema
+      or die "fm-captain-hold: decision binding has an incompatible schema: $path\n";
+    defined($origin) && ($origin eq $any_origin || $origin =~ /\A[A-Za-z0-9._-]+\z/)
+      or die "fm-captain-hold: decision binding has an invalid origin id: $path\n";
+    print "$origin\n";
+  ' "$path" "$BINDING_SCHEMA" "$BINDING_ANY" || return 2
+}
+
+command_binding() {
+  local source=${1:-} origin
+  [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+  validate_source_id "$source"
+  origin=$(read_binding "$source") || exit 1
+  [ -n "$origin" ] || return 1
+  printf '%s\n' "$origin"
+}
+
+# `binding` is a read-only lookup of one record (read_binding) and needs none of the libraries sourced below: it is answered here, before
+# they load, so the check the Slack plane makes before each post of the second person (bin/fm_slack_watch.py, Watch.bound) costs one shell and
+# one perl rather than the start-up of every library. It reads the same home and state as every other command.
+if [ "${1:-}" = binding ]; then
+  shift
+  command_binding "$@"
+  exit
+fi
+
 # shellcheck source=bin/fm-classify-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-classify-lib.sh"
@@ -465,26 +554,6 @@ captain_hold_cleanup() {
 }
 trap captain_hold_cleanup EXIT
 
-usage() {
-  awk '
-    NR == 1 { next }
-    /^#/ { sub(/^# ?/, ""); print; next }
-    { exit }
-  ' "$0"
-}
-
-fail() {
-  printf 'fm-captain-hold: %s\n' "$*" >&2
-  exit 1
-}
-
-validate_slug() {  # <label> <value>
-  local label=$1 value=$2
-  case "$value" in
-    ''|*[!A-Za-z0-9._-]*) fail "$label must be a non-empty privacy-safe slug: $value" ;;
-  esac
-}
-
 validate_one_line() {  # <label> <value>
   local label=$1 value=$2
   [ -n "$value" ] || fail "$label must not be empty"
@@ -521,10 +590,6 @@ sha256_text() {  # <text>
 legacy_hold_id() {  # <origin-id> <key>
   printf '%s-decision-%s' "$1" "$2"
 }
-
-# The legacy any-origin binding marker. Slug validation rejects parentheses, so
-# no real origin id or task id can collide with it.
-BINDING_ANY='(any)'
 
 DECISION_TEXT=''
 DECISION_DIGEST=''
@@ -2429,53 +2494,6 @@ command_withdraw() {
 
 # --- the one keyed-answer intake, and the source bindings that feed it --------
 
-BINDING_DIR="$STATE/decision-bindings"
-BINDING_SCHEMA=fm-decision-binding.v1
-
-validate_source_id() {  # <source-id>
-  validate_slug source-id "$1"
-  [ "${#1}" -le 64 ] || fail "source-id must be at most 64 characters: $1"
-}
-
-binding_path() { printf '%s/%s.origin\n' "$BINDING_DIR" "$1"; }
-
-# The stored binding value, or empty when the source is unbound. An unreadable
-# or wrong-schema record is a hard error rather than a silent "unbound":
-# feeding nothing is the safe direction only when it is a deliberate choice,
-# never when it is a corrupted record.
-read_binding() {  # <source-id>
-  local path
-  path=$(binding_path "$1")
-  perl -MErrno=ENOENT -MFcntl=S_ISREG -e '
-    use strict; use warnings;
-    my ($path, $expected_schema, $any_origin) = @ARGV;
-    my @stat = lstat $path;
-    unless (@stat) {
-      exit 0 if $! == ENOENT;
-      die "fm-captain-hold: decision binding cannot be checked: $path: $!\n";
-    }
-    S_ISREG($stat[2]) or die "fm-captain-hold: decision binding is unsafe: $path\n";
-    open my $file, "<", $path or do {
-      exit 0 if $! == ENOENT;
-      die "fm-captain-hold: decision binding cannot be read: $path: $!\n";
-    };
-    my ($schema, $origin);
-    $! = 0;
-    while (my $line = <$file>) {
-      chomp $line;
-      $schema = $1 if !defined($schema) && $line =~ /^schema=(.*)$/;
-      $origin = $1 if !defined($origin) && $line =~ /^origin=(.*)$/;
-    }
-    die "fm-captain-hold: decision binding cannot be read: $path: $!\n" if $!;
-    close $file or die "fm-captain-hold: decision binding cannot be read: $path: $!\n";
-    defined($schema) && $schema eq $expected_schema
-      or die "fm-captain-hold: decision binding has an incompatible schema: $path\n";
-    defined($origin) && ($origin eq $any_origin || $origin =~ /\A[A-Za-z0-9._-]+\z/)
-      or die "fm-captain-hold: decision binding has an invalid origin id: $path\n";
-    print "$origin\n";
-  ' "$path" "$BINDING_SCHEMA" "$BINDING_ANY" || return 2
-}
-
 command_bind() {
   local source=${1:-} origin=${2:-} dest tmp
   [ "$#" -ge 1 ] && [ "$#" -le 2 ] || { usage >&2; exit 2; }
@@ -2530,15 +2548,6 @@ command_unbind() {
     unlink($path) or $!{ENOENT} or die "fm-captain-hold: cannot remove the decision binding: $path: $!\n";
   ' "$BINDING_DIR" "$dest" || fail "cannot unbind $source"
   printf 'unbound: %s\n' "$source"
-}
-
-command_binding() {
-  local source=${1:-} origin
-  [ "$#" -eq 1 ] || { usage >&2; exit 2; }
-  validate_source_id "$source"
-  origin=$(read_binding "$source") || exit 1
-  [ -n "$origin" ] || return 1
-  printf '%s\n' "$origin"
 }
 
 # The durable captain decision one keyed answer records. Pure function of its
@@ -3719,7 +3728,6 @@ case "${1:-}" in
   reconcile-requests) shift; command_reconcile_requests "$@" ;;
   bind) shift; command_bind "$@" ;;
   unbind) shift; command_unbind "$@" ;;
-  binding) shift; command_binding "$@" ;;
   complete) shift; command_complete "$@" ;;
   verify) shift; command_verify "$@" ;;
   open) shift; command_open "$@" ;;

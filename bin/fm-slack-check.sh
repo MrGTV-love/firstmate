@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Standing Slack poll on the existing custom-check cadence.
 # Usage:
-#   fm-slack-check.sh [check] [--replay <transcript.json>]   run the check
+#   fm-slack-check.sh [check] [--replay <transcript.json>]   run the check (the owner's work)
+#   fm-slack-check.sh check-second [--replay <transcript.json>]   run the second person's check, registered by arm after the owner's
 #   fm-slack-check.sh arm [--replay <transcript.json>]
 #   fm-slack-check.sh disarm [--replay <transcript.json>]
 #   fm-slack-check.sh retarget [--replay <transcript.json>]   after FM_SLACK_DM_USER changed
-#   fm-slack-check.sh resolve <request-ts>   close one failed owner request that Main has dealt with
+#   fm-slack-check.sh resolve <request-ts>[@<member id>]   close one failed request that Main has dealt with
+#     (the bare ts is the owner's request; the second person's is listed and closed as <ts>@<member id>)
 # A request whose acknowledgement failed in its own thread on 3 polls is woken once as not acknowledged and stays
 # open in state.pending as failed, owner Main, until resolve closes it. After that wake each run, a run that finds the
 # slack-dm source unbound included (the one thing such a run prints for a request), lists it once as
@@ -38,7 +40,7 @@ case "${1:-}" in
   -h|--help)
     printf '%s\n' \
       'Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]' \
-      '       fm-slack-check.sh resolve <request-ts>' \
+      '       fm-slack-check.sh resolve <request-ts>[@<member id>]' \
       'Bind slack-dm with fm-captain-hold.sh before arm; arm proves the DM is readable.' \
       'Retarget stops tracking the old DM after FM_SLACK_DM_USER changed, opens the new DM and records its newest message as the' \
       'starting point, so the next poll takes in the requests sent after it; arm records a fresh starting point again.' \
@@ -71,7 +73,7 @@ case "${1:-}" in
       | python3 "$FM_SLACK_SCRIPT_DIR/fm_slack_watch.py" --print-help-text
     exit 0
     ;;
-  arm|check|disarm|retarget|resolve)
+  arm|check|check-second|disarm|retarget|resolve)
     export FM_SLACK_CHECK_ACTION=$1
     shift
     ;;

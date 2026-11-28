@@ -23,10 +23,11 @@ HELPER="$ROOT/tests/fm_slack_watch_test.py"
 planted="$ROOT/tests/.fm-slack-secret-planted"
 cleanup() { rm -f "$planted"; }
 trap cleanup EXIT HUP INT TERM
-HOMES=("$TMP/ok" "$TMP/failing" "$TMP/intake")
+HOMES=("$TMP/ok" "$TMP/failing" "$TMP/intake" "$TMP/second")
 bash "$FIX/make-home.sh" mirror "${HOMES[0]}" >/dev/null
 bash "$FIX/make-home.sh" unreachable "${HOMES[1]}" >/dev/null
 bash "$FIX/make-home.sh" intake "${HOMES[2]}" >/dev/null
+bash "$FIX/make-home.sh" intake "${HOMES[3]}" >/dev/null
 
 run_plane() {  # <home> <capture-name> <command> [args...]
   local h=$1 name=$2
@@ -62,6 +63,23 @@ run_plane "${HOMES[2]}" request-secrets "$ROOT/bin/fm-slack-poll.sh" --replay "$
 for ts in 2000.000300 2000.000400 2000.000500; do
   grep -q "^check: slack request $ts .*secret removed" "${HOMES[2]}/data/captured/request-secrets.out" || fail "the request $ts did not carry the marker and its flag"
 done
+
+# The second person's requests: their own DM window, with the same values in their text (the token, the signing secret, and the token as an entity).
+SECOND="$FIX/second-person/transcript.json"
+run_second() { FM_SLACK_SECOND_USER=U0SYNTHSEC1 run_plane "$@"; }
+run_second "${HOMES[3]}" arm "$ROOT/bin/fm-slack-check.sh" arm --replay "$SECOND"
+run_second "${HOMES[3]}" start-poll "$ROOT/bin/fm-slack-poll.sh" --replay "$SECOND"
+second_replay=$(python3 "$HELPER" replay-file "${HOMES[3]}/state/slack-watch")
+python3 "$HELPER" owner-message "$second_replay" 3000.000100 U0SYNTHSEC1 "second person request that holds $SECRET" '{"channel": "D0SECONDDM1"}'
+python3 "$HELPER" owner-message "$second_replay" 3000.000200 U0SYNTHSEC1 "second person request that holds $SIGNING" '{"channel": "D0SECONDDM1"}'
+python3 "$HELPER" owner-message "$second_replay" 3000.000300 U0SYNTHSEC1 "second person request whose entity joins it: $joined" '{"channel": "D0SECONDDM1"}'
+run_second "${HOMES[3]}" request-secrets "$ROOT/bin/fm-slack-poll.sh" --replay "$SECOND"
+for ts in 3000.000100 3000.000200 3000.000300; do
+  grep -q "^check: slack request $ts from U0SYNTHSEC1: .*secret removed" "${HOMES[3]}/data/captured/request-secrets.out" || fail "the second person request $ts did not carry the marker and its flag"
+done
+[ "$(grep -c '"method": "chat.postMessage"' "${HOMES[3]}/state/slack-watch/outbound.jsonl")" = 3 ] || fail "the second person requests were not all acknowledged"
+# Their records are kept in their own store, second-requests.jsonl (the owner's requests.jsonl holds nothing of theirs); the full scan below reads it.
+[ -s "${HOMES[3]}/state/slack-watch/second-requests.jsonl" ] || fail "the second person requests left no record to scan"
 
 # The scan is only meaningful if the plane really ran with the token.
 [ -s "${HOMES[0]}/state/slack-watch/state.json" ] || fail "the plane left no state to scan"
@@ -104,11 +122,24 @@ done
 [ "$(tail -n 1 "${HOMES[2]}/data/captured/read-followup.out" | grep -oF '[secret removed]' | wc -l | tr -d ' ')" = 2 ] \
   || fail "the follow-up read did not replace both values"
 
+# The replay's stand-ins for Slack that this test created, by provenance: each (home, transcript) pair a run of the plane used. The replay keeps its stand-in at
+# one exact path that the pair decides (bin/fm_slack_replay.py: <home>/state/slack-watch/replay-state-<the first 16 hex of sha256(resolved transcript path)>.json);
+# only those exact paths are set aside, never a file for its name or its content (F11 of the reviews of c5868b6f and 5048f815).
+STANDINS=$(printf '%s\t%s\n' \
+  "${HOMES[0]}" "$FIX/mirror/transcript.json" "${HOMES[0]}" "$FIX/arming/arm.json" "${HOMES[1]}" "$FIX/unreachable/transcript.json" \
+  "${HOMES[2]}" "$INTAKE" "${HOMES[3]}" "$SECOND")
+
 scan() {  # <output-file>; prints matches=N
-  FM_SLACK_SCAN_SECRET="$SECRET" FM_SLACK_SCAN_SIGNING="$SIGNING" python3 - "$1" "${HOMES[@]}" <<'PY'
-import os, subprocess, sys
+  FM_SLACK_SCAN_SECRET="$SECRET" FM_SLACK_SCAN_SIGNING="$SIGNING" FM_SLACK_SCAN_STANDINS="$STANDINS" python3 - "$1" "${HOMES[@]}" <<'PY'
+import hashlib, os, subprocess, sys
 out, homes = sys.argv[1], sys.argv[2:]
 needles = [os.environ['FM_SLACK_SCAN_SECRET'].encode(), os.environ['FM_SLACK_SCAN_SIGNING'].encode()]
+standins = set()
+for pair in os.environ['FM_SLACK_SCAN_STANDINS'].split('\n'):
+    if pair:
+        home, transcript = pair.split('\t')
+        digest = hashlib.sha256(os.path.realpath(transcript).encode()).hexdigest()[:16]
+        standins.add(os.path.realpath(os.path.join(home, 'state', 'slack-watch', 'replay-state-' + digest + '.json')))
 paths = subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0')
 paths += [os.path.join(root, name).encode()
           for home in homes
@@ -120,9 +151,12 @@ for raw in paths:
     if not raw:
         continue
     path = raw.decode(errors='replace')
-    if os.path.basename(path).startswith('replay-state-'):
-        continue  # the fixture stand-in for Slack, which keeps what the owner typed
-    if os.path.isfile(path) and any(needle in open(path, 'rb').read() for needle in needles):
+    if not os.path.isfile(path):
+        continue
+    data = open(path, 'rb').read()
+    # Only the replay's own stand-ins for Slack are set aside, by their exact provenance paths above (they keep what the people typed into the stand-in DMs).
+    # Every other tracked or state file is scanned, whatever its name or content.
+    if os.path.realpath(path) not in standins and any(needle in data for needle in needles):
         matches.append(path)
 with open(out, 'w') as handle:
     for path in matches:
@@ -139,8 +173,19 @@ scan "$TMP/state.out" > "$TMP/state.count"
 [ "$(cat "$TMP/state.count")" = "matches=1" ] || fail "the scan missed a planted state copy"
 grep -q "match: ${HOMES[0]}/state/leak.txt" "$TMP/state.out" || fail "the state match was not named"
 
-# Planted tracked copy, using a temporary index so the real index is untouched.
+# Planted copies that carry the replay's schema bytes or its file name but are not a stand-in this test created: each is scanned and found.
 rm -f "${HOMES[0]}/state/leak.txt"
+cp "${HOMES[3]}/state/slack-watch/second-requests.jsonl" "$TMP/second-requests.kept"
+printf '{"schema": "fm-slack-replay-state.v1", "value": "%s"}\n' "$SECRET" > "${HOMES[3]}/state/slack-watch/second-requests.jsonl"
+printf '{"schema": "fm-slack-replay-state.v1", "value": "%s"}\n' "$SECRET" > "${HOMES[0]}/state/slack-watch/replay-state-0000000000000000.json"
+scan "$TMP/spoof.out" > "$TMP/spoof.count"
+[ "$(cat "$TMP/spoof.count")" = "matches=2" ] || fail "the scan set aside a file for its schema bytes or its name"
+grep -q "match: ${HOMES[3]}/state/slack-watch/second-requests.jsonl" "$TMP/spoof.out" || fail "a schema-bearing second-person store was set aside"
+grep -q "match: ${HOMES[0]}/state/slack-watch/replay-state-0000000000000000.json" "$TMP/spoof.out" || fail "a replay-named file outside the provenance list was set aside"
+rm -f "${HOMES[0]}/state/slack-watch/replay-state-0000000000000000.json"
+mv "$TMP/second-requests.kept" "${HOMES[3]}/state/slack-watch/second-requests.jsonl"
+
+# Planted tracked copy, using a temporary index so the real index is untouched.
 export GIT_INDEX_FILE="$TMP/index"
 git read-tree HEAD
 printf '%s\n' "$SECRET" > "$planted"
