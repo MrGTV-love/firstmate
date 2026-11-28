@@ -365,6 +365,29 @@ test_memory_pressure_refuses_a_new_secondmate_but_not_its_respawn() {
   pass "native memory pressure defers a new secondmate but never its recovery respawn"
 }
 
+# Test 12: the free-disk floor refuses a NEW secondmate below 20 GiB, but the
+# respawn of one this home already records is recovery, not new work.
+test_disk_floor_refuses_a_new_secondmate_but_not_its_respawn() {
+  local out status
+  make_secondmate_case sm-disk sm-disk-a1
+  out=$(FM_FAKE_DF_AVAIL_KB=1048576 run_secondmate_spawn "$CASE_SM" --captain-model-pin "$STALE_MODEL" 2>&1)
+  status=$?
+  [ "$status" -eq 75 ] || fail "1 GiB free must defer a new secondmate with 75 (got $status)"$'\n'"$out"
+  assert_contains "$out" "deferred: disk free floor refused spawn of task sm-disk-a1: 1 GiB free on the volume holding $CASE_SM, below the floor of 20 GiB" \
+    "the secondmate deferral did not name the free GiB, the floor and its home"
+  [ ! -e "$CASE_HOME/state/sm-disk-a1.meta" ] || fail "a deferred secondmate must leave no task record"
+  [ ! -s "$CASE_LAUNCH_LOG" ] || fail "a deferred secondmate must not reach the pane"
+  out=$(FM_FAKE_DF_AVAIL_KB=$((20 * 1048576)) run_secondmate_spawn "$CASE_SM" --captain-model-pin "$STALE_MODEL" 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "a new secondmate must launch at exactly 20 GiB free"$'\n'"$out"
+  out=$(FM_FAKE_DF_AVAIL_KB=1048576 run_secondmate_spawn 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "1 GiB free must not refuse the respawn of a recorded secondmate"$'\n'"$out"
+  assert_not_contains "$out" "disk free floor" "a secondmate respawn printed a floor message"
+  [ -s "$CASE_LAUNCH_LOG" ] || fail "the respawn at 1 GiB free must reach the pane"
+  pass "the disk floor defers a new secondmate but never its recovery respawn"
+}
+
 # --- run --------------------------------------------------------------------
 
 test_stale_model_refused_without_pin
@@ -378,3 +401,4 @@ test_relaunch_to_another_stale_model_is_still_refused
 test_secondmate_respawn_of_its_recorded_model_is_not_refused
 test_secondmate_respawn_onto_another_stale_model_is_refused
 test_memory_pressure_refuses_a_new_secondmate_but_not_its_respawn
+test_disk_floor_refuses_a_new_secondmate_but_not_its_respawn
