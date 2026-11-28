@@ -189,9 +189,22 @@ project_lock_state() {
   )
 }
 
-# group_members <pgid>: pids still in that process group, read without ps (bin/fm-proc-info.py).
+# proc_table_pid_ppid_pgid: print "<pid> <ppid> <pgid>" for every visible process.
+# Uses ps first (works on Linux and unconfined macOS) and falls back to
+# bin/fm-proc-info.py when macOS sandbox-exec refuses setuid ps.
+proc_table_pid_ppid_pgid() {
+  local out rc=0
+  out=$(LC_ALL=C ps -axo pid=,ppid=,pgid= 2>/dev/null) || rc=$?
+  if [ "$rc" -eq 0 ] && [ -n "$out" ]; then
+    printf '%s\n' "$out"
+    return 0
+  fi
+  python3 -I "$ROOT/bin/fm-proc-info.py" table pid,ppid,pgid | awk '{ gsub(",", " "); print $1, $2, $3 }'
+}
+
+# group_members <pgid>: pids still in that process group.
 group_members() {
-  python3 -I "$ROOT/bin/fm-proc-info.py" table pid,pgid | awk -v g="$1" '{ gsub(",", " ") } $2 == g { print $1 }'
+  proc_table_pid_ppid_pgid | awk -v g="$1" '$3 == g { print $1 }'
 }
 
 # normalize_out <case-dir> <file>: paths and pids masked, so two cases compare.

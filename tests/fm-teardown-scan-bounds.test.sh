@@ -239,7 +239,7 @@ test_sigterm_while_the_scan_waits_on_a_forked_producer_that_ignores_it_ends_the_
     pass "the scan canonicalizes copies in-process: a forking producer that ignores SIGTERM is never read, so it cannot hold the teardown"
     return 0
   fi
-  producer=$(python3 -I "$ROOT/bin/fm-proc-info.py" table pid,ppid,pgid | awk -v g="$pid" '{ gsub(",", " ") } $3 == g && $2 == g { print $1; exit }')
+  producer=$(proc_table_pid_ppid_pgid | awk -v g="$pid" '$3 == g && $2 == g { print $1; exit }')
   before=$(scan_snapshot "$case_dir")
   [ "$(project_lock_state "$case_dir")" = held ] || fail "canon: the scan does not hold the project lock"
   kill -TERM -- "-$pid"
