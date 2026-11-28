@@ -18,7 +18,8 @@ records, every task's metadata and relaunch records, the home data root apart
 from this task's directory and the duration ledger, other tasks' branches, loose
 or packed (this task keeps its declared branch and its
 archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-owned
-records of this task, the shared legacy Jev audit, this home's config and .env,
+records of this task, the shared legacy Jev audit, the review ledger and its
+carry-over proof scratch directories, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
 and other projects' no-mistakes gate repositories. Each protected folder and
@@ -26,8 +27,9 @@ every folder above it also refuses rename and deletion. --data is this task's
 directory below the home data root. The build refuses while a protected ref
 path in this repository's shared Git directory (packed-refs, HEAD, index,
 commondir, other tasks' branch refs and reflogs, replace refs, other
-worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
-link, or a folder above one is a symbolic link, naming the path and the link
+worktrees' HEAD, index and commondir) or the home's review ledger
+state/review-records.jsonl has a second hard link or is a symbolic link, or a
+folder above a protected ref path is a symbolic link, naming the path and the link
 count or target, because a write through such an alias would be judged by the
 alias's path. A HEAD symbolic link to a refs/heads name stays allowed. Other
 projects' and gate repositories' Git directories are not scanned. Task ids
@@ -134,8 +136,8 @@ def child_dirs(root, keep):
     return [canonical(path) for path in Path(root).iterdir() if path.is_dir() and canonical(path) not in keep] if Path(root).is_dir() else []
 
 
-def extra_links(common, gitdir, own_branch):
-    """Protected shared ref paths that another name reaches.
+def extra_links(common, gitdir, own_branch, state=None):
+    """Protected shared ref and review-ledger paths that another name reaches.
 
     The profile denies these paths by their own name, but a write opened
     through another name for the same file is judged by that other name: a
@@ -152,6 +154,8 @@ def extra_links(common, gitdir, own_branch):
     own = {root / "refs/heads" / own_branch, root / "logs/refs/heads" / own_branch} if own_branch else set()
     heads = {root / "HEAD"}
     paths = [root / name for name in ("packed-refs", "HEAD", "index", "commondir", "refs", "logs", "logs/refs", "worktrees")]
+    if state:
+        paths.append(Path(state) / "review-records.jsonl")
     for folder in ("refs/heads", "logs/refs/heads", "refs/replace"):
         paths.append(root / folder)
         if os.path.realpath(root / folder) == str(root / folder):
@@ -196,15 +200,15 @@ def build(args):
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
         raise ValueError("a repository with reftable ref storage cannot be confined")
-    linked = extra_links(common, gitdir, args.branch)
+    state = canonical(args.state)
+    linked = extra_links(common, gitdir, args.branch, state=state)
     if linked:
         shown = ", ".join(f"{path} ({why})" for path, why in linked[:5])
         raise ValueError(
-            f"protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: {shown}"
+            f"protected path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: {shown}"
             + (f" and {len(linked) - 5} more" if len(linked) > 5 else "") + "; remove the extra link or symbolic link and launch again")
     data = canonical(args.data)
     data_root = str(Path(data).parent)
-    state = canonical(args.state)
     protect = [canonical(path) for path in args.protect]
     deny = [canonical(Path(home) / name) for name in HARNESS_HOMES]
     deny += [canonical(args.home), canonical(args.config), data_root] + protect
@@ -288,6 +292,8 @@ def build(args):
     lines.append("(deny file-write* " + under(state, r"[^/]+\.(meta|control-relaunch)(\.[^/]*)?(/.*)?") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
+    lines.append(f"(deny file-write* (literal {quoted(state + '/review-records.jsonl')}))")
+    lines.append("(deny file-write* " + under(state, r"\.review-carry-[^/]*(/.*)?") + ")")
     # No task operation writes a replace ref, and one changes what a commit
     # holds for every Git command in the primary checkout.
     git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]

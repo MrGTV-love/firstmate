@@ -815,6 +815,8 @@ def fixture(repo, base, harness, user_home, other):
         write(state / name)
     write(state / f"{other}.jev-guard.jsonl", json.dumps({"at": 2, "task": other, "decision": "clear"}) + "\n")
     write(state / "jev-guard.jsonl", json.dumps({"at": 1, "task": "legacy", "decision": "clear"}) + "\n")
+    write(state / "review-records.jsonl", json.dumps({"schema": "fm-review-record.v1", "kind": "captain-word"}) + "\n")
+    write(state / ".review-carry-99999-fixture/proof.git/config", "[core]\n\tbare = true\n")
     write(state / "task.status", "")
     write(state / "task.meta", f"spawn_gen=proof-probe\nwindow=fmtest:fm-task\nworktree={worktree}\nproject=fmtest\n")
     write(state / "task.inbox/001.msg", "message")
@@ -836,6 +838,9 @@ def fixture(repo, base, harness, user_home, other):
         "other-task-temp": Path(f"/private/tmp/fm-{other}/payload"),
         "extending-task-home-tmp": user_tmp / "fm-teardown.task-2/old",
         "shared-legacy-audit": state / "jev-guard.jsonl",
+        "review-records": state / "review-records.jsonl",
+        "review-carry-scratch": state / ".review-carry-99999-fixture/proof.git/config",
+        "review-carry-scratch-new": state / ".review-carry-new-worker",
         "main-meta": state / "task.meta", "main-control-relaunch": state / "task.control-relaunch",
         "main-git-hooks": state / "task.git-hooks/pre-commit",
         "data-secondmates": data / "secondmates.md", "data-captain": data / "captain.md", "data-backlog": data / "backlog.md",
@@ -940,11 +945,13 @@ def hardlink_alias(repo, manifest, base, harness, env):
     # path rules. The build must refuse, say which file and how many links,
     # and publish no profile, whatever path the alias sits at.
     common = Path(manifest["home"]) / "projects/project/.git"
+    state = Path(manifest["home"]) / "state"
     aliases = {"worktree": (common / "packed-refs", Path(manifest["worktree"]) / "packed-refs-alias"),
                "outside-worktree": (common / "packed-refs", Path(manifest["user_tmp"]) / "fm-task-packed-refs-alias"),
                "task-data": (common / "packed-refs", Path(manifest["home"]) / "data/task/packed-refs-alias"),
                "loose-ref": (common / "refs/heads/fm/other", Path(manifest["worktree"]) / "loose-ref-alias"),
-               "head": (common / "HEAD", Path(manifest["user_tmp"]) / "fm-task-head-alias")}
+               "head": (common / "HEAD", Path(manifest["user_tmp"]) / "fm-task-head-alias"),
+               "review-records": (state / "review-records.jsonl", Path(manifest["worktree"]) / "review-records-alias")}
     aliases.update({f"other-worktree-{name}": (common / "worktrees/fm-other" / name, Path(manifest["worktree"]) / f"other-worktree-{name}-alias")
                     for name in ("HEAD", "index", "commondir")})
     for name, (target, alias) in aliases.items():

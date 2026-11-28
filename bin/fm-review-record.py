@@ -210,6 +210,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import sqlite3
 import stat
 import subprocess
@@ -503,6 +504,47 @@ def derived_authors(home, pr, head, task, base):
 
 
 CARRIED_FACT = "review carried from {head}: the live head is that reviewed change merged cleanly with its base"
+CARRY_SCRATCH_PREFIX = ".review-carry-"
+CARRY_SCRATCH_PID_RE = re.compile(r"^\.review-carry-([1-9][0-9]*)-")
+CARRY_SCRATCH_MAX_AGE = 3600
+
+
+def sweep_stale_carry_scratch(state):
+    """Best-effort cleanup of leftover carry-over scratch directories after a killed run.
+
+    Directories named `.review-carry-<pid>-*` are removed only when `<pid>` is
+    proven dead (ESRCH). Legacy directories without a PID segment are removed
+    only when older than CARRY_SCRATCH_MAX_AGE seconds.
+    Symlinks, non-directories, and live PIDs are never touched.
+    """
+    now = time.time()
+    try:
+        entries = list(Path(state).iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        name = entry.name
+        if not name.startswith(CARRY_SCRATCH_PREFIX):
+            continue
+        try:
+            info = entry.lstat()
+        except OSError:
+            continue
+        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+            continue
+        match = CARRY_SCRATCH_PID_RE.match(name)
+        pid = int(match.group(1)) if match else None
+        if pid is not None and pid <= 0x7FFFFFFF:
+            try:
+                os.kill(pid, 0)
+                continue
+            except ProcessLookupError:
+                pass
+            except OSError:
+                continue
+        elif (now - info.st_mtime) < CARRY_SCRATCH_MAX_AGE:
+            continue
+        shutil.rmtree(entry, ignore_errors=True)
 
 
 def isolated_merge_tree(scratch, objects, object_format, point, reviewed):
@@ -572,8 +614,10 @@ def carry_over_refusal(home, task, head, reviewed, base, others):
         return "cannot read the task worktree's object format"
     # The scratch repository lives beside the review records, so only a writer
     # that could already forge a review row can reach it while the merge runs.
+    state = state_dir(home)
+    sweep_stale_carry_scratch(state)
     try:
-        holder = tempfile.TemporaryDirectory(prefix=".review-carry-", dir=state_dir(home))
+        holder = tempfile.TemporaryDirectory(prefix=f"{CARRY_SCRATCH_PREFIX}{os.getpid()}-", dir=state)
     except OSError as exc:
         return f"cannot make the proof's scratch repository in the state directory: {exc.strerror or exc}"
     with holder as scratch:
