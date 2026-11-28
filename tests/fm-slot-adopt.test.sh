@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Unit cases for the relaunch adoption decision and its helpers in bin/fm-slot-provision-lib.sh and the custody owner
 # bin/fm-task-copy-lib.sh: the pool-slot claim's home, an unreadable foreign record, the drift report's attribution
-# (a change the default branch absorbed and reverted, a hidden symlink retarget), the primary-clone provisioner's
-# cache-free export (a forged cached module must not run, a substituted file is detected), and the old-copy preflight
-# that asks the provisioner that would really run. Every case runs on scratch repositories built here.
+# (a change the default branch absorbed and reverted, a hidden symlink retarget), the clone provisioner's verified
+# cache-free export (a forged cached module must not run, a substituted file is detected), and the preflight that asks
+# the provisioner that would really run, never the copy's own. Every case runs on scratch repositories built here.
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -154,18 +154,32 @@ test_a_change_the_default_branch_absorbed_and_reverted_is_still_task_drift() {
   pass "drift: a task change that main absorbed and reverted is listed; an upstream-only path is not"
 }
 
-# make_primary <name>: a project whose primary checkout holds a provisioner that imports a sibling module, committed on main.
+# make_primary <name>: a project whose primary checkout holds a provisioner that imports a sibling module, committed on main
+# and published to a bare origin (every route runs the verified export of the fetched origin version). P_OLD is the commit
+# before the provisioner existed, so a copy started there predates it by history.
 make_primary() {
   local name=$1
   P_DIR="$TMP_ROOT/$name"
   P_PROJ="$P_DIR/project"
   git init --quiet -b main "$P_PROJ"
+  printf 'x\n' >"$P_PROJ/README.md"
+  git -C "$P_PROJ" add README.md
+  git -C "$P_PROJ" "${GITID[@]}" commit -qm readme
+  P_OLD=$(git -C "$P_PROJ" rev-parse HEAD)
   mkdir -p "$P_PROJ/scripts/git-stability"
   printf 'print("TIP_MODULE")\n' >"$P_PROJ/scripts/git-stability/helper_mod.py"
   printf 'import helper_mod  # noqa\nimport sys\nif "--check-manifest-only" in sys.argv:\n    print("{\\"state\\": \\"BLOCKED\\", \\"reason\\": \\"manifest_exists\\"}")\n' \
     >"$P_PROJ/scripts/git-stability/provision_existing_slot.py"
   git -C "$P_PROJ" add -A
   git -C "$P_PROJ" "${GITID[@]}" commit -qm initial
+  git clone --quiet --bare "$P_PROJ" "$P_DIR/origin.git"
+  git -C "$P_PROJ" remote add origin "file://$P_DIR/origin.git"
+  git -C "$P_PROJ" fetch --quiet origin
+}
+
+publish_primary() { # commit what the project's main holds to its origin and fetch it back
+  git -C "$P_PROJ" push -q origin main
+  git -C "$P_PROJ" fetch -q origin
 }
 
 plant_forged_cache() { # <primary>: a matching-header cached module whose code differs from its source
@@ -188,7 +202,7 @@ test_a_forged_cached_module_never_runs_and_a_substitution_is_detected() {
   plant_forged_cache "$P_PROJ"
   out=$(cd "$P_PROJ" && python3 scripts/git-stability/provision_existing_slot.py 2>&1)
   assert_contains "$out" FORGED_MODULE 'the fixture is vacuous: the forged cache does not run on the unprotected route'
-  fm_slot_primary_provisioner "$P_PROJ" || fail 'the clean primary provisioner was refused'
+  fm_slot_origin_provisioner "$P_PROJ" || fail 'the clean clone provisioner was refused'
   out=$(fm_slot_run_local "$P_PROJ" "$P_DIR/report" "${FM_SLOT_PYARGS[@]}" "$FM_SLOT_PROVISIONER" >/dev/null; cat "$P_DIR/report")
   assert_contains "$out" TIP_MODULE 'the verified tip module did not run'
   case "$out" in *FORGED_MODULE*) fail "a forged cached module ran on the verified route: $out" ;; esac
@@ -199,7 +213,7 @@ test_a_forged_cached_module_never_runs_and_a_substitution_is_detected() {
   if fm_slot_export_verify 2>/dev/null; then fail 'a substitution after the check was not detected'; fi
   fm_slot_export_drop
   # a substitution that is RESTORED (same bytes, same mode) before the run ends still changes the change time
-  fm_slot_primary_provisioner "$P_PROJ" || fail 'the clean primary provisioner was refused on the second export'
+  fm_slot_origin_provisioner "$P_PROJ" || fail 'the clean clone provisioner was refused on the second export'
   fm_slot_export_verify || fail 'an untouched second export failed its own verification'
   cp -p "$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py" "$P_DIR/helper_mod.saved"
   chmod u+w "$FM_SLOT_EXPORT/scripts/git-stability/helper_mod.py"
@@ -211,27 +225,15 @@ test_a_forged_cached_module_never_runs_and_a_substitution_is_detected() {
   fm_slot_export_drop
   # a locally changed imported module is refused before anything runs
   printf '# local edit\n' >>"$P_PROJ/scripts/git-stability/helper_mod.py"
-  if fm_slot_primary_provisioner "$P_PROJ" 2>/dev/null; then fail 'a primary clone whose imported module differs from the tip was accepted'; fi
-  pass "primary provisioner: a forged cached module does not run, a substituted export file is detected, a locally changed module is refused"
+  if fm_slot_origin_provisioner "$P_PROJ" 2>/dev/null; then fail 'a clone whose imported module differs from its fetched origin version was accepted'; fi
+  pass "clone provisioner: a forged cached module does not run, a substituted export file is detected, a locally changed module is refused"
 }
 
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run() {
   local out rc
   make_primary primary-preflight
-  git -C "$P_PROJ" "${GITID[@]}" commit -q --allow-empty -m second
-  git clone --quiet --bare "$P_PROJ" "$P_DIR/origin.git"
-  git -C "$P_PROJ" remote add origin "file://$P_DIR/origin.git"
-  git -C "$P_PROJ" fetch --quiet origin
-  # the assigned copy predates the provisioner: it sits at a commit that has no scripts directory
-  printf 'x\n' >"$P_PROJ/README.md"
-  git -C "$P_PROJ" add README.md
-  git -C "$P_PROJ" "${GITID[@]}" commit -qm 'readme'
-  git -C "$P_PROJ" push -q origin main
-  git -C "$P_PROJ" fetch -q origin
-  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" origin/main
-  git -C "$P_DIR/copy" rm -rq scripts
-  git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
-  git -C "$P_DIR/copy" update-ref refs/remotes/origin/main "$(git -C "$P_DIR/copy" rev-parse HEAD)"
+  # the assigned copy predates the provisioner: it sits at the commit before the scripts directory existed
+  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" "$P_OLD"
   printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy" "$P_PROJ" >"$P_DIR/t.meta"
   [ ! -e "$P_DIR/copy/scripts/git-stability/provision_existing_slot.py" ] || fail 'the fixture copy still has the provisioner'
   out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
@@ -243,11 +245,25 @@ p = sys.argv[1]
 open(p, "w").write('import sys\nif "--check-manifest-only" in sys.argv:\n    print("{\\"state\\": \\"BLOCKED\\", \\"reason\\": \\"manifest_exists\\"}")\n')
 PY
   git -C "$P_PROJ" "${GITID[@]}" commit -qam 'provisioner reports a collision'
-  git -C "$P_PROJ" branch -f main HEAD 2>/dev/null || true
+  publish_primary
   out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
   [ "$rc" -ne 0 ] || fail "an old copy with a manifest collision passed the preflight: $out"
   assert_contains "$out" manifest_exists 'the collision was not named by the preflight'
-  pass "preflight: an old copy is judged by the primary provisioner's read-only check, collision refused, clean admitted"
+  # the copy's own provisioner is never asked: a task branch whose provisioner reports a collision, while the clone's
+  # verified one does not, passes the preflight
+  printf 'print("TIP_MODULE")\nimport sys\n' >"$P_PROJ/scripts/git-stability/provision_existing_slot.py"
+  git -C "$P_PROJ" "${GITID[@]}" commit -qam 'provisioner reports no collision'
+  publish_primary
+  git -C "$P_PROJ" worktree add --quiet -b fm/u "$P_DIR/copy-u" origin/main
+  python3 - "$P_DIR/copy-u/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import sys
+open(sys.argv[1], "w").write('import sys\nif "--check-manifest-only" in sys.argv:\n    print("{\\"state\\": \\"BLOCKED\\", \\"reason\\": \\"manifest_exists\\"}")\n')
+PY
+  git -C "$P_DIR/copy-u" "${GITID[@]}" commit -qam 'task branch provisioner reports a collision'
+  printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy-u" "$P_PROJ" >"$P_DIR/u.meta"
+  out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy-u" u fm/u "$P_DIR/u.meta" README.md scripts 2>&1); rc=$?
+  [ "$rc" -eq 0 ] || fail "the preflight asked the copy's own provisioner instead of the clone's verified one: $out"
+  pass "preflight: a copy is judged by the clone's verified read-only check, never its own; collision refused, clean admitted"
 }
 
 # A refusal on the second adopt check, after the launch wiring and the record were written, says so; the first check does not.
@@ -266,7 +282,7 @@ test_a_second_adoption_refusal_says_the_wiring_and_record_were_written() {
   pass "adopt check: a refusal after the wiring and record were written says so; the first-check refusal keeps its text"
 }
 
-# A provision refused after the primary clone's verified export was made leaves no export or bytecode directory behind.
+# A provision refused after the clone's verified export was made leaves no export or bytecode directory behind.
 test_a_refused_provision_leaves_no_export_directory() {
   local out rc tmpd
   make_primary provision-cleanup
@@ -275,32 +291,41 @@ test_a_refused_provision_leaves_no_export_directory() {
   git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
   tmpd=$P_DIR/tmp
   mkdir -p "$tmpd"
-  out=$(TMPDIR="$tmpd" FM_SLOT_PRIMARY_PROVISIONER=1 fm_slot_provision true "$P_PROJ" "$P_DIR/copy" t 'bad..branch' "$P_DIR/report.json" '' '' README.md 2>&1); rc=$?
+  out=$(TMPDIR="$tmpd" fm_slot_provision true "$P_PROJ" "$P_DIR/copy" t 'bad..branch' "$P_DIR/report.json" '' '' README.md 2>&1); rc=$?
   [ "$rc" -ne 0 ] || fail "a provision with an invalid branch was accepted: $out"
+  # the refusal is the branch check, which comes after the verified export was made
+  assert_contains "$out" 'is not a valid branch name' 'the provision was refused before its verified export was made'
   [ -z "$(ls -A "$tmpd")" ] || fail "a refused provision left temp directories: $(ls -A "$tmpd")"
   pass "provision: a refused provision after the verified export leaves no export or bytecode directory"
 }
 
-# D4(c): the recovery of a refused first provisioning keeps its prior behavior: it never takes the primary clone's
-# provisioner for a prepared copy that lacks the script, while every other relaunch may.
-test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner() {
-  local out rc
+# D4(c): the recovery of a refused first provisioning keeps its prior behavior: it still refuses a prepared copy that
+# lacks the script, a read of the copy that runs nothing, while every other route runs the clone's verified export.
+test_a_refused_first_provisioning_recovery_still_refuses_a_copy_without_the_script() {
+  local out rc tmpd
   make_primary recovery-route
   git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" HEAD
   git -C "$P_DIR/copy" rm -rq scripts
   git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'prepared copy has no provisioner'
   printf 'kind=ship\nrecovery=slot-provision-refused\n' >"$P_DIR/recovery.meta"
   printf 'kind=ship\n' >"$P_DIR/ordinary.meta"
-  fm_slot_primary_route_allowed "$P_DIR/ordinary.meta" || fail 'an ordinary relaunch was denied the primary provisioner route'
-  if fm_slot_primary_route_allowed "$P_DIR/recovery.meta"; then fail 'the recovery of a refused first provisioning was allowed the primary provisioner route'; fi
-  # the flag fm-spawn sets from that answer: the recovery refuses the missing copy-local script as before
-  out=$(FM_SLOT_PRIMARY_PROVISIONER=0 fm_slot_provision true "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/report.json" '' '' README.md 2>&1); rc=$?
+  if fm_slot_recovery_route "$P_DIR/ordinary.meta"; then fail 'an ordinary relaunch was taken for the recovery of a refused first provisioning'; fi
+  fm_slot_recovery_route "$P_DIR/recovery.meta" || fail 'the recovery of a refused first provisioning was not recognized'
+  # the flag fm-spawn sets from that answer: the recovery refuses the missing copy-local script as before, and runs nothing
+  tmpd=$P_DIR/tmp
+  mkdir -p "$tmpd"
+  # shellcheck disable=SC2329 # fm_slot_provision calls this runner by name.
+  recording_runner() { printf 'ran\n' >>"$P_DIR/runner.called"; }
+  out=$(TMPDIR="$tmpd" FM_SLOT_RECOVERY_COPY_CHECK=1 fm_slot_provision recording_runner "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/report.json" '' '' README.md 2>&1); rc=$?
   [ "$rc" -ne 0 ] || fail "a recovery without the route was admitted: $out"
   assert_contains "$out" 'slot provisioner is missing from assigned copy' 'the recovery did not refuse the missing copy-local script'
-  # the paired control: the route flag set for an ordinary relaunch gets past that check
-  out=$(FM_SLOT_PRIMARY_PROVISIONER=1 fm_slot_provision true "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/report.json" '' '' README.md 2>&1) || true
+  [ ! -e "$P_DIR/runner.called" ] || fail 'the recovery refusal ran a provisioner'
+  [ "$(git -C "$P_DIR/copy" branch --show-current)" = fm/t ] || fail 'the recovery refusal changed the copy branch'
+  [ -z "$(ls -A "$tmpd")" ] || fail "the recovery refusal left a provisioner export: $(ls -A "$tmpd")"
+  # the paired control: an ordinary relaunch (no recovery flag) gets past that check
+  out=$(FM_SLOT_RECOVERY_COPY_CHECK=0 fm_slot_provision true "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/report.json" '' '' README.md 2>&1) || true
   case "$out" in *'missing from assigned copy'*) fail "the ordinary route was refused for the missing script: $out" ;; esac
-  pass "provision: a refused-first-provisioning recovery refuses the missing copy-local provisioner; an ordinary relaunch takes the primary one"
+  pass "provision: a refused-first-provisioning recovery refuses the missing copy-local provisioner and runs nothing; an ordinary relaunch takes the clone's verified one"
 }
 
 # D8: a pinned provisioner without the read-only manifest check still has its collision named before the stop, from the
@@ -308,20 +333,12 @@ test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner()
 test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named() {
   local out rc digest
   make_primary pinned-preflight
-  git clone --quiet --bare "$P_PROJ" "$P_DIR/origin.git"
-  git -C "$P_PROJ" remote add origin "file://$P_DIR/origin.git"
-  printf 'x\n' >"$P_PROJ/README.md"
-  git -C "$P_PROJ" add README.md
-  git -C "$P_PROJ" "${GITID[@]}" commit -qm readme
   # the pinned provisioner: create-only, no read-only check, no same-owner arm
   printf 'import sys\nprint("create-only")\n' >"$P_PROJ/scripts/git-stability/provision_existing_slot.py"
   git -C "$P_PROJ" "${GITID[@]}" commit -qam 'pinned create-only provisioner'
-  git -C "$P_PROJ" push -q origin main
-  git -C "$P_PROJ" fetch -q origin
-  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" origin/main
-  git -C "$P_DIR/copy" rm -rq scripts
-  git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
-  git -C "$P_DIR/copy" update-ref refs/remotes/origin/main "$(git -C "$P_DIR/copy" rev-parse HEAD)"
+  publish_primary
+  # the assigned copy predates the provisioner: it sits at the commit before the scripts directory existed
+  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" "$P_OLD"
   printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy" "$P_PROJ" >"$P_DIR/t.meta"
   mkdir -p "$P_DIR/durable" "$P_DIR/hookstate/worktree-lifecycle"
   digest=$(python3 -c 'import hashlib,os,sys; print(hashlib.sha256(os.path.realpath(sys.argv[1]).encode()).hexdigest()[:16])' "$P_DIR/copy")
@@ -341,6 +358,7 @@ test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named
   # a provisioner with a same-owner arm may admit an identical declaration: not foreseen, the existing rollback stays
   printf 'import sys\ndef _same_owner_outcome():\n    pass\n' >"$P_PROJ/scripts/git-stability/provision_existing_slot.py"
   git -C "$P_PROJ" "${GITID[@]}" commit -qam 'provisioner with a same-owner arm'
+  publish_primary
   out=$(fm_slot_foresee_refusals "$P_PROJ" "$P_DIR/copy" t fm/t "$P_DIR/t.meta" README.md 2>&1); rc=$?
   unset WORKTREE_LIFECYCLE_STORE_DIR CODEX_HOOK_STATE_DIR
   [ "$rc" -eq 0 ] || fail "a provisioner with a same-owner arm was refused by guesswork: $out"
@@ -395,13 +413,8 @@ test_a_shadowed_or_disagreeing_lifecycle_record_is_refused_by_name() {
 test_the_no_manifest_route_consults_copy_custody() {
   local out rc
   make_primary noman-custody
-  git clone --quiet --bare "$P_PROJ" "$P_DIR/origin.git"
-  git -C "$P_PROJ" remote add origin "file://$P_DIR/origin.git"
-  git -C "$P_PROJ" fetch --quiet origin
-  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" origin/main
-  git -C "$P_DIR/copy" rm -rq scripts
-  git -C "$P_DIR/copy" "${GITID[@]}" commit -qm 'old copy has no provisioner'
-  git -C "$P_DIR/copy" update-ref refs/remotes/origin/main "$(git -C "$P_DIR/copy" rev-parse HEAD)"
+  # the assigned copy predates the provisioner: it sits at the commit before the scripts directory existed
+  git -C "$P_PROJ" worktree add --quiet -b fm/t "$P_DIR/copy" "$P_OLD"
   mkdir -p "$P_DIR/home/state" "$P_DIR/home/data"
   export FM_HOME="$P_DIR/home"
   printf 'worktree=%s\nproject=%s\nkind=ship\n' "$P_DIR/copy" "$P_PROJ" >"$P_DIR/home/state/t.meta"
@@ -820,7 +833,7 @@ test_a_forged_cached_module_never_runs_and_a_substitution_is_detected
 test_old_copy_preflight_asks_the_provisioner_that_would_really_run
 test_a_second_adoption_refusal_says_the_wiring_and_record_were_written
 test_a_refused_provision_leaves_no_export_directory
-test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner
+test_a_refused_first_provisioning_recovery_still_refuses_a_copy_without_the_script
 test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named
 test_the_no_manifest_route_consults_copy_custody
 )

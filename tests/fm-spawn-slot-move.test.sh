@@ -12,6 +12,9 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-spawn-slot-move)
+# Provisioning uses the shared fetched-default selector as well as isolation.
+# shellcheck source=bin/fm-task-copy-lib.sh
+. "$ROOT/bin/fm-task-copy-lib.sh"
 # A mutated copy of the library may be tested instead (scratch-only mutation runs).
 SLOT_LIB=${FM_TEST_SLOT_LIB:-$ROOT/bin/fm-slot-provision-lib.sh}
 # shellcheck source=bin/fm-slot-provision-lib.sh

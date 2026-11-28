@@ -197,7 +197,11 @@ fm_session_end_refusal_reason() {  # <control-output>
     -e 's/.*slot provisioning refused: \([a-z_]*\).*/\1/p' -e 's/.*"reason": "\([a-z_]*\)".*/\1/p' | head -n 1)
   if [ -z "$reason" ]; then
     case "$text" in
-      *'slot provisioner refused'*|*'slot adoption refused'*|*'slot provisioning refused'*|*'refused relaunch of governed task'*|*'slot provisioner is missing'*|*'slot provisioner source is not'*)
+      *'slot provisioner refused'*|*'slot adoption refused'*|*'slot provisioning refused'*|*'refused relaunch of governed task'*|*'slot provisioner is missing'*)
+        reason=unclassified ;;
+      # The check of the registered clone's provisioner against its fetched origin version (fm_slot_origin_provisioner in
+      # bin/fm-slot-provision-lib.sh) refuses with these texts before any provisioner runs.
+      *'differs from fetched origin version'*|*'cannot read fetched origin '*|*'cannot read the import closure of project clone provisioner'*|*'cannot read project clone provisioner'*|*'verified export of project clone provisioner'*)
         reason=unclassified ;;
     esac
   fi

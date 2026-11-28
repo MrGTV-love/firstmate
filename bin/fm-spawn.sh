@@ -620,8 +620,10 @@
 #   history; a non-clean or otherwise doubtful copy is skipped as described above.
 #   A project carrying scripts/git-stability/provision_existing_slot.py additionally
 #   requires repeatable --owned-path <tracked-path> flags: explicit task scope,
-#   never inferred from the brief. bin/fm-slot-provision-lib.sh calls that actual
-#   provisioner before any harness admission, with origin/main's merge-base by
+#   never inferred from the brief. bin/fm-slot-provision-lib.sh runs the registered
+#   project clone's provisioner on every route, never the copy's, as a verified
+#   export of its fetched origin version (its header owns that check),
+#   before any harness admission, with origin/main's merge-base by
 #   default or the selected qualified local-default ref/SHA for unpublished local
 #   delivery. The latter requires the project's explicit --base-source local-default
 #   capability; an older project owner refuses rather than widening scope. Task id
@@ -646,8 +648,9 @@
 #   the relaunch by name unless that task's record places its copy inside the slot; no other peer claim is checked, and Vernant's push-time
 #   owned_paths gate stays the control. A relaunch with no recorded manifest keeps
 #   the provisioning route and must pass the clean-slot contract (a copy that
-#   predates the provisioner runs the primary clone's current main, verified byte for
-#   byte against the default branch tip). --owned-path on a
+#   predates the provisioner needs nothing more, because the clone's verified export
+#   runs on every route; only the recovery of a refused first provisioning still
+#   refuses a copy that lacks the script). --owned-path on a
 #   relaunch never overrides recorded scope: it is accepted only to scope a task
 #   with none recorded (for example, admitted before its project was governed),
 #   which then runs the same governed preparation; elsewhere it refuses. If that
@@ -2127,6 +2130,8 @@ parse_orca_worktree_result() {
 
 spawn_abort_cleanup() {
   local status=$? skill_meta_tmp
+  # A refusal that exits inside provisioning (spawn_slot_refused) never returns to fm_slot_provision's own drop.
+  fm_slot_export_drop
   if [ -n "$SPAWN_BASE_REF" ]; then
     git -C "$PROJ_ABS" update-ref -d "$SPAWN_BASE_REF" >/dev/null 2>&1 || true
     SPAWN_BASE_REF=
@@ -7215,7 +7220,7 @@ spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
   [ "$rc" -le 255 ] || { echo 'error: assigned-copy provisioner completion status is out of range' >&2; return 1; }
   return "$rc"
 }
-[ "$RELAUNCH" -eq 0 ] || ! fm_slot_primary_route_allowed "$RELAUNCH_META" || FM_SLOT_PRIMARY_PROVISIONER=1
+[ "$RELAUNCH" -eq 0 ] || ! fm_slot_recovery_route "$RELAUNCH_META" || FM_SLOT_RECOVERY_COPY_CHECK=1
 if [ "$SLOT_GOVERNED" = 1 ] && [ "$SLOT_ADOPT" = 1 ]; then
   fm_slot_adopt_check "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$RELAUNCH_META" "$STATE" || spawn_slot_refused
   fm_slot_drift_report "$WT" "$ID" "$BRANCH" "$FM_SLOT_BASE_SHA" "${SLOT_OWNED_PATHS[@]}"

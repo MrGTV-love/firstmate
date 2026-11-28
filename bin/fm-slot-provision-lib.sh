@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 # Existing-copy lifecycle integration for fm-spawn.sh and fm-promote.sh.
-# Projects carrying scripts/git-stability/provision_existing_slot.py must attest
-# the assigned isolated copy before admission. --owned-path is an explicit,
-# repeatable task scope, never inferred from prose or expanded to the whole repo.
+# Every route (spawn, promotion, relaunch) runs scripts/git-stability/provision_existing_slot.py
+# of the registered project clone passed as project, never the task copy's file:
+# before any provisioning or branch change, the script and its import closure in
+# the clone must match their raw bytes and Git mode at the fetched origin
+# default-branch ref (the same default selection as fleet sync), and the bytes
+# that run are that ref's, from a private read-only export with a fresh bytecode
+# cache that is checked again after the run (fm_slot_origin_provisioner, D7).
+# Missing, unreadable or different inputs refuse and say to run fleet sync; this
+# check never fetches or repairs the clone. --worktree-path still names the copy.
+# Only the relaunch that recovers a refused first provisioning still refuses a
+# copy that lacks the script (D4(c)): a read of the copy, nothing in it runs.
+# Governed projects must attest the assigned isolated copy before admission.
+# --owned-path is an explicit, repeatable task scope, never inferred from prose
+# or expanded to the whole repo.
 # The provisioner owns schema, default origin/main merge-base validation, explicit
 # local-default qualification, same-owner adoption and lease/liveness-gated replacement.
 # A selected local-default ref/SHA is passed explicitly by spawn; no local choice
@@ -14,7 +25,7 @@
 # Firstmate never deletes/replaces its manifests or creates another worktree.
 # Call from a clean checkout on the task branch, using the project's existing
 # Python environment (no environment installation/sync). Preserve its full report.
-# Requires fm-task-copy-lib.sh for isolation and preservation predicates.
+# Requires fm-task-copy-lib.sh for isolation, preservation and default selection.
 # shellcheck disable=SC2034 # Output globals consumed by the entrypoints.
 FM_SLOT_PROVISIONED=0
 FM_SLOT_MANIFEST=
@@ -138,18 +149,14 @@ fm_slot_provision_run() {
   FM_SLOT_PREPARED_HEAD=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
-  provisioner=$copy/scripts/git-stability/provision_existing_slot.py
-  FM_SLOT_PYARGS=()
-  if [ ! -f "$provisioner" ]; then
-    # A relaunch of a task whose copy predates the provisioner runs the primary clone's current main (D7); every
-    # other caller still requires the script in the assigned copy.
-    [ "${FM_SLOT_PRIMARY_PROVISIONER:-0}" = 1 ] || {
-      echo "error: slot provisioner is missing from assigned copy $copy" >&2
-      return 1
-    }
-    fm_slot_primary_provisioner "$project" || return 1
-    provisioner=$FM_SLOT_PROVISIONER
+  # Every route runs the registered clone's verified export (fm_slot_origin_provisioner), never the copy's file. Only the
+  # relaunch that recovers a refused first provisioning first reads the copy for the script (D4(c)); it runs nothing there.
+  if [ "${FM_SLOT_RECOVERY_COPY_CHECK:-0}" = 1 ] && [ ! -f "$copy/scripts/git-stability/provision_existing_slot.py" ]; then
+    echo "error: slot provisioner is missing from assigned copy $copy" >&2
+    return 1
   fi
+  fm_slot_origin_provisioner "$project" || return 1
+  provisioner=$FM_SLOT_PROVISIONER
   git check-ref-format --branch "$branch" >/dev/null || return 1
   old_branch=$(git -C "$copy" branch --show-current) || return 1
   old_head=$(git -C "$copy" rev-parse --verify HEAD) || return 1
@@ -262,18 +269,23 @@ PY
   FM_SLOT_PROVISIONED=1
 }
 
-# The provisioner a relaunch runs for a copy that predates it (D7): the primary clone's, and only when the entry
-# script and every repository-local module it imports (transitively) hold the bytes of the default branch's tip,
-# whatever branch the clone is on. A linked checkout, or a primary checkout whose closure differs from the tip, is
-# refused by name. Sets FM_SLOT_PROVISIONER to the script path.
+# The one provisioner every route runs (D7, Main 4356): the registered clone's scripts/git-stability/provision_existing_slot.py
+# and every repository-local module it imports (transitively), only when each file's raw bytes and Git mode in the clone
+# equal that path at the fetched origin default-branch ref refs/remotes/origin/<default> (the same default selection as
+# fleet sync), whatever branch the clone is on. The task copy's file never runs. The check reads only the fetched ref:
+# it never fetches or repairs the clone. Missing, unreadable or different inputs refuse by name and say to run fleet
+# sync. Sets FM_SLOT_PROVISIONER to the export's script path and FM_SLOT_PYARGS to its interpreter arguments.
 FM_SLOT_PROVISIONER=
-FM_SLOT_PRIMARY_PROVISIONER=0
+# 1 only for the relaunch that recovers a refused first provisioning (D4(c), set by fm-spawn from fm_slot_recovery_route):
+# that route still refuses a copy that lacks the script. It is a read of the copy; nothing in the copy runs.
+FM_SLOT_RECOVERY_COPY_CHECK=0
 FM_SLOT_CLOSURE_PY=$(cat <<'FMCLOSUREPY'
 import ast
 import os
 import sys
 
-root = sys.argv[1]
+# The physical root, so the containment checks below compare like with like when the clone path holds a symlink.
+root = os.path.realpath(sys.argv[1])
 entry = os.path.join(root, "scripts/git-stability/provision_existing_slot.py")
 seen = []
 queue = [entry]
@@ -348,60 +360,77 @@ for path in final:
 FMCLOSUREPY
 )
 
-fm_slot_primary_provisioner() { # <project>
-  local project=$1 common primary default tip closure kind rel
+fm_slot_origin_provisioner() { # <project>
+  local project=$1 rel=scripts/git-stability/provision_existing_slot.py default ref closure line
+  local -a entries=()
   FM_SLOT_PROVISIONER=
-  common=$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || {
-    echo "error: slot provisioner source is not the primary clone's current main: the project's repository is unreadable" >&2
+  [ -f "$project/$rel" ] || {
+    echo "error: slot provisioner is missing from project clone $project: $project/$rel; provisioning refused; run fleet sync" >&2
     return 1
   }
-  primary=$(dirname "$common")
-  { [ "$(git -C "$primary" rev-parse --show-toplevel 2>/dev/null)" = "$primary" ] &&
-    [ -f "$primary/scripts/git-stability/provision_existing_slot.py" ]; } || {
-    echo "error: slot provisioner source is not the primary clone's current main: $primary is not a checkout holding the provisioner" >&2
+  default=$(fm_task_copy_default_branch "$project") || {
+    echo "error: cannot read fetched origin default branch for $project/$rel; provisioning refused; run fleet sync" >&2
     return 1
   }
-  default=$(fm_task_copy_default_branch "$primary") || default=
-  tip=
-  [ -z "$default" ] || tip=$(git -C "$primary" rev-parse --verify --quiet "refs/heads/$default^{commit}") || tip=
-  [ -n "$tip" ] || {
-    echo "error: slot provisioner source is not the primary clone's current main: the default branch tip cannot be read" >&2
-    return 1
-  }
-  closure=$(python3 -c "$FM_SLOT_CLOSURE_PY" "$primary") || closure=
+  ref=refs/remotes/origin/$default
+  closure=$(python3 -I -c "$FM_SLOT_CLOSURE_PY" "$project") || closure=
   [ -n "$closure" ] || {
-    echo "error: slot provisioner source is not the primary clone's current main: its import closure cannot be read" >&2
+    echo "error: cannot read the import closure of project clone provisioner $project/$rel; provisioning refused; run fleet sync" >&2
     return 1
   }
-  while IFS=$'\t' read -r kind rel; do
-    [ "$kind" = file ] || {
-      echo "error: slot provisioner source is not the primary clone's current main: $rel cannot be read" >&2
-      return 1
-    }
-    [ "$(git -C "$primary" hash-object -- "$rel" 2>/dev/null)" = "$(git -C "$primary" rev-parse --verify --quiet "$tip:$rel" 2>/dev/null)" ] || {
-      echo "error: slot provisioner source is not the primary clone's current main: $rel differs from $default's tip in $primary" >&2
-      return 1
-    }
-  done <<<"$closure"
-  # The bytes that run are the tip's, from a private read-only export of exactly the verified closure (written from the
-  # tip's blobs, never from the working tree), run with an interpreter cache prefix that is a fresh empty directory so no
-  # bytecode that existed before the run can load. Its hashes are checked again after the run (fm_slot_export_verify).
+  while IFS= read -r line; do entries+=("$line"); done <<<"$closure"
+  # The bytes that run are the origin ref's, from a private read-only export of exactly the verified closure (written from
+  # the ref's blobs, never from the working tree), run with an interpreter cache prefix that is a fresh empty directory so
+  # no bytecode that existed before the run can load. Its hashes are checked again after the run (fm_slot_export_verify).
   FM_SLOT_EXPORT=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-export.XXXXXX") || return 1
   FM_SLOT_PYCACHE=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-pycache.XXXXXX") || { fm_slot_export_drop; return 1; }
   FM_SLOT_EXPORT_SUMS=$FM_SLOT_EXPORT.sums
   : >"$FM_SLOT_EXPORT_SUMS" || { fm_slot_export_drop; return 1; }
-  while IFS=$'\t' read -r kind rel; do
-    if ! { mkdir -p "$FM_SLOT_EXPORT/$(dirname "$rel")" && git -C "$primary" show "$tip:$rel" >"$FM_SLOT_EXPORT/$rel"; }; then
-      echo "error: slot provisioner source is not the primary clone's current main: $rel could not be exported from $default's tip" >&2
-      fm_slot_export_drop
-      return 1
-    fi
-  done <<<"$closure"
+  # Compare raw bytes (no Git filters) and the Git file mode of every closure file with the ref; never fetch a missing
+  # object (GIT_NO_LAZY_FETCH). A file that cannot be parsed hides its imports, so it refuses as unreadable.
+  GIT_NO_LAZY_FETCH=1 python3 -I - "$project" "$ref" "$FM_SLOT_EXPORT" "${entries[@]}" <<'PY' || { fm_slot_export_drop; return 1; }
+import os
+import subprocess
+import sys
+
+project, ref, export = sys.argv[1:4]
+for line in sys.argv[4:]:
+    kind, relative = line.split('\t', 1)
+    path = os.path.join(project, relative)
+    try:
+        with open(path, 'rb') as source:
+            content = source.read()
+            mode = b'100755' if os.fstat(source.fileno()).st_mode & 0o100 else b'100644'
+        if kind != 'file':
+            raise OSError('it is not parseable Python, so its imports cannot be checked')
+    except OSError as exc:
+        print(f'error: cannot read project clone provisioner {path}: {exc}; provisioning refused; run fleet sync', file=sys.stderr)
+        sys.exit(1)
+    try:
+        entry = subprocess.check_output(['git', '-C', project, 'ls-tree', ref, '--', relative], stderr=subprocess.PIPE)
+        origin_mode, object_type, blob = entry.split(b'\t', 1)[0].split()
+        if object_type != b'blob' or origin_mode not in (b'100644', b'100755'):
+            raise ValueError('origin path is not a regular provisioner file')
+        origin_content = subprocess.check_output(['git', '-C', project, 'cat-file', 'blob', blob.decode('ascii')], stderr=subprocess.PIPE)
+    except (OSError, subprocess.CalledProcessError, ValueError) as exc:
+        print(f'error: cannot read fetched origin version {ref}:{relative} for {path}: {exc}; provisioning refused; run fleet sync', file=sys.stderr)
+        sys.exit(1)
+    if content != origin_content:
+        print(f'error: slot provisioner {path} differs from fetched origin version {ref}:{relative}; provisioning refused; run fleet sync', file=sys.stderr)
+        sys.exit(1)
+    if mode != origin_mode:
+        print(f'error: slot provisioner {path} mode differs from fetched origin version {ref}:{relative}; provisioning refused; run fleet sync', file=sys.stderr)
+        sys.exit(1)
+    target = os.path.join(export, relative)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, 'xb') as handle:
+        handle.write(origin_content)
+PY
   chmod -R a-w "$FM_SLOT_EXPORT" 2>/dev/null || true
   # The record is taken after the files are made read-only: bytes, inode and change time in nanoseconds of every file, so a
   # substitution that is restored before the run ends still changes an inode or a change time (D7 (a)).
   fm_slot_export_fingerprint "$FM_SLOT_EXPORT" >"$FM_SLOT_EXPORT_SUMS" || {
-    echo "error: slot provisioner source is not the primary clone's current main: the export could not be recorded" >&2
+    echo "error: the verified export of project clone provisioner $project/$rel could not be recorded; provisioning refused" >&2
     fm_slot_export_drop
     return 1
   }
@@ -500,14 +529,10 @@ fm_slot_foresee_refusals() { # <project> <copy> <task-id> <branch> <meta> <owned
     fm_slot_drift_report "$copy" "$id" "$branch" "$base" "$@"
     return 1
   fi
-  # The provisioner that would really run: the copy's own, or for a copy that predates it the verified primary
-  # clone export (D7). Its read-only manifest check, when it has one, names a manifest collision before the stop.
-  script=$copy/scripts/git-stability/provision_existing_slot.py
-  FM_SLOT_PYARGS=()
-  if [ ! -f "$script" ]; then
-    fm_slot_primary_provisioner "$project" || return 1
-    script=$FM_SLOT_PROVISIONER
-  fi
+  # The provisioner that would really run: the registered clone's verified export on every route, never the copy's file
+  # (fm_slot_origin_provisioner). Its read-only manifest check, when it has one, names a manifest collision before the stop.
+  fm_slot_origin_provisioner "$project" || return 1
+  script=$FM_SLOT_PROVISIONER
   if ! grep -q -e '--check-manifest-only' "$script" 2>/dev/null; then
     # A pinned provisioner without the read-only check and without a same-owner arm refuses every existing manifest at
     # its create-only path (D8), so the same two record paths its own writer uses are read here, and a manifest found
@@ -630,11 +655,10 @@ fm_slot_adopt_route() { # <meta> <relocating 0|1>
   [ "$(fm_meta_get "$1" recovery)" != slot-provision-refused ]
 }
 
-# 0 when a relaunch of <meta>'s task may run the primary clone's verified provisioner for a copy that predates it (D7):
-# every relaunch except the recovery of a first provisioning that was refused, which keeps its prior behavior (D4(c))
-# and so still requires the script in the assigned copy.
-fm_slot_primary_route_allowed() { # <meta>
-  [ "$(fm_meta_get "$1" recovery)" != slot-provision-refused ]
+# 0 when a relaunch of <meta>'s task recovers a first provisioning that was refused. That route keeps its prior behavior
+# (D4(c)) and still refuses a copy that lacks the script (FM_SLOT_RECOVERY_COPY_CHECK); every other route does not ask.
+fm_slot_recovery_route() { # <meta>
+  [ "$(fm_meta_get "$1" recovery)" = slot-provision-refused ]
 }
 
 # The custody decision of a relaunch that provisions a manifest on its own copy (no recorded manifest): named by the same

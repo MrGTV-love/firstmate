@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # fm-control.sh relaunch of a governed task that has no recorded slot manifest (the provisioning route).
 #
-# Two behaviors: a copy that predates the provisioner is provisioned by the primary clone's current main
-# (and the next relaunch then adopts the recorded manifest instead of provisioning again), and every provisioning
-# refusal the recorded facts foresee is named before the running agent is stopped, with the record unchanged.
+# Two behaviors: a copy that predates the provisioner is provisioned by the clone's verified export of its fetched origin
+# version, as every route is (and the next relaunch then adopts the recorded manifest instead of provisioning again),
+# and every provisioning refusal the recorded facts foresee is named before the running agent is stopped, with the
+# record unchanged.
 # The fixture provisioner is create-only and counts its runs (tests/fm-control-relaunch-slot-helpers.sh).
 # Shared fixtures: tests/fm-control-relaunch-helpers.sh.
 
@@ -23,12 +24,12 @@ assert_refused_before_stop() { # <case-dir> <id> <reason> <label> <out> <rc> <me
   [ ! -s "$dir/provisioner.called" ] || fail "$label ran the provisioner"
 }
 
-# D7: the copy predates the provisioner, the project's primary clone holds it. The relaunch needs no --owned-path.
+# D7: the copy predates the provisioner, the project's clone holds it. The relaunch needs no --owned-path.
 test_old_copy_is_provisioned_by_the_primary_clone_then_adopted() {
   local id=nomanold out rc sum
   make_noman_case noman-old "$id" 0 README.md
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
-  expect_code 0 "$rc" "an old copy must be provisioned by the primary clone's provisioner"$'\n'"$out"
+  expect_code 0 "$rc" "an old copy must be provisioned by the clone's verified provisioner"$'\n'"$out"
   [ "$(wc -l < "$ADOPT_SENTINEL" | tr -d ' ')" = 1 ] || fail "the provisioner did not run exactly once: $(cat "$ADOPT_SENTINEL")"
   grep -F -- "--worktree-path" "$ADOPT_SENTINEL" | grep -F "$ADOPT_DIR/wt" >/dev/null || fail 'the provisioner was not pointed at the old copy'
   [ "$(meta_field "$ADOPT_DIR" "$id" slot_manifest)" = "$ADOPT_MANIFEST" ] || fail 'the record did not gain the manifest'
@@ -43,21 +44,21 @@ PY
   expect_code 0 "$rc" "the next relaunch must adopt the recorded manifest"$'\n'"$out"
   [ "$(wc -l < "$ADOPT_SENTINEL" | tr -d ' ')" = 1 ] || fail 'the second relaunch ran the provisioner again'
   [ "$sum" = "$(shasum -a 256 "$ADOPT_MANIFEST")" ] || fail 'the second relaunch changed the manifest'
-  pass "fm-control relaunch: an old copy is provisioned by the primary clone's provisioner once, then adopted"
+  pass "fm-control relaunch: an old copy is provisioned by the clone's verified provisioner once, then adopted"
 }
 
-# The provisioner the primary clone would run must hold the default branch tip's bytes.
-test_primary_provisioner_must_match_the_default_tip() {
+# The provisioner the clone would run must hold the bytes of its fetched origin version.
+test_clone_provisioner_must_match_its_fetched_origin_version() {
   local id=nomandrift out rc before
   make_noman_case noman-drift "$id" 0 README.md
   printf '# locally modified\n' >> "$ADOPT_DIR/proj/scripts/git-stability/provision_existing_slot.py"
   before=$(cat "$ADOPT_META")
   out=$(run_adopt_control "$ADOPT_DIR" "$id"); rc=$?
-  expect_code 1 "$rc" "a modified primary provisioner must be refused: $out"
-  assert_contains "$out" "is not the primary clone's current main" 'the refusal did not name the provisioner source'
+  expect_code 1 "$rc" "a modified clone provisioner must be refused: $out"
+  assert_contains "$out" "differs from fetched origin version" 'the refusal did not name the provisioner source'
   [ ! -s "$ADOPT_SENTINEL" ] || fail 'the modified provisioner ran'
   [ ! -e "$ADOPT_MANIFEST" ] || fail 'a manifest was created from a modified provisioner'
-  pass "fm-control relaunch: a primary provisioner that differs from the default tip is refused by name"
+  pass "fm-control relaunch: a clone provisioner that differs from its fetched origin version is refused by name"
 }
 
 # D8: every foreseeable provisioning refusal is named before the agent is stopped, and the record is unchanged.
@@ -158,7 +159,7 @@ test_a_copy_another_task_records_is_refused_before_the_stop_on_the_provisioning_
 
 control_relaunch_test_cases=(
 test_old_copy_is_provisioned_by_the_primary_clone_then_adopted
-test_primary_provisioner_must_match_the_default_tip
+test_clone_provisioner_must_match_its_fetched_origin_version
 test_foreseen_refusals_come_before_the_stop
 test_committed_out_of_scope_refusal_names_every_path_and_the_report
 test_manifest_exists_refusal_names_the_collision_the_memory_hashes
