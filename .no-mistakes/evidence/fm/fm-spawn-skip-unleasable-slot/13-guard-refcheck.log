@@ -1,0 +1,25 @@
+ok - a registration naming an existing script is clean
+ok - a registration naming a missing script fails
+ok - a json filename is not mistaken for a script path
+ok - a missing registry owner path fails
+ok - a missing registry test path fails
+ok - a registry test list whose every path resolves is clean
+ok - a registry test list with one missing path fails
+ok - a registry test list naming no path fails ('')
+ok - a registry test list naming no path fails (',')
+ok - a registry test list naming no path fails (', ,')
+ok - a registry test path with an inner space that names no file fails
+ok - a registry test list whose items carry outer spaces is clean
+ok - the second trimmed registry test item is checked too
+ok - a registry test path holding \u0000 fails
+ok - a registry test path holding \u0001 fails
+ok - a registry owner holding a newline between two existing paths fails
+ok - a registry spec path that resolves is clean
+ok - a missing registry spec path fails
+ok - a retired guard referenced from tracked code fails
+ok - a retired id named only by its changelog and retirement test stays clean
+ok - a file naming the retirement test's path stays clean
+ok - the bare id beside the retirement test's path still fails
+ok - a missing registry is left to the lint
+ok - fm-guard-refcheck
+bash tests/fm-guard-refcheck.test.sh  2.20s user 5.56s system 62% cpu 12.486 total

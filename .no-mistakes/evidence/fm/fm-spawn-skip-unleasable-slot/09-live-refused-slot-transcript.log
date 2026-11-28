@@ -1,0 +1,45 @@
+
+===== pool state BEFORE spawn (real treehouse, one row per slot: path, leased, lease_holder) =====
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/1/project	true	recovered: state file was corrupt or truncated; verify before reuse
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/2/project	null	-
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/3/project	null	-
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/4/project	null	-
+
+===== pool hand-out order typed by the stub pane (refused slot first) =====
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/1/project
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/2/project
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/3/project
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/4/project
+
+===== $ bin/fm-spawn.sh evidence-recovered-slot <project> --mode no-mistakes --yolo off   (output) =====
+warning: task evidence-recovered-slot: /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/home/data/evidence-recovered-slot/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/home/data/evidence-recovered-slot/launch-brief.md records no ship branch; defaulting to legacy branch fm/evidence-recovered-slot
+warning: /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/home/data/evidence-recovered-slot/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skipped: copy /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/1/project already carries another holder's lease in the pool state (holder: recovered: state file was corrupt or truncated; verify before reuse); this spawn wrote nothing to it; taking another copy
+skill selection for evidence-recovered-slot: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+copies left untouched (each already carries another holder's lease, so this home holds no lease on it and wrote nothing to it; record: /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/home/data/evidence-recovered-slot/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/1/project (already carries another holder's lease in the pool state (holder: recovered: state file was corrupt or truncated; verify before reuse); this spawn wrote nothing to it)
+spawned evidence-recovered-slot harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-evidence-recovered-slot worktree=/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/2/project
+
+===== exit status =====
+0
+
+===== state/evidence-recovered-slot.meta worktree line =====
+worktree=/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/2/project
+
+===== data/evidence-recovered-slot/skipped-copies.tsv =====
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/1/project	already carries another holder's lease in the pool state (holder: recovered: state file was corrupt or truncated; verify before reuse); this spawn wrote nothing to it	recovered: state file was corrupt or truncated; verify before reuse	1795840704	firstmate:fm-evidence-recovered-slot
+
+===== pool state AFTER spawn =====
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/1/project	true	recovered: state file was corrupt or truncated; verify before reuse
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/2/project	null	-
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/3/project	null	-
+/Users/charlesabrooker/tmp/fm-spawn-real-treehouse.V6GzgY/evidence/th-root/.treehouse/project-62abfe/4/project	null	-
+
+===== refused slot unchanged? (worktree digest, raw state entry bytes, slot folder listing) =====
+worktree digest: identical
+state entry bytes: identical
+slot folder: identical
+
+===== treehouse calls the spawn made (stand-in log over real binary) =====

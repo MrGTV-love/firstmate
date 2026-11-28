@@ -1,0 +1,3 @@
+ok - tmux an abort after a pass-over interrupts the in-flight get, keeps the pane in the passed-over copy and leaves that copy untouched
+ok - tmux the pass-over in-flight case rejects an abort that leaves the second get running
+ok - tmux an abort after a pass-over whose get survives the interrupt says the pane is not settled and records it

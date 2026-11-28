@@ -1,0 +1,51 @@
+
+===== lab session: fm-lab-passover-37333-24905 (non-default, provisioned with bin/fm-herdr-lab.sh) =====
+
+===== pool state BEFORE (path, leased, lease_holder) =====
+/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj	true	other-holder
+
+===== $ HERDR_SESSION=fm-lab-passover-37333-24905 bin/fm-spawn.sh hlpass1 <proj> "sh -c 'echo ok'" --backend herdr --mode no-mistakes --yolo off =====
+
+===== launcher identity: HERDR_PANE_ID=w1:p1 HERDR_SOCKET_PATH=/Users/charlesabrooker/.config/herdr/sessions/fm-lab-passover-37333-24905/herdr.sock =====
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.oJAsIE
+warning: task hlpass1: /Users/charlesabrooker/tmp/fm-lab.oJAsIE/data/hlpass1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.oJAsIE/data/hlpass1/launch-brief.md records no ship branch; defaulting to legacy branch fm/hlpass1
+warning: /Users/charlesabrooker/tmp/fm-lab.oJAsIE/data/hlpass1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+warning: herdr presentation could not publish an exact restart binding; this task will use flat fallback after a restart
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 61s; no path/output progress for 0s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (it is an isolated worktree, but no second read agreed with it)
+skipped: copy /Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj already carries another holder's lease in the pool state (holder: other-holder); this spawn wrote nothing to it; taking another copy
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 185s; no path/output progress for 61s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 246s; no path/output progress for 122s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 308s; no path/output progress for 184s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 369s; no path/output progress for 245s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 431s; no path/output progress for 307s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 492s; no path/output progress for 368s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 553s; no path/output progress for 429s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 614s; no path/output progress for 490s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 675s; no path/output progress for 551s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj' (the pane is still in a copy this spawn skipped)
+error: treehouse get did not enter an isolated worktree after 11 polls (no path or output progress for 600s) (last seen '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj': the pane is still in a copy this spawn skipped; spawning project '/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/proj'; copies skipped by this spawn: /Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj); aborting acquisition
+copies left untouched (each already carries another holder's lease, so this home holds no lease on it and wrote nothing to it; record: /Users/charlesabrooker/tmp/fm-lab.oJAsIE/data/hlpass1/skipped-copies.tsv):
+  /Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj (already carries another holder's lease in the pool state (holder: other-holder); this spawn wrote nothing to it)
+error: acquisition pane fm-lab-passover-37333-24905:w2:p2 (fm-lab-passover-37333-24905:w2:p2) is left open after a pass-over and is not settled: the herdr backend did not report the pane's foreground processes, so an interrupt was sent but no treehouse get in it is proved cancelled; this abort is not clean: inspect the pane and the copies it stands in (treehouse status) before closing it (record: /Users/charlesabrooker/tmp/fm-lab.oJAsIE/data/hlpass1/acquisition-pane.tsv)
+exit status: 1
+
+===== stand-in get calls typed into the real Herdr pane =====
+51596 get
+58475 get
+
+===== data/hlpass1/acquisition-pane.tsv =====
+fm-lab-passover-37333-24905:w2:p2	unobservable	the herdr backend did not report the pane's foreground processes, so an interrupt was sent but no treehouse get in it is proved cancelled	1795841726
+
+===== data/hlpass1/skipped-copies.tsv =====
+/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj	already carries another holder's lease in the pool state (holder: other-holder); this spawn wrote nothing to it	other-holder	1795841713	fm-lab-passover-37333-24905:w2:p2
+
+===== state/hlpass1.meta present? =====
+ls: /Users/charlesabrooker/tmp/fm-lab.oJAsIE/state/hlpass1.meta: No such file or directory
+
+===== Herdr panes in the lab session after the run (pane_id, cwd as Herdr lists it; Herdr may list the start cwd, the spawn reads the live path) =====
+w1:p1	/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R
+w2:p2	/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/proj
+
+===== pool state AFTER =====
+/Users/charlesabrooker/tmp/fm-herdr-passover.lozy1R/th-root/.treehouse/proj-9505a2/1/proj	true	other-holder
+pool state file: byte-identical

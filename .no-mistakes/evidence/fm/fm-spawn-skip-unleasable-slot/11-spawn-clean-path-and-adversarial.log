@@ -1,0 +1,4 @@
+ok - a clean copy whose one pool row is positively unleased is claimed and used, as before
+ok - text that says 'already leased', with no such lease in the pool state, does not skip the copy
+ok - a second row for one copy - same name or path, or a symlink alias under another name, with either holder in either order - refuses the whole spawn before any claim
+bash tests/fm-spawn-real-treehouse.test.sh     22.10s user 52.40s system 53% cpu 2:20.33 total

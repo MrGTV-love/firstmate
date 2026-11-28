@@ -1,0 +1,12 @@
+$ bin/fm-test-run.sh --list --family real-treehouse
+tests/fm-control-relaunch-real-treehouse.test.sh
+tests/fm-spawn-acquisition-real-treehouse.test.sh
+tests/fm-spawn-real-treehouse.test.sh
+tests/fm-teardown-pool-real-treehouse.test.sh
+
+$ bin/fm-test-run.sh --list --changed --base c4a207ac3 | grep real-treehouse
+tests/fm-control-relaunch-real-treehouse.test.sh
+tests/fm-spawn-acquisition-real-treehouse.test.sh
+tests/fm-spawn-real-treehouse.test.sh
+tests/fm-teardown-pool-real-treehouse.test.sh
+tests/fm-teardown-real-treehouse.test.sh

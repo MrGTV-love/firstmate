@@ -1,0 +1,6 @@
+ok - when every copy carries another holder's lease the spawn ends in one refusal that names each copy and its reason
+ok - a refused copy handed out again is not taken, tried again or looped on, and the spawn ends within its bound
+ok - an abort leaves a pane in a passed-over copy open, and an abort before any copy closes the pane it created
+ok - a governed refusal after a pass-over names its recovery record and the abort stays not clean
+ok - an abort after a passed-over copy and a clean copy was reached leaves the pane open at the claim, the base check and the hold
+ok - a foreign marker beside a passed-over copy keeps its bytes; the claim trace and the rm and mv log never name it, and the next clean copy is claimed

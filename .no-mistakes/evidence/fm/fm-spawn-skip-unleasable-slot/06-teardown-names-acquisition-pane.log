@@ -1,0 +1,3 @@
+ok - teardown releases a skipped copy only when it is clean and landed, idle, and still this task's lease
+ok - every skipped-copy notice says teardown does not check the acquisition window, in every world and on Herdr
+bash tests/fm-teardown-pool.test.sh    10.01s user 20.16s system 49% cpu 1:01.19 total

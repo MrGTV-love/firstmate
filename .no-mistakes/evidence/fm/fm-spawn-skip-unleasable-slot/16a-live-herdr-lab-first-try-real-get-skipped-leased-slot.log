@@ -1,0 +1,39 @@
+NOTE (added after the run): first try. The pane shell's own rc files put the REAL treehouse first on PATH, so the real 'treehouse get' skipped the leased slot 1 and made a new clean slot 2 on the scratch pool. No pass-over and no abort happened; the spawn succeeded in slot 2 (normal path on real Herdr). 'pool state file: CHANGED' means slot 2 was added; slot 1 kept other-holder. The 'after the abort' header below is wrong for this try: read it as 'after the run'.
+
+===== lab session: fm-lab-passover-49614-24315 (non-default, provisioned with bin/fm-herdr-lab.sh) =====
+
+===== pool state BEFORE (path, leased, lease_holder) =====
+/Users/charlesabrooker/tmp/fm-herdr-passover.OFbLMp/th-root/.treehouse/proj-1967d8/1/proj	true	other-holder
+
+===== $ HERDR_SESSION=fm-lab-passover-49614-24315 bin/fm-spawn.sh hlpass1 <proj> "sh -c 'echo ok'" --backend herdr --mode no-mistakes --yolo off =====
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.nZD71F
+warning: task hlpass1: /Users/charlesabrooker/tmp/fm-lab.nZD71F/data/hlpass1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.nZD71F/data/hlpass1/launch-brief.md records no ship branch; defaulting to legacy branch fm/hlpass1
+warning: /Users/charlesabrooker/tmp/fm-lab.nZD71F/data/hlpass1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+waiting: treehouse get to enter an isolated worktree; foreground running; elapsed 61s; no path/output progress for 0s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.OFbLMp/proj' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 122s; no path/output progress for 0s; last path '/Users/charlesabrooker/tmp/fm-herdr-passover.OFbLMp/th-root/.treehouse/proj-1967d8/2/proj' (it is an isolated worktree, but no second read agreed with it)
+skill selection for hlpass1: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sh write_confinement=unconfined-macos-sh
+spawned hlpass1 harness=sh kind=ship mode=no-mistakes yolo=off window=fm-lab-passover-49614-24315:w1:p2 worktree=/Users/charlesabrooker/tmp/fm-herdr-passover.OFbLMp/th-root/.treehouse/proj-1967d8/2/proj
+exit status: 0
+
+===== stand-in get calls typed into the real Herdr pane =====
+cat: /Users/charlesabrooker/tmp/fm-herdr-passover.OFbLMp/get.log: No such file or directory
+
+===== data/hlpass1/acquisition-pane.tsv =====
+cat: /Users/charlesabrooker/tmp/fm-lab.nZD71F/data/hlpass1/acquisition-pane.tsv: No such file or directory
+
+===== data/hlpass1/skipped-copies.tsv =====
+cat: /Users/charlesabrooker/tmp/fm-lab.nZD71F/data/hlpass1/skipped-copies.tsv: No such file or directory
+
+===== state/hlpass1.meta present? =====
+/Users/charlesabrooker/tmp/fm-lab.nZD71F/state/hlpass1.meta
+
+===== Herdr panes in the lab session after the abort (pane_id, cwd) =====
+w1:p2	/Users/charlesabrooker/tmp/fm-herdr-passover.OFbLMp/proj
+
+===== pool state AFTER =====
+/Users/charlesabrooker/tmp/fm-herdr-passover.OFbLMp/th-root/.treehouse/proj-1967d8/1/proj	true	other-holder
+/Users/charlesabrooker/tmp/fm-herdr-passover.OFbLMp/th-root/.treehouse/proj-1967d8/2/proj	null	-
+pool state file: CHANGED

@@ -1,0 +1,11 @@
+ok - a-kept: on a real pool slot the close keeps the copy and the lease, the unique files restore to the builder's hashes and the control is left out
+ok - a-released: the unique file is preserved with its hash, the control is gone with the copy and unpreserved, and the real binary returned the slot
+ok - b-process: a copy with a foreign process inside it is refused naming the process, the process is left running, and the copy, the task and the real lease are unchanged
+ok - b-record: a copy another task's record names is refused naming that task, with the copy and the real lease unchanged
+ok - b-claim: a slot another task now claims is left untouched (no driver call, no return), with the copy, the claim and the real lease unchanged
+ok - c-race: a real start racing the close, and one after it, never received the held slot; the copy, the claim and the real lease are unchanged
+ok - c-race-unleased: on an unleased real slot, racing starts never received it, the close leased it, and the copy is unchanged
+ok - c-late-file: an ignored file created while the driver runs refuses the first close with the copy, claim and real lease unchanged, and the next run assesses the changed copy once and closes around it
+ok - f-sweep-race: a real copy-sweep apply and report during a teardown held in the driver listed the copy, called the driver no more and wrote no second tar
+ok - the scratch tmux server starts and keeps its socket path short under a TMPDIR of 172 bytes
+bash tests/fm-teardown-real-treehouse.test.sh  59.72s user 92.35s system 54% cpu 4:37.85 total

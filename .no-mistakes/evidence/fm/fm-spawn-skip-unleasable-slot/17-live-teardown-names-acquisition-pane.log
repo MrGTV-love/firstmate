@@ -1,0 +1,24 @@
+
+===== real `treehouse status --json` rows (path, lease_holder, processes) with a process of this driver (pid 66544) in the own slot =====
+{"path":"/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/1/project","lease_holder":"other-holder","processes":[]}
+{"path":"/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/2/project","lease_holder":"firstmate-skipped:task-x1","processes":[{"pid":66544,"name":"sleep"}]}
+
+===== skipped-copies.tsv BEFORE teardown =====
+/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/1/project	passed over	other-holder	1	@42
+/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/2/project	dirty_tree	firstmate-skipped:task-x1	1	@41
+
+===== bin/fm-teardown.sh task-x1 exit 0; stderr lines about skipped copies =====
+notice: the record row for /Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/1/project names holder 'other-holder', not this task's firstmate-skipped:task-x1; that lease is not this task's, so nothing is returned and the row is left as it is (acquisition pane @42 of the spawn stood in it; teardown does not check that window, so it may still be live)
+warning: leaving /Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/2/project leased to firstmate-skipped:task-x1: 1 process(es) are running inside it (acquisition pane @41 of the spawn stood in it; teardown does not check that window, so it may still be live) (skipped for: dirty_tree)
+  release it by hand once it is landed or unwanted: (cd '/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/project' && treehouse return '/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/2/project' --if-lease-holder 'firstmate-skipped:task-x1' </dev/null)
+
+===== skipped-copies.tsv AFTER teardown =====
+/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/1/project	passed over	other-holder	1	@42
+/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/2/project	dirty_tree	firstmate-skipped:task-x1	1	@41
+
+===== returns run by teardown =====
+return --force /Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/wt
+
+===== pool leases AFTER =====
+/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/1/project	other-holder
+/Users/charlesabrooker/tmp/fm-teardown-tests.YoTV1c/evidence-busy/th-root/.treehouse/project-b8cbb4/2/project	firstmate-skipped:task-x1

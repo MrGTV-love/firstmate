@@ -1,0 +1,2 @@
+ok - teardown returns a skipped copy only under the exact holder this task leased it with, never a lookalike holder, with the real treehouse
+bash tests/fm-teardown-pool-real-treehouse.test.sh  3.16s user 7.83s system 57% cpu 18.969 total
