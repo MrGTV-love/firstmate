@@ -1224,6 +1224,8 @@ db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-12', 
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm---', 'openai')")
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm-5.4\u017f-2', 'anthropic')")
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'z\u00e4i/glm-5.4', 'openai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'zai/glm-5.4/', 'openai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'z\u00e4i/glm-5.4/', 'anthropic')")
 db.commit()
 PY2
   case_dir=$(make_case zhipu-provider-no-widening claude-opus-5-5)
@@ -1231,8 +1233,8 @@ PY2
     || fail "record provider-boundary PASS"
   out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
     --task task-x1 --base "$BASE") || fail "plan failed on non-zhipu provider alias db"
-  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] | length == 9' <<<"$out" >/dev/null \
-    || fail "gpt/OpenAI/moonshot-long-s and malformed/non-ASCII zhipu models under any provider must all stay no-mistakes:unknown: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] | length == 11' <<<"$out" >/dev/null \
+    || fail "gpt/OpenAI/moonshot-long-s and malformed/non-ASCII/trailing-slash zhipu models under any provider must all stay no-mistakes:unknown: $out"
   "$JQ_BIN" -e '.groups["no-mistakes:openai"] == null and .groups["no-mistakes:anthropic"] == null and .groups["no-mistakes:moonshot"] == null and .groups["no-mistakes:zhipu"] == null' \
     <<<"$out" >/dev/null || fail "malformed models and non-Zhipu providers must not widen attribution: $out"
 
@@ -1256,32 +1258,42 @@ PY2
   expect_code 1 "$rc" "control: without zhipu mapping zai/glm-5.4 must refuse as unknown: $out"
   expect_not_qualified "$out" "unknown" "zhipu positive control refusal"
 
-  # 6. Protection sensitivity controls: each guard is mutated independently so
-  # weakening ASCII/tail validation, widening PROVIDER_FAMILIES, or dropping the
-  # Zhipu empty-model fill guard is proven observable by our negative probes.
-  local weak_copy="$TMP_ROOT/zhipu-weak-control-bin"
-  cp -R "$ROOT/bin" "$weak_copy"
-  python3 - "$weak_copy/fm-review-record.py" <<'PY2' || fail "plant protection sensitivity control"
+  # 6. Protection sensitivity controls: each guard is mutated in its own copy so
+  # weakening ASCII/tail validation, widening PROVIDER_FAMILIES, dropping the
+  # Zhipu empty-model fill guard, or dropping zhipu_rejected in provider fill is
+  # independently proven observable by our negative probes.
+  local weak_model_copy="$TMP_ROOT/zhipu-weak-model-control-bin"
+  cp -R "$ROOT/bin" "$weak_model_copy"
+  python3 - "$weak_model_copy/fm-review-record.py" <<'PY2' || fail "plant model sensitivity control"
 import sys
 p = sys.argv[1]
 s = open(p).read()
 n1 = '    if family == "zhipu" and zhipu_rejected(value):\n        return "unknown"\n'
-n2 = 'provider_family = PROVIDER_FAMILIES.get(provider)'
-assert s.count(n1) == 1 and s.count(n2) == 1, "protection lines not found"
-s = s.replace(n1, '').replace(n2, 'provider_family = FAMILIES.get(provider.casefold())')
-open(p, "w").write(s)
+assert s.count(n1) == 1, "model zhipu_rejected line not found"
+open(p, "w").write(s.replace(n1, ''))
 PY2
   case_dir=$(make_case zhipu-weak-tail claude-opus-5-5)
-  RECORD="$weak_copy/fm-review-record.py" record_review "$case_dir" "$HEAD1" PASS "$long_s_id" '{"ship":["claude-opus-5-5"]}' >/dev/null \
+  RECORD="$weak_model_copy/fm-review-record.py" record_review "$case_dir" "$HEAD1" PASS "$long_s_id" '{"ship":["claude-opus-5-5"]}' >/dev/null \
     || fail "record weak-tail control PASS"
   rc=0
-  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$weak_copy/fm-review-record.py" verify --pr "$URL" \
+  out=$(NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$weak_model_copy/fm-review-record.py" verify --pr "$URL" \
     --head "$HEAD1" --task task-x1 --base "$BASE" --review-only --json) || rc=$?
-  expect_code 0 "$rc" "protection control: dropping ASCII/tail validation must let $long_s_id pass, or this test observes nothing: $out"
-  out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
+  expect_code 0 "$rc" "protection control: dropping ASCII/tail validation alone must let $long_s_id pass, or this test observes nothing: $out"
+
+  local weak_prov_copy="$TMP_ROOT/zhipu-weak-prov-control-bin"
+  cp -R "$ROOT/bin" "$weak_prov_copy"
+  python3 - "$weak_prov_copy/fm-review-record.py" <<'PY2' || fail "plant provider lookup sensitivity control"
+import sys
+p = sys.argv[1]
+s = open(p).read()
+n2 = 'provider_family = PROVIDER_FAMILIES.get(provider)'
+assert s.count(n2) == 1, "provider lookup line not found"
+open(p, "w").write(s.replace(n2, 'provider_family = FAMILIES.get(provider.casefold())'))
+PY2
+  out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_prov_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
     --task task-x1 --base "$BASE") || fail "weak provider control plan failed"
-  "$JQ_BIN" -e '.groups["no-mistakes:openai"] != null and .groups["no-mistakes:moonshot"] != null' <<<"$out" >/dev/null \
-    || fail "protection control: widening PROVIDER_FAMILIES must attribute gpt/OpenAI/long-s: $out"
+  "$JQ_BIN" -e '(.groups["no-mistakes:openai"] | map(.model) | index("mystery-9") != null and index("mystery-10") != null) and .groups["no-mistakes:moonshot"] != null' <<<"$out" >/dev/null \
+    || fail "protection control: widening PROVIDER_FAMILIES alone must attribute gpt/OpenAI/long-s: $out"
 
   local weak_fill_copy="$TMP_ROOT/zhipu-weak-fill-control-bin"
   cp -R "$ROOT/bin" "$weak_fill_copy"

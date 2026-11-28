@@ -260,11 +260,16 @@ def nonempty(value, field):
 def zhipu_rejected(value):
     if not isinstance(value, str) or not value:
         return False
-    tail = value.casefold().rsplit("/", 1)[-1]
-    name = re.match(r"([a-z]*)(\d*)", tail)
-    if FAMILIES.get(name.group(1)) != "zhipu":
+    segments = value.casefold().split("/")
+    if not any(FAMILIES.get(re.match(r"([a-z]*)", seg).group(1)) == "zhipu" for seg in segments):
         return False
-    return not value.isascii() or not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail)
+    tail = segments[-1]
+    tail_family = FAMILIES.get(re.match(r"([a-z]*)", tail).group(1))
+    return (
+        tail_family != "zhipu"
+        or not value.isascii()
+        or not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail)
+    )
 
 
 def model(value, field):
