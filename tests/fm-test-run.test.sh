@@ -804,16 +804,19 @@ test_partition_checks_judge_loss_and_duplication() {
 # The teardown groups partition one suite: every case a group file
 # defines is registered by that file, and no case is registered by two groups.
 test_teardown_groups_register_each_case_once() {
-  assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse
+  assert_partition_exact teardown array teardown_test_cases '' \
+    fm-teardown fm-teardown-pool fm-teardown-pool-nested \
+    fm-teardown-cleanup fm-teardown-docker fm-teardown-retained fm-teardown-closeout \
+    fm-teardown-real-treehouse
   pass "the teardown groups are a duplicate-free cover, each case registered by the file that defines it"
 }
 
 # Each group must stay independently runnable and keep its lane coverage: the
-# shared helper change selects all three, and the pr-forge family still owns the
+# shared helper change selects all groups, and the pr-forge family still owns the
 # landing and cleanup paths the former single file carried.
 test_teardown_groups_share_helper_and_stay_selectable() {
   local tmp repo listed listed_alone family script group helper lock_helper
-  local -a groups=(fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse)
+  local -a groups=(fm-teardown fm-teardown-pool fm-teardown-pool-nested fm-teardown-cleanup fm-teardown-docker fm-teardown-retained fm-teardown-closeout fm-teardown-real-treehouse)
   helper=fm-teardown-helpers
   helper=$helper.sh
   lock_helper=git-lock-helpers
@@ -1168,6 +1171,7 @@ test_changed_watch_helpers_select_runnable_consumers() {
   cp -R "$ROOT/bin/." "$repo/bin/"
   cp "$ROOT/tests/fm-pi-watch-loader-live.test.sh" "$repo/tests/"
   printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-omp-harness.test.sh"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-omp-harness-watch.test.sh"
   : >"$repo/tests/fm-pi-watch-loader-live.test.mjs"
   : >"$repo/tests/watch-lifecycle-expiry.mjs"
   git -C "$repo" add bin tests
@@ -1178,7 +1182,7 @@ test_changed_watch_helpers_select_runnable_consumers() {
       || fail "$path failed changed-test selection"
     case "$path" in
       fm-pi-watch-loader-live.test.mjs) expected=tests/fm-pi-watch-loader-live.test.sh ;;
-      watch-lifecycle-expiry.mjs) expected=$(printf '%s\n' tests/fm-omp-harness.test.sh tests/fm-pi-watch-extension.test.sh) ;;
+      watch-lifecycle-expiry.mjs) expected=$(printf '%s\n' tests/fm-omp-harness-watch.test.sh tests/fm-omp-harness.test.sh tests/fm-pi-watch-extension.test.sh) ;;
     esac
     [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] || fail "$path selected incorrect consumers: $listed"
     git -C "$repo" add "tests/$path"
@@ -2166,13 +2170,14 @@ test_list_scheduled_non_lane_selections_use_serial_weights() {
 }
 
 test_portable_shard_union_and_coverage_guard() {
-  local s1 s2 proven serial herdr all_count union_count overlap out lane
+  local s1 s2 proven family_parallel serial herdr all_count union_count overlap out lane
   s1=$("$RUNNER" --list --lane portable-parallel-1)
   s2=$("$RUNNER" --list --lane portable-parallel-2)
   proven=$("$RUNNER" --list --proven-isolated)
+  family_parallel=$("$RUNNER" --list --lane portable-family-parallel)
   serial=$("$RUNNER" --list --lane portable-serial)
   herdr=$("$RUNNER" --list --family real-herdr-gated)
-  [ -n "$s1" ] && [ -n "$s2" ] || fail "portable parallel shards must be non-empty"
+  [ -n "$s1" ] && [ -n "$s2" ] && [ -n "$family_parallel" ] || fail "portable parallel and family-parallel lanes must be non-empty"
   # Shards disjoint.
   overlap=$(comm -12 <(printf '%s\n' "$s1" | LC_ALL=C sort) <(printf '%s\n' "$s2" | LC_ALL=C sort) || true)
   [ -z "$overlap" ] || fail "portable parallel shards overlap: $overlap"
@@ -2181,18 +2186,18 @@ test_portable_shard_union_and_coverage_guard() {
     "$(printf '%s\n' "$proven" | LC_ALL=C sort -u)" ] \
     || fail "shard union must equal proven-isolated set"
   # No herdr in portable lanes.
-  printf '%s\n' "$s1" "$s2" "$serial" | grep -Fq 'tests/fm-backend-herdr-smoke.test.sh' \
+  printf '%s\n' "$s1" "$s2" "$family_parallel" "$serial" | grep -Fq 'tests/fm-backend-herdr-smoke.test.sh' \
     && fail "portable lanes must not include real-herdr-gated smoke"
   printf '%s\n' "$herdr" | grep -Fq 'tests/fm-backend-herdr-smoke.test.sh' \
     || fail "herdr family must include smoke"
   out=$("$RUNNER" --check-coverage)
   assert_contains "$out" "FM_TEST_COVERAGE ok" "coverage guard success marker"
   all_count=$("$RUNNER" --list --all | wc -l | tr -d ' ')
-  union_count=$(printf '%s\n' "$s1" "$s2" "$serial" "$herdr" | LC_ALL=C sort -u | wc -l | tr -d ' ')
+  union_count=$(printf '%s\n' "$s1" "$s2" "$family_parallel" "$serial" "$herdr" | LC_ALL=C sort -u | wc -l | tr -d ' ')
   [ "$union_count" = "$all_count" ] \
     || fail "union of lanes ($union_count) must equal --all ($all_count)"
-  # No duplicates across the four partitions.
-  [ "$(printf '%s\n' "$s1" "$s2" "$serial" "$herdr" | LC_ALL=C sort | uniq -d | wc -l | tr -d ' ')" = "0" ] \
+  # No duplicates across the partitions.
+  [ "$(printf '%s\n' "$s1" "$s2" "$family_parallel" "$serial" "$herdr" | LC_ALL=C sort | uniq -d | wc -l | tr -d ' ')" = "0" ] \
     || fail "lanes must not duplicate scripts"
   # LPT execution order, asserted against the runner's own measured schedule
   # rather than against a script name: naming the current longest script here is
@@ -2452,9 +2457,9 @@ test_portable_serial_packing_budget_boundary() {
   sed -i.bak \
     -e 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=3/' \
     -e 's/^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=.*/PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=0/' \
-    -e 's/^tests\/fm-teardown\.test\.sh 0$/tests\/fm-teardown.test.sh 700000/' \
-    -e 's/^tests\/fm-watch-triage-waits\.test\.sh 0$/tests\/fm-watch-triage-waits.test.sh 700000/' \
-    -e 's/^tests\/fm-watcher-lock\.test\.sh 0$/tests\/fm-watcher-lock.test.sh 700000/' \
+    -e 's/^tests\/fm-control\.test\.sh 0$/tests\/fm-control.test.sh 700000/' \
+    -e 's/^tests\/fm-supervision-host\.test\.sh 0$/tests\/fm-supervision-host.test.sh 700000/' \
+    -e 's/^tests\/fm-control-relaunch\.test\.sh 0$/tests\/fm-control-relaunch.test.sh 700000/' \
     "$repo/bin/fm-test-run.sh"
   out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
   expect_code 1 "$rc" "a multi-script shard above the target must be refused beside a larger lone script"
@@ -2491,7 +2496,7 @@ start = text.index("portable_serial_weight_hints() {")
 end = text.index("\nEOF", start)
 text = text[:start] + re.sub(
     r"(?m)^(tests/[^ ]+\.test\.sh) [0-9]+$",
-    lambda match: f"{match[1]} {sys.argv[2] if match[1] == 'tests/fm-watch-triage.test.sh' else sys.argv[3]}",
+    lambda match: f"{match[1]} {sys.argv[2] if match[1] == 'tests/fm-copy-sweep.test.sh' else sys.argv[3]}",
     text[start:end],
 ) + text[end:]
 runner.write_text(text)
@@ -3299,7 +3304,7 @@ test_herdr_ci_family_run_has_a_step_timeout() {
 doc = YAML.load_file(ARGV[0])
 job = doc.fetch("jobs").fetch("tests-herdr")
 step = job.fetch("steps").find { |s|
-  s.is_a?(Hash) && s["name"] == "Run real-Herdr family (serial, required)"
+  s.is_a?(Hash) && s["id"] == "run-real-herdr-family"
 }
 raise "missing family-run step" if step.nil?
 raise "family-run step has no timeout-minutes" unless step.key?("timeout-minutes")

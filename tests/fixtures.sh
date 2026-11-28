@@ -394,7 +394,7 @@ fm_test_spawn_script() {
       rm -rf "$stage"
       git clone -q --no-hardlinks "$ROOT" "$stage" >/dev/null 2>&1 || return 1
     fi
-    (cd "$ROOT" && tar --exclude=.git --exclude=graft --exclude=node_modules -cf - .) | (cd "$stage" && tar -xf -) || { rm -rf "$stage"; return 1; }
+    (cd "$ROOT" && tar --exclude=./.git --exclude=./graft --exclude=./node_modules --exclude=./tests --exclude=./.worktrees --exclude=./.repair-worktrees --exclude=./.scratch --exclude=./.cache-npm --exclude=./.lavish --exclude=./_research --exclude='*.pkg' -cf - .) | (cd "$stage" && tar -xf -) || { rm -rf "$stage"; return 1; }
     printf '#!/bin/sh\nexit 0\n' > "$stage/bin/fm-home-summary-refresh.sh"
     chmod +x "$stage/bin/fm-home-summary-refresh.sh"
     if ! mv "$stage" "$tree" 2>/dev/null; then

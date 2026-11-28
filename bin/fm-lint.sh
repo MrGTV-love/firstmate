@@ -61,7 +61,8 @@
 # and ShellCheck binary. Identical concurrent misses share one check through flock.
 # Only successful, input-stable results are retained; findings always run again.
 # FM_LINT_CACHE_DIR overrides ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint;
-# "off" disables reuse. CI always disables reuse so every canonical root is checked.
+# "off" disables reuse. CI disables reuse by default so every canonical root is
+# checked unless FM_LINT_ALLOW_CI_CACHE=1 and FM_LINT_CACHE_DIR are both set.
 # Nothing prunes that directory; each key leaves small files until removed by hand.
 # A missing, unwritable or unresolvable cache falls back to real analysis.
 #
@@ -1802,7 +1803,9 @@ if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
 fi
 CACHE_DIR=${FM_LINT_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint}
 if [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
-  CACHE_DIR=off
+  if [ "${FM_LINT_ALLOW_CI_CACHE:-0}" != 1 ] || [ -z "${FM_LINT_CACHE_DIR:-}" ]; then
+    CACHE_DIR=off
+  fi
 fi
 if [ "$FAST" -eq 1 ]; then
   printf 'fm-lint.sh: fast local mode; ShellCheck extended analysis disabled\n' >&2
@@ -1839,9 +1842,9 @@ ROOT_GRACE=${FM_LINT_ROOT_GRACE:-5}
 # demand for the heaviest roots is near 5.5-6 GiB: the 8 GiB address-space
 # cap's ~5.33 GiB wall caught bin/fm-spawn.sh, bin/fm-teardown.sh,
 # tests/fm-pending-reply.test.sh, and
-# tests/fm-launch-prompt-signals-live-e2e.test.sh. CI runs one root per
-# lint job, so worst-case resident demand is ~8 GiB plus runner overhead,
-# inside the 16 GiB runner. Local lint defaults to two workers; two such
+# tests/fm-launch-prompt-signals-live-e2e.test.sh. CI runs up to FM_LINT_JOBS=2
+# workers per lint job (with ShellCheck cache opt-in via FM_LINT_ALLOW_CI_CACHE=1),
+# staying inside the 16 GiB hosted runner. Local lint also defaults to two workers;
 # caps allow ~16 GiB resident plus host overhead, so use FM_LINT_JOBS=1 on
 # smaller local machines. A root that exceeds its cap fails by name.
 # Never drop diagnostic rules or leave a source owner unchecked to fit a root

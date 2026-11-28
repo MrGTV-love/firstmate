@@ -3567,21 +3567,11 @@ open_loops_surface() {
   fi
   # Keep the legacy display-field identity and append the producer's opaque
   # current-row token; never infer an opening from mutable source or handling history.
-  ids=$(jq -rs '
-    if length == 1 then .[0] else error("expected one open-loop ledger") end
-    | if type == "object" and .schema == "fm-open-loops.v1"
-        and (.generated_epoch | type) == "number"
-        and (.home | type) == "string" and (.home | length) > 0
-        and (.complete | type) == "boolean" and (.rows | type) == "array"
-        and all(.rows[]; type == "object" and (.id | type) == "string"
-          and (.id | length) > 0 and (.overdue | type) == "boolean"
-          and (if has("current_identity") then
-            (.current_identity | type == "string" and test("^[0-9a-f]{24}$")) else true end))
-      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]
-        + (if has("current_identity") then [.current_identity] else [] end)]
-        | sort | .[] | @json
-      else error("invalid open-loop ledger") end
-  ' "$ledger" 2>/dev/null) || return 0
+  if ! declare -F fm_open_loops_extract_overdue_ids >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-open-loops-validate-lib.sh
+    . "$SCRIPT_DIR/fm-open-loops-validate-lib.sh"
+  fi
+  ids=$(fm_open_loops_extract_overdue_ids "$ledger") || return 0
   if [ -f "$ledger" ] && [ ! -L "$ledger" ] \
     && [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ]; then
     rm -f "$STATE/.open-loops-stale-surfaced"

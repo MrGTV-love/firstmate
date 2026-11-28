@@ -76,7 +76,7 @@ puts YAML.load_file(ARGV[0]).fetch("jobs").fetch(ARGV[1]).fetch("timeout-minutes
 # must join a tier, and a job-level value outside these tiers is exactly the
 # one-off number the policy removed.
 FAST_TIER_JOBS='test-coverage invariants tests-timing-aggregate'
-NORMAL_TIER_JOBS='lint tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-serial cpu-pass-concurrency macos-stock-bash'
+NORMAL_TIER_JOBS='lint tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-family-parallel tests-portable-serial cpu-pass-concurrency macos-stock-bash'
 HEAVY_TIER_JOBS='tests-herdr'
 
 # Print the one timeout every listed job shares; fail on any disagreement.
@@ -231,16 +231,23 @@ test_ci_matrices_match_executable_partitions() {
   ruby -ryaml -ropen3 - "$CI_WORKFLOW" "$ROOT" <<'RUBY' || fail "CI partition contract"
 jobs = YAML.load_file(ARGV[0]).fetch("jobs")
 root = ARGV[1]
-serial = jobs.fetch("tests-portable-serial").fetch("strategy")
-raise "serial failures must not cancel other shards" unless serial.fetch("fail-fast") == false
-matrix = serial.fetch("matrix")
-raise "unexpected serial dimensions" unless matrix.keys == ["shard"]
-shards = matrix.fetch("shard")
 lanes, status = Open3.capture2(File.join(root, "bin/fm-test-run.sh"), "--list-lanes")
 raise "cannot list runner lanes" unless status.success?
-actual = lanes.lines.map(&:strip).select { |l| l.match?(/\Aportable-serial-\d+of\d+\z/) }
-expected = shards.map { |s| "portable-serial-#{s}of#{shards.length}" }
-raise "CI matrix and runner disagree" unless actual.sort == expected.sort
+lane_lines = lanes.lines.map(&:strip)
+[
+  ["tests-portable-serial", "portable-serial"],
+  ["tests-portable-family-parallel", "portable-family-parallel"],
+  ["tests-herdr", "real-herdr-gated"],
+].each do |job_name, prefix|
+  strat = jobs.fetch(job_name).fetch("strategy")
+  raise "#{job_name} failures must not cancel other shards" unless strat.fetch("fail-fast") == false
+  m = strat.fetch("matrix")
+  raise "unexpected #{job_name} dimensions" unless m.keys == ["shard"]
+  shards = m.fetch("shard")
+  actual = lane_lines.select { |l| l.match?(/\A#{Regexp.escape(prefix)}-\d+of\d+\z/) }
+  expected = shards.map { |s| "#{prefix}-#{s}of#{shards.length}" }
+  raise "CI matrix and runner disagree for #{job_name}: #{actual} vs #{expected}" unless actual.sort == expected.sort
+end
 lint = jobs.fetch("lint").fetch("strategy")
 raise "lint failures must not cancel another partition" unless lint.fetch("fail-fast") == false
 matrix = lint.fetch("matrix")
@@ -261,14 +268,18 @@ RUBY
 # split into words, so the check is the --lane and --jobs the runner receives,
 # whichever spelling or flag order the step uses.
 test_parallel_lanes_pass_the_modeled_job_count() {
-  local jobs
-  jobs=$("$ROOT/bin/fm-test-run.sh" --check-coverage 2>/dev/null \
-    | sed -n 's/.*parallel_jobs=\([0-9][0-9]*\).*/\1/p')
+  local coverage jobs family_jobs
+  coverage=$("$ROOT/bin/fm-test-run.sh" --check-coverage 2>/dev/null)
+  jobs=$(printf '%s\n' "$coverage" | sed -n 's/.*parallel_jobs=\([0-9][0-9]*\).*/\1/p')
+  family_jobs=$(printf '%s\n' "$coverage" | sed -n 's/.*family_parallel_jobs=\([0-9][0-9]*\).*/\1/p')
   [ -n "$jobs" ] || fail "the runner did not report parallel_jobs, so CI cannot be checked against the model"
+  [ -n "$family_jobs" ] || fail "the runner did not report family_parallel_jobs, so CI cannot be checked against the model"
   [ "$jobs" -gt 1 ] || fail "parallel_jobs must be greater than one, got $jobs"
-  ruby -ryaml -rshellwords - "$CI_WORKFLOW" "$jobs" <<'RUBY' || fail "portable parallel CI job count"
+  [ "$family_jobs" -gt 1 ] || fail "family_parallel_jobs must be greater than one, got $family_jobs"
+  ruby -ryaml -rshellwords - "$CI_WORKFLOW" "$jobs" "$family_jobs" <<'RUBY' || fail "portable parallel CI job count"
 jobs = YAML.load_file(ARGV[0]).fetch("jobs")
 want = ARGV[1]
+want_family = ARGV[2]
 %w[1 2].each do |n|
   job = "tests-portable-parallel-#{n}"
   lane = "portable-parallel-#{n}"
@@ -293,8 +304,16 @@ want = ARGV[1]
   raise "#{job} must pass --jobs #{want}, the count CI runs and the model starts from, got #{options["jobs"].inspect}" \
     unless options["jobs"] == want
 end
+fam_cmds = jobs.fetch("tests-portable-family-parallel").fetch("steps").map { |s| s["run"] }.compact.flat_map do |run|
+  run.gsub(/\\\n/, " ").lines.reject { |l| l.strip.start_with?("#") }.map { |l| Shellwords.split(l) }
+end.select { |words| words.first == "bin/fm-test-run.sh" }
+raise "tests-portable-family-parallel must invoke bin/fm-test-run.sh exactly once" unless fam_cmds.length == 1
+fam_words = fam_cmds.first.drop(1)
+fam_jobs_idx = fam_words.index("--jobs")
+fam_jobs_val = fam_jobs_idx ? fam_words[fam_jobs_idx + 1] : nil
+raise "tests-portable-family-parallel must pass --jobs #{want_family}, got #{fam_jobs_val.inspect}" unless fam_jobs_val == want_family
 RUBY
-  pass "both portable parallel jobs pass the concurrency the model starts from"
+  pass "portable parallel and family-parallel jobs pass the modeled concurrency"
 }
 
 # Execute each producer's shell on an actual merge checkout, then resolve the
