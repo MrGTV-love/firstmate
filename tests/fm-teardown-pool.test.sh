@@ -4566,10 +4566,19 @@ test_skipped_copies_are_released_only_when_clean_and_landed() {
       [ "$dir" != "$busy" ] || procs='[{"pid": 1}]'
       printf '%s{"path": "%s", "lease_holder": "%s", "processes": %s}' "$sep" "$canon" "$holder" "$procs"
       sep=,
-      printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\n' "$dir" >> "$rec"
+      # The busy copy's row names the acquisition pane the spawn left open on it (the fifth column).
+      if [ "$dir" = "$busy" ]; then
+        printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\t@41\n' "$dir" >> "$rec"
+      else
+        printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\n' "$dir" >> "$rec"
+      fi
     done
     printf ']\n'
   } > "$case_dir/pool.json"
+  # Two rows the spawn wrote for copies it passed over (another holder's lease): one names the acquisition pane, one is
+  # an older four-column row.
+  printf '%s\tpassed over\tholder-with-pane\t1\t@42\n%s\tpassed over\tholder-old-row\t1\n' \
+    "$case_dir/passed-with-pane" "$case_dir/passed-old-row" >> "$rec"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> '$log'
@@ -4579,6 +4588,24 @@ SH
   chmod +x "$case_dir/fakebin/treehouse"
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "skipped-copies: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fxq "notice: the record row for $case_dir/passed-with-pane names holder 'holder-with-pane', not this task's firstmate-skipped:task-x1; that lease is not this task's, so nothing is returned and the row is left as it is (acquisition pane @42 of the spawn stood in it; teardown does not check that window, so it may still be live)" "$case_dir/stderr" \
+    || fail "skipped-copies: the notice for a passed-over row did not name its acquisition pane"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fxq "notice: the record row for $case_dir/passed-old-row names holder 'holder-old-row', not this task's firstmate-skipped:task-x1; that lease is not this task's, so nothing is returned and the row is left as it is" "$case_dir/stderr" \
+    || fail "skipped-copies: the notice for a passed-over row without a pane changed"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fxq "$case_dir/passed-with-pane"$'\t'"passed over"$'\t'"holder-with-pane"$'\t'"1"$'\t'"@42" "$rec" \
+    || fail "skipped-copies: the passed-over row with a pane was not kept as it was"$'\n'"$(cat "$rec")"
+  grep -Fxq "$case_dir/passed-old-row"$'\t'"passed over"$'\t'"holder-old-row"$'\t'"1" "$rec" \
+    || fail "skipped-copies: the four-column passed-over row was not kept as it was"$'\n'"$(cat "$rec")"
+  ! grep -Fq "return $case_dir/passed-with-pane" "$log" \
+    || fail "skipped-copies: the passed-over lease with a pane was returned"$'\n'"$(cat "$log")"
+  ! grep -Fq "return $case_dir/passed-old-row" "$log" \
+    || fail "skipped-copies: the four-column passed-over lease was returned"$'\n'"$(cat "$log")"
+  grep -Fq "process(es) are running inside it (acquisition pane @41 of the spawn stood in it; teardown does not check that window, so it may still be live)" "$case_dir/stderr" \
+    || fail "skipped-copies: the refusal for the busy copy did not name its acquisition pane"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fxq "$busy"$'\t'"dirty_tree"$'\t'"firstmate-skipped:task-x1"$'\t'"1"$'\t'"@41" "$rec" \
+    || fail "skipped-copies: the busy copy's row lost its acquisition pane"$'\n'"$(cat "$rec")"
+  grep -Fxq "$unlanded"$'\t'"dirty_tree"$'\t'"firstmate-skipped:task-x1"$'\t'"1" "$rec" \
+    || fail "skipped-copies: a four-column row was not kept as it was"$'\n'"$(cat "$rec")"
   canon=$(cd "$landed" && pwd -P)
   grep -Fq "return $canon --if-lease-holder firstmate-skipped:task-x1" "$log" || fail "skipped-copies: the clean, landed copy was not released"$'\n'"$(cat "$log")"
   for dir in "$unlanded" "$other" "$busy"; do
@@ -4590,6 +4617,111 @@ SH
   ! grep -Fq "$landed" "$rec" || fail "skipped-copies: the released copy's record was kept"
   grep -Fq "release it by hand" "$case_dir/stderr" || fail "skipped-copies: no manual release command was printed for a kept copy"
   pass "teardown releases a skipped copy only when it is clean and landed, idle, and still this task's lease"
+}
+
+# The skipped-copy notices name the acquisition pane recorded in each row and make no claim about its window: teardown
+# does not check it, so every notice gives the same text in every world and on every backend, and none says the window
+# is gone or closed. Four tmux worlds (rows @41 and @42; the task window firstmate:fm-task-x1):
+#   gone    - the close succeeds and the pane listing holds @42 but not @41.
+#   listed  - the close returns success but the listing still holds @41 and @42.
+#   fails   - the close is refused under --force and the window stays listed.
+#   noread  - the close succeeds but the pane listing fails.
+# One Herdr world: the recorded pane was already gone before teardown and the close attempt fails.
+test_a_skipped_copy_notice_claims_the_window_closed_only_when_it_closed() {
+  local case_dir rec rc busy canon world note
+  note="teardown does not check that window, so it may still be live"
+  for world in gone listed fails noread; do
+    case_dir=$(make_case "skipped-notice-close-$world")
+    write_meta "$case_dir" no-mistakes ship
+    mkdir -p "$case_dir/data/task-x1"
+    busy="$case_dir/skip-busy"
+    git -C "$case_dir/project" worktree add -q --detach "$busy" main
+    canon=$(cd "$busy" && pwd -P)
+    rec="$case_dir/data/task-x1/skipped-copies.tsv"
+    printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\t@41\n%s\tpassed over\tholder-with-pane\t1\t@42\n' \
+      "$busy" "$case_dir/passed-with-pane" > "$rec"
+    printf '[{"path": "%s", "lease_holder": "firstmate-skipped:task-x1", "processes": [{"pid": 1}]}]\n' "$canon" > "$case_dir/pool.json"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  kill-window) [ "$world" = fails ] && { echo refused >&2; exit 1; } ;;
+  list-windows) [ "$world" = fails ] && { printf '%s\n' fm-task-x1; exit 0; } ;;
+  list-panes)
+    case "$world" in
+      listed|fails) printf '%s\n' @41 %7 @42 %8 ;;
+      noread) echo 'lost server' >&2; exit 1 ;;
+      *) printf '%s\n' @42 %8 ;;
+    esac
+    exit 0
+    ;;
+esac
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+    rc=0
+    if [ "$world" = fails ]; then
+      run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "skipped-notice-$world: the forced teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+      assert_grep "could not be closed" "$case_dir/stderr" "skipped-notice-$world: the forced run did not report the failed close"
+    else
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "skipped-notice-$world: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+    fi
+    grep -Fq "process(es) are running inside it (acquisition pane @41 of the spawn stood in it; $note)" "$case_dir/stderr" \
+      || fail "skipped-notice-$world: the busy-copy warning for @41 did not say '$note'"$'\n'"$(cat "$case_dir/stderr")"
+    grep -Fq "that lease is not this task's, so nothing is returned and the row is left as it is (acquisition pane @42 of the spawn stood in it; $note)" "$case_dir/stderr" \
+      || fail "skipped-notice-$world: the passed-over notice for @42 did not say '$note'"$'\n'"$(cat "$case_dir/stderr")"
+    assert_skipped_notices_claim_nothing "$case_dir" "$world"
+  done
+
+  # Herdr: the recorded pane default:wG:pQ was already gone before teardown, and the close attempt fails.
+  world=herdr-gone
+  case_dir=$(make_case "skipped-notice-close-$world")
+  write_meta "$case_dir" no-mistakes ship
+  configure_flat_herdr_teardown_case "$case_dir"
+  # shellcheck disable=SC2016 # the sed program matches the stub's literal text, not an expansion here
+  sed -i.bak 's/^    : > "\${FM_FAKE_HERDR_CLOSED:?}"$/    echo "close refused" >\&2; exit 1/' "$case_dir/fakebin/herdr"
+  rm -f "$case_dir/fakebin/herdr.bak"
+  grep -Fq 'close refused' "$case_dir/fakebin/herdr" || fail "skipped-notice-$world: the Herdr stub's close was not made to fail"
+  : > "$case_dir/herdr-closed"
+  : > "$case_dir/herdr.log"
+  mkdir -p "$case_dir/data/task-x1"
+  busy="$case_dir/skip-busy"
+  git -C "$case_dir/project" worktree add -q --detach "$busy" main
+  canon=$(cd "$busy" && pwd -P)
+  printf '%s\tdirty_tree\tfirstmate-skipped:task-x1\t1\tdefault:wG:pQ\n' "$busy" > "$case_dir/data/task-x1/skipped-copies.tsv"
+  printf '[{"path": "%s", "lease_holder": "firstmate-skipped:task-x1", "processes": [{"pid": 1}]}]\n' "$canon" > "$case_dir/pool.json"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in status) cat '$case_dir/pool.json' ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  rc=0
+  FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/herdr-closed" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "skipped-notice-$world: teardown should complete"$'\n'"$(cat "$case_dir/stderr")"
+  grep -Fq "process(es) are running inside it (acquisition pane default:wG:pQ of the spawn stood in it; $note)" "$case_dir/stderr" \
+    || fail "skipped-notice-$world: the busy-copy warning did not say '$note'"$'\n'"$(cat "$case_dir/stderr")"
+  assert_skipped_notices_claim_nothing "$case_dir" "$world"
+  pass "every skipped-copy notice says teardown does not check the acquisition window, in every world and on Herdr"
+}
+
+# assert_skipped_notices_claim_nothing <case-dir> <world>: no acquisition-pane note in the run's stderr says a window is
+# gone or closed, or that teardown did not establish something.
+assert_skipped_notices_claim_nothing() {  # <case-dir> <world>
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      *gone*|*closed*|*'did not establish'*) fail "skipped-notice-$2: a notice claims a window state: $line" ;;
+    esac
+  done < <(grep -o 'acquisition pane [^)]*)' "$1/stderr")
+  grep -q 'acquisition pane [^)]*)' "$1/stderr" || fail "skipped-notice-$2: no acquisition-pane note was printed"
 }
 
 # D4 (review of 8c6c20ece): a skipped copy is released only on teardown_landed proof. An anchor makes a commit
@@ -5033,6 +5165,7 @@ test_cleanup_roots_preserve_foreign_copy_git_storage
 test_tasktmp_preserves_reassociated_copy_git_storage
 test_subordinate_slot_cleanup_preserves_ancestor_custody
 test_skipped_copies_are_released_only_when_clean_and_landed
+test_a_skipped_copy_notice_claims_the_window_closed_only_when_it_closed
 test_skipped_copies_with_an_anchor_or_ignored_work_are_kept
 test_a_skipped_copy_whose_pool_row_has_no_process_list_stays_leased
 test_a_skipped_copy_whose_process_list_is_null_stays_leased

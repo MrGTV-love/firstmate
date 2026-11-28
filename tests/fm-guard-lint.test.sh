@@ -160,6 +160,42 @@ MISSINGTEST=$(fixture missingtest)
 rm -f "$MISSINGTEST/tests/gguard.test.sh"
 assert_fails_with "R7 fails a nonexistent test file" "$MISSINGTEST" R7
 
+TWOTESTS=$(fixture twotests)
+: >"$TWOTESTS/tests/gguard-real.test.sh"
+mutate "$TWOTESTS" '.guards[0].test = "tests/gguard.test.sh, tests/gguard-real.test.sh"'
+assert_clean "R7 accepts a test list whose every file resolves" "$TWOTESTS"
+rm -f "$TWOTESTS/tests/gguard-real.test.sh"
+assert_fails_with "R7 fails a test list with one nonexistent file" "$TWOTESTS" R7
+
+# A test list that names no path once its empty items are dropped proves nothing, the same as an empty field.
+n=0
+for empty in '' ',' ', ,'; do
+  n=$((n + 1))
+  NOTEST=$(fixture "notest$n")
+  mutate "$NOTEST" ".guards[0].test = \"$empty\""
+  assert_fails_with "R7 fails a test list naming no file ('$empty')" "$NOTEST" R7
+done
+
+# Each item is checked exactly as written: only its outer spaces and tabs are trimmed, so an inner space stays part of
+# the path, and a path that differs from an existing file only by that space does not exist.
+INNER=$(fixture innerspace)
+mutate "$INNER" '.guards[0].test = "tests/gguard. test.sh"'
+assert_fails_with "R7 fails a test path with an inner space that names no file" "$INNER" R7
+TRIMMED=$(fixture trimmed)
+: >"$TRIMMED/tests/gguard-real.test.sh"
+mutate "$TRIMMED" '.guards[0].test = " tests/gguard.test.sh , tests/gguard-real.test.sh "'
+assert_clean "R7 accepts a test list whose items carry outer spaces" "$TRIMMED"
+rm -f "$TRIMMED/tests/gguard-real.test.sh"
+assert_fails_with "R7 checks the second trimmed item too" "$TRIMMED" R7
+
+# An item holding a control character is refused, whatever file its other characters spell: the shell drops a NUL, so
+# "tests/gguard.\u0000test.sh" would otherwise be checked as the existing tests/gguard.test.sh.
+for ctl in '\u0000' '\u0001'; do
+  CTL=$(fixture "control-$ctl")
+  mutate "$CTL" ".guards[0].test = \"tests/gguard.${ctl}test.sh\""
+  assert_fails_with "R7 fails a test path holding $ctl" "$CTL" R7
+done
+
 # --- R8 telemetry -----------------------------------------------------------
 NOTEL=$(fixture notel)
 mutate "$NOTEL" '.guards[0].telemetry = ""'

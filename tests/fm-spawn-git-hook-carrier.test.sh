@@ -666,8 +666,12 @@ SH
   [ "$(uname)" != Darwin ] || codesign -f -s - "$dir/launcher/treehouse" >/dev/null 2>&1 || true
   # shellcheck disable=SC2016 # $? and $status expand in the launcher, not here.
   printf 'cd %q || exit 1\n%s\nstatus=$?\nexit "$status"\n' "$wt" "/bin/bash --noprofile --rcfile '$dir/rc' -i" > "$dir/launcher/get.sh"
+  # The real `treehouse pool-dir` always names the project's pool folder; the copy here is a plain worktree, so the
+  # folder it names (empty) does not hold it, and the spawn may use it as an ordinary copy.
+  mkdir -p "$dir/treehouse-pool"
   cat > "$fakebin/treehouse" <<SH
 #!/usr/bin/env bash
+[ "\${1:-}" != pool-dir ] || { printf '%s\n' '$dir/treehouse-pool'; exit 0; }
 [ "\${1:-}" = get ] || exit 0
 exec -a treehouse '$dir/launcher/treehouse' '$dir/launcher/get.sh'
 SH

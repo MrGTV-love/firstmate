@@ -30,8 +30,8 @@
 #   R4 the fail direction is declared closed or open
 #   R5 the block budget is declared, 1 to 3, or carries budget_reason
 #   R6 a post-write guard carries precheck_gap
-#   R7 every owner file and test file resolves (wiring itself is owned by
-#      bin/fm-guard-refcheck.sh)
+#   R7 every owner file and test file resolves, and the test list names at least
+#      one file (wiring itself is owned by bin/fm-guard-refcheck.sh)
 #   R8 every instrumented guard names its telemetry target and calls the writer
 #   R9 every exemption carries a derivation and a demotion candidate
 # plus three rules over the refusal sites bin/fm-guard-sites.py discovers in the
@@ -58,6 +58,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=bin/fm-guard-registry-lib.sh
+. "$SCRIPT_DIR/fm-guard-registry-lib.sh"
 
 MODE=enforce
 BASE_REF=origin/main
@@ -200,7 +202,6 @@ while IFS= read -r entry; do
   budget=$(printf '%s' "$entry" | jq -r '.budget | if type == "number" then tostring else . end')
   budget_reason=$(printf '%s' "$entry" | jq -r '.budget_reason // ""')
   telemetry=$(printf '%s' "$entry" | jq -r '.telemetry // ""')
-  test=$(printf '%s' "$entry" | jq -r '.test // ""')
   decision=$(printf '%s' "$entry" | jq -r '.decision // ""')
   precheck_gap=$(printf '%s' "$entry" | jq -r '.precheck_gap // ""')
   proxy=$(printf '%s' "$entry" | jq -r '.proxy // false')
@@ -258,10 +259,21 @@ while IFS= read -r entry; do
       [ -e "$ROOT/$f" ] || printf 'R7\t%s\tnonexistent owner file %s\n' "$id" "$f" >>"$VIOLATIONS"
     done
   fi
-  if [ -z "$test" ]; then
+  # bin/fm-guard-registry-lib.sh owns how the test field is read; each item it returns must exist exactly as written,
+  # and a field it cannot read, or one that names no item, is refused like an empty field.
+  if ! test_items=$(fm_guard_registry_test_items "$entry"); then
+    violation R7 "$id" "test field cannot be read"
+  elif [ -z "$test_items" ]; then
     violation R7 "$id" "test is empty"
   else
-    [ -e "$ROOT/$test" ] || violation R7 "$id" "nonexistent test file $test"
+    while IFS= read -r line; do
+      case "${line%%$'\t'*}" in
+        path) [ -e "$ROOT/${line#*$'\t'}" ] || violation R7 "$id" "nonexistent test file ${line#*$'\t'}" ;;
+        *) violation R7 "$id" "test path ${line#*$'\t'} holds a control character" ;;
+      esac
+    done <<EOF
+$test_items
+EOF
   fi
 
   if [ -z "$telemetry" ]; then

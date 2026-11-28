@@ -356,6 +356,194 @@ test_changed_wake_classifier_selects_both_consumers() {
   pass "wake classifier changes select both consuming suites without broadening coverage"
 }
 
+# The real-Treehouse cases were moved out of backend-dispatch and pr-forge scripts, so every owner change that selected
+# them there must still select them; a change no moved case ever depended on must not.
+test_changed_owners_of_the_moved_real_treehouse_cases_select_them() {
+  local tmp repo listed source script
+  local -a scripts=(fm-spawn-real-treehouse fm-spawn-acquisition-real-treehouse fm-control-relaunch-real-treehouse fm-teardown-pool-real-treehouse)
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-real-treehouse-selection.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  mkdir -p "$repo/bin/backends"
+  for script in "${scripts[@]}"; do
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$script.test.sh"
+    chmod +x "$repo/tests/$script.test.sh"
+  done
+  for source in backends/tmux.sh backends/herdr.sh fm-control-lib.sh fm-teardown-nested-lib.sh fm-teardown.sh fm-spawn.sh fm-model-index.sh fm-watch.sh; do
+    : >"$repo/bin/$source"
+  done
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm real-treehouse-selection-fixture
+
+  for source in backends/tmux.sh backends/herdr.sh fm-control-lib.sh fm-teardown-nested-lib.sh fm-teardown.sh fm-spawn.sh fm-model-index.sh fm-watch.sh; do
+    printf '\n' >"$repo/bin/$source"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$source changed selection failed"
+    for script in "${scripts[@]}"; do
+      if [ "$source" = fm-watch.sh ]; then
+        assert_not_contains "$listed" "tests/$script.test.sh" "$source does not select $script"
+      elif [ "$source" = fm-model-index.sh ]; then
+        [ "$script" != fm-control-relaunch-real-treehouse ] \
+          || assert_contains "$listed" "tests/$script.test.sh" "$source selects $script, as it selected its old host script"
+      else
+        assert_contains "$listed" "tests/$script.test.sh" "$source selects $script"
+      fi
+    done
+    : >"$repo/bin/$source"
+  done
+
+  rm -rf "$tmp"
+  pass "every owner change that selected a moved real-Treehouse case still selects it, and an unrelated change does not"
+}
+
+# A case moved out of a script into the real-treehouse family is selected wherever that former host script is: by the
+# host's --family, by a change to the host itself, and by a path that selects the host. A reference that moved from the
+# host into a helper the host sources still selects the host (the reference scan follows sourced helpers).
+test_moved_real_treehouse_cases_follow_their_former_host() {
+  local tmp repo listed entry host moved family trigger
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-moved-host.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  mkdir -p "$repo/bin/backends"
+  local -a pairs=(
+    'fm-spawn-pool-base-freshen fm-spawn-real-treehouse standalone tests/skip-clock.sh'
+    'fm-spawn-acquisition-cleanup fm-spawn-acquisition-real-treehouse backend-dispatch bin/backends/tmux.sh'
+    'fm-control-relaunch-backends fm-control-relaunch-real-treehouse backend-dispatch bin/fm-model-index.sh'
+    'fm-teardown-pool fm-teardown-pool-real-treehouse pr-forge bin/fm-teardown-nested-lib.sh'
+  )
+  for entry in "${pairs[@]}"; do
+    read -r host moved family trigger <<<"$entry"
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$host.test.sh"
+    printf '#!/usr/bin/env bash\n' >"$repo/tests/$moved.test.sh"
+    chmod +x "$repo/tests/$host.test.sh" "$repo/tests/$moved.test.sh"
+  done
+  # The freshen host names the clock only through the helper it sources, as at the moved head.
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
+  printf '. "$(dirname "${BASH_SOURCE[0]}")/fm-spawn-pool-helpers.sh"\n' >>"$repo/tests/fm-spawn-pool-base-freshen.test.sh"
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
+  printf '# shared pool helpers\nSKIP_CLOCK="$ROOT/tests/skip-clock.sh"\n' >"$repo/tests/fm-spawn-pool-helpers.sh"
+  printf '# a clock\n' >"$repo/tests/skip-clock.sh"
+  for trigger in backends/tmux.sh fm-model-index.sh fm-teardown-nested-lib.sh fm-watch.sh; do : >"$repo/bin/$trigger"; done
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm moved-host-fixture
+
+  for entry in "${pairs[@]}"; do
+    read -r host moved family trigger <<<"$entry"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --family "$family") || fail "--family $family listing failed"
+    assert_contains "$listed" "tests/$host.test.sh" "--family $family lists the host $host"
+    assert_contains "$listed" "tests/$moved.test.sh" "--family $family lists $moved, whose cases came from $host"
+    printf '\n' >>"$repo/tests/$host.test.sh"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) || fail "$host changed selection failed"
+    assert_contains "$listed" "tests/$moved.test.sh" "a change to $host selects $moved"
+    git -C "$repo" checkout -q -- "tests/$host.test.sh"
+    printf '\n' >>"$repo/$trigger"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) || fail "$trigger changed selection failed"
+    assert_contains "$listed" "tests/$host.test.sh" "a change to $trigger selects $host"
+    assert_contains "$listed" "tests/$moved.test.sh" "a change to $trigger selects $moved, as it selects $host"
+    git -C "$repo" checkout -q -- "$trigger"
+  done
+  printf '\n' >>"$repo/bin/fm-watch.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) || fail "fm-watch.sh changed selection failed"
+  for entry in "${pairs[@]}"; do
+    read -r host moved family trigger <<<"$entry"
+    assert_not_contains "$listed" "tests/$moved.test.sh" "an unrelated change does not select $moved"
+  done
+  git -C "$repo" checkout -q -- bin/fm-watch.sh
+
+  # The base library is not followed: a script named only in tests/lib.sh's code, which every test sources, selects
+  # the test that names it, not every test.
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
+  printf '. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\n' | tee -a "$repo/tests/fm-teardown-pool.test.sh" >>"$repo/tests/fm-spawn-acquisition-cleanup.test.sh"
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
+  printf 'BASE_TOOL="$ROOT/bin/fm-base-only.sh"\n' >"$repo/tests/lib.sh"
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
+  printf '#!/usr/bin/env bash\n"$ROOT/bin/fm-base-only.sh"\n' >"$repo/tests/fm-base-only.test.sh"
+  : >"$repo/bin/fm-base-only.sh"
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm base-library-fixture
+  printf '\n' >>"$repo/bin/fm-base-only.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) || fail "fm-base-only.sh changed selection failed"
+  assert_contains "$listed" "tests/fm-base-only.test.sh" "a change to a script selects the test that names it"
+  assert_not_contains "$listed" "tests/fm-teardown-pool.test.sh" "a script named only in tests/lib.sh does not select every test"
+
+  rm -rf "$tmp"
+  pass "a moved real-Treehouse case is selected by its former host's family, its host's change and its host's triggers"
+}
+
+# A concurrency-safe family run under an explicit --jobs still runs the script that holds cases moved out of one of its
+# members: that script entered only through the moved-case mapping, so it is not refused for lacking a concurrency
+# proof; it runs in the serial phase after every concurrent phase, and the output names it. Named directly, the same
+# unproven script keeps the explicit --jobs refusal.
+test_inherited_moved_script_runs_serially_under_explicit_jobs() {
+  local tmp repo entry family host moved rc out
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-inherited-jobs.XXXXXX")
+  repo="$tmp/repo"
+  mkdir -p "$repo/bin" "$repo/tests"
+  cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/"
+  cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  chmod +x "$repo/bin/fm-test-run.sh"
+  for entry in 'standalone fm-spawn-pool-base-freshen fm-spawn-real-treehouse' \
+    'pr-forge fm-teardown-pool fm-teardown-pool-real-treehouse'; do
+    read -r family host moved <<<"$entry"
+    for s in "$host" "$moved" fm-teardown; do
+      printf '#!/usr/bin/env bash\necho "ok - %s ran"\n' "$s" >"$repo/tests/$s.test.sh"
+      chmod +x "$repo/tests/$s.test.sh"
+    done
+  done
+  for entry in 'standalone fm-spawn-pool-base-freshen fm-spawn-real-treehouse' \
+    'pr-forge fm-teardown-pool fm-teardown-pool-real-treehouse'; do
+    read -r family host moved <<<"$entry"
+    rc=0
+    (cd "$repo" && bin/fm-test-run.sh --family "$family" --jobs 2) >"$tmp/out" 2>"$tmp/err" || rc=$?
+    [ "$rc" -eq 0 ] || fail "--family $family --jobs 2 refused or failed: $(cat "$tmp/err")"
+    assert_grep "ok - $host ran" "$tmp/out" "--family $family --jobs 2 did not run $host"
+    assert_grep "ok - $moved ran" "$tmp/out" "--family $family --jobs 2 did not run the inherited $moved"
+    assert_grep "tests/$moved.test.sh entered this selection only as the holder of cases moved out of a selected script" \
+      "$tmp/err" "--family $family --jobs 2 did not name the inherited $moved as serial"
+    python3 - "$tmp/out" "tests/$moved.test.sh" <<'PY' || fail "--family $family --jobs 2 ran $moved beside another script: $(cat "$tmp/out")"
+import sys
+active, moved, beside = set(), sys.argv[2], False
+for line in open(sys.argv[1], encoding="utf-8"):
+    parts = line.split()
+    if line.startswith("FM_TEST_BEGIN "):
+        path = parts[2]
+        if active and (path == moved or moved in active):
+            beside = True
+        active.add(path)
+    elif line.startswith("FM_TEST_END "):
+        active.discard(parts[2])
+sys.exit(1 if beside else 0)
+PY
+    rc=0
+    (cd "$repo" && bin/fm-test-run.sh "tests/$moved.test.sh" "tests/$host.test.sh" --jobs 2) >"$tmp/out" 2>"$tmp/err" || rc=$?
+    [ "$rc" -ne 0 ] || fail "naming the unproven $moved directly under --jobs 2 was not refused"
+    assert_grep "--jobs 2 refused: tests/$moved.test.sh is not in the proven-isolated set" "$tmp/err" \
+      "naming $moved directly did not keep the explicit --jobs refusal"
+  done
+  # A --changed --jobs 2 run for a former owner (bin/fm-teardown.sh) must also admit inherited real-treehouse scripts
+  # into the serial phase, while changing a real-treehouse script itself keeps the explicit --jobs refusal.
+  : >"$repo/bin/fm-teardown.sh"
+  git -C "$repo" init -q
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm inherited-changed-fixture
+  printf '\n' >>"$repo/bin/fm-teardown.sh"
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD --jobs 2) >"$tmp/out" 2>"$tmp/err" || rc=$?
+  [ "$rc" -eq 0 ] || fail "--changed --jobs 2 for bin/fm-teardown.sh refused or failed: $(cat "$tmp/err")"
+  assert_grep "ok - fm-teardown-pool ran" "$tmp/out" "--changed --jobs 2 for bin/fm-teardown.sh did not run fm-teardown-pool"
+  assert_grep "ok - fm-teardown-pool-real-treehouse ran" "$tmp/out" "--changed --jobs 2 for bin/fm-teardown.sh did not run inherited real-treehouse"
+  git -C "$repo" checkout -q -- bin/fm-teardown.sh
+  printf '\n' >>"$repo/tests/fm-teardown-pool-real-treehouse.test.sh"
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD --jobs 2) >"$tmp/out" 2>"$tmp/err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "--changed --jobs 2 when real-treehouse script itself changed was not refused"
+  assert_grep "--jobs 2 refused: tests/fm-teardown-pool-real-treehouse.test.sh is not in the proven-isolated set" "$tmp/err" \
+    "direct change to real-treehouse script did not keep explicit --jobs refusal"
+  rm -rf "$tmp"
+  pass "an inherited moved-case script runs in the serial phase under an explicit --jobs, and a directly named one is still refused"
+}
+
 test_changed_spawn_selects_picker_without_broadening_siblings() {
   local tmp repo listed source
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-spawn-selection.XXXXXX")
@@ -804,7 +992,7 @@ test_partition_checks_judge_loss_and_duplication() {
 # The teardown groups partition one suite: every case a group file
 # defines is registered by that file, and no case is registered by two groups.
 test_teardown_groups_register_each_case_once() {
-  assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse
+  assert_partition_exact teardown array teardown_test_cases '' fm-teardown fm-teardown-pool fm-teardown-cleanup fm-teardown-real-treehouse fm-teardown-pool-real-treehouse
   pass "the teardown groups are a duplicate-free cover, each case registered by the file that defines it"
 }
 
@@ -1219,7 +1407,7 @@ test_changed_status_owners_select_all_consuming_tests() {
       || fail "$owner owner-only change failed selection"
     expected=$(
       {
-        for family in pure-contract-unit standalone secondmate session-bootstrap afk watcher-wake-lock backend-dispatch pr-forge snapshot-bearings; do
+        for family in pure-contract-unit standalone secondmate session-bootstrap afk watcher-wake-lock backend-dispatch pr-forge snapshot-bearings real-treehouse; do
           "$repo/bin/fm-test-run.sh" --list --family "$family"
         done
         printf '%s\n' \
@@ -1233,7 +1421,7 @@ test_changed_status_owners_select_all_consuming_tests() {
       } | LC_ALL=C sort -u
     )
     [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
-      || fail "$owner change must select exactly its nine consuming families and owner-specific scripts: $listed"
+      || fail "$owner change must select exactly its ten consuming families and owner-specific scripts: $listed"
     for script in \
       fm-classify-corr-token.test.sh \
       fm-pending-reply.test.sh \
@@ -3391,6 +3579,9 @@ test_teardown_groups_register_each_case_once
 test_teardown_groups_share_helper_and_stay_selectable
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_watch_helpers_select_runnable_consumers
+test_changed_owners_of_the_moved_real_treehouse_cases_select_them
+test_moved_real_treehouse_cases_follow_their_former_host
+test_inherited_moved_script_runs_serially_under_explicit_jobs
 test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
@@ -3444,7 +3635,7 @@ test_aggregate_json
 # group file defines is registered by that file or run as a command from another
 # line of it (the omp adoption cases), and no case is registered by two groups.
 test_control_relaunch_groups_partition_one_inventory() {
-  assert_partition_exact control-relaunch array-nested control_relaunch_test_cases '' fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends fm-control-relaunch-adopt fm-control-relaunch-provision fm-disk-floor-relaunch
+  assert_partition_exact control-relaunch array-nested control_relaunch_test_cases '' fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends fm-control-relaunch-adopt fm-control-relaunch-provision fm-control-relaunch-real-treehouse fm-disk-floor-relaunch
   pass "the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it"
 }
 

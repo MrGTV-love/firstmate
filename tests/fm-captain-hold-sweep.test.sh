@@ -899,7 +899,7 @@ test_sweep_resolves_bound_captain_keys() {
         legacy-closed) key="third-choice"; origin="origin-closed"; expected=1 ;;
         exact-open) key=sweep-bound-open; origin=--any-origin ;;
         exact-closed) key=exact-choice; expected=1 ;;
-        missing) key=missing-choice; expected=2 ;;
+        missing) key="missing-choice"; expected=2 ;;
         any-origin) key=third-choice; origin=--any-origin; expected=2 ;;
         bad-binding) key=exact-choice; expected=2 ;;
       esac

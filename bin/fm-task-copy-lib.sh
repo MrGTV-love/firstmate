@@ -604,10 +604,10 @@ fm_task_copy_enclosing_pool_slot() {  # <project> <canonical-path>
 }
 
 # The lease holder Treehouse writes on every entry it rebuilds from a corrupt
-# or truncated state file. Treehouse 3.1.0 and later free such an entry on their
-# own, under the state lock of whichever pool command runs next (treehouse get
-# included), once the slot is idle, tracked-clean, and landed; an ordinary lease
-# is released only by treehouse return.
+# or truncated state file. Treehouse never frees a recovered lease by itself
+# (`treehouse return --all` skips it); it stays until it is returned by name or
+# acknowledged with `treehouse lease --recover`. An ordinary lease is released
+# only by treehouse return.
 FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or truncated; verify before reuse'
 
 # Whether Treehouse's own pool state durably holds pool slot <slot>, so that
@@ -615,7 +615,10 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # file records as not leased (`treehouse get --help`: a leased worktree is never
 # handed out by a later get until treehouse return releases it); a live owner
 # process, dirt, or an unmerged HEAD also make a get skip a slot, but each of
-# those can change before the get runs, so none of them counts here. Every
+# those can change before the get runs, so none of them counts here. Slot 124
+# was handed out while it carried a recovered lease, so these callers still
+# never prune, reset or return a held slot, and spawn checks every copy it is
+# handed (the pass-over). Every
 # entry naming <slot>'s directory, however its path is spelled, must be leased:
 # an ordinary lease holds; a
 # recovered lease (FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER) holds only when
@@ -627,17 +630,23 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # Sets FM_TASK_COPY_SLOT_NAME to the slot's name in Treehouse state (the name
 # treehouse status and treehouse lease use), or empty when no entry records
 # <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, conflicting, recovered,
-# escaped, relative, missing-jq, or unknown; FM_TASK_COPY_SLOT_HOLDER to the lease
+# escaped, relative, invalid (a matching row whose leased value is neither JSON true nor false nor absent), missing-jq, or unknown; FM_TASK_COPY_SLOT_HOLDER to the lease
 # holder of the last leased entry that records <slot>, or empty; and on failure
 # FM_TASK_COPY_SLOT_REASON to a clause following the slot's path.
 # Returns 0 when held, 1 otherwise.
 # The last state file read and its entries are kept in
 # FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES, so a scan
-# reads each pool's state once; a scan clears both before it starts.
+# reads each pool's state once; a scan clears both before it starts. A passed
+# fm_task_copy_pool_state_strict leaves there the rows of the document it
+# proved, so the next call for that file reads those rows and not the file.
 FM_TASK_COPY_SLOT_NAME=
 FM_TASK_COPY_SLOT_HOLDER=
 FM_TASK_COPY_SLOT_STATE=
 FM_TASK_COPY_SLOT_REASON=
+# How many state rows are <slot>: rows that carry its name, or whose path is the same directory by identity (a differently
+# spelled path, a symlink, whatever the row's name and holder). A caller that needs one consistent record requires 1, since
+# FM_TASK_COPY_SLOT_HOLDER is only the last leased row's holder. Counted for every row, leased or not.
+FM_TASK_COPY_SLOT_ROWS=0
 FM_TASK_COPY_POOL_STATE_FILE=
 FM_TASK_COPY_POOL_STATE_ENTRIES=
 fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
@@ -650,6 +659,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   FM_TASK_COPY_SLOT_HOLDER=
   FM_TASK_COPY_SLOT_STATE=unknown
   FM_TASK_COPY_SLOT_REASON=
+  FM_TASK_COPY_SLOT_ROWS=0
   if ! command -v jq >/dev/null 2>&1; then
     FM_TASK_COPY_SLOT_STATE=missing-jq
     FM_TASK_COPY_SLOT_REASON="cannot be proved leased: reading Treehouse state $state needs jq, which is not installed"
@@ -661,7 +671,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   if [ "$state" = "$FM_TASK_COPY_POOL_STATE_FILE" ]; then
     entries=$FM_TASK_COPY_POOL_STATE_ENTRIES
   else
-    entries=$(jq -r '.worktrees[]? | [("L" + (if .leased == true then "leased" else "unleased" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring))] | @tsv' "$state" 2>/dev/null) || {
+    entries=$(jq -r '.worktrees[]? | [("L" + (if has("leased") == false or .leased == false then "unleased" elif .leased == true then "leased" else "invalid" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring))] | @tsv' "$state" 2>/dev/null) || {
       FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state cannot be read"
       return 1
     }
@@ -703,6 +713,13 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     fi
     matched=$((matched + 1))
     FM_TASK_COPY_SLOT_NAME=${name#N}
+    # Only JSON true is leased and only JSON false (or no leased key, which is how Treehouse writes an unleased slot) is
+    # unleased; any other value (a string, a number, null) cannot be read as either.
+    if [ "${leased#L}" = invalid ]; then
+      FM_TASK_COPY_SLOT_STATE=invalid
+      FM_TASK_COPY_SLOT_REASON="cannot be proved leased or unleased: Treehouse state $state holds a leased value for entry '${name#N}' that is neither true nor false"
+      return 1
+    fi
     [ "${leased#L}" != leased ] || FM_TASK_COPY_SLOT_HOLDER=${holder#H}
     if [ "${leased#L}" != leased ]; then
       has_unleased=1
@@ -710,6 +727,14 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
       has_recovered=1
     fi
   done <<< "$entries"
+  if [ "$matched" -gt 0 ]; then
+    while IFS=$'\t' read -r _ _ name path; do
+      path=${path#P}
+      if [ "${name#N}" = "$FM_TASK_COPY_SLOT_NAME" ] || { [ -n "$path" ] && [ "$path" -ef "$slot" ]; }; then
+        FM_TASK_COPY_SLOT_ROWS=$((FM_TASK_COPY_SLOT_ROWS + 1))
+      fi
+    done <<< "$entries"
+  fi
   if [ "$has_unleased" = 1 ]; then
     if [ "$matched" = 1 ]; then
       # Ordinary leases safely skipped on the held path still affect the
@@ -737,7 +762,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   fi
   if [ "$has_recovered" = 1 ]; then
     FM_TASK_COPY_SLOT_STATE=recovered
-    FM_TASK_COPY_SLOT_REASON="is not a Firstmate home and carries Treehouse's recovered-state lease in $state, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed"
+    FM_TASK_COPY_SLOT_REASON="is not a Firstmate home and carries Treehouse's recovered-state lease in $state, which Treehouse never frees by itself (treehouse return --all skips it): it stays until it is returned by name or acknowledged with treehouse lease --recover"
     return 1
   fi
   if [ "$matched" -gt 0 ]; then
@@ -745,6 +770,192 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     return 0
   fi
   FM_TASK_COPY_SLOT_REASON="has no entry in Treehouse state $state, so its lease cannot be proved"
+  return 1
+}
+
+# fm_task_copy_pool_state_strict <state-file>: the strict allow-list proof that the WHOLE Treehouse state file is one the
+# installed Treehouse CLI reads as intact, read exactly as written: every number by its own text, every key once. A caller
+# must have this proof before it reads any row of the file as a positive classification (bin/fm-spawn.sh
+# spawn_classify_copy, before a copy is passed over OR claimed); a lenient read that coerces (a number read as text, a
+# string read as a boolean, 1.0 read as 1, the last of two equal keys) is never a proof, because the real CLI calls such a
+# file corrupt and rebuilds it. The row reader fm_task_copy_pool_slot_held stays lenient for its other callers. Returns 0
+# only when ALL of these hold, in EVERY row, not only the row the caller wants:
+#   - the file is a regular, readable, non-symlink file of UTF-8 text with no byte-order mark, holding exactly one JSON
+#     document with no key repeated in any object and no NaN or Infinity;
+#   - the document is an object whose `worktrees` is an array of objects, and whose `version`, when present, is an integer
+#     literal from 0 to 4 (the versions the installed CLI reads; it refuses any other);
+#   - each row has a string `name`, a non-empty string `path` and a `created_at` that is an RFC 3339 time;
+#   - when present: `leased`, `destroying` and `seed_inventory_known` are booleans; `lease_id`, `lease_holder`,
+#     `seed_inventory_digest`, `seed_auth_identity`, `seed_backend` and `base_branch` are strings; `leased_at` is an RFC
+#     3339 time; `owner_pid` is an integer literal within 32 bits and `owner_started_at` one within 64 bits (no fraction and
+#     no exponent: the CLI calls 1.0 and 1e3 corrupt there); `seeded_paths` is an array of strings; a JSON null is not
+#     accepted for any of them (the CLI writes none);
+#   - no key, in a row or at the top, has a non-ASCII letter or spells one of these names in another case (the CLI's decoder
+#     matches names without regard to case);
+#   - no string anywhere holds a \u escape of a lone UTF-16 surrogate. jq refuses a whole file with a lone HIGH surrogate
+#     and reads a lone LOW one as U+FFFD; this proof refuses both, so for the low form it refuses a state that the jq reading
+#     alone classified (as the spawn did at 1f2d57dc): a state entry that cannot be read as written is not classified.
+# On success it puts the rows of the document it proved, in fm_task_copy_pool_slot_held's own form, in that reader's cache
+# (FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES), so the next fm_task_copy_pool_slot_held for a slot of
+# this file classifies from the very bytes that were proved and reads no file; on failure it empties that cache. The file is
+# read once, through a descriptor opened without following a symlink, so the bytes proved are the regular file's.
+# These are the fields and forms the installed Treehouse (v3.1.7-fm.8759019) decodes, found by feeding the real CLI each
+# JSON type and literal form in each field (the table is recorded with the evidence of the task that added this function).
+# Where the CLI is more lenient (a null, a non-ASCII key, a repeated key with equal types, year 0000) the proof refuses.
+# A field that CLI does not decode is ignored, as the CLI ignores it. Sets FM_TASK_COPY_STRICT_REASON on failure. Needs
+# python3.
+FM_TASK_COPY_STRICT_REASON=
+fm_task_copy_pool_state_strict() {  # <state-file>
+  local state=$1 out
+  FM_TASK_COPY_STRICT_REASON=
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  command -v python3 >/dev/null 2>&1 || { FM_TASK_COPY_STRICT_REASON="python3 is not installed"; return 1; }
+  if out=$(python3 -I - "$state" <<'PY'
+import datetime, json, os, re, stat, sys
+
+path = sys.argv[1]
+
+def not_intact(why):
+    print(why)
+    sys.exit(1)
+
+try:
+    if not stat.S_ISREG(os.lstat(path).st_mode):
+        not_intact("is not a regular file (a symlink, a folder or a device)")
+    # The bytes proved are read through this one descriptor, so a file swapped in after the check above is never what is read.
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as fh:
+        if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
+            not_intact("is not a regular file (a symlink, a folder or a device)")
+        raw = fh.read()
+except OSError as err:
+    not_intact("cannot be read (%s)" % err.strerror)
+try:
+    text = raw.decode("utf-8")
+except UnicodeDecodeError:
+    not_intact("is not UTF-8 text")
+if text.startswith("﻿"):
+    not_intact("starts with a byte-order mark")
+
+class Fraction:
+    """A number written with a fraction or an exponent, kept as its text, so it is never an integer."""
+    def __init__(self, text):
+        self.text = text
+
+def once(pairs):
+    seen = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError("the key %r appears twice in one object" % key)
+        seen[key] = value
+    return seen
+
+def no_constant(name):
+    raise ValueError("%s is not a JSON number" % name)
+
+try:
+    doc = json.loads(text, object_pairs_hook=once, parse_float=Fraction, parse_int=int, parse_constant=no_constant)
+except ValueError as err:
+    not_intact("is not one JSON document read exactly (%s)" % err)
+
+# A \u escape of a lone surrogate decodes to a string that is not text; jq refuses the whole file for a high one and reads a
+# low one as U+FFFD, and this proof refuses both.
+todo = [doc]
+while todo:
+    item = todo.pop()
+    if type(item) is dict:
+        todo.extend(item.keys())
+        todo.extend(item.values())
+    elif type(item) is list:
+        todo.extend(item)
+    elif type(item) is str:
+        try:
+            item.encode("utf-8")
+        except UnicodeEncodeError:
+            not_intact("holds a \\u escape of a lone UTF-16 surrogate, which is not text")
+
+TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?(Z|[+-]([0-9]{2}):([0-9]{2}))")
+
+def is_time(v):
+    if type(v) is not str:
+        return False
+    m = TIME.fullmatch(v)
+    if not m:
+        return False
+    try:
+        datetime.datetime(*(int(g) for g in m.groups()[:6]))
+    except ValueError:
+        return False
+    return m.group(8) == "Z" or (int(m.group(9)) <= 23 and int(m.group(10)) <= 59)
+
+def is_str(v):
+    return type(v) is str
+
+def is_bool(v):
+    return type(v) is bool
+
+def int_within(bits):
+    return lambda v: type(v) is int and -(1 << (bits - 1)) <= v < (1 << (bits - 1))
+
+ROW = {
+    "name": is_str, "path": lambda v: is_str(v) and v != "", "created_at": is_time,
+    "leased": is_bool, "destroying": is_bool, "seed_inventory_known": is_bool,
+    "lease_id": is_str, "lease_holder": is_str, "seed_inventory_digest": is_str, "seed_auth_identity": is_str,
+    "seed_backend": is_str, "base_branch": is_str, "leased_at": is_time,
+    "owner_pid": int_within(32), "owner_started_at": int_within(64),
+    "seeded_paths": lambda v: type(v) is list and all(type(x) is str for x in v),
+}
+REQUIRED = ("name", "path", "created_at")
+TOP = ("version", "worktrees")
+
+def keys_exact(obj, known, where):
+    for key in obj:
+        if any(ord(c) > 127 for c in key):
+            not_intact("%s has a key with a non-ASCII letter (%r)" % (where, key))
+        if key.lower() in known and key != key.lower():
+            not_intact("%s has the key %r, which the CLI reads as %r" % (where, key, key.lower()))
+
+if type(doc) is not dict:
+    not_intact("is not a JSON object")
+keys_exact(doc, TOP, "the document")
+if "version" in doc and not (type(doc["version"]) is int and 0 <= doc["version"] <= 4):
+    not_intact("has a version that is not an integer from 0 to 4")
+rows = doc.get("worktrees")
+if type(rows) is not list:
+    not_intact("has no worktrees array")
+for n, row in enumerate(rows):
+    if type(row) is not dict:
+        not_intact("has row %d that is not an object" % n)
+    keys_exact(row, ROW, "row %d" % n)
+    for key in REQUIRED:
+        if key not in row:
+            not_intact("has row %d with no %s" % (n, key))
+    for key, ok in ROW.items():
+        if key in row and not ok(row[key]):
+            not_intact("has row %d whose %s is not of the type or form the CLI reads" % (n, key))
+
+# The rows of the proved document, exactly as fm_task_copy_pool_slot_held's jq reading writes them (one line per row, each
+# field behind its one-letter prefix, escaped as jq's @tsv escapes: backslash, tab, line feed, carriage return).
+def tsv(text):
+    return text.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r")
+
+lines = []
+for row in rows:
+    lines.append("\t".join((
+        "L" + ("leased" if row.get("leased") is True else "unleased"),
+        "H" + tsv(row.get("lease_holder", "")),
+        "N" + tsv(row["name"]),
+        "P" + tsv(row["path"]),
+    )))
+sys.stdout.buffer.write("\n".join(lines).encode("utf-8"))
+PY
+  ); then
+    FM_TASK_COPY_POOL_STATE_FILE=$state
+    FM_TASK_COPY_POOL_STATE_ENTRIES=$out
+    return 0
+  fi
+  FM_TASK_COPY_STRICT_REASON="Treehouse state $state ${out:-cannot be checked}"
   return 1
 }
 
@@ -839,8 +1050,11 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
 # nor is an unleased slot in a superseded pool folder
 # (fm_task_copy_slot_in_current_pool), which is judged again at each call, and a
 # slot a task merely left is not a record's current copy, so none of them
-# stops the allocation. A uniquely recorded unleased slot names the treehouse
-# lease command that holds it in place without touching it; teardown's
+# stops the allocation. Slot 124 was handed out while it carried a recovered
+# lease, so these callers still never prune, reset or return a held slot, and
+# spawn checks every copy it is handed (the pass-over). A uniquely recorded
+# unleased slot names the treehouse lease command that holds it in place
+# without touching it; teardown's
 # treehouse return releases that lease with the slot. Conflicting records
 # instead need inspection and repair: lease selects only the first matching
 # name, so it cannot reliably clear that refusal. No other refusal names a

@@ -6,6 +6,8 @@
 # These tests drive the real spawn path with a fake terminal, then prove it
 # starts the worker from the fetched origin tip, launches a clean origin-less
 # pool as-is, or stops when a configured origin is unusable.
+# The cases that drive the real treehouse binary on a scratch pool live in
+# tests/fm-spawn-real-treehouse.test.sh; both files share tests/fm-spawn-pool-helpers.sh.
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -14,61 +16,8 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-spawn-pool-base-freshen)
 # Every spawn in this file runs with its detached home-summary refresh stubbed (tests/fixtures.sh fm_test_spawn_script).
 export FM_TEST_STUB_SUMMARY_REFRESH=1
-
-make_case() {
-  local name=$1 id=$2 default=${3:-main} case_dir home project origin pool publisher fakebin initial
-  case_dir="$TMP_ROOT/$name"
-  home="$case_dir/home"
-  project="$case_dir/project"
-  origin="$case_dir/origin.git"
-  pool="$case_dir/pool"
-  publisher="$case_dir/publisher"
-  fakebin=$(make_spawn_fakebin "$case_dir/fake")
-
-  mkdir -p "$home/data/$id" "$home/projects" "$home/state" "$home/config"
-  printf 'codex\n' > "$home/config/crew-harness"
-  fm_test_spawn_brief "$home" "$id"
-  touch "$home/state/.last-watcher-beat"
-
-  git init --quiet -b "$default" "$project"
-  printf 'base\n' > "$project/README.md"
-  git -C "$project" add README.md
-  git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
-  git clone --quiet --bare "$project" "$origin"
-  git -C "$project" remote add origin "file://$origin"
-  initial=$(git -C "$project" rev-parse HEAD)
-  git -C "$project" worktree add --quiet --detach "$pool" "$initial"
-
-  git clone --quiet "file://$origin" "$publisher"
-  printf 'must survive a newly spawned branch\n' > "$publisher/advanced-main.txt"
-  git -C "$publisher" add advanced-main.txt
-  git -C "$publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm advance-main
-  git -C "$publisher" push --quiet origin "$default"
-
-  printf '%s\n' "$case_dir|$home|$project|$pool|$fakebin|$initial|$default"
-}
-
-read_case_record() {
-  IFS='|' read -r CASE_DIR HOME_DIR PROJECT_DIR POOL_DIR FAKEBIN_DIR INITIAL_SHA DEFAULT_BRANCH <<EOF
-$1
-EOF
-}
-
-run_spawn() {
-  local id=$1
-  shift
-  fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$FAKEBIN_DIR" \
-    "$id" "$PROJECT_DIR" "$@"
-}
-
-# A copy the slot rules skip is left as found and another is requested; this fake world has no other
-# copy, so the acquisition wait must reach its no-progress limit. The clock below advances SECONDS
-# by a minute per one-second sleep, so that wait ends at once and the refusal is what the case reads.
-SKIP_CLOCK="$ROOT/tests/skip-clock.sh"
-
-run_spawn_skipping() {
-  FM_TEST_TICK_SECONDS=60 BASH_ENV="$SKIP_CLOCK" run_spawn "$@"
-}
+# shellcheck source=tests/fm-spawn-pool-helpers.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-spawn-pool-helpers.sh"
 
 test_remote_seeded_home_spawns_from_treehouse_pool() {
   local rec id out status lock
@@ -255,7 +204,7 @@ make_originless_case() {  # <name> <id>
   git init --quiet -b main "$project"
   printf 'base\n' > "$project/README.md"
   git -C "$project" add README.md
-  git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial >/dev/null
   initial=$(git -C "$project" rev-parse HEAD)
   git -C "$project" worktree add --quiet --detach "$pool" "$initial"
 
@@ -502,10 +451,10 @@ make_submodule_case() {  # <name> <id>
   git init --quiet -b main "$sub"
   printf 'pin one\n' > "$sub/lib.txt"
   git -C "$sub" add lib.txt
-  git -C "$sub" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm sub-one
+  git -C "$sub" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm sub-one >/dev/null
   subpin1=$(git -C "$sub" rev-parse HEAD)
   printf 'pin two\n' > "$sub/lib.txt"
-  git -C "$sub" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam sub-two
+  git -C "$sub" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam sub-two >/dev/null
   subpin2=$(git -C "$sub" rev-parse HEAD)
   git -C "$sub" checkout --quiet "$subpin1"
 
@@ -514,7 +463,7 @@ make_submodule_case() {  # <name> <id>
   git -C "$project" add README.md
   git -C "$project" -c protocol.file.allow=always -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
     submodule --quiet add "file://$sub" ui
-  git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial >/dev/null
   git clone --quiet --bare "$project" "$origin"
   git -C "$project" remote add origin "file://$origin"
   git -C "$project" worktree add --quiet --detach "$pool" HEAD
@@ -524,7 +473,7 @@ make_submodule_case() {  # <name> <id>
   git clone --quiet "file://$origin" "$publisher"
   git -C "$publisher" -c protocol.file.allow=always submodule --quiet update --init
   git -C "$publisher/ui" checkout --quiet "$subpin2"
-  git -C "$publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam advance-pin
+  git -C "$publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam advance-pin >/dev/null
   git -C "$publisher" push --quiet origin main
   advanced=$(git -C "$publisher" rev-parse HEAD)
 
@@ -532,9 +481,11 @@ make_submodule_case() {  # <name> <id>
 }
 
 read_submodule_case() {
+  local record=${1##*$'\n'}
   IFS='|' read -r CASE_DIR HOME_DIR PROJECT_DIR POOL_DIR FAKEBIN_DIR SUBPIN1 SUBPIN2 ADVANCED_SHA <<EOF
-$1
+$record
 EOF
+  case "$CASE_DIR" in /*) ;; *) fail "the case directory '$CASE_DIR' is not absolute" ;; esac
 }
 
 # The first of two consecutive spawns: it succeeds, resets the superproject onto
@@ -707,7 +658,8 @@ lay_out_as_pool_slot() {
   local slot_root="$CASE_DIR/slots"
   mkdir -p "$slot_root/1"
   git -C "$PROJECT_DIR" worktree move "$POOL_DIR" "$slot_root/1/project"
-  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot_root/1/project" \
+  # A row as the real CLI writes it: name, path and created_at are always present.
+  printf '{"worktrees":[{"name":"1","path":"%s","created_at":"2026-01-01T00:00:00Z"}]}\n' "$slot_root/1/project" \
     > "$slot_root/treehouse-state.json"
   POOL_DIR="$slot_root/1/project"
   SLOT_CLAIM="$slot_root/1/.fm-slot-owner"
@@ -900,20 +852,6 @@ test_scout_base_branch_refused_on_gerrit_forge() {
 
 # Exercise the final assigned-copy revision, not just its classification before
 # the ordinary freshness reset. Each public-path attempt owns a fresh task ID.
-write_refusing_slot_owner() { # <repository>
-  mkdir -p "$1/scripts/git-stability"
-  cat > "$1/scripts/git-stability/provision_existing_slot.py" <<'PY'
-import json
-import os
-import sys
-from pathlib import Path
-
-Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
-print(json.dumps({"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}))
-raise SystemExit(2)
-PY
-}
-
 run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> <ship|scout>
   local shape=$1 kind=$2 id case_dir home project origin pool publisher fakebin before advanced out status=0 token temp staging
   local args=()
@@ -1591,147 +1529,6 @@ PY
 
 # --- a skipped copy: another copy is taken, the skipped one is left exactly as found ----------------
 
-# make_skip_case <name> <id> <slot-count>: make_case plus extra pool slots at the same commit and a
-# tmux whose pane enters the next slot each time `treehouse get` is typed into it (an empty answer
-# once the slots run out). The treehouse stub records its calls; FM_TEST_LEASE_RC makes `lease` fail.
-# Sets SKIP_SLOTS (the slot paths in hand-out order) and SKIP_LOG.
-make_skip_case() {
-  local name=$1 id=$2 count=$3 rec n slot
-  rec=$(make_case "$name" "$id")
-  read_case_record "$rec"
-  SKIP_SLOTS=("$POOL_DIR")
-  for ((n = 2; n <= count; n++)); do
-    slot="$CASE_DIR/pool$n"
-    git -C "$PROJECT_DIR" worktree add --quiet --detach "$slot" "$INITIAL_SHA"
-    SKIP_SLOTS+=("$slot")
-  done
-  make_skip_transport
-}
-
-# make_skip_transport: with SKIP_SLOTS, CASE_DIR and FAKEBIN_DIR set, a tmux whose pane enters the next slot each time
-# `treehouse get` is typed into it (staying put once the slots run out), and a treehouse stub that logs its calls.
-make_skip_transport() {
-  local real_tmux
-  printf '%s\n' "${SKIP_SLOTS[@]}" > "$CASE_DIR/slots"
-  : > "$CASE_DIR/panepath"
-  echo 0 > "$CASE_DIR/get-count"
-  SKIP_LOG="$CASE_DIR/treehouse.log"
-  : > "$SKIP_LOG"
-  real_tmux="$FAKEBIN_DIR/tmux.real"
-  mv "$FAKEBIN_DIR/tmux" "$real_tmux"
-  cat > "$FAKEBIN_DIR/tmux" <<SH
-#!/usr/bin/env bash
-case "\$*" in
-  *'#{pane_current_path}'*) cat '$CASE_DIR/panepath'; exit 0 ;;
-  *send-keys*'treehouse get'*)
-    n=\$(( \$(cat '$CASE_DIR/get-count') + 1 ))
-    echo "\$n" > '$CASE_DIR/get-count'
-    line=\$(sed -n "\${n}p" '$CASE_DIR/slots')
-    # Once the slots run out the pane stays where it is, as a real pane does while a get finds no copy.
-    [ -z "\$line" ] || printf '%s\\n' "\$line" > '$CASE_DIR/panepath'
-    exit 0 ;;
-esac
-exec '$real_tmux' "\$@"
-SH
-  chmod +x "$FAKEBIN_DIR/tmux"
-  cat > "$FAKEBIN_DIR/treehouse" <<SH
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >> '$SKIP_LOG'
-case "\${1:-}" in lease) eval "\${FM_TEST_LEASE_PROBE:-:}" >>'$SKIP_LOG' 2>&1; exit "\${FM_TEST_LEASE_RC:-0}" ;; esac
-exit 0
-SH
-  chmod +x "$FAKEBIN_DIR/treehouse"
-}
-
-# slot_digest <slot>: HEAD, its branch, EVERY ref of the repository (the refs are shared by every copy), the index, and
-# every file outside .git (a regular file by sha256, a symlink by its target). It FAILS (nonzero) when any read fails,
-# so a failed read can never compare equal to another.
-slot_digest() {
-  local slot=$1 head sym refs
-  (
-    set -o pipefail
-    head=$(git -C "$slot" rev-parse HEAD) || exit 1
-    printf 'HEAD %s\n' "$head"
-    sym=$(git -C "$slot" symbolic-ref -q HEAD) || { [ "$?" = 1 ] || exit 1; sym=detached; }
-    printf 'SYMBOLIC %s\n' "$sym"
-    # A symbolic ref is recorded with its target, so a retarget between two refs at one commit is a difference.
-    refs=$(git -C "$slot" for-each-ref --format='%(refname)%09%(objectname)%09%(symref)') || exit 1
-    printf 'REFS\n%s\nENDREFS\n' "$refs"
-    git -C "$slot" ls-files -s --debug || exit 1
-    cd "$slot" || exit 1
-    # shellcheck disable=SC2016 # The inner sh expands its own $1.
-    find . -path ./.git -prune -o \( -type f -o -type l \) -print0 | LC_ALL=C sort -z |
-      xargs -0 -n1 sh -c 'if [ -L "$1" ]; then printf "LINK %s -> %s\n" "$1" "$(readlink "$1")"; else shasum -a 256 -- "$1"; fi' _
-  ) 2>&1
-}
-
-# The refs a spawn may change while it works in ANOTHER copy: origin's default tracking ref and origin/HEAD (Main 003).
-# New refs (the task's own branch, anchors) may appear. Nothing else that existed before may differ or vanish.
-
-# second_copy_refs <id> [governed]: the "<ref>=<old>><new>" pairs that a spawn which skipped one copy and then MOVED another
-# copy of the same repository legitimately writes into the shared ref set: origin's default tracking ref and origin/HEAD
-# at origin's tip (recorded after the move succeeded) and, for a governed task, its branch and the preservation anchor
-# of the detached copy it started from. The skipped copy's own digest may differ by exactly these and nothing else.
-second_copy_refs() {
-  local id=$1 tip
-  tip=$(git -C "$CASE_DIR/origin.git" rev-parse --verify "refs/heads/$DEFAULT_BRANCH") || fail "origin's tip cannot be read"
-  printf '%s\n' "refs/remotes/origin/$DEFAULT_BRANCH=absent>$tip" "refs/remotes/origin/HEAD=absent>$tip@refs/remotes/origin/$DEFAULT_BRANCH"
-  if [ "${2:-}" = governed ]; then
-    printf '%s\n' "refs/heads/fm/$id=absent>$tip" "refs/fm/anchor/$id-$(git -C "$PROJECT_DIR" rev-parse --short "$INITIAL_SHA")=absent>$INITIAL_SHA"
-  fi
-}
-
-# assert_digest_unchanged <slot> <before-digest> <message>: the copy reads back as it did, and every ref that existed
-# still has the same value, but for the two allowed ones.
-# assert_digest_unchanged <slot> <before-digest> <label> [<ref>=<old>><new>...]: the digest now equals <before-digest> in HEAD,
-# the branch, the index and every file, and the SET of refs, each with its symbolic target, is identical in both directions
-# (a ref that is new, gone, moved or retargeted fails). The only exception is a ref named as <ref>=<old>><new> ("absent"
-# for a ref that did not exist), which must go from exactly <old> to exactly <new>.
-assert_digest_unchanged() {
-  local slot=$1 before=$2 label=$3 after b_plain a_plain b_refs a_refs why
-  shift 3
-  after=$(slot_digest "$slot") || fail "$label (the slot could not be read)"
-  b_plain=$(printf '%s\n' "$before" | awk '/^REFS$/{skip=1} !skip{print} /^ENDREFS$/{skip=0}')
-  a_plain=$(printf '%s\n' "$after" | awk '/^REFS$/{skip=1} !skip{print} /^ENDREFS$/{skip=0}')
-  [ "$b_plain" = "$a_plain" ] || fail "$label"
-  b_refs=$(printf '%s\n' "$before" | awk '/^REFS$/{on=1;next} /^ENDREFS$/{on=0} on')
-  a_refs=$(printf '%s\n' "$after" | awk '/^REFS$/{on=1;next} /^ENDREFS$/{on=0} on')
-  why=$(python3 - "$b_refs" "$a_refs" "$@" <<'PY'
-import sys
-def parse(text):
-    out = {}
-    for line in text.splitlines():
-        if line.strip():
-            name, sha, target = (line.split("\t") + ["", ""])[:3]
-            out[name] = sha + ("@" + target if target else "")
-    return out
-before, after = parse(sys.argv[1]), parse(sys.argv[2])
-# A named change is "<ref>=<old>><new>" ("absent" for a ref that did not exist): the OLD value must be what the digest held
-# and the NEW value must be exactly the one named. Anything else, or any unnamed difference, is a failure.
-allowed = {}
-for spec in sys.argv[3:]:
-    name, _, rest = spec.partition("=")
-    old, _, new = rest.partition(">")
-    allowed[name] = (old, new)
-bad = []
-for name in sorted(set(before) | set(after)):
-    old, new = before.get(name, "absent"), after.get(name, "absent")
-    if old == new:
-        continue
-    if name in allowed and allowed[name] == (old, new):
-        continue
-    bad.append("%s: %s -> %s" % (name, old, new))
-print("; ".join(bad))
-sys.exit(1 if bad else 0)
-PY
-  ) || fail "$label (the ref set changed: $why)"
-}
-
-# assert_no_launch <launch-log>: no harness was launched (the fake launcher logs each launch).
-assert_no_launch() {
-  [ ! -s "$1" ] || fail "a harness was launched: $(cat "$1")"
-}
-
 test_a_skipped_dirty_copy_is_left_as_found_and_another_is_taken() {
   local id out status before sync
   id='pool-skip-dirty-take-next'
@@ -2059,6 +1856,100 @@ test_skipped_copies_are_recorded_and_listed() {
   assert_grep "${SKIP_SLOTS[0]}" "$HOME_DIR/data/$id/skipped-copies.tsv" "the skipped copy was not recorded for its owner"
   assert_grep "firstmate-skipped:$id" "$HOME_DIR/data/$id/skipped-copies.tsv" "the record did not name the lease holder"
   pass "every copy a spawn leases is recorded and listed"
+}
+
+# The rm/mv log and the claim trace (tests/fm-spawn-pool-helpers.sh) must see what they claim to see.
+# (1) A deliberate `rm -f` and `mv` of the marker in a read-only folder fail without a word, and the log must still hold them.
+test_the_mutation_log_sees_an_attempted_removal_that_fails_quietly() {
+  local id folder marker log rc=0
+  [ "$(id -u)" != 0 ] || { echo "skip - root writes into a read-only folder"; return 0; }
+  id='pool-mutation-log-selftest'
+  make_skip_case mutation-log-selftest "$id" 1
+  folder="$CASE_DIR/slots-selftest"
+  mkdir -p "$folder"
+  marker="$folder/.fm-slot-owner"
+  printf 'task=other-task\n' > "$marker"
+  chmod 444 "$marker"
+  chmod 555 "$folder"
+  log="$CASE_DIR/mutation.log"; : > "$log"
+  install_mutation_log "$log"
+  PATH="$FAKEBIN_DIR:$PATH" rm -f "$marker" 2>/dev/null || true
+  PATH="$FAKEBIN_DIR:$PATH" mv -f "$marker" "$folder/moved" 2>/dev/null || true
+  chmod 755 "$folder"
+  [ -f "$marker" ] || fail "the self-test's marker was removed in a read-only folder"
+  (assert_no_mutation_logged "$log" "$folder" "self-test") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "a logged rm and mv of the marker were not reported"
+  [ "$(grep -c "$folder" "$log")" = 2 ] || fail "the log did not hold both attempts: $(cat "$log")"
+  pass "the mutation log holds an attempted removal and rename that fail quietly, and the assertion rejects them"
+}
+
+# (2) The overwrite-and-restore mutant: a claim that overwrites the marker in place and puts the old bytes back leaves the
+# final bytes unchanged, so an end-state check passes it; the claim trace holds the call and the assertion rejects it.
+test_the_claim_trace_catches_an_overwrite_and_restore_of_the_marker() {
+  local id folder marker trace before after script rc=0 immutable_why
+  id='pool-claim-trace-selftest'
+  make_skip_case claim-trace-selftest "$id" 1
+  folder="$CASE_DIR/slots-selftest"
+  mkdir -p "$folder"
+  marker="$folder/.fm-slot-owner"
+  printf 'task=other-task\nhome=/somewhere/else\n' > "$marker"
+  trace="$CASE_DIR/claim.trace"; : > "$trace"
+  before=$(shasum -a 256 < "$marker")
+  script="$CASE_DIR/mutant-claim.sh"
+  cat > "$script" <<SH
+fm_treehouse_slot_owner_claim() {  # the mutant: overwrite the marker in place, then restore it
+  local saved
+  saved=\$(cat '$marker')
+  printf 'overwritten\n' > '$marker'
+  printf '%s\n' "\$saved" > '$marker'
+}
+fm_treehouse_slot_owner_claim '$folder/project' "$id" /home
+SH
+  FM_TEST_CLAIM_TRACE="$trace" BASH_ENV="$ROOT/tests/claim-trace.sh" bash "$script" || fail "the mutant script failed"
+  after=$(shasum -a 256 < "$marker")
+  [ "$before" = "$after" ] || fail "the mutant did not restore the marker, so it does not model overwrite-and-restore"
+  (assert_claim_trace_clear "$trace" "$folder" "self-test") >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "the claim trace did not reject an overwrite-and-restore of the marker: $(cat "$trace")"
+  # Immutable marker, where the host supports it: the same overwrite now fails loudly instead of being restored.
+  if immutable_why=$(immutable_on "$marker"); then
+    (printf 'overwritten\n' > "$marker") 2>/dev/null && { chflags nouchg "$marker"; fail "an immutable marker was overwritten"; }
+    chflags nouchg "$marker"
+  else
+    echo "note: no immutable flag here ($immutable_why); the trace alone closes the overwrite-and-restore mutant"
+  fi
+  pass "an overwrite-and-restore of the marker leaves its bytes equal and is rejected by the claim trace"
+}
+
+# The verified non-pool control and its negative, in a world with no pool state at all: the copy the fake get hands out is a
+# plain worktree. It goes on as an ordinary copy when the pool directory Treehouse names does not hold it, and is refused
+# before any claim when Treehouse names no pool directory.
+test_a_copy_outside_the_named_pool_goes_on_and_an_unnamed_pool_refuses() {
+  local rec id out status mode
+  for mode in named-elsewhere fails prints-nothing; do
+    id="pool-ordinary-$mode"
+    rec=$(make_case "ordinary-$mode" "$id")
+    read_case_record "$rec"
+    case "$mode" in
+      named-elsewhere) : ;;
+      fails)
+        # shellcheck disable=SC2016 # the fake's own script text
+        printf '#!/usr/bin/env bash\n[ "${1:-}" != pool-dir ] || exit 1\nexit 0\n' > "$FAKEBIN_DIR/treehouse"
+        ;;
+      prints-nothing) printf '#!/usr/bin/env bash\nexit 0\n' > "$FAKEBIN_DIR/treehouse" ;;
+    esac
+    out=$(FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch.log" run_spawn "$id" --mode no-mistakes --yolo off)
+    status=$?
+    if [ "$mode" = named-elsewhere ]; then
+      expect_code 0 "$status" "a copy outside the named pool should go on as an ordinary copy"$'\n'"$out"
+      assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$id.meta" "the ordinary copy was not used"
+    else
+      [ "$status" -ne 0 ] || fail "$mode: the spawn went on although Treehouse named no pool directory"$'\n'"$out"
+      assert_contains "$out" "did not name this project's pool directory" "$mode: the refusal did not say why"
+      assert_no_launch "$CASE_DIR/launch.log"
+      [ ! -e "$(dirname "$POOL_DIR")/.fm-slot-owner" ] || fail "$mode: a claim marker was written"
+    fi
+  done
+  pass "a plain copy goes on as an ordinary copy when the named pool directory excludes it, and is refused before any claim when pool-dir fails or prints nothing"
 }
 
 # --- finding 10 (validators) -----------------------------------------------------------------
@@ -2925,6 +2816,9 @@ test_a_dirty_governed_copy_is_skipped_and_another_is_taken
 test_the_loop_budget_is_one_bound_across_all_gets
   test_no_get_is_typed_once_the_bound_was_spent_between_two_gets
 test_skipped_copies_are_recorded_and_listed
+test_the_mutation_log_sees_an_attempted_removal_that_fails_quietly
+test_the_claim_trace_catches_an_overwrite_and_restore_of_the_marker
+test_a_copy_outside_the_named_pool_goes_on_and_an_unnamed_pool_refuses
 test_slot_digest_sees_another_tasks_branch_move
 test_slot_digest_sees_a_new_foreign_ref
 test_slot_digest_sees_a_removed_ref

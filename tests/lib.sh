@@ -993,16 +993,107 @@ fm_test_bash_only_dir() {
   printf '%s\n' "$dir"
 }
 
+# fm_fake_exit0 <fakebin> <tool>...: each tool does nothing and exits 0. A no-op `treehouse` still names a pool folder for
+# `treehouse pool-dir`, run from the project, as the real one always does: the folder of a pool state beside one of the
+# project's registered worktrees (a <pool>/<slot>/<repo> copy next to <pool>/treehouse-state.json), else an empty folder
+# inside <fakebin>, under which no copy of a fake world lies. bin/fm-spawn.sh spawn_classify_copy treats a copy that is not
+# a readable pool slot as an ordinary copy only when the named pool folder excludes it, so a fake that named none would
+# refuse every fake-world spawn; and the pool-currency rule (bin/fm-task-copy-lib.sh fm_task_copy_slot_in_current_pool)
+# reads a slot outside the named folder as a superseded pool, so a fake that named another folder would hide a real pool.
 fm_fake_exit0() {
-  local fakebin=$1 tool
+  local fakebin=$1 tool pool
   shift
   for tool in "$@"; do
-    cat > "$fakebin/$tool" <<'SH'
+    if [ "$tool" = treehouse ]; then
+      mkdir -p "$fakebin/.treehouse-pool"
+      pool=$(CDPATH='' cd -- "$fakebin/.treehouse-pool" && pwd -P) || return 1
+      cat > "$fakebin/$tool" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = pool-dir ]; then
+  while IFS= read -r line; do
+    case "\$line" in "worktree "*) wt=\${line#worktree } ;; *) continue ;; esac
+    [ -f "\${wt%/*/*}/treehouse-state.json" ] || continue
+    printf '%s\\n' "\${wt%/*/*}"
+    exit 0
+  done < <(git worktree list --porcelain 2>/dev/null)
+  printf '%s\\n' '$pool'
+fi
+exit 0
+SH
+    else
+      cat > "$fakebin/$tool" <<'SH'
 #!/usr/bin/env bash
 exit 0
 SH
+    fi
     chmod +x "$fakebin/$tool"
   done
+}
+
+# fm_test_real_treehouse_missing <capability>...: prints what this host lacks for a case that drives the real treehouse
+# with jq and the named capabilities - lease-path (`treehouse lease --path`) and get-lease (`treehouse get --lease`) -
+# as "no jq", "no Treehouse with <flags>", or both joined by "and"; prints nothing when nothing is missing. An unknown
+# capability name is reported missing, so a mistyped gate never passes.
+fm_test_real_treehouse_missing() {
+  local th cap flags='' missing=''
+  command -v jq >/dev/null 2>&1 || missing='no jq'
+  th=$(command -v treehouse 2>/dev/null || true)
+  for cap in "$@"; do
+    case "$cap" in
+      lease-path) [ -n "$th" ] && "$th" lease --help 2>&1 | grep -Eq -- '--path' && continue; cap='lease --path' ;;
+      get-lease) [ -n "$th" ] && "$th" get --help 2>&1 | grep -q -- '--lease' && continue; cap='get --lease' ;;
+    esac
+    flags="${flags:+$flags and }$cap"
+  done
+  [ -z "$flags" ] || missing="${missing:+$missing and }no Treehouse with $flags"
+  printf '%s' "$missing"
+}
+
+# real_treehouse_has <capability>...: jq is installed and the installed treehouse has every named capability.
+real_treehouse_has() {
+  [ -z "$(fm_test_real_treehouse_missing "$@")" ]
+}
+
+# real_treehouse_ready: both capabilities.
+real_treehouse_ready() {
+  real_treehouse_has lease-path get-lease
+}
+
+# fm_test_require_real_treehouse [<capability>...]: the gate of a script whose every case drives the real treehouse and
+# needs jq and the named capabilities (default: both). Without them here it prints the runner's gate-skip line, naming
+# what is missing (jq separately from any Treehouse capability), as the script's first output and exits 0, so
+# bin/fm-test-run.sh counts it skipped.
+fm_test_require_real_treehouse() {
+  local missing
+  [ "$#" -gt 0 ] || set -- lease-path get-lease
+  missing=$(fm_test_real_treehouse_missing "$@")
+  [ -n "$missing" ] || return 0
+  echo "skip: $missing on this host"
+  exit 0
+}
+
+# fm_test_real_treehouse_case_plan <case-needs>...: for a script whose cases need different Treehouse capabilities. Each
+# argument is "<case> <capability>..." (jq is always needed and is checked by the script's own gate). Prints the cases
+# this host can run, one per line, in the order given. When any case cannot run, its first output line - which the
+# caller must print before anything else - is the runner's gate-skip line naming what is missing and every case left
+# out, so bin/fm-test-run.sh counts the script as gate-skipped while the cases this host can run still run.
+fm_test_real_treehouse_case_plan() {
+  local entry case_name cap skipped='' run='' needed=' '
+  for entry in "$@"; do
+    read -r case_name entry <<<"$entry"
+    # shellcheck disable=SC2086 # the capability list is split on purpose
+    if [ -n "$(fm_test_real_treehouse_missing $entry)" ]; then
+      skipped="${skipped:+$skipped, }$case_name"
+      for cap in $entry; do
+        case "$needed" in *" $cap "*) ;; *) needed="$needed$cap " ;; esac
+      done
+    else
+      run="$run$case_name"$'\n'
+    fi
+  done
+  # shellcheck disable=SC2086 # the capability list is split on purpose
+  [ -z "$skipped" ] || printf 'skip: %s on this host, so these cases did not run: %s\n' "$(fm_test_real_treehouse_missing $needed)" "$skipped"
+  printf '%s' "$run"
 }
 
 # fm_fake_docker <fakebin>

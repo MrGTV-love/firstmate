@@ -105,6 +105,66 @@ REGTEST=$(fixture regtest)
 rm -f "$REGTEST/tests/gguard.test.sh"
 assert_fails_with "a missing registry test path fails" "$REGTEST" "registration=registry:gguard"
 
+REGTESTS=$(fixture regtests)
+: >"$REGTESTS/tests/gguard-real.test.sh"
+jq '.guards[0].test = "tests/gguard.test.sh, tests/gguard-real.test.sh"' "$REGTESTS/docs/guards/registry.json" >"$REGTESTS/registry.tmp"
+mv "$REGTESTS/registry.tmp" "$REGTESTS/docs/guards/registry.json"
+$GIT "$REGTESTS" add -A
+$GIT "$REGTESTS" -c user.email=t@example.invalid -c user.name=t commit -qm two-tests
+assert_clean "a registry test list whose every path resolves is clean" "$REGTESTS"
+rm -f "$REGTESTS/tests/gguard-real.test.sh"
+assert_fails_with "a registry test list with one missing path fails" "$REGTESTS" "MISSING tests/gguard-real.test.sh registration=registry:gguard"
+
+# A test list that names no path once its empty items are dropped proves nothing, so it fails like a missing path.
+n=0
+for empty in '' ',' ', ,'; do
+  n=$((n + 1))
+  NOTEST=$(fixture "notest$n")
+  jq --arg t "$empty" '.guards[0].test = $t' "$NOTEST/docs/guards/registry.json" >"$NOTEST/registry.tmp"
+  mv "$NOTEST/registry.tmp" "$NOTEST/docs/guards/registry.json"
+  $GIT "$NOTEST" add -A
+  $GIT "$NOTEST" -c user.email=t@example.invalid -c user.name=t commit -qm "no test path $n"
+  assert_fails_with "a registry test list naming no path fails ('$empty')" "$NOTEST" "MISSING (no test path) registration=registry:gguard"
+done
+
+# Each item is checked exactly as written: only its outer spaces and tabs are trimmed, so an inner space stays part of
+# the path, and a path that differs from an existing file only by that space does not exist.
+set_registry_test() {  # <root> <test-field> <message>
+  jq --arg t "$2" '.guards[0].test = $t' "$1/docs/guards/registry.json" >"$1/registry.tmp"
+  mv "$1/registry.tmp" "$1/docs/guards/registry.json"
+  $GIT "$1" add -A
+  $GIT "$1" -c user.email=t@example.invalid -c user.name=t commit -qm "$3"
+}
+INNER=$(fixture innerspace)
+set_registry_test "$INNER" 'tests/gguard. test.sh' 'inner space'
+assert_fails_with "a registry test path with an inner space that names no file fails" "$INNER" "MISSING tests/gguard. test.sh registration=registry:gguard"
+TRIMMED=$(fixture trimmed)
+: >"$TRIMMED/tests/gguard-real.test.sh"
+set_registry_test "$TRIMMED" ' tests/gguard.test.sh , tests/gguard-real.test.sh ' 'outer spaces'
+assert_clean "a registry test list whose items carry outer spaces is clean" "$TRIMMED"
+rm -f "$TRIMMED/tests/gguard-real.test.sh"
+assert_fails_with "the second trimmed registry test item is checked too" "$TRIMMED" "MISSING tests/gguard-real.test.sh registration=registry:gguard"
+
+# An item holding a control character is refused, whatever file its other characters spell: the shell drops a NUL, so
+# "tests/gguard.\u0000test.sh" would otherwise be checked as the existing tests/gguard.test.sh.
+for ctl in '\u0000' '\u0001'; do
+  CTL=$(fixture "control-$ctl")
+  jq ".guards[0].test = \"tests/gguard.${ctl}test.sh\"" "$CTL/docs/guards/registry.json" >"$CTL/registry.tmp"
+  mv "$CTL/registry.tmp" "$CTL/docs/guards/registry.json"
+  $GIT "$CTL" add -A
+  $GIT "$CTL" -c user.email=t@example.invalid -c user.name=t commit -qm "control $ctl"
+  assert_fails_with "a registry test path holding $ctl fails" "$CTL" "MISSING \"tests/gguard.${ctl}test.sh\" registration=registry:gguard"
+done
+
+# An owner field holding a newline between two existing paths must fail rather than split into two paths.
+OWN_NL=$(fixture owner-newline)
+: >"$OWN_NL/bin/other.sh"
+jq '.guards[0].owner = "bin/wired.sh\nbin/other.sh"' "$OWN_NL/docs/guards/registry.json" >"$OWN_NL/registry.tmp"
+mv "$OWN_NL/registry.tmp" "$OWN_NL/docs/guards/registry.json"
+$GIT "$OWN_NL" add -A
+$GIT "$OWN_NL" -c user.email=t@example.invalid -c user.name=t commit -qm "owner newline"
+assert_fails_with "a registry owner holding a newline between two existing paths fails" "$OWN_NL" 'MISSING "bin/wired.sh\nbin/other.sh" registration=registry:gguard'
+
 REGSPEC=$(fixture regspec)
 jq '.spec = "docs/guard-spec.md"' "$REGSPEC/docs/guards/registry.json" >"$REGSPEC/registry.tmp"
 mv "$REGSPEC/registry.tmp" "$REGSPEC/docs/guards/registry.json"

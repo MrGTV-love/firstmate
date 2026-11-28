@@ -57,7 +57,15 @@ if [ "${1:-}" = lease ] && [ "${2:-}" = --help ]; then
   exit 0
 fi
 printf 'treehouse %s\n' "$*" >> "$FM_FAKE_CALL_LOG"
-case "${1:-}" in status) printf '[]\n' ;; esac
+case "${1:-}" in
+  status) printf '[]\n' ;;
+  pool-dir)
+    # The installed CLI always names the repository's pool folder; the copies
+    # here are plain worktrees, so the empty pool folder of the case holds none.
+    mkdir -p "${FM_FAKE_CALL_LOG%/*}/treehouse-pool" || exit 1
+    printf '%s\n' "${FM_FAKE_CALL_LOG%/*}/treehouse-pool"
+    ;;
+esac
 exit 0
 SH
   chmod +x "$fakebin/tmux" "$fakebin/treehouse"

@@ -69,7 +69,10 @@
 #                   safe to run concurrently: individually in the proven-isolated
 #                   set (bin/fm-test-isolation-proof.sh --list), or in a family
 #                   carrying a recorded concurrent proof
-#                   (list_concurrent_safe_families below). Overall cap is 8;
+#                   (list_concurrent_safe_families below). A script that
+#                   entered only as the holder of moved real-Treehouse cases
+#                   (add_inherited_script) is not refused; it
+#                   runs in the serial phase. Overall cap is 8;
 #                   family proofs may impose a lower cap. Individually proven
 #                   scripts share one phase; scripts admitted only by a family
 #                   proof run in a separate phase for each family. Concurrent
@@ -128,7 +131,7 @@
 # is logged with its reason and recorded in the timing artifact.
 #
 # expected_gate_skip classes name why a family is allowed to skip: herdr (the
-# pinned real-Herdr lane), optional-binary (a backend whose binary is optional),
+# pinned real-Herdr lane), optional-binary (a backend or tool whose binary is optional, such as the real treehouse),
 # live-capability (a live-harness guard governed by fm_live_gate, which records
 # unavailable tools and explicit policy skips; see tests/lib.sh), or none.
 #
@@ -269,6 +272,7 @@ LANE=
 BASE_REF=origin/main
 JSON_PATH=
 SCRIPTS=()
+INHERITED_SCRIPTS=()
 EXCLUDE_FAMILIES=()
 FAIL_ON_GATE_SKIP=()
 JOBS=1
@@ -599,6 +603,10 @@ family_for_basename() {
     fm-backend-orca.test.sh)
       printf '%s\n' orca
       ;;
+    fm-spawn-real-treehouse.test.sh|fm-spawn-acquisition-real-treehouse.test.sh|\
+    fm-control-relaunch-real-treehouse.test.sh|fm-teardown-pool-real-treehouse.test.sh)
+      printf '%s\n' real-treehouse
+      ;;
     fm-branch-supervision.test.sh|fm-busy-adapter-wiring.test.sh|\
     fm-busy-state.test.sh|fm-classify-corr-token.test.sh|\
     fm-claude-stop-autoarm.test.sh|fm-cursor-harness.test.sh|\
@@ -628,6 +636,7 @@ expected_gate_skip_for_family() {
     live-harness-optin) printf '%s\n' live-capability ;;
     cmux|zellij|orca) printf '%s\n' optional-binary ;;
     snapshot-bearings) printf '%s\n' optional-binary ;;
+    real-treehouse) printf '%s\n' optional-binary ;;
     *) printf '%s\n' none ;;
   esac
 }
@@ -647,6 +656,7 @@ snapshot-bearings
 cmux
 zellij
 orca
+real-treehouse
 standalone
 unclassified
 EOF
@@ -948,6 +958,7 @@ tests/fm-contributions-read-saved.test.sh 2081
 tests/fm-contributions.test.sh 200949
 tests/fm-control-reassociate.test.sh 395783
 tests/fm-control-relaunch-backends.test.sh 681931
+tests/fm-control-relaunch-real-treehouse.test.sh 5000
 tests/fm-control-relaunch-recovery.test.sh 550782
 tests/fm-control-relaunch.test.sh 340032
 tests/fm-control.test.sh 186185
@@ -1156,6 +1167,7 @@ tests/fm-slack-intake-unchanged.test.sh 4517
 tests/fm-slack-secret-scan.test.sh 25525
 tests/fm-slack-watch.test.sh 696773
 tests/fm-spawn-acquisition-cleanup.test.sh 37389
+tests/fm-spawn-acquisition-real-treehouse.test.sh 15000
 tests/fm-spawn-claude-api-key-guard.test.sh 93245
 tests/fm-spawn-claude-start-confirm.test.sh 63776
 tests/fm-spawn-compact-adviser-disable-remote.test.sh 455824
@@ -1164,7 +1176,8 @@ tests/fm-spawn-dispatch-profile.test.sh 495961
 tests/fm-spawn-herdr-launch-shell.test.sh 12222
 tests/fm-spawn-model-pin.test.sh 42939
 tests/fm-spawn-orca-worktree.test.sh 3763
-tests/fm-spawn-pool-base-freshen.test.sh 114254
+tests/fm-spawn-pool-base-freshen.test.sh 57254
+tests/fm-spawn-real-treehouse.test.sh 57000
 tests/fm-spawn-retained-copy.test.sh 38842
 tests/fm-spawn-worktree-settle.test.sh 39374
 tests/fm-startup-growth-check.test.sh 9250
@@ -1188,6 +1201,7 @@ tests/fm-teamclaude-launch-live-e2e.test.sh 842
 tests/fm-teamclaude-launch.test.sh 13609
 tests/fm-teardown-cleanup.test.sh 1005601
 tests/fm-teardown-endpoint-safety.test.sh 89444
+tests/fm-teardown-pool-real-treehouse.test.sh 3000
 tests/fm-teardown-pool.test.sh 520244
 tests/fm-teardown-scan-bounds.test.sh 180000
 tests/fm-teardown.test.sh 321463
@@ -1723,14 +1737,29 @@ normalize_script_path() {
   esac
 }
 
-# Append unique relative-or-absolute script paths to SCRIPTS.
+# Append unique relative-or-absolute script paths to SCRIPTS. A script added here is named directly, so it is no
+# longer inherited-only (INHERITED_SCRIPTS, add_inherited_script below).
 add_script() {
   local p existing
+  local -a kept=()
   p=$(normalize_script_path "$1")
+  for existing in "${INHERITED_SCRIPTS[@]+"${INHERITED_SCRIPTS[@]}"}"; do
+    [ "$existing" = "$p" ] || kept+=("$existing")
+  done
+  INHERITED_SCRIPTS=("${kept[@]+"${kept[@]}"}")
   for existing in "${SCRIPTS[@]+"${SCRIPTS[@]}"}"; do
     [ "$existing" = "$p" ] && return 0
   done
   SCRIPTS+=("$p")
+}
+
+# script_is_inherited_only <path>: <path> entered the selection only through add_inherited_script.
+script_is_inherited_only() {  # <path>
+  local existing
+  for existing in "${INHERITED_SCRIPTS[@]+"${INHERITED_SCRIPTS[@]}"}"; do
+    [ "$existing" = "$1" ] && return 0
+  done
+  return 1
 }
 
 select_all() {
@@ -1741,6 +1770,44 @@ select_all() {
   done < <(all_repo_tests)
 }
 
+# moved_cases_script <basename>: the script that holds cases moved out of <basename> into the real-treehouse family,
+# where only an installed Treehouse runs them. The one owner of that pairing: --family and --changed select the moved
+# script wherever they select the script its cases came from, so a selection that ran a case before the move still runs
+# it. Lanes keep each script in its own family's lane only, so CI still runs every script once.
+moved_cases_script() {  # <basename>
+  case "$1" in
+    fm-spawn-pool-base-freshen.test.sh) printf '%s\n' fm-spawn-real-treehouse.test.sh ;;
+    fm-spawn-acquisition-cleanup.test.sh) printf '%s\n' fm-spawn-acquisition-real-treehouse.test.sh ;;
+    fm-control-relaunch-backends.test.sh) printf '%s\n' fm-control-relaunch-real-treehouse.test.sh ;;
+    fm-teardown-pool.test.sh) printf '%s\n' fm-teardown-pool-real-treehouse.test.sh ;;
+  esac
+}
+
+# add_inherited_script <path>: add <path> to SCRIPTS as inherited-only (if not already selected), so under an explicit
+# --jobs it runs in the serial phase after every concurrent phase instead of being refused. A later add_script call
+# promotes it to directly selected. Two routes call it: add_script_with_moved_cases, and select_changed for a
+# real-treehouse script that a former owner's changed path selects through its family.
+add_inherited_script() {  # <path>
+  local p existing
+  p=$(normalize_script_path "$1")
+  for existing in "${SCRIPTS[@]+"${SCRIPTS[@]}"}"; do
+    [ "$existing" = "$p" ] && return 0
+  done
+  SCRIPTS+=("$p")
+  INHERITED_SCRIPTS+=("$p")
+}
+
+# add_script_with_moved_cases <path>: add_script, plus the script holding any cases moved out of <path>. A moved script
+# not otherwise selected is recorded in INHERITED_SCRIPTS: under an explicit --jobs it is not refused for lacking a
+# concurrency proof, because the caller did not name it; it runs in the serial phase after every concurrent phase.
+add_script_with_moved_cases() {  # <path>
+  local moved
+  add_script "$1"
+  moved=$(moved_cases_script "$(basename "$1")")
+  [ -n "$moved" ] && [ -f "tests/$moved" ] || return 0
+  add_inherited_script "tests/$moved"
+}
+
 select_family() {
   local want=$1 s base fam found=0
   [ -n "$want" ] || die "--family requires a name"
@@ -1749,25 +1816,75 @@ select_family() {
     base=$(basename "$s")
     fam=$(family_for_basename "$base")
     if [ "$fam" = "$want" ]; then
-      add_script "$s"
+      add_script_with_moved_cases "$s"
       found=1
     fi
   done < <(all_repo_tests)
   [ "$found" -eq 1 ] || die "no tests mapped to family '$want'"
 }
 
-families_for_test_reference() {  # <needle>...
-  local s needle
-  local found=0
-  local -a needles=()
+# tests_naming <needle>...: the tests/*.test.sh scripts that name a needle, either in their own text or in the code of
+# a tests/*.sh helper they source, followed through helpers that source further helpers. A helper is a sourced file
+# (a `.` or `source` line naming <name>.sh) for which tests/<name>.sh exists; one rule for every helper, so a
+# reference that moves from a test into a helper it sources still selects that test. A helper's comment lines are not
+# read. The base library - tests/lib.sh and every helper it sources - is not followed: every test loads it, so a
+# reference there would select the complete suite, which this map never does; a change to a base file itself is
+# selected by its own arm below.
+tests_naming() {  # <needle>...
+  local needle f
+  local -a needles=() helpers=()
   for needle in "$@"; do needles+=(-e "$needle"); done
+  # shellcheck disable=SC2035
+  for f in tests/*.sh; do
+    case "$f" in *.test.sh) ;; *) [ -f "$f" ] && helpers+=("$f") ;; esac
+  done
+  {
+    # shellcheck disable=SC2035
+    for f in tests/*.sh; do [ -f "$f" ] && printf 'F\t%s\n' "$f"; done
+    # shellcheck disable=SC2035
+    grep -lF "${needles[@]}" tests/*.test.sh 2>/dev/null | awk '{ print "M\t" $0 }'
+    if [ "${#helpers[@]}" -gt 0 ]; then
+      FM_TESTS_NAMING_NEEDLES=$(printf '%s\n' "$@") awk '
+        BEGIN { count = split(ENVIRON["FM_TESTS_NAMING_NEEDLES"], needle, "\n") }
+        /^[[:space:]]*#/ { next }
+        { for (i = 1; i <= count; i++) if (needle[i] != "" && index($0, needle[i])) { print "M\t" FILENAME; nextfile } }
+      ' "${helpers[@]}" 2>/dev/null
+    fi
+    # shellcheck disable=SC2035
+    grep -HE '^[[:space:]]*(\.|source)[[:space:]]' tests/*.sh 2>/dev/null | awk '{ print "E\t" $0 }'
+  } | awk -F'\t' '
+    $1 == "F" { exists[$2] = 1; next }
+    $1 == "M" { named[$2] = 1; next }
+    $1 == "E" {
+      line = $2; file = substr(line, 1, index(line, ":") - 1); rest = substr(line, index(line, ":") + 1)
+      name = ""
+      while (match(rest, /[A-Za-z0-9._-]+\.sh/)) { name = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH) }
+      if (name != "") { from[++edges] = file; to[edges] = "tests/" name }
+    }
+    END {
+      base["tests/lib.sh"] = 1
+      changed = 1
+      while (changed) {
+        changed = 0
+        for (i = 1; i <= edges; i++) if (base[from[i]] && exists[to[i]] && !base[to[i]]) { base[to[i]] = 1; changed = 1 }
+      }
+      changed = 1
+      while (changed) {
+        changed = 0
+        for (i = 1; i <= edges; i++) if (exists[to[i]] && !base[to[i]] && named[to[i]] && !named[from[i]]) { named[from[i]] = 1; changed = 1 }
+      }
+      for (f in named) if (f ~ /\.test\.sh$/) print f
+    }' | LC_ALL=C sort
+}
+
+families_for_test_reference() {  # <needle>...
+  local s
+  local found=0
   while IFS= read -r s; do
     [ -n "$s" ] || continue
-    if grep -Fq "${needles[@]}" "$s"; then
-      family_for_basename "$(basename "$s")"
-      found=1
-    fi
-  done < <(all_repo_tests)
+    family_for_basename "$(basename "$s")"
+    found=1
+  done < <(tests_naming "$@")
   [ "$found" -eq 1 ]
 }
 
@@ -1780,11 +1897,9 @@ scripts_for_test_reference() {
   local found=0
   while IFS= read -r s; do
     [ -n "$s" ] || continue
-    if grep -Fq "$needle" "$s"; then
-      printf '__script__:%s\n' "$(basename "$s")"
-      found=1
-    fi
-  done < <(all_repo_tests)
+    printf '__script__:%s\n' "$(basename "$s")"
+    found=1
+  done < <(tests_naming "$needle")
   [ "$found" -eq 1 ]
 }
 
@@ -1850,6 +1965,7 @@ families_for_changed_path() {
     tests/fm-backend-herdr-eventwait.test.py)
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       ;;
     tests/omp_wake_turns.py)
       printf '%s\n' "__script__:fm-omp-wake-turns.test.sh"
@@ -1913,33 +2029,40 @@ families_for_changed_path() {
     bin/backends/herdr*|bin/fm-herdr-lab.sh|tests/herdr-test-safety.sh|tests/herdr-client-pair-fixture.sh)
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' pure-contract-unit
       ;;
     bin/fm-herdr-session-cleanup.sh)
       printf '%s\n' session-bootstrap
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       ;;
     bin/backends/zellij*|tests/zellij-test-safety.sh)
       printf '%s\n' zellij
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       ;;
     bin/backends/cmux*|tests/cmux-test-safety.sh)
       printf '%s\n' cmux
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       ;;
     bin/backends/orca*|bin/backends/tmux.sh)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' orca
       ;;
     bin/fm-backend.sh|bin/fm-backend-hometag-lib.sh)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' real-herdr-gated
       ;;
     bin/fm-agent-process-lib.sh)
       # The shared harness-process classifier feeds both the tmux and Herdr
       # liveness verdicts, so a change to it is proven by both backends' suites.
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' real-herdr-gated
       printf '%s\n' pure-contract-unit
       ;;
@@ -1953,6 +2076,7 @@ families_for_changed_path() {
       printf '%s\n' afk
       printf '%s\n' watcher-wake-lock
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' pr-forge
       printf '%s\n' snapshot-bearings
       printf '%s\n' "__script__:fm-afk-pi-herdr-return-e2e.test.sh"
@@ -2029,6 +2153,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-control-relaunch.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-recovery.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-real-treehouse.test.sh"
       printf '%s\n' "__script__:fm-session-end-relaunch.test.sh"
       ;;
     bin/fm-quota-axi-lib.sh)
@@ -2087,6 +2212,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-control-relaunch.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-recovery.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-real-treehouse.test.sh"
       printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' session-bootstrap
       ;;
@@ -2101,6 +2227,7 @@ families_for_changed_path() {
       # The one .env accessor, sourced by bin/fm-x-lib.sh (Relay token) and
       # bin/fm-typesafe-lib.sh (dispatch and skill-pick TypeSafe and OpenRouter keys).
       printf '%s\n' pr-forge
+      printf '%s\n' real-treehouse
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
@@ -2203,11 +2330,13 @@ families_for_changed_path() {
     bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-teardown-nested-lib.sh|bin/fm-idle-session-reap.sh|bin/fm-review-diff.sh|\
     bin/fm-x-*|bin/fm-check*|bin/fm-pipeline-spend.sh)
       printf '%s\n' pr-forge
+      printf '%s\n' real-treehouse
       ;;
     bin/fm-task-docker-lib.sh)
       # The task-owned Docker ownership rules, sourced by bin/fm-teardown.sh
       # (pr-forge) and proven against a real Docker by its live guard.
       printf '%s\n' pr-forge
+      printf '%s\n' real-treehouse
       printf '%s\n' live-harness-optin
       ;;
     bin/fm-nm-run-lib.sh)
@@ -2216,6 +2345,7 @@ families_for_changed_path() {
       # pre-teardown run abort (pr-forge).
       printf '%s\n' pure-contract-unit
       printf '%s\n' pr-forge
+      printf '%s\n' real-treehouse
       ;;
     bin/fm-task-copy-lib.sh)
       # Which local copy a task record may name: fm-spawn's isolation guard
@@ -2224,14 +2354,17 @@ families_for_changed_path() {
       printf '%s\n' pr-forge
       printf '%s\n' session-bootstrap
       printf '%s\n' secondmate
+      printf '%s\n' real-treehouse
       ;;
     bin/fm-control-lib.sh)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       ;;
     bin/fm-launch-proof-lib.sh|bin/fm-reboot-recover.sh)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-supervision-events.test.sh"
       printf '%s\n' "__script__:fm-omp-reboot-live-e2e.test.sh"
@@ -2242,6 +2375,7 @@ families_for_changed_path() {
       # re-selects the live guard (fm-composer-matrix-live-e2e) alongside the
       # portable families.
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' pure-contract-unit
       printf '%s\n' live-harness-optin
       printf '%s\n' "__script__:fm-composer-native-band.test.sh"
@@ -2253,16 +2387,19 @@ families_for_changed_path() {
     bin/fm-spawn.sh)
       printf '%s\n' backend-dispatch
       printf '%s\n' pure-contract-unit
+      printf '%s\n' real-treehouse
       printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
     bin/fm-send.sh|bin/fm-harness.sh|bin/fm-peek.sh|bin/fm-composer*)
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' pure-contract-unit
       ;;
     bin/fm-teamclaude-launch.sh)
       # The TeamClaude launcher reads the installed TeamClaude CLI's exports, so
       # a change re-selects its live guard alongside the launch-path suites.
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' live-harness-optin
       ;;
     bin/fm-task-inbox-lib.sh)
@@ -2270,6 +2407,7 @@ families_for_changed_path() {
       # (backend-dispatch), the watcher's re-ring check (watcher-wake-lock),
       # and the live doorbell guard against real harnesses.
       printf '%s\n' backend-dispatch
+      printf '%s\n' real-treehouse
       printf '%s\n' watcher-wake-lock
       printf '%s\n' live-harness-optin
       retirement_tests_for_reference "$path" || true
@@ -2327,8 +2465,9 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       ;;
     tests/git-config-helpers.sh)
-      # The reference scan is not transitive, so match the two helpers that
-      # source this one as well: most suites inherit it only through them.
+      # The reference scan does not follow the base library (tests/lib.sh and
+      # what it sources), so match the two helpers that source this one as
+      # well: most suites inherit it only through them.
       families_for_test_reference git-config-helpers.sh lib.sh herdr-test-safety.sh \
         || printf '%s\n' "__unmapped__:$path"
       ;;
@@ -2357,8 +2496,8 @@ families_for_changed_path() {
         || printf '%s\n' "__unmapped__:$path"
       ;;
     tests/git-lock-helpers.sh)
-      # tests/fm-teardown-helpers.sh sources this helper.
-      # The reference scan reads only tests/*.test.sh, so name the module too.
+      # tests/fm-teardown-helpers.sh sources this helper; the reference scan
+      # follows that, and naming the module keeps the selection explicit.
       families_for_test_reference git-lock-helpers.sh fm-teardown-helpers.sh \
         || printf '%s\n' "__unmapped__:$path"
       ;;
@@ -2441,14 +2580,20 @@ select_changed() {
     while IFS= read -r s; do
       [ -n "$s" ] || continue
       if [ "$(family_for_basename "$(basename "$s")")" = "$f" ]; then
-        add_script "$s"
+        if [ "$f" = real-treehouse ]; then
+          # Entered only via a former owner's changed-path mapping (moved real-Treehouse cases);
+          # if a real-treehouse test script itself changed, wanted_scripts below promotes it via add_script.
+          add_inherited_script "$s"
+        else
+          add_script_with_moved_cases "$s"
+        fi
       fi
     done < <(all_repo_tests)
   done
 
   for script_name in "${wanted_scripts[@]+"${wanted_scripts[@]}"}"; do
     if [ -f "tests/$script_name" ]; then
-      add_script "tests/$script_name"
+      add_script_with_moved_cases "tests/$script_name"
     fi
   done
 
@@ -2952,6 +3097,8 @@ fi
 
 # An explicit --jobs names a concurrency for exactly the selection given, so an
 # unproven script in it is a refusal rather than something to schedule around.
+# The one exception is an inherited-only script (add_inherited_script): the
+# caller never named it, so it runs serially.
 if [ "$JOBS" -gt 1 ] && [ "$AUTO_CONCURRENCY" -eq 0 ]; then
   # A single heavy suite can occupy a whole serial shard. Its family may have
   # a separate concurrency proof, but that never changes this lane's contract.
@@ -2961,6 +3108,10 @@ if [ "$JOBS" -gt 1 ] && [ "$AUTO_CONCURRENCY" -eq 0 ]; then
     esac
   fi
   for s in "${SCRIPTS[@]}"; do
+    if ! script_allows_concurrency "$s" && script_is_inherited_only "$s"; then
+      log "$s entered this selection only as the holder of cases moved out of a selected script and has no concurrency proof, so it runs in the serial phase after every concurrent phase"
+      continue
+    fi
     if ! script_allows_concurrency "$s"; then
       die "--jobs $JOBS refused: $s is not in the proven-isolated set (see bin/fm-test-isolation-proof.sh --list) and its family has no recorded concurrent proof. Unproven stateful scripts stay serial."
     fi

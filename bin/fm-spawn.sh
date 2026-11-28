@@ -571,6 +571,33 @@
 #   it is leased durably in place to this home (`treehouse lease --path`, holder firstmate-skipped:<task>,
 #   because Treehouse resets a slot when its shell exits), recorded in $DATA/<task>/skipped-copies.tsv with the
 #   row read back, listed in the spawn output, and a second `treehouse get` in the same pane takes another copy.
+#   A copy the pool hands out that already carries another holder's lease (an ordinary lease of another holder or
+#   Treehouse's recovered lease), shown by one consistent row of Treehouse's pool state read before anything is written, is
+#   passed over before any claim, lease command or idle proof: nothing is written to it, the claim marker beside it is
+#   never created, replaced or removed, and this home takes no lease (the pool state already holds it). It is recorded in
+#   skipped-copies.tsv with the holder the pool names and the acquisition endpoint, which bin/fm-teardown.sh never returns,
+#   and listed as passed over. From the first pass-over to the end of the spawn, even after a clean copy is reached, the
+#   acquisition pane is never closed: the get that entered the passed-over copy opened a subshell inside it and every
+#   later get runs beneath that subshell, so an abort is settled and proved from the pane's own process table (closing
+#   the pane proves nothing about a get still running there), and nothing outside the record is left running. Closing
+#   the pane later (teardown closes the worker's window, which is this pane) does not release or reset a passed-over
+#   copy: Treehouse never prunes or resets a leased worktree, an ordinary or a recovered lease (`treehouse capabilities`
+#   reports persistent_recovered_leases), even with no process inside, until `treehouse return <path>` releases it.
+#   Slot 124 was handed out while it carried a recovered lease, so these callers still never prune, reset or return a
+#   held slot, and spawn checks every copy it is handed (the pass-over).
+#   An abort after a pass-over, before launch, instead interrupts any `treehouse get` in the pane's foreground and
+#   proves from the process table that those processes are gone and that the pane rests in a copy this spawn passed
+#   over or leased in place; anything else (a get still alive, a pane resting in another copy, a foreground the
+#   backend cannot read, which is interrupted all the same) is an error. Only tmux reads the foreground. Every other backend, Herdr flat or projected
+#   included, always reports the abort as not clean: Herdr pass-over settlement and the Herdr projection branch
+#   (HERDR_PROJECTION_ABORT_CLEANUP, which a pass-over turns off) are untested, so no Herdr abort is ever called clean.
+#   Either way the pane is recorded, read back, in $DATA/<task>/acquisition-pane.tsv. Treehouse never frees a recovered lease by
+#   itself (`treehouse return --all` skips it): it stays until it is returned by name or acknowledged with
+#   `treehouse lease --recover`. Each passed-over copy is a distinct copy the acquisition never accepts again,
+#   so the loop ends by the one absolute bound below or by the copies the pool has, with the refusal naming each copy.
+#   A pool state that cannot be read as exactly one consistent row for the copy (unreadable, a duplicate row by name or by
+#   physical path, a conflicting entry, a lease that is this task's own) refuses the whole spawn at that point, before any
+#   claim; only a copy whose one row is positively unleased goes on to the claim and the idle proof.
 #   A doubt that is an UNKNOWN (could not tell), a record that cannot be written and read back, or a path that
 #   cannot be resolved refuses the whole spawn: the copy is leased where it stands and nothing is launched.
 #   One absolute thirty-minute bound covers every get and is read before each get, after the custody scan.
@@ -2096,6 +2123,8 @@ SPAWN_BRIEF_DELIVERED=0
 SPAWN_BRIEF_FAILURE_REASON=
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_TREEHOUSE_ABORT_TARGET=
+# The acquisition endpoint once a copy was passed over: never closed again; an abort settles it instead (spawn_settle_passed_over_pane).
+SPAWN_PASSED_OVER_PANE=
 SPAWN_ROUTING_PAIR=
 
 spawn_fresh_commit_rollback() {
@@ -2201,6 +2230,11 @@ spawn_abort_cleanup() {
         status=1
       fi
     fi
+  fi
+  # After a pass-over the pane is never closed by an abort: closing it proves nothing about a get still running there, so
+  # the get is interrupted in place and proved gone from the pane's process table instead. This never ends the cleanup early.
+  if [ -n "$SPAWN_PASSED_OVER_PANE" ] && [ "$KIND" != secondmate ] && [ "$SPAWN_LAUNCH_SENT" = 0 ]; then
+    spawn_settle_passed_over_pane || status=1
   fi
   if [ "$ORCA_ABORT_CLEANUP" = 1 ]; then
     ORCA_ABORT_CLEANUP=0
@@ -6589,6 +6623,8 @@ spawn_path_is_prior_copy() { # <path>
 # copy (spawn_skip_copy); the pane then still sits in the skipped copy until the new get moves it.
 SPAWN_SKIPPED_SLOTS=()
 SPAWN_SKIPPED_INFO=()
+# The copies among SPAWN_SKIPPED_SLOTS that already carried another holder's lease: skipped without a lease of this home.
+SPAWN_REFUSED_INFO=()
 SPAWN_PROVEN_COPY=
 SPAWN_APPLY_FAILED=0
 SPAWN_ACQUIRE_T0=
@@ -6609,15 +6645,116 @@ spawn_pane_pid() {
   [ "$pid" -gt 1 ] || return 0
   printf '%s' "$pid"
 }
+# The pids of <target>'s foreground process group, one per line, from the process table: on tmux the processes of the
+# pane's tty in the tty's foreground group. Nothing on every other backend. Herdr is deliberately absent: its pass-over
+# settlement and its projection branch are untested, so an empty read keeps every Herdr abort reported as not clean.
+spawn_foreground_pids() { # <target>
+  case "$BACKEND" in
+    tmux) fm_backend_tmux_foreground_pids "$1" 2>/dev/null || true ;;
+  esac
+}
+# Whether <pid> is a live process the kernel names `treehouse`: the launcher rule of bin/fm-slot-provision-lib.sh.
+spawn_pid_is_treehouse() { # <pid>
+  local comm
+  comm=$(LC_ALL=C ps -p "$1" -o comm= 2>/dev/null) || return 1
+  comm=${comm%"${comm##*[![:space:]]}"}
+  [ "${comm##*/}" = treehouse ]
+}
+# Settle the acquisition pane on an abort after a pass-over, without closing it (the header owns why). A `treehouse get`
+# in the pane's foreground is interrupted through the backend and must then be gone from the process table, and the pane
+# must rest in a copy this spawn passed over or leased in place; a get still alive, a pane resting anywhere else, or a
+# foreground or path the backend cannot read (interrupted all the same) is an error. Only tmux can be proved settled: on
+# Herdr (flat or projected), which is untested here, and on every other backend the outcome is always unobservable. The
+# outcome is recorded and read back in $DATA/<task>/acquisition-pane.tsv (endpoint, outcome, detail, epoch). Returns 1
+# unless the pane was proved settled and recorded. Never exits.
+spawn_settle_passed_over_pane() {
+  local target=$SPAWN_PASSED_OVER_PANE fg pid gets='' alive='' path='' outcome='' detail row i=0
+  fg=$(spawn_foreground_pids "$target")
+  for pid in $fg; do
+    ! spawn_pid_is_treehouse "$pid" || gets="${gets:+$gets }$pid"
+  done
+  # Before launch the foreground is a get or an interactive shell, which an interrupt leaves at its prompt, so a foreground
+  # that cannot be read is interrupted too; only the process table can say the get is gone, so that outcome stays unproved.
+  if [ -n "$gets" ] || [ -z "$fg" ]; then
+    spawn_send_key "$target" C-c >/dev/null 2>&1 || true
+  fi
+  if [ -n "$gets" ]; then
+    while :; do
+      alive=''
+      for pid in $gets; do
+        ! spawn_pid_is_treehouse "$pid" || alive="${alive:+$alive }$pid"
+      done
+      [ -n "$alive" ] && [ "$i" -lt 100 ] || break
+      i=$((i + 1))
+      sleep 0.1
+    done
+  fi
+  if [ -z "$fg" ]; then
+    outcome=unobservable
+    detail="the $BACKEND backend did not report the pane's foreground processes, so an interrupt was sent but no treehouse get in it is proved cancelled"
+  elif [ -n "$alive" ]; then
+    outcome=get-not-cancelled
+    detail="treehouse get process(es) $alive in its foreground were interrupted but are still running and can still take a copy no record names"
+  else
+    # Read again after the interrupt: the foreground must hold no get, and the pane must rest in a recorded copy.
+    fg=$(spawn_foreground_pids "$target")
+    alive=''
+    for pid in $fg; do
+      ! spawn_pid_is_treehouse "$pid" || alive="${alive:+$alive }$pid"
+    done
+    path=$(spawn_current_path "$target" 2>/dev/null) || path=
+    if [ -z "$fg" ] || [ -z "$path" ]; then
+      outcome=unobservable
+      detail="the pane's foreground or current path could not be read after the interrupt, so it is not proved to rest in a copy this spawn passed over or leased in place"
+    elif [ -n "$alive" ]; then
+      outcome=get-not-cancelled
+      detail="treehouse process(es) $alive are in its foreground after the interrupt and can still take a copy no record names"
+    elif ! spawn_slot_skipped "$path"; then
+      outcome=unrecorded-copy
+      if [ "$(fm_meta_get "$STATE/$ID.meta" recovery)" = slot-provision-refused ] &&
+        [ "$(real_path_or_raw "$(fm_meta_get "$STATE/$ID.meta" worktree)")" = "$(real_path_or_raw "$path")" ]; then
+        detail="it rests in $path, which is not a copy this spawn passed over or leased in place: that copy is recorded by the governed refusal in $STATE/$ID.meta, not in skipped-copies.tsv"
+      else
+        detail="it rests in $path, which is not a copy this spawn passed over or leased in place, so a shell there holds that copy outside skipped-copies.tsv"
+      fi
+    elif [ -n "$gets" ]; then
+      outcome=get-cancelled
+      detail="the treehouse get running in it (pid(s) $gets) was interrupted and is gone, and it rests in $path, a copy this spawn passed over or leased in place"
+    else
+      outcome=no-get
+      detail="no treehouse get was running in it, and it rests in $path, a copy this spawn passed over or leased in place"
+    fi
+  fi
+  row=$(printf '%s\t%s\t%s\t%s' "$target" "$outcome" "$(printf '%s' "$detail" | tr '\t\r\n' '   ')" "$(date +%s)")
+  if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/acquisition-pane.tsv" && grep -Fxq -- "$row" "$DATA/$ID/acquisition-pane.tsv"; } 2>/dev/null; then
+    echo "error: acquisition pane $target ($T) is left open after a pass-over and its record could not be written and read back in $DATA/$ID/acquisition-pane.tsv; $detail" >&2
+    return 1
+  fi
+  case "$outcome" in
+    get-cancelled | no-get)
+      echo "notice: acquisition pane $target ($T) is left open so the abort is proved from its process table; $detail (record: $DATA/$ID/acquisition-pane.tsv)" >&2
+      return 0
+      ;;
+  esac
+  echo "error: acquisition pane $target ($T) is left open after a pass-over and is not settled: $detail; this abort is not clean: inspect the pane and the copies it stands in (treehouse status) before closing it (record: $DATA/$ID/acquisition-pane.tsv)" >&2
+  return 1
+}
 # What this spawn left leased: each copy it skipped is leased in place to this home (holder
 # firstmate-skipped:<task>) and recorded in $DATA/<task>/skipped-copies.tsv. Nothing here releases a lease.
 spawn_report_leased_copies() {
   local entry
-  [ "${#SPAWN_SKIPPED_INFO[@]}" -gt 0 ] || return 0
-  echo "leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: $DATA/$ID/skipped-copies.tsv):"
-  for entry in "${SPAWN_SKIPPED_INFO[@]}"; do
-    echo "  ${entry%%|*} (${entry#*|}) held by firstmate-skipped:$ID"
-  done
+  if [ "${#SPAWN_SKIPPED_INFO[@]}" -gt 0 ]; then
+    echo "leased copies (owned by this home; release one only through bin/fm-teardown.sh's landed-work test, never automatically; record: $DATA/$ID/skipped-copies.tsv):"
+    for entry in "${SPAWN_SKIPPED_INFO[@]}"; do
+      echo "  ${entry%%|*} (${entry#*|}) held by firstmate-skipped:$ID"
+    done
+  fi
+  if [ "${#SPAWN_REFUSED_INFO[@]}" -gt 0 ]; then
+    echo "copies left untouched (each already carries another holder's lease, so this home holds no lease on it and wrote nothing to it; record: $DATA/$ID/skipped-copies.tsv):"
+    for entry in "${SPAWN_REFUSED_INFO[@]}"; do
+      echo "  ${entry%%|*} (${entry#*|})"
+    done
+  fi
 }
 spawn_slot_skipped() { # <path>: whether this spawn skipped that copy
   local skipped real
@@ -6761,6 +6898,28 @@ spawn_acquire_pool_slot() {
 
   validate_spawn_worktree "treehouse get" "$T"
 
+  # The pool state decides before any claim is written: a copy that already carries another holder's lease is passed over; a
+  # copy whose state cannot be read as one consistent record is refused (the copy may hold work, so its endpoint stays open on
+  # it, untouched, exactly as for a lease that cannot be taken); only a positively unleased copy goes on to the claim.
+  if [ "$RELAUNCH" -eq 0 ]; then
+    spawn_classify_copy "$WT"
+    case "$SPAWN_COPY_LEASE_STATE" in
+      other)
+        spawn_pass_over_copy
+        spawn_acquire_pool_slot
+        return
+        ;;
+      unknown)
+        SPAWN_TREEHOUSE_ABORT_TARGET=
+        HERDR_PROJECTION_ABORT_CLEANUP=0
+        ORCA_ABORT_CLEANUP=0
+        spawn_report_leased_copies >&2
+        echo "error: the pool state does not show copy $WT as one consistent record (${FM_TASK_COPY_SLOT_REASON:-state ${FM_TASK_COPY_SLOT_STATE:-unknown}}, ${FM_TASK_COPY_SLOT_ROWS:-0} row(s) for it); nothing was written to it and no claim was made, its endpoint $T stays open on it because closing that endpoint would let Treehouse reset it; no worker admitted" >&2
+        exit 1
+        ;;
+    esac
+  fi
+
   # Claim the pool slot for this task. The interactive `treehouse get` sent to
   # the pane above records only a process lease (Treehouse's durable
   # `get --lease --lease-holder`, which bin/fm-home-seed.sh uses for secondmate
@@ -6781,10 +6940,124 @@ spawn_acquire_pool_slot() {
     SPAWN_SLOT_CLAIMED=1
   fi
 }
+# What Treehouse's own pool state, read now and read-only and before anything is written, says about pool copy <path>.
+# Sets SPAWN_COPY_LEASE_STATE to one of
+#   ordinary  the copy is positively NOT in this project's pool: Treehouse named the pool directory and the copy is not under
+#             it. Handled as before. No other proof is accepted: a lookup that fails is not a proof;
+#   unleased  the whole state file passed the strict proof, exactly one row is the copy and it is not leased: a normal
+#             candidate;
+#   other     the whole state file passed the strict proof, exactly one row is the copy, and it is leased by a holder other
+#             than this task's own firstmate-skipped:<id> (an ordinary lease or Treehouse's recovered lease);
+#             SPAWN_OTHER_LEASE_HOLDER holds that holder. Only this state passes a copy over;
+#   unknown   anything else: a copy that lies in the pool, or that cannot be shown to lie outside it, whose state is missing,
+#             a symlink or unreadable; a state that fails the strict proof in ANY row (fm_task_copy_pool_state_strict: one
+#             JSON document read exactly, every row's field types, nothing coerced); an escaped or relative path; no row for
+#             the copy; a row that is also another row by name or by physical identity (a differently spelled path or a
+#             symlink, whatever the names and holders, in either order); a conflicting entry; a lease that is this task's
+#             own; or a state that, read twice, does not give the copy the same row count, state, holder and name.
+# This is called for a copy the pool just handed this spawn, so it is a pool copy by construction; a pool-slot test that
+# fails therefore leaves it unknown unless the pool directory resolves and excludes it. The copy is classified from the rows
+# of the very document the strict proof read (the proof leaves them in fm_task_copy_pool_slot_held's cache), so the file is
+# never read leniently for a classification. Every physical alias and every duplicate name counts
+# (fm_task_copy_pool_slot_held counts them), so one row is never read out of several. No command's message is ever the
+# proof, and treehouse is not asked: its status command can rewrite state. Treehouse writes its state under its own lock,
+# which this spawn does not hold (the Firstmate project lock does not stop a treehouse command run elsewhere), so the file
+# is proved and classified a second time, and the copy is classified only when both readings pass the proof and agree for
+# it; a state that changed for the copy, or became one the proof refuses, between the two readings is unknown. This is a
+# sampling limit: "no corrupt state reaches a worker" holds for a corruption that a reading sees. A change made and undone
+# between two readings, or made after the second, is seen by no reading and can be seen by no read-only classifier; the copy
+# is then classified from a state that passed the proof twice, and a worker may be launched.
+spawn_classify_copy() { # <path>
+  local real pool_dir state reading first_rows='' first_state='' first_holder='' first_name=''
+  SPAWN_COPY_LEASE_STATE=unknown
+  SPAWN_OTHER_LEASE_HOLDER=
+  FM_TASK_COPY_SLOT_STATE=unknown
+  FM_TASK_COPY_SLOT_ROWS=0
+  FM_TASK_COPY_SLOT_REASON="the copy path cannot be resolved"
+  real=$(CDPATH='' cd -- "$1" 2>/dev/null && pwd -P) && [ -n "$real" ] || return 0
+  if ! fm_treehouse_pool_slot "$PROJ_ABS" "$real"; then
+    # Not a readable pool slot. That alone proves nothing: a pool copy whose state is missing, a symlink or unparseable looks
+    # the same. It is ordinary ONLY when Treehouse names this project's pool directory and the copy is not under it.
+    if pool_dir=$(fm_task_copy_treehouse_pool_dir "$PROJ_ABS") && pool_dir=$(CDPATH='' cd -- "$pool_dir" 2>/dev/null && pwd -P) && [ -n "$pool_dir" ]; then
+      case "$real" in
+        "$pool_dir"/*)
+          FM_TASK_COPY_SLOT_STATE=missing-state
+          FM_TASK_COPY_SLOT_REASON="lies in this project's pool $pool_dir whose state file cannot be used (missing, a symlink or not a Git-matching pool)"
+          ;;
+        *) SPAWN_COPY_LEASE_STATE=ordinary ;;
+      esac
+    else
+      FM_TASK_COPY_SLOT_STATE=missing-state
+      FM_TASK_COPY_SLOT_REASON="is not a readable pool slot and Treehouse did not name this project's pool directory, so it is not shown to lie outside the pool"
+    fi
+    return 0
+  fi
+  # Each reading proves the whole state file exactly as written and classifies the copy from the rows of that proved
+  # document; no row of a file that fails the proof is read as a classification.
+  state="${real%/*/*}/treehouse-state.json"
+  for reading in first second; do
+    if ! fm_task_copy_pool_state_strict "$state"; then
+      FM_TASK_COPY_SLOT_STATE=invalid
+      FM_TASK_COPY_SLOT_REASON="cannot be classified on the $reading reading of the pool state: $FM_TASK_COPY_STRICT_REASON"
+      return 0
+    fi
+    fm_task_copy_pool_slot_held "$real" || :
+    # No later reader in this spawn may take this reading's rows for a newer one.
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    if [ "$reading" = first ]; then
+      first_rows=$FM_TASK_COPY_SLOT_ROWS first_state=$FM_TASK_COPY_SLOT_STATE first_holder=$FM_TASK_COPY_SLOT_HOLDER first_name=$FM_TASK_COPY_SLOT_NAME
+    elif [ "$first_rows" != "$FM_TASK_COPY_SLOT_ROWS" ] || [ "$first_state" != "$FM_TASK_COPY_SLOT_STATE" ] ||
+      [ "$first_holder" != "$FM_TASK_COPY_SLOT_HOLDER" ] || [ "$first_name" != "$FM_TASK_COPY_SLOT_NAME" ]; then
+      FM_TASK_COPY_SLOT_REASON="changed between two readings of the pool state $state (first $first_rows row(s), state ${first_state:-none}, holder '${first_holder}'; then $FM_TASK_COPY_SLOT_ROWS row(s), state ${FM_TASK_COPY_SLOT_STATE:-none}, holder '${FM_TASK_COPY_SLOT_HOLDER}')"
+      FM_TASK_COPY_SLOT_STATE=changed
+      return 0
+    fi
+  done
+  [ "$FM_TASK_COPY_SLOT_ROWS" = 1 ] || return 0
+  case "$FM_TASK_COPY_SLOT_STATE" in
+    unleased) SPAWN_COPY_LEASE_STATE=unleased ;;
+    held | recovered)
+      [ -n "$FM_TASK_COPY_SLOT_HOLDER" ] && [ "$FM_TASK_COPY_SLOT_HOLDER" != "firstmate-skipped:$ID" ] || return 0
+      SPAWN_OTHER_LEASE_HOLDER=$FM_TASK_COPY_SLOT_HOLDER
+      SPAWN_COPY_LEASE_STATE=other
+      ;;
+  esac
+  return 0
+}
+# A copy the pool handed this spawn that already carries another holder's lease is passed over before anything is written to
+# it: no claim (the claim marker beside the copy is never created, replaced or removed), no lease command, no idle proof.
+# The pool state already holds the copy's lease, so this home adds no lease of its own. The pane is not closed for the rest
+# of this spawn, and an abort settles it instead (the header owns why); a Herdr pass-over, and the Herdr projection cleanup
+# this turns off, are untested, so a Herdr abort here is always reported as not clean. It is recorded in $DATA/<task>/skipped-copies.tsv
+# with the lease holder the pool state names in the holder column, never a holder this home could own, so
+# bin/fm-teardown.sh never returns it, and with the acquisition endpoint in the fifth column. The record is read back; a
+# record that cannot be written and read back refuses the whole spawn.
+spawn_pass_over_copy() {
+  local passed=$WT real row reason
+  # From here an abort never closes the pane: it settles it from the pane's process table instead (the header owns why).
+  SPAWN_PASSED_OVER_PANE=$WT_TARGET
+  SPAWN_TREEHOUSE_ABORT_TARGET=
+  HERDR_PROJECTION_ABORT_CLEANUP=0
+  real=$(CDPATH='' cd -- "$passed" 2>/dev/null && pwd -P) && [ -n "$real" ] || {
+    echo "error: copy '$passed' cannot be resolved to a real path, so its record cannot be trusted; nothing was written to it and the spawn is refused (no worker admitted)" >&2
+    exit 1
+  }
+  reason=$(printf 'already carries another holder'"'"'s lease in the pool state (holder: %s); this spawn wrote nothing to it' "$SPAWN_OTHER_LEASE_HOLDER" | tr '\t\r\n' '   ')
+  row=$(printf '%s\t%s\t%s\t%s\t%s' "$real" "$reason" "$(printf '%s' "$SPAWN_OTHER_LEASE_HOLDER" | tr '\t\r\n' '   ')" "$(date +%s)" "$WT_TARGET")
+  if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/skipped-copies.tsv" && grep -Fxq -- "$row" "$DATA/$ID/skipped-copies.tsv"; } 2>/dev/null; then
+    echo "error: could not write and read back the record of passed-over copy $real in $DATA/$ID/skipped-copies.tsv; nothing was written to the copy and the spawn is refused (no worker admitted)" >&2
+    exit 1
+  fi
+  SPAWN_SKIPPED_SLOTS+=("$real")
+  SPAWN_REFUSED_INFO+=("$real|$reason")
+  echo "skipped: copy $real $reason; taking another copy" >&2
+  WT=
+}
 # A copy that is not plainly clean, idle and behind the target is never used and never touched
 # (bin/fm-slot-provision-lib.sh owns the rules). Treehouse resets a slot when its shell exits,
 # so the skipped copy is first leased durably, in place and without touching it: treehouse
-# then never hands it out again and never resets it, and its owner can still find it. Only
+# then never prunes or resets it, and its owner can still find it. Only
 # the claim this spawn just wrote is released. Then a second `treehouse get` in the same pane
 # hands another slot. A relaunch keeps the copy its task's work lives in, so it never skips.
 spawn_skip_copy() {
@@ -6812,7 +7085,7 @@ spawn_skip_copy() {
     echo "error: skipped copy '$skipped' cannot be resolved to a real path, so its record cannot be trusted; it stays leased as firstmate-skipped:$ID, its endpoint $T stays open, and the spawn is refused (no worker admitted)" >&2
     exit 1
   fi
-  row=$(printf '%s\t%s\tfirstmate-skipped:%s\t%s' "$real" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)")
+  row=$(printf '%s\t%s\tfirstmate-skipped:%s\t%s\t%s' "$real" "${FM_SLOT_SKIP_REASON:-unknown}" "$ID" "$(date +%s)" "$WT_TARGET")
   if ! { mkdir -p "$DATA/$ID" && printf '%s\n' "$row" >>"$DATA/$ID/skipped-copies.tsv" && grep -Fxq -- "$row" "$DATA/$ID/skipped-copies.tsv"; } 2>/dev/null; then
     echo "error: could not write and read back the record of skipped copy $real in $DATA/$ID/skipped-copies.tsv; the copy stays leased as firstmate-skipped:$ID, its endpoint $T stays open, and the spawn is refused (no worker admitted)" >&2
     exit 1

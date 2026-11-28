@@ -15,7 +15,7 @@
 #      .codex/, .cursor/, .grok/, .pi/, .opencode/, and .omp/, plus any file the
 #      caller adds with --registrations.
 #   2. registry: the spec path and every owner and test path in the guard
-#      registry resolve.
+#      registry resolve, and each guard's test list names at least one path.
 #   3. retirement: every id in the retirement changelog has zero live references
 #      outside the changelog itself and its own retirement test, and is absent
 #      from the active registry. A mention of the retirement test's own path is
@@ -28,6 +28,7 @@
 #
 # Output:
 #   MISSING <path> registration=<file>          a wired path does not exist
+#   MISSING (no test path) registration=registry:<id>  a guard names no test
 #   RESURRECTED <guard> <file>:<line>           a retired guard is referenced
 #   REFCHECK_SUMMARY registrations=<n> paths=<n> missing=<n> retired=<n> resurrected=<n>
 # With --json, one JSON object carries the same fields plus every finding.
@@ -38,12 +39,14 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=bin/fm-guard-registry-lib.sh
+. "$SCRIPT_DIR/fm-guard-registry-lib.sh"
 REGISTRY=''
 RETIRED=
 JSON=0
 EXTRA_REGISTRATIONS=''
 
-usage() { sed -n '3,32p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,34p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "error: $*" >&2; exit 2; }
 
 while [ $# -gt 0 ]; do
@@ -123,23 +126,43 @@ EOF
 # Registry wiring: spec, owner and test paths resolve.
 registry_missing=0
 if [ -f "$REGISTRY" ]; then
-  while IFS=$'\t' read -r id owner test; do
-    for f in $(printf '%s\n' "$owner" | tr ',' '\n' | tr '+' '\n'); do
-      f=$(printf '%s' "$f" | tr -d ' \t')
-      [ -n "$f" ] || continue
-      if [ ! -e "$ROOT/$f" ]; then
-        registry_missing=$((registry_missing + 1))
-        [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"
-        printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
-      fi
-    done
-    if [ -n "$test" ] && [ ! -e "$ROOT/$test" ]; then
+  while IFS= read -r entry; do
+    id=$(printf '%s' "$entry" | jq -r '.id // ""')
+    owner_items=$(printf '%s' "$entry" | jq -r '
+      (.owner // "") | (if type == "string" then . else tojson end)
+      | split(",") | map(split("+")) | flatten
+      | map(sub("^[ \t]+"; "") | sub("[ \t]+$"; ""))
+      | map(select(length > 0))
+      | .[]
+      | if (explode | any(. < 32 or . == 127)) then "invalid\t" + tojson else "path\t" + . end') || owner_items=$'invalid\t(the owner field cannot be read)'
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      f=${line#*$'\t'}
+      [ "${line%%$'\t'*}" != path ] || [ ! -e "$ROOT/$f" ] || continue
       registry_missing=$((registry_missing + 1))
-      [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$test" "$id"
-      printf 'MISSING\t%s\tregistry:%s\n' "$test" "$id" >>"$FINDINGS"
+      [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"
+      printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
+    done <<EOF
+$owner_items
+EOF
+    # bin/fm-guard-registry-lib.sh owns how the test field is read. Each item must exist exactly as written; a field
+    # that cannot be read, names no item, or holds an item with a control character proves nothing about the guard.
+    if ! test_items=$(fm_guard_registry_test_items "$entry"); then
+      test_items=$'invalid\t(the test field cannot be read)'
+    elif [ -z "$test_items" ]; then
+      test_items=$'invalid\t(no test path)'
     fi
+    while IFS= read -r line; do
+      f=${line#*$'\t'}
+      [ "${line%%$'\t'*}" != path ] || [ ! -e "$ROOT/$f" ] || continue
+      registry_missing=$((registry_missing + 1))
+      [ "$JSON" -eq 1 ] || printf 'MISSING %s registration=registry:%s\n' "$f" "$id"
+      printf 'MISSING\t%s\tregistry:%s\n' "$f" "$id" >>"$FINDINGS"
+    done <<EOF
+$test_items
+EOF
   done <<EOF
-$(jq -r '.guards[] | [.id, (.owner // ""), (.test // "")] | @tsv' "$REGISTRY")
+$(jq -c '.guards[]' "$REGISTRY")
 EOF
   spec=$(jq -r '.spec // empty' "$REGISTRY")
   if [ -n "$spec" ] && [ ! -e "$ROOT/$spec" ]; then
