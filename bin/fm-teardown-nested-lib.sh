@@ -123,6 +123,7 @@ TEARDOWN_CLOSEOUT_OUT=
 TEARDOWN_CLOSEOUT_STDOUT=
 TEARDOWN_FOREIGN_RULE=
 TEARDOWN_FOREIGN_PID=
+TEARDOWN_FOREIGN_HOLDER_FILE=
 TEARDOWN_REFUSED_COPIES=()
 TEARDOWN_FRICTION_GUARD=FM-TEARDOWN-PRESERVATION
 
@@ -142,7 +143,12 @@ teardown_copy_question() {  # <rule> <copy>
     copy-head-resolved) printf 'Which verified commit holds the work in %s (%s)? Keep the copy; no discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     copy-ignored-files) printf 'What owner-approved disposition covers the ignored files only %s holds (%s)? Keep the copy; no removal or discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     copy-anchor-commit) printf 'Which commit does the existing preservation anchor protect, and does it cover %s (%s)? Keep the copy and the anchor; no overwrite is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
-    process-cwd-owner) printf 'Which task or person owns process %s, which is running in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
+    process-cwd-owner)
+      if [ -n "$TEARDOWN_FOREIGN_HOLDER_FILE" ]; then
+        printf 'Which task or person owns process %s, which holds %s open in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$TEARDOWN_FOREIGN_HOLDER_FILE" "$2"
+      else
+        printf 'Which task or person owns process %s, which is running in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2"
+      fi ;;
     lock-launcher-owner) printf 'Is launcher %s, named in the creation lock on %s, still running, and who owns it?' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
     creation-lock-owner) printf 'Who owns the creation lock on %s, and may it be released?' "$2" ;;
     nonforced-removal) printf 'What retained disposition covers the contents Git still protects in %s? Preserve this copy; no forced removal is authorized.' "$2" ;;
@@ -152,13 +158,58 @@ teardown_copy_question() {  # <rule> <copy>
   esac
 }
 
+# Sets <var> to the absolute form of <path>, byte-exact (printf -v, never a
+# captured copy, which would drop a final newline): the path itself when it is
+# absolute, otherwise the folder it names relative to the directory this run
+# started in (TEARDOWN_START_PWD; a caller that records none uses its current
+# directory). Fails when no absolute form can be made.
+teardown_absolute_root() {  # <var> <path>
+  local base
+  case "$2" in
+    '') return 1 ;;
+    /*) printf -v "$1" '%s' "$2" ;;
+    *)
+      base=${TEARDOWN_START_PWD:-}
+      if [ -z "$base" ]; then
+        # The trailing "." keeps a final newline of the directory through the capture.
+        base=$(pwd -P 2>/dev/null && printf .) || return 1
+        base=${base%.}
+        base=${base%$'\n'}
+      fi
+      case "$base" in /*) ;; *) return 1 ;; esac
+      printf -v "$1" '%s/%s' "${base%/}" "${2#./}" ;;
+  esac
+}
+
+# Sets <var> to the one canonical spelling of absolute <path> that decides
+# whether two roots are the same folder: every empty and "." component dropped,
+# so a trailing slash, a repeated slash or a "./" part does not make a
+# different folder. It reads nothing, so it works for a folder not made yet.
+teardown_canonical_root() {  # <var> <absolute path>
+  local rest=$2 part out=''
+  while [ -n "$rest" ]; do
+    part=${rest%%/*}
+    if [ "$part" = "$rest" ]; then rest=''; else rest=${rest#*/}; fi
+    case "$part" in ''|.) ;; *) out+=/$part ;; esac
+  done
+  printf -v "$1" '%s' "${out:-/}"
+}
+
 # One event per refused copy/predicate, not another event for the registered-copy
 # wrapper that repeats it. The command re-enters the existing proof/preservation
 # owner without force, so a forced or legacy-record run, which it could not
 # complete, gets a human-only exit instead. A new custody/disposition decision is
-# asked explicitly.
+# asked explicitly. The command names absolute folders only, each quoted with
+# printf %q so every byte of it survives on one line: FM_HOME, and each of the
+# state, data and config roots the run used that is a different folder from its
+# default under FM_HOME (compared in teardown_canonical_root's spelling), each
+# relative one taken relative to the directory the run started in. Run as
+# printed, from any directory and a shell that sets none of the overrides, it
+# reaches the same folders. A run that cannot make a root absolute gets the
+# human-only exit instead, naming that root.
 teardown_refuse_copy() {  # <rule> <missing> <copy>
-  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh}
+  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh} roots='' why='' piece
+  local abs_home abs_state abs_data abs_config key_home key_root root value
   # An unavailable inspection is not a policy judgment. The later custody
   # wrapper repeats this diagnostic without manufacturing a policy event.
   if [ "$1" = inspection-unavailable ]; then
@@ -168,10 +219,40 @@ teardown_refuse_copy() {  # <rule> <missing> <copy>
   fi
   exit_text=$(teardown_copy_question "$1" "$3")
   if [ "$1" = ignored-bytes-preserved ] && [ "${FORCE:-}" != --force ] && [ "${LEGACY_RECORD_GIVEN:-0}" != 1 ]; then
-    kind=machine
-    printf -v command 'FM_HOME=%q bash %q %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
-    exit_text=$command
-    missing="$missing Restore readable source and writable preservation storage, then run the completing command."
+    teardown_absolute_root abs_home "$FM_HOME" || { printf -v piece 'the home folder (%q)' "$FM_HOME"; why=$piece; }
+    for root in state data config; do
+      case "$root" in
+        state) value=${STATE:-$FM_HOME/state} ;;
+        data) value=${DATA:-$FM_HOME/data} ;;
+        config) value=${CONFIG:-$FM_HOME/config} ;;
+      esac
+      teardown_absolute_root "abs_$root" "$value" || { printf -v piece 'the %s folder (%q)' "$root" "$value"; why="${why:+$why, }$piece"; }
+    done
+    if [ -n "$why" ]; then
+      exit_text="No completing command is printed because $why is relative and the directory this run started in cannot be read, so a command naming it could not reach it from another directory. Once readable source and writable preservation storage are restored, re-run this teardown from the directory it started in."
+      missing="$missing Restore readable source and writable preservation storage, then re-run this teardown from the directory it started in."
+    else
+      kind=machine
+      teardown_canonical_root key_home "$abs_home"
+      for root in state data config; do
+        case "$root" in
+          state) value=$abs_state ;;
+          data) value=$abs_data ;;
+          config) value=$abs_config ;;
+        esac
+        teardown_canonical_root key_root "$value"
+        [ "$key_root" = "${key_home%/}/$root" ] && continue
+        printf -v piece ' FM_%s_OVERRIDE=%q' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$value"
+        roots+=$piece
+      done
+      if [ "${TEARDOWN_BY_PATH:-}" = 1 ]; then
+        printf -v command 'FM_HOME=%q%s bash %q --copy %q --record-id %q' "$abs_home" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$TEARDOWN_BY_PATH_COPY" "$ID"
+      else
+        printf -v command 'FM_HOME=%q%s bash %q %q' "$abs_home" "$roots" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
+      fi
+      exit_text=$command
+      missing="$missing Restore readable source and writable preservation storage, then run the completing command."
+    fi
   fi
   FM_HOME="$FM_HOME" FM_FRICTION_REVISION_FILE="$revision" \
     fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$missing" "$kind" "$exit_text" nested-copy "$3" "$ID"
@@ -244,11 +325,25 @@ teardown_pid_age_secs() {  # <pid>
 
 # Is the pid in a creation lock a launcher that may still be alive? A pid that
 # started after the lock file was written cannot be the process that wrote it:
-# pids are recycled. A start time that cannot be read counts as live. Returns 0
-# when it may be alive, 1 when it is gone or a recycled pid.
+# pids are recycled. A start time that cannot be read counts as live. Only a read
+# that proves the process absent counts as gone: a ps that failed, was refused or
+# said anything but "no such process" leaves the launcher possibly alive
+# (fm_task_copy_launcher_state). When the read proves nothing,
+# TEARDOWN_LOCK_LAUNCHER_UNPROVED holds the next step for the refusal to print.
+# Returns 0 when it may be alive, 1 when it is gone or a recycled pid.
+TEARDOWN_LOCK_LAUNCHER_UNPROVED=
 teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
-  local pid=$1 lock=$2 age mtime now
-  ps -p "$pid" -o pid= >/dev/null 2>&1 || return 1
+  local pid=$1 lock=$2 age mtime now state=0
+  TEARDOWN_LOCK_LAUNCHER_UNPROVED=
+  fm_task_copy_launcher_state "$pid" || state=$?
+  case "$state" in
+    0) ;;
+    1) return 1 ;;
+    *)
+      TEARDOWN_LOCK_LAUNCHER_UNPROVED="; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid $pid; end that process only after you confirm pid $pid is the launcher named by the lock (a pid can be reused)"
+      return 0
+      ;;
+  esac
   age=$(teardown_pid_age_secs "$pid") || return 0
   mtime=$(fm_lock_path_mtime "$lock") || return 0
   case "$mtime" in ''|*[!0-9]*) return 0 ;; esac
@@ -526,9 +621,12 @@ teardown_ignored_sha256() {  # [<path>]
 # Bundle preservation is separate from delivery, and is deliberately rechecked
 # rather than placed in the immutable-HEAD landing cache. fm-teardown.sh's
 # header owns the record format and supported creation/recovery commands.
+# What a refusal tells the operator to run once the bundle or the captain's call
+# exists; the by-path mode names its own command.
+TEARDOWN_RETRY_ACTION='retry ordinary teardown'
 teardown_bundle_refuse() {  # <predicate> [hint]
   echo "teardown: bundle preservation unavailable: $1." >&2
-  [ -z "${2:-}" ] || echo "Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in $DATA/$ID/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown." >&2
+  [ -z "${2:-}" ] || echo "Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in $DATA/$ID/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; $TEARDOWN_RETRY_ACTION." >&2
   return 1
 }
 
@@ -771,6 +869,16 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
     echo "teardown: the captain's land-or-drop call for bundle $1 is held on task $call" >&2
     return 0
   fi
+  # A by-path run has no task row of its own, so any open captain-held row that
+  # names the bundle and every recorded tip is the call (bin/fm-teardown.sh's
+  # header, "By-path teardown"). That is an exception to the held-task rule, so it
+  # is granted only after teardown_by_path_exception_clear has judged its harm
+  # rows here, at the exception, whatever ran before it.
+  if [ "$rc" = 0 ] && [ "${TEARDOWN_BY_PATH:-}" = 1 ]; then
+    teardown_by_path_exception_clear "$1" "$2" || return 1
+    echo "teardown: the captain's land-or-drop call for bundle $1 is held on task $call" >&2
+    return 0
+  fi
   if [ "$rc" -ge 2 ]; then
     teardown_bundle_refuse "$1: the captain's held calls cannot be read completely"
     return 1
@@ -780,7 +888,7 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
   if [ "$held" = 1 ]; then
     teardown_bundle_refuse "$1: task $ID is held for the captain on another question, and no open captain-held task's hold reason names the bundle and every recorded tip"
     {
-      printf 'File the land-or-drop call as its own task, then retry ordinary teardown:'
+      printf 'File the land-or-drop call as its own task, then %s:' "$TEARDOWN_RETRY_ACTION"
       printf ' %q' bin/fm-captain-hold.sh hold "$ID-bundle" --title "$title" \
         --origin "$ID" --owner captain --reason "$reason" \
         --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'
@@ -793,7 +901,7 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
     fi
     teardown_bundle_refuse "$1: task $ID is not held for the captain's land-or-drop call naming the bundle and every recorded tip"
     {
-      printf 'Hold it for the captain, then retry ordinary teardown:'
+      printf 'Hold it for the captain, then %s:' "$TEARDOWN_RETRY_ACTION"
       printf ' %q' bin/fm-captain-hold.sh hold "$ID" --owner captain --reason "$reason" \
         --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'
       printf '\n'
@@ -802,7 +910,7 @@ teardown_bundle_require_captain_call() {  # <bundle> <unlanded-tips> <recorded-t
     [ -z "${PROJ:-}" ] || repo=(--repo "${PROJ##*/}")
     teardown_bundle_refuse "$1: task $ID has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip"
     {
-      printf 'File the land-or-drop call as its row, then retry ordinary teardown:'
+      printf 'File the land-or-drop call as its row, then %s:' "$TEARDOWN_RETRY_ACTION"
       printf ' %q' bin/fm-captain-hold.sh hold "$ID" --title "$title" ${repo[@]+"${repo[@]}"} --owner captain --reason "$reason" \
         --boundary destructive --if-no 'Keep the copy and bundle; do not discard the commits'
       printf '\n'
@@ -861,43 +969,21 @@ teardown_bundle_store() {  # <copy> <source> <sha256>
   [ -z "$TEARDOWN_BUNDLE_REASON" ]
 }
 
-# <ref> itself must carry a locally-only commit, or delivery proof is still
-# required. Coverage includes only this cleanup's HEADs and deleted branch refs,
-# never unrelated unheld branches in the shared repository.
-teardown_bundle_preserved() {  # <copy> <ref> [hint]
-  local copy=$1 ref=$2 hint=${3:-} record="$DATA/$ID/preservation-bundles.tsv"
-  local bundle source hash tips tip own required side heads advertised digest stored
-  TEARDOWN_BUNDLE_ACCEPTED=
-  if ! teardown_bundle_attended; then
-    if [ -f "$record" ] && [ ! -L "$record" ] \
-        && own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") && [ -n "$own" ]; then
-      teardown_bundle_refuse 'recorded bundles require attended teardown; unattended cleanup still requires landing'
-      echo 'Retry ordinary teardown from the attended main session after ending away or quiet mode; the bundle must pass all preservation proofs there.' >&2
-    fi
-    return 1
-  fi
-  own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") || {
-    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
-  }
-  if [ -z "$own" ]; then
-    teardown_bundle_refuse "copy has no unlanded tips of its own; existing delivery proof is still required"
-    return 1
-  fi
-  side=$(teardown_bundle_removed_refs "$copy") || {
-    teardown_bundle_refuse "copy's branches cannot be inspected: $copy"; return 1;
-  }
-  required=$({ printf '%s\n' "$ref"; [ -z "$side" ] || printf '%s\n' "$side"; } | teardown_bundle_tips "$copy") || {
-    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
-  }
-  if ! teardown_bundle_record; then
-    teardown_bundle_refuse "$TEARDOWN_BUNDLE_REASON" "$hint"
-    return 1
-  fi
+# Verifies the recorded bundle (teardown_bundle_record has read the record) against
+# <required>, the copy's own unlanded tips one per line: the bundle is a regular
+# nonsymlink file whose bytes match the record, passes git bundle verify, advertises
+# every required tip and every recorded tip, the record lists every required tip,
+# and restores in an isolated repository. Sets TEARDOWN_BUNDLE_SOURCE (the recorded
+# path), TEARDOWN_BUNDLE_USE (the file verified: the source, or the stored copy once
+# the source is gone), TEARDOWN_BUNDLE_HASH and TEARDOWN_BUNDLE_TIPS from the record,
+# and TEARDOWN_BUNDLE_REASON, empty on success and otherwise what failed. Writes
+# nothing. The route below and the by-path exception both call it.
+teardown_bundle_verify() {  # <copy> <required-tips, one per line>
+  local copy=$1 required=$2 bundle hash tips stored heads advertised digest tip
   bundle=$TEARDOWN_BUNDLE_RECORD_PATH
   hash=$TEARDOWN_BUNDLE_RECORD_HASH
   tips=$TEARDOWN_BUNDLE_RECORD_TIPS
   TEARDOWN_BUNDLE_REASON=
-  source=$bundle
   stored="$DATA/$ID/preserved-bundles/$hash.bundle"
   # A completed admission survives deletion of its original source. Never mask
   # changed bytes or a symlink at a source that still exists.
@@ -937,6 +1023,49 @@ teardown_bundle_preserved() {  # <copy> <ref> [hint]
       TEARDOWN_BUNDLE_REASON='bundle cannot be restored in an isolated repository'
     fi
   fi
+  TEARDOWN_BUNDLE_SOURCE=$TEARDOWN_BUNDLE_RECORD_PATH
+  TEARDOWN_BUNDLE_USE=$bundle
+  TEARDOWN_BUNDLE_HASH=$hash
+  TEARDOWN_BUNDLE_TIPS=$tips
+}
+
+# <ref> itself must carry a locally-only commit, or delivery proof is still
+# required. Coverage includes only this cleanup's HEADs and deleted branch refs,
+# never unrelated unheld branches in the shared repository.
+teardown_bundle_preserved() {  # <copy> <ref> [hint]
+  local copy=$1 ref=$2 hint=${3:-} record="$DATA/$ID/preservation-bundles.tsv"
+  local bundle source hash tips own required side
+  TEARDOWN_BUNDLE_ACCEPTED=
+  if ! teardown_bundle_attended; then
+    if [ -f "$record" ] && [ ! -L "$record" ] \
+        && own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") && [ -n "$own" ]; then
+      teardown_bundle_refuse 'recorded bundles require attended teardown; unattended cleanup still requires landing'
+      echo "From the attended main session, after ending away or quiet mode, $TEARDOWN_RETRY_ACTION; the bundle must pass all preservation proofs there." >&2
+    fi
+    return 1
+  fi
+  own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") || {
+    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
+  }
+  if [ -z "$own" ]; then
+    teardown_bundle_refuse "copy has no unlanded tips of its own; existing delivery proof is still required"
+    return 1
+  fi
+  side=$(teardown_bundle_removed_refs "$copy") || {
+    teardown_bundle_refuse "copy's branches cannot be inspected: $copy"; return 1;
+  }
+  required=$({ printf '%s\n' "$ref"; [ -z "$side" ] || printf '%s\n' "$side"; } | teardown_bundle_tips "$copy") || {
+    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
+  }
+  if ! teardown_bundle_record; then
+    teardown_bundle_refuse "$TEARDOWN_BUNDLE_REASON" "$hint"
+    return 1
+  fi
+  teardown_bundle_verify "$copy" "$required"
+  bundle=$TEARDOWN_BUNDLE_USE
+  source=$TEARDOWN_BUNDLE_SOURCE
+  hash=$TEARDOWN_BUNDLE_HASH
+  tips=$TEARDOWN_BUNDLE_TIPS
   if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
     teardown_bundle_require_captain_call "$source" "$(printf '%s' "$required" | paste -sd ' ' -)" "$tips" || return 1
     if teardown_bundle_store "$copy" "$bundle" "$hash"; then
@@ -1135,6 +1264,7 @@ teardown_foreign_copy_unowned() {  # <copy>
   local copy=$1 rc=0 pids pid
   TEARDOWN_OWN_SCANNED=0
   TEARDOWN_FOREIGN_PID=
+  TEARDOWN_FOREIGN_HOLDER_FILE=
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
   fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
   case "$rc" in
@@ -1178,7 +1308,7 @@ teardown_foreign_copy_unowned() {  # <copy>
         if ! teardown_pid_is_task_own "$pid"; then
           TEARDOWN_FOREIGN_RULE='lock-launcher-owner'
           TEARDOWN_FOREIGN_PID=$pid
-          TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
+          TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running$TEARDOWN_LOCK_LAUNCHER_UNPROVED"
           return 1
         fi
         teardown_foreign_proc_record "$pid"
@@ -1417,32 +1547,89 @@ teardown_foreign_copies_prove() {  # <slot>
   teardown_foreign_refusals_print
 }
 
-# Does one of the task's own nested copies hold a Git repository or linked
-# worktree that is not the task's own, such as a separate clone or a worktree of
-# another project? The held close removes that own copy with its contents, and
-# no registered-copy list sees such a repository, so its commits would be lost
-# with no ref left behind. Submodules of the own repository and linked worktrees
-# of the same repository are not counted: the latter are foreign copies and are
-# proved on their own. Prints a refusal and returns 1 for the first repository
+# Is <bare>, a bare repository found inside <copy>, landed content of the copy's own
+# repository? Only when git proves it: at least one file under it is tracked, no
+# tracked file under it carries an index flag that hides an edit from git status
+# (`git ls-files -v` tags every one H: not assume-unchanged, a lowercase tag, and
+# not skip-worktree, S), and git status for that directory (untracked files listed
+# one by one, ignored ones too) prints nothing, so every file under it is tracked
+# and unmodified. An untracked, ignored, modified or deleted file under it, a
+# flagged file, a flag read or status that fails, and a directory git cannot read
+# are all "not proved": it counts as another repository.
+teardown_copy_bare_repo_landed() {  # <copy> <bare>
+  local own=$1 bare=$2 rel tracked flags entry changes
+  case "$bare" in "$own"/?*) rel=${bare#"$own"/} ;; *) return 1 ;; esac
+  tracked=$(git -C "$own" ls-files -z -- ":(literal)$rel" 2>/dev/null) || return 1
+  [ -n "$tracked" ] || return 1
+  flags=$(git -C "$own" ls-files -v -- ":(literal)$rel" 2>/dev/null) || return 1
+  [ -n "$flags" ] || return 1
+  while IFS= read -r entry; do
+    case "$entry" in 'H '*) ;; *) return 1 ;; esac
+  done <<< "$flags"
+  changes=$(git -C "$own" status --porcelain=v1 -z -uall --ignored=traditional -- ":(literal)$rel" 2>/dev/null) || return 1
+  [ -z "$changes" ]
+}
+
+# Prints, one per line, every Git repository inside <copy> that is not the copy's
+# own: a nested clone or a linked worktree of another repository (a .git entry
+# whose common directory is not the copy's), and a bare repository (HEAD, objects
+# and refs together, which carries no .git entry), under ignored folders such as
+# .claude and .opencode too. Not counted: submodules of the copy's own repository,
+# linked worktrees of the same repository (registered copies, proved on their own)
+# and a bare repository whose every file the copy's own repository tracks and holds
+# unmodified, with no index flag hiding an edit (teardown_copy_bare_repo_landed),
+# which is landed content. Prints
+# nothing else and changes nothing. Returns 0
+# when the whole copy was searched, 2 when the copy's own Git directory cannot be
+# read, and the failing find's status when a directory could not be searched; the
+# repositories found before a failed search are printed anyway. The one scan the
+# held close of a task's own nested copies and teardown --copy both use.
+teardown_copy_other_repo_dirs() {  # <copy>
+  local own=$1 listing hit dir common own_common bare rc status=0
+  own_common=$(git -C "$own" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 2
+  listing=$(find -P "$own" -mindepth 2 -name .git ! -path "$own/.git/*" -print 2>/dev/null) || status=$?
+  while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    dir=$(dirname "$hit")
+    rc=0
+    common=$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || rc=$?
+    case "$rc:$common" in
+      0:"$own_common"|0:"$own_common"/modules/*|0:"$own_common"/worktrees/*/modules/*) continue ;;
+    esac
+    printf '%s\n' "$dir"
+  done <<< "$listing"
+  listing=$(find -P "$own" -mindepth 2 -type d -name objects ! -path "$own/.git/*" -print 2>/dev/null) || status=$?
+  while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    bare=${hit%/objects}
+    [ "${bare##*/}" != .git ] || continue
+    { [ -f "$bare/HEAD" ] && [ -d "$bare/refs" ]; } || continue
+    ! teardown_copy_bare_repo_landed "$own" "$bare" || continue
+    printf '%s\n' "$bare"
+  done <<< "$listing"
+  return "$status"
+}
+
+# Does one of the task's own nested copies hold a Git repository that is not the
+# task's own, such as a separate clone, a worktree of another project or a bare
+# repository that is not landed content? The held close removes that own copy
+# with its contents, and no registered-copy list sees such a repository, so its
+# commits would be lost with no ref left behind. teardown_copy_other_repo_dirs
+# owns what counts. Prints a refusal and returns 1 for the first repository
 # found, or when the scan cannot be completed; changes nothing.
 teardown_own_nested_other_repos() {
-  local own hit dir common own_common rc status
+  local own hit dir status
   for own in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     [ -d "$own" ] || continue
-    if ! own_common=$(git -C "$own" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
+    if ! git -C "$own" rev-parse --path-format=absolute --git-common-dir >/dev/null 2>&1; then
       teardown_refuse_copy inspection-unavailable "the Git directory of task $ID's nested copy $own cannot be read, so what it holds cannot be proved; nothing was removed." "$own"
       return 1
     fi
     status=0
-    hit=$(find -P "$own" -mindepth 2 -name .git ! -path "$own/.git/*" -print 2>/dev/null) || status=$?
+    hit=$(teardown_copy_other_repo_dirs "$own") || status=$?
     while IFS= read -r hit; do
       [ -n "$hit" ] || continue
-      dir=$(dirname "$hit")
-      rc=0
-      common=$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || rc=$?
-      case "$rc:$common" in
-        0:"$own_common"|0:"$own_common"/modules/*|0:"$own_common"/worktrees/*/modules/*) continue ;;
-      esac
+      dir=$hit
       teardown_refuse_copy registered-copy-proven "pool slot ${TEARDOWN_RETURN_SLOT:-$own} would lose Git repository $dir inside task $ID's nested copy $own, which holds work no task record proves landed; its commits would have no ref left; nothing was removed." "$dir"
       return 1
     done <<< "$hit"
@@ -2519,9 +2706,9 @@ teardown_copy_git_protects() {  # <copy>
 # Preserves the ignored files of one proved foreign copy, then releases and
 # removes it. Returns 1 after printing a refusal, or a plain error where Git's
 # removal failed for a reason other than protecting the copy's contents.
-teardown_foreign_copy_dispose() {  # <slot> <copy>
+teardown_foreign_copy_dispose() {  # <slot> <copy> [ignored-mode]
   local slot=$1 copy=$2 rc=0 remove_rc remove_err protected
-  teardown_preserve_ignored "$copy" || {
+  teardown_preserve_ignored "$copy" "${3:-}" || {
     teardown_refuse_copy ignored-bytes-preserved "the ignored files of foreign copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
   }
@@ -2796,4 +2983,530 @@ teardown_own_locked_copies_release() {
     fi
   done
   teardown_retained_hold
+}
+
+# By-path teardown (bin/fm-teardown.sh --copy <path> [--record-id <id>]).
+#
+# Removes one nested worktree no task record names. bin/fm-teardown.sh's header
+# ("By-path teardown") owns the contract and docs/agent-control.md the operator
+# rule; this section owns the mechanics. Every landed-work, ignored-file, process,
+# lock and removal step is the foreign-copy code above, called unchanged
+# (teardown_foreign_copy_prove twice, then teardown_foreign_copy_dispose); this
+# section adds only what a copy with no record lacks: finding the clone that
+# registers it, the open-handle scan, the claim and inner-copy checks, the bundle
+# record id, the lock on the path and the audit record. It never signals a process,
+# because no scan root is set (TEARDOWN_RETURN_SLOT, WT and TASK_TMP stay empty)
+# and teardown_pid_is_task_own is therefore false for every pid.
+TEARDOWN_BY_PATH_CLONE=
+TEARDOWN_BY_PATH_HASH=
+TEARDOWN_BY_PATH_HOLDER=
+TEARDOWN_BY_PATH_WHY=
+TEARDOWN_BY_PATH_WHY_RULE=
+TEARDOWN_BY_PATH_LOG='record-less-copy-removals.log'
+
+# The one place a by-path run prints a refusal of its own. The checks below record
+# why they stop with teardown_by_path_why and return 1; teardown_by_path_main
+# prints that reason once.
+teardown_by_path_refuse() {  # <reason>
+  echo "REFUSED: $1; nothing was removed." >&2
+  return 1
+}
+teardown_by_path_why() {  # <reason>
+  TEARDOWN_BY_PATH_WHY=$1
+  TEARDOWN_BY_PATH_WHY_RULE=
+  return 1
+}
+# A refusal whose only cause is an input that could not be read: the exception
+# gives it rule inspection-unavailable, never a policy row.
+teardown_by_path_unread() {  # <reason>
+  TEARDOWN_BY_PATH_WHY=$1
+  TEARDOWN_BY_PATH_WHY_RULE=inspection-unavailable
+  return 1
+}
+
+# Settles the copy's canonical path and the bundle record id before anything
+# else uses ID: the request id is a placeholder until here. A copy that is gone
+# keeps the path as given, resolved through its nearest existing parent. Returns
+# 2 for a request that is not valid and 1 for a refusal.
+teardown_by_path_prepare() {
+  local raw=$TEARDOWN_BY_PATH_COPY parent canon hash
+  case "$raw" in
+    /*) ;;
+    *) echo "error: teardown --copy needs an absolute path, not $(fm_refuse_text "$raw")" >&2; return 2 ;;
+  esac
+  case "$raw" in
+    *$'\t'*|*$'\n'*|*$'\r'*) echo "error: teardown --copy path $(fm_refuse_text "$raw") holds a tab or line break, which its audit record cannot hold" >&2; return 2 ;;
+  esac
+  while [ "${#raw}" -gt 1 ] && [ "${raw%/}" != "$raw" ]; do raw=${raw%/}; done
+  if [ -L "$raw" ]; then
+    echo "error: teardown --copy takes the copy's own path, and $(fm_refuse_text "$raw") is a symbolic link" >&2
+    return 2
+  fi
+  if [ -d "$raw" ]; then
+    canon=$(fm_task_copy_canonical_dir "$raw") || canon=$raw
+  else
+    parent=${raw%/*}
+    [ -n "$parent" ] || parent=/
+    canon=$(fm_task_copy_canonical_dir "$parent") || canon=${raw%/*}
+    canon="${canon%/}/${raw##*/}"
+  fi
+  hash=$(printf '%s' "$canon" | teardown_ignored_sha256) || {
+    echo "error: teardown --copy cannot hash the copy's path: no SHA-256 tool is available" >&2
+    return 1
+  }
+  TEARDOWN_BY_PATH_COPY=$canon
+  TEARDOWN_BY_PATH_HASH=${hash:0:16}
+  [ -n "$TEARDOWN_BY_PATH_RECORD_ID" ] || TEARDOWN_BY_PATH_RECORD_ID="copy-$TEARDOWN_BY_PATH_HASH"
+  ID=$TEARDOWN_BY_PATH_RECORD_ID
+  if [ -e "$STATE/$ID.meta" ] || [ -L "$STATE/$ID.meta" ]; then
+    echo "error: record id $ID names a live task record in $STATE, so teardown --copy never takes it as a bundle record id; give --record-id another id, or run bin/fm-teardown.sh $ID for that task" >&2
+    return 2
+  fi
+  TEARDOWN_RETRY_ACTION="run the same teardown --copy command again"
+}
+
+# The globals the reused proofs read that the record-driven flow sets from a task
+# record. A by-path run has no record, so each takes the strictest value: the
+# plain no-mistakes landing rule (no local-only shortcut), no recorded PR, no task
+# scratch, no returned slot and no nested copies of its own.
+teardown_by_path_init() {
+  WT=
+  PROJ=
+  MODE=no-mistakes
+  BASE_BRANCH=
+  PR_URL=
+  KIND=ship
+  TASK_TMP=
+  LAUNCH_HOME_TOKEN=
+  TEARDOWN_RETURN_SLOT=
+  TEARDOWN_ENCLOSING_SLOT=
+  TEARDOWN_PEER_SLOT=
+  TEARDOWN_NESTED_COPIES=()
+  TEARDOWN_BACKLOG_TRANSITION=close
+  TEARDOWN_BACKLOG_APPLIES=0
+  if fm_backlog_transition_applies "$CONFIG" "$DATA" ship; then
+    TEARDOWN_BACKLOG_APPLIES=1
+  elif [ "$?" -eq 2 ]; then
+    teardown_by_path_why "the backlog data directory is inaccessible: $DATA ($FM_BACKLOG_TRANSITION_ERROR)"
+    return 1
+  fi
+}
+
+# Finds the clone that registers <copy> strictly inside itself: a project clone
+# under this home's projects/, or a Treehouse slot of one. A path that is the
+# clone or slot itself, an unregistered directory or a path elsewhere finds none.
+# Sets TEARDOWN_BY_PATH_CLONE and PROJ (the project clone, whose ref store the
+# landing proof reads). Works for a copy whose directory is gone, so a rerun can
+# tell a stale registration from a finished removal.
+# Returns 0 when a clone registers it, 1 when every clone it could be in was read
+# and none does, and 2 when none registers it but something it needed could not be
+# read (TEARDOWN_BY_PATH_UNREADABLE names the first such thing), so "not
+# registered" is never concluded from an unreadable list. An entry that is not a
+# directory, not a Git repository at all, or a subdirectory of another repository
+# is no clone and is skipped; a Git repository that cannot be read, a clone or slot
+# whose registration list cannot be read, and a projects folder that cannot be
+# listed, are not.
+TEARDOWN_BY_PATH_UNREADABLE=
+teardown_by_path_locate() {  # <canonical-copy>
+  local copy=$1 project proj top clone slot registered
+  TEARDOWN_BY_PATH_CLONE=
+  TEARDOWN_BY_PATH_UNREADABLE=
+  # An absent projects folder holds no clone; one that is there but cannot be listed
+  # (or a link to nothing) is not an empty one.
+  if [ -e "$FM_HOME/projects" ] || [ -L "$FM_HOME/projects" ]; then
+    if [ ! -d "$FM_HOME/projects" ] || ! ls -A -- "$FM_HOME/projects" >/dev/null 2>&1; then
+      TEARDOWN_BY_PATH_UNREADABLE="the project folder $(fm_refuse_text "$FM_HOME/projects") could not be read"
+    fi
+  fi
+  for project in "$FM_HOME"/projects/*; do
+    [ -d "$project" ] || continue
+    proj=$(fm_task_copy_canonical_dir "$project") || {
+      [ -n "$TEARDOWN_BY_PATH_UNREADABLE" ] || TEARDOWN_BY_PATH_UNREADABLE="the project directory $(fm_refuse_text "$project") could not be read"
+      continue
+    }
+    if ! top=$(git -C "$proj" rev-parse --show-toplevel 2>/dev/null); then
+      if [ -e "$proj/.git" ] || [ -L "$proj/.git" ]; then
+        [ -n "$TEARDOWN_BY_PATH_UNREADABLE" ] || TEARDOWN_BY_PATH_UNREADABLE="the Git repository $(fm_refuse_text "$proj") could not be read"
+      fi
+      continue
+    fi
+    [ "$(fm_task_copy_canonical_dir "$top")" = "$proj" ] || continue
+    clone=
+    case "$copy" in "$proj"/*) clone=$proj ;; esac
+    if [ -z "$clone" ] && slot=$(fm_task_copy_enclosing_pool_slot "$proj" "$copy"); then
+      clone=$slot
+    fi
+    [ -n "$clone" ] || continue
+    fm_task_copy_read_registered_nested "$clone" || {
+      [ -n "$TEARDOWN_BY_PATH_UNREADABLE" ] || TEARDOWN_BY_PATH_UNREADABLE=$(fm_task_copy_unreadable_list_text "the clone $(fm_refuse_text "$clone")'s")
+      continue
+    }
+    registered=$FM_TASK_COPY_NESTED
+    if printf '%s\n' "$registered" | grep -Fxq -- "$copy"; then
+      TEARDOWN_BY_PATH_CLONE=$clone
+      PROJ=$proj
+      return 0
+    fi
+  done
+  [ -z "$TEARDOWN_BY_PATH_UNREADABLE" ] || return 2
+  return 1
+}
+
+# Refuses while any process has <copy> as its cwd or holds a file open inside it.
+# One scan of every open file: a failed scan, or no lsof, refuses, because a copy
+# whose holders are unknown is not proved idle. Nothing is ever signalled.
+teardown_by_path_holders() {  # <copy>
+  local copy=$1 out line pid='' command='' fd='' name hits='' held=''
+  if ! command -v lsof >/dev/null 2>&1; then
+    teardown_by_path_unread "$(fm_refuse_text "$copy") cannot be proved idle: lsof is not installed to list the processes holding it"
+    return 1
+  fi
+  out=$(lsof -nP -w -Fpcfn 2>/dev/null) || {
+    teardown_by_path_unread "$(fm_refuse_text "$copy") cannot be proved idle: the process scan failed"
+    return 1
+  }
+  while IFS= read -r line; do
+    case "$line" in
+      p*) pid=${line#p}; command=; fd= ;;
+      c*) command=${line#c} ;;
+      f*) fd=${line#f} ;;
+      n*)
+        name=${line#n}
+        case "$name" in
+          "$copy"|"$copy"/*)
+            [ "$pid" = "$$" ] || case " $hits " in
+              *" $pid "*) ;;
+              *)
+                if [ -z "$hits" ]; then
+                  TEARDOWN_BY_PATH_HOLDER="process $pid ($(fm_refuse_text "$command")) holds $(fm_refuse_text "$name") through ${fd:-an open file}"
+                  [ "$fd" = cwd ] || held=$name
+                fi
+                hits+="${hits:+ }$pid"
+                ;;
+            esac
+            ;;
+        esac
+        ;;
+    esac
+  done <<< "$out"
+  [ -z "$hits" ] || {
+    TEARDOWN_FOREIGN_PID=${hits%% *}
+    TEARDOWN_FOREIGN_HOLDER_FILE=$held
+    teardown_by_path_why "$(fm_refuse_text "$copy") is in use: $TEARDOWN_BY_PATH_HOLDER (processes holding it: $hits)"
+    return 1
+  }
+}
+
+# Does <copy> hold a Git repository or linked worktree that its own clone does not
+# register, a bare repository included? teardown_copy_other_repo_dirs is the scan,
+# the one the held close of a task's own nested copies uses too. Returns 1 with the
+# first repository found in TEARDOWN_BY_PATH_OTHER_REPO, 2 when the scan cannot be
+# completed, and 0 when there is none.
+TEARDOWN_BY_PATH_OTHER_REPO=
+teardown_by_path_other_repos() {  # <copy>
+  local hits rc=0
+  hits=$(teardown_copy_other_repo_dirs "$1") || rc=$?
+  TEARDOWN_BY_PATH_OTHER_REPO=${hits%%$'\n'*}
+  [ -z "$TEARDOWN_BY_PATH_OTHER_REPO" ] || return 1
+  [ "$rc" = 0 ] || return 2
+}
+
+# Refuses a copy that has another registered worktree inside it, which git worktree
+# remove would delete with it, and a copy that holds a Git repository or worktree
+# no clone registers (a separate clone, or a worktree of another project), whose
+# commits would go with it and which no registration list shows. git status cannot
+# see either when .claude is ignored, and the clean proof skips untracked files
+# under .claude. The second scan is teardown_by_path_other_repos; every repository
+# it finds is refused, because nothing here proves its commits landed.
+teardown_by_path_inner() {  # <copy>
+  local copy=$1 inner rc=0
+  fm_task_copy_read_registered_nested "$copy" || {
+    teardown_by_path_unread "$(fm_task_copy_unreadable_list_text "the copy $(fm_refuse_text "$copy")'s"), so the worktrees registered inside it cannot be listed"
+    return 1
+  }
+  inner=$FM_TASK_COPY_NESTED
+  while IFS= read -r inner; do
+    [ -n "$inner" ] && [ -d "$inner" ] || continue
+    teardown_by_path_why "$(fm_refuse_text "$copy") holds registered worktree $(fm_refuse_text "$inner"), which removing it would delete; remove or prove that worktree first"
+    return 1
+  done <<< "$inner"
+  teardown_by_path_other_repos "$copy" || rc=$?
+  case "$rc" in
+    0) ;;
+    1)
+      teardown_by_path_why "$(fm_refuse_text "$copy") holds Git repository $(fm_refuse_text "$TEARDOWN_BY_PATH_OTHER_REPO") that no clone registers, which removing it would delete with its commits; remove it or land its commits first"
+      return 1
+      ;;
+    *)
+      teardown_by_path_unread "$(fm_refuse_text "$copy") could not be scanned for other Git repositories, so what removing it would delete cannot be proved"
+      return 1
+      ;;
+  esac
+}
+
+# A Treehouse slot's owner claim that names a task with a live record in any local
+# home keeps its nested copies out of this mode, as it keeps the slot out of
+# another task's cleanup. A claim naming a task no home has a record for is stale;
+# a claim that cannot be read proves nothing and refuses. A by-path run is no task,
+# and its record id is operator-chosen, so a claim naming that very id is not
+# "mine": it is resolved against the live records like any other claim.
+teardown_by_path_claim() {
+  local task state_dir
+  fm_treehouse_pool_slot "$PROJ" "$TEARDOWN_BY_PATH_CLONE" || return 0
+  fm_treehouse_slot_owner_state "$TEARDOWN_BY_PATH_CLONE" "$ID"
+  case "$FM_TREEHOUSE_SLOT_OWNER" in
+    absent) return 0 ;;
+    unsafe)
+      teardown_by_path_unread "the owner claim of pool slot $(fm_refuse_text "$TEARDOWN_BY_PATH_CLONE") cannot be read, so who the slot belongs to is unknown; inspect the claim file beside the slot"
+      return 1
+      ;;
+  esac
+  task=$FM_TREEHOUSE_SLOT_OWNER_ID
+  fm_task_id_path_safe "$task" || {
+    teardown_by_path_why "the owner claim of pool slot $(fm_refuse_text "$TEARDOWN_BY_PATH_CLONE") names an id that is not a task id"
+    return 1
+  }
+  fm_local_firstmate_state_dirs "$STATE" || {
+    teardown_by_path_unread "$FM_LOCAL_FIRSTMATE_ERROR"
+    return 1
+  }
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    if [ -f "$state_dir/$task.meta" ] && [ ! -L "$state_dir/$task.meta" ]; then
+      teardown_by_path_why "pool slot $(fm_refuse_text "$TEARDOWN_BY_PATH_CLONE") is claimed by task $task, whose record is live in $(fm_refuse_text "$state_dir"); tear that task down with bin/fm-teardown.sh $task"
+      return 1
+    fi
+  done
+}
+
+# The audit record, data/record-less-copy-removals.log: UTC time, bundle record id,
+# clone, copy, HEAD and the proof (landed, or the stored bundle), tab separated.
+# Written once every proof has passed and before anything is removed, so a removal
+# that began always has its line; a line for the same id, copy and HEAD is not
+# written twice. It records that the removal was authorized and never stands in
+# for a proof: a rerun proves everything again.
+teardown_by_path_audit() {  # <copy> <head> <proof>
+  local record="$DATA/$TEARDOWN_BY_PATH_LOG" clone
+  clone=$(fm_refuse_text "$TEARDOWN_BY_PATH_CLONE")
+  mkdir -p "$DATA" 2>/dev/null || return 1
+  teardown_held_copies_record_shape_ok "$record" || return 1
+  if [ -f "$record" ] && FM_BP_ID=$ID FM_BP_COPY=$1 FM_BP_HEAD=$2 awk -F'\t' \
+      '$2 == ENVIRON["FM_BP_ID"] && $4 == ENVIRON["FM_BP_COPY"] && $5 == ENVIRON["FM_BP_HEAD"] { f = 1 } END { exit !f }' "$record" 2>/dev/null; then
+    echo "teardown: the audit record for this copy and HEAD is already in $record" >&2
+    return 0
+  fi
+  { printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ID" "$clone" "$1" "$2" "$3" >> "$record"; } 2>/dev/null
+}
+
+# The by-path exception to the held-task rule (teardown_bundle_require_captain_call)
+# replaces "a task owns this copy and no captain decision is pending". Its harm is
+# losing an owner's work or unlanded work, so it is judged here, at the exception,
+# row by row, whatever ran before it, each row by the owner of that proof (none is
+# written twice):
+#   H1 a live task record in any local home names the copy; H5 a process runs in
+#      it; H6 a Vernant creation lock's launcher may be alive
+#      (teardown_foreign_copy_unowned)
+#   H2 a live task's claim on the copy's pool slot, a claim naming this run's own
+#      record id included (teardown_by_path_claim)
+#   H3 another registered worktree, or a Git repository no clone registers, a bare
+#      one included, under ignored folders such as .claude too
+#      (teardown_by_path_inner)
+#   H4 the copy's own unlanded commits are not all in the verified bundle
+#      (teardown_bundle_record and teardown_bundle_verify, the route's own
+#      verification), or the open captain call does not name every recorded tip
+#      (teardown_bundle_captain_call)
+#   H5 a process holds a file open in it (teardown_by_path_holders)
+#   H7 the tree is not clean and stable, or holds an ignored file that exists
+#      nowhere else outside .claude and .opencode, which the removal preserves
+#      whole (fm_task_copy_preserve, teardown_preservable_ignored)
+# Locating the copy, the audit record, the path lock and the lack of any --force
+# are the route's mechanics, not the widened harm, and stay where they are. Any row
+# that holds, or cannot be read, refuses; the refusal names it (a row whose input
+# cannot be read as rule inspection-unavailable, never a policy row), and
+# TEARDOWN_BY_PATH_EXCEPTION_WHY, _RULE, _PID and _HELD keep that reason, and the
+# process it names, for the final refusal.
+TEARDOWN_BY_PATH_EXCEPTION_WHY=
+TEARDOWN_BY_PATH_EXCEPTION_RULE=
+TEARDOWN_BY_PATH_EXCEPTION_PID=
+TEARDOWN_BY_PATH_EXCEPTION_HELD=
+teardown_by_path_exception_clear() {  # <bundle> <required-tips, space separated>
+  local copy=$TEARDOWN_BY_PATH_COPY rc=0 why='' why_rule='' unique reason_before=${TEARDOWN_BUNDLE_REASON:-}
+  TEARDOWN_BY_PATH_EXCEPTION_WHY=
+  TEARDOWN_BY_PATH_EXCEPTION_RULE=
+  fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 || rc=$?
+  if [ "$rc" = 1 ]; then
+    why_rule=${FM_TASK_COPY_STABLE:-inspection-unavailable}
+    [ -z "$FM_TASK_COPY_DIRTY" ] || why_rule='copy-preserved'
+    why="it $FM_TASK_COPY_REASON"
+  elif ! unique=$(teardown_preservable_ignored "$copy"); then
+    why_rule='inspection-unavailable'
+    why="its ignored files could not be listed"
+  elif [ -n "$unique" ]; then
+    why_rule='copy-ignored-files'
+    why="it holds ignored files that exist nowhere else: $(fm_refuse_text "$(printf '%s\n' "$unique" | LC_ALL=C sort -u | tr '\n' ' ')")"
+  elif ! teardown_foreign_copy_unowned "$copy"; then
+    why_rule=$TEARDOWN_FOREIGN_RULE
+    why=$TEARDOWN_FOREIGN_WHY
+  elif ! teardown_by_path_holders "$copy"; then
+    why_rule=${TEARDOWN_BY_PATH_WHY_RULE:-process-cwd-owner}
+    why=$TEARDOWN_BY_PATH_WHY
+  elif ! teardown_by_path_claim; then
+    why_rule=${TEARDOWN_BY_PATH_WHY_RULE:-active-record-owner}
+    why=$TEARDOWN_BY_PATH_WHY
+  elif ! teardown_by_path_inner "$copy"; then
+    why_rule=${TEARDOWN_BY_PATH_WHY_RULE:-registered-copy-proven}
+    why=$TEARDOWN_BY_PATH_WHY
+  elif ! teardown_bundle_record; then
+    why_rule='inspection-unavailable'
+    why=$TEARDOWN_BUNDLE_REASON
+  else
+    # shellcheck disable=SC2086 # Tips are full hex object names, one word each.
+    teardown_bundle_verify "$copy" "$(printf '%s\n' $2)"
+    if [ -n "$TEARDOWN_BUNDLE_REASON" ]; then
+      why_rule='copy-preserved'
+      why="the bundle no longer proves the copy's commits: $TEARDOWN_BUNDLE_REASON"
+    else
+      # shellcheck disable=SC2086 # Recorded tips are full hex object names.
+      if ! teardown_bundle_captain_call "$1" $TEARDOWN_BUNDLE_TIPS >/dev/null; then
+        why_rule='copy-preserved'
+        why="no open captain-held call names the bundle and every recorded tip"
+      fi
+    fi
+  fi
+  TEARDOWN_BUNDLE_REASON=$reason_before
+  TEARDOWN_BY_PATH_WHY=
+  TEARDOWN_BY_PATH_WHY_RULE=
+  [ -n "$why" ] || return 0
+  TEARDOWN_BY_PATH_EXCEPTION_WHY=$why
+  TEARDOWN_BY_PATH_EXCEPTION_RULE=$why_rule
+  TEARDOWN_BY_PATH_EXCEPTION_PID=$TEARDOWN_FOREIGN_PID
+  TEARDOWN_BY_PATH_EXCEPTION_HELD=$TEARDOWN_FOREIGN_HOLDER_FILE
+  teardown_bundle_refuse "$1: the by-path exception to the held-task rule does not apply: $why"
+}
+
+# A copy whose directory is gone. Never removes anything; says what it found.
+teardown_by_path_missing() {
+  local copy=$TEARDOWN_BY_PATH_COPY record="$DATA/$TEARDOWN_BY_PATH_LOG" line='' stamp head proof rc=0
+  teardown_by_path_locate "$copy" || rc=$?
+  case "$rc" in
+    0)
+      teardown_by_path_why "$(fm_refuse_text "$copy") is gone but $(fm_refuse_text "$TEARDOWN_BY_PATH_CLONE") still registers it; this mode never prunes a registration - once it is checked, git -C $(fm_refuse_text "$TEARDOWN_BY_PATH_CLONE") worktree prune clears it"
+      return 1
+      ;;
+    1) ;;
+    *)
+      teardown_by_path_why "$(fm_refuse_text "$copy") is gone, but $TEARDOWN_BY_PATH_UNREADABLE, so whether a clone still registers it is unknown"
+      return 1
+      ;;
+  esac
+  if [ -f "$record" ]; then
+    line=$(FM_BP_COPY=$copy awk -F'\t' '$4 == ENVIRON["FM_BP_COPY"] { l = $0 } END { print l }' "$record" 2>/dev/null) || line=
+  fi
+  if [ -z "$line" ]; then
+    teardown_by_path_why "there is no copy at $(fm_refuse_text "$copy"), and no audit record in $(fm_refuse_text "$record") names it"
+    return 1
+  fi
+  IFS=$'\t' read -r stamp _ _ _ head proof <<< "$line"
+  echo "teardown: $(fm_refuse_text "$copy") is already gone, and this run removed nothing: the audit record in $(fm_refuse_text "$record") shows its removal was authorized at $stamp for HEAD $head (proof: $proof)." >&2
+}
+
+# A copy Vernant's creation lock holds goes through Vernant's closeout driver, never
+# a plain removal. The driver and its plan are asked here, before the audit line, so
+# a release the driver would decline is refused before any protected step.
+teardown_by_path_driver_ready() {  # <clone> <copy>
+  local rc=0
+  teardown_copy_lock_file "$2" || rc=$?
+  [ "$rc" = 0 ] || return 0
+  if ! teardown_closeout_ready_in "$1"; then
+    teardown_by_path_why "Vernant's creation lock holds $(fm_refuse_text "$2"), and $TEARDOWN_CLOSEOUT_OUT, so it cannot be released"
+    return 1
+  fi
+  teardown_closeout_plan_allows "$1" "$2" && return 0
+  teardown_by_path_why "Vernant's creation lock holds $(fm_refuse_text "$2"), and $TEARDOWN_CLOSEOUT_PLAN_WHY"
+  return 1
+}
+
+teardown_by_path_run() {
+  local copy=$TEARDOWN_BY_PATH_COPY head proof rc
+  teardown_by_path_init || return 1
+  fm_refuse_if_gate_agent
+  CONTROL_LOCK="$STATE/.teardown-copy-$TEARDOWN_BY_PATH_HASH.lock"
+  trap teardown_release_locks EXIT
+  fm_lock_try_acquire "$CONTROL_LOCK" || {
+    teardown_by_path_why "another teardown --copy run holds $(fm_refuse_text "$copy") ($(fm_refuse_text "$CONTROL_LOCK"))"
+    return 1
+  }
+  CONTROL_LOCK_HELD=1
+  fm_lease_guard "$ID" "teardown (fm-teardown --copy)"
+  if [ ! -e "$copy" ] && [ ! -L "$copy" ]; then
+    teardown_by_path_missing
+    return
+  fi
+  rc=0
+  teardown_by_path_locate "$copy" || rc=$?
+  case "$rc" in
+    0) ;;
+    1)
+      teardown_by_path_why "$(fm_refuse_text "$copy") is not a worktree registered strictly inside a project clone of this home ($(fm_refuse_text "$FM_HOME")/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here"
+      return 1
+      ;;
+    *)
+      teardown_by_path_why "$TEARDOWN_BY_PATH_UNREADABLE, so whether it registers $(fm_refuse_text "$copy") is unknown"
+      return 1
+      ;;
+  esac
+  teardown_by_path_holders "$copy" || return 1
+  teardown_by_path_inner "$copy" || return 1
+  teardown_by_path_claim || return 1
+  TEARDOWN_FOREIGN_COPIES=("$copy")
+  teardown_by_path_prove "$copy" || return 1
+  teardown_by_path_driver_ready "$TEARDOWN_BY_PATH_CLONE" "$copy" || return 1
+  # Proved again, as the ordinary release does, and the holder scan repeated, as the last
+  # steps before the audit line and the removal. The reused proof re-reads only working
+  # directories (pids_with_cwd_under), so a process that began holding a file open in the
+  # copy after the first scan is seen only by this scan. TEARDOWN_RETURN_SLOT stays empty:
+  # the clone is neither returned nor swept, so it adds no scan root, no removal root and no
+  # HEAD the bundle must also hold.
+  teardown_by_path_prove "$copy" || return 1
+  teardown_by_path_holders "$copy" || return 1
+  head=$FM_TASK_COPY_HEAD
+  proof=landed
+  [ -z "$TEARDOWN_BUNDLE_SWEEP_PROOF" ] || proof="bundle $(fm_refuse_text "$TEARDOWN_BUNDLE_SWEEP_PROOF")"
+  teardown_by_path_audit "$copy" "$head" "$proof" || {
+    teardown_by_path_why "the audit record $(fm_refuse_text "$DATA/$TEARDOWN_BY_PATH_LOG") cannot be written, and nothing is removed without it"
+    return 1
+  }
+  # retained: .claude and .opencode are kept whole, so nothing unique there is lost and a
+  # Claude-made copy is not refused for its settings files.
+  teardown_foreign_copy_dispose "$TEARDOWN_BY_PATH_CLONE" "$copy" retained || return 1
+  echo "teardown: removed record-less copy $(fm_refuse_text "$copy") (HEAD $head, proof: $proof); audit record: $(fm_refuse_text "$DATA/$TEARDOWN_BY_PATH_LOG")" >&2
+}
+
+# The foreign-copy proof, with its typed refusal. Returns 1 after recording why.
+teardown_by_path_prove() {  # <copy>
+  local copy=$1
+  TEARDOWN_BUNDLE_SWEEP_PROOF=
+  TEARDOWN_BY_PATH_EXCEPTION_WHY=
+  teardown_foreign_copy_prove "$copy" && return 0
+  [ -z "$TEARDOWN_FOREIGN_DIAG" ] || printf '%s\n' "$TEARDOWN_FOREIGN_DIAG" >&2
+  # A refusal by the by-path exception names its own row, not the generic landing
+  # envelope the proof sets after it.
+  if [ -n "$TEARDOWN_BY_PATH_EXCEPTION_WHY" ]; then
+    TEARDOWN_FOREIGN_RULE=$TEARDOWN_BY_PATH_EXCEPTION_RULE
+    TEARDOWN_FOREIGN_WHY=$TEARDOWN_BY_PATH_EXCEPTION_WHY
+    TEARDOWN_FOREIGN_PID=$TEARDOWN_BY_PATH_EXCEPTION_PID
+    TEARDOWN_FOREIGN_HOLDER_FILE=$TEARDOWN_BY_PATH_EXCEPTION_HELD
+  fi
+  teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "copy $copy is not removed: $TEARDOWN_FOREIGN_WHY." "$copy"
+  teardown_by_path_why "$(fm_refuse_text "$copy did not pass every proof (rule=$TEARDOWN_FOREIGN_RULE)${TEARDOWN_FOREIGN_WHY:+: $TEARDOWN_FOREIGN_WHY}")"
+  return 1
+}
+
+teardown_by_path_main() {
+  local rc=0
+  TEARDOWN_BY_PATH_WHY=
+  teardown_by_path_run || rc=$?
+  if [ "$rc" != 0 ] && [ -n "$TEARDOWN_BY_PATH_WHY" ]; then
+    teardown_by_path_refuse "$TEARDOWN_BY_PATH_WHY" || true
+  fi
+  return "$rc"
 }

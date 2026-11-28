@@ -4447,7 +4447,7 @@ SH
 }
 
 test_typed_preservation_exit_completes_cleanup() {
-  local rc exclude route line preserved ownership operation
+  local rc exclude route line preserved ownership operation root want
   # A foreign copy that holds ignored bytes is held and never reaches preservation
   # (test_a_foreign_copy_with_only_unique_ignored_files_is_held_and_the_slot_is_not_returned)
   # unless the hold cannot apply to it, as inside the task's own nested copy.
@@ -4482,6 +4482,12 @@ test_typed_preservation_exit_completes_cleanup() {
     "FM_FRICTION_OPERATION_ID=$operation FM_FRICTION_EPISODE_ID=$operation "*) ;;
     *) fail "printed route does not carry the refusal's operation and episode: $route" ;;
   esac
+  # The route is run as printed from a shell with none of the root overrides, so it must carry the
+  # state, data and config folders this run used (the fixture sets all three, none the home default).
+  for root in state data config; do
+    printf -v want ' FM_%s_OVERRIDE=%q ' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$FOREIGN_CASE/$root"
+    case "$route" in *"$want"*) ;; *) fail "printed route does not carry$want: $route" ;; esac
+  done
   # While storage is still broken the route is refused again, as another
   # attempt of the same operation that prints the same route.
   run_printed_route "$route" rc
@@ -4497,6 +4503,7 @@ test_typed_preservation_exit_completes_cleanup() {
   assert_absent "$FOREIGN_CASE/state/task-x1.meta" 'printed route did not close task'
   preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f)
   assert_equals 'unique retained bytes' "$(cat "$preserved")" 'completing route lost ignored bytes'
+  assert_absent "$FOREIGN_CASE/home/data" 'the printed route wrote under the home data folder, not the one the run used'
   jq -es --arg op "$operation" '
       map(.outcome) == ["blocked", "retried", "blocked", "retried", "retry-succeeded", "completed"]
       and (map(.operation_id) | unique == [$op]) and (map(.episode_id) | unique == [$op])
@@ -4507,6 +4514,92 @@ test_typed_preservation_exit_completes_cleanup() {
     || fail "a refusal and its successful retry must be one operation ending in retry-succeeded and completed: $(cat "$FOREIGN_CASE/home/state/friction.jsonl")"
   done
   pass 'the typed preservation refusal of an own copy and of a foreign copy inside it retains unique bytes, and its printed command completes cleanup after storage repair as one operation'
+}
+
+# A recorded task closed in a home whose state, data and config folders are the home's own defaults
+# prints the completing command it always printed, with no root override on it, and that text run
+# as printed from a shell with none of the overrides completes the close. The fixture's roots are
+# moved into the home so the run's overrides are the defaults; the typed case above runs the same
+# refusal with roots that differ and shows each one printed.
+test_the_completing_command_of_a_default_home_close_carries_no_root_override() {
+  local rc exclude route line root preserved want
+  dead_launcher_pid
+  make_own_locked_copy_case default-roots-route enclosing "$FOREIGN_DEAD_PID"
+  for root in state data config; do
+    mkdir -p "$FOREIGN_CASE/home/$root"
+    cp -R "$FOREIGN_CASE/$root/." "$FOREIGN_CASE/home/$root/"
+    rm -rf "${FOREIGN_CASE:?}/$root"
+  done
+  FOREIGN_ROOTS_BASE=$FOREIGN_CASE/home
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'unique retained bytes\n' > "$FOREIGN_COPY/unique.dat"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FOREIGN_CASE/fakebin/cp"
+  chmod +x "$FOREIGN_CASE/fakebin/cp"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "default-roots: failed preservation must keep refusing: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_COPY/unique.dat" 'default-roots: the ignored file was lost'
+  route=
+  while IFS= read -r line; do
+    case "$line" in 'completing-command: '*) route=${line#completing-command: } ;; esac
+  done < "$FOREIGN_CASE/stderr"
+  [ -n "$route" ] || fail 'default-roots: the refusal omitted its completing command'
+  route=$(printf '%s\n' "$route" | sed 's/^FM_FRICTION_OPERATION_ID=[^ ]* FM_FRICTION_EPISODE_ID=[^ ]* //')
+  printf -v want 'FM_HOME=%q bash %q task-x1' "$FOREIGN_CASE/home" "$ROOT/bin/fm-teardown.sh"
+  assert_equals "$want" "$route" 'default-roots: the printed command is not the one printed before roots were carried'
+  case "$route" in *OVERRIDE*) fail "default-roots: a default root was printed as an override: $route" ;; esac
+  rm "$FOREIGN_CASE/fakebin/cp"
+  run_printed_route "$route" rc
+  expect_code 0 "$rc" "default-roots: the printed command failed after storage was restored: $(cat "$FOREIGN_CASE/completed.stderr")"
+  assert_absent "$FOREIGN_COPY" 'default-roots: the printed command did not retire the copy'
+  assert_absent "$FOREIGN_CASE/home/state/task-x1.meta" 'default-roots: the printed command did not close the task'
+  preserved=$(find "$FOREIGN_CASE/home/data/task-x1/nested-copy-preserved" -name unique.dat -type f)
+  assert_equals 'unique retained bytes' "$(cat "$preserved")" 'default-roots: the printed command lost the ignored bytes'
+  unset FOREIGN_ROOTS_BASE
+  pass 'the completing command of a default-home close carries no root override and completes the close when run as printed'
+}
+
+# A home, state, data and config folder given relative to the directory a run starts in is printed in the
+# completing command as the absolute folder it named, so the printed text works from any directory: run from
+# another folder with none of the overrides, it completes against the folders the refused run used.
+test_the_completing_command_names_the_absolute_roots_of_a_relative_roots_close() {
+  local rc exclude route line root want preserved base
+  dead_launcher_pid
+  make_own_locked_copy_case relative-roots-route enclosing "$FOREIGN_DEAD_PID"
+  base=$(cd "$FOREIGN_CASE" && pwd -P)
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'unique retained bytes\n' > "$FOREIGN_COPY/unique.dat"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FOREIGN_CASE/fakebin/cp"
+  chmod +x "$FOREIGN_CASE/fakebin/cp"
+  FOREIGN_RELATIVE_ROOTS=1
+  run_foreign_teardown rc
+  unset FOREIGN_RELATIVE_ROOTS
+  expect_code 1 "$rc" "relative-roots: failed preservation must keep refusing: $(cat "$FOREIGN_CASE/stderr")"
+  route=
+  while IFS= read -r line; do
+    case "$line" in 'completing-command: '*) route=${line#completing-command: } ;; esac
+  done < "$FOREIGN_CASE/stderr"
+  [ -n "$route" ] || fail "relative-roots: the refusal omitted its completing command: $(cat "$FOREIGN_CASE/stderr")"
+  printf -v want ' FM_HOME=%q ' "$base/home"
+  case "$route" in *"$want"*) ;; *) fail "relative-roots: the printed command does not name the absolute home$want: $route" ;; esac
+  for root in state data config; do
+    printf -v want ' FM_%s_OVERRIDE=%q ' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$base/$root"
+    case "$route" in *"$want"*) ;; *) fail "relative-roots: the printed command does not name the absolute folder$want: $route" ;; esac
+  done
+  case "$route" in *=state\ *|*=data\ *|*=config\ *|*FM_HOME=home\ *) fail "relative-roots: the printed command names a relative folder: $route" ;; esac
+  rm "$FOREIGN_CASE/fakebin/cp"
+  mkdir -p "$FOREIGN_CASE/elsewhere"
+  FOREIGN_REPLAY_DIR=$FOREIGN_CASE/elsewhere
+  run_printed_route "$route" rc
+  unset FOREIGN_REPLAY_DIR
+  expect_code 0 "$rc" "relative-roots: the printed command failed from another folder: $(cat "$FOREIGN_CASE/completed.stderr")"
+  assert_absent "$FOREIGN_COPY" 'relative-roots: the printed command did not retire the copy'
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" 'relative-roots: the printed command did not close the task of the refused run'
+  preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f)
+  assert_equals 'unique retained bytes' "$(cat "$preserved")" 'relative-roots: the printed command lost the ignored bytes'
+  assert_equals '' "$(ls -A "$FOREIGN_CASE/elsewhere")" 'relative-roots: the printed command wrote into the folder it was run from'
+  pass 'a completing command names absolute folders for relative roots and completes the close from another directory'
 }
 
 test_forced_preservation_refusal_prints_no_completing_command() {
@@ -5343,6 +5436,94 @@ test_a_held_close_refuses_when_an_own_nested_copy_holds_another_repository() {
     done
   done
   pass "a held close refuses, with nothing removed, when an own nested copy holds a separate repository or another project's worktree"
+}
+
+# A bare repository carries no .git entry, so the scan every caller shares (the held close of an
+# own nested copy here, teardown --copy in tests/fm-teardown.test.sh) finds it by its HEAD, objects
+# and refs together. A commit only that repository holds would go with the copy.
+test_a_held_close_refuses_when_an_own_nested_copy_holds_a_bare_repository() {
+  local rc second nested commit
+  make_own_locked_copy_case held-bare-repo enclosing
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_CASE/project" rev-parse main)"
+  seed_backlog_in_flight "$FOREIGN_CASE"
+  second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+  held_foreign_unlanded "$second"
+  nested=$FOREIGN_COPY/.claude/backup.git
+  mkdir -p "$FOREIGN_COPY/.claude"
+  git clone -q --bare "$FOREIGN_CASE/project" "$nested" || fail 'held-bare-repo: cannot create the bare repository'
+  commit=$(git --git-dir="$nested" commit-tree 'HEAD^{tree}' -p HEAD -m 'unlanded commit only a bare repository holds') \
+    || fail 'held-bare-repo: cannot create the commit'
+  git --git-dir="$nested" update-ref refs/heads/unlanded "$commit"
+  held_snapshot "$FOREIGN_CASE" "$second"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "held-bare-repo: a held close must not remove an own copy that holds a bare repository: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "Git repository $nested inside task task-x1's nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+    "held-bare-repo: the refusal did not name the bare repository: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "nothing was removed" "$FOREIGN_CASE/stderr" 'held-bare-repo: the refusal did not say nothing was removed'
+  assert_present "$FOREIGN_COPY" 'held-bare-repo: the own nested copy was removed'
+  git --git-dir="$nested" cat-file -e "$commit" || fail 'held-bare-repo: the bare repository lost its commit'
+  assert_equals "$commit" "$(git --git-dir="$nested" rev-parse refs/heads/unlanded)" 'held-bare-repo: the bare repository ref moved'
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" 'held-bare-repo: the task record was removed'
+  held_assert_untouched held-bare-repo "$FOREIGN_CASE" "$second"
+  pass 'a held close refuses, with nothing removed, when an own nested copy holds a bare repository'
+}
+
+# A bare repository whose every file the enclosing repository tracks and holds unmodified is landed
+# content, a fixture, and does not count as another repository: the held close goes ahead. The same
+# bare repository with one untracked ref, one untracked object or one modified file counts and the
+# close refuses with nothing removed, and so does one whose tracked file was changed behind an index
+# flag (assume-unchanged or skip-worktree), which git status does not show. The scan is the one
+# teardown --copy uses too (tests/fm-teardown.test.sh).
+test_a_held_close_counts_a_bare_repository_only_when_git_does_not_hold_it_landed() {
+  local rc shape second nested head
+  for shape in tracked-clean untracked-ref untracked-object modified-file assume-unchanged skip-worktree; do
+    make_own_locked_copy_case "held-bare-tracked-$shape" enclosing
+    printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+    seed_backlog_in_flight "$FOREIGN_CASE"
+    nested=$FOREIGN_COPY/.claude/fixtures/repo.git
+    mkdir -p "${nested%/*}"
+    git clone -q --bare "$FOREIGN_CASE/project" "$nested" || fail "held-bare-tracked-$shape: cannot create the bare fixture"
+    git -C "$FOREIGN_COPY" add -f .claude/fixtures/repo.git
+    git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'track a bare fixture repository'
+    git -C "$FOREIGN_CASE/project" update-ref refs/heads/main "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
+    add_gh_pr_merged_for_head "$FOREIGN_CASE" "$(git -C "$FOREIGN_COPY" rev-parse HEAD)"
+    head=$(git --git-dir="$nested" rev-parse HEAD)
+    case "$shape" in
+      untracked-ref) printf '%s\n' "$head" > "$nested/refs/heads/untracked-ref" ;;
+      untracked-object) printf 'an object nothing tracks\n' | git --git-dir="$nested" hash-object -w --stdin >/dev/null ;;
+      modified-file) printf 'changed after it was committed\n' >> "$nested/description" ;;
+      assume-unchanged|skip-worktree)
+        git -C "$FOREIGN_COPY" update-index "--$shape" .claude/fixtures/repo.git/description
+        printf 'changed behind an index flag\n' >> "$nested/description"
+        # The fixture bites: git status does not show the edit the flag hides.
+        [ -z "$(git -C "$FOREIGN_COPY" status --porcelain=v1 -uall --ignored=traditional -- .claude/fixtures/repo.git)" ] \
+          || fail "held-bare-tracked-$shape: git status still shows the flagged edit, so the fixture does not hide it" ;;
+    esac
+    second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+    git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+    held_foreign_unlanded "$second"
+    held_snapshot "$FOREIGN_CASE" "$second"
+    run_foreign_teardown rc
+    if [ "$shape" = tracked-clean ]; then
+      expect_code 0 "$rc" "held-bare-tracked-$shape: a tracked, clean bare fixture must not stop a held close: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "held-bare-tracked-$shape"
+      assert_absent "$FOREIGN_COPY" "held-bare-tracked-$shape: the own nested copy survived"
+    else
+      expect_code 1 "$rc" "held-bare-tracked-$shape: a bare repository git does not hold landed must stop a held close: $(cat "$FOREIGN_CASE/stderr")"
+      assert_present "$FOREIGN_COPY" "held-bare-tracked-$shape: the own nested copy was removed"
+      git --git-dir="$nested" cat-file -e "$head" || fail "held-bare-tracked-$shape: the bare repository lost its commit"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-bare-tracked-$shape: the task record was removed"
+      case "$shape" in
+        untracked-ref | untracked-object | assume-unchanged | skip-worktree)
+          assert_grep "Git repository $nested inside task task-x1's nested copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" \
+            "held-bare-tracked-$shape: the refusal did not name the bare repository: $(cat "$FOREIGN_CASE/stderr")" ;;
+      esac
+      held_assert_untouched "held-bare-tracked-$shape" "$FOREIGN_CASE" "$second"
+    fi
+  done
+  pass 'a held close ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object, a modified file or an edit an index flag hides'
 }
 
 # A submodule of the task's own repository is not another repository: its git
@@ -8695,6 +8876,8 @@ test_task_closes_beside_a_foreign_copy_with_unpushed_commits
 test_held_copy_record_has_one_exact_line_per_copy
 test_a_held_close_removes_only_the_tasks_own_nested_copy
 test_a_held_close_refuses_when_an_own_nested_copy_holds_another_repository
+test_a_held_close_refuses_when_an_own_nested_copy_holds_a_bare_repository
+test_a_held_close_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
 test_a_held_close_is_not_stopped_by_a_submodule_of_the_own_repository
 test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal
 test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wait
@@ -8755,6 +8938,8 @@ test_foreign_copy_regenerable_ignored_files_need_no_preservation
 test_a_foreign_copy_with_durable_tac_state_is_held_and_tac_tmp_is_not_the_reason
 test_a_foreign_copy_whose_ignored_files_cannot_be_listed_is_refused_not_held
 test_typed_preservation_exit_completes_cleanup
+test_the_completing_command_of_a_default_home_close_carries_no_root_override
+test_the_completing_command_names_the_absolute_roots_of_a_relative_roots_close
 test_forced_preservation_refusal_prints_no_completing_command
 test_legacy_preservation_refusal_prints_no_completing_command
 test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal

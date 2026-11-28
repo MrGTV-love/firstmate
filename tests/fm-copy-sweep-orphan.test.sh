@@ -8,8 +8,8 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-copy-sweep-orphan)
 fm_git_identity
 
-make_squash_world() {
-  W="$TMP_ROOT/squash"
+make_squash_world() {  # [name]
+  W="$TMP_ROOT/${1:-squash}"
   HOMED="$W/home"
   CLONE="$HOMED/projects/example"
   mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
@@ -177,45 +177,103 @@ test_report_predicts_apply_after_later_main_edit() {
   pass 'after a later main edit to a squash-merged path, report and apply agree on every copy'
 }
 
-test_confined_launcher_observation() {
-  # The sourceable task-copy API performs no home scan. Test doubles below
-  # model unreadable/malformed helper responses, never ps output.
+test_refused_launcher_observation() {
+  # The sourceable task-copy API performs no home scan. The ps and python3
+  # doubles below model a sandbox that refuses ps and a process table read that
+  # would claim the launcher absent; neither may prove a launcher gone.
   # shellcheck source=bin/fm-task-copy-lib.sh
   . "$ROOT/bin/fm-task-copy-lib.sh"
-  local live rc=0
+  local live exited rc status
   sleep 60 &
   live=$!
-  if [ "$(uname -s)" = Darwin ]; then
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-  else
-    fm_task_copy_launcher_state "$live" || rc=$?
-  fi
-  # Always retire our fixture, including on an assertion failure.
+  sleep 0.1 &
+  exited=$!
+  wait "$exited" 2>/dev/null || true
+  for status in 126 2 127; do
+    # shellcheck disable=SC2329 # The python3 doubles stand for a table read that must not be asked.
+    (
+      ps() { printf 'ps: Operation not permitted\n' >&2; return "$status"; }
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was taken as an answer for a live launcher"
+      rc=0
+      fm_task_copy_launcher_state "$exited" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was taken as absence for an exited launcher"
+      python3() { return 1; }
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by a failed table read"
+      python3() { printf '%s\n' ''; }
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by an empty table read"
+      python3() { printf '%s\n' 1 unreadable; }
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by a partial table read"
+    ) || fail "a refused or failed ps was not kept unknown (exit $status)"
+  done
   kill "$live" 2>/dev/null || true
   wait "$live" 2>/dev/null || true
-  assert_equals 0 "$rc" 'live launcher was not positively observed'
-  rc=0
-  if [ "$(uname -s)" = Darwin ]; then
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-  else
-    fm_task_copy_launcher_state "$live" || rc=$?
-  fi
-  assert_equals 1 "$rc" 'exited launcher was not proved absent'
-  (
-    python3() { return 1; }
-    rc=0
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-    assert_equals 2 "$rc" 'failed helper was mistaken for absence'
-    python3() { printf '%s\n' ''; }
-    rc=0
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-    assert_equals 2 "$rc" 'empty observation was mistaken for absence'
-    python3() { printf '%s\n' 1 unreadable; }
-    rc=0
-    fm_task_copy_confined_launcher_state "$live" || rc=$?
-    assert_equals 2 "$rc" 'partial malformed observation was mistaken for absence'
-  ) || fail 'unknown launcher boundaries failed'
-  pass 'live launcher holds, exited launcher is absent, failed or incomplete observations remain unknown'
+  pass 'a refused or failed ps leaves a live or exited launcher unknown, whatever a table read would say'
+}
+
+# A valid, nonempty process table that lists live pids (pid 1 and this test shell) and leaves the
+# launcher out is the shape a confined reader sees when the restriction that refused ps also hides
+# processes. It is only part of the table, so it proves nothing about the launcher, live or exited:
+# a refused or failed ps stays unknown (2) whatever such a table says.
+test_a_refused_ps_is_not_settled_by_a_valid_partial_process_table() {
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local live exited rc status
+  sleep 60 &
+  live=$!
+  sleep 0.1 &
+  exited=$!
+  wait "$exited" 2>/dev/null || true
+  for status in 126 2 127; do
+    # shellcheck disable=SC2329 # The doubles stand for a refused ps and the table read it must not trust.
+    (
+      ps() { printf 'ps: Operation not permitted\n' >&2; return "$status"; }
+      python3() { printf '%s\n' 1 "$$"; }
+      [ -n "$(python3)" ] || fail "the partial table is empty"
+      python3 | grep -qx -- "$live" && fail "the partial table lists the live launcher"
+      kill -0 "$live" 2>/dev/null || fail "the launcher is not alive"
+      rc=0
+      fm_task_copy_launcher_state "$live" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by a valid partial table that omits a live launcher"
+      rc=0
+      fm_task_copy_launcher_state "$exited" || rc=$?
+      assert_equals 2 "$rc" "a ps that exited $status was settled by a valid partial table that omits an exited launcher"
+    ) || fail "a refused or failed ps was settled by a valid partial table (exit $status)"
+  done
+  kill "$live" 2>/dev/null || true
+  wait "$live" 2>/dev/null || true
+  pass 'a refused or failed ps stays unknown when a valid, nonempty process table leaves the launcher out'
+}
+
+# A sweep where ps refuses every launcher read keeps the clean, squash-landed,
+# Vernant-locked copy: the driver is never asked, and the copy stays registered
+# and locked. test_squash_orphans is the control where a readable ps reaps it.
+test_refused_ps_keeps_a_locked_copy() {
+  local real_ps
+  make_squash_world squash-refused-ps
+  real_ps=$(command -v ps)
+  cat > "$W/bin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  '-p '*' -o pid=') echo 'ps: Operation not permitted' >&2; exit 126 ;;
+esac
+exec "$real_ps" "\$@"
+SH
+  chmod +x "$W/bin/ps"
+  sweep --apply
+  assert_equals HELD-LOCKED "$(class_of "$CLEAN")" 'a refused ps did not hold the locked copy'
+  assert_contains "$OUT" 'cannot be observed; absence is not proved' 'the hold did not say the launcher cannot be observed'
+  assert_present "$CLEAN/feature.txt" 'a refused ps let the locked copy be removed'
+  git -C "$CLONE" worktree list --porcelain | grep -A4 -Fx "worktree $CLEAN" | grep -q '^locked' \
+    || fail 'a refused ps let the locked copy be unregistered or unlocked'
+  pass 'a refused ps keeps a clean Vernant-locked copy registered and locked'
 }
 
 make_preserved_world() {
@@ -546,6 +604,109 @@ SH
   pass 'three refused applies add no preserve, keep mismatch evidence, and leave originals and held copies unchanged'
 }
 
+# A clean, landed copy whose ignored .claude/keep.txt exists nowhere else, so the
+# apply preserves it and then classifies the copy again before removing it.
+# <shape> says what the cp stand-in does while it preserves that file:
+# listing plants a registration whose gitdir is a link to nothing, so the
+# clone's registration list cannot be read at the reclassification; head moves
+# the copy's head with a new local commit.
+make_reclassify_world() {  # <shape>
+  local real_cp real_git fail_n target
+  W="$TMP_ROOT/reclassify-$1"
+  HOMED="$W/home"
+  CLONE="$HOMED/projects/example"
+  mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$W/bin" "$W/no-pool"
+  fm_git_init_commit "$CLONE"
+  printf '.claude/\n' > "$CLONE/.gitignore"
+  git -C "$CLONE" add .gitignore
+  git -C "$CLONE" commit -qm 'ignore payloads'
+  fm_git_add_origin "$CLONE" "$W/origin.git"
+  git -C "$CLONE" push -q origin main
+  git -C "$CLONE" fetch -q origin
+  target=$CLONE/.claude/worktrees/target
+  git -C "$CLONE" worktree add -q --detach "$target" origin/main
+  put_file "$target/.claude/keep.txt" 'original target bytes'
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$W/bin/lsof"
+  real_cp=$(command -v cp)
+  case "$1" in
+    listing)
+      cat > "$W/bin/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+case "\$2" in
+  $target/.claude)
+    mkdir -p "$CLONE/.git/worktrees/planted"
+    ln -s "$W/no-such-target" "$CLONE/.git/worktrees/planted/gitdir" ;;
+esac
+SH
+      ;;
+    head)
+      cat > "$W/bin/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+case "\$2" in
+  $target/.claude) git -C "$target" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m moved ;;
+esac
+SH
+      ;;
+    read-before|read-after)
+      # The cp stand-in is the real cp; a git stand-in fails one of the apply's two
+      # plain `git -C <copy> rev-parse HEAD` reads of the copy (the first one
+      # before preservation, the second one after it) and counts them in
+      # head-reads, so the head itself never changes.
+      real_git=$(command -v git)
+      fail_n=1
+      [ "$1" = read-after ] && fail_n=2
+      cat > "$W/bin/git" <<SH
+#!/usr/bin/env bash
+if [ "\$#" = 4 ] && [ "\$1" = -C ] && [ "\$2" = "$target" ] && [ "\$3" = rev-parse ] && [ "\$4" = HEAD ]; then
+  n=\$(cat "$W/head-reads" 2>/dev/null || printf 0)
+  n=\$((n + 1))
+  printf '%s\\n' "\$n" > "$W/head-reads"
+  [ "\$n" != "$fail_n" ] || { echo 'fatal: injected HEAD read failure' >&2; exit 128; }
+fi
+exec "$real_git" "\$@"
+SH
+      chmod +x "$W/bin/git"
+      ;;
+  esac
+  chmod +x "$W/bin/lsof"
+  [ ! -f "$W/bin/cp" ] || chmod +x "$W/bin/cp"
+  RECLASSIFY_TARGET=$target
+}
+
+# After preservation the apply classifies the copy again. When that
+# reclassification is not REAPABLE-PROVEN the FAILED line gives classify's own
+# class and reason: a registration list that cannot be read is reported as that,
+# naming the registration the scan found, not as a copy that changed. A head that
+# moves after preservation is still reported as a copy that changed, but only a
+# read that worked can name that cause: a HEAD read that fails, before or after
+# preservation, is named as the failed read and makes no claim that the copy
+# changed. In every shape the copy and its original bytes stay.
+test_a_reclassification_after_preservation_reports_its_own_reason() {
+  local shape row
+  for shape in listing head read-after read-before; do
+    make_reclassify_world "$shape"
+    sweep_status --apply
+    assert_equals 1 "$SWEEP_RC" "$shape: a copy left after preservation must fail the run"
+    row=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$RECLASSIFY_TARGET"$'\t') || fail "$shape: no FAILED line for the copy: $OUT"
+    case "$shape" in
+      listing)
+        assert_contains "$row" "worktree registration list could not be read (registration " "$shape: the FAILED line does not say the registration list could not be read"
+        assert_contains "$row" "$CLONE/.git/worktrees/planted/gitdir cannot be read)" "$shape: the FAILED line does not name the registration the scan found"
+        assert_not_contains "$row" 'copy changed after preservation' "$shape: a listing that could not be read was reported as a changed copy" ;;
+      head)
+        assert_contains "$row" 'copy changed after preservation' "$shape: a head that moved after preservation was not reported as a changed copy" ;;
+      read-after|read-before)
+        assert_equals 2 "$(cat "$W/head-reads")" "$shape: the apply did not make both HEAD reads of the copy"
+        assert_contains "$row" "the copy's HEAD could not be read ${shape#read-} preservation" "$shape: the FAILED line does not name the HEAD read that failed"
+        assert_not_contains "$row" 'copy changed after preservation' "$shape: an unreadable HEAD was reported as a changed copy" ;;
+    esac
+    assert_equals 'original target bytes' "$(cat "$RECLASSIFY_TARGET/.claude/keep.txt")" "$shape: the copy lost its original bytes"
+  done
+  pass 'a reclassification after preservation reports its own reason, and a moved head is still a changed copy'
+}
+
 # A write that leaves every preserved original unchanged proves nothing about the
 # preserve, so it stops the removal without adding one.
 test_activity_only_write_adds_no_preserve() {
@@ -691,19 +852,25 @@ test_ps_observation_diagnostics() {
   fm_task_copy_ps_observation_state 42 2 '' $'ps: process id too large: 42\n' || rc=$?
   assert_equals 2 "$rc" 'the not-found line on another exit must remain unknown'
   rc=0
-  fm_task_copy_launcher_state 999999 || rc=$?
-  assert_equals 1 "$rc" 'an impossible PID on this host must be proved absent'
+  ( ps() { return 126; }; fm_task_copy_launcher_state 999999 ) || rc=$?
+  assert_equals 2 "$rc" 'a refused ps must leave even an impossible PID unknown'
+  rc=0
+  ( ps() { return 1; }; fm_task_copy_launcher_state 999999 ) || rc=$?
+  assert_equals 1 "$rc" 'a ps that completes with no such process must prove absence'
   pass 'only the exact not-found line for this PID joins empty absence; every other diagnostic stays unknown'
 }
 
 fm_test_only
 test_squash_orphans
 test_report_predicts_apply_after_later_main_edit
-test_confined_launcher_observation
+test_refused_launcher_observation
+test_a_refused_ps_is_not_settled_by_a_valid_partial_process_table
+test_refused_ps_keeps_a_locked_copy
 test_preserved_classes
 test_regenerable_class
 test_regenerable_write_keeps_waiting
 test_check_matches_report_for_quiet_waiting_copy
 test_refused_removal_adds_no_preserve
 test_activity_only_write_adds_no_preserve
+test_a_reclassification_after_preservation_reports_its_own_reason
 test_ps_observation_diagnostics
