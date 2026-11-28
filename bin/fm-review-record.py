@@ -264,7 +264,7 @@ def model(value, field):
     if name.group(1) == "o" and name.group(2):
         return "openai"
     family = FAMILIES.get(name.group(1), "unknown")
-    if family == "zhipu" and not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail):
+    if family == "zhipu" and (not value.isascii() or not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail)):
         return "unknown"
     return family
 
