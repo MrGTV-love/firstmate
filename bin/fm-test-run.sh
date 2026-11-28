@@ -474,7 +474,7 @@ family_for_basename() {
     fm-watch-triage-waits-declared.test.sh|fm-watch-triage-waits-pauses.test.sh|\
     fm-watch-triage-waits-away.test.sh|\
     fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-watch-github-accounting.test.sh|fm-task-inbox.test.sh|\
-    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-work-progress.test.sh|\
+    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-landing-loop.test.sh|fm-work-progress.test.sh|\
     fm-status-runaway-guard.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -1227,6 +1227,7 @@ tests/fm-watch-triage-waits.test.sh 419114
 tests/fm-watch-triage.test.sh 657468
 tests/fm-watch-typesafe-health.test.sh 22535
 tests/fm-watchdog-check.test.sh 50170
+tests/fm-landing-loop.test.sh 5000
 tests/fm-watcher-lock.test.sh 209816
 tests/fm-work-progress.test.sh 177361
 tests/fm-worker-account-live-e2e.test.sh 4839

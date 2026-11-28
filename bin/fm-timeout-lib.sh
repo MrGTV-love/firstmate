@@ -133,6 +133,16 @@ fm_progress_quiet_secs() {
   printf '%s\n' "$secs"
 }
 
+# fm_pr_ready_reconcile_secs: seconds of silence that stop one ready-PR
+# registration pass (bin/fm-pr-ready-reconcile.sh), printed in whole seconds.
+# FM_PR_READY_RECONCILE_TIMEOUT overrides it. The watcher and
+# bin/fm-landing-loop.py both read this one default.
+fm_pr_ready_reconcile_secs() {
+  local PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
+  case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
+  printf '%s\n' "$PR_READY_RECONCILE_TIMEOUT"
+}
+
 # fm_posix_python: 0 when python3 is a POSIX interpreter able to run
 # fm-duration.py's process-group runners. A native Windows python3 on a Git Bash
 # PATH is not, so callers fall back instead of failing every read. The answer is

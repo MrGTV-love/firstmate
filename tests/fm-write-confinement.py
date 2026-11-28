@@ -827,6 +827,8 @@ def fixture(repo, base, harness, user_home, other):
     write(home / ".env")
     for name in ("secondmates.md", "captain.md", "backlog.md"):
         write(data / name)
+    write(state / ".landing-loop/state.json", "{}\n")
+    write(state / ".landing-loop/runs/task-1/request.json", "{}\n")
     write(base / "other-home/state/x.status")
     protected = {
         "project-primary": project / "README", "primary-index": project / ".git/index", "home-primary": home / "README",
@@ -836,6 +838,8 @@ def fixture(repo, base, harness, user_home, other):
         "other-task-temp": Path(f"/private/tmp/fm-{other}/payload"),
         "extending-task-home-tmp": user_tmp / "fm-teardown.task-2/old",
         "shared-legacy-audit": state / "jev-guard.jsonl",
+        "landing-loop-state": state / ".landing-loop/state.json",
+        "landing-loop-request": state / ".landing-loop/runs/task-1/request.json",
         "main-meta": state / "task.meta", "main-control-relaunch": state / "task.control-relaunch",
         "main-git-hooks": state / "task.git-hooks/pre-commit",
         "data-secondmates": data / "secondmates.md", "data-captain": data / "captain.md", "data-backlog": data / "backlog.md",
