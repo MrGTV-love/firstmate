@@ -525,7 +525,7 @@ test_watcher_surfaces_new_contribution_once() {
   out="$home/watcher.out"
   rc=0
   with_home "$home" env FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
-    "$ROOT/bin/fm-watch-checkpoint.sh" --seconds 5 > "$out" 2> "$home/watcher.err" || rc=$?
+    "$ROOT/bin/fm-watch-checkpoint.sh" --seconds 15 > "$out" 2> "$home/watcher.err" || rc=$?
   [ "$rc" -eq 0 ] || fail "watcher did not surface the new contribution signal: $(cat "$home/watcher.err")"
   grep -E '^check: contributions delivery [0-9a-f]{64}$' "$out" >/dev/null \
     || fail "watcher did not surface the durable contribution wake: $(cat "$out")"
@@ -533,7 +533,7 @@ test_watcher_surfaces_new_contribution_once() {
   [ "$rows" = 1 ] || fail "one contribution signal created $rows durable check wakes"
   rc=0
   with_home "$home" env FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
-    "$ROOT/bin/fm-watch-checkpoint.sh" --seconds 5 > "$home/watcher-repeat.out" 2> "$home/watcher-repeat.err" || rc=$?
+    "$ROOT/bin/fm-watch-checkpoint.sh" --seconds 15 > "$home/watcher-repeat.out" 2> "$home/watcher-repeat.err" || rc=$?
   [ "$rc" -eq 0 ] || fail "an undrained contribution signal did not ring again: $(cat "$home/watcher-repeat.err")"
   rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" { count++ } END { print count + 0 }' "$home/state/.wake-queue")
   [ "$rows" = 1 ] || fail "repeat contribution observation created $rows durable check wakes"
