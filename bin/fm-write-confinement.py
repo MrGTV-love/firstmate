@@ -27,8 +27,9 @@ every folder above it also refuses rename and deletion. --data is this task's
 directory below the home data root. The build refuses while a protected ref
 path in this repository's shared Git directory (packed-refs, HEAD, index,
 commondir, other tasks' branch refs and reflogs, replace refs, other
-worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
-link, or a folder above one is a symbolic link, naming the path and the link
+worktrees' HEAD, index and commondir) or the home's review ledger
+state/review-records.jsonl has a second hard link or is a symbolic link, or a
+folder above a protected ref path is a symbolic link, naming the path and the link
 count or target, because a write through such an alias would be judged by the
 alias's path. A HEAD symbolic link to a refs/heads name stays allowed. Other
 projects' and gate repositories' Git directories are not scanned. Task ids

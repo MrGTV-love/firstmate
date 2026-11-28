@@ -506,6 +506,7 @@ def derived_authors(home, pr, head, task, base):
 CARRIED_FACT = "review carried from {head}: the live head is that reviewed change merged cleanly with its base"
 CARRY_SCRATCH_PREFIX = ".review-carry-"
 CARRY_SCRATCH_PID_RE = re.compile(r"^\.review-carry-([1-9][0-9]*)-")
+CARRY_SCRATCH_MAX_AGE = 3600
 
 
 def sweep_stale_carry_scratch(state):
@@ -513,13 +514,9 @@ def sweep_stale_carry_scratch(state):
 
     Directories named `.review-carry-<pid>-*` are removed only when `<pid>` is
     proven dead (ESRCH). Legacy directories without a PID segment are removed
-    only when older than FM_REVIEW_CARRY_SCRATCH_MAX_AGE (default 3600s).
+    only when older than CARRY_SCRATCH_MAX_AGE seconds.
     Symlinks, non-directories, and live PIDs are never touched.
     """
-    try:
-        max_age = int(os.environ.get("FM_REVIEW_CARRY_SCRATCH_MAX_AGE", "3600") or 3600)
-    except ValueError:
-        max_age = 3600
     now = time.time()
     try:
         entries = list(Path(state).iterdir())
@@ -537,17 +534,15 @@ def sweep_stale_carry_scratch(state):
             continue
         match = CARRY_SCRATCH_PID_RE.match(name)
         pid = int(match.group(1)) if match else None
-        if pid is not None and 0 < pid <= 0x7FFFFFFF:
-            if pid == os.getpid():
-                continue
+        if pid is not None and pid <= 0x7FFFFFFF:
             try:
                 os.kill(pid, 0)
                 continue
             except ProcessLookupError:
                 pass
-            except (PermissionError, OverflowError, OSError):
+            except OSError:
                 continue
-        elif max_age >= 0 and (now - info.st_mtime) < max_age:
+        elif (now - info.st_mtime) < CARRY_SCRATCH_MAX_AGE:
             continue
         shutil.rmtree(entry, ignore_errors=True)
 
