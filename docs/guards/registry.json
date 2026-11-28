@@ -5820,6 +5820,18 @@
           "file": "bin/fm-spawn.sh",
           "match": "confinement_refuse false \"cannot derive the protected-asset write profile\"",
           "count": 1
+        },
+        {
+          "file": "bin/fm-spawn.sh",
+          "match": "echo \"warning: could not install the confined Git refusal note for $ID;"
+        },
+        {
+          "file": "bin/fm-confined-git.sh",
+          "match": "FM_CONFINED_GIT_MARKER='# fm-confined-git wrapper: explains a confined Git write refused under refs/heads/archive/.'"
+        },
+        {
+          "file": "bin/fm-confined-git.sh",
+          "match": "printf 'firstmate: write confinement refused %s; this task may write archive branches only as archive/%s-submitted-<8 lowercase hex> or archive/%s-pipeline-<8 lowercase hex>\\n'"
         }
       ],
       "emitters": ["bin/fm-spawn.sh"],

@@ -163,10 +163,15 @@ test_teardown_closes_the_backlog_item_itself() {
   seed_backlog_in_flight "$case_dir"
   mkdir -p "$case_dir/state/.nm-read-cache-task-x1"
   printf 'entry\n' > "$case_dir/state/.nm-read-cache-task-x1/status"
+  fm_git_init_commit "$case_dir/wrapper-repo"
+  "$ROOT/bin/fm-confined-git.sh" install "$case_dir/state/task-x1.git-path" task-x1 "$case_dir/wrapper-repo" \
+    || fail "could not install the confined Git wrapper fixture"
 
   out=$(run_teardown "$case_dir") || fail "teardown failed with a real backlog"
   assert_absent "$case_dir/state/.nm-read-cache-task-x1" \
     "teardown left the task's no-mistakes read cache behind"
+  assert_absent "$case_dir/state/task-x1.git-path" \
+    "teardown left the confined launch's Git wrapper folder behind"
   [ "$(backlog_row_state "$case_dir")" = "done" ] \
     || fail "teardown returned success while its backlog item was still open: $(backlog_row_state "$case_dir")"
   assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
@@ -3104,7 +3109,7 @@ test_invalid_preservation_bundle_refuses() {
 # Source placement is irrelevant after admission; stored bytes must survive.
 test_bundle_storage_inside_removal_root_refuses() {
   local shape case_dir rc target
-  for shape in copy slot scratch state-cache; do
+  for shape in copy slot scratch state-cache state-git-path; do
     make_bundle_copy_case "bundle-storage-$shape"
     case_dir=$NESTED_CASE
     case "$shape" in
@@ -3115,6 +3120,7 @@ test_bundle_storage_inside_removal_root_refuses() {
         printf 'tasktmp=%s\n' "$target" >> "$case_dir/state/task-x1.meta"
         ;;
       state-cache) target="$case_dir/state/.nm-read-cache-task-x1" ;;
+      state-git-path) target="$case_dir/state/task-x1.git-path" ;;
     esac
     mkdir -p "$target"
     ln -s "$target" "$case_dir/data/task-x1/preserved-bundles"

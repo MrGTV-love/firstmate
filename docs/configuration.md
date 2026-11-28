@@ -3283,6 +3283,7 @@ In that shared Git directory the task keeps its own declared branch and the two 
 Both archive names are anchored at both ends on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
 That holds for a task created after the profile was built, because the profile names only these two exact shapes and never a prefix.
 Any other archive name, such as `archive/<task>-submitted` without the hex suffix, stays refused.
+Inside the sandbox `git` resolves first to the task's wrapper in `state/<task>.git-path`, so a Git write refused under `refs/heads/archive/` ends with one extra stderr line that names the refused ref and both allowed archive names with the task id spelled out; [`bin/fm-confined-git.sh`](../bin/fm-confined-git.sh) owns the wrapper and its limits.
 The task may also create the `refs/heads/archive` and `logs/refs/heads/archive` folders again after Git removes them empty, only as those exact folders, and it may never rename or delete them.
 When a project branch named `archive` fills either folder name with a file, Git refuses every `archive/` name in that project, so the launch keeps no archive grant for that folder.
 The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write by their own path, a rename onto `packed-refs` is refused, and creating a new hard link to `packed-refs` is refused, so another task's packed branch under `refs/heads` stays protected against those routes.
@@ -3310,7 +3311,7 @@ A repository with reftable ref storage refuses the launch, because its refs are 
 In a repository with files ref storage, the shared `commondir` file and the shared `reftable` folder refuse every write; these denies cover only those default locations.
 The shared `config` stays writable, so a confined worker can still forge a ref the primary checkout resolves: it sets `core.repositoryformatversion=1` and `extensions.refStorage=files://<path>` or `reftable:///<path>`, and Git then reads every ref from a folder the worker wrote.
 This config route predates this change and is not closed here.
-Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch`, the installed `state/<task>.git-hooks` and the launch author history `state/<task>.launch-models`.
+Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch`, the installed `state/<task>.git-hooks` and `state/<task>.git-path` and the launch author history `state/<task>.launch-models`.
 The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
 The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
 The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, `no-mistakes init`, the duration ledger, test slots, tool caches, `git fetch` without pruning, `git stash` and `git push -u` keep working.

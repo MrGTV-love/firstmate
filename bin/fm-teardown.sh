@@ -80,7 +80,7 @@
 # fixed path while its SHA-256 matches the record. Only the stored copy's
 # physical location is checked: it must be outside
 # roots this cleanup removes (the copies, returned slot, tasktmp, launch-home
-# scratch, and task state directories: .inbox, .git-hooks, .dsh and
+# scratch, and task state directories: .inbox, .git-hooks, .git-path, .dsh and
 # .nm-read-cache-<task-id>). Symlink aliases into those roots also refuse.
 # Other registered worktrees and enclosing pool folders are not removal roots;
 # a firstmate home can keep its data there. No source-location restriction is
@@ -6980,7 +6980,7 @@ cleanup_firstmate_home_children() {
       "$sub_state/$child_id.claude-settings.json" "$sub_state/$child_id.devin-config.json" \
       "$sub_state/.$child_id.branch-outcome-index" "$sub_state/.$child_id.wait-identity"
     chmod u+w "$sub_state/$child_id.git-hooks" 2>/dev/null || true
-    rm -rf "$sub_state/$child_id.git-hooks"
+    rm -rf "$sub_state/$child_id.git-hooks" "$sub_state/$child_id.git-path"
   done
 }
 
@@ -7574,9 +7574,10 @@ rm -f "${TEARDOWN_RUNTIME_PATHS[@]}"
 # retired endpoint; teardown only runs after landing is confirmed, so any
 # leftover unhandled steer here is moot rather than unlanded work.
 # state/<id>.git-hooks is the spawn-owned commit-msg strip directory, left
-# read-only by its installer.
+# read-only by its installer; state/<id>.git-path holds the confined launch's
+# Git wrapper (bin/fm-confined-git.sh).
 chmod u+w "$STATE/$ID.git-hooks" 2>/dev/null || true
-rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh"
+rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/$ID.git-path" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh"
 # A presentation journal the close path left behind is orphaned once the
 # recorded pane is proven gone (the Herdr gate above) unless it still names a
 # live projected workspace - a version 2 binding of some other pane, or a

@@ -7584,6 +7584,7 @@ fi
 WRITE_CONFINEMENT=not-applicable
 CLAUDE_SESSION_ID=
 WRITE_CONFINEMENT_PROFILE=
+CONFINED_GIT_DIR=
 confinement_started=$SECONDS
 confinement_refuse() {
   local source_ok=$1
@@ -7674,6 +7675,15 @@ if [ "$KIND" != secondmate ]; then
           mkdir -m 700 "$confinement_claude_root/$confinement_dir" 2>/dev/null || [ -d "$confinement_claude_root/$confinement_dir" ] \
             || { confinement_refuse false "cannot create $confinement_claude_root/$confinement_dir for this Claude session"; exit 1; }
         done
+      fi
+      # A Git write the profile refuses under refs/heads/archive/ gets one extra
+      # stderr line naming the allowed archive shapes; bin/fm-confined-git.sh
+      # owns the wrapper and its limits. The line only explains a refusal, so a
+      # failed install launches with Git unwrapped.
+      if "$SCRIPT_DIR/fm-confined-git.sh" install "$STATE_REAL/$ID.git-path" "$ID" "$WT"; then
+        CONFINED_GIT_DIR="$STATE_REAL/$ID.git-path"
+      else
+        echo "warning: could not install the confined Git refusal note for $ID; a refused archive write shows only Git's own message" >&2
       fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --task "$ID" --cleared-by proceed 2>/dev/null || true
@@ -9158,6 +9168,11 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # fetch after the remote deletes a branch. This entry outranks that setting.
   # shellcheck disable=SC2016 # The launch shell expands these references.
   LAUNCH='fm_n=${GIT_CONFIG_COUNT:-0}; export "GIT_CONFIG_KEY_$fm_n=fetch.prune" "GIT_CONFIG_VALUE_$fm_n=false" GIT_CONFIG_COUNT=$((fm_n + 1)); unset fm_n; '"$LAUNCH"
+  # Only the confined child, inside the sandbox, resolves git to the wrapper.
+  if [ -n "$CONFINED_GIT_DIR" ]; then
+    # shellcheck disable=SC2016 # The launch shell expands PATH.
+    LAUNCH="export PATH=$(shell_quote "$CONFINED_GIT_DIR")"'${PATH:+:$PATH}; '"$LAUNCH"
+  fi
 fi
 LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH"
 # Every launch starts a new environment with /usr/bin/env -i. Generate only

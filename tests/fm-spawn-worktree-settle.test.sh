@@ -289,11 +289,13 @@ test_nonmeasured_harness_stays_unconfined_and_audited() {
 if [ "\${1:-}" = --version ]; then printf 'codex-cli 1.0.0\\n'; exit 0; fi
 if [ "\${FM_TASK_INBOX:-}" = '$FM_EXPECT_INBOX' ]; then
   printf 'unconfined\\n' > '$FM_COMPAT_MARKER'
+  command -v git > '$HOME_DIR/codex-git'
 fi
 SH
   chmod +x "$FAKEBIN_DIR/codex"
   out=$(run_settle_spawn "$id")
   expect_code 0 "$?" "non-measured codex spawn was refused: $out"
+  assert_absent "$HOME_DIR/state/$id.git-path" "an unconfined launch installed the confined Git wrapper"
   if [ "$(uname -s)" = Darwin ]; then
     assert_grep 'write_confinement=unconfined-macos-codex' "$HOME_DIR/state/$id.meta" "unconfined codex coverage absent from metadata"
     assert_contains "$out" 'harness=codex write_confinement=unconfined-macos-codex' "coverage audit did not name codex"
@@ -304,6 +306,7 @@ SH
   PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
   expect_code 0 "$?" "delivered codex launch did not execute unchanged"
   assert_equals unconfined "$(cat "$FM_COMPAT_MARKER")" "codex unexpectedly acquired a write boundary"
+  assert_equals "$(PATH="$FAKEBIN_DIR:$PATH" command -v git)" "$(cat "$HOME_DIR/codex-git")" "an unconfined launch resolved git to something other than the pane's git"
   pass "non-measured harness launches unchanged and explicitly reports unconfined coverage"
 }
 
@@ -357,6 +360,33 @@ SH
   assert_equals '700 700' "$(stat -f %Lp "$root" "$root/session-env" | tr '\n' ' ' | sed 's/ $//')" \
     "a missing Claude config root the confined spawn creates must be owner-only"
   pass "a confined Claude spawn creates a missing config root owner-only"
+}
+
+# The confined Git wrapper only explains a refusal, so a spawn that cannot
+# install it warns and launches with git unwrapped.
+test_confined_spawn_without_its_git_wrapper_still_launches() {
+  local rec id out
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
+    return 0
+  fi
+  id=settle-confined-no-wrapper-z8
+  rec=$(make_settle_case confined-no-wrapper "$id" 0)
+  read_settle_record "$rec"
+  printf 'claude\n' > "$HOME_DIR/config/crew-harness"
+  cat > "$FAKEBIN_DIR/claude" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != --version ] || printf '2.1.310 (Claude Code)\n'
+SH
+  chmod +x "$FAKEBIN_DIR/claude"
+  mkdir -p "$HOME_DIR/elsewhere"
+  ln -s "$HOME_DIR/elsewhere" "$HOME_DIR/state/$id.git-path"
+  out=$(SETTLE_CLAUDE_CONFIG_DIR="$HOME_DIR/claude-root" run_settle_spawn "$id")
+  expect_code 0 "$?" "a confined spawn that could not install its Git wrapper was refused: $out"
+  assert_contains "$out" "warning: could not install the confined Git refusal note for $id" "the failed wrapper install was not reported"
+  assert_grep 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta" "the confined spawn lost its write profile"
+  assert_absent "$HOME_DIR/elsewhere/git" "the wrapper install wrote through a symbolic link"
+  pass "a confined spawn that cannot install its Git wrapper warns and still launches"
 }
 
 # A missing config root whose parents are also missing is created owner-only
@@ -416,6 +446,9 @@ case "\${1:-}" in --version) printf '%s\\n' '$version'; exit 0 ;; esac
   echo "tmpdir=\$TMPDIR"
   echo "confinement=\$FM_WRITE_CONFINEMENT"
   echo "fetch-prune=\$(git config --get fetch.prune)"
+  echo "git=\$(command -v git)"
+  git -C '$WT_DIR' branch 'archive/$id-replay-07526ab01' HEAD 2> '$HOME_DIR/data/$id/refused.err'
+  echo "refused-status=\$?"
 } > '$probe'
 SH
     session_probe="$HOME_DIR/data/$id/claude-session-probe"
@@ -450,8 +483,11 @@ SH
     source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
     PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
     assert_present "$probe" "delivered $harness launch did not reach the harness"
-    assert_equals $'foreign=refused\nstatus=appended\ntmpdir=/tmp/fm-'"$id"$'\nconfinement=seatbelt-v1\nfetch-prune=false' "$(cat "$probe")" \
-      "delivered $harness launch ran outside its write profile or without fetch.prune=false"
+    assert_equals $'foreign=refused\nstatus=appended\ntmpdir=/tmp/fm-'"$id"$'\nconfinement=seatbelt-v1\nfetch-prune=false\ngit='"$(cd -P "$HOME_DIR/state" && pwd -P)/$id.git-path/git"$'\nrefused-status=128' "$(cat "$probe")" \
+      "delivered $harness launch ran outside its write profile, without fetch.prune=false or without the confined Git wrapper"
+    assert_contains "$(tail -n 1 "$HOME_DIR/data/$id/refused.err")" \
+      "refused archive/$id-replay-07526ab01; this task may write archive branches only as archive/$id-submitted-<8 lowercase hex> or archive/$id-pipeline-<8 lowercase hex>" \
+      "a confined $harness launch's refused archive write did not name the allowed archive shapes"
     assert_equals "$before" "$(cat "$PROJ_DIR/README.md")" "confined $harness changed the primary checkout"
     assert_grep 'probe-status-append' "$HOME_DIR/state/$id.status" "confined $harness could not append its own status"
     if [ "$harness" = claude ]; then
@@ -1062,6 +1098,7 @@ test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined
 test_confined_claude_creates_a_missing_config_root_owner_only
+test_confined_spawn_without_its_git_wrapper_still_launches
 test_confined_claude_creates_a_missing_config_root_chain_owner_only
 test_confined_raw_claude_launch_runs_through_teamclaude
 test_compound_raw_claude_launch_runs_confined
