@@ -83,7 +83,7 @@ The sweep reads and files; it never fixes.
    A class qualifies for a guard at two or more instances from different tasks.
 4. For each qualifying class, pick the ladder rung, name the recorded instance it would have rejected, and name any existing guard that missed.
 5. File each proposed guard as an ordinary backlog task following the configured-backend contract in [`docs/configuration.md`](../../../docs/configuration.md#required-tools-and-manual-mode), after checking the backlog for an existing item on the same class.
-   Use `bin/fm-tasks-axi.sh add` for tasks-axi homes and the documented manual path for manual homes.
+   Use `bin/fm-tasks-axi.sh add` (with `--objective`) for tasks-axi homes and the documented manual path for manual homes.
    Dispatch follows normal intake and the project's delivery mode.
    Never fix inline, and never edit a project's `AGENTS.md` or `CLAUDE.md`; guidance for firstmate's own material goes through `firstmate-coding-guidelines`.
 6. Report only qualifying classes with their evidence counts, chosen rungs, and filed task ids.

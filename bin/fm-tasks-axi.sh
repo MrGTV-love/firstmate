@@ -7,7 +7,8 @@
 # Every routine firstmate backlog read or mutation goes through this command
 # rather than a bare `tasks-axi`; `fm-tasks-axi.sh <command> --help` prints
 # tasks-axi's own help. Accepted arguments reach tasks-axi as given except for
-# captain-drop completion below and file addressing: a relative
+# the intake flags and closing proofs, captain-drop completion below, and file
+# addressing: a relative
 # value of `--to` or any `--*-file` flag (`--body-file`, `--relation-file`, ...)
 # is made absolute against the caller's working directory, because tasks-axi
 # starts from the backlog root instead. `--report` stays as given: tasks-axi
@@ -19,9 +20,10 @@
 # Decoded reasons use quoted strings so embedded line breaks remain intact.
 #
 # Supported completion grammar: an optional `task` noun, `done` or `close`,
-# exactly one ID, and --pr, --report, --note, --drop-file, --keep, --no-prune,
-# --json, or --help. Valued options accept split or = forms; --keep requires a
-# non-negative count. `start` and `reopen` accept the same noun and single-ID
+# exactly one ID, and --pr, --report, --note, --drop-file, --duplicate-of,
+# --moved-to, --keep, --no-prune, --json, or --help. Valued options accept split
+# or = forms except --moved-to, which takes two values (`--moved-to <home>
+# <item-id>`); --keep requires a non-negative count. `start` and `reopen` accept the same noun and single-ID
 # forms with only --json or --help. Exact unconsumed --help prints help without
 # mutation and may omit the ID; a help token consumed as a value is refused.
 # Unknown or global options (including --backend), option-like values, and
@@ -64,7 +66,8 @@
 #   - `done`/`close` (with or without the optional `task` noun) of a ship or scout row
 #     without proof that its deliverable exists: a regular, nonsymlink,
 #     non-empty report for a scout, a GitHub pull request the forge reports
-#     merged for a ship, or --drop-file carrying the captain's own words.
+#     merged for a ship, --drop-file carrying the captain's own words, or a
+#     closing proof below, which stands in for a deliverable.
 #     The drop file must be regular and nonsymlink, contain non-whitespace
 #     words without NUL bytes, and be 1..8192 bytes; the exact words are retained
 #     at data/<id>/captain-drop.md and the row records only the fixed note
@@ -72,7 +75,68 @@
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.
-# FM_TASKS_AXI_REFUSE_OPEN_CALL=1 (set only by bin/fm-pr-close-items.sh) makes that guard
+#   - `add`/`create` without an objective, or with a title that overlaps an
+#     open or recently closed item (see "Intake" below), or `done`/`close` with a
+#     closing proof the checks below stop. No flag or environment variable waives
+#     any of them. docs/guards/registry.json registers these guards (backlog-intake-*
+#     and backlog-close-*). Each policy refusal prints the bin/fm-refuse-lib.sh
+#     envelope above its message, and each decision writes one guard event on
+#     backlog-intake-duplicate: --dup-of agrees with that guard and records
+#     cleared_by dup-of, and --not-dup waives it and also records --override.
+#
+# Intake. Every `add` (and the `create` alias, with or without the `task` noun,
+# the title positional or `--title`, and `--mint`) must name the objective the
+# item serves: `--objective O1`..`O7`, the ids that docs/objectives.md lists, or
+# `--objective none --objective-reason "<why>"`. An unknown id, or `none` with no
+# reason, is refused, and so is an `--dup-of` or `--not-dup` without one. The
+# objective and its reason land in data/backlog-review.tsv, one line per filed
+# item (id, review-by left empty, objective, reason), because tasks-axi has no
+# field for them. The file is
+# checked writable before anything is filed, and an item whose line fails to
+# write is removed again. Each add writes an attribution token, a hidden comment
+# line (`<!-- fm-add:<random> -->`) at the end of the new item's body. An add whose
+# answer cannot be read gets its line only for the one new item whose stored body
+# carries its own token; when no new item, or more than one, carries it, the add
+# names the items to check and removes nothing. The token is bookkeeping: the
+# add's answer shows the body without it (`null` or `""` for an add with no body),
+# and `done --duplicate-of` never copies it into the kept item. A line that fails
+# to write and an answer tied to no single new item both exit 1, even though
+# tasks-axi accepted the add. An add whose title overlaps a Queued or In flight item,
+# or one of the 50 newest Done items, is refused with the three best neighbours
+# and the two overrides as full commands: `--dup-of <kept-id>` appends the new
+# title and body to that kept item in the active backlog through `tasks-axi
+# update --archive-body` and files nothing (an item that is only in the done
+# archive is refused with a pointer to `--not-dup`), and `--not-dup <id>`, given
+# once and naming a qualifying neighbour, files the item. All four intake flags
+# refuse an empty or option-like value in split and = form alike. An add is never
+# its own neighbour, and `--dup-of` its own id is refused. A backlog
+# or done archive that cannot be read stops the add. bin/fm-backlog-intake.py
+# owns the overlap rule, the Done window, and the owner-filed pattern; the
+# objective list is docs/objectives.md; docs/configuration.md states the rule.
+# The rule covers `add` and `create` only. A typed public-followup obligation that
+# bin/fm-public-followup.sh registers goes through `tasks-axi public-followup`, is
+# not a backlog work item, and needs no objective.
+#
+# Closing proofs. `done`/`close` also accepts two proofs that need no deliverable
+# and no owner words, for an item of any kind:
+#   --duplicate-of <kept-id>  the kept item exists and is Queued or In flight;
+#                             the duplicate's title and body are appended to it
+#                             first (under the kept item's control lock, with the
+#                             body read again before the write), then the
+#                             duplicate closes.
+#   --moved-to <home> <id>    <home> is registered exactly once in the
+#                             secondmate registry of this operation's own data
+#                             directory, is a different backlog from this one, and
+#                             its own backlog holds <id> open. A local home is read
+#                             through tasks-axi; a remote home through bin/fm-on.sh.
+# Both stop at an item the owner filed (bin/fm-backlog-intake.py OWNER_PATTERN), an
+# open owner call (bin/fm-captain-hold.sh open, where a call it cannot read counts
+# as undecided), an item with a live task record, a closed item, and an item that
+# still blocks an open item (the refusal names those items and how to re-point
+# them; nothing re-points them for you); neither combines with --pr, --report,
+# --drop-file, or --note. The closing note records
+# the proof ("duplicate of <kept-id>", "moved to <home> as <id>").
+# FM_TASKS_AXI_REFUSE_OPEN_CALL=1 (set only by bin/fm-pr-close-items.sh) makes the `done`/`close` guard
 # also refuse an open captain hold on a row of any kind, inside the lock; without it a
 # row that is not a ship or scout closes as before.
 # A `done`/`close` (or a `public-followup record-delivery`/`waive` that left the row Done
@@ -89,8 +153,9 @@
 # found the id already present (tasks-axi reports `already`) writes nothing, and
 # a failed ledger write costs one stderr line. While config/fleet-ledger is
 # absent the command runs as before.
-# Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
-# in that case the decoder's nonzero status is returned.
+# Otherwise the exit status is tasks-axi's own, unless decoding a read fails, in
+# which case the decoder's nonzero status is returned, or an add's objective line
+# cannot be recorded (exit 1, see "Intake" above).
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -103,6 +168,12 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
 # shellcheck source=bin/fm-hold-reason-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-hold-reason-lib.sh"
+# shellcheck source=bin/fm-secondmate-registry-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
+# shellcheck source=bin/fm-refuse-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-refuse-lib.sh"
+INTAKE_HELPER="$SCRIPT_DIR/fm-backlog-intake.py"
+OBJECTIVES_FILE="$SCRIPT_DIR/../docs/objectives.md"
 
 usage() {
   awk '
@@ -117,6 +188,29 @@ fail() {
   exit 2
 }
 
+# One policy refusal of a backlog-intake-* or backlog-close-* guard: the guard
+# event and the fm_refuse envelope. With <message> it then fails with that message;
+# without one it returns, for a caller that prints a longer refusal itself.
+backlog_refuse() {  # <guard> <rule> <missing> <machine|human-only> <next-step> <subject> [<message>]
+  FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-event.sh" "$1" deny --source-ok true 2>/dev/null || true
+  FM_HOME="$FM_HOME" FM_FRICTION_REVISION_FILE="${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-tasks-axi.sh}" \
+    fm_refuse "$1" "$2" "$3" "$4" "$5" backlog-item "$6"
+  [ "$#" -lt 7 ] || fail "$7"
+}
+
+# The guard's source cannot be read, so it fails closed. This is not a policy
+# judgment, so the event marks the source and no envelope is printed.
+backlog_source_stop() {  # <guard> <message>
+  FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-event.sh" "$1" deny --source-ok false 2>/dev/null || true
+  fail "$2"
+}
+
+backlog_guard_allow() {  # <guard> [<writer options>...]
+  local guard=$1
+  shift
+  FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-event.sh" "$guard" allow "$@" 2>/dev/null || true
+}
+
 case "${1:-}" in
   -h|--help)
     usage
@@ -125,6 +219,7 @@ case "${1:-}" in
 esac
 
 CALLER_DIR=$(pwd)
+ORIG_ARGS=("$@")  # the command as typed, for the override lines a refusal prints
 # These directories are used again after entering the backlog root. Preserve
 # their caller-relative meaning for ledger configuration and state writes too.
 case "$FM_HOME" in /*) ;; *) FM_HOME="$CALLER_DIR/$FM_HOME" ;; esac
@@ -182,6 +277,9 @@ parse_task_mutation() {
   TASK_REPORT=
   TASK_DROP=
   TASK_NOTE=0
+  TASK_DUP_OF=
+  TASK_MOVED_HOME=
+  TASK_MOVED_ITEM=
   [ "${tokens[0]:-}" != task ] || i=1
   TASK_COMMAND=${tokens[i]:-}
   case "$TASK_COMMAND" in
@@ -203,6 +301,9 @@ parse_task_mutation() {
       case "$expect" in
         --pr) TASK_PR=$token ;; --report) TASK_REPORT=$token ;;
         --drop-file) TASK_DROP=$token ;; --note) TASK_NOTE=1 ;;
+        --duplicate-of) TASK_DUP_OF=$token ;;
+        --moved-to) TASK_MOVED_HOME=$token; expect=--moved-to-item; continue ;;
+        --moved-to-item) TASK_MOVED_ITEM=$token ;;
       esac
       expect=''
       continue
@@ -212,9 +313,11 @@ parse_task_mutation() {
         *:--help) TASK_HELP=1; continue ;;
         *:--json) continue ;;
         done:--no-prune|close:--no-prune) continue ;;
-        done:--pr|close:--pr|done:--report|close:--report|done:--drop-file|close:--drop-file|done:--note|close:--note|done:--keep|close:--keep)
+        done:--pr|close:--pr|done:--report|close:--report|done:--drop-file|close:--drop-file|done:--note|close:--note|done:--keep|close:--keep|done:--duplicate-of|close:--duplicate-of|done:--moved-to|close:--moved-to)
           expect=$token; continue ;;
-        done:--pr=*|close:--pr=*|done:--report=*|close:--report=*|done:--drop-file=*|close:--drop-file=*|done:--note=*|close:--note=*|done:--keep=*|close:--keep=*)
+        done:--moved-to=*|close:--moved-to=*)
+          fail "--moved-to takes two values: --moved-to <home> <item-id>" ;;
+        done:--pr=*|close:--pr=*|done:--report=*|close:--report=*|done:--drop-file=*|close:--drop-file=*|done:--note=*|close:--note=*|done:--keep=*|close:--keep=*|done:--duplicate-of=*|close:--duplicate-of=*)
           expect=${token%%=*}
           token=${token#*=}
           case "$token" in
@@ -223,6 +326,7 @@ parse_task_mutation() {
           case "$expect" in
             --pr) TASK_PR=$token ;; --report) TASK_REPORT=$token ;;
             --drop-file) TASK_DROP=$token ;; --note) TASK_NOTE=1 ;;
+            --duplicate-of) TASK_DUP_OF=$token ;;
             --keep) [[ "$token" =~ ^[0-9]+$ ]] || fail "--keep requires a non-negative count; run tasks-axi directly for other grammar" ;;
           esac
           expect=''
@@ -244,6 +348,9 @@ parse_task_mutation() {
     esac
   done
   if [ "$bounded" = 1 ]; then
+    case "$expect" in
+      --moved-to-item) fail "--moved-to takes two values: --moved-to <home> <item-id>" ;;
+    esac
     [ -z "$expect" ] || fail "$expect requires a value; run tasks-axi directly for other grammar"
     [ "$TASK_HELP" = 1 ] || [ -n "$TASK_ID" ] || fail "$TASK_COMMAND requires exactly one id; run tasks-axi directly for other grammar"
   fi
@@ -252,6 +359,7 @@ parse_task_mutation() {
 TASK_CONTROL_LOCK_HELD=0
 TASK_META_LOCK_HELD=0
 task_mutation_cleanup() {
+  kept_lock_release
   if [ "$TASK_META_LOCK_HELD" = 1 ]; then
     fm_lock_release "$TASK_META_LOCK" || true
     TASK_META_LOCK_HELD=0
@@ -262,13 +370,638 @@ task_mutation_cleanup() {
   fi
 }
 
+intake_python() {
+  command -v python3 >/dev/null 2>&1 || fail "python3 is required for the backlog intake and closing-proof checks"
+  python3 "$INTAKE_HELPER" "$@"
+}
+
+# The kept item's control lock serializes this append with every other wrapper
+# command on that item; it is taken without waiting, so two items that name each
+# other cannot deadlock. A direct tasks-axi write is not serialized, which the
+# read-compare-write in append_to_kept covers.
+KEPT_LOCK=
+KEPT_LOCK_HELD=0
+kept_lock_acquire() {  # <kept-id>
+  local st
+  # shellcheck disable=SC2153  # STATE comes from fm-wake-lib.sh
+  case "$STATE" in /*) st=$STATE ;; *) st="$CALLER_DIR/$STATE" ;; esac
+  trap task_mutation_cleanup EXIT
+  KEPT_LOCK="$st/.control-$1.lock"
+  fm_lock_try_acquire "$KEPT_LOCK" \
+    || { KEPT_LOCK=; fail "another command is changing the kept item $1; run this again in a moment"; }
+  KEPT_LOCK_HELD=1
+}
+kept_lock_release() {
+  if [ "$KEPT_LOCK_HELD" = 1 ]; then
+    fm_lock_release "$KEPT_LOCK" || true
+    KEPT_LOCK_HELD=0
+  fi
+}
+
+# Append <title> and <body> to the kept item <kept> through tasks-axi's
+# recoverable body rewrite (--archive-body keeps the old body). The body is read
+# again just before the write; a change in between is read afresh and merged, so
+# another writer's text is never overwritten. A repeat after an interrupted run
+# finds the whole block (the exact marker line and the body) already in the body
+# and adds nothing; any other text is appended.
+append_to_kept() {  # <kept-id> <origin label> <title> <body>
+  local kept=$1 label=$2 title=$3 body=$4 shown again current latest block tmp attempt=0
+  block=$(printf -- '---\nMerged from %s: %s\n%s' "$label" "$title" "$body")
+  kept_lock_acquire "$kept"
+  tmp=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-merge.XXXXXX" 2>/dev/null) \
+    || fail "cannot create a scratch file to merge into $kept"
+  while [ "$attempt" -lt 3 ]; do
+    attempt=$((attempt + 1))
+    shown=$(fm_backlog_row_show "$DATA" "$kept" --full) \
+      || { rm -f -- "$tmp"; fail "cannot read the kept item $kept: $(printf '%s\n' "$shown" | sed -n '1p')"; }
+    current=$(printf '%s\n' "$shown" | intake_python field body) || current=
+    case $'\n'"$current"$'\n' in *$'\n'"$block"$'\n'*) rm -f -- "$tmp"; kept_lock_release; return 0 ;; esac
+    {
+      [ -z "$current" ] || printf '%s\n\n' "$current"
+      printf '%s\n' "$block"
+    } > "$tmp"
+    again=$(fm_backlog_row_show "$DATA" "$kept" --full) \
+      || { rm -f -- "$tmp"; fail "cannot read the kept item $kept: $(printf '%s\n' "$again" | sed -n '1p')"; }
+    latest=$(printf '%s\n' "$again" | intake_python field body) || latest=
+    [ "$latest" = "$current" ] || continue
+    fm_backlog_mutate "$DATA" update "$kept" --body-file "$tmp" --archive-body \
+      || { rm -f -- "$tmp"; fail "could not append to the kept item $kept: ${FM_BACKLOG_TRANSITION_ERROR:-tasks-axi said no}"; }
+    rm -f -- "$tmp"
+    kept_lock_release
+    return 0
+  done
+  rm -f -- "$tmp"
+  fail "the kept item $kept changed three times while its text was being read; nothing was appended, try again"
+}
+
+# Read <item> in the registered remote home <home> through bin/fm-on.sh, which
+# owns the route, the transport, and the remote wrapper's own backlog addressing.
+# Sets REMOTE_ITEM_STATE on success. Exit 1: the item is absent there; exit 2: the
+# remote backlog cannot be read (the transport failed or the answer is not a task
+# record), with the reason in REMOTE_ITEM_ERROR. Call it in this shell, not in a
+# command substitution, so both values reach the caller.
+REMOTE_ITEM_STATE=
+REMOTE_ITEM_ERROR=
+IDENTITY_ERROR=
+# Parse one identity answer (stdout only). It must hold exactly the three lines
+# machine=<id>, data=/<path> and dev_ino=<d>:<i>, each once, and nothing else; any
+# other line means the answer is not an identity. Sets IDENT_MACHINE, IDENT_DATA,
+# and IDENT_DEVINO.
+IDENT_MACHINE=
+IDENT_DATA=
+IDENT_DEVINO=
+identity_parse() {  # <identity text>
+  local line seen=''
+  IDENT_MACHINE=
+  IDENT_DATA=
+  IDENT_DEVINO=
+  while IFS= read -r line; do
+    case "$line" in
+      machine=?*) case "$seen" in *m*) return 1 ;; esac; seen=${seen}m; IDENT_MACHINE=${line#machine=} ;;
+      data=/*) case "$seen" in *d*) return 1 ;; esac; seen=${seen}d; IDENT_DATA=${line#data=} ;;
+      dev_ino=*)
+        case "$seen" in *i*) return 1 ;; esac
+        [[ "${line#dev_ino=}" =~ ^[0-9]+:[0-9]+$ ]] || return 1
+        seen=${seen}i; IDENT_DEVINO=${line#dev_ino=} ;;
+      *) return 1 ;;
+    esac
+  done <<< "$1"
+  [ "${#seen}" -eq 3 ]
+}
+# Run one identity command, keeping stdout (the identity) apart from stderr (text
+# for the error message only), so a warning line can never change the comparison.
+# Sets IDENTITY_OUT and IDENTITY_ERR; returns the command's status.
+IDENTITY_OUT=
+IDENTITY_ERR=
+identity_capture() {  # <command...>
+  local errfile status
+  errfile=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-identity.XXXXXX" 2>/dev/null) || { IDENTITY_OUT=; IDENTITY_ERR='cannot create a scratch file'; return 1; }
+  IDENTITY_OUT=$("$@" 2>"$errfile" </dev/null)
+  status=$?
+  IDENTITY_ERR=$(cat -- "$errfile" 2>/dev/null)
+  rm -f -- "$errfile"
+  return "$status"
+}
+# A move may close the source item only when the target is proved to be a
+# different physical backlog. The proof is the backlog's own identity (machine,
+# canonical data directory, device and inode), read through the same transport
+# that reads the target's item, and never a host name or an address.
+# Returns 0 for a proved different backlog, 1 for the same backlog, and 2 when
+# either identity cannot be read. Sets IDENTITY_ERROR on 2.
+remote_backlog_differs() {  # <home>
+  local mine_m mine_d mine_i
+  IDENTITY_ERROR=
+  identity_capture env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-backlog-identity.sh" \
+    || { IDENTITY_ERROR="cannot read this backlog's identity: $(printf '%s\n' "$IDENTITY_ERR" | sed -n '1p')"; return 2; }
+  identity_parse "$IDENTITY_OUT" || { IDENTITY_ERROR="this backlog's identity is not complete"; return 2; }
+  mine_m=$IDENT_MACHINE mine_d=$IDENT_DATA mine_i=$IDENT_DEVINO
+  identity_capture env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" \
+    "$SCRIPT_DIR/fm-on.sh" "$1" fm-backlog-identity.sh \
+    || { IDENTITY_ERROR="cannot read $1's backlog identity: $(printf '%s\n%s\n' "$IDENTITY_ERR" "$IDENTITY_OUT" | sed -n '/./{p;q;}')"; return 2; }
+  identity_parse "$IDENTITY_OUT" || { IDENTITY_ERROR="the identity answered by $1 is not complete"; return 2; }
+  # The same backlog only when all three values are equal.
+  [ "$mine_m" != "$IDENT_MACHINE" ] || [ "$mine_d" != "$IDENT_DATA" ] || [ "$mine_i" != "$IDENT_DEVINO" ]
+}
+
+remote_item_state() {  # <home> <item>
+  local out status state
+  out=$(env -u FM_ROOT_OVERRIDE FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" \
+    "$SCRIPT_DIR/fm-on.sh" "$1" fm-tasks-axi.sh show "$2" 2>&1 </dev/null)
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    if printf '%s\n' "$out" | grep -q '^code: NOT_FOUND$'; then return 1; fi
+    REMOTE_ITEM_ERROR=$(printf '%s\n' "$out" | sed -n '1p')
+    return 2
+  fi
+  state=$(printf '%s\n' "$out" | sed -n 's/^  state: *//p' | sed -n '1p')
+  [ -n "$state" ] || { REMOTE_ITEM_ERROR="the answer from $1 is not a task record"; return 2; }
+  REMOTE_ITEM_STATE=$state
+}
+
+# The checks both closing proofs share: the item must not belong to the owner.
+# Runs with the item's row already probed (FM_BACKLOG_ROW_*).
+guard_owner_items() {  # <id> <title> <body>
+  local id=$1 hold_status words_route
+  local hold_env=(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA")
+  [ -z "${FM_STATE_OVERRIDE:-}" ] || hold_env+=(FM_STATE_OVERRIDE="$FM_STATE_OVERRIDE")
+  [ -z "${FM_CONFIG_OVERRIDE:-}" ] || hold_env+=(FM_CONFIG_OVERRIDE="$FM_CONFIG_OVERRIDE")
+  [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] \
+    || backlog_refuse backlog-close-item-eligible item-closed "an open item to close" machine "bin/fm-tasks-axi.sh show $id" "$id" "$id is already closed"
+  [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
+    || backlog_refuse backlog-close-item-eligible live-task "an item with no live task record" machine "bin/fm-teardown.sh $id" "$id" "$id has a live task record; complete it with bin/fm-teardown.sh $id, which owns the landing proof"
+  env -u FM_ROOT_OVERRIDE "${hold_env[@]}" "$SCRIPT_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1
+  hold_status=$?
+  case "$hold_status" in
+    0) backlog_refuse backlog-close-item-eligible open-owner-call "the owner's answer to this call" human-only "what is the owner's answer to the call $id?" "$id" "$id is an open owner call; answer it with bin/fm-captain-hold.sh answer $id --decision-file <the owner's words>, or reconcile it with bin/fm-captain-hold.sh reconcile close $id" ;;
+    1) ;;
+    *) backlog_source_stop backlog-close-item-eligible "cannot tell whether $id is an open owner call, so it counts as undecided; run bin/fm-captain-hold.sh open $id and fix what it reports" ;;
+  esac
+  if printf '%s\n%s\n' "$2" "$3" | intake_python owner-filed; then
+    # --drop-file is a proof for ship and scout rows only; other kinds take the words as a note.
+    case "$FM_BACKLOG_ROW_KIND" in
+      ship|scout) words_route="record them with bin/fm-tasks-axi.sh done $id --drop-file <words-file>" ;;
+      *) words_route="record them with bin/fm-tasks-axi.sh done $id --note \"<the owner's words>\"" ;;
+    esac
+    backlog_refuse backlog-close-item-eligible owner-filed "the owner's words" human-only "does the owner close $id, and in what words?" "$id" "$id quotes the owner or captain, so it is the owner's own item; only the owner's words close it: get them, then $words_route"
+  fi
+}
+
+# A proof close leaves the work open elsewhere, so it must not release the open
+# items <id> still blocks. <advice> says how to re-point them for this proof.
+guard_open_dependents() {  # <id> <advice>
+  local list dependents status
+  list=$(fm_backlog_row_list "$DATA" --fields blocked_by) \
+    || backlog_source_stop backlog-close-item-eligible "cannot read the backlog to find what $1 blocks, so nothing was closed: $(printf '%s\n' "$list" | sed -n '1p')"
+  dependents=$(printf '%s\n' "$list" | intake_python dependents "$1")
+  status=$?
+  case "$status" in
+    0) backlog_refuse backlog-close-item-eligible open-dependents "no open item blocked by this one" machine "bin/fm-tasks-axi.sh unblock <dependent> --by $1" "$1" "$1 still blocks open items: $(printf '%s' "$dependents" | tr '\n' ' '). Closing it would release them while its work is still open, so nothing was closed. $2" ;;
+    1) ;;
+    *) backlog_source_stop backlog-close-item-eligible "cannot tell what $1 blocks, so nothing was closed; fix what is named above, then close it again" ;;
+  esac
+}
+
+# --duplicate-of <kept> and --moved-to <home> <item>: close on checked proof,
+# without the owner's words. Runs with the item's row already probed (found).
+# Nothing is written until every check has passed.
+guard_closing_proof() {
+  local id=$TASK_ID kept=$TASK_DUP_OF home_id=$TASK_MOVED_HOME item=$TASK_MOVED_ITEM shown title body home_data probe_status dest_state
+  [ -z "$TASK_PR$TASK_REPORT$TASK_DROP" ] && [ "$TASK_NOTE" = 0 ] \
+    || fail "a duplicate or moved item closes on its own proof; do not combine --duplicate-of or --moved-to with --pr, --report, --drop-file, or --note"
+  { [ -z "$kept" ] || [ -z "$home_id$item" ]; } \
+    || fail "give --duplicate-of or --moved-to, not both"
+  shown=$(fm_backlog_row_show "$DATA" "$id" --full) \
+    || backlog_source_stop backlog-close-item-eligible "cannot read $id: $(printf '%s\n' "$shown" | sed -n '1p')"
+  title=$(printf '%s\n' "$shown" | intake_python field title) || title=
+  body=$(printf '%s\n' "$shown" | intake_python field body) || body=
+  # The add's attribution token is bookkeeping, not text the filer wrote: it is
+  # never copied into the kept item.
+  body=$(printf '%s\n' "$body" | sed '/^<!-- fm-add:[0-9a-f]* -->$/d')
+  guard_owner_items "$id" "$title" "$body"
+  if [ -n "$kept" ]; then
+    [[ "$kept" =~ ^[A-Za-z0-9._-]+$ ]] || fail "unsupported kept item id '$kept'"
+    [ "$kept" != "$id" ] \
+      || backlog_refuse backlog-close-duplicate-of kept-is-self "a kept item other than this one" machine "bin/fm-tasks-axi.sh done $id --duplicate-of <kept-id>" "$id" "an item cannot be a duplicate of itself"
+    fm_backlog_row_probe "$DATA" "$kept" || {
+      [ "$FM_BACKLOG_ROW_RESULT" = not_found ] \
+        && backlog_refuse backlog-close-duplicate-of kept-missing "a kept item in this backlog" machine "bin/fm-tasks-axi.sh done $id --duplicate-of <kept-id>" "$id" "the kept item $kept does not exist in this backlog"
+      backlog_source_stop backlog-close-duplicate-of "cannot read the kept item $kept: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
+    }
+    case "${FM_BACKLOG_ROW_STATE%% *}" in
+      queued|in_flight) ;;
+      *) backlog_refuse backlog-close-duplicate-of kept-not-open "a Queued or In flight kept item" machine "bin/fm-tasks-axi.sh done $id --duplicate-of <kept-id>" "$id" "the kept item $kept is not Queued or In flight; a duplicate closes into open work only" ;;
+    esac
+    guard_open_dependents "$id" "Re-point every one first, held or not: bin/fm-tasks-axi.sh block <dependent> --by $kept, then bin/fm-tasks-axi.sh unblock <dependent> --by $id (the kept item $kept itself needs only the unblock step)."
+    backlog_guard_allow backlog-close-item-eligible
+    append_to_kept "$kept" "duplicate $id" "$title" "$body"
+    backlog_guard_allow backlog-close-duplicate-of
+    GUARD_ARGS=(--note "duplicate of $kept")
+    LEDGER_CLOSE_ARGS=(--duplicate-of "$kept")
+  else
+    [[ "$home_id" =~ ^[A-Za-z0-9._-]+$ ]] && [[ "$item" =~ ^[A-Za-z0-9._-]+$ ]] \
+      || fail "--moved-to takes a registered home id and an item id: --moved-to <home> <item-id>"
+    # The registry is the one in this operation's own data directory, and the home
+    # id must name exactly one record there.
+    secondmate_registry_line_for_id "$DATA/secondmates.md" "$home_id" \
+      || backlog_refuse backlog-close-moved-to home-not-registered "one registered home" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id is not one registered home in $DATA/secondmates.md"
+    if [ "$SECONDMATE_REGISTRY_REMOTE" = 1 ]; then
+      remote_backlog_differs "$home_id"
+      case $? in
+        0) ;;
+        1) backlog_refuse backlog-close-moved-to same-backlog "a different backlog" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id reaches this backlog itself (the same machine, data directory and inode); a moved item must live in a different backlog" ;;
+        *) backlog_source_stop backlog-close-moved-to "cannot prove $home_id is a different backlog, so nothing was closed: $IDENTITY_ERROR" ;;
+      esac
+      remote_item_state "$home_id" "$item"
+      case $? in
+        0) dest_state=$REMOTE_ITEM_STATE ;;
+        1) backlog_refuse backlog-close-moved-to item-missing "the item in the new home" machine "bin/fm-tasks-axi.sh done $id --moved-to $home_id <item-id>" "$id" "$home_id's backlog has no item $item" ;;
+        *) backlog_source_stop backlog-close-moved-to "cannot read $home_id's backlog, so nothing was closed: ${REMOTE_ITEM_ERROR:-unreachable remote}" ;;
+      esac
+    else
+      case "$SECONDMATE_REGISTRY_HOME" in /*) ;; *) backlog_source_stop backlog-close-moved-to "the registered home path for $home_id is not absolute" ;; esac
+      home_data="$SECONDMATE_REGISTRY_HOME/data"
+      if [ "$home_data" -ef "$DATA" ] || { [ -e "$home_data/backlog.md" ] && [ "$home_data/backlog.md" -ef "$DATA/backlog.md" ]; }; then
+        backlog_refuse backlog-close-moved-to same-backlog "a different backlog" machine "bin/fm-tasks-axi.sh done $id --moved-to <home> <item-id>" "$id" "$home_id is this backlog itself; a moved item must live in a different backlog"
+      fi
+      fm_backlog_row_probe "$home_data" "$item"
+      probe_status=$?
+      # The probe re-addressed the backlog to that home; point it back at this one.
+      fm_backlog_tasks_axi_addressing "$DATA" || fail "${FM_BACKLOG_TRANSITION_ERROR:-data directory cannot be resolved: $DATA}"
+      if [ "$probe_status" -ne 0 ]; then
+        [ "$FM_BACKLOG_ROW_RESULT" = not_found ] \
+          && backlog_refuse backlog-close-moved-to item-missing "the item in the new home" machine "bin/fm-tasks-axi.sh done $id --moved-to $home_id <item-id>" "$id" "$home_id's backlog has no item $item"
+        backlog_source_stop backlog-close-moved-to "cannot read $home_id's backlog, so nothing was closed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
+      fi
+      dest_state=${FM_BACKLOG_ROW_STATE%% *}
+    fi
+    case "${dest_state%% *}" in
+      queued|in_flight) ;;
+      *) backlog_refuse backlog-close-moved-to item-not-open "an open item in the new home" machine "bin/fm-tasks-axi.sh done $id --moved-to $home_id <item-id>" "$id" "$home_id's item $item is not open (Queued or In flight); moved work must be open in the new home" ;;
+    esac
+    guard_open_dependents "$id" "Re-point each one first: for a dependent with no hold, bin/fm-tasks-axi.sh hold <dependent> --reason \"waits for $item in $home_id\" (a blocker cannot name an item in another backlog); then, for every dependent, bin/fm-tasks-axi.sh unblock <dependent> --by $id. A dependent already on a hold keeps that hold and needs only the unblock step, because a new hold replaces the old one and can erase an owner call."
+    backlog_guard_allow backlog-close-item-eligible
+    backlog_guard_allow backlog-close-moved-to
+    GUARD_ARGS=(--note "moved to $home_id as $item")
+    LEDGER_CLOSE_ARGS=(--moved-to "$home_id" "$item")
+  fi
+  GUARD_STRIP_PROOF=1
+}
+
+# Intake: parse an add, drop the flags tasks-axi does not know, and judge the
+# objective and the duplicate neighbours before anything is written.
+ADD_TITLE=
+ADD_BODY=
+ADD_OBJECTIVE=
+ADD_REASON=
+ADD_DUP_OF=
+ADD_ID=
+ADD_NOT_DUP=
+ADD_HELP=0
+ADD_NEIGHBOURS=
+set_intake_flag() {  # <flag> <value>
+  case "$2" in
+    ''|-*) fail "$1 requires a value; run tasks-axi directly for other grammar" ;;
+  esac
+  case "$1" in
+    --objective) ADD_OBJECTIVE=$2 ;;
+    --objective-reason) ADD_REASON=$2 ;;
+    --dup-of) ADD_DUP_OF=$2 ;;
+    --not-dup)
+      [ -z "$ADD_NOT_DUP" ] || fail "--not-dup takes one neighbour id; give it once"
+      ADD_NOT_DUP=$2
+      ;;
+  esac
+}
+parse_add_intake() {  # <args...>; rewrites ARGS without the intake flags
+  local tokens=("$@") i=0 j token expect='' mint=0 body_file='' flag_title=''
+  local positionals=() kept=()
+  [ "${tokens[0]:-}" != task ] || i=1
+  i=$((i + 1))
+  for ((j = 0; j < i; j++)); do kept+=("${tokens[j]}"); done
+  for token in "${tokens[@]:$i}"; do
+    if [ -n "$expect" ]; then
+      case "$expect" in
+        --objective|--objective-reason|--dup-of|--not-dup) set_intake_flag "$expect" "$token" ;;
+        *)
+          kept+=("$token")
+          case "$expect" in --body) ADD_BODY=$token ;; --body-file) body_file=$token ;; --title) flag_title=$token ;; esac
+          ;;
+      esac
+      expect=''
+      continue
+    fi
+    case "$token" in
+      --help|-h) ADD_HELP=1; kept+=("$token") ;;
+      --objective|--objective-reason|--dup-of|--not-dup) expect=$token ;;
+      --objective=*|--objective-reason=*|--dup-of=*|--not-dup=*) set_intake_flag "${token%%=*}" "${token#*=}" ;;
+      --kind|--repo|--body|--body-file|--title|--blocked-by|--pr|--report|--priority|--prefix|--backend)
+        kept+=("$token"); expect=$token ;;
+      --body=*) ADD_BODY=${token#*=}; kept+=("$token") ;;
+      --body-file=*) body_file=${token#*=}; kept+=("$token") ;;
+      --title=*) flag_title=${token#*=}; kept+=("$token") ;;
+      --mint) mint=1; kept+=("$token") ;;
+      -*) kept+=("$token") ;;
+      *) positionals+=("$token"); kept+=("$token") ;;
+    esac
+  done
+  [ -z "$expect" ] || fail "$expect requires a value; run tasks-axi directly for other grammar"
+  if [ "$mint" = 1 ]; then
+    ADD_TITLE=${positionals[0]:-}
+  else
+    ADD_ID=${positionals[0]:-}
+    ADD_TITLE=${positionals[1]:-}
+  fi
+  [ -z "$flag_title" ] || ADD_TITLE=$flag_title
+  if [ -n "$ADD_DUP_OF" ] && [ -z "$ADD_BODY" ] && [ -n "$body_file" ]; then
+    ADD_BODY=$(cat -- "$body_file" 2>/dev/null) || fail "cannot read --body-file $body_file"
+  fi
+  ARGS=("${kept[@]}")
+}
+
+# The objective sidecar must be writable before anything is filed, so a filed
+# item is never left without its row.
+intake_sidecar_ready() {
+  local sidecar="$DATA/backlog-review.tsv"
+  if [ -e "$sidecar" ] || [ -L "$sidecar" ]; then
+    [ -f "$sidecar" ] && [ ! -L "$sidecar" ] && [ -w "$sidecar" ] \
+      || fail "cannot record the objective: $sidecar is not a writable regular file; fix it, then file the item again (nothing was filed)"
+  else
+    [ -d "$DATA" ] && [ -w "$DATA" ] \
+      || fail "cannot record the objective: $DATA is not a writable directory (nothing was filed)"
+  fi
+}
+
+state_label() {  # <state> <source>
+  local label
+  case "$1" in queued) label=Queued ;; in_flight) label="In flight" ;; done) label=Done ;; *) label=$1 ;; esac
+  [ "$2" != archive ] || label="$label, archived"
+  printf '%s' "$label"
+}
+
+guard_intake() {
+  local list valid id state score source ntitle neighbour_ids='' keep_line='' status top='' shown_count=0 known=0
+  local subject=${ADD_ID:-new-item} add_step='bin/fm-tasks-axi.sh add <id> <title>'
+  [ "$ADD_HELP" = 0 ] || return 0
+  valid=$(intake_python objectives "$OBJECTIVES_FILE") \
+    || backlog_source_stop backlog-intake-objective "cannot read the objective list $OBJECTIVES_FILE"
+  valid=$(printf '%s' "$valid" | tr '\n' ' ')
+  if [ -z "$ADD_OBJECTIVE" ]; then
+    backlog_refuse backlog-intake-objective objective-missing "an objective" machine "$add_step --objective <objective-id>" "$subject" "add needs the objective the item serves: --objective <id> with one of $valid (docs/objectives.md), or --objective none --objective-reason \"<why no objective applies>\""
+  fi
+  if [ "$ADD_OBJECTIVE" = none ]; then
+    [[ "$ADD_REASON" =~ [^[:space:]] ]] \
+      || backlog_refuse backlog-intake-objective reason-missing "a reason for no objective" machine "$add_step --objective none --objective-reason <why>" "$subject" "--objective none needs --objective-reason \"<why no objective applies>\""
+  else
+    for id in $valid; do
+      [ "$id" != "$ADD_OBJECTIVE" ] || known=1
+    done
+    [ "$known" = 1 ] \
+      || backlog_refuse backlog-intake-objective objective-unknown "an objective docs/objectives.md lists" machine "$add_step --objective <objective-id>" "$subject" "unknown objective '$ADD_OBJECTIVE'; use one of $valid (docs/objectives.md), or --objective none --objective-reason \"<why>\""
+  fi
+  backlog_guard_allow backlog-intake-objective
+  if [ -n "$ADD_DUP_OF" ] && [ -n "$ADD_NOT_DUP" ]; then
+    fail "give --dup-of or --not-dup, not both"
+  fi
+  if [ -n "$ADD_DUP_OF" ] && [ "$ADD_DUP_OF" = "$ADD_ID" ]; then
+    backlog_refuse backlog-intake-dup-of kept-is-self "a kept item other than this add" machine "$add_step --objective <objective-id> --dup-of <kept-id>" "$subject" "--dup-of names this add's own id $ADD_ID; an item cannot be a duplicate of itself, so nothing was filed or appended"
+  fi
+  [ -n "$ADD_TITLE" ] || return 0
+  list=$(fm_backlog_row_list "$DATA") \
+    || backlog_source_stop backlog-intake-duplicate "cannot read the backlog to check for duplicates, so nothing was filed: $(printf '%s\n' "$list" | sed -n '1p')"
+  ADD_PRE_IDS=$(printf '%s\n' "$list" | list_ids)
+  ADD_NEIGHBOURS=$(printf '%s\n' "$list" | intake_python neighbours "$ADD_TITLE" "$(fm_backlog_done_archive "$DATA")" "$ADD_ID")
+  status=$?
+  case "$status" in
+    0|1) ;;
+    *) backlog_source_stop backlog-intake-duplicate "the duplicate check could not read the backlog or its done archive, so nothing was filed; fix what is named above, then file the item again" ;;
+  esac
+  if [ -n "$ADD_DUP_OF" ]; then
+    [[ "$ADD_DUP_OF" =~ ^[A-Za-z0-9._-]+$ ]] || fail "unsupported kept item id '$ADD_DUP_OF'"
+    if ! printf '%s\n' "$list" | intake_python exists "$ADD_DUP_OF"; then
+      if intake_python archived "$(fm_backlog_done_archive "$DATA")" "$ADD_DUP_OF"; then
+        backlog_refuse backlog-intake-dup-of kept-archived "a kept item in the active backlog" machine "$add_step --objective <objective-id> --not-dup $ADD_DUP_OF" "$subject" "the kept item $ADD_DUP_OF is Done and archived, and an archived item cannot take an appended note; nothing was filed or appended. If the new item is the same work, nothing needs filing; if it is different work, file it with --not-dup $ADD_DUP_OF"
+      fi
+      backlog_refuse backlog-intake-dup-of kept-missing "a kept item in this backlog" machine "$add_step --objective <objective-id> --dup-of <kept-id>" "$subject" "the kept item $ADD_DUP_OF does not exist in this backlog"
+    fi
+    append_to_kept "$ADD_DUP_OF" "a duplicate filing" "$ADD_TITLE" "$ADD_BODY"
+    backlog_guard_allow backlog-intake-dup-of
+    backlog_guard_allow backlog-intake-duplicate --cleared-by dup-of
+    printf 'ok: merged into %s (nothing filed)\n' "$ADD_DUP_OF"
+    exit 0
+  fi
+  while IFS=$'\t' read -r id _; do
+    [ -z "$id" ] || neighbour_ids="$neighbour_ids $id "
+  done <<NEIGHBOURS
+$ADD_NEIGHBOURS
+NEIGHBOURS
+  if [ -n "$ADD_NOT_DUP" ]; then
+    case "$neighbour_ids" in
+      *" $ADD_NOT_DUP "*) ;;
+      *)
+        if printf '%s\n' "$list" | intake_python exists "$ADD_NOT_DUP" || intake_python archived "$(fm_backlog_done_archive "$DATA")" "$ADD_NOT_DUP"; then
+          backlog_refuse backlog-intake-not-dup not-a-neighbour "a neighbour of this title" machine "$add_step --objective <objective-id> --not-dup <neighbour-id>" "$subject" "--not-dup $ADD_NOT_DUP names an item whose title does not overlap this one enough to be a neighbour; nothing was filed"
+        fi
+        backlog_refuse backlog-intake-not-dup item-missing "an item in this backlog" machine "$add_step --objective <objective-id> --not-dup <neighbour-id>" "$subject" "--not-dup $ADD_NOT_DUP names no item in this backlog; nothing was filed"
+        ;;
+    esac
+    intake_sidecar_ready
+    backlog_guard_allow backlog-intake-not-dup
+    backlog_guard_allow backlog-intake-duplicate --override --cleared-by not-dup
+    return 0
+  fi
+  if [ -z "$ADD_NEIGHBOURS" ]; then
+    intake_sidecar_ready
+    backlog_guard_allow backlog-intake-duplicate
+    return 0
+  fi
+  backlog_refuse backlog-intake-duplicate title-overlap "a judgment of the listed neighbours" human-only "is this add the same work as ${ADD_NEIGHBOURS%%$'\t'*}?" "$subject"
+  {
+    printf 'fm-tasks-axi: this title overlaps open or recently closed items, so nothing was filed:\n'
+    while IFS=$'\t' read -r id state score source ntitle; do
+      [ -n "$id" ] || continue
+      shown_count=$((shown_count + 1))
+      [ "$shown_count" -le 3 ] || break
+      printf '  %s (%s, overlap %s) %s\n' "$id" "$(state_label "$state" "$source")" "$score" "$ntitle"
+    done <<NEIGHBOURS
+$ADD_NEIGHBOURS
+NEIGHBOURS
+    while IFS=$'\t' read -r id state _ source _; do
+      if [ -z "$top" ] && [ "$source" = active ]; then top=$id; fi
+      [ -n "$keep_line" ] || keep_line=$id
+    done <<NEIGHBOURS
+$ADD_NEIGHBOURS
+NEIGHBOURS
+    printf 'Judge them, then run the add again with one of these two overrides (each still needs --objective):\n'
+    if [ -n "$top" ]; then
+      printf '  the work is the same - append this title and body to %s and file nothing:\n    %q' "$top" "$0"
+      printf ' %q' "${ORIG_ARGS[@]}" --dup-of "$top"
+      printf '\n'
+    else
+      printf '  (every neighbour is Done and archived, so --dup-of has no item to append to)\n'
+    fi
+    printf '  the work is different from %s - file it:\n    %q' "$keep_line" "$0"
+    printf ' %q' "${ORIG_ARGS[@]}" --not-dup "$keep_line"
+    printf '\n'
+  } >&2
+  exit 2
+}
+
+# The item ids in a `tasks-axi list` answer, one per line.
+list_ids() {
+  awk '/^  [^ ]/ { sub(/^  /, ""); n = index($0, ","); if (n > 0) print substr($0, 1, n - 1) }'
+}
+
+# Each add carries an attribution token the add itself writes: a hidden comment
+# at the end of the item's body. When tasks-axi's answer cannot be read, the new
+# item is claimed only if its stored body carries this invocation's token, so a
+# second writer's item is never recorded as this add's and never removed by it.
+ADD_NONCE=
+ADD_BODY_TMP=
+
+# Rewrite ARGS so the body (from --body or --body-file, or empty) ends with the
+# token, through one scratch --body-file. A body given to a flag pair that cannot
+# be read cleanly is left alone, and the add then has no token to prove itself.
+tag_add_body() {
+  local args=("${ARGS[@]}") kept=() i=0 token body='' have_body=0 body_file=''
+  ADD_NONCE=$(python3 -c 'import secrets; print(secrets.token_hex(12))' 2>/dev/null) || ADD_NONCE=
+  [ -n "$ADD_NONCE" ] || return 0
+  while [ "$i" -lt "${#args[@]}" ]; do
+    token=${args[$i]}
+    case "$token" in
+      --body) body=${args[$((i + 1))]:-}; have_body=$((have_body + 1)); i=$((i + 2)); continue ;;
+      --body=*) body=${token#*=}; have_body=$((have_body + 1)); i=$((i + 1)); continue ;;
+      --body-file) body_file=${args[$((i + 1))]:-}; have_body=$((have_body + 1)); i=$((i + 2)); continue ;;
+      --body-file=*) body_file=${token#*=}; have_body=$((have_body + 1)); i=$((i + 1)); continue ;;
+    esac
+    kept+=("$token")
+    i=$((i + 1))
+  done
+  if [ "$have_body" -gt 1 ]; then ADD_NONCE=; return 0; fi
+  ADD_BODY_TMP=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-body.XXXXXX" 2>/dev/null) || { ADD_NONCE=; return 0; }
+  if [ -n "$body_file" ]; then
+    cat -- "$body_file" > "$ADD_BODY_TMP" 2>/dev/null || { rm -f -- "$ADD_BODY_TMP"; ADD_BODY_TMP=; ADD_NONCE=; return 0; }
+  else
+    printf '%s' "$body" > "$ADD_BODY_TMP"
+  fi
+  [ ! -s "$ADD_BODY_TMP" ] || printf '\n' >> "$ADD_BODY_TMP"
+  printf '<!-- fm-add:%s -->\n' "$ADD_NONCE" >> "$ADD_BODY_TMP"
+  ARGS=("${kept[@]}" --body-file "$ADD_BODY_TMP")
+}
+
+# The stored text of one item, read the way the other backlog reads are.
+item_text() {  # <id>
+  fm_backlog_tasks_axi_addressing "$DATA" || return 1
+  if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
+    (cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && fm_tasks_axi show "$1" --full --file "$FM_BACKLOG_AXI_FILE" 2>&1)
+  else
+    (cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && fm_tasks_axi show "$1" --full 2>&1)
+  fi
+}
+
+# Print the add's answer without the token, so the caller sees what tasks-axi
+# would have printed for the body it gave. The body field is decoded, the token's
+# line and the newline after it are removed, and the field is written back: an
+# add with no body of its own prints `"body": null` (--json) or `body: ""`, never
+# a bare newline, and `--body hello` prints "hello", not "hello\n". Any token
+# left in a shape that is not a body field is cut out as a last step.
+print_add_answer() {  # <captured-add-stdout-file>
+  if [ -z "$ADD_NONCE" ]; then cat -- "$1"; return; fi
+  python3 -I -c '
+import json, re, sys
+text = sys.stdin.read()
+marker = "<!-- fm-add:" + sys.argv[1] + " -->"
+def field(m):
+    try:
+        value = json.loads(chr(34) + m.group(3) + chr(34))
+    except ValueError:
+        return m.group(0)
+    if marker not in value:
+        return m.group(0)
+    value = "\n".join(l for l in value.split("\n") if l != marker).rstrip("\n")
+    if value:
+        shown = json.dumps(value, ensure_ascii=False)
+    else:
+        shown = "null" if m.group(2).startswith(chr(34)) else chr(34) + chr(34)
+    return m.group(1) + m.group(2) + shown + m.group(4)
+text = re.sub(r"^(\s*)(\"body\": |body: )\"((?:[^\"\\]|\\.)*)\"(,?)$", field, text, flags=re.M)
+text = re.sub(r"(?:\\n)*" + re.escape(marker) + r"(?:\\n)*", "", text)
+sys.stdout.write(text)
+' "$ADD_NONCE" < "$1" || cat -- "$1"
+}
+
+# The add's own answer could not be read. Claim the item this invocation filed by
+# its token, never by "the only new id". Sets ADDED_ID, or leaves it empty when
+# nothing new was filed (the id already existed). Returns 1, changing nothing,
+# when the item cannot be proved to be this add's.
+recover_added_id() {
+  local after new id text proven='' count=0 unproven
+  ADDED_ID=
+  # A named id that existed before the add was not filed by it.
+  if [ -n "$ADD_ID" ] && printf '%s\n' "$ADD_PRE_IDS" | grep -Fxq -- "$ADD_ID"; then
+    return 0
+  fi
+  if [ -z "$ADD_NONCE" ] || [ -z "${ADD_PRE_IDS+x}" ] || ! after=$(fm_backlog_row_list "$DATA"); then
+    printf 'fm-tasks-axi: the answer of the add%s could not be read and this add cannot be tied to an item, so no objective was recorded and nothing was changed; check %s with tasks-axi list and data/backlog-review.tsv\n' \
+      "${ADD_ID:+ of $ADD_ID}" "${ADD_ID:-the new item}" >&2
+    return 1
+  fi
+  new=$(printf '%s\n' "$after" | list_ids | grep -Fxv -f <(printf '%s\n' "$ADD_PRE_IDS") || true)
+  for id in $new; do
+    if text=$(item_text "$id") && printf '%s' "$text" | grep -Fq -- "fm-add:$ADD_NONCE"; then
+      proven=$id
+      count=$((count + 1))
+    fi
+  done
+  if [ "$count" -eq 1 ]; then
+    ADDED_ID=$proven
+    return 0
+  fi
+  unproven=$(printf '%s' "$new" | tr '\n' ' ' | sed 's/ $//')
+  printf 'fm-tasks-axi: the answer of the add%s could not be read, and no new item (%s) carries this add'"'"'s token, so the objective could not be tied to one of them and nothing was changed; check them with tasks-axi list and data/backlog-review.tsv\n' \
+    "${ADD_ID:+ of $ADD_ID}" "${unproven:-none}" >&2
+  return 1
+}
+
+# One line per filed item in data/backlog-review.tsv: id, review-by (empty),
+# objective, and reason. A row that cannot be written removes the item again, but
+# only an item proved to be this add's: its own answer names it, or its stored body
+# carries this add's token. An add that cannot be proved fails, naming the items to
+# check, and removes nothing.
+intake_record() {  # <captured-add-stdout-file>
+  local reason row status=0
+  added_fields "$1" || status=$?
+  case "$status" in
+    0) ;;
+    3) return 0 ;;
+    *)
+      recover_added_id || return 1
+      # Nothing new was filed (the id already existed): there is no row to write.
+      [ -n "$ADDED_ID" ] || return 0
+      ;;
+  esac
+  reason=$(printf '%s' "$ADD_REASON" | tr '\t\n' '  ')
+  row=$(printf '%s\t\t%s\t%s' "$ADDED_ID" "$ADD_OBJECTIVE" "$reason")
+  printf '%s\n' "$row" >> "$DATA/backlog-review.tsv" && return 0
+  if fm_backlog_mutate "$DATA" rm "$ADDED_ID"; then
+    printf 'fm-tasks-axi: could not record the objective of %s in %s/backlog-review.tsv, so the item was removed again; nothing is filed\n' "$ADDED_ID" "$DATA" >&2
+  else
+    printf 'fm-tasks-axi: could not record the objective of %s in %s/backlog-review.tsv, and the item could not be removed (%s); remove it with tasks-axi rm %s\n' \
+      "$ADDED_ID" "$DATA" "${FM_BACKLOG_TRANSITION_ERROR:-tasks-axi said no}" "$ADDED_ID" >&2
+  fi
+  return 1
+}
+
 guard_completion() {
   local id=$TASK_ID pr=$TASK_PR report=$TASK_REPORT drop note=$TASK_NOTE proof=()
   drop=$(absolute_from_caller "$TASK_DROP")
   case "$TASK_COMMAND" in done|close) ;; *) return 0 ;; esac
   [ "$TASK_CONTROL_LOCK_HELD" = 1 ] || return 0
   fm_backlog_row_probe "$DATA" "$id" || {
-    [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && return 0
+    if [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+      [ -z "$TASK_DUP_OF$TASK_MOVED_HOME$TASK_MOVED_ITEM" ] \
+        || backlog_refuse backlog-close-item-eligible item-missing "an item in this backlog" machine "bin/fm-tasks-axi.sh list" "$id" "no item $id in this backlog to close"
+      return 0
+    fi
     fail "cannot identify the task being completed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
   }
   # Opt-in for bin/fm-pr-close-items.sh only: refuse an open owner call for every row kind,
@@ -276,6 +1009,10 @@ guard_completion() {
   if [ "${FM_TASKS_AXI_REFUSE_OPEN_CALL:-}" = 1 ] && [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] \
     && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
     fail "$id is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it"
+  fi
+  if [ -n "$TASK_DUP_OF$TASK_MOVED_HOME$TASK_MOVED_ITEM" ]; then
+    guard_closing_proof
+    return
   fi
   case "$FM_BACKLOG_ROW_KIND" in ship|scout) ;; *) return 0 ;; esac
   [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
@@ -289,7 +1026,7 @@ guard_completion() {
     fm_backlog_drop_record "$DATA" "$id" "$drop" \
       || fail "--drop-file must be a regular file holding the captain's own words (1..8192 bytes)"
     GUARD_ARGS=(--note dropped)
-    GUARD_STRIP_DROP=1
+    GUARD_STRIP_PROOF=1
     proof=("${GUARD_ARGS[@]}")
   elif [ -n "$report" ]; then
     [ "$FM_BACKLOG_ROW_KIND" = scout ] \
@@ -329,7 +1066,7 @@ else
 fi
 
 GUARD_ARGS=()
-GUARD_STRIP_DROP=0
+GUARD_STRIP_PROOF=0
 LEDGER_CLOSE_ARGS=()
 parse_task_mutation "$@"
 if [ "$TASK_HELP" = 0 ] && [[ "$TASK_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
@@ -345,13 +1082,26 @@ if [ "$TASK_HELP" = 0 ] && [[ "$TASK_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
   TASK_META_LOCK_HELD=1
 fi
 guard_completion
-if [ "$GUARD_STRIP_DROP" = 1 ]; then
-  # The drop words stay in the retained file; tasks-axi receives only the fixed note.
+case "$TASK_COMMAND" in
+  add|create)
+    # shellcheck source=bin/fm-wake-lib.sh
+    command -v fm_lock_try_acquire >/dev/null 2>&1 || . "$SCRIPT_DIR/fm-wake-lib.sh"
+    parse_add_intake "${ARGS[@]}"
+    guard_intake
+    ;;
+esac
+if [ "$GUARD_STRIP_PROOF" = 1 ]; then
+  # The drop words stay in the retained file, and a duplicate or moved item's
+  # proof is checked above; tasks-axi receives only the fixed note.
   kept=()
   skip=0
   for arg in "${ARGS[@]}"; do
-    if [ "$skip" = 1 ]; then skip=0; continue; fi
-    case "$arg" in --drop-file) skip=1; continue ;; --drop-file=*) continue ;; esac
+    if [ "$skip" -gt 0 ]; then skip=$((skip - 1)); continue; fi
+    case "$arg" in
+      --drop-file|--duplicate-of) skip=1; continue ;;
+      --moved-to) skip=2; continue ;;
+      --drop-file=*|--duplicate-of=*) continue ;;
+    esac
     kept+=("$arg")
   done
   ARGS=("${kept[@]}" "${GUARD_ARGS[@]}")
@@ -378,41 +1128,89 @@ case "$TASK_COMMAND" in
     fi
     ;;
 esac
-# Append task.filed for the item an `add` just created, read from the add's own
-# output so a minted id and every defaulted field are the ones tasks-axi stored.
-ledger_task_filed() {  # <captured-stdout-file>
-  local out fields id='' repo='' kind='' priority='' key value ledger_state ledger_config
-  out=$(cat -- "$1") || return 0
-  if printf '%s' "$out" | jq -e . >/dev/null 2>&1; then
-    fields=$(printf '%s' "$out" | jq -r 'select(.ok == true and .action == "add" and (.already | not))
-      | .task | "id\t\(.id // "")", "repo\t\(.repo // "")", "kind\t\(.kind // "")", "priority\t\(.priority // "")"' 2>/dev/null) || return 0
-  else
-    fields=$(printf '%s\n' "$out" | awk '
-      /^ok: added / { added = 1; next }
-      added && /^  (id|kind|repo|priority): / {
-        key = $1; sub(/:$/, "", key); value = $0; sub(/^  [a-z]+: /, "", value)
-        gsub(/^"|"$/, "", value); if (value == "-") value = ""
-        printf "%s\t%s\n", key, value
-      }') || return 0
-  fi
+# Read the item an `add` just created from the add's own captured stdout, so a
+# minted id and every defaulted field are the ones tasks-axi stored. Sets
+# ADDED_ID/REPO/KIND/PRIORITY and returns 0 for a newly created item, 3 when
+# tasks-axi says the id was already present (nothing new was filed), and 1 when
+# the output cannot be read, which is not proof that nothing was filed.
+added_fields() {  # <captured-stdout-file>
+  local out fields key value json_status
+  ADDED_ID=
+  ADDED_REPO=
+  ADDED_KIND=
+  ADDED_PRIORITY=
+  ADDED_ALREADY=0
+  out=$(cat -- "$1") || return 1
+  # JSON output is read with python3, which the intake checks already require,
+  # so a home without jq still records the objective of a --json add.
+  # Exit 3 means the output is not JSON and the text reader below takes over.
+  json_status=0
+  fields=$(printf '%s' "$out" | python3 -I -c '
+import json, sys
+try:
+    doc = json.load(sys.stdin)
+except ValueError:
+    sys.exit(3)
+if not (isinstance(doc, dict) and doc.get("ok") is True and doc.get("action") == "add"):
+    sys.exit(4)
+if doc.get("already"):
+    print("already\ttrue")
+task = doc.get("task") or {}
+for key in ("id", "repo", "kind", "priority"):
+    value = task.get(key)
+    print("%s\t%s" % (key, "" if value is None else value))
+' 2>/dev/null) || json_status=$?
+  case "$json_status" in
+    0) ;;
+    3)
+      fields=$(printf '%s\n' "$out" | awk '
+        /^ok: add .* already exists/ { seen = 1; print "already\ttrue"; next }
+        /^ok: added / { seen = 1; next }
+        seen && /^  (id|kind|repo|priority): / {
+          key = $1; sub(/:$/, "", key); value = $0; sub(/^  [a-z]+: /, "", value)
+          gsub(/^"|"$/, "", value); if (value == "-") value = ""
+          printf "%s\t%s\n", key, value
+        }') || return 1
+      ;;
+    *) return 1 ;;
+  esac
   while IFS=$'\t' read -r key value; do
-    case "$key" in id) id=$value ;; repo) repo=$value ;; kind) kind=$value ;; priority) priority=$value ;; esac
+    case "$key" in already) ADDED_ALREADY=1 ;; id) ADDED_ID=$value ;; repo) ADDED_REPO=$value ;; kind) ADDED_KIND=$value ;; priority) ADDED_PRIORITY=$value ;; esac
   done <<< "$fields"
-  [ -n "$id" ] || return 0
+  # An add that tasks-axi reports as already present filed nothing new.
+  [ "$ADDED_ALREADY" = 0 ] || return 3
+  [ -n "$ADDED_ID" ]
+}
+
+# Append task.filed for the item an `add` just created.
+ledger_task_filed() {  # <captured-stdout-file>
+  local ledger_state ledger_config
+  added_fields "$1" || return 0
   ledger_state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
   ledger_config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
   FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$ledger_state FM_CONFIG_OVERRIDE=$ledger_config \
-    "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$id" "$repo" "$kind" "$priority" || true
+    "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$ADDED_ID" "$ADDED_REPO" "$ADDED_KIND" "$ADDED_PRIORITY" || true
 }
 
 case "$TASK_COMMAND" in
   add|create)
-    if [ -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/fleet-ledger" ] && add_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-add.XXXXXX" 2>/dev/null); then
+    if [ "$ADD_HELP" = 0 ]; then
+      # Capture the add's stdout: the objective record and the fleet ledger both
+      # need the id tasks-axi stored, and a failed capture must not file unrecorded.
+      add_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-add.XXXXXX" 2>/dev/null) \
+        || fail "cannot create a scratch file to record the add's objective"
+      tag_add_body
       tasks-axi ${ARGS[@]+"${ARGS[@]}"} > "$add_out"
       add_status=$?
-      cat -- "$add_out"
-      [ "$add_status" -ne 0 ] || ledger_task_filed "$add_out" || true
-      rm -f -- "$add_out"
+      if [ "$add_status" -eq 0 ] && ! intake_record "$add_out"; then
+        rm -f -- "$add_out" ${ADD_BODY_TMP:+"$ADD_BODY_TMP"}
+        exit 1
+      fi
+      print_add_answer "$add_out"
+      if [ "$add_status" -eq 0 ]; then
+        [ ! -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/fleet-ledger" ] || ledger_task_filed "$add_out" || true
+      fi
+      rm -f -- "$add_out" ${ADD_BODY_TMP:+"$ADD_BODY_TMP"}
       exit "$add_status"
     fi
     ;;

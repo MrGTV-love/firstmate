@@ -21,23 +21,23 @@ test_bound_channel_answers_close_at_answer_time() {
   write_origin_meta "$home" "$id"
   printf 'done: proposal deck ready for the captain\n' > "$home/state/$id.status"
   printf '# Sample eval proposal\n\nThree captain choices remain.\n' > "$home/data/$id/report.md"
-  run_captain "$home" hold sample-membership-call --title "Captain call: membership" \
+  run_captain "$home" hold sample-membership-call --title "Membership choice" \
     --reason "captain membership choice pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-headline-call --title "Captain call: headline" \
+  run_captain "$home" hold sample-headline-call --title "Headline metric" \
     --reason "captain headline choice pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-forged-call --title "Captain call: forged" \
+  run_captain "$home" hold sample-forged-call --title "Forged prose guard" \
     --reason "captain forged choice pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-invalid-close-call --title "Captain call: invalid close" \
+  run_captain "$home" hold sample-invalid-close-call --title "Invalid close mode" \
     --reason "captain close mode validation pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-source-reconcile --title "Captain call: reconcile" \
+  run_captain "$home" hold sample-source-reconcile --title "Source publication recheck" \
     --reason "captain re-check pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-bare-reconcile --title "Captain call: bare reconcile" \
+  run_captain "$home" hold sample-bare-reconcile --title "Bare selection probe" \
     --reason "captain bare re-check pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-old-shape --title "Captain call: old board shape" \
+  run_captain "$home" hold sample-old-shape --title "Legacy board shape" \
     --reason "captain old board pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-old-reconcile --title "Captain call: old bare reconcile" \
+  run_captain "$home" hold sample-old-reconcile --title "Archaic plain value" \
     --reason "captain old bare reconcile pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-old-reconcile-note --title "Captain call: old annotated reconcile" \
+  run_captain "$home" hold sample-old-reconcile-note --title "Annotated outdated note" \
     --reason "captain old annotated reconcile pending" --repo sample --origin "$id" >/dev/null
   tasks_in "$home" add sample-gated-work "Gated sample work" --kind ship --repo sample \
     --body 'Gated work plan.' >/dev/null
@@ -956,8 +956,9 @@ test_unversioned_deck_shapes_with_extra_fields_still_route() {
   local home id result out show
   home=$(make_home unversioned-deck-shapes)
   for id in sample-plain-note sample-extra-fields sample-note-text sample-choice-alias sample-note-reconcile; do
-    run_captain "$home" hold "$id" --title "Captain call: $id" \
-      --reason "captain deck choice pending" --repo sample >/dev/null \
+    tasks_in "$home" add "$id" "Captain call: $id" --kind captain --repo sample >/dev/null \
+      || fail "could not create $id"
+    run_captain "$home" hold "$id" --reason "captain deck choice pending" >/dev/null \
       || fail "could not hold $id"
   done
   result="$home/unversioned-deck.result"
