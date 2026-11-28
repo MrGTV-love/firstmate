@@ -418,7 +418,9 @@ test_moved_real_treehouse_cases_follow_their_former_host() {
     chmod +x "$repo/tests/$host.test.sh" "$repo/tests/$moved.test.sh"
   done
   # The freshen host names the clock only through the helper it sources, as at the moved head.
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
   printf '. "$(dirname "${BASH_SOURCE[0]}")/fm-spawn-pool-helpers.sh"\n' >>"$repo/tests/fm-spawn-pool-base-freshen.test.sh"
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
   printf '# shared pool helpers\nSKIP_CLOCK="$ROOT/tests/skip-clock.sh"\n' >"$repo/tests/fm-spawn-pool-helpers.sh"
   printf '# a clock\n' >"$repo/tests/skip-clock.sh"
   for trigger in backends/tmux.sh fm-model-index.sh fm-teardown-nested-lib.sh fm-watch.sh; do : >"$repo/bin/$trigger"; done
@@ -450,8 +452,11 @@ test_moved_real_treehouse_cases_follow_their_former_host() {
 
   # The base library is not followed: a script named only in tests/lib.sh's code, which every test sources, selects
   # the test that names it, not every test.
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
   printf '. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\n' | tee -a "$repo/tests/fm-teardown-pool.test.sh" >>"$repo/tests/fm-spawn-acquisition-cleanup.test.sh"
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
   printf 'BASE_TOOL="$ROOT/bin/fm-base-only.sh"\n' >"$repo/tests/lib.sh"
+  # shellcheck disable=SC2016 # the fixture line is written literally, not expanded here
   printf '#!/usr/bin/env bash\n"$ROOT/bin/fm-base-only.sh"\n' >"$repo/tests/fm-base-only.test.sh"
   : >"$repo/bin/fm-base-only.sh"
   git -C "$repo" add bin tests

@@ -1487,7 +1487,9 @@ if [ "$#" -gt 0 ]; then
     for entry in "${CASE_NEEDS[@]}"; do
       [ "${entry%% *}" = "$selected_test" ] && { found=$entry; break; }
     done
-    [ -n "$found" ] && declare -F "$selected_test" >/dev/null 2>&1 || fail "unknown selected test: $selected_test"
+    if [ -z "$found" ] || ! declare -F "$selected_test" >/dev/null 2>&1; then
+      fail "unknown selected test: $selected_test"
+    fi
     selected_needs+=("$found")
   done
 else

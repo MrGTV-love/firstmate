@@ -4684,6 +4684,7 @@ SH
   case_dir=$(make_case "skipped-notice-close-$world")
   write_meta "$case_dir" no-mistakes ship
   configure_flat_herdr_teardown_case "$case_dir"
+  # shellcheck disable=SC2016 # the sed program matches the stub's literal text, not an expansion here
   sed -i.bak 's/^    : > "\${FM_FAKE_HERDR_CLOSED:?}"$/    echo "close refused" >\&2; exit 1/' "$case_dir/fakebin/herdr"
   rm -f "$case_dir/fakebin/herdr.bak"
   grep -Fq 'close refused' "$case_dir/fakebin/herdr" || fail "skipped-notice-$world: the Herdr stub's close was not made to fail"
@@ -4720,7 +4721,7 @@ assert_skipped_notices_claim_nothing() {  # <case-dir> <world>
       *gone*|*closed*|*'did not establish'*) fail "skipped-notice-$2: a notice claims a window state: $line" ;;
     esac
   done < <(grep -o 'acquisition pane [^)]*)' "$1/stderr")
-  [ -n "$(grep -o 'acquisition pane [^)]*)' "$1/stderr")" ] || fail "skipped-notice-$2: no acquisition-pane note was printed"
+  grep -q 'acquisition pane [^)]*)' "$1/stderr" || fail "skipped-notice-$2: no acquisition-pane note was printed"
 }
 
 # D4 (review of 8c6c20ece): a skipped copy is released only on teardown_landed proof. An anchor makes a commit
