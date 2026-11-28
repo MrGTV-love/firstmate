@@ -284,7 +284,7 @@ PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=25
+PORTABLE_SERIAL_SHARDS=27
 
 # How many scripts each portable-parallel job is modeled to run at once. The
 # lane membership is exactly the proven-isolated set, whose recorded four-way
@@ -357,8 +357,12 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # The shard count is the fewest that pass and leave lane slack of at least one
 # target. After the 2026-10-29 hint refresh the table sums to 28352649 ms, so
 # twenty-four shards pass with only 447351 ms of slack and are refused by that
-# rule; twenty-five leave 1647351 ms and pack at serial_max_ms 1134269 ms
-# (docs/fm-test-portable-shards.md, "Portable serial CI shards").
+# rule; twenty-five leave 1647351 ms and pack at serial_max_ms 1134269 ms.
+# On 2026-11-27 the table, with its 26 unhinted members at the default weight,
+# sums to 30382121 ms: twenty-five shards fail the guard, twenty-six pass with
+# only 817879 ms of slack and are refused, and twenty-seven leave 2017879 ms and
+# pack at serial_max_ms 1125621 ms (docs/fm-test-portable-shards.md,
+# "Portable serial CI shards").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
@@ -951,6 +955,8 @@ tests/fm-control-reassociate.test.sh 395783
 tests/fm-control-relaunch-backends.test.sh 681931
 tests/fm-control-relaunch-recovery.test.sh 550782
 tests/fm-control-relaunch.test.sh 340032
+tests/fm-control-successor-scott.test.sh 50296
+tests/fm-control-successor.test.sh 244566
 tests/fm-control.test.sh 186185
 tests/fm-copy-sweep.test.sh 438967
 tests/fm-cpu-pass.test.sh 26583
@@ -1231,6 +1237,7 @@ tests/fm-watcher-lock.test.sh 209816
 tests/fm-work-progress.test.sh 177361
 tests/fm-worker-account-live-e2e.test.sh 4839
 tests/fm-worker-account.test.sh 183909
+tests/fm-write-confinement-successor.test.sh 6466
 tests/fm-write-confinement.test.sh 889
 EOF
 }

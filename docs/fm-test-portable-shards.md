@@ -403,8 +403,15 @@ Replaying each run's recorded script durations through the twenty-four-shard mem
 This is a replay of recorded durations, not a measured CI run.
 The refreshed serial hints sum to 28352649 ms, so twenty-four shards still pass `--check-coverage` (`serial_shards=24 serial_unhinted=0 serial_max_ms=1181663 serial_budget_ms=1200000`) but leave only 447351 ms of lane slack (24 x 1200000 - 28352649), less than one 1200000 ms target, and the [shard-count rule](#portable-serial-ci-shards) refuses them.
 Twenty-five leave 1647351 ms and pass (`serial_shards=25 serial_unhinted=0 serial_max_ms=1134269 serial_budget_ms=1200000`), so twenty-five is the fewest serial shards that pass and keep one target of slack.
-`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-five.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` then all named twenty-five.
 The same scripts run, so serial-script minutes do not change, but the twenty-fifth shard adds one job's setup; the twenty-five-shard assignment has not been replayed.
+On 2026-11-27 the twenty-five shards were full: main `c4a207ac3` failed `--check-coverage` on its own (`portable serial shard 1 of 25 packs 1203012ms`), after its predecessor `932cb0bf2` passed at `serial_max_ms=1199931`.
+The branch-succession change then added `tests/fm-control-successor.test.sh` (244566 ms), `tests/fm-control-successor-scott.test.sh` (50296 ms), and `tests/fm-write-confinement-successor.test.sh` (6466 ms), whose hints are their successful `exit=0`, `gate_skip=false` records from the serial shards of pull-request [run 46101707263](https://github.com/MrGTV-love/firstmate/actions/runs/46101707263).
+With those hints and the 45000 ms default for the 26 still unhinted members, the serial table sums to 30382121 ms and every one of the twenty-five shards models near 1215000 ms (`portable serial shard 1 of 25 packs 1215030ms`).
+Twenty-six shards pass (`serial_shards=26 serial_unhinted=26 serial_max_ms=1168685 serial_budget_ms=1200000`) but leave 817879 ms of lane slack (26 x 1200000 - 30382121), less than one target, so the [shard-count rule](#portable-serial-ci-shards) refuses them.
+Twenty-seven leave 2017879 ms and pass (`serial_shards=27 serial_unhinted=26 serial_max_ms=1125621 serial_budget_ms=1200000`), so twenty-seven is the fewest serial shards that pass and keep one target of slack.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-seven.
+The packing target, the parallel budget, and the job timeout are unchanged; the twenty-seven-shard assignment has not been replayed.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
@@ -499,7 +506,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses thirty-one long-lived Linux jobs (twenty-five serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses thirty-three long-lived Linux jobs (twenty-seven serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession and coalesces main pushes into one group per branch, so a burst of merges queues one pending run for the newest commit and never cancels the running one.
 The compliance workflow keeps its own event semantics.
