@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build a macOS Seatbelt profile for one isolated ship/scout worker.
 
-Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
-       --projects DIR --data DIR --state DIR --task ID
+Usage: fm-write-confinement.py --worktree DIR --project DIR --home DIR
+       --config DIR --projects DIR --data DIR --state DIR --task ID
        --harness {omp,claude} --profile FILE
        [--agent-dir DIR] [--branch NAME] [--protect DIR ...]
        [--claude-session UUID]
@@ -17,19 +17,36 @@ assets: project primary checkouts, other task worktrees, other tasks' state
 records, every task's metadata and relaunch records, the home data root apart
 from this task's directory and the duration ledger, other tasks' branches, loose
 or packed (this task keeps its declared branch and its
-archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-owned
+archive/<task>-{submitted,pipeline}-<hex8> recovery branches), the Vernant
+lifecycle record folders vernant-worktree-lifecycle/owned-paths-approvals and
+vernant-worktree-lifecycle/captain-drop in this repository's shared Git
+directory, even before they exist (reads stay open), temp roots, Main-owned
 records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
 and other projects' no-mistakes gate repositories. Each protected folder and
-every folder above it also refuses rename and deletion. --data is this task's
-directory below the home data root. The build refuses while a protected ref
+every folder above it also refuses rename and deletion. The worker's own .git
+file and <gitdir>/commondir refuse every write, and its worktree, its gitdir and
+every folder above them refuse every write to their own path, rename and
+deletion among them, so no prepared folder holding a repointed .git file or
+commondir can take their place. For a project whose
+checked-out tree holds scripts/git_management/worktree_lifecycle.py the build
+first creates an absent vernant-worktree-lifecycle folder. --data is this
+task's directory below the home data root. --project is the task's project
+checkout; the build refuses, naming what it found, unless the shared Git
+directory the worktree resolves is the one that checkout resolves and the
+worktree's own Git directory sits in that directory's worktrees folder, so a
+repointed .git file or commondir cannot move the protected records to a
+repository the worker made; a missing --project refuses too. The build refuses while a protected ref
 path in this repository's shared Git directory (packed-refs, HEAD, index,
 commondir, other tasks' branch refs and reflogs, replace refs, other
 worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
 link, or a folder above one is a symbolic link, naming the path and the link
 count or target, because a write through such an alias would be judged by the
-alias's path. A HEAD symbolic link to a refs/heads name stays allowed. Other
+alias's path; it also stops while a lifecycle record, the worker's own .git
+file or its <gitdir>/commondir has a second hard link or is a symbolic link,
+or the lifecycle folder, a record folder or an entry inside one is a symbolic
+link. A HEAD symbolic link to a refs/heads name stays allowed. Other
 projects' and gate repositories' Git directories are not scanned. Task ids
 come from the state/<id>.meta
 records of this home and every --protect home. The caller wraps its final
@@ -66,6 +83,17 @@ WORKER_RECORDS = (
     r"live-model\.[0-9]+\.tmp",
     r"omp-session\.json\.[0-9]+\.[0-9]+\.tmp",
 )
+# Vernant's slot lifecycle widens a task's owned paths, and its captain-drop
+# closeout route releases a copy, only once the unconfined supervisor has
+# written a record in one of these folders of the shared Git directory, so a
+# confined task never writes its own. Every other entry of the lifecycle
+# folder, such as the slot manifests and their retired/ receipts, stays
+# writable, and reads stay open for the supervisor and the closeout driver.
+VERNANT_LIFECYCLE = "vernant-worktree-lifecycle"
+VERNANT_RECORDS = tuple(VERNANT_LIFECYCLE + "/" + name for name in ("owned-paths-approvals", "captain-drop"))
+# A project whose checked-out tree holds Vernant's lifecycle module keeps the
+# lifecycle folder; the build creates it there before the launch.
+VERNANT_MODULE = "scripts/git_management/worktree_lifecycle.py"
 
 
 def canonical(value):
@@ -146,7 +174,7 @@ def extra_links(common, gitdir, own_branch):
     symbolic link to a refs/heads name is Git's core.preferSymlinkRefs form,
     which Git reads as the name and never follows. The task's own branch, its
     reflog and its own worktree Git directory are writable by design and are
-    not checked.
+    not checked here; lifecycle_links checks that directory's commondir.
     """
     root = Path(common)
     own = {root / "refs/heads" / own_branch, root / "logs/refs/heads" / own_branch} if own_branch else set()
@@ -181,6 +209,80 @@ def extra_links(common, gitdir, own_branch):
     return found
 
 
+def lifecycle_links(common, worktree, gitdir):
+    """Existing second names for Vernant's lifecycle records.
+
+    The record folders are denied by path, but a write through another name
+    for a record is judged by that name: a second hard link to a record, or a
+    symbolic link at the lifecycle folder, at a record folder or at any entry
+    inside one. The same holds for the worker's own .git file and its
+    commondir, which name the shared Git directory that lifecycle readers of
+    the worktree resolve; project_repository checks that they name the
+    project's. Such a name made before the build can sit anywhere
+    the worker writes, so the build stops while one exists, as for the shared
+    refs above.
+    """
+    lifecycle = Path(common) / VERNANT_LIFECYCLE
+    paths = [Path(worktree) / ".git", Path(gitdir) / "commondir"]
+    if lifecycle.is_symlink():
+        paths.append(lifecycle)
+    else:
+        for folder in (Path(common) / name for name in VERNANT_RECORDS):
+            paths.append(folder)
+            if not folder.is_symlink():
+                for where, folders, names in os.walk(folder):
+                    paths += [Path(where) / name for name in folders + names]
+    found = []
+    for path in paths:
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode):
+            found.append((path, f"symbolic link to {os.readlink(path)}"))
+        elif stat.S_ISREG(info.st_mode) and info.st_nlink > 1:
+            found.append((path, f"{info.st_nlink} links"))
+    return found
+
+
+def project_repository(project, common, gitdir):
+    """Refuse unless the worktree's repository is the project's own.
+
+    The worker's own .git file and commondir decide which shared Git directory
+    the build protects, so the project checkout, never the worktree, names it.
+    """
+    if not project:
+        raise ValueError("no --project checkout was given, so the worker's repository cannot be proved to be the project's")
+    expected = canonical(subprocess.check_output(
+        ["git", "-C", project, "rev-parse", "--path-format=absolute", "--git-common-dir"], text=True).strip())
+    if common != expected:
+        raise ValueError(f"the worktree's shared Git directory is {common}, not the project's {expected}")
+    if Path(gitdir).parent != Path(common) / "worktrees":
+        raise ValueError(f"the worktree's Git directory {gitdir} is not in {common}/worktrees")
+
+
+def vernant_lifecycle(worktree, common):
+    """Create Vernant's lifecycle folder before the launch.
+
+    The confined worker may not create it: Seatbelt judges a folder renamed
+    onto an absent path as a folder created there, so a grant to create it
+    would also let a prepared folder, records and all, take its place.
+    Vernant's write_manifest creates it with mkdir(parents=True,
+    exist_ok=True), which passes once the folder exists. Only a project whose
+    checked-out tree holds Vernant's lifecycle module gets it; any other
+    project gets nothing written.
+    """
+    lifecycle = Path(common) / VERNANT_LIFECYCLE
+    if os.path.lexists(lifecycle):
+        return
+    listed = subprocess.run(["git", "-C", worktree, "ls-tree", "--name-only", "HEAD", "--", VERNANT_MODULE],
+                            capture_output=True, text=True, env=dict(os.environ, LC_ALL="C"))
+    if listed.returncode:
+        raise ValueError(f"git ls-tree HEAD -- {VERNANT_MODULE} failed (exit {listed.returncode})")
+    if listed.stdout.strip() == VERNANT_MODULE:
+        lifecycle.mkdir(exist_ok=True)
+
+
 def build(args):
     if not re.fullmatch(TASK_ID, args.task):
         raise ValueError("invalid task id")
@@ -192,11 +294,12 @@ def build(args):
         ["git", "-C", worktree, "rev-parse", "--path-format=absolute", "--git-common-dir"], text=True).strip())
     if gitdir == common:
         raise ValueError("worker must use an isolated linked worktree")
+    project_repository(args.project, common, gitdir)
     if (Path(common) / "reftable").exists():
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
         raise ValueError("a repository with reftable ref storage cannot be confined")
-    linked = extra_links(common, gitdir, args.branch)
+    linked = extra_links(common, gitdir, args.branch) + lifecycle_links(common, worktree, gitdir)
     if linked:
         shown = ", ".join(f"{path} ({why})" for path, why in linked[:5])
         raise ValueError(
@@ -291,6 +394,7 @@ def build(args):
     # No task operation writes a replace ref, and one changes what a commit
     # holds for every Git command in the primary checkout.
     git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]
+    git_shared += [str(Path(common) / name) for name in VERNANT_RECORDS]
     lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in git_shared]
     # The primary checkout's own HEAD and index live in the shared Git directory.
     for name in ("HEAD", "HEAD.lock", "index", "index.lock"):
@@ -369,17 +473,25 @@ def build(args):
         created.append(f"(require-all (literal {quoted(folder)}) (vnode-type DIRECTORY))")
         lines.append("(allow file-write* " + under(
             common, re.escape(parent) + "/" + re.escape(args.task) + "-(submitted|pipeline)-" + "[0-9a-f]" * 8 + r"(\.lock)?") + ")")
+    vernant_lifecycle(worktree, common)
     lines += [f"(allow file-write* {item})" for item in runtime]
     lines += [f"(allow file-write-create {item})" for item in created]
     lines += [f"(deny file-write* {item})" for item in harness_protected]
     # A protected folder, a folder holding protected entries, and every folder
     # above them refuse rename and deletion; creating children stays allowed.
-    anchors = deny + git_shared + claude_children + [state, common, str(gates), home + "/tmp", claude_tmp]
+    anchors = deny + git_shared + claude_children + [state, common, str(gates), home + "/tmp", claude_tmp, worktree, gitdir]
     fixed = []
     for anchor in anchors:
         path = Path(anchor)
         fixed += ([str(path)] if path.is_dir() else []) + [str(parent) for parent in path.parents if str(parent) != "/"]
     lines += [f"(deny file-write* (literal {quoted(path)}))" for path in dict.fromkeys(fixed)]
+    # The worker's own .git file and its commondir name the shared Git
+    # directory that Git resolves for this worktree, so a reader of the
+    # worktree, Vernant's lifecycle readers among them, would follow a
+    # repointed one to records the worker wrote. Git writes both only when a
+    # worktree is added, moved or repaired.
+    for path in (Path(worktree) / ".git", Path(gitdir) / "commondir"):
+        lines.append(f"(deny file-write* (literal {quoted(path)}))")
     lines += startup_read_rules(home)
     Path(args.profile).write_text("\n".join(lines) + "\n")
 
@@ -415,6 +527,7 @@ def main():
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--harness", choices=("omp", "claude"), required=True)
     parser.add_argument("--agent-dir")
+    parser.add_argument("--project")
     parser.add_argument("--branch", default="")
     parser.add_argument("--claude-session")
     parser.add_argument("--protect", action="append", default=[])
