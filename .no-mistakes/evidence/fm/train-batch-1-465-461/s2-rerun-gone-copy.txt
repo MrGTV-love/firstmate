@@ -1,0 +1,13 @@
+## Scenario: rerun on an already-removed copy exits 0 and names its audit line; branch kept
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray   (second run)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.r9qDn5
+teardown: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray is already gone, and this run removed nothing: the audit record in /Users/charlesabrooker/tmp/fm-lab.r9qDn5/data/record-less-copy-removals.log shows its removal was authorized at 2026-11-28T01:52:42Z for HEAD 60fba972bc9dc616df7858b6f80a35b8a646bb8e (proof: landed).
+exit=0
+$ wc -l audit log
+       1
+$ git branch --list fm/stray
+  fm/stray
+## Adversarial: a gone path no audit line names refuses
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.r9qDn5
+REFUSED: there is no copy at /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/never-existed, and no audit record in /Users/charlesabrooker/tmp/fm-lab.r9qDn5/data/record-less-copy-removals.log names it; nothing was removed.
+exit=1

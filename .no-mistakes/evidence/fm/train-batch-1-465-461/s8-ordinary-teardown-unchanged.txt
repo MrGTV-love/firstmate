@@ -1,0 +1,4 @@
+## Ordinary teardown by task id with no record still refuses first
+$ FM_HOME=$LAB bin/fm-teardown.sh no-such-task
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.r9qDn5/state/no-such-task.meta
+exit=1

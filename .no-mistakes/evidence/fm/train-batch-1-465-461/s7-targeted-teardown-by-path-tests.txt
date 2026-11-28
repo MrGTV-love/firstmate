@@ -1,0 +1,12 @@
+### bash tests/fm-teardown.test.sh test_by_path_removes_a_bundle_held_copy_only_when_the_captains_call_is_filed
+ok - teardown --copy removes a bundle-held copy only once an open captain-held row names the bundle and every tip
+exit=0
+### bash tests/fm-teardown.test.sh test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
+ok - teardown --copy ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object, a modified file or an unreadable status
+exit=0
+### bash tests/fm-teardown.test.sh test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude
+ok - teardown --copy refuses a copy holding a bare repository with an unpushed commit under .claude, and removes the same copy once it holds none
+exit=0
+### bash tests/fm-teardown.test.sh test_by_path_two_simultaneous_runs_on_one_copy_let_one_proceed
+ok - two simultaneous teardown --copy runs on one copy: one proceeds, the other refuses and changes nothing
+exit=0

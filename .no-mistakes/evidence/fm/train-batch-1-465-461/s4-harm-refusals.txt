@@ -1,0 +1,63 @@
+## H1: a live task record names the copy
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy $COPY
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=active-record-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 is not removed: task t-live's active record names it as its worktree.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 (task t-live's active record names it as its worktree)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 did not pass every proof (rule=active-record-owner): task t-live's active record names it as its worktree; nothing was removed.
+exit=1
+  copy present: yes  registered: 1  audit lines: 1
+
+## H5: a process has the copy as its cwd (never signalled)
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy $COPY
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 is in use: process 81643 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 through cwd (processes holding it: 81643); nothing was removed.
+exit=1
+  copy present: yes  registered: 1  audit lines: 1
+  holder alive after run: yes
+
+## H6: a process holds a file open in the copy
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy $COPY
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 is in use: process 125 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2/a.txt through 3 (processes holding it: 125); nothing was removed.
+exit=1
+  copy present: yes  registered: 1  audit lines: 1
+
+## Dirty: tracked edit
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy $COPY
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 is not removed: it has uncommitted or untracked-unignored changes.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 did not pass every proof (rule=copy-preserved): it has uncommitted or untracked-unignored changes; nothing was removed.
+exit=1
+  copy present: yes  registered: 1  audit lines: 1
+
+## Ignored file that exists nowhere else
+/Users/charlesabrooker/tmp/fm-scen-scripts.gybPOJ/harm.sh: line 18: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2/.git/../.gitignore: Not a directory
+/Users/charlesabrooker/tmp/fm-scen-scripts.gybPOJ/harm.sh: line 20: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.git/worktrees/stray2/info/exclude: No such file or directory
+!! secret.txt
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy $COPY
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-ignored-files missing=copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 is not removed: it holds ignored files that exist nowhere else: secret.txt.
+human-only-exit: What owner-approved disposition covers the ignored files only /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 holds (it holds ignored files that exist nowhere else: secret.txt)? Keep the copy; no removal or discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 did not pass every proof (rule=copy-ignored-files): it holds ignored files that exist nowhere else: secret.txt; nothing was removed.
+exit=1
+  copy present: yes  registered: 1  audit lines: 1
+
+## Nested Git repository inside the copy
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy $COPY
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 holds Git repository /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2/vendor-repo that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
+exit=1
+  copy present: yes  registered: 1  audit lines: 1
+
+## Unlanded commit with no bundle
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy $COPY
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.r9qDn5/data/copy-fdce95503ef53a5d/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.r9qDn5/data/copy-fdce95503ef53a5d/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; run the same teardown --copy command again.
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 is not removed: its HEAD db3a4287af7f is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 (its HEAD db3a4287af7f is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 did not pass every proof (rule=copy-landed): its HEAD db3a4287af7f is not proved landed; nothing was removed.
+exit=1
+  copy present: yes  registered: 1  audit lines: 1
+  work.txt still there: work
+
+## Control: harms cleared, the same copy is now removed
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy $COPY
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 from pool slot /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 (HEAD 60fba972bc9dc616df7858b6f80a35b8a646bb8e, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/data/record-less-copy-removals.log
+exit=0
+  copy present: NO  registered: 0  audit lines: 2

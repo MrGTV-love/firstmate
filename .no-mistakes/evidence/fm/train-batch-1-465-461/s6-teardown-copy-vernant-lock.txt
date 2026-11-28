@@ -1,0 +1,12 @@
+## teardown --copy on a Vernant-locked copy whose launcher is dead
+### ps refused by the macOS sandbox:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/locked is not removed: its creation-lock launcher process 17335 may still be running; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid 17335; end that process only after you confirm pid 17335 is the launcher named by the lock (a pid can be reused).
+human-only-exit: Is launcher 17335, named in the creation lock on /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/locked, still running, and who owns it?
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/locked did not pass every proof (rule=lock-launcher-owner): its creation-lock launcher process 17335 may still be running; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid 17335; end that process only after you confirm pid 17335 is the launcher named by the lock (a pid can be reused); nothing was removed.
+exit=1
+  still present: yes  locked: 3
+
+### normal ps (no closeout driver in this clone):
+REFUSED: Vernant's creation lock holds /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/locked, and Vernant's closeout driver /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/scripts/git-stability/closeout_pr.py or its interpreter /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.venv/bin/python is not available, so it cannot be released; nothing was removed.
+exit=1
+  still present: yes

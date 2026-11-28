@@ -1,0 +1,48 @@
+## Adversarial: argument guards refuse with exit 2 and change nothing
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --force
+error: teardown --copy takes no --force: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+exit=
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --drop-file /tmp/x
+error: teardown --copy takes no --drop-file: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+exit=
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --legacy-record
+error: teardown --copy takes no --legacy-record: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+exit=
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --bogus
+error: invalid teardown request
+exit=
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --record-id ../evil
+error: --record-id requires a path-safe id
+exit=
+$ bin/fm-teardown.sh --copy .claude/worktrees/stray2
+error: teardown --copy needs an absolute path, not .claude/worktrees/stray2
+exit=
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/linkcopy
+error: teardown --copy takes the copy's own path, and /Users/charlesabrooker/tmp/fm-lab.r9qDn5/linkcopy is a symbolic link
+exit=
+## Adversarial: wrong targets refuse with exit 1
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
+exit=
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-outside.u6aEQU
+REFUSED: /Users/charlesabrooker/tmp/fm-outside.u6aEQU is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
+exit=
+$ bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
+exit=
+$ copy still present+registered:
+/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2
+/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 60fba97 [fm/stray2]
+       1
+exit=2 : --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --force
+exit=2 : --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --drop-file /tmp/x
+exit=2 : --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --legacy-record
+exit=2 : --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --bogus
+exit=2 : --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray2 --record-id ../evil
+exit=2 : --copy .claude/worktrees/stray2
+exit=2 : --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/linkcopy
+exit=1 : --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo
+exit=1 : --copy /Users/charlesabrooker/tmp/fm-outside.2CBV1l
+exit=1 : --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects
+exit=2 : --copy (no path)
+1

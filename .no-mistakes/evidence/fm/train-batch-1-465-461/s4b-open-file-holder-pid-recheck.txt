@@ -1,0 +1,3 @@
+## H6 recheck: holder pid is 40770
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray3 is in use: process 40770 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray3/a.txt through 3 (processes holding it: 40770); nothing was removed.
+exit=1

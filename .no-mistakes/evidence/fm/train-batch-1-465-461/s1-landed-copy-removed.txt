@@ -1,0 +1,15 @@
+## Scenario: landed record-less copy is removed by path
+$ git -C projects/demo worktree list
+/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo                         60fba97 [main]
+/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray 60fba97 [fm/stray]
+$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.r9qDn5
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray (HEAD 60fba972bc9dc616df7858b6f80a35b8a646bb8e, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/data/record-less-copy-removals.log
+exit=0
+$ ls copy
+ls: /Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray: No such file or directory
+$ git worktree list
+/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo 60fba97 [main]
+$ cat data/record-less-copy-removals.log
+2026-11-28T01:52:42Z	copy-110358036d79482b	/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo	/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/stray	60fba972bc9dc616df7858b6f80a35b8a646bb8e	landed

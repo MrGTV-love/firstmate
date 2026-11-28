@@ -1,0 +1,48 @@
+## Copy sweep (report only), Vernant-locked copy, launcher pid dead; pool root isolated to the lab
+### target commit, normal ps:
+copy-sweep: mode=report containers=1 copies=1
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:17335 launcher=17335 (launcher 17335 is gone; only Vernant's closeout driver releases it); closeout driver or interpreter unavailable
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.r9qDn5: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+
+### target commit, ps refused by the macOS sandbox (exit 126):
+copy-sweep: mode=report containers=1 copies=1
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:17335 launcher=17335 (launcher 17335 cannot be observed; absence is not proved)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.r9qDn5: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
+
+### base commit 2440b75c6 (before #461), ps refused by the macOS sandbox:
+copy-sweep: mode=report containers=1 copies=1
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.r9qDn5/projects/demo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:17335 launcher=17335 (launcher 17335 is gone; only Vernant's closeout driver releases it); closeout driver or interpreter unavailable
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-lab.r9qDn5: 0.00 GiB of 20 GiB, ok
+regenerable: 0.00 GiB in 0 proven copies, 0 proven copies not sized
