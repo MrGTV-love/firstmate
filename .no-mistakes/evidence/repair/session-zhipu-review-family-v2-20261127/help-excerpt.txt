@@ -1,0 +1,17 @@
+48:A recorded provider, matched exactly as a canonical family name or a Zhipu
+49:route name, can resolve an otherwise unknown model alias, except that a Zhipu
+50:provider fills zhipu only for an empty model and a malformed or non-ASCII
+51:Zhipu-family model id stays unknown under every provider; conflicting
+52-provider/model families are unreadable unknown. An invocation that records no
+53-model and no provider is absent unknown unless its agent is exactly claude. Every invocation counts, including
+54-cancelled and errored ones. An invocation with an empty model takes a family
+--
+139:xai, moonshot, meta, zhipu (aliases claude, gpt, chatgpt, codex, oN, gemini,
+140-gemma, grok, kimi, llama, glm, and the exact native Claude names opus,
+141-sonnet, haiku, which are deliberately anthropic because Claude records bare
+142-model names); route prefixes ending in / are dropped, and zai/z-ai are
+143:recognized only as Zhipu pipeline provider names, never as bare model ids.
+144:A zhipu-family id containing any non-ASCII character or whose last segment is
+145-not ASCII alphanumeric runs joined by single . _ : or - stays unknown. Stored typed family fields
+146-never decide independence. Uncovered-group refusals name each uncovered family,
+147-reporting any group with an unknown author family before known-family groups.
