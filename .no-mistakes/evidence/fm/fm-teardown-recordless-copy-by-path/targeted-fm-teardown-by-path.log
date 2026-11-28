@@ -1,0 +1,7 @@
+ok - teardown --copy refuses a pool slot claimed by a live task or by an unreadable claim, and removes the copy under a stale claim without touching it
+ok - teardown --copy refuses a copy that holds another registered worktree or carries a lock that is not Vernant's
+ok - teardown --copy keeps a Vernant-locked copy when ps cannot prove its launcher gone, even when a confined table read cannot see it, and releases it when ps proves the launcher absent
+ok - teardown --copy resolves a slot claim that names its own record id against the live records of every local home, and passes it only when no home holds one
+ok - teardown --copy refuses a present copy when a clone registration list cannot be read, and removes it when the list reads
+ok - teardown --copy refuses a copy holding an unregistered Git repository or another project worktree, and removes the same copy once it holds none
+Terminated: 15

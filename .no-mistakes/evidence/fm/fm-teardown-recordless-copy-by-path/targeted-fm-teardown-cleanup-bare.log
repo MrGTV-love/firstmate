@@ -1,0 +1,2 @@
+ok - a held close refuses, with nothing removed, when an own nested copy holds a bare repository
+ok - a held close ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object, a modified file or an edit an index flag hides

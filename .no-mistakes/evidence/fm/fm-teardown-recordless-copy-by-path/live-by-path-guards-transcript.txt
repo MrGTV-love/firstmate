@@ -1,0 +1,73 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.SX98GJ
+##### G1 Vernant-locked copy, launcher alive, ps refused (126) for it
+
+=== G1 teardown --copy, refused ps
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SX98GJ
+stderr: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive is not removed: its creation-lock launcher process 13783 may still be running; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid 13783; end that process only after you confirm pid 13783 is the launcher named by the lock (a pid can be reused).
+stderr: human-only-exit: Is launcher 13783, named in the creation lock on /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive, still running, and who owns it?
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive did not pass every proof (rule=lock-launcher-owner): its creation-lock launcher process 13783 may still be running; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid 13783; end that process only after you confirm pid 13783 is the launcher named by the lock (a pid can be reused); nothing was removed.
+exit=1
+  present=yes registered=yes locked=yes closeout-execute-calls=0
+  launcher 13783 still alive (never signalled)
+
+##### G1b same, ps fails with another error (exit 3)
+
+=== G1b teardown --copy, failing ps
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SX98GJ
+stderr: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive is not removed: its creation-lock launcher process 13783 may still be running; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid 13783; end that process only after you confirm pid 13783 is the launcher named by the lock (a pid can be reused).
+stderr: human-only-exit: Is launcher 13783, named in the creation lock on /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive, still running, and who owns it?
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive did not pass every proof (rule=lock-launcher-owner): its creation-lock launcher process 13783 may still be running; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid 13783; end that process only after you confirm pid 13783 is the launcher named by the lock (a pid can be reused); nothing was removed.
+exit=1
+  present=yes registered=yes locked=yes closeout-execute-calls=0
+
+##### G2 launcher proved gone by the real ps
+  real ps -p 13783 exit=1 (1 = no such process)
+
+=== G2 teardown --copy, launcher gone
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SX98GJ
+stderr: teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive from pool slot /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj
+stderr: teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive (HEAD 9eebe051c71712075ec4d6165b51ee5c3c8dd7b6, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.SX98GJ/data/record-less-copy-removals.log
+exit=0
+  present=no registered=no locked=no closeout-execute-calls=1
+  closeout.log:
+    /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj|--cleanup-worktree /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/vlive --execute-cleanup
+
+##### G3 preserve of .claude cannot publish
+
+=== G3 teardown --copy, preserve blocked
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/nopub --record-id pres-1
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SX98GJ
+stderr: error: preservation directory /Users/charlesabrooker/tmp/fm-lab.SX98GJ/data/pres-1/nested-copy-preserved is not a real directory
+stderr: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of foreign copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/nopub could not be preserved in /Users/charlesabrooker/tmp/fm-lab.SX98GJ/data/pres-1/nested-copy-preserved; it was not removed. Restore readable source and writable preservation storage, then run the completing command.
+stderr: completing-command: FM_FRICTION_OPERATION_ID=ecb02967-7387-443f-97ff-d0aba382271d FM_FRICTION_EPISODE_ID=ecb02967-7387-443f-97ff-d0aba382271d FM_HOME=/Users/charlesabrooker/tmp/fm-lab.SX98GJ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8F9ZDETMYPV12JGCSC46PSM/bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/nopub --record-id pres-1
+exit=1
+  present=yes registered=yes locked=no closeout-execute-calls=1
+  .claude/settings.local.json present=yes remove-calls=0
+
+=== G3 run the printed completing command after the obstacle is gone
+$ env -u FM_GATE_REFUSE_BYPASS FM_TEARDOWN_VERNANT_PYTHON=/Users/charlesabrooker/tmp/fm-bpg-fake.mc4gBW/vernant-python bash -c FM_FRICTION_OPERATION_ID=ecb02967-7387-443f-97ff-d0aba382271d FM_FRICTION_EPISODE_ID=ecb02967-7387-443f-97ff-d0aba382271d FM_HOME=/Users/charlesabrooker/tmp/fm-lab.SX98GJ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8F9ZDETMYPV12JGCSC46PSM/bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/nopub --record-id pres-1
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SX98GJ
+stderr: teardown: the audit record for this copy and HEAD is already in /Users/charlesabrooker/tmp/fm-lab.SX98GJ/data/record-less-copy-removals.log
+stderr: teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/nopub in /Users/charlesabrooker/tmp/fm-lab.SX98GJ/data/pres-1/nested-copy-preserved/736dea4bab7e5cae4e387cc2ce8fa627d5ea21b1dda9eaa8354c55342a3f6992
+stderr: teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/nopub from pool slot /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj
+stderr: teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/nopub (HEAD 9eebe051c71712075ec4d6165b51ee5c3c8dd7b6, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.SX98GJ/data/record-less-copy-removals.log
+exit=0
+  present=no registered=no locked=no closeout-execute-calls=1
+  preserved: /Users/charlesabrooker/tmp/fm-lab.SX98GJ/data/pres-1/nested-copy-preserved/736dea4bab7e5cae4e387cc2ce8fa627d5ea21b1dda9eaa8354c55342a3f6992/files/.claude/settings.local.json -> unique settings
+
+##### G4 a clone in projects/ whose registration list cannot be read
+
+=== G4 teardown --copy, other clone unreadable
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/blocked
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SX98GJ
+stderr: teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/blocked from pool slot /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj
+stderr: teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.SX98GJ/projects/proj/.claude/worktrees/blocked (HEAD 9eebe051c71712075ec4d6165b51ee5c3c8dd7b6, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.SX98GJ/data/record-less-copy-removals.log
+exit=0
+  present=no registered=no locked=no closeout-execute-calls=1
+
+##### teardown
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8F9ZDETMYPV12JGCSC46PSM/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.SX98GJ && rm -rf /Users/charlesabrooker/tmp/fm-lab.SX98GJ
+lab removed: yes

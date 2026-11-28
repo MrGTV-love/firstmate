@@ -1,0 +1,17 @@
+=== U1 remove landed copy (all lists readable)
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.UUCSpz/projects/proj/.claude/worktrees/g from pool slot /Users/charlesabrooker/tmp/fm-lab.UUCSpz/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.UUCSpz/projects/proj/.claude/worktrees/g (HEAD f95726fcc63d726fa85a2c8e133f4cc5e0d022e4, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.UUCSpz/data/record-less-copy-removals.log
+exit=0
+=== U2 rerun on gone copy, lists readable
+teardown: /Users/charlesabrooker/tmp/fm-lab.UUCSpz/projects/proj/.claude/worktrees/g is already gone, and this run removed nothing: the audit record in /Users/charlesabrooker/tmp/fm-lab.UUCSpz/data/record-less-copy-removals.log shows its removal was authorized at 2026-11-28T03:16:44Z for HEAD f95726fcc63d726fa85a2c8e133f4cc5e0d022e4 (proof: landed).
+exit=0
+=== U3 rerun on gone copy while clone projects/other/.git is unreadable (chmod 000)
+REFUSED: /Users/charlesabrooker/tmp/fm-lab.UUCSpz/projects/proj/.claude/worktrees/g is gone, but the Git repository /Users/charlesabrooker/tmp/fm-lab.UUCSpz/projects/other could not be read, so whether a clone still registers it is unknown; nothing was removed.
+exit=1
+=== U4 rerun on gone copy while the projects folder cannot be listed (chmod 000)
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+audit lines: 1
+lab removed

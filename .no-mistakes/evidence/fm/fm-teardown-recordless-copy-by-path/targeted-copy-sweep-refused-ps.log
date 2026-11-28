@@ -1,0 +1,25 @@
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.fj2MY4/squash-refused-ps/home/projects/example/.claude/worktrees/clean	worktree lock: vernant-session-active owner=launcher:67198 launcher=67198 (launcher 67198 cannot be observed; absence is not proved)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.fj2MY4/squash-refused-ps/home/projects/example/.claude/worktrees/tracked	worktree lock: vernant-session-active owner=launcher:67676 launcher=67676 (launcher 67676 cannot be observed; absence is not proved)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.fj2MY4/squash-refused-ps/home/projects/example/.claude/worktrees/unique	worktree lock: vernant-session-active owner=launcher:67422 launcher=67422 (launcher 67422 cannot be observed; absence is not proved)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-copy-sweep-orphan.fj2MY4/squash-refused-ps/home/projects/example/.claude/worktrees/untracked	worktree lock: vernant-session-active owner=launcher:67842 launcher=67842 (launcher 67842 cannot be observed; absence is not proved)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=4
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget container /Users/charlesabrooker/tmp/fm-copy-sweep-orphan.fj2MY4/squash-refused-ps/home: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=0 freed=0.00
+exit=0
+ok - a refused ps keeps a clean Vernant-locked copy registered and locked
+rc=0
+ok - a refused or failed ps stays unknown when a valid, nonempty process table leaves the launcher out
+rc=0
+ok - a refused ps holds a Vernant-locked copy even when the confined table cannot see its launcher, and a readable ps that shows the launcher gone still reaches the driver
+rc=0

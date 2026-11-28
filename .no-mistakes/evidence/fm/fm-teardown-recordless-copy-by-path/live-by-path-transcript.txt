@@ -1,249 +1,200 @@
-# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.DewibD
-# side dir (origin, shims) = /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ
-
-##### S0 baseline (base commit d25e907): a record-less copy cannot be removed at all
-$ <base>/bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red
-  stderr| error: invalid teardown request
-  rc=2
-$ <base>/bin/fm-teardown.sh base-red
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.DewibD/state/base-red.meta
-  rc=1
-/Users/charlesabrooker/.no-mistakes/evidence/01M8EXWJS2BG0SEBJEWKN9J4CX/drive-by-path.sh: line 54: /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ/git-remove.log: No such file or directory
-  -> copy: present, registered; git-worktree-remove calls so far: ; provider calls: 0
-
+lab home: /Users/charlesabrooker/tmp/fm-lab.6cc230
 ##### S1 landed record-less copy is removed
 
-=== S1 landed copy (head on origin/main), project clone
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red from pool slot /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj
-  stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red (HEAD 74f9beedd2f2378ea14598cf6d605fa35752a275, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.DewibD/data/record-less-copy-removals.log
-  rc=0
-  -> copy: gone, unregistered; git-worktree-remove calls so far: 1; provider calls: 0
+=== S1 base-red: ordinary teardown by id has no record
+$ TD landed
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.6cc230/state/landed.meta
+exit=1
+
+=== S1 teardown --copy landed copy
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/landed
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/landed from pool slot /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj
+stderr: teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/landed (HEAD d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.6cc230/data/record-less-copy-removals.log
+exit=0
+  present=no registered=no remove-calls=1 treehouse-calls=0
+  clone .git present=yes main=d1e3ec2
   audit log:
-    | 2026-11-27T16:57:46Z	copy-846e71a222d329f8	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red	74f9beedd2f2378ea14598cf6d605fa35752a275	landed
+    2026-11-28T03:08:02Z	copy-2ebc2e5a9ba4095c	/Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj	/Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/landed	d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1	landed
   git-remove.log:
-    | -C /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj worktree remove /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red
-  clone still a repo: true
+    -C /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj worktree remove /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/landed
 
-##### S1b rerun on the removed copy converges
+##### S2 rerun on gone copy converges
 
-=== S1b rerun on already-removed copy
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| teardown: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red is already gone, and this run removed nothing: the audit record in /Users/charlesabrooker/tmp/fm-lab.DewibD/data/record-less-copy-removals.log shows its removal was authorized at 2026-11-27T16:57:46Z for HEAD 74f9beedd2f2378ea14598cf6d605fa35752a275 (proof: landed).
-  rc=0
-  -> copy: gone, unregistered; git-worktree-remove calls so far: 1; provider calls: 0
+=== S2 rerun teardown --copy on gone copy
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/landed
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: teardown: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/landed is already gone, and this run removed nothing: the audit record in /Users/charlesabrooker/tmp/fm-lab.6cc230/data/record-less-copy-removals.log shows its removal was authorized at 2026-11-28T03:08:02Z for HEAD d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1 (proof: landed).
+exit=0
+  present=no registered=no remove-calls=1 treehouse-calls=0
+  audit lines=1
 
-##### S3 --force and friends refused by name
+##### S3 --force / --drop-file / relative path refused
 
-=== S3 flag --force
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/forceme --force
-  stderr| error: teardown --copy takes no --force: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
-  rc=2
+=== S3 --force
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/forcey --force
+stderr: error: teardown --copy takes no --force: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+exit=2
+  present=yes registered=yes remove-calls=1 treehouse-calls=0
 
-=== S3 flag --drop-file
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/forceme --drop-file
-  stderr| error: teardown --copy takes no --drop-file: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
-  rc=2
-
-=== S3 flag --legacy-record
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/forceme --legacy-record
-  stderr| error: teardown --copy takes no --legacy-record: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
-  rc=2
+=== S3 --drop-file
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/forcey --drop-file /tmp/x
+stderr: error: teardown --copy takes no --drop-file: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed
+exit=2
+  present=yes registered=yes remove-calls=1 treehouse-calls=0
 
 === S3 relative path
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy relative/path
-  stderr| error: teardown --copy needs an absolute path, not relative/path
-  rc=2
-  -> copy: present, registered; git-worktree-remove calls so far: 1; provider calls: 0
+$ TD --copy projects/proj/.claude/worktrees/forcey
+stderr: error: teardown --copy needs an absolute path, not projects/proj/.claude/worktrees/forcey
+exit=2
+  present=yes registered=yes remove-calls=1 treehouse-calls=0
 
-##### S4 unlanded commit, no bundle -> refused
+##### S4 unlanded commit, no bundle
 
-=== S4 unlanded, no bundle
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.DewibD/data/copy-3fae13dca7ce145d/preservation-bundles.tsv.
-  stderr| Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.DewibD/data/copy-3fae13dca7ce145d/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; run the same teardown --copy command again.
-  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded is not removed: its HEAD bb29a09181f6 is not proved landed.
-  stderr| human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded (its HEAD bb29a09181f6 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded did not pass every proof (rule=copy-landed): its HEAD bb29a09181f6 is not proved landed; nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 1; provider calls: 0
+=== S4 unlanded no bundle
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded --record-id rec-unl
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-lab.6cc230/data/rec-unl/preservation-bundles.tsv.
+stderr: Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-lab.6cc230/data/rec-unl/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; run the same teardown --copy command again.
+stderr: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded is not removed: its HEAD 53a5c44477e3 is not proved landed.
+stderr: human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded (its HEAD 53a5c44477e3 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded did not pass every proof (rule=copy-landed): its HEAD 53a5c44477e3 is not proved landed; nothing was removed.
+exit=1
+  present=yes registered=yes remove-calls=1 treehouse-calls=0
 
-##### S2 bundle-held copy: refuse without captain row, then removed after the printed hold command
+##### S5 bundle-held copy: refused without captain call, removed after the printed hold
   bundle verifies
 
-=== S2 bundle recorded, no captain row
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded --record-id rec-bundle
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ/bundles/work.bundle: task rec-bundle has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip.
-  stderr| File the land-or-drop call as its row, then run the same teardown --copy command again: bin/fm-captain-hold.sh hold rec-bundle --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-bundle --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-bundle\,\ tips\ bb29a09181f64d6dd9fdf6af94515751cdd9839f:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ/bundles/work.bundle\,\ whose\ record\ lists\ advertised\ tips\ 74f9beedd2f2378ea14598cf6d605fa35752a275\ bb29a09181f64d6dd9fdf6af94515751cdd9839f\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
-  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded is not removed: its HEAD bb29a09181f6 is not proved landed.
-  stderr| human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded (its HEAD bb29a09181f6 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded did not pass every proof (rule=copy-landed): its HEAD bb29a09181f6 is not proved landed; nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 1; provider calls: 0
-  printed hold command: bin/fm-captain-hold.sh hold rec-bundle --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-bundle --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-bundle\,\ tips\ bb29a09181f64d6dd9fdf6af94515751cdd9839f:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ/bundles/work.bundle\,\ whose\ record\ lists\ advertised\ tips\ 74f9beedd2f2378ea14598cf6d605fa35752a275\ bb29a09181f64d6dd9fdf6af94515751cdd9839f\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
-  hold rc=0
-  hold| rec-bundle
+=== S5 bundle recorded, no captain call
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded --record-id rec-unl
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-lab.6cc230/bundles/w.bundle: task rec-unl has no backlog row to hold the captain's land-or-drop call naming the bundle and every recorded tip.
+stderr: File the land-or-drop call as its row, then run the same teardown --copy command again: bin/fm-captain-hold.sh hold rec-unl --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-unl --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-unl\,\ tips\ 53a5c44477e330a56d048b4b094dcfff3c2b6536:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab.6cc230/bundles/w.bundle\,\ whose\ record\ lists\ advertised\ tips\ 53a5c44477e330a56d048b4b094dcfff3c2b6536\ d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
+stderr: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded is not removed: its HEAD 53a5c44477e3 is not proved landed.
+stderr: human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded (its HEAD 53a5c44477e3 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded did not pass every proof (rule=copy-landed): its HEAD 53a5c44477e3 is not proved landed; nothing was removed.
+exit=1
+  present=yes registered=yes remove-calls=1 treehouse-calls=0
+  printed hold command: bin/fm-captain-hold.sh hold rec-unl --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-unl --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-unl\,\ tips\ 53a5c44477e330a56d048b4b094dcfff3c2b6536:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab.6cc230/bundles/w.bundle\,\ whose\ record\ lists\ advertised\ tips\ 53a5c44477e330a56d048b4b094dcfff3c2b6536\ d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
 
-=== S2 bundle recorded, captain row filed
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded --record-id rec-bundle
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ/bundles/work.bundle is held on task rec-bundle
-  stderr| teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.DewibD/data/rec-bundle/preserved-bundles/60f24ec5f6d32308475699b40f06a2f59069569de0234a18f930dc0bb38bceea.bundle sha256=60f24ec5f6d32308475699b40f06a2f59069569de0234a18f930dc0bb38bceea tips=74f9beedd2f2378ea14598cf6d605fa35752a275 bb29a09181f64d6dd9fdf6af94515751cdd9839f (source /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ/bundles/work.bundle)
-  stderr| teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ/bundles/work.bundle is held on task rec-bundle
-  stderr| teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.DewibD/data/rec-bundle/preserved-bundles/60f24ec5f6d32308475699b40f06a2f59069569de0234a18f930dc0bb38bceea.bundle sha256=60f24ec5f6d32308475699b40f06a2f59069569de0234a18f930dc0bb38bceea tips=74f9beedd2f2378ea14598cf6d605fa35752a275 bb29a09181f64d6dd9fdf6af94515751cdd9839f (source /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ/bundles/work.bundle)
-  stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded from pool slot /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj
-  stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded (HEAD bb29a09181f64d6dd9fdf6af94515751cdd9839f, proof: bundle /Users/charlesabrooker/tmp/fm-lab.DewibD/data/rec-bundle/preserved-bundles/60f24ec5f6d32308475699b40f06a2f59069569de0234a18f930dc0bb38bceea.bundle); audit record: /Users/charlesabrooker/tmp/fm-lab.DewibD/data/record-less-copy-removals.log
-  rc=0
-  -> copy: gone, unregistered; git-worktree-remove calls so far: 2; provider calls: 0
-  stored bundle:
-    | 60f24ec5f6d32308475699b40f06a2f59069569de0234a18f930dc0bb38bceea.bundle
-  restored from stored bundle: unpublished
+=== S5 run the printed hold command
+$ env FM_HOME=/Users/charlesabrooker/tmp/fm-lab.6cc230 bash -c bin/fm-captain-hold.sh hold rec-unl --title Land\ or\ drop\ the\ bundle-preserved\ commits\ of\ rec-unl --repo proj --owner captain --reason Land\ or\ drop\ the\ unlanded\ commits\ of\ rec-unl\,\ tips\ 53a5c44477e330a56d048b4b094dcfff3c2b6536:\ they\ are\ preserved\ in\ bundle\ /Users/charlesabrooker/tmp/fm-lab.6cc230/bundles/w.bundle\,\ whose\ record\ lists\ advertised\ tips\ 53a5c44477e330a56d048b4b094dcfff3c2b6536\ d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1\;\ an\ advertised\ tip\ may\ already\ be\ landed. --boundary destructive --if-no Keep\ the\ copy\ and\ bundle\;\ do\ not\ discard\ the\ commits
+stdout: rec-unl
+exit=0
 
-##### S5 dirty tree -> refused
+=== S5 teardown --copy after the call is filed
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded --record-id rec-unl
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.6cc230/bundles/w.bundle is held on task rec-unl
+stderr: teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.6cc230/data/rec-unl/preserved-bundles/2cb1764df50266637926d06ed70ebb818825a76c4ccbafa228110182099166a9.bundle sha256=2cb1764df50266637926d06ed70ebb818825a76c4ccbafa228110182099166a9 tips=53a5c44477e330a56d048b4b094dcfff3c2b6536 d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1 (source /Users/charlesabrooker/tmp/fm-lab.6cc230/bundles/w.bundle)
+stderr: teardown: the captain's land-or-drop call for bundle /Users/charlesabrooker/tmp/fm-lab.6cc230/bundles/w.bundle is held on task rec-unl
+stderr: teardown: preserved unlanded commits in bundle /Users/charlesabrooker/tmp/fm-lab.6cc230/data/rec-unl/preserved-bundles/2cb1764df50266637926d06ed70ebb818825a76c4ccbafa228110182099166a9.bundle sha256=2cb1764df50266637926d06ed70ebb818825a76c4ccbafa228110182099166a9 tips=53a5c44477e330a56d048b4b094dcfff3c2b6536 d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1 (source /Users/charlesabrooker/tmp/fm-lab.6cc230/bundles/w.bundle)
+stderr: teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded from pool slot /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj
+stderr: teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/unlanded (HEAD 53a5c44477e330a56d048b4b094dcfff3c2b6536, proof: bundle /Users/charlesabrooker/tmp/fm-lab.6cc230/data/rec-unl/preserved-bundles/2cb1764df50266637926d06ed70ebb818825a76c4ccbafa228110182099166a9.bundle); audit record: /Users/charlesabrooker/tmp/fm-lab.6cc230/data/record-less-copy-removals.log
+exit=0
+  present=no registered=no remove-calls=2 treehouse-calls=0
+  stored bundle present=yes
+  restored tip from stored bundle: 53a5c44 unpublished
 
-=== S5 tracked edit
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty is not removed: it has uncommitted or untracked-unignored changes.
-  stderr| human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty did not pass every proof (rule=copy-preserved): it has uncommitted or untracked-unignored changes; nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 2; provider calls: 0
+##### S6 dirty tree refused
 
-=== S5 untracked file
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty is not removed: it has uncommitted or untracked-unignored changes.
-  stderr| human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty did not pass every proof (rule=copy-preserved): it has uncommitted or untracked-unignored changes; nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 2; provider calls: 0
+=== S6 untracked file
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/dirty
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/dirty is not removed: it has uncommitted or untracked-unignored changes.
+stderr: human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/dirty (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/dirty did not pass every proof (rule=copy-preserved): it has uncommitted or untracked-unignored changes; nothing was removed.
+exit=1
+  present=yes registered=yes remove-calls=2 treehouse-calls=0
 
-##### S6 a process in the copy -> refused, never signalled
+##### S7 process in copy refused, not signalled
 
-=== S6 process cwd in copy
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/busy
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/busy is in use: process 80222 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/busy through cwd (processes holding it: 80222); nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 2; provider calls: 0
-  holder pid 80222 still alive (not signalled)
+=== S7 process cwd in copy
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/busy
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/busy is in use: process 89834 (sleep) holds /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/busy through cwd (processes holding it: 89834); nothing was removed.
+exit=1
+  present=yes registered=yes remove-calls=2 treehouse-calls=0
+  holder pid 89834 still alive (not signalled)
 
-=== S6 same copy once idle
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/busy
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/busy from pool slot /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj
-  stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/busy (HEAD 74f9beedd2f2378ea14598cf6d605fa35752a275, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.DewibD/data/record-less-copy-removals.log
-  rc=0
-  -> copy: gone, unregistered; git-worktree-remove calls so far: 3; provider calls: 0
+=== S7 after holder exits
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/busy
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/busy from pool slot /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj
+stderr: teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/busy (HEAD d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.6cc230/data/record-less-copy-removals.log
+exit=0
+  present=no registered=no remove-calls=3 treehouse-calls=0
 
-##### S7 a live task record names the copy -> refused
+##### S8 copy a live task record names refused
 
-=== S7 live record names copy
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/recorded
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=active-record-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/recorded is not removed: task task-live's active record names it as its worktree.
-  stderr| human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/recorded (task task-live's active record names it as its worktree)? Keep this copy until that evidence exists; no discard is authorized.
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/recorded did not pass every proof (rule=active-record-owner): task task-live's active record names it as its worktree; nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 3; provider calls: 0
+=== S8 live record names copy
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/named
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=active-record-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/named is not removed: task livetask's active record names it as its worktree.
+stderr: human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/named (task livetask's active record names it as its worktree)? Keep this copy until that evidence exists; no discard is authorized.
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/named did not pass every proof (rule=active-record-owner): task livetask's active record names it as its worktree; nothing was removed.
+exit=1
+  present=yes registered=yes remove-calls=3 treehouse-calls=0
 
-##### S8 not a registered nested worktree -> refused
+##### S9 bare repository with unpushed commit under .claude refused
 
-=== S8 unregistered directory
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/plain-dir
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/plain-dir is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.DewibD/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
-  rc=1
+=== S9 bare repo under .claude
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/barey
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/barey holds Git repository /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/barey/.claude/hidden.git that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
+exit=1
+  present=yes registered=yes remove-calls=3 treehouse-calls=0
 
-=== S8 the clone itself
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.DewibD/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
-  rc=1
+##### S10 .claude preserved whole before removal
 
-=== S8 path outside the home
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab-side.IbYyNQ is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.DewibD/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
-  rc=1
-  clone intact
-
-##### S9 another Git repository inside the copy (ignored .claude) -> refused
-/Users/charlesabrooker/.no-mistakes/evidence/01M8EXWJS2BG0SEBJEWKN9J4CX/drive-by-path.sh: line 156: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested/.git/../.gitignore: Not a directory
-fatal: pathspec '.gitignore' did not match any files
-On branch fm/nested
-nothing to commit, working tree clean
-
-=== S9 nested clone under ignored .claude
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested holds Git repository /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested/.claude/inner that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 3; provider calls: 0
-
-=== S9 untracked bare repository under ignored .claude
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested holds Git repository /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested/.claude/bare.git that no clone registers, which removing it would delete with its commits; remove it or land its commits first; nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 3; provider calls: 0
-
-##### S10 .claude preserved whole, then copy removed
-
-=== S10 ignored .claude content
-$ FM_HOME=$LAB bin/fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested --record-id rec-claude
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=nonforced-removal missing=git worktree remove would not remove foreign copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested without force; it was not removed.
-  stderr| human-only-exit: What retained disposition covers the contents Git still protects in /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested? Preserve this copy; no forced removal is authorized.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 4; provider calls: 0
+=== S10 copy with ignored .claude
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/keepclaude --record-id rec-keep
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/keepclaude in /Users/charlesabrooker/tmp/fm-lab.6cc230/data/rec-keep/nested-copy-preserved/dfa00193e25a0729ebc8e597875a04b3405dae12c0119c8a862b50ff02217468
+stderr: teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/keepclaude from pool slot /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj
+stderr: teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/keepclaude (HEAD d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.6cc230/data/record-less-copy-removals.log
+exit=0
+  present=no registered=no remove-calls=4 treehouse-calls=0
   preserved tree:
+    ./nested-copy-preserved/dfa00193e25a0729ebc8e597875a04b3405dae12c0119c8a862b50ff02217468/meta/copy-path
+    ./nested-copy-preserved/dfa00193e25a0729ebc8e597875a04b3405dae12c0119c8a862b50ff02217468/meta/SHA256SUMS
+    ./nested-copy-preserved/dfa00193e25a0729ebc8e597875a04b3405dae12c0119c8a862b50ff02217468/files/.claude/notes.md
+  preserved notes.md content: my notes
 
-##### S11 Vernant creation lock with a refused ps -> refused (fail closed)
+##### S11 two simultaneous runs on one copy
+run1 exit=0
+  run1: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+  run1: teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/race from pool slot /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj
+  run1: teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/race (HEAD d1e3ec2fddb134b0577f8dad8b5906ef762bb6c1, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.6cc230/data/record-less-copy-removals.log
+run2 exit=1
+  run2: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+  run2: REFUSED: another teardown --copy run holds /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/race (/Users/charlesabrooker/tmp/fm-lab.6cc230/state/.teardown-copy-8a21f07aaba6868c.lock); nothing was removed.
+  present=no registered=no remove-calls=1 treehouse-calls=0
 
-=== S11 locked copy, ps refused (126)
-  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  stderr| REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=lock-launcher-owner missing=copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/locked is not removed: its creation-lock launcher process 95823 may still be running; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid 95823; end that process only after you confirm pid 95823 is the launcher named by the lock (a pid can be reused).
-  stderr| human-only-exit: Is launcher 95823, named in the creation lock on /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/locked, still running, and who owns it?
-  stderr| REFUSED: /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/locked did not pass every proof (rule=lock-launcher-owner): its creation-lock launcher process 95823 may still be running; ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid 95823; end that process only after you confirm pid 95823 is the launcher named by the lock (a pid can be reused); nothing was removed.
-  rc=1
-  -> copy: present, registered; git-worktree-remove calls so far: 4; provider calls: 0
-  launcher pid 95823 still alive (not signalled)
+##### S12 path that is not a registered nested worktree refused
 
-##### S12 two simultaneous runs on one copy
-  run1 rc=0
-  run1 stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  run1 stderr| teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/race from pool slot /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj
-  run1 stderr| teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/race (HEAD 74f9beedd2f2378ea14598cf6d605fa35752a275, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.DewibD/data/record-less-copy-removals.log
-  run2 rc=1
-  run2 stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DewibD
-  run2 stderr| REFUSED: another teardown --copy run holds /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/race (/Users/charlesabrooker/tmp/fm-lab.DewibD/state/.teardown-copy-0fea150b3bd24e70.lock); nothing was removed.
-  worktree remove calls for race copy: 1
-  -> copy: gone, unregistered; git-worktree-remove calls so far: 5; provider calls: 0
+=== S12 plain directory
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/plain
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/plain is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.6cc230/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
+exit=1
 
-##### final audit log
-  | 2026-11-27T16:57:46Z	copy-846e71a222d329f8	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/base-red	74f9beedd2f2378ea14598cf6d605fa35752a275	landed
-  | 2026-11-27T16:58:33Z	rec-bundle	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/unlanded	bb29a09181f64d6dd9fdf6af94515751cdd9839f	bundle /Users/charlesabrooker/tmp/fm-lab.DewibD/data/rec-bundle/preserved-bundles/60f24ec5f6d32308475699b40f06a2f59069569de0234a18f930dc0bb38bceea.bundle
-  | 2026-11-27T16:59:03Z	copy-e068d6c14c876876	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/busy	74f9beedd2f2378ea14598cf6d605fa35752a275	landed
-  | 2026-11-27T16:59:37Z	rec-claude	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested	74f9beedd2f2378ea14598cf6d605fa35752a275	landed
-  | 2026-11-27T16:59:56Z	copy-0fea150b3bd24e70	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj	/Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/race	74f9beedd2f2378ea14598cf6d605fa35752a275	landed
+=== S12 the clone itself
+$ TD --copy /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj
+stderr: fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6cc230
+stderr: REFUSED: /Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj is not a worktree registered strictly inside a project clone of this home (/Users/charlesabrooker/tmp/fm-lab.6cc230/projects) or a Treehouse slot of one; a slot, a clone, an unregistered directory and a path elsewhere are never removed here; nothing was removed.
+exit=1
+  clone present=yes
 
-##### provider calls (treehouse/no-mistakes/gh/gh-axi): 0
+##### final registered worktrees
+/Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj                          d1e3ec2 [main]
+/Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/barey  d1e3ec2 [fm/barey]
+/Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/dirty  d1e3ec2 [fm/dirty]
+/Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/forcey d1e3ec2 [fm/forcey]
+/Users/charlesabrooker/tmp/fm-lab.6cc230/projects/proj/.claude/worktrees/named  d1e3ec2 [fm/named]
+treehouse calls: 0
 
-##### teardown of the lab
-  remaining | /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj                            74f9bee [main]
-  remaining | /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/dirty    74f9bee [fm/dirty]
-  remaining | /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/forceme  74f9bee [fm/forceme]
-  remaining | /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/locked   74f9bee [fm/locked] locked
-  remaining | /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/nested   74f9bee [fm/nested]
-  remaining | /Users/charlesabrooker/tmp/fm-lab.DewibD/projects/proj/.claude/worktrees/recorded 74f9bee [fm/recorded]
-  lab removed: /Users/charlesabrooker/tmp/fm-lab.DewibD
-  side dir removed
-
-##### CORRECTION (added after the run): S9 and S10 above used a .claude that was UNTRACKED, not ignored (the .gitignore write failed: "Not a directory"). S10 shows git's own non-forced removal refusing untracked .claude content; the copy was kept. The ignored-.claude cases are in live-by-path-transcript-2.txt (A, B, D).
+##### teardown
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8F9ZDETMYPV12JGCSC46PSM/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.6cc230 && rm -rf /Users/charlesabrooker/tmp/fm-lab.6cc230
+lab removed: yes

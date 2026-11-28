@@ -1,0 +1,16 @@
+=== BASE 932cb0bf2: teardown --copy <landed record-less copy>
+$ fm-teardown.sh --copy /Users/charlesabrooker/tmp/fm-lab.Gzd0dR/projects/proj/.claude/worktrees/stray
+error: invalid teardown request
+exit=2
+=== BASE 932cb0bf2: teardown stray (by id; no state/stray.meta)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Gzd0dR
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.Gzd0dR/state/stray.meta
+exit=1
+copy present after base runs: yes
+=== HEAD 90aae78a3: same copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Gzd0dR
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.Gzd0dR/projects/proj/.claude/worktrees/stray from pool slot /Users/charlesabrooker/tmp/fm-lab.Gzd0dR/projects/proj
+teardown: removed record-less copy /Users/charlesabrooker/tmp/fm-lab.Gzd0dR/projects/proj/.claude/worktrees/stray (HEAD c9c35aa297373dae4613fad66d428ab91d0d8cdc, proof: landed); audit record: /Users/charlesabrooker/tmp/fm-lab.Gzd0dR/data/record-less-copy-removals.log
+exit=0
+copy present after head run: no
+lab removed
