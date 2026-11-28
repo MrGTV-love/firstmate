@@ -1195,7 +1195,10 @@ def m3852_coverage_lapses():
     w = World('m3852-lapses')
     w.observe()
     seen = {}
-    real = dict(run_child=engine.run_child, start_binding=engine.start_binding, with_intercept=engine.with_intercept)
+    real = dict(run_child=engine.run_child, start_binding=engine.start_binding, with_intercept=engine.with_intercept,
+                disk_floor_status=engine.disk_floor_status)
+    # The free-disk floor starts bin/fm-disk-floor-lib.sh, a process; tests/fm-cpu-pass-admission.py owns its cases.
+    engine.disk_floor_status = lambda step: 0
 
     def state():
         return [(item['released'], item['covered']) for item in engine.pending_census(str(w.pool), set(engine.running_runs()))]
@@ -1414,7 +1417,9 @@ def start_in_process(w, read_host_db=None, db=None):
     lines, ran = [], []
     real = dict(run_child=engine.run_child, start_binding=engine.start_binding, with_intercept=engine.with_intercept,
                 log=engine.log, read_host_db=engine.read_host_db, FIRST_NOTICE_SECS=engine.FIRST_NOTICE_SECS,
-                HOST_STATE_DB=engine.HOST_STATE_DB)
+                HOST_STATE_DB=engine.HOST_STATE_DB, disk_floor_status=engine.disk_floor_status)
+    # The free-disk floor starts bin/fm-disk-floor-lib.sh, a process; tests/fm-cpu-pass-admission.py owns its cases.
+    engine.disk_floor_status = lambda step: 0
 
     def child(command, environment, fd, on_poll=None, cancellable=False):
         ran.append(True)
