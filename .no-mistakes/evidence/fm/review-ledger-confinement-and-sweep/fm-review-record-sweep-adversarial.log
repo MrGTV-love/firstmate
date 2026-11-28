@@ -1,0 +1,2 @@
+ok - carry-over sweeps dead-PID and aged legacy scratch directories while preserving live ones
+ok - the carry-over sweep leaves symbolic links, their targets and plain files alone

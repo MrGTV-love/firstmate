@@ -1,0 +1,6 @@
+== base (7753a66be) bin/fm-review-record.py, change's tests ==
+not ok - the scratch repository must be made in the state directory with the verifier's PID, not elsewhere: /Users/charlesabrooker/tmp/fm-review-record-tests.D737C4/carry-scratch-place/home/state/.review-carry-ls1v4rn5/proof.git
+exit=1
+== base (7753a66be) bin/fm-review-record.py, sweep test only ==
+not ok - dead-PID scratch dir must be swept: /Users/charlesabrooker/tmp/fm-review-record-tests.3OB5FK/carry-scratch-sweep/home/state/.review-carry-7160-leftover
+exit=1

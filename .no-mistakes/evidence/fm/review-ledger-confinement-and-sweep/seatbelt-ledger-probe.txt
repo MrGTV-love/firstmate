@@ -1,0 +1,32 @@
+BASE     claude append review-records.jsonl              WRITE-ALLOWED
+BASE     claude replace review-records.jsonl (mv)        WRITE-ALLOWED
+BASE     claude tamper existing carry scratch file       WRITE-ALLOWED
+BASE     claude create new .review-carry-* dir           WRITE-ALLOWED
+BASE     claude own task.status (should stay allowed)    WRITE-ALLOWED
+BASE     claude worktree file (should stay allowed)      WRITE-ALLOWED
+BASE claude profile rules mentioning ledger/carry: 0
+BASE     claude build with ledger hard-link alias        BUILD-ACCEPTED
+CHANGE   claude append review-records.jsonl              WRITE-DENIED
+CHANGE   claude replace review-records.jsonl (mv)        WRITE-DENIED
+CHANGE   claude tamper existing carry scratch file       WRITE-DENIED
+CHANGE   claude create new .review-carry-* dir           WRITE-DENIED
+CHANGE   claude own task.status (should stay allowed)    WRITE-ALLOWED
+CHANGE   claude worktree file (should stay allowed)      WRITE-ALLOWED
+CHANGE claude profile rules mentioning ledger/carry: 2
+CHANGE   claude build with ledger hard-link alias        BUILD-REFUSED: cannot prepare worker write confinement: protected path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-lab-seatbelt.KThlnh/home/state/review-records.jsonl (2 links); remove the extra link or symbolic link and launch again
+BASE     omp    append review-records.jsonl              WRITE-ALLOWED
+BASE     omp    replace review-records.jsonl (mv)        WRITE-ALLOWED
+BASE     omp    tamper existing carry scratch file       WRITE-ALLOWED
+BASE     omp    create new .review-carry-* dir           WRITE-ALLOWED
+BASE     omp    own task.status (should stay allowed)    WRITE-ALLOWED
+BASE     omp    worktree file (should stay allowed)      WRITE-ALLOWED
+BASE omp profile rules mentioning ledger/carry: 0
+BASE     omp    build with ledger hard-link alias        BUILD-ACCEPTED
+CHANGE   omp    append review-records.jsonl              WRITE-DENIED
+CHANGE   omp    replace review-records.jsonl (mv)        WRITE-DENIED
+CHANGE   omp    tamper existing carry scratch file       WRITE-DENIED
+CHANGE   omp    create new .review-carry-* dir           WRITE-DENIED
+CHANGE   omp    own task.status (should stay allowed)    WRITE-ALLOWED
+CHANGE   omp    worktree file (should stay allowed)      WRITE-ALLOWED
+CHANGE omp profile rules mentioning ledger/carry: 2
+CHANGE   omp    build with ledger hard-link alias        BUILD-REFUSED: cannot prepare worker write confinement: protected path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /Users/charlesabrooker/tmp/fm-lab-seatbelt.naiOOr/home/state/review-records.jsonl (2 links); remove the extra link or symbolic link and launch again
