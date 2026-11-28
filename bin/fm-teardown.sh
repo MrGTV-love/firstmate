@@ -3441,7 +3441,8 @@ teardown_return_collisions() { # <copy> <branch>
 # branch a return resets it to tracks a path (teardown_return_collisions, the proof's own comparison), and its
 # lease still held by this task's skipped-copy holder. The return is the conditional one the holder gates, never forced.
 # Any other outcome leaves the lease where it is and prints the exact command for a later release. A row
-# whose copy is gone is dropped; a row naming another holder is kept untouched. This never changes the exit status.
+# whose copy is gone, or whose lease the pool now shows another holder has taken, is dropped; a row whose own holder
+# column names another holder is kept untouched. This never changes the exit status.
 # One skipped-copies.tsv row as read: four columns, or five when the row named the spawn's acquisition endpoint.
 teardown_skipped_row() { # <copy> <reason> <holder> <epoch> <endpoint>
   if [ -n "$5" ]; then printf '%s\t%s\t%s\t%s\t%s\n' "$@"; else printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4"; fi

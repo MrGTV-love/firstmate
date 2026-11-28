@@ -70,8 +70,8 @@
 #                   set (bin/fm-test-isolation-proof.sh --list), or in a family
 #                   carrying a recorded concurrent proof
 #                   (list_concurrent_safe_families below). A script that
-#                   entered only as the holder of cases moved out of a
-#                   selected script (moved_cases_script) is not refused; it
+#                   entered only as the holder of moved real-Treehouse cases
+#                   (add_inherited_script) is not refused; it
 #                   runs in the serial phase. Overall cap is 8;
 #                   family proofs may impose a lower cap. Individually proven
 #                   scripts share one phase; scripts admitted only by a family
@@ -1738,7 +1738,7 @@ normalize_script_path() {
 }
 
 # Append unique relative-or-absolute script paths to SCRIPTS. A script added here is named directly, so it is no
-# longer one that entered only through the moved-case mapping (INHERITED_SCRIPTS, below).
+# longer inherited-only (INHERITED_SCRIPTS, add_inherited_script below).
 add_script() {
   local p existing
   local -a kept=()
@@ -1753,7 +1753,7 @@ add_script() {
   SCRIPTS+=("$p")
 }
 
-# script_is_inherited_only <path>: <path> entered the selection only through the moved-case mapping.
+# script_is_inherited_only <path>: <path> entered the selection only through add_inherited_script.
 script_is_inherited_only() {  # <path>
   local existing
   for existing in "${INHERITED_SCRIPTS[@]+"${INHERITED_SCRIPTS[@]}"}"; do
@@ -1785,7 +1785,8 @@ moved_cases_script() {  # <basename>
 
 # add_inherited_script <path>: add <path> to SCRIPTS as inherited-only (if not already selected), so under an explicit
 # --jobs it runs in the serial phase after every concurrent phase instead of being refused. A later add_script call
-# promotes it to directly selected.
+# promotes it to directly selected. Two routes call it: add_script_with_moved_cases, and select_changed for a
+# real-treehouse script that a former owner's changed path selects through its family.
 add_inherited_script() {  # <path>
   local p existing
   p=$(normalize_script_path "$1")
@@ -3096,8 +3097,8 @@ fi
 
 # An explicit --jobs names a concurrency for exactly the selection given, so an
 # unproven script in it is a refusal rather than something to schedule around.
-# The one exception is a script that entered only through the moved-case mapping
-# (add_script_with_moved_cases): the caller never named it, so it runs serially.
+# The one exception is an inherited-only script (add_inherited_script): the
+# caller never named it, so it runs serially.
 if [ "$JOBS" -gt 1 ] && [ "$AUTO_CONCURRENCY" -eq 0 ]; then
   # A single heavy suite can occupy a whole serial shard. Its family may have
   # a separate concurrency proof, but that never changes this lane's contract.
