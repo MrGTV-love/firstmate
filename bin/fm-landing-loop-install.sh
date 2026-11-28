@@ -69,6 +69,17 @@ render() {  # <interval>
 
 loaded() { "$LAUNCHCTL" print "$DOMAIN/$LABEL" >/dev/null 2>&1; }
 
+bootout_wait() {
+  local tries=0
+  loaded || return 0
+  "$LAUNCHCTL" bootout "$DOMAIN/$LABEL" >/dev/null 2>&1
+  while loaded; do
+    [ "$tries" -lt 20 ] || return 1
+    sleep 0.25
+    tries=$((tries + 1))
+  done
+}
+
 cmd_install() {
   local interval=${FM_LANDING_LOOP_INTERVAL_SECS:-120} print_only=0 tmp
   while [ "$#" -gt 0 ]; do
@@ -95,7 +106,7 @@ cmd_install() {
     rm -f "$tmp"
     die "the rendered plist failed plutil -lint"
   fi
-  loaded && "$LAUNCHCTL" bootout "$DOMAIN/$LABEL" >/dev/null 2>&1
+  bootout_wait || { rm -f "$tmp"; die "launchctl still has $LABEL loaded"; }
   mv -f "$tmp" "$PLIST" || die "cannot write $PLIST"
   "$LAUNCHCTL" bootstrap "$DOMAIN" "$PLIST" || die "launchctl bootstrap failed for $PLIST"
   printf 'installed %s (every %ss) for %s\n' "$LABEL" "$interval" "$FM_HOME"
@@ -103,10 +114,7 @@ cmd_install() {
 
 cmd_uninstall() {
   require_test_seam_overrides
-  loaded && "$LAUNCHCTL" bootout "$DOMAIN/$LABEL" >/dev/null 2>&1
-  if loaded; then
-    die "launchctl still has $LABEL loaded"
-  fi
+  bootout_wait || die "launchctl still has $LABEL loaded"
   rm -f "$PLIST"
   printf 'removed %s\n' "$LABEL"
 }

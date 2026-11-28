@@ -2,19 +2,20 @@
 """Standalone PR landing loop: reconcile, update stale bases serially, and let carried PASSes merge.
 
 Usage (FM_HOME names the absolute home; FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE select state/config):
-  fm-landing-loop.py step [--no-reconcile] [--include-stale-red]   one bounded pass (launchd entrypoint)
-  fm-landing-loop.py plan [--include-stale-red] [--json]           read-only plan of candidates and trains
+  fm-landing-loop.py step                                          one bounded pass (launchd entrypoint)
+  fm-landing-loop.py plan [--json]                                 read-only plan of candidates and trains
   fm-landing-loop.py train [--repo O/R] [--prs N,M] [--max K] [--build --worktree DIR --branch B]
                                                                    plan or build a non-conflicting Train-member batch branch
   fm-landing-loop.py status [--json]                               print durable landing-loop state
   fm-landing-loop.py events [--limit N]                            print recent landing-loop events
-  fm-landing-loop.py run [--interval N] [--include-stale-red]      foreground loop calling step every N seconds
 
 This program decouples PR landing from Main's chat and watcher lifecycle without adding a second
 merge gate or weakening any guard:
   1. It invokes bin/fm-pr-ready-reconcile.sh so registered ready ship PRs continue stepping through
      bin/fm-pr-auto-review.py (independent review + carried PASS verification + bin/fm-pr-merge.sh)
-     even while Main's watcher is down.
+     even while Main's watcher is down. Like the watcher, it stops that pass only when it goes
+     silent for FM_PR_READY_RECONCILE_TIMEOUT seconds (default 120) under fm-duration.py keep-going,
+     never for taking long.
   2. It scans this home's registered kind=ship GitHub PRs (mode no-mistakes or direct-PR) that are
      open, non-draft, mergeable, and behind their base branch. Before launching any update, it checks
      that merging the live base tip with the PR head is conflict-free via an isolated git merge-tree.
@@ -31,13 +32,14 @@ merge gate or weakening any guard:
          PR head advances before releasing the serial slot (failing into backoff + wake if it does not).
   4. Every merge still goes through bin/fm-pr-merge.sh (never gh pr merge directly, never
      --attended-override). Main is woken via a `check: landing-loop <task>: ...` wake only on
-     actionable failures (conflicts, dirty no-mistakes worktrees, failed updates), with normal-case
-     deduplication per (task, full head SHA) and at-least-once crash recovery, never on routine
-     updates or landings.
+     conflicts and failed updates, with normal-case deduplication per (task, wake kind, full head
+     SHA) and at-least-once crash recovery, never on routine updates, held rows, or landings.
 
 Durable state lives under <state>/.landing-loop/: lock, state.json, events.jsonl, inflight.json,
 and per-update logs/results under runs/.
 Exit status: 0 on normal pass/command, 2 on usage or configuration error.
+step --no-reconcile skips phase 1 and FM_LANDING_LOOP_RECONCILE_BIN replaces the reconcile helper,
+both honored only when FM_TEST_SEAM=1.
 """
 import argparse
 import fcntl
@@ -58,10 +60,11 @@ PR_URL = re.compile(r"https://github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9._-]+)/pull
 SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 MAX_INFLIGHT = int(os.environ.get("FM_LANDING_LOOP_MAX_INFLIGHT", "1") or 1)
 RETRY_SECS = int(os.environ.get("FM_LANDING_LOOP_RETRY_SECS", "1800") or 1800)
-DEFAULT_INTERVAL = int(os.environ.get("FM_LANDING_LOOP_INTERVAL", "120") or 120)
 GH_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_GH_TIMEOUT", "60") or 60)
 GIT_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_GIT_TIMEOUT", "120") or 120)
-RECONCILE_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_RECONCILE_TIMEOUT", "300") or 300)
+RECONCILE_STALL_SECS = os.environ.get("FM_PR_READY_RECONCILE_TIMEOUT", "")
+if not re.fullmatch(r"[1-9][0-9]*", RECONCILE_STALL_SECS):
+    RECONCILE_STALL_SECS = "120"
 DEFAULT_CMD_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_CMD_TIMEOUT", "120") or 120)
 UPDATE_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_UPDATE_TIMEOUT", "7200") or 7200)
 UPDATE_POLL_SECS = int(os.environ.get("FM_LANDING_LOOP_UPDATE_POLL_SECS", "120") or 120)
@@ -147,14 +150,14 @@ def append_event(home, task, pr, head, kind, detail):
 
 def emit_wake_once(home, state_doc, task, pr, head, key, text, state_path=None):
     emitted = state_doc.setdefault("emitted_wakes", {})
-    dedup = f"{task}:{head or ''}"
+    dedup = f"{task}:{key}:{head or ''}"
     if dedup in emitted:
         return False
     marker_file = home.root / "emitted-wakes.log"
     marker_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     # Hold FM_WAKE_QUEUE_LOCK across the dedup check, append, and marker write
     # (bin/fm-wake-lib.sh:fm_wake_append_locked). This guarantees normal-case
-    # deduplication per (task, full head SHA) and deduplication while the wake
+    # deduplication per (task, wake kind, full head SHA) and deduplication while the wake
     # remains queued, with at-least-once recovery (matching bin/fm-pr-merge.sh
     # and bin/fm-pr-auto-review.py) if killed between queue append and marker
     # write so an actionable wake is never silently lost.
@@ -316,59 +319,79 @@ def review_verified(home, task, pr, head, base):
     return out.get("ok") is True and out.get("basis") == "independent-review", out
 
 
+def fetch_missing_commits(worktree, shas):
+    missing = [sha for sha in shas
+               if run(["git", "-C", str(worktree), "cat-file", "-e", f"{sha}^{{commit}}"]).returncode != 0]
+    if missing:
+        run(["git", "-C", str(worktree), "fetch", "--quiet", "origin", *missing])
+
+
+def isolated_scratch_repo(worktree, scratch):
+    """Return (env, error) for a bare repo under scratch that borrows worktree's objects.
+
+    The env drops every inherited GIT_* variable and disables system/global config, attributes,
+    replace refs, and grafts, so no worktree config, hooks, or files take part in a proof.
+    """
+    objects = run(["git", "-C", str(worktree), "rev-parse", "--path-format=absolute", "--git-path", "objects"])
+    obj_fmt = run(["git", "-C", str(worktree), "rev-parse", "--show-object-format"])
+    if objects.returncode != 0 or obj_fmt.returncode != 0:
+        return None, "could not locate worktree object store"
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    repo = os.path.join(scratch, "proof.git")
+    env.update({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_GRAFT_FILE": os.devnull,
+        "XDG_CONFIG_HOME": scratch,
+        "HOME": scratch,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_AUTHOR_NAME": "Firstmate Train",
+        "GIT_AUTHOR_EMAIL": "train@local.invalid",
+        "GIT_COMMITTER_NAME": "Firstmate Train",
+        "GIT_COMMITTER_EMAIL": "train@local.invalid",
+    })
+    made = subprocess.run(
+        ["git", "init", "-q", "--bare", "--template=", f"--object-format={obj_fmt.stdout.strip()}", repo],
+        capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
+    )
+    if made.returncode != 0:
+        return None, "could not initialize scratch merge-tree repo"
+    with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
+        handle.write(objects.stdout.strip() + "\n")
+    env["GIT_DIR"] = repo
+    return env, None
+
+
 def check_clean_merge_tree(worktree, base_tip, head):
-    """Return (ok, detail, tree_sha) using an isolated bare scratch repo so worktree config never interferes."""
+    """Return (ok, detail) using an isolated bare scratch repo so worktree config never interferes."""
     wt = Path(worktree)
     if not wt.is_dir():
-        return False, f"worktree {worktree} is missing", None
-    missing = [sha for sha in (base_tip, head)
-               if run(["git", "-C", str(wt), "cat-file", "-e", f"{sha}^{{commit}}"]).returncode != 0]
-    if missing:
-        run(["git", "-C", str(wt), "fetch", "--quiet", "origin", *missing])
+        return False, f"worktree {worktree} is missing"
+    fetch_missing_commits(wt, (base_tip, head))
     for sha in (base_tip, head):
         if run(["git", "-C", str(wt), "cat-file", "-e", f"{sha}^{{commit}}"]).returncode != 0:
-            return False, f"commit {sha[:12]} unavailable in worktree", None
-    objects = run(["git", "-C", str(wt), "rev-parse", "--path-format=absolute", "--git-path", "objects"])
-    obj_fmt = run(["git", "-C", str(wt), "rev-parse", "--show-object-format"])
-    if objects.returncode != 0 or obj_fmt.returncode != 0:
-        return False, "could not locate worktree object store", None
+            return False, f"commit {sha[:12]} unavailable in worktree"
     try:
         with tempfile.TemporaryDirectory(prefix="fm-land-mt-") as scratch:
-            env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-            repo = os.path.join(scratch, "proof.git")
-            env.update({
-                "GIT_CONFIG_NOSYSTEM": "1",
-                "GIT_CONFIG_GLOBAL": os.devnull,
-                "GIT_ATTR_NOSYSTEM": "1",
-                "GIT_NO_REPLACE_OBJECTS": "1",
-                "GIT_GRAFT_FILE": os.devnull,
-                "XDG_CONFIG_HOME": scratch,
-                "HOME": scratch,
-                "GIT_TERMINAL_PROMPT": "0",
-            })
-            made = subprocess.run(
-                ["git", "init", "-q", "--bare", "--template=", f"--object-format={obj_fmt.stdout.strip()}", repo],
-                capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
-            )
-            if made.returncode != 0:
-                return False, "could not initialize scratch merge-tree repo", None
-            with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
-                handle.write(objects.stdout.strip() + "\n")
-            env["GIT_DIR"] = repo
+            env, error = isolated_scratch_repo(wt, scratch)
+            if error:
+                return False, error
             merged = subprocess.run(
                 ["git", "-c", f"core.attributesFile={os.devnull}", "merge-tree", "--write-tree", "--no-messages", base_tip, head],
                 capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
             )
             if merged.returncode == 1:
-                return False, "conflicts with current base tip", None
+                return False, "conflicts with current base tip"
             if merged.returncode != 0:
-                return False, f"git merge-tree failed (exit {merged.returncode})", None
+                return False, f"git merge-tree failed (exit {merged.returncode})"
             lines = merged.stdout.splitlines()
             if len(lines) != 1 or not SHA.fullmatch(lines[0]):
-                return False, "unexpected git merge-tree output", None
-            return True, "clean", lines[0]
+                return False, "unexpected git merge-tree output"
+            return True, "clean"
     except subprocess.TimeoutExpired:
-        return False, "git merge-tree timed out", None
+        return False, "git merge-tree timed out"
 
 
 def worktree_is_clean(worktree):
@@ -387,19 +410,33 @@ TERMINAL_NM_STATUSES = frozenset({
 })
 
 
-def no_mistakes_run_state(worktree):
-    """Return (busy_or_unreadable, reason). Requires explicit terminal status; fails closed otherwise."""
+def nm_field(output, key):
+    """First TOON scalar for key in `no-mistakes axi status` output, quotes stripped (bin/fm-nm-run-lib.sh:fm_nm_field)."""
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(f"{key}:"):
+            return stripped.split(":", 1)[1].strip().strip('"')
+    return None
+
+
+def no_mistakes_run_state(worktree, branch):
+    """Return (busy_or_unreadable, reason). Requires explicit terminal status; fails closed otherwise.
+
+    The bare answer can name another branch's run when several crews validate the same repository
+    (bin/fm-crew-state.sh), so only an answer naming this task's branch can make it busy.
+    """
     res = run(["no-mistakes", "axi", "status"], cwd=worktree, timeout=GH_TIMEOUT)
     if res.returncode != 0:
         return True, f"no-mistakes axi status unreadable or timed out (exit {res.returncode})"
-    seen_status = None
-    for line in res.stdout.splitlines():
-        stripped = line.strip()
-        if seen_status is None and stripped.startswith("status:"):
-            seen_status = stripped.split(":", 1)[1].strip().strip('"').lower()
-            break
+    seen_status = nm_field(res.stdout, "status")
     if seen_status is None:
         return True, "no-mistakes axi status returned no run status"
+    seen_status = seen_status.lower()
+    run_branch = nm_field(res.stdout, "branch")
+    if not run_branch or not branch:
+        return True, "no-mistakes axi status run branch unreadable"
+    if run_branch != branch:
+        return False, f"no own run (status names branch {run_branch})"
     if seen_status in TERMINAL_NM_STATUSES:
         return False, f"terminal status ({seen_status})"
     return True, f"no-mistakes run already active in worktree (status: {seen_status})"
@@ -474,12 +511,11 @@ def reap_inflight(home, state_doc, state_path=None):
     return still_running
 
 
-def launch_update(home, item, base_name, base_tip, expected_tree, state_doc, state_path):
+def launch_update(home, item, base_name, base_tip, state_doc, state_path):
     task = item["task"]
     meta = item["meta"]
     mode = meta["mode"]
     worktree = meta.get("worktree", "")
-    branch = meta.get("branch", "") or item["view"].get("headRefName", "")
     head = item["view"]["headRefOid"]
     run_id = f"{task}-{head[:10]}-{int(time.time())}"
     run_dir = home.root / "runs" / run_id
@@ -493,11 +529,9 @@ def launch_update(home, item, base_name, base_tip, expected_tree, state_doc, sta
         "number": int(pr_match.group(3)) if pr_match else item.get("number", 0),
         "mode": mode,
         "worktree": worktree,
-        "branch": branch,
         "head": head,
         "base_name": base_name,
         "base_tip": base_tip,
-        "expected_tree": expected_tree,
         "at": int(time.time()),
     }
     req_text = json.dumps(request, indent=1) + "\n"
@@ -552,8 +586,6 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
     base_name = req["base_name"]
     base_tip = req["base_tip"]
     expected_head = req["head"]
-    expected_tree = req.get("expected_tree") or ""
-    branch = req["branch"]
     log_path = run_dir / "output.log"
     rc = 1
     detail = ""
@@ -703,7 +735,7 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
         pass
 
 
-def assess_candidates(home, include_stale_red=False, inflight=None, backoff=None, completed_heads=None, repo_filter=None):
+def assess_candidates(home, inflight=None, backoff=None, completed_heads=None, repo_filter=None):
     inflight = inflight or {}
     backoff = backoff or {}
     completed_heads = completed_heads or {}
@@ -800,7 +832,7 @@ def assess_candidates(home, include_stale_red=False, inflight=None, backoff=None
             continue
         has_pass, _ = review_verified(home, task, pr, head, view.get("baseRefOid") or cmp["base_tip"])
         failed = [name for st, name in problems if st != "pending"]
-        if failed and not (has_pass or include_stale_red):
+        if failed and not has_pass:
             entry["action"] = "red-checks"
             entry["reason"] = f"red checks without PASS: {', '.join(failed[:3])}"
             rows.append(entry)
@@ -817,26 +849,25 @@ def assess_candidates(home, include_stale_red=False, inflight=None, backoff=None
                 entry["reason"] = "worktree has uncommitted changes"
                 rows.append(entry)
                 continue
-            nm_busy, nm_reason = no_mistakes_run_state(worktree)
+            nm_busy, nm_reason = no_mistakes_run_state(worktree, meta.get("branch") or view.get("headRefName") or "")
             if nm_busy:
                 entry["action"] = "busy"
                 entry["reason"] = nm_reason
                 rows.append(entry)
                 continue
-        clean, detail, expected_tree = check_clean_merge_tree(worktree, cmp["base_tip"], head)
+        clean, detail = check_clean_merge_tree(worktree, cmp["base_tip"], head)
         if not clean:
             entry["action"] = "conflict" if "conflict" in detail else "held"
             entry["reason"] = detail
             rows.append(entry)
             continue
-        entry["expected_tree"] = expected_tree
         entry["action"] = "update"
-        entry["reason"] = f"behind {base_name} by {cmp['behind_by']} ({'PASS verified' if has_pass else 'checks green' if not failed else 'stale-red opt-in'})"
+        entry["reason"] = f"behind {base_name} by {cmp['behind_by']} ({'PASS verified' if has_pass else 'checks green'})"
         rows.append(entry)
     return rows
 
 
-def run_step(home, no_reconcile=False, include_stale_red=False, repo_filter=None):
+def run_step(home, no_reconcile=False, repo_filter=None):
     home.root.mkdir(mode=0o700, parents=True, exist_ok=True)
     lock_file = open(home.root / "lock", "a+")
     try:
@@ -849,12 +880,25 @@ def run_step(home, no_reconcile=False, include_stale_red=False, repo_filter=None
         state_doc = read_json(state_path, {"v": 1, "inflight": {}, "backoff": {}, "emitted_wakes": {}, "tasks": {}})
         # Phase 1: run reconcile + auto-review/merge independently of Main's watcher.
         if not no_reconcile:
-            rec = run([str(BIN / "fm-pr-ready-reconcile.sh")], home, timeout=RECONCILE_TIMEOUT)
-            state_doc["last_reconcile"] = {"at": int(time.time()), "rc": rec.returncode}
+            reconcile_bin = str(BIN / "fm-pr-ready-reconcile.sh")
+            if os.environ.get("FM_TEST_SEAM") == "1" and os.environ.get("FM_LANDING_LOOP_RECONCILE_BIN"):
+                reconcile_bin = os.environ["FM_LANDING_LOOP_RECONCILE_BIN"]
+            try:
+                rc = subprocess.run(
+                    [sys.executable, str(BIN / "fm-duration.py"), "keep-going", RECONCILE_STALL_SECS, "--", reconcile_bin],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    env={**home.env(), "FM_PR_READY_RECONCILE_TIMEOUT": RECONCILE_STALL_SECS},
+                ).returncode
+            except OSError:
+                rc = 127
+            state_doc["last_reconcile"] = {"at": int(time.time()), "rc": rc}
         # Phase 2: collect finished detached base-update workers.
         inflight = reap_inflight(home, state_doc, state_path=state_path)
         # Phase 3: assess stale-base PRs and admit up to MAX_INFLIGHT serial updates.
-        rows = assess_candidates(home, include_stale_red=include_stale_red, inflight=inflight,
+        rows = assess_candidates(home, inflight=inflight,
                                  backoff=state_doc.get("backoff"), completed_heads=state_doc.get("completed_heads"),
                                  repo_filter=repo_filter)
         admitted = len(inflight)
@@ -873,12 +917,8 @@ def run_step(home, no_reconcile=False, include_stale_red=False, repo_filter=None
                 emit_wake_once(home, state_doc, task, row["pr"], row["head"], "conflict",
                                f"{row['pr']} has merge conflicts against {row['base_name']}; needs conflict resolution",
                                state_path=state_path)
-            elif row["action"] == "held":
-                emit_wake_once(home, state_doc, task, row["pr"], row["head"], "held",
-                               f"{row['pr']} held: {row['reason']}",
-                               state_path=state_path)
             elif row["action"] == "update" and admitted < MAX_INFLIGHT:
-                launch_update(home, row, row["base_name"], row["base_tip"], row.get("expected_tree") or "", state_doc, state_path)
+                launch_update(home, row, row["base_name"], row["base_tip"], state_doc, state_path)
                 summary[task]["action"] = "inflight"
                 summary[task]["reason"] = f"launched {row['mode']} base update"
                 admitted += 1
@@ -890,9 +930,9 @@ def run_step(home, no_reconcile=False, include_stale_red=False, repo_filter=None
         lock_file.close()
 
 
-def cmd_plan(home, include_stale_red=False, as_json=False, repo_filter=None):
+def cmd_plan(home, as_json=False, repo_filter=None):
     state_doc = read_json(home.root / "state.json", {"inflight": {}, "backoff": {}})
-    rows = assess_candidates(home, include_stale_red=include_stale_red,
+    rows = assess_candidates(home,
                              inflight=state_doc.get("inflight"), backoff=state_doc.get("backoff"),
                              completed_heads=state_doc.get("completed_heads"), repo_filter=repo_filter)
     out = [{k: v for k, v in r.items() if k not in ("view", "meta")} for r in rows]
@@ -918,43 +958,13 @@ def plan_train_batch(worktree, base_tip, candidates, max_members=5):
     wt = Path(worktree)
     if not wt.is_dir():
         return [], [{"pr": c["pr"], "reason": f"worktree {worktree} missing"} for c in candidates], None
-    objects = run(["git", "-C", str(wt), "rev-parse", "--path-format=absolute", "--git-path", "objects"])
-    obj_fmt = run(["git", "-C", str(wt), "rev-parse", "--show-object-format"])
-    if objects.returncode != 0 or obj_fmt.returncode != 0:
-        return [], [{"pr": c["pr"], "reason": "could not locate git object store"} for c in candidates], None
-    missing = [sha for sha in [base_tip, *(c["head"] for c in candidates)]
-               if run(["git", "-C", str(wt), "cat-file", "-e", f"{sha}^{{commit}}"]).returncode != 0]
-    if missing:
-        run(["git", "-C", str(wt), "fetch", "--quiet", "origin", *missing])
+    fetch_missing_commits(wt, [base_tip, *(c["head"] for c in candidates)])
     selected, excluded = [], []
     final_tree = None
     with tempfile.TemporaryDirectory(prefix="fm-train-plan-") as scratch:
-        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-        repo = os.path.join(scratch, "train.git")
-        env.update({
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_ATTR_NOSYSTEM": "1",
-            "GIT_NO_REPLACE_OBJECTS": "1",
-            "GIT_NO_GRAFT_FILE": "1",
-            "GIT_GRAFT_FILE": os.devnull,
-            "XDG_CONFIG_HOME": scratch,
-            "HOME": scratch,
-            "GIT_TERMINAL_PROMPT": "0",
-            "GIT_AUTHOR_NAME": "Firstmate Train",
-            "GIT_AUTHOR_EMAIL": "train@local.invalid",
-            "GIT_COMMITTER_NAME": "Firstmate Train",
-            "GIT_COMMITTER_EMAIL": "train@local.invalid",
-        })
-        made = subprocess.run(
-            ["git", "init", "-q", "--bare", "--template=", f"--object-format={obj_fmt.stdout.strip()}", repo],
-            capture_output=True, text=True, check=False, env=env, timeout=GIT_TIMEOUT,
-        )
-        if made.returncode != 0:
-            return [], [{"pr": c["pr"], "reason": "could not initialize scratch train repo"} for c in candidates], None
-        with open(os.path.join(repo, "objects", "info", "alternates"), "w", encoding="utf-8") as handle:
-            handle.write(objects.stdout.strip() + "\n")
-        env["GIT_DIR"] = repo
+        env, error = isolated_scratch_repo(wt, scratch)
+        if error:
+            return [], [{"pr": c["pr"], "reason": error} for c in candidates], None
         cur_commit = base_tip
         for cand in candidates:
             if len(selected) >= max_members:
@@ -1000,7 +1010,7 @@ def format_train_closes_block(members):
     return "\n".join(lines) + "\n"
 
 
-def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale_red=False,
+def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5,
               worktree=None, branch=None, base_name="main", build=False, as_json=False):
     wt = worktree or str(home.home)
     candidates = []
@@ -1015,7 +1025,14 @@ def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale
                 return 2
             url = f"https://github.com/{repo_filter}/pull/{tok}"
             view = gh_pr_view(url)
-            if not view or str(view.get("state", "")).upper() != "OPEN" or view.get("isDraft") is not False:
+            if not view:
+                excluded_pre.append({"pr": url, "head": None, "reason": "could not read PR from forge"})
+                continue
+            if str(view.get("state", "")).upper() != "OPEN":
+                excluded_pre.append({"pr": url, "head": view["headRefOid"], "reason": f"PR state is {view.get('state')}"})
+                continue
+            if view.get("isDraft") is not False:
+                excluded_pre.append({"pr": url, "head": view["headRefOid"], "reason": "PR is a draft"})
                 continue
             cand_base = view.get("baseRefName") or ""
             if cand_base != base_name:
@@ -1031,14 +1048,21 @@ def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale
         owner, repo = repo_filter.split("/", 1)
     else:
         state_doc = read_json(home.root / "state.json", {"inflight": {}, "backoff": {}})
-        rows = assess_candidates(home, include_stale_red=include_stale_red,
+        rows = assess_candidates(home,
                                  inflight=state_doc.get("inflight"), backoff=state_doc.get("backoff"),
                                  completed_heads=state_doc.get("completed_heads"), repo_filter=repo_filter)
+        owner = repo = None
         for r in rows:
             if r["action"] in ("update", "at-tip"):
                 cand_base = r["base_name"] or ""
                 if cand_base != base_name:
                     excluded_pre.append({"pr": r["pr"], "head": r["head"], "reason": f"targets base {cand_base or '(unknown)'}, not {base_name}"})
+                    continue
+                match = PR_URL.fullmatch(r["pr"])
+                if owner is None:
+                    owner, repo = match.group(1), match.group(2)
+                elif f"{match.group(1)}/{match.group(2)}".lower() != f"{owner}/{repo}".lower():
+                    excluded_pre.append({"pr": r["pr"], "head": r["head"], "reason": f"in {match.group(1)}/{match.group(2)}, not train repository {owner}/{repo}"})
                     continue
                 candidates.append({
                     "task": r["task"],
@@ -1047,12 +1071,6 @@ def cmd_train(home, repo_filter=None, prs_csv=None, max_members=5, include_stale
                     "head": r["head"],
                     "base_name": cand_base,
                 })
-        if not candidates:
-            out = {"ok": True, "selected": [], "excluded": excluded_pre, "closes_block": ""}
-            print(json.dumps(out, indent=1) if as_json else "landing-loop train: no eligible PRs")
-            return 0
-        match = PR_URL.fullmatch(candidates[0]["pr"])
-        owner, repo = match.group(1), match.group(2)
     if not candidates:
         out = {"ok": True, "selected": [], "excluded": excluded_pre, "closes_block": ""}
         print(json.dumps(out, indent=1) if as_json else "landing-loop train: no eligible PRs")
@@ -1174,17 +1192,14 @@ def main(argv):
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_step = sub.add_parser("step")
     p_step.add_argument("--no-reconcile", action="store_true")
-    p_step.add_argument("--include-stale-red", action="store_true")
     p_step.add_argument("--repo", default=None)
     p_plan = sub.add_parser("plan")
-    p_plan.add_argument("--include-stale-red", action="store_true")
     p_plan.add_argument("--json", action="store_true")
     p_plan.add_argument("--repo", default=None)
     p_train = sub.add_parser("train")
     p_train.add_argument("--repo", default=None)
     p_train.add_argument("--prs", default=None)
     p_train.add_argument("--max", dest="max_members", type=int, default=5)
-    p_train.add_argument("--include-stale-red", action="store_true")
     p_train.add_argument("--worktree", default=None)
     p_train.add_argument("--branch", default=None)
     p_train.add_argument("--base", default="main")
@@ -1194,23 +1209,21 @@ def main(argv):
     p_status.add_argument("--json", action="store_true")
     p_events = sub.add_parser("events")
     p_events.add_argument("--limit", type=int, default=50)
-    p_run = sub.add_parser("run")
-    p_run.add_argument("--interval", type=int, default=DEFAULT_INTERVAL)
-    p_run.add_argument("--include-stale-red", action="store_true")
-    p_run.add_argument("--repo", default=None)
     args = parser.parse_args(argv[1:])
     home = Home()
     if args.cmd == "step":
-        return run_step(home, no_reconcile=args.no_reconcile, include_stale_red=args.include_stale_red, repo_filter=args.repo)
+        if args.no_reconcile and os.environ.get("FM_TEST_SEAM") != "1":
+            print("error: step --no-reconcile is honored only when FM_TEST_SEAM=1", file=sys.stderr)
+            return 2
+        return run_step(home, no_reconcile=args.no_reconcile, repo_filter=args.repo)
     if args.cmd == "plan":
-        return cmd_plan(home, include_stale_red=args.include_stale_red, as_json=args.json, repo_filter=args.repo)
+        return cmd_plan(home, as_json=args.json, repo_filter=args.repo)
     if args.cmd == "train":
         return cmd_train(
             home,
             repo_filter=args.repo,
             prs_csv=args.prs,
             max_members=max(1, args.max_members),
-            include_stale_red=args.include_stale_red,
             worktree=args.worktree,
             branch=args.branch,
             base_name=args.base,
@@ -1221,11 +1234,6 @@ def main(argv):
         return cmd_status(home, as_json=args.json)
     if args.cmd == "events":
         return cmd_events(home, limit=args.limit)
-    if args.cmd == "run":
-        interval = max(15, args.interval)
-        while True:
-            run_step(home, include_stale_red=args.include_stale_red, repo_filter=args.repo)
-            time.sleep(interval)
     return 2
 
 

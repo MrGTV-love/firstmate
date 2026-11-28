@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Tests for bin/fm-landing-loop.py and bin/fm-landing-loop-install.sh.
 # Exercises hermetic stale-base serial admission, conflict wake escalation,
-# direct-PR clean merge/push, failed update backoff, and launchd installer seams
-# against local bare git repositories and fake gh/no-mistakes shims.
+# direct-PR server-side update-branch, failed update backoff, the reconcile
+# phase, train batches, and launchd installer seams against local bare git
+# repositories and fake gh/no-mistakes/launchctl shims.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -129,7 +130,7 @@ PY
   cat > "$shim/no-mistakes" <<SH
 #!/usr/bin/env bash
 if [ "\$1" = axi ] && [ "\$2" = status ]; then
-  printf 'status: completed\n'
+  printf 'status: completed\nbranch: %s\n' "\$(git rev-parse --abbrev-ref HEAD)"
   exit 0
 fi
 printf '%s %s\n' "\$PWD" "\$*" >> "$log"
@@ -325,46 +326,123 @@ JSON
 test_launchd_installer_renders_installs_and_uninstalls() {
   local dir="$TMP_ROOT/install" home="$TMP_ROOT/install/home" agents="$TMP_ROOT/install/agents"
   mkdir -p "$home/state" "$agents"
-  local fake_lc="$dir/launchctl" loaded_flag="$dir/loaded"
+  local fake_lc="$dir/launchctl" loaded_flag="$dir/loaded" pending="$dir/unload-pending" stuck="$dir/bootout-stuck"
+  # Like launchd, bootout returns before the service is gone (two more print calls), and
+  # bootstrap refuses while the old instance is still loaded.
   cat > "$fake_lc" <<SH
 #!/usr/bin/env bash
 case "\$1" in
-  print) [ -f "$loaded_flag" ] ;;
-  bootstrap) touch "$loaded_flag" ;;
-  bootout) rm -f "$loaded_flag" ;;
+  print)
+    [ -f "$loaded_flag" ] || exit 1
+    if [ -f "$pending" ]; then
+      n=\$(cat "$pending")
+      if [ "\$n" -le 0 ]; then rm -f "$loaded_flag" "$pending"; exit 1; fi
+      printf '%s\n' \$((n - 1)) > "$pending"
+    fi
+    exit 0 ;;
+  bootstrap) [ ! -f "$loaded_flag" ] || exit 5; touch "$loaded_flag" ;;
+  bootout) [ -f "$stuck" ] || printf '2\n' > "$pending" ;;
   *) exit 1 ;;
 esac
 SH
   chmod +x "$fake_lc"
-  local printed
-  printed=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$INSTALL" install --interval 90 --print) || fail "install --print failed"
-  grep -q "<integer>90</integer>" <<<"$printed" || fail "rendered plist must carry interval 90"
-  grep -q "fm-landing-loop.py" <<<"$printed" || fail "rendered plist must invoke fm-landing-loop.py"
-  FM_TEST_SEAM=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_LANDING_LOOP_AGENT_DIR="$agents" FM_LANDING_LOOP_LAUNCHCTL="$fake_lc" \
-    "$INSTALL" install --interval 60 >/dev/null || fail "install failed"
+  seam_install() {
+    FM_TEST_SEAM=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+      FM_LANDING_LOOP_AGENT_DIR="$agents" FM_LANDING_LOOP_LAUNCHCTL="$fake_lc" "$INSTALL" "$@"
+  }
+  plist_meaning() {  # <plist file or -> <interval>
+    python3 -c '
+import plistlib, sys
+src, interval, root, home = sys.argv[1:]
+data = plistlib.loads(sys.stdin.buffer.read() if src == "-" else open(src, "rb").read())
+ok = (
+    data.get("StartInterval") == int(interval)
+    and data.get("ProgramArguments", [])[-2:] == [root + "/bin/fm-landing-loop.py", "step"]
+    and data.get("EnvironmentVariables", {}).get("FM_HOME") == home
+)
+sys.exit(0 if ok else 1)
+' "$1" "$2" "$ROOT" "$home"
+  }
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$INSTALL" install --interval 90 --print | plist_meaning - 90 \
+    || fail "--print must render a plist running <root>/bin/fm-landing-loop.py step every 90s for this home"
+  seam_install install --interval 60 >/dev/null || fail "install failed"
+  local plist
+  plist=$(printf '%s\n' "$agents"/*.plist)
+  plist_meaning "$plist" 60 || fail "installed plist must run step every 60s for this home"
+  seam_install install --interval 75 >/dev/null || fail "reinstall must wait for the asynchronous bootout before bootstrap"
+  plist_meaning "$plist" 75 || fail "reinstall must replace the agent plist"
   local st
-  st=$(FM_TEST_SEAM=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_LANDING_LOOP_AGENT_DIR="$agents" FM_LANDING_LOOP_LAUNCHCTL="$fake_lc" \
-    "$INSTALL" status)
-  grep -q "plist=present launchd=loaded" <<<"$st" || fail "expected installed status, got: $st"
-  FM_TEST_SEAM=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_LANDING_LOOP_AGENT_DIR="$agents" FM_LANDING_LOOP_LAUNCHCTL="$fake_lc" \
-    "$INSTALL" uninstall >/dev/null || fail "uninstall failed"
-  st=$(FM_TEST_SEAM=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_LANDING_LOOP_AGENT_DIR="$agents" FM_LANDING_LOOP_LAUNCHCTL="$fake_lc" \
-    "$INSTALL" status)
-  grep -q "plist=absent launchd=not-loaded" <<<"$st" || fail "expected uninstalled status, got: $st"
+  st=$(seam_install status)
+  case "$st" in *"plist=present launchd=loaded") ;; *) fail "expected installed status, got: $st" ;; esac
+  touch "$stuck"
+  if seam_install install --interval 45 >/dev/null 2>&1; then
+    fail "reinstall must refuse when the old agent stays loaded after bootout"
+  fi
+  plist_meaning "$plist" 75 || fail "a refused reinstall must leave the existing plist in place"
+  local leftover
+  for leftover in "$agents"/*.tmp.*; do
+    [ ! -e "$leftover" ] || fail "a refused reinstall must remove its rendered temporary plist: $leftover"
+  done
+  rm -f "$stuck"
+  seam_install uninstall >/dev/null || fail "uninstall must wait for the asynchronous bootout"
+  st=$(seam_install status)
+  case "$st" in *"plist=absent launchd=not-loaded") ;; *) fail "expected uninstalled status, got: $st" ;; esac
   # FM_TEST_SEAM=1 without explicit overrides must fail closed and never touch ~/Library/LaunchAgents.
   if FM_TEST_SEAM=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     FM_LANDING_LOOP_AGENT_DIR="" FM_LANDING_LOOP_LAUNCHCTL="" \
     "$INSTALL" status >/dev/null 2>&1; then
     fail "FM_TEST_SEAM=1 without agent-dir and launchctl overrides must refuse"
   fi
-  pass "launchd installer renders valid plist, installs, reports status, enforces test-seam overrides, and uninstalls cleanly"
+  pass "launchd installer renders the agent, waits out asynchronous bootout on reinstall and uninstall, refuses a stuck reinstall without touching the plist, and enforces test-seam overrides"
 }
 
-test_dirty_no_mistakes_worktree_held_and_wakes_once() {
+test_conflict_then_failed_update_wakes_for_each_kind() {
+  local dir="$TMP_ROOT/conflict-then-fail" home="$TMP_ROOT/conflict-then-fail/home" shim="$TMP_ROOT/conflict-then-fail/shim"
+  mkdir -p "$home/state" "$home/config" "$home/data"
+  local info wt head tip
+  info=$(make_git_pair "$dir/repo" "fm/task-k" "shared.txt" "unused.txt" 1)
+  read -r wt head tip <<< "$info"
+  local url="https://github.com/example/repo/pull/110"
+  fm_write_meta "$home/state/task-k.meta" "kind=ship" "mode=no-mistakes" "branch=fm/task-k" "worktree=$wt" "pr=$url"
+  write_gh_data() {  # <tip>
+    cat > "$dir/gh.json" <<JSON
+{
+  "prs": {
+    "$url": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head", "headRefName": "fm/task-k", "baseRefName": "main", "baseRefOid": "$1", "statusCheckRollup": [{"__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-11-27T00:00:00Z"}]}}
+  },
+  "compares": {
+    "$head": {"base_commit": {"sha": "$1"}, "behind_by": 1}
+  }
+}
+JSON
+  }
+  write_gh_data "$tip"
+  write_fake_gh "$shim" "$dir/gh.json"
+  write_fake_nm "$shim" "$dir/nm.log" 1
+  PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "conflict step must exit 0"
+  "$JQ_BIN" -e '.tasks["task-k"].action == "conflict"' "$home/state/.landing-loop/state.json" >/dev/null \
+    || fail "conflicting head must classify as conflict first"
+  # The base drops the conflicting change, so the same head now merges cleanly and its update fails.
+  git -C "$wt" checkout -q main
+  git -C "$wt" revert --no-edit HEAD >/dev/null
+  git -C "$wt" push -q origin main
+  local new_tip
+  new_tip=$(git -C "$wt" rev-parse HEAD)
+  git -C "$wt" checkout -q fm/task-k
+  write_gh_data "$new_tip"
+  PATH="$shim:$PATH" FM_LANDING_LOOP_DURATION_BIN="$shim/fake-duration.py" FM_HOME="$home" python3 "$LOOP" step --no-reconcile \
+    || fail "update step must exit 0"
+  PATH="$shim:$PATH" FM_LANDING_LOOP_DURATION_BIN="$shim/fake-duration.py" wait_for_inflight_done "$home" \
+    || fail "failing update worker must finish"
+  grep -q "$wt rerun" "$dir/nm.log" || fail "clean head must launch the failing rerun"
+  grep -q "landing-loop task-k: .*has merge conflicts" "$home/state/.wake-queue" \
+    || fail "conflict must wake Main"
+  grep -q "landing-loop task-k: base update for .* failed" "$home/state/.wake-queue" \
+    || fail "a failed update on a head that already raised a conflict wake must still wake Main"
+  pass "conflict and failed-update wakes for the same head are deduplicated per kind, so neither hides the other"
+}
+
+test_dirty_no_mistakes_worktree_held_without_wake() {
   local dir="$TMP_ROOT/dirty" home="$TMP_ROOT/dirty/home" shim="$TMP_ROOT/dirty/shim"
   mkdir -p "$home/state" "$home/config" "$home/data"
   local info wt head tip
@@ -390,10 +468,10 @@ JSON
   "$JQ_BIN" -e '.tasks["dirty-a"].action == "held"' "$home/state/.landing-loop/state.json" >/dev/null \
     || fail "dirty no-mistakes worktree must be held"
   [ ! -e "$dir/nm.log" ] || fail "dirty worktree must never launch no-mistakes rerun"
-  local wakes
-  wakes=$(grep -c "landing-loop dirty-a:" "$home/state/.wake-queue" 2>/dev/null || echo 0)
-  assert_equals "1" "$wakes" "held dirty checkout must emit exactly one wake"
-  pass "dirty no-mistakes worktree is held without launching rerun and wakes Main once"
+  if grep -q "landing-loop dirty-a:" "$home/state/.wake-queue" 2>/dev/null; then
+    fail "a held dirty checkout is neither a conflict nor a failed update and must not wake Main"
+  fi
+  pass "dirty no-mistakes worktree is held without launching rerun or waking Main"
 }
 
 test_train_plans_and_builds_conflict_free_batch_excluding_conflicts() {
@@ -452,7 +530,9 @@ test_train_plans_and_builds_conflict_free_batch_excluding_conflicts() {
     "https://github.com/example/repo/pull/201": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h201", "headRefName": "fm/pr201", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
     "https://github.com/example/repo/pull/202": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h202", "headRefName": "fm/pr202", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
     "https://github.com/example/repo/pull/203": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h203", "headRefName": "fm/pr203", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
-    "https://github.com/example/repo/pull/204": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h204", "headRefName": "fm/pr204", "baseRefName": "release", "baseRefOid": "$tip", "statusCheckRollup": []}}
+    "https://github.com/example/repo/pull/204": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h204", "headRefName": "fm/pr204", "baseRefName": "release", "baseRefOid": "$tip", "statusCheckRollup": []}},
+    "https://github.com/example/repo/pull/205": {"view": {"state": "OPEN", "isDraft": true, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h202", "headRefName": "fm/pr205", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
+    "https://github.com/example/repo/pull/207": {"view": {"state": "CLOSED", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$h202", "headRefName": "fm/pr207", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}}
   },
   "compares": {
     "$h201": {"base_commit": {"sha": "$tip"}, "behind_by": 0}
@@ -461,10 +541,14 @@ test_train_plans_and_builds_conflict_free_batch_excluding_conflicts() {
 JSON
   write_fake_gh "$shim" "$dir/gh.json"
   local out
-  out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" train --repo example/repo --prs 201,202,203,204 --worktree "$wt" --branch fm/train-batch-1 --build --json) \
+  out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" train --repo example/repo --prs 201,202,203,204,205,206,207 --worktree "$wt" --branch fm/train-batch-1 --build --json) \
     || fail "train --build failed"
-  "$JQ_BIN" -e '(.selected | map(.number)) == [201, 202] and (.excluded | length) == 2' <<<"$out" >/dev/null \
-    || fail "train must select 201+202 and exclude wrong-base 204 and conflicting 203: $out"
+  "$JQ_BIN" -e '(.selected | map(.number)) == [201, 202] and (.excluded | length) == 5' <<<"$out" >/dev/null \
+    || fail "train must select 201+202 and exclude conflicting 203, wrong-base 204, draft 205, unreadable 206, closed 207: $out"
+  "$JQ_BIN" -e 'any(.excluded[]; .pr == "https://github.com/example/repo/pull/205" and .reason == "PR is a draft")
+    and any(.excluded[]; .pr == "https://github.com/example/repo/pull/206" and .reason == "could not read PR from forge")
+    and any(.excluded[]; .pr == "https://github.com/example/repo/pull/207" and .reason == "PR state is CLOSED")' <<<"$out" >/dev/null \
+    || fail "train must report every requested PR it drops, with the reason: $out"
   "$JQ_BIN" -e 'any(.excluded[]; .pr == "https://github.com/example/repo/pull/204" and (.reason | contains("targets base release")))' <<<"$out" >/dev/null \
     || fail "train must exclude PR targeting release: $out"
   "$JQ_BIN" -e 'any(.excluded[]; .pr == "https://github.com/example/repo/pull/203" and .reason == "conflicts with train batch")' <<<"$out" >/dev/null \
@@ -481,7 +565,7 @@ JSON
     || fail "closes block must list PR 201"
   "$JQ_BIN" -r '.closes_block' <<<"$out" | grep -qx 'Train-member: https://github.com/example/repo/pull/202' \
     || fail "closes block must list PR 202"
-  pass "train command proves cumulative conflict-free batch, excludes wrong-base and conflicting PRs, protects existing branches, builds under merge.ff=only, and emits canonical Train-member closes block"
+  pass "train command proves cumulative conflict-free batch, reports every excluded requested PR, protects existing branches, builds under merge.ff=only, and emits canonical Train-member closes block"
 }
 
 test_unreadable_nm_status_fails_closed() {
@@ -531,8 +615,9 @@ SH
   "$JQ_BIN" -e '.tasks["status-fail"].action == "busy"' "$home/state/.landing-loop/state.json" >/dev/null \
     || fail "zero-exit status response without status: field must fail closed as busy"
   [ ! -e "$dir/nm.log" ] || fail "must not launch rerun on zero-exit error status response"
-  # outcome: passed without status:, or alongside status: running, must stay busy.
-  for payload in $'outcome: passed\n' $'status: running\noutcome: passed\n'; do
+  # outcome: passed without status:, alongside this branch's status: running, or a run whose
+  # branch is unreadable, must stay busy.
+  for payload in $'outcome: passed\n' $'status: running\nbranch: fm/status-fail\noutcome: passed\n' $'status: running\n'; do
     cat > "$shim/no-mistakes" <<SH
 #!/usr/bin/env bash
 if [ "\$1" = axi ] && [ "\$2" = status ]; then
@@ -545,14 +630,28 @@ SH
     chmod +x "$shim/no-mistakes"
     PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" step --no-reconcile || fail "outcome-only step must exit 0"
     "$JQ_BIN" -e '.tasks["status-fail"].action == "busy"' "$home/state/.landing-loop/state.json" >/dev/null \
-      || fail "outcome without terminal status must fail closed as busy"
+      || fail "status answer without this branch's terminal status must fail closed as busy: $payload"
   done
   [ ! -e "$dir/nm.log" ] || fail "must not launch rerun when status is missing or running"
+  # A sibling crew's running pipeline answered for the shared repository is not this task's run.
+  cat > "$shim/no-mistakes" <<SH
+#!/usr/bin/env bash
+if [ "\$1" = axi ] && [ "\$2" = status ]; then
+  printf 'status: running\nbranch: fm/sibling-crew\n'
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$shim/no-mistakes"
+  local sibling_out
+  sibling_out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" plan --json)
+  "$JQ_BIN" -e '.tasks[0].action == "update"' <<<"$sibling_out" >/dev/null \
+    || fail "another branch's running pipeline must not hold this task busy, got: $sibling_out"
   # Terminal status ci_monitor_interrupted must be recognized as idle (eligible for update).
   cat > "$shim/no-mistakes" <<SH
 #!/usr/bin/env bash
 if [ "\$1" = axi ] && [ "\$2" = status ]; then
-  printf 'run:\n  status: ci_monitor_interrupted\n'
+  printf 'run:\n  status: ci_monitor_interrupted\n  branch: fm/status-fail\n'
   exit 0
 fi
 exit 0
@@ -562,7 +661,7 @@ SH
   plan_out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" plan --json)
   "$JQ_BIN" -e '.tasks[0].action == "update"' <<<"$plan_out" >/dev/null \
     || fail "ci_monitor_interrupted must be treated as terminal/eligible, got: $plan_out"
-  pass "no-mistakes axi status fails closed on exit error and statusless zero-exit errors, and treats ci_monitor_interrupted as terminal"
+  pass "no-mistakes axi status fails closed on exit error, statusless or branchless answers, and this branch's live run; ignores a sibling branch's run; treats ci_monitor_interrupted as terminal"
 }
 
 test_detached_update_timeout_terminates_nested_child() {
@@ -587,7 +686,7 @@ JSON
   cat > "$shim/no-mistakes" <<SH
 #!/usr/bin/env bash
 if [ "\$1" = axi ] && [ "\$2" = status ]; then
-  printf 'status: completed\n'
+  printf 'status: completed\nbranch: %s\n' "\$(git rev-parse --abbrev-ref HEAD)"
   exit 0
 fi
 printf '%s\n' "\$\$" > "$dir/child.pid"
@@ -625,13 +724,89 @@ PY
   pass "detached update timeout forwards SIGTERM through wrapper and terminates nested child process group"
 }
 
+test_train_without_prs_stays_in_one_repository() {
+  local dir="$TMP_ROOT/train-repos" home="$TMP_ROOT/train-repos/home" shim="$TMP_ROOT/train-repos/shim"
+  mkdir -p "$home/state" "$home/config" "$home/data"
+  local info wt head1 tip
+  info=$(make_git_pair "$dir/repo" "fm/one" "one.txt" "main-one.txt" 0)
+  read -r wt head1 tip <<< "$info"
+  git -C "$wt" checkout -q -b fm/two main
+  printf 'two\n' > "$wt/two.txt"
+  git -C "$wt" add two.txt
+  git -C "$wt" commit -q -m 'fork pr'
+  local head2
+  head2=$(git -C "$wt" rev-parse HEAD)
+  git -C "$wt" checkout -q fm/one
+  local url1="https://github.com/example/repo/pull/301" url2="https://github.com/forked/repo/pull/302"
+  fm_write_meta "$home/state/one.meta" "kind=ship" "mode=direct-PR" "branch=fm/one" "worktree=$wt" "pr=$url1"
+  fm_write_meta "$home/state/two.meta" "kind=ship" "mode=direct-PR" "branch=fm/two" "worktree=$wt" "pr=$url2"
+  cat > "$dir/gh.json" <<JSON
+{
+  "prs": {
+    "$url1": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head1", "headRefName": "fm/one", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}},
+    "$url2": {"view": {"state": "OPEN", "isDraft": false, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "headRefOid": "$head2", "headRefName": "fm/two", "baseRefName": "main", "baseRefOid": "$tip", "statusCheckRollup": []}}
+  },
+  "compares": {
+    "$head1": {"base_commit": {"sha": "$tip"}, "behind_by": 0},
+    "$head2": {"base_commit": {"sha": "$tip"}, "behind_by": 0}
+  }
+}
+JSON
+  write_fake_gh "$shim" "$dir/gh.json"
+  local out
+  out=$(PATH="$shim:$PATH" FM_HOME="$home" python3 "$LOOP" train --worktree "$wt" --json) || fail "train plan failed"
+  "$JQ_BIN" -e \
+    "(.selected | map(.pr)) == [\"$url1\"] and any(.excluded[]; .pr == \"$url2\" and (.reason | contains(\"not train repository example/repo\")))" \
+    <<<"$out" >/dev/null || fail "a train must hold members of one repository only: $out"
+  pass "train without --prs keeps members in the first candidate's repository and reports the others as excluded"
+}
+
+test_step_runs_reconcile_under_stall_rule() {
+  local dir="$TMP_ROOT/reconcile" home="$TMP_ROOT/reconcile/home"
+  mkdir -p "$home/state" "$home/config" "$home/data" "$dir"
+  cat > "$dir/reconcile.sh" <<SH
+#!/usr/bin/env bash
+printf '%s %s\n' "\$FM_HOME" "\$FM_PR_READY_RECONCILE_TIMEOUT" > "$dir/ran"
+SH
+  chmod +x "$dir/reconcile.sh"
+  FM_LANDING_LOOP_RECONCILE_BIN="$dir/reconcile.sh" FM_HOME="$home" python3 "$LOOP" step || fail "step must exit 0"
+  assert_equals "$home 120" "$(cat "$dir/ran" 2>/dev/null)" "step must run the reconcile helper for this home with the watcher's stall interval"
+  "$JQ_BIN" -e '.last_reconcile.rc == 0' "$home/state/.landing-loop/state.json" >/dev/null \
+    || fail "step must record the reconcile exit status"
+  # A silent pass is stopped by the stall rule and its whole process tree dies.
+  cat > "$dir/reconcile.sh" <<SH
+#!/usr/bin/env bash
+sleep 60 &
+printf '%s\n' "\$!" > "$dir/child.pid"
+wait
+SH
+  FM_PR_READY_RECONCILE_TIMEOUT=1 FM_LANDING_LOOP_RECONCILE_BIN="$dir/reconcile.sh" FM_HOME="$home" python3 "$LOOP" step \
+    || fail "step with a silent reconcile must exit 0"
+  "$JQ_BIN" -e '.last_reconcile.rc == 124' "$home/state/.landing-loop/state.json" >/dev/null \
+    || fail "a silent reconcile must be recorded as stopped for inactivity: $(cat "$home/state/.landing-loop/state.json")"
+  local cpid
+  cpid=$(cat "$dir/child.pid" 2>/dev/null || true)
+  [ -n "$cpid" ] || fail "silent reconcile must have started its child"
+  if kill -0 "$cpid" 2>/dev/null; then
+    kill -9 "$cpid" 2>/dev/null || true
+    fail "reconcile child $cpid survived the stall stop"
+  fi
+  if env -u FM_TEST_SEAM FM_HOME="$home" python3 "$LOOP" step --no-reconcile >/dev/null 2>&1; then
+    fail "step --no-reconcile must be refused without FM_TEST_SEAM=1"
+  fi
+  pass "step runs the reconcile helper under the stall rule, records its status, stops a silent pass with its tree, and refuses --no-reconcile outside the test seam"
+}
+
 fm_test_run_cases \
   test_serial_admission_updates_one_clean_stale_pr_at_a_time \
   test_conflict_holds_and_emits_single_wake \
+  test_conflict_then_failed_update_wakes_for_each_kind \
   test_direct_pr_updates_server_side_without_mutating_worktree \
-  test_dirty_no_mistakes_worktree_held_and_wakes_once \
+  test_dirty_no_mistakes_worktree_held_without_wake \
   test_unreadable_nm_status_fails_closed \
   test_detached_update_timeout_terminates_nested_child \
   test_failed_update_backs_off_and_wakes_main_once \
   test_train_plans_and_builds_conflict_free_batch_excluding_conflicts \
+  test_train_without_prs_stays_in_one_repository \
+  test_step_runs_reconcile_under_stall_rule \
   test_launchd_installer_renders_installs_and_uninstalls -- "$@"
