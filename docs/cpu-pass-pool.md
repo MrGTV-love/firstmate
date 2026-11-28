@@ -232,7 +232,7 @@ An admitted command keeps the directory unless it runs the client directly (thro
 Limit: a fresh start that no wrapper in this repository can see, the real client called by its absolute path past the interception, a wrapper that resets `PATH` (`sudo`, `env -i`), or a start made outside every route (a bare typed `no-mistakes axi run --intent ...`), is admitted only by admission at run creation inside the no-mistakes fork, backlog task `nm-run-creation-admission`.
 A shell's `-c` string, after the shell's other options (`bash -l -c`, `bash -o pipefail -c`), is read as a command line without its comments and redirections, split at its control operators and newlines, so `cd x&&no-mistakes axi run --intent ...` is a start too.
 `bin/fm-duration.py run` routes such a command through this owner before starting its execution clock; its `--pipeline-priority` option selects the class.
-`bin/fm-mem-guard.sh run` hands its command to `pipeline-start --only-fresh` after its own memory reading: a new run queues in class `other`, and every other command runs unchanged.
+`bin/fm-mem-guard.sh run` hands its command to `pipeline-start --only-fresh` after its own disk-floor check and, on macOS, its memory reading: a new run queues in class `other`, and every other command runs unchanged.
 Generated worker delivery instructions name both routes.
 Existing-run reattachment, responses and status reads do not requeue, restart a run or consume another start.
 Each recognized or intercepted start is admitted once, and a second fresh start inside an admitted command is admitted on its own.

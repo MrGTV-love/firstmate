@@ -14,8 +14,8 @@
 # cannot prevent supervising existing work. run first asks fm-disk-floor-lib.sh
 # whether the volume holding the current directory still has the free-disk floor
 # and exits 75 below it, so a nearly full disk starts no new run on either OS.
-# admit, run and sample only record a
-# reading in the invoking home's state. After that check, run hands COMMAND to
+# admit, run and sample only record a reading in the invoking home's state.
+# After the disk and memory checks, run hands COMMAND to
 # fm-cpu-pass.py pipeline-start --only-fresh: a command that begins a new
 # no-mistakes run (its engine's fresh_pipeline_start) queues there in class
 # other; any other command runs with only the engine's exec interception added
