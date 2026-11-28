@@ -14,8 +14,9 @@
 #
 # This file owns three capability tables plus their pure artifact-path tables.
 # fm_control_endpoint_absence_verdict and its worktree-holder helper perform
-# backend and process reads; the tables remain pure, and sourcing this file
-# performs no probes:
+# backend and process reads, and fm_control_relaunch_journal_verdict reads one
+# journal file; the tables remain pure, and sourcing this file performs no
+# probes:
 #
 #   1. Verb allowlist. There is no arbitrary-text and no generic raw-key entry
 #      point on the control plane; a caller either names an allowlisted verb or
@@ -52,12 +53,13 @@ authorize-continuation
 reassociate
 adopt
 stay
+rerecord-slot
 EOF
 }
 
 fm_control_verb_allowed() {  # <verb>
   case "${1-}" in
-    interrupt|exit|relaunch|authorize-continuation|reassociate|adopt|stay) return 0 ;;
+    interrupt|exit|relaunch|authorize-continuation|reassociate|adopt|stay|rerecord-slot) return 0 ;;
   esac
   return 1
 }
@@ -353,6 +355,54 @@ fm_control_backend_state_verified() {  # <backend>
     tmux|herdr) return 0 ;;
   esac
   return 1
+}
+
+# fm_control_relaunch_journal_verdict: the ONE classification of a task's
+# relaunch journal (state/<id>.control-relaunch), shared by reassociate and
+# rerecord-slot, each of which maps the classes to its own verdicts. It reads
+# only the file and prints one class:
+#   absent               no journal;
+#   unreadable           not a regular file, a symlink, unreadable, or its
+#                        task= is not this task;
+#   complete             phase=complete;
+#   failed-closed        a failed:* phase whose rollback kept or restored the
+#                        prior incarnation (prior-record-kept,
+#                        prior-record-kept-agent-dead, instructions-restored);
+#   failed-needs-stopped a failed:* phase that left the old agent alive or its
+#                        state unproven (instructions-restored-agent-alive,
+#                        instructions-restored-agent-state-<s>);
+#   failed-open          any other or missing rollback on a failed:* phase;
+#   in-flight            every other phase, a missing one and a bare failed:.
+fm_control_relaunch_journal_verdict() {  # <journal> <task-id>
+  local journal=${1-} id=${2-} phase rollback
+  if [ ! -e "$journal" ] && [ ! -L "$journal" ]; then
+    printf 'absent\n'
+    return 0
+  fi
+  if [ ! -f "$journal" ] || [ -L "$journal" ] || [ ! -r "$journal" ] \
+     || ! cat -- "$journal" >/dev/null 2>&1 \
+     || [ "$(fm_backend_meta_exact_value "$journal" task)" != "$id" ]; then
+    printf 'unreadable\n'
+    return 0
+  fi
+  phase=$(fm_backend_meta_exact_value "$journal" phase) || phase=
+  case "$phase" in
+    complete) printf 'complete\n' ;;
+    failed:?*)
+      rollback=$(fm_backend_meta_exact_value "$journal" rollback) || rollback=
+      case "$rollback" in
+        instructions-restored-agent-state-*)
+          case "${rollback#instructions-restored-agent-state-}" in
+            ''|*[!A-Za-z0-9._-]*) rollback= ;;
+          esac ;;
+      esac
+      case "$rollback" in
+        prior-record-kept|prior-record-kept-agent-dead|instructions-restored) printf 'failed-closed\n' ;;
+        instructions-restored-agent-alive|instructions-restored-agent-state-?*) printf 'failed-needs-stopped\n' ;;
+        *) printf 'failed-open\n' ;;
+      esac ;;
+    *) printf 'in-flight\n' ;;
+  esac
 }
 
 fm_control_lsof_path() (

@@ -627,18 +627,15 @@ fm_drift_flagged_oracle() {
   done | LC_ALL=C sort
 }
 
-# Tracked paths hidden from status by assume-unchanged or skip-worktree: changed bytes, an exec-bit flip, a file turned
-# into a directory, a symlink retarget and a symlink turned into a file are listed; unchanged bytes, a checkout's own
-# line-ending conversion and a sparse absence are not. The batched check decides exactly what a per-path check decides,
-# including for a path git reads specially on a line (a leading quote). A name git would read as a pathspec is judged
-# by its own index entry: an unchanged docs/g*x is not listed although docs/g!x, which its pattern also matches and
-# which sorts first, holds other bytes, and a changed :colon.txt is listed (git reads ":colon.txt" as the pathspec
-# colon.txt, which matches no entry here, so a lookup by pathspec skipped it). A name with a space, a newline (which the
-# batched hash cannot name on a line) or a backslash (which a pathspec reads as an escape) is judged by its own entry,
-# and a changed one is printed on one line: a newline as \x0a, a backslash doubled.
-test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides() {
-  local out f reported expected
-  make_world drift-flagged
+# fm_drift_flagged_world <name>: a copy whose tracked paths are hidden from status by assume-unchanged or skip-worktree:
+# changed bytes, an exec-bit flip, a file turned into a directory, a symlink retarget and a symlink turned into a file,
+# and changed names holding a space, a newline, a backslash or a leading dash; unchanged bytes, unchanged names holding
+# a space, a newline or a backslash, a checkout's own line-ending conversion and a sparse absence beside them. Sets
+# FM_DRIFT_FLAGGED_EXPECTED to the changed paths as the report writes them (a newline as \x0a, a backslash doubled),
+# sorted.
+fm_drift_flagged_world() {
+  local f nl=$'docs/new\nline.txt'
+  make_world "$1"
   for f in au-bytes au-same au-exec sw-bytes sw-same sw-dir crlf-same crlf-changed sw-gone; do
     printf 'line one\nline two\n' >"$W_PROJ/docs/$f.txt"
   done
@@ -646,6 +643,7 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
   printf 'star\n' >"$W_PROJ/docs/g*x"
   printf 'bang, other bytes\n' >"$W_PROJ/docs/g!x"
   printf 'colon\n' >"$W_PROJ/:colon.txt"
+  printf 'dash\n' >"$W_PROJ/-dash.txt"
   # A space, a newline and a backslash in a name, each once changed and once unchanged.
   for f in 'docs/sp ace' 'docs/sp same' $'docs/new\nline' $'docs/new\nsame' 'docs/back\slash' 'docs/back\same'; do
     printf 'unusual name\n' >"$W_PROJ/$f.txt"
@@ -659,10 +657,10 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
   W_BASE=$(git -C "$W_SLOT" rev-parse HEAD)
   git -C "$W_SLOT" update-ref refs/remotes/origin/main "$W_BASE"
   grep -q $'\r' "$W_SLOT/docs/crlf-same.txt" || fail 'the fixture is vacuous: checkout did not write CRLF line endings'
-  git -C "$W_SLOT" update-index --assume-unchanged docs/au-bytes.txt docs/au-same.txt docs/au-exec.txt docs/link-retarget
+  git -C "$W_SLOT" update-index --assume-unchanged docs/au-bytes.txt docs/au-same.txt docs/au-exec.txt docs/link-retarget "$nl"
   git -C "$W_SLOT" update-index --skip-worktree docs/sw-bytes.txt docs/sw-same.txt docs/sw-dir.txt docs/crlf-same.txt \
-    docs/crlf-changed.txt docs/sw-gone.txt docs/link-to-file '"quoted.txt' 'docs/g*x' :colon.txt \
-    'docs/sp ace.txt' 'docs/sp same.txt' $'docs/new\nline.txt' $'docs/new\nsame.txt' 'docs/back\slash.txt' 'docs/back\same.txt'
+    docs/crlf-changed.txt docs/sw-gone.txt docs/link-to-file '"quoted.txt' 'docs/g*x' :colon.txt ./-dash.txt \
+    'docs/sp ace.txt' 'docs/sp same.txt' $'docs/new\nsame.txt' 'docs/back\slash.txt' 'docs/back\same.txt'
   [ "$(git -C "$W_SLOT" ls-files -s -- 'docs/g*x' | head -n 1 | cut -f 2)" = 'docs/g!x' ] \
     || fail 'the fixture is vacuous: the docs/g*x pathspec does not match docs/g!x first'
   [ "$(git -C "$W_SLOT" ls-files -v -- ':(literal)docs/back\slash.txt' ':(literal)docs/back\same.txt' | grep -c '^S ')" = 2 ] \
@@ -677,16 +675,63 @@ test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides(
   rm "$W_SLOT/docs/link-to-file" && printf 'target-two' >"$W_SLOT/docs/link-to-file"
   printf 'quoted, changed\n' >"$W_SLOT/\"quoted.txt"
   printf 'colon, changed\n' >"$W_SLOT/:colon.txt"
-  for f in 'docs/sp ace' $'docs/new\nline' 'docs/back\slash'; do printf 'unusual name, changed\n' >"$W_SLOT/$f.txt"; done
+  printf 'dash, changed\n' >"$W_SLOT/-dash.txt"
+  for f in 'docs/sp ace' "${nl%.txt}" 'docs/back\slash'; do printf 'unusual name, changed\n' >"$W_SLOT/$f.txt"; done
   [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail "the fixture is not hidden from status: $(git -C "$W_SLOT" status --porcelain)"
+  FM_DRIFT_FLAGGED_EXPECTED=$(printf '%s\n' '"quoted.txt' :colon.txt -dash.txt docs/au-bytes.txt docs/au-exec.txt \
+    docs/crlf-changed.txt docs/link-retarget docs/link-to-file 'docs/new\x0aline.txt' 'docs/sp ace.txt' docs/sw-bytes.txt \
+    docs/sw-dir.txt 'docs/back\\slash.txt' | LC_ALL=C sort)
+}
+
+fm_drift_flagged_reported() { printf '%s\n' "$1" | sed -n 's/^  drift: proven //p' | LC_ALL=C sort; }
+
+# The hidden changes of fm_drift_flagged_world are listed and the rest are not. The batched check decides exactly what a
+# per-path check decides, including for a path git reads specially on a line (a leading quote or a newline). A name git
+# would read as a pathspec is judged by its own index entry: an unchanged docs/g*x is not listed although docs/g!x,
+# which its pattern also matches and which sorts first, holds other bytes, and a changed :colon.txt is listed (git reads
+# ":colon.txt" as the pathspec colon.txt, which matches no entry here, so a lookup by pathspec skipped it). A name with
+# a space, a newline (which the batched hash cannot name on a line) or a backslash (which a pathspec reads as an escape)
+# is judged by its own entry, and a changed one is printed on one line: a newline as \x0a, a backslash doubled.
+test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides() {
+  local out reported
+  fm_drift_flagged_world drift-flagged
   out=$(STATE='' drift)
-  reported=$(printf '%s\n' "$out" | sed -n 's/^  drift: proven //p' | LC_ALL=C sort)
-  expected=$(printf '%s\n' '"quoted.txt' :colon.txt docs/au-bytes.txt docs/au-exec.txt docs/crlf-changed.txt docs/link-retarget \
-    docs/link-to-file docs/sw-bytes.txt docs/sw-dir.txt 'docs/sp ace.txt' 'docs/new\x0aline.txt' 'docs/back\\slash.txt' \
-    | LC_ALL=C sort)
-  assert_equals "$expected" "$reported" 'the hidden changes reported are not exactly the changed flagged paths'
+  reported=$(fm_drift_flagged_reported "$out")
+  assert_equals "$FM_DRIFT_FLAGGED_EXPECTED" "$reported" 'the hidden changes reported are not exactly the changed flagged paths'
   assert_equals "$(fm_drift_flagged_oracle "$W_SLOT")" "$reported" 'the report decided a flagged path differently from a per-path check'
   pass "drift: hidden flagged-path changes are listed exactly as a per-path check decides; unchanged and sparse paths are not"
+}
+
+# A batched `hash-object --stdin-paths` that fails, or that answers one line short, decides nothing: every path it was
+# given is hashed again on its own, so the changed paths are still listed and the unchanged ones are not.
+test_a_failed_or_short_batch_hash_still_lists_every_changed_flagged_path() {
+  local mode out reported shim log real
+  real=$(command -v git)
+  for mode in fail short; do
+    fm_drift_flagged_world "drift-flagged-batch-$mode"
+    shim="$W_DIR/shim" log="$W_DIR/batch-calls.log"
+    mkdir -p "$shim"
+    : >"$log"
+    cat >"$shim/git" <<SH
+#!/bin/sh
+for arg in "\$@"; do
+  if [ "\$arg" = --stdin-paths ]; then
+    printf x >>'$log'
+    case $mode in
+      fail) cat >/dev/null; exit 1 ;;
+      short) '$real' "\$@" | sed '\$d'; exit 0 ;;
+    esac
+  fi
+done
+exec '$real' "\$@"
+SH
+    chmod +x "$shim/git"
+    out=$(STATE='' PATH="$shim:$PATH" drift)
+    [ -s "$log" ] || fail "the fixture is vacuous: the $mode batch hash was never run"
+    reported=$(fm_drift_flagged_reported "$out")
+    assert_equals "$FM_DRIFT_FLAGGED_EXPECTED" "$reported" "a $mode batch hash changed which flagged paths are listed"
+  done
+  pass "drift: a failed or one-line-short batch hash still lists exactly the changed flagged paths"
 }
 
 # fm_drift_git_calls <flagged-count>: builds a world whose docs/many holds that many skip-worktree files, every third
@@ -799,6 +844,123 @@ test_a_pointer_in_an_unknown_record_store_is_refused_and_a_known_one_adopted() {
   pass "adoption: a pointer in a record store the relaunch does not compute is refused by name; the same pointer under the matching stores is adopted"
 }
 
+# fm_slot_rerecord_verdict is the read-only replay of rerecord-slot's three content verdicts against a renewed manifest:
+# a forward-merged branch whose renewal adds the directory of a new file is admitted with its labels, and a renewal that
+# adds an untouched tracked file, or keeps a base that is no longer the merge-base, is refused by name. Nothing is written.
+test_the_rerecord_replay_verdict_judges_a_renewed_manifest() {
+  local m1 out rc
+  make_world rerecord-replay
+  mkdir -p "$W_PROJ/lib"
+  printf 'a\n' >"$W_PROJ/lib/a.txt"
+  printf 'doc2\n' >"$W_PROJ/docs/y.txt"
+  git -C "$W_PROJ" add -A
+  git -C "$W_PROJ" "${GITID[@]}" commit -qm 'main M1'
+  git -C "$W_PROJ" push --quiet origin main
+  git -C "$W_PROJ" fetch --quiet origin
+  m1=$(git -C "$W_PROJ" rev-parse HEAD)
+  printf 'owned2\n' >"$W_SLOT/src/a.txt"
+  git -C "$W_SLOT" "${GITID[@]}" commit -qam 'own change'
+  git -C "$W_SLOT" "${GITID[@]}" merge -q --no-edit origin/main
+  mkdir -p "$W_SLOT/lib"
+  printf 'new\n' >"$W_SLOT/lib/new.txt"
+  git -C "$W_SLOT" add -A
+  git -C "$W_SLOT" "${GITID[@]}" commit -qm 'new lib file'
+  renew() { # <base> <owned-path>...
+    python3 - "$W_MANIFEST" "$1" "${@:2}" <<'PY2'
+import json, sys
+path, base = sys.argv[1:3]
+record = json.load(open(path))
+record.update(base_sha=base, base_ref="origin/main", owned_paths=sys.argv[3:])
+json.dump(record, open(path, "w"))
+PY2
+  }
+  renew "$m1" src lib
+  out=$(fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$(printf '%s\n' "$out" | head -n 1)" = ok ] || fail "the forward-merged renewal was refused: $out"
+  assert_contains "$out" 'added_scope=lib rule=c' 'the new directory was not admitted by rule (c)'
+  assert_contains "$out" 'scope_split=prior:1 changed:0 ancestor:1' 'the scope split is wrong'
+  renew "$m1" src lib docs
+  out=$(fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  assert_contains "$out" 'scope_entry_not_own_work' 'an untouched tracked directory was admitted'
+  renew "$W_BASE" src lib
+  out=$(fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  assert_contains "$out" 'base_not_merge_base' 'a base that is no longer the merge-base was admitted'
+  # A copy whose own line or uncommitted set cannot be read is refused by name, never reported ok with every added entry
+  # labelled side-branch. The copy is made unreadable to git only for the one read under test.
+  renew "$m1" src lib
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_own_line_paths() { return 1; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src); rc=$?
+  [ "$rc" -ne 0 ] || fail "an unreadable own line still exited 0: $out"
+  [ "$out" = "scope_entry_not_own_work"$'\t'"the task's own first-parent line could not be read from the copy, so no entry can be attributed" ] \
+    || fail "an unreadable own line was not refused by name: $out"
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_uncommitted_paths() { return 1; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src); rc=$?
+  [ "$rc" -ne 0 ] || fail "an unreadable uncommitted set still exited 0: $out"
+  [ "${out%%$'\t'*}" = scope_release_strands_work ] || fail "an unreadable uncommitted set was not refused by name: $out"
+  # The identity, base and scope verdicts print exactly ok on success, so a first line that only starts with ok is
+  # malformed: an identity verdict printing ok<TAB>x is refused, and the same stand-in printing exactly ok is admitted.
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_identity_verdict() { printf 'ok\tx\n'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$out" = "manifest_unreadable"$'\t'"the verdict printed a malformed ok line" ] \
+    || fail "an identity verdict printing ok<TAB>x was not refused: $out"
+  # An ok without its newline, and ok followed by a NUL, are not byte for byte ok and one newline either.
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_identity_verdict() { printf 'ok'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$out" = "manifest_unreadable"$'\t'"the verdict printed a malformed ok line" ] \
+    || fail "an identity verdict printing an unterminated ok was not refused: $out"
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_identity_verdict() { printf 'ok\000\n'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$out" = "manifest_unreadable"$'\t'"the verdict printed a malformed ok line" ] \
+    || fail "an identity verdict printing ok and a NUL was not refused: $out"
+  # shellcheck disable=SC2329 # stub invoked indirectly by fm_slot_rerecord_verdict
+  out=$(fm_slot_rerecord_identity_verdict() { printf 'ok\n'; }; fm_slot_rerecord_verdict "$W_MANIFEST" "$W_SLOT" "$W_PROJ" t fm/t "$W_BASE" src)
+  [ "$(printf '%s\n' "$out" | head -n 1)" = ok ] || fail "an identity verdict printing exactly ok was refused: $out"
+  # The whole-file mode the post-publish owner re-read uses: exactly ok and one newline passes, a trailing blank line does
+  # not, and neither does a file the compare cannot read.
+  printf 'ok\n' > "$W_DIR/verdict-exact"
+  printf 'ok\n\n' > "$W_DIR/verdict-blank"
+  fm_slot_rerecord_verdict_ok "$W_DIR/verdict-exact" manifest_unreadable whole || fail 'the whole-file mode refused exactly ok'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-blank" manifest_unreadable whole || fail 'the whole-file mode passed ok and a blank line'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-missing" manifest_unreadable whole || fail 'the whole-file mode passed a missing file'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-missing" manifest_unreadable || fail 'the first-line mode passed a missing file'
+  fm_slot_rerecord_verdict_ok "$W_DIR/verdict-blank" manifest_unreadable || fail 'the first-line mode refused a first line of exactly ok'
+  printf 'ok\nmore\n' > "$W_DIR/verdict-more"
+  fm_slot_rerecord_verdict_ok "$W_DIR/verdict-more" manifest_unreadable || fail 'the first-line mode refused ok followed by report lines'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-more" manifest_unreadable whole || fail 'the whole-file mode passed ok followed by more lines'
+  # A file the compare cannot read refuses in both modes.
+  printf 'ok\n' > "$W_DIR/verdict-unreadable"
+  chmod 000 "$W_DIR/verdict-unreadable"
+  if [ -r "$W_DIR/verdict-unreadable" ]; then
+    chmod 600 "$W_DIR/verdict-unreadable"
+    fail 'the fixture is vacuous: an unreadable verdict file is still readable here'
+  fi
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-unreadable" manifest_unreadable || fail 'the first-line mode passed an unreadable file'
+  ! fm_slot_rerecord_verdict_ok "$W_DIR/verdict-unreadable" manifest_unreadable whole || fail 'the whole-file mode passed an unreadable file'
+  chmod 600 "$W_DIR/verdict-unreadable"
+  # Both statuses of the compare's pipeline are read: a producer that writes ok and one newline and then returns 1
+  # refuses in both modes. The fault control is a copy of the function without the producer's status check, which
+  # accepts the same input, so that status check is what refuses.
+  # shellcheck disable=SC2329,SC2059 # the stub shadows printf for the function under test and passes its arguments on
+  out=$(printf() { builtin printf "$@"; return 1; }
+    fm_slot_rerecord_verdict_ok "$W_DIR/verdict-exact" manifest_unreadable && echo first-passed
+    fm_slot_rerecord_verdict_ok "$W_DIR/verdict-exact" manifest_unreadable whole && echo whole-passed
+    true)
+  [ -z "$out" ] || fail "a producer that returned 1 after writing ok and one newline passed: $out"
+  # shellcheck disable=SC2016 # the sed pattern names the literal ${st[0]} in the function's source
+  eval "$(declare -f fm_slot_rerecord_verdict_ok | sed -e '1s/^fm_slot_rerecord_verdict_ok /fm_rr_verdict_ok_no_producer_status /' \
+    -e 's/\[ "\${st\[0\]}" = 0 \] && //')"
+  [ "$(declare -f fm_rr_verdict_ok_no_producer_status | grep -c 'st\[0\]')" = 0 ] \
+    || fail 'the fault control is vacuous: the copy still checks the producer status'
+  # shellcheck disable=SC2329,SC2059 # the stub shadows printf for the function under test and passes its arguments on
+  out=$(printf() { builtin printf "$@"; return 1; }
+    fm_rr_verdict_ok_no_producer_status "$W_DIR/verdict-exact" manifest_unreadable && echo first-passed
+    fm_rr_verdict_ok_no_producer_status "$W_DIR/verdict-exact" manifest_unreadable whole && echo whole-passed
+    true)
+  [ "$out" = "first-passed"$'\n'"whole-passed" ] || fail "the fault control without the producer status check did not accept: $out"
+  [ -z "$(git -C "$W_SLOT" status --porcelain)" ] || fail 'the replay changed the copy'
+  pass "rerecord replay: a forward-merged renewal is admitted with its labels; an untouched entry, a stale base, an unreadable own line or uncommitted set, and a malformed ok verdict (ok<TAB>x, an unterminated ok, ok and a NUL) are refused by name; an exact ok verdict is admitted; the whole-file mode refuses ok and a blank line; the copy is unchanged"
+}
+
 CASES=(
 test_same_task_claim_from_another_home_is_not_this_tasks_own
 test_an_unreadable_foreign_record_is_an_error_not_no_conflict
@@ -812,6 +974,7 @@ test_firstmate_written_wiring_is_not_reported_as_drift
 test_a_kept_copy_of_recorded_wiring_is_not_reported_as_drift
 test_many_ignored_paths_print_a_sample_and_write_the_complete_report
 test_hidden_flagged_path_changes_are_listed_exactly_as_a_per_path_check_decides
+test_a_failed_or_short_batch_hash_still_lists_every_changed_flagged_path
 test_the_flagged_path_check_starts_a_fixed_number_of_git_processes
 test_a_killed_runs_leftover_temp_is_removed_by_the_next_write
 test_an_unremovable_temp_after_a_failed_write_still_prints_the_complete_report
@@ -823,6 +986,7 @@ test_a_refused_provision_leaves_no_export_directory
 test_a_refused_first_provisioning_recovery_never_takes_the_primary_provisioner
 test_a_pinned_provisioner_without_the_check_option_still_has_its_collision_named
 test_the_no_manifest_route_consults_copy_custody
+test_the_rerecord_replay_verdict_judges_a_renewed_manifest
 )
 
 fm_test_run_cases "${CASES[@]}" -- "$@"

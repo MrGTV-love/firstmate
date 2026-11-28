@@ -874,8 +874,135 @@ fm_slot_adopt_sibling_claim() { # <slot> <copy> <state-dir>
   return 1
 }
 
-FM_SLOT_DRIFT_PY=$(cat <<'FMDRIFTPY'
+# The task's own line, one owner for the drift report and rerecord-slot's side-branch labels: the first-parent
+# non-merge commits from <tip> to <head>, plus each first-parent merge's combined diff (the paths it authored itself).
+# own_line(git, tip, head) returns the set of paths as bytes; git is the caller's runner (raising on an exit outside ok).
+FM_SLOT_OWN_LINE_DEF=$(cat <<'FMOWNLINEPY'
+import os
+import subprocess
+
+
+def own_line(git, tip, head):
+    def split(raw):
+        return [part for part in raw.split(b"\0") if part]
+    own = set(split(git("log", "--first-parent", "--no-merges", "--no-renames", "--name-only", "-z", "--format=", head, "--not", tip).stdout))
+    for merge in git("rev-list", "--first-parent", "--merges", head, "--not", tip).stdout.decode().split():
+        own |= set(split(git("show", "--cc", "--name-only", "-z", "--format=", merge, ok=(0, 128)).stdout))
+    return own
+FMOWNLINEPY
+)
+
+# The index-flagged tracked paths (assume-unchanged, skip-worktree) whose existence, type, mode or bytes differ, which
+# git status cannot report: one owner for the drift report and rerecord-slot's strand check. flagged_changed(git, copy)
+# returns the paths as bytes.
+FM_SLOT_FLAGGED_DEF=$(cat <<'FMFLAGGEDPY'
 import hashlib
+import os
+import subprocess
+
+
+def flagged_changed(git, copy):
+    # The index is read once and the working bytes are hashed in one batch, so a copy with many flagged paths costs a
+    # fixed number of git processes rather than two per path. Each path is compared with its own index entry by exact
+    # name, so a name git would read as a pathspec (one holding *, ?, [ or \, or starting with :, which git reads as magic
+    # and so as the name without its colon) is judged by its own entry, never by another entry the pattern matches first
+    # and never skipped because the pattern matches no entry.
+    env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+
+    def names(raw):
+        return [part for part in raw.split(b"\0") if part]
+
+    found = []
+    flagged = []
+    for row in names(git("ls-files", "-v", "-z").stdout):
+        tag, path = row[:1], row[2:]
+        if tag.islower() or tag == b"S":
+            flagged.append((tag, path))
+    if not flagged:
+        return found
+    index = {}
+    for row in names(git("ls-files", "-s", "-z").stdout):
+        fields, _, path = row.partition(b"\t")
+        index.setdefault(path, fields.split())
+    algo = git("rev-parse", "--show-object-format", ok=(0, 128)).stdout.decode().strip() or "sha1"
+
+    def blob_id(data):
+        # The id git gives these bytes as a blob with no path filters, which is what `hash-object --stdin` computes.
+        return hashlib.new(algo, b"blob %d\0" % len(data) + data).hexdigest()
+
+    def hash_files(paths):
+        # One `hash-object --stdin-paths` for every path it can name on a line (it reads a leading quote as C quoting and
+        # drops a carriage return before the newline), and one `hash-object -- <path>` for the rest and for every path of
+        # a batch git refused (it stops at the first path it cannot hash); a failure leaves an empty id, which differs.
+        ids = {}
+        batch = [p for p in paths if b"\n" not in p and not p.startswith(b'"') and not p.endswith(b"\r")]
+        if batch:
+            proc = subprocess.run(["git", "-C", copy, "hash-object", "--stdin-paths"], input=b"".join(p + b"\n" for p in batch),
+                                  capture_output=True, env=env)
+            rows = proc.stdout.decode().split()
+            if proc.returncode == 0 and len(rows) == len(batch):
+                ids.update(zip(batch, rows))
+        for path in paths:
+            if path not in ids:
+                one = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True,
+                                     stdin=subprocess.DEVNULL, env=env)
+                ids[path] = one.stdout.decode().strip()
+        return ids
+
+    regular = []
+    for tag, path in flagged:
+        full = os.path.join(os.fsencode(copy), path)
+        if not os.path.lexists(full):
+            # An assume-unchanged path that is gone was deleted by the task, which status cannot show; a skip-worktree path
+            # that is absent is what sparse checkout leaves unmaterialized on purpose, so it is not a difference.
+            if tag.islower() and tag != b"s":
+                found.append(path)
+            continue
+        entry = index.get(path, [])
+        if len(entry) < 2:
+            # The index read lists no entry for a path its flag read listed, so its bytes cannot be compared: it differs.
+            found.append(path)
+            continue
+        mode, want = entry[0].decode(), entry[1].decode()
+        if os.path.islink(full):
+            if mode != "120000" or blob_id(os.readlink(full)) != want:
+                found.append(path)
+        elif not os.path.isfile(full):
+            # A directory or other non-file where a tracked file was: git cannot hash it as a blob, so it differs.
+            found.append(path)
+        else:
+            regular.append((path, mode, want, "100755" if os.stat(full).st_mode & 0o100 else "100644"))
+    hashed = hash_files([path for path, _mode, _want, _have in regular])
+    for path, mode, want, have in regular:
+        if hashed[path] != want or have != mode:
+            found.append(path)
+    return found
+FMFLAGGEDPY
+)
+
+# One parser of `git status --porcelain=v1 -z` output for the drift report and rerecord-slot's uncommitted set: each
+# caller runs its own status command and passes the raw bytes. status_entries(raw) yields (code, path, other), where
+# other is the second path of a rename or copy entry (both ends are reported) and None for every other entry.
+FM_SLOT_STATUS_DEF=$(cat <<'FMSTATUSPY'
+def status_entries(raw):
+    fields = raw.split(b"\0")
+    i = 0
+    while i < len(fields):
+        entry = fields[i]
+        i += 1
+        if len(entry) < 4:
+            continue
+        code, path = entry[:2], entry[3:]
+        if code[:1] in b"RC":
+            other = fields[i] if i < len(fields) else b""
+            i += 1
+            yield code, path, other
+            continue
+        yield code, path, None
+FMSTATUSPY
+)
+
+FM_SLOT_DRIFT_BODY=$(cat <<'FMDRIFTPY'
 import os
 import re
 import subprocess
@@ -990,14 +1117,9 @@ for tip_head in heads:
         fork = base
         limits.append("the default branch tip or the fork point is unavailable; the recorded base %s is the reference, so inherited upstream paths may be listed as uncertain" % base[:12])
     net = set(names(git("diff", "--no-renames", "-z", "--name-only", "--ignore-submodules=none", fork, tip_head).stdout))
-    own = set()
-    if known:
-        # The task's own line: the commits on the first-parent chain, a merge counting only for the paths it authored
-        # itself (the combined diff). A path that reaches HEAD only through a merged side branch, such as another task's
-        # branch, is not established as this task's work, so it is listed uncertain, never proven (D3 R3).
-        own |= set(names(git("log", "--first-parent", "--no-merges", "--no-renames", "--name-only", "-z", "--format=", tip_head, "--not", tip).stdout))
-        for merge in git("rev-list", "--first-parent", "--merges", tip_head, "--not", tip).stdout.decode().split():
-            own |= set(names(git("show", "--cc", "--name-only", "-z", "--format=", merge, ok=(0, 128)).stdout))
+    # The task's own line (FM_SLOT_OWN_LINE_DEF). A path that reaches HEAD only through a merged side branch, such as
+    # another task's branch, is not established as this task's work, so it is listed uncertain, never proven (D3 R3).
+    own = own_line(git, tip, tip_head) if known else set()
     for path in net:
         (add if known and path in own else uncertain)(path)
     if known:
@@ -1029,19 +1151,12 @@ if shallow:
     limits.append("the copy is a shallow clone, so history before its cut-off cannot show who changed a path; the list may be incomplete")
 # The working copy: modified, deleted, untracked (every file), renamed or copied (both ends), and ignored.
 raw = git("-c", "core.fileMode=true", "status", "--porcelain=v1", "-z", "--untracked-files=all",
-          "--ignore-submodules=none", "--ignored=traditional").stdout.split(b"\0")
-i = 0
-while i < len(raw):
-    entry = raw[i]
-    i += 1
-    if len(entry) < 4:
-        continue
-    code, path = entry[:2], entry[3:]
-    if code[:1] in b"RC":
+          "--ignore-submodules=none", "--ignored=traditional").stdout
+for code, path, other in status_entries(raw):
+    if other is not None:
         add(path)
-        if i < len(raw) and raw[i]:
-            add(raw[i])
-        i += 1
+        if other:
+            add(other)
         continue
     if code == b"!!":
         if wiring_only(path.rstrip(b"/")):
@@ -1052,77 +1167,9 @@ while i < len(raw):
             uncertain(path, "ignored")
     else:
         add(path.rstrip(b"/") if code == b"??" and path.endswith(b"/") else path)
-# Tracked paths that status cannot report (assume-unchanged, skip-worktree) whose existence, type, mode or bytes differ.
-# The index is read once and the working bytes are hashed in one batch, so a copy with many flagged paths costs a fixed
-# number of git processes rather than two per path. Each path is compared with its own index entry by exact name, so a
-# name git would read as a pathspec (one holding *, ?, [ or \, or starting with :, which git reads as magic and so as
-# the name without its colon) is judged by its own entry, never by another entry the pattern matches first and never
-# skipped because the pattern matches no entry.
-flagged = []
-for row in names(git("ls-files", "-v", "-z").stdout):
-    tag, path = row[:1], row[2:]
-    if tag.islower() or tag == b"S":
-        flagged.append((tag, path))
-index = {}
-if flagged:
-    for row in names(git("ls-files", "-s", "-z").stdout):
-        fields, _, path = row.partition(b"\t")
-        index.setdefault(path, fields.split())
-algo = "sha1"
-if flagged:
-    algo = git("rev-parse", "--show-object-format", ok=(0, 128)).stdout.decode().strip() or "sha1"
-
-
-def blob_id(data):
-    # The id git gives these bytes as a blob with no path filters, which is what `hash-object --stdin` computes.
-    return hashlib.new(algo, b"blob %d\0" % len(data) + data).hexdigest()
-
-
-def hash_files(paths):
-    # One `hash-object --stdin-paths` for every path it can name on a line (it reads a leading quote as C quoting and drops
-    # a carriage return before the newline), and one `hash-object -- <path>` for the rest and for every path of a batch
-    # git refused (it stops at the first path it cannot hash); a failure leaves an empty id, which differs.
-    ids = {}
-    batch = [p for p in paths if b"\n" not in p and not p.startswith(b'"') and not p.endswith(b"\r")]
-    if batch:
-        proc = subprocess.run(["git", "-C", copy, "hash-object", "--stdin-paths"], input=b"".join(p + b"\n" for p in batch),
-                              capture_output=True, env=env)
-        rows = proc.stdout.decode().split()
-        if proc.returncode == 0 and len(rows) == len(batch):
-            ids.update(zip(batch, rows))
-    for path in paths:
-        if path not in ids:
-            one = subprocess.run(["git", "-C", copy, "hash-object", "--", os.fsdecode(path)], capture_output=True,
-                                 stdin=subprocess.DEVNULL, env=env)
-            ids[path] = one.stdout.decode().strip()
-    return ids
-
-
-regular = []
-for tag, path in flagged:
-    full = os.path.join(os.fsencode(copy), path)
-    if not os.path.lexists(full):
-        # An assume-unchanged path that is gone was deleted by the task, which status cannot show; a skip-worktree path
-        # that is absent is what sparse checkout leaves unmaterialized on purpose, so it is not a difference.
-        if tag.islower() and tag != b"s":
-            add(path)
-        continue
-    entry = index.get(path, [])
-    if len(entry) < 2:
-        continue
-    mode, want = entry[0].decode(), entry[1].decode()
-    if os.path.islink(full):
-        if mode != "120000" or blob_id(os.readlink(full)) != want:
-            add(path)
-    elif not os.path.isfile(full):
-        # A directory or other non-file where a tracked file was: git cannot hash it as a blob, so it differs.
-        add(path)
-    else:
-        regular.append((path, mode, want, "100755" if os.stat(full).st_mode & 0o100 else "100644"))
-hashed = hash_files([path for path, _mode, _want, _have in regular])
-for path, mode, want, have in regular:
-    if hashed[path] != want or have != mode:
-        add(path)
+# Tracked paths that status cannot report (FM_SLOT_FLAGGED_DEF).
+for path in flagged_changed(git, copy):
+    add(path)
 print("drift-count\t%d" % len(proven))
 for path in sorted(proven):
     labels = [proven[path]] + sorted(status.get(path, ()))
@@ -1131,6 +1178,10 @@ for limit in dict.fromkeys(limits):
     print("limitation\t" + limit)
 FMDRIFTPY
 )
+FM_SLOT_DRIFT_PY="$FM_SLOT_OWN_LINE_DEF
+$FM_SLOT_FLAGGED_DEF
+$FM_SLOT_STATUS_DEF
+$FM_SLOT_DRIFT_BODY"
 
 # The most `uncertain,ignored` drift lines the stderr report prints when the complete report is written to a file.
 FM_SLOT_DRIFT_SAMPLE=20
@@ -1219,6 +1270,1210 @@ This section supersedes earlier branch-creation or clean-base reset instructions
 Do not create another worktree inside this copy, delete or edit the lifecycle manifest, or widen the recorded scope.
 Paths you changed outside the recorded scope stay your own work and are reported to firstmate, and the push-time owned_paths check decides what may be pushed; a refused push or a wider scope must return to firstmate with the exact refusal, never to a nested-worktree fallback.
 EOF
+}
+
+# --- Re-recording a renewed slot identity (fm-control <id> rerecord-slot) ----------------------
+# When the project renews a governed task's durable slot record after an authorized forward merge and scope refresh, the
+# task record still holds the slot identity copied at spawn, so adoption refuses every relaunch. These functions are the
+# one supported way to re-record it: they rewrite only the task record's slot_base_sha= and slot_owned_path= lines, from
+# the renewed record, and only when the renewed record is this task's own lease for this copy, branch and owner, its base
+# is a forward move to the copy's current merge-base with the project default branch, and its scope is the previously
+# recorded scope plus the minimal cover of every path the branch changed.
+# What they read: the task record and the manifest (copied once into a private snapshot, whose bytes every content
+# verdict reads), the copy's git history, refs, operation markers and working-copy status (this block's own git reads
+# run with GIT_OPTIONAL_LOCKS=0; the shared isolation and custody checks it calls read as they always have), the
+# copy-custody owners, the relaunch journal, the backlog-close marker, the endpoint's agent
+# state and the per-task spawn lock. The verdicts (fm_slot_rerecord_*_verdict and fm_slot_rerecord_verdict) and the
+# proofs write nothing; the two content-proof steps (fm_slot_rerecord_*_step) write only into the work directory their
+# caller gives them. The only writers are fm_slot_rerecord_stage (a staged record under state/), fm_slot_rerecord_archive
+# (the prior record and the audit record under data/<id>/slot-rerecord/), fm_slot_rerecord_audit_set (audit result
+# rewrites), the publish and restore of the task record by bin/fm-backlog-transition-lib.sh's publisher, and
+# fm_slot_rerecord_reconcile_pending's sweep of this task's own leftover temporaries.
+# docs/agent-control.md "Re-recording a renewed slot identity" owns the operator contract and every refusal.
+
+FM_SLOT_RERECORD_REASON=
+FM_SLOT_RERECORD_DETAIL=
+FM_SLOT_RERECORD_SPAWN_LOCK=
+# The run whose write is in flight, set by the verb and read by the stage rules, the commit, the rollback and the
+# reconciliation: state dir, task id, task record, audit directory, staged record, audit record, archive, and the prior
+# (P) and staged (S) record digests.
+FM_RR_STATE=
+FM_RR_ID=
+FM_RR_META=
+FM_RR_DIR=
+FM_RR_STAGED=
+FM_RR_AUDIT=
+FM_RR_ARCHIVE=
+FM_RR_P=
+FM_RR_S=
+# The audit records a --check run found pending or rolling-back, as comma-joined file names.
+FM_RR_PENDING=
+# What a write run's step 3 reconciliation did to each pending or rolling-back audit record, as comma-joined phrases.
+FM_RR_RECONCILED=
+# The error a rollback's restore publish reported, named by fm_slot_rerecord_restored, and 1 once that restore publish
+# has run (whatever it reported), so no later line claims "not restored" for a record the publish may have touched.
+FM_RR_RESTORE_ERROR=
+FM_RR_RESTORE_PUBLISHED=0
+# What that restore publish returned once it ran: success or failure, so a line about the publisher says what it returned.
+FM_RR_RESTORE_RESULT=
+# A write run's outcome lines (stdout, stderr). fm_slot_rerecord_report stores them in one assignment each and only
+# fm-control's EXIT trap prints them, once, so no exit prints an outcome and then flags it as printed. A stored outcome
+# never carries a copy of the step 3 entries: it carries a marker where they go (fm_slot_rerecord_changes,
+# fm_slot_rerecord_entries_mark, fm_slot_rerecord_changes_line), and fm_slot_rerecord_expand fills every marker from the
+# entries recorded when the trap prints, so an entry recorded after the outcome was stored is still named, once.
+FM_RR_FINAL_OUT=
+FM_RR_FINAL_ERR=
+# The step 3 audit record this run is closing (set before its rename, cleared by fm_slot_rerecord_closed), so the EXIT
+# trap can name an audit record whose rename landed before its entry was recorded.
+FM_RR_CLOSING=
+
+fm_slot_rerecord_report() { # <out|err> <text>: store <text> (one or more lines) as this run's outcome
+  if [ "$1" = out ]; then
+    FM_RR_FINAL_OUT="$FM_RR_FINAL_OUT$2"$'\n'
+  else
+    FM_RR_FINAL_ERR="$FM_RR_FINAL_ERR$2"$'\n'
+  fi
+}
+
+fm_slot_rerecord_reported() { # whether this run's outcome is already stored
+  [ -n "$FM_RR_FINAL_OUT$FM_RR_FINAL_ERR" ]
+}
+
+# For the EXIT trap: an audit record whose closing rename may have landed before fm_slot_rerecord_closed recorded it is
+# read back from disk and named, unless an entry for it is already recorded or <named-audit>, the audit record a line the
+# trap stored already names, is that audit record.
+fm_slot_rerecord_closing_entry() { # [named-audit]
+  local audit=$FM_RR_CLOSING result
+  [ -n "$audit" ] || return 0
+  [ "$audit" != "${1:-}" ] || { FM_RR_CLOSING=; return 0; }
+  case ", $FM_RR_RECONCILED" in
+    *", audit $audit "*) FM_RR_CLOSING=; return 0 ;;
+  esac
+  result=$(fm_slot_rerecord_field "$audit" result 2>/dev/null) || result=
+  fm_slot_rerecord_reconciled "$audit" "reads ${result:-unreadable}" "this run stopped while closing it"
+  FM_RR_CLOSING=
+}
+
+fm_slot_rerecord_fail() { # <reason> <detail>
+  FM_SLOT_RERECORD_REASON=$1
+  FM_SLOT_RERECORD_DETAIL=${2:-}
+  return 1
+}
+
+# The text of what a run that stops before its own publish changed, from the entries recorded now: <unchanged> when its
+# step 3 reconciliation acted on no audit record, otherwise every reconciliation entry. Only fm_slot_rerecord_expand
+# calls it, at print time.
+fm_slot_rerecord_changes_text() { # <refusing|stopping|...> <unchanged>
+  if [ -z "$FM_RR_RECONCILED" ]; then
+    printf '%s\n' "$2"
+  else
+    printf 'before %s, this run reconciled earlier interrupted runs: %s; no manifest, copy or journal was changed\n' \
+      "$1" "$FM_RR_RECONCILED"
+  fi
+}
+
+# Markers for a stored outcome, each delimited by US (\037) with its fields split by RS (\036); the bytes never occur in
+# the text around them. fm_slot_rerecord_changes marks fm_slot_rerecord_changes_text <verb> <unchanged>;
+# fm_slot_rerecord_entries_mark marks "; <frame>, this run reconciled earlier interrupted runs: <entries>", or nothing
+# when there is no entry; fm_slot_rerecord_changes_line marks a whole line "<prefix><changes text>" that is dropped when
+# there is no entry.
+fm_slot_rerecord_changes() { # <refusing|stopping|...> <unchanged>
+  printf '\037R\036%s\036%s\037' "$1" "$2"
+}
+fm_slot_rerecord_entries_mark() { # <frame>
+  printf '\037E\036%s\037' "$1"
+}
+fm_slot_rerecord_changes_line() { # <prefix> <verb>
+  printf '\037L\036%s\036%s\037' "$1" "$2"
+}
+
+# <text> with every marker filled from the entries recorded now, and every line a marker left empty dropped.
+fm_slot_rerecord_expand() { # <text>
+  local rest=$1 out='' mark kind field line
+  while [[ "$rest" == *$'\037'* ]]; do
+    out+=${rest%%$'\037'*}
+    rest=${rest#*$'\037'}
+    mark=${rest%%$'\037'*}
+    rest=${rest#*$'\037'}
+    kind=${mark%%$'\036'*}
+    field=${mark#*$'\036'}
+    case "$kind" in
+      R) out+=$(fm_slot_rerecord_changes_text "${field%%$'\036'*}" "${field#*$'\036'}") ;;
+      E) [ -z "$FM_RR_RECONCILED" ] || out+="; $field, this run reconciled earlier interrupted runs: $FM_RR_RECONCILED" ;;
+      L) [ -z "$FM_RR_RECONCILED" ] || out+="${field%%$'\036'*}$(fm_slot_rerecord_changes_text "${field#*$'\036'}" '')" ;;
+    esac
+  done
+  out+=$rest
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "$line" ] || printf '%s\n' "$line"
+  done <<< "$out"
+}
+
+# What the task record holds now, read from its bytes at the moment of the call and never assumed from the step that ran:
+# staged (sha256 FM_RR_S), prior (FM_RR_P), neither, or unreadable when no sha256 can be read from it. A read that fails
+# is unreadable, never "neither".
+fm_slot_rerecord_record_state() {
+  local sha
+  sha=$(fm_slot_rerecord_sha "$FM_RR_META" 2>/dev/null) || sha=
+  if ! printf '%s\n' "$sha" | grep -Eqx '[0-9a-f]{64}'; then
+    printf 'unreadable\n'
+  elif [ -n "$FM_RR_S" ] && [ "$sha" = "$FM_RR_S" ]; then
+    printf 'staged\n'
+  elif [ -n "$FM_RR_P" ] && [ "$sha" = "$FM_RR_P" ]; then
+    printf 'prior\n'
+  else
+    printf 'neither\n'
+  fi
+}
+
+# A step 3 entry's record effect after it rolled an earlier interrupted run back, from fm_slot_rerecord_record_state.
+fm_slot_rerecord_record_effect() {
+  case "$(fm_slot_rerecord_record_state)" in
+    prior) printf "the task record was restored to the prior record's bytes\n" ;;
+    staged) printf "the task record still holds the interrupted run's published record\n" ;;
+    neither) printf 'the task record holds bytes that are neither the prior nor the staged record\n' ;;
+    *) printf 'the task record could not be read\n' ;;
+  esac
+}
+
+# What a run that published its own staged record did after its rollback, from what the record holds now
+# (fm_slot_rerecord_record_state), naming a restore publish that reported failure (FM_RR_RESTORE_ERROR), the audit
+# record and its result, and every step 3 entry.
+fm_slot_rerecord_restored() {
+  local entries='' outcome
+  case "$(fm_slot_rerecord_record_state)" in
+    prior)
+      outcome="then restored the prior record from $FM_RR_ARCHIVE"
+      [ -z "${FM_RR_RESTORE_ERROR:-}" ] ||
+        outcome="$outcome, although the restore publish reported failure ($FM_RR_RESTORE_ERROR)"
+      ;;
+    staged) outcome="the prior record could not be restored; it is archived at $FM_RR_ARCHIVE" ;;
+    neither)
+      if [ "$FM_RR_RESTORE_PUBLISHED" = 1 ] && [ "$FM_RR_RESTORE_RESULT" = success ]; then
+        outcome="the restore publish returned success but the record did not read back as the prior record, so whether the prior record was restored is not known; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $FM_RR_ARCHIVE"
+      elif [ "$FM_RR_RESTORE_PUBLISHED" = 1 ]; then
+        outcome="the restore publish reported failure ($FM_RR_RESTORE_ERROR), so whether the prior record was restored is not known; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $FM_RR_ARCHIVE"
+      else
+        outcome="the prior record could not be restored; the record now holds bytes that are neither the prior nor this run's published record; the prior record is archived at $FM_RR_ARCHIVE"
+      fi
+      ;;
+    *)
+      outcome="whether the prior record was restored is not known, because the task record could not be read; the prior record is archived at $FM_RR_ARCHIVE"
+      ;;
+  esac
+  entries=$(fm_slot_rerecord_entries_mark 'before publishing')
+  printf "this run published task %s's record and %s; the audit record %s is %s%s; no manifest, copy or journal was changed\n" \
+    "$FM_RR_ID" "$outcome" "$FM_RR_AUDIT" "$(fm_slot_rerecord_field "$FM_RR_AUDIT" result)" "$entries"
+}
+
+# What a run stopped while <stage> may still rename the task record or its audit record did, or with no <stage> what a run
+# stopped after its own publish did: what the record holds now (fm_slot_rerecord_record_state: <whose> published record,
+# the prior record, neither, or that it could not be read), the audit record and its result, and every step 3 entry.
+fm_slot_rerecord_kept() { # <stage-or-empty> <whose>
+  local holds result audit when="after publishing task $FM_RR_ID's record"
+  [ -z "$1" ] || when="while $1 task $FM_RR_ID's record, so that rename may still land"
+  case "$(fm_slot_rerecord_record_state)" in
+    staged) holds="the record now holds $2 published record" ;;
+    prior) holds='the record now holds the prior record' ;;
+    neither) holds='the record now holds bytes that are neither the prior nor the staged record' ;;
+    *) holds='the record could not be read' ;;
+  esac
+  result=$(fm_slot_rerecord_field "$FM_RR_AUDIT" result 2>/dev/null) || result=
+  case "$result" in
+    pending|rolling-back) audit="is left $result for the next write run to reconcile" ;;
+    *) audit="is ${result:-unreadable}" ;;
+  esac
+  printf 'this run stopped %s; %s; the audit record %s %s; %s\n' "$when" "$holds" "$FM_RR_AUDIT" "$audit" \
+    "$(fm_slot_rerecord_changes stopping 'no manifest, copy or journal was changed')"
+}
+
+fm_slot_rerecord_refuse() { # <reason> <detail> [<tail>]: stores the refusal for the EXIT trap to print
+  fm_slot_rerecord_report err \
+    "error: slot rerecord refused: $1${2:+: $2}; ${3:-$(fm_slot_rerecord_changes refusing 'no record, manifest, copy or journal was changed')}"
+  return 1
+}
+
+fm_slot_rerecord_reconciled() { # <audit> <result> <effect>
+  FM_RR_RECONCILED="${FM_RR_RECONCILED:+$FM_RR_RECONCILED, }audit $1 $2 ($3)"
+}
+
+# Step 3: record that the reconciliation left the task record as <record-effect> and closed <audit> as <result>, when the
+# audit record carries <result>; otherwise record that it could not be closed and the result it still carries.
+fm_slot_rerecord_closed() { # <audit> <result> <closed-effect> <record-effect>
+  local now
+  now=$(fm_slot_rerecord_field "$1" result)
+  if [ "$now" = "$2" ]; then
+    fm_slot_rerecord_reconciled "$1" "$2" "$3"
+  else
+    fm_slot_rerecord_reconciled "$1" "could not be closed as $2" "$4; the audit stays ${now:-unreadable}"
+  fi
+  FM_RR_CLOSING=
+}
+
+fm_slot_rerecord_sha() { # <file>
+  [ -f "$1" ] || return 1
+  shasum -a 256 -- "$1" 2>/dev/null | awk '{print $1}'
+}
+
+# The sha256 of a record's slot block: its slot_base_sha= and slot_owned_path= lines, in order.
+fm_slot_rerecord_block_sha() { # <record>
+  { grep -E '^(slot_base_sha|slot_owned_path)=' -- "$1" 2>/dev/null || true; } | shasum -a 256 | awk '{print $1}'
+}
+
+# One key of an audit record: printed only when the file carries exactly one such line.
+fm_slot_rerecord_field() { # <file> <key>
+  local count
+  count=$(grep -c "^$2=" -- "$1" 2>/dev/null) || true
+  [ "${count:-0}" = 1 ] || return 1
+  sed -n "s/^$2=//p" "$1"
+}
+
+# Whether a verdict passed: its first line is byte for byte "ok" and one newline (its first three bytes equal "ok\n"),
+# or with "whole" the whole file is exactly that. The identity, base and scope verdicts print exactly that on success.
+# The bytes are compared with cmp against "ok\n" piped from printf, never read into a variable, so a NUL, a missing
+# newline or a trailing blank line cannot pass. Both statuses of that one pipeline are read before the verdict: the
+# verdict passes only when printf and cmp both exit 0, so a missing or unreadable file, a failed write of "ok\n" or a
+# compare that cannot run does not pass. Otherwise the first line, "<reason><TAB><detail>", is loaded as the refusal,
+# and any other ok-prefixed or empty first line refuses under <reason-if-empty>.
+fm_slot_rerecord_verdict_ok() { # <verdict-file> <reason-if-empty> [whole]
+  local line='' st=()
+  if [ "${3:-}" = whole ]; then
+    printf 'ok\n' | cmp -s -- "$1" - 2>/dev/null
+    st=("${PIPESTATUS[@]}")
+  else
+    printf 'ok\n' | cmp -s -n 3 -- "$1" - 2>/dev/null
+    st=("${PIPESTATUS[@]}")
+  fi
+  [ "${#st[@]}" = 2 ] && [ "${st[0]}" = 0 ] && [ "${st[1]}" = 0 ] && return 0
+  IFS= read -r line 2>/dev/null < "$1" || true
+  case "$line" in
+    ok*) fm_slot_rerecord_fail "$2" 'the verdict printed a malformed ok line' ;;
+    '') fm_slot_rerecord_fail "$2" 'the verdict could not be computed' ;;
+    *$'\t'*) fm_slot_rerecord_fail "${line%%$'\t'*}" "${line#*$'\t'}" ;;
+    *) fm_slot_rerecord_fail "$line" '' ;;
+  esac
+}
+
+# A1: only the lock-owning main Firstmate may re-record. The caller sources bin/fm-session-lock-lib.sh first.
+fm_slot_rerecord_authorized() { # <state-dir>
+  local actor
+  [ -z "${FM_TASK_ID:-}" ] ||
+    { fm_slot_rerecord_fail actor_not_main 'a worker (FM_TASK_ID is set) never re-records slot identity'; return 1; }
+  actor=$(fm_lease_actor 2>/dev/null) ||
+    { fm_slot_rerecord_fail actor_not_main "the supervision actor '${FM_SUPERVISION_ACTOR:-}' is not recognised"; return 1; }
+  [ "$actor" = main ] ||
+    { fm_slot_rerecord_fail actor_not_main 'the supervision branch never re-records slot identity; leave it to main (role partition: docs/pi-supervision-branch.md)'; return 1; }
+  fm_session_lock_owned_by_self "$1" ||
+    { fm_slot_rerecord_fail session_lock_not_owned 're-recording slot identity requires the actual lock-owning main Firstmate'; return 1; }
+}
+
+# Proof 1: a ship or scout whose record names its own slot manifest, base and scope, on the adoption route.
+fm_slot_rerecord_prove_shape() { # <record>
+  local record=$1 count kind
+  count=$(grep -c '^kind=' -- "$record" 2>/dev/null) || true
+  [ "${count:-0}" = 1 ] ||
+    { fm_slot_rerecord_fail not_ship_or_scout "the record carries ${count:-0} kind= lines, not exactly one"; return 1; }
+  kind=$(fm_meta_get "$record" kind)
+  case "$kind" in
+    ship|scout) ;;
+    *) fm_slot_rerecord_fail not_ship_or_scout "the task is a '$kind'"; return 1 ;;
+  esac
+  { [ -n "$(fm_meta_get "$record" slot_manifest)" ] && [ -n "$(fm_meta_get "$record" slot_base_sha)" ] &&
+    grep -q '^slot_owned_path=' -- "$record"; } ||
+    { fm_slot_rerecord_fail not_recorded 'the record does not name a slot manifest, a slot base and at least one slot scope entry'; return 1; }
+  fm_slot_adopt_route "$record" 0 ||
+    { fm_slot_rerecord_fail not_adoption_route 'the record carries recovery=slot-provision-refused, so its first provisioning never finished'; return 1; }
+  ! grep -q '^slot_source_ref=' -- "$record" ||
+    { fm_slot_rerecord_fail local_only_source_unsupported 'the record declares a local-only slot source (slot_source_ref=), which this verb does not re-record'; return 1; }
+}
+
+# Proof 2: the agent at the recorded endpoint is proven stopped, exactly the reconcile-only rule.
+fm_slot_rerecord_prove_stopped() { # <backend> <target> <worktree>
+  local state absence
+  fm_control_backend_state_verified "$1" ||
+    { fm_slot_rerecord_fail agent_not_proven_stopped "backend $1 has no recovery-grade agent-state classifier"; return 1; }
+  state=$(fm_backend_agent_state "$1" "$2")
+  case "$state" in
+    dead) return 0 ;;
+    missing)
+      absence=$(fm_control_endpoint_absence_verdict "$1" "$2" "$3")
+      case "${absence%%$'\t'*}" in
+        dead|gone) return 0 ;;
+      esac
+      fm_slot_rerecord_fail agent_not_proven_stopped "the endpoint $2 reads missing and its absence is not proven (${absence#*$'\t'})"
+      return 1
+      ;;
+  esac
+  fm_slot_rerecord_fail agent_not_proven_stopped "the endpoint $2 reads '$state'; stop it with fm-control.sh <id> exit, then re-record"
+}
+
+# Proof 2b: no launch owner holds the task's spawn lock. Tried nonwaiting with the default pid binding, as fm-spawn.sh
+# takes it; on success the caller holds it to exit (FM_SLOT_RERECORD_SPAWN_LOCK names it).
+fm_slot_rerecord_prove_no_launch() { # <state-dir> <task-id>
+  local lock="$1/.spawn-$2.lock"
+  FM_SLOT_RERECORD_SPAWN_LOCK=
+  if fm_lock_try_acquire "$lock"; then
+    FM_SLOT_RERECORD_SPAWN_LOCK=$lock
+    return 0
+  fi
+  if [ "${FM_LOCK_BUSY:-0}" = 1 ]; then
+    fm_slot_rerecord_fail launch_in_progress "the holder of the task's spawn lock $lock (pid ${FM_LOCK_HELD_PID:-unknown}) is still running; the refusal ends when that holder exits, and a holder that never exits belongs to the stuck-worker recovery path"
+  else
+    fm_slot_rerecord_fail launch_in_progress "the task's spawn lock $lock could not be acquired, so no launch owner is proved absent"
+  fi
+}
+
+# Proof 3: the one place this verb reads the relaunch journal classes (fm_control_relaunch_journal_verdict). Every
+# failed:* journal proceeds to the stopped proof, which judges it; an in-flight or unreadable journal refuses.
+fm_slot_rerecord_journal_disposition() { # <class> <journal>
+  local phase
+  case "$1" in
+    absent|complete|failed-closed|failed-needs-stopped|failed-open) return 0 ;;
+    in-flight)
+      phase=$(grep '^phase=' -- "$2" 2>/dev/null | head -n 1) || phase=
+      fm_slot_rerecord_fail relaunch_unfinished "the relaunch journal $2 records ${phase:-no phase}, so its transaction may still be in flight; closing an in-flight journal belongs to relaunch recovery, not to this verb (follow-up backlog item fm-relaunch-inflight-journal-recovery)"
+      ;;
+    *)
+      fm_slot_rerecord_fail relaunch_unfinished "the relaunch journal $2 cannot be read as this task's (not a regular file, a symlink, unreadable, or naming another task); reconcile it before re-recording (follow-up backlog item fm-relaunch-inflight-journal-recovery)"
+      ;;
+  esac
+}
+
+fm_slot_rerecord_prove_no_backlog_close() { # <state-dir> <task-id>
+  [ ! -e "$1/$2.backlog-close" ] && [ ! -L "$1/$2.backlog-close" ] && return 0
+  fm_slot_rerecord_fail backlog_close_pending "task $2 has a pending authoritative backlog close; finish or repair it before re-recording"
+}
+
+# Proof 4: the pointer is the provisioner's durable record for the copy (judged by path, so it reads the live pointer).
+fm_slot_rerecord_prove_records() { # <project> <copy> <pointer>
+  local real paths verdict
+  [ -f "$3" ] && [ ! -L "$3" ] ||
+    { fm_slot_rerecord_fail manifest_missing "$3 is not a regular file"; return 1; }
+  real=$(CDPATH='' cd -- "$2" 2>/dev/null && pwd -P) ||
+    { fm_slot_rerecord_fail manifest_store_unknown "the copy $2 cannot be read, so its record stores cannot be computed"; return 1; }
+  paths=$(fm_slot_record_paths "$1" "$real") ||
+    { fm_slot_rerecord_fail manifest_store_unknown "the repository of $1 cannot be read, so the record stores cannot be computed"; return 1; }
+  verdict=$(fm_slot_adopt_records "$3" "${paths%%$'\n'*}" "${paths#*$'\n'}") ||
+    { fm_slot_rerecord_fail manifest_unreadable "$3"; return 1; }
+  [ "${verdict%%$'\t'*}" = ok ] && return 0
+  fm_slot_rerecord_fail "${verdict%%$'\t'*}" "${verdict#*$'\t'}"
+}
+
+# Proof 5, manifest fields: lifecycle, copy, branch and owner. Pure; prints ok or "<reason><TAB><detail>".
+fm_slot_rerecord_identity_verdict() { # <manifest> <recorded-worktree> <branch> <task-id>
+  python3 -I - "$@" <<'PY'
+import json
+import os
+import sys
+
+manifest, worktree, branch, task = sys.argv[1:5]
+try:
+    with open(manifest, encoding="utf-8") as handle:
+        record = json.load(handle)
+except (OSError, ValueError):
+    print("manifest_unreadable\tthe manifest is not valid JSON")
+    sys.exit(0)
+if not isinstance(record, dict):
+    print("manifest_unreadable\tthe manifest is not a JSON object")
+    sys.exit(0)
+
+
+def field(name):
+    value = record.get(name)
+    return value if isinstance(value, str) else ""
+
+
+if field("lifecycle_state") != "worktree_active":
+    print("lifecycle_state_mismatch\tmanifest state is %r, not worktree_active" % field("lifecycle_state"))
+elif not field("worktree_path") or os.path.realpath(field("worktree_path")) != os.path.realpath(worktree):
+    print("worktree_path_mismatch\tmanifest names %r, the task copy is %r" % (field("worktree_path"), worktree))
+elif field("branch") != branch:
+    print("branch_mismatch\tmanifest branch is %r, the task branch is %r" % (field("branch"), branch))
+elif field("owner_id") != task:
+    print("owner_mismatch\tmanifest owner is %r, the task is %r" % (field("owner_id"), task))
+else:
+    print("ok")
+PY
+}
+
+# Proof 5, the copy: isolated, same repository, on its branch with no operation in progress, custody agreed.
+fm_slot_rerecord_prove_copy() { # <project> <copy> <branch> <task-id> <meta> <state-dir> <manifest-snapshot>
+  local project=$1 copy=$2 branch=$3 id=$4 meta=$5 state=$6 manifest=$7 common slot_common root head marker git_path
+  fm_task_copy_isolated "$copy" "$project" ||
+    { fm_slot_rerecord_fail not_isolated "$FM_TASK_COPY_REASON"; return 1; }
+  common=$(GIT_OPTIONAL_LOCKS=0 git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
+    { fm_slot_rerecord_fail repository_mismatch "the repository of $project cannot be read"; return 1; }
+  slot_common=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
+    { fm_slot_rerecord_fail repository_mismatch "the repository of $copy cannot be read"; return 1; }
+  [ "$common" = "$slot_common" ] ||
+    { fm_slot_rerecord_fail repository_mismatch "$copy is not a checkout of $project's repository"; return 1; }
+  root=$(python3 -I -c 'import json, sys
+try:
+    value = json.load(open(sys.argv[1], encoding="utf-8")).get("repo_root")
+except Exception:
+    value = None
+print(value if isinstance(value, str) else "")' "$manifest" 2>/dev/null) || root=
+  if [ -z "$root" ] || ! { [ "$(dirname "$common")" -ef "$root" ] ||
+    [ "$(GIT_OPTIONAL_LOCKS=0 git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$common" ]; }; then
+    fm_slot_rerecord_fail repository_mismatch "the manifest's repository root '${root}' is not this task's repository"
+    return 1
+  fi
+  head=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" symbolic-ref -q HEAD 2>/dev/null) || head=
+  [ "$head" = "refs/heads/$branch" ] ||
+    { fm_slot_rerecord_fail operation_in_progress "the copy is on ${head:-a detached HEAD}, not refs/heads/$branch"; return 1; }
+  for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply sequencer; do
+    git_path=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --path-format=absolute --git-path "$marker" 2>/dev/null) ||
+      { fm_slot_rerecord_fail operation_in_progress "the copy's $marker marker cannot be located"; return 1; }
+    [ ! -e "$git_path" ] ||
+      { fm_slot_rerecord_fail operation_in_progress "the copy has $marker, so a git operation is in progress"; return 1; }
+  done
+  fm_slot_custody_check "$project" "$copy" "$id" "$meta" "$state" ||
+    { fm_slot_rerecord_fail "$FM_SLOT_CUSTODY_REASON" "$FM_SLOT_CUSTODY_DETAIL"; return 1; }
+}
+
+# Proof 6: the manifest base is a forward move of the recorded base to the copy's current merge-base with
+# origin/<default>. Reads the copy's refs and history; never fetches. Prints ok or "<reason><TAB><detail>".
+fm_slot_rerecord_base_verdict() { # <manifest> <copy> <project> <recorded-base> <head>
+  local default
+  default=$(fm_task_copy_default_branch "$3" 2>/dev/null) || default=
+  python3 -I - "$1" "$2" "$default" "$4" "$5" <<'PY'
+import json
+import os
+import re
+import subprocess
+import sys
+
+manifest, copy, default, recorded, head = sys.argv[1:6]
+env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+
+
+def git(*args):
+    return subprocess.run(["git", "-C", copy, *args], capture_output=True, stdin=subprocess.DEVNULL, env=env)
+
+
+try:
+    with open(manifest, encoding="utf-8") as handle:
+        record = json.load(handle)
+    if not isinstance(record, dict):
+        raise ValueError
+except (OSError, ValueError):
+    print("manifest_unreadable\tthe manifest is not a JSON object")
+    sys.exit(0)
+
+
+def field(name):
+    value = record.get(name)
+    return value if isinstance(value, str) else ""
+
+
+def ancestor(a, b):
+    return bool(a) and bool(b) and git("merge-base", "--is-ancestor", a, b).returncode == 0
+
+
+if not default:
+    print("default_branch_unreadable\tthe project default branch cannot be resolved")
+    sys.exit(0)
+tip = git("rev-parse", "--verify", "--quiet", "refs/remotes/origin/%s^{commit}" % default)
+tip = tip.stdout.decode().strip() if tip.returncode == 0 else ""
+if not tip:
+    print("default_branch_unreadable\trefs/remotes/origin/%s does not resolve in the copy; a project whose default branch resolves only locally is not supported" % default)
+    sys.exit(0)
+base = field("base_sha")
+if field("base_ref") != "origin/" + default:
+    print("base_ref_mismatch\tmanifest base_ref is %r, not %r" % (field("base_ref"), "origin/" + default))
+elif not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", base):
+    print("base_invalid\tmanifest base_sha %r is not a full commit id" % base)
+elif not ancestor(recorded, base):
+    print("base_not_forward\tthe recorded base %s is not an ancestor of the manifest base %s" % (recorded, base))
+elif not ancestor(base, tip):
+    print("base_not_on_default\tthe manifest base %s is not on origin/%s (%s)" % (base, default, tip))
+elif not ancestor(base, head):
+    print("base_not_in_head\tthe manifest base %s is not an ancestor of the copy's HEAD %s" % (base, head))
+else:
+    merge_base = git("merge-base", tip, head).stdout.decode().strip()
+    if merge_base != base:
+        print("base_not_merge_base\tthe manifest base %s is not merge-base(origin/%s, HEAD) = %s; renew the durable record against the current merge-base (this verb never fetches: if origin/%s is stale, fetch it in the primary clone first)" % (base, default, merge_base or "none", default))
+    else:
+        print("ok")
+PY
+}
+
+# The task's own first-parent line from <tip> to <head> (FM_SLOT_OWN_LINE_DEF), NUL-separated, sorted.
+fm_slot_own_line_paths() { # <copy> <tip-sha> <head>
+  python3 -I -c "$FM_SLOT_OWN_LINE_DEF
+import sys
+
+copy, tip, head = sys.argv[1:4]
+env = dict(os.environ, GIT_OPTIONAL_LOCKS='0')
+
+
+def git(*args, ok=(0,)):
+    proc = subprocess.run(['git', '-C', copy, *args], capture_output=True, stdin=subprocess.DEVNULL, env=env)
+    if proc.returncode not in ok:
+        raise RuntimeError('git %s exit %d' % (' '.join(args[:2]), proc.returncode))
+    return proc
+
+
+for path in sorted(own_line(git, tip, head)):
+    sys.stdout.buffer.write(path + b'\0')
+" "$1" "$2" "$3"
+}
+
+# The copy's uncommitted set, NUL-separated: every path git status reports (both ends of a rename or copy) plus every
+# index-flagged tracked path that differs (FM_SLOT_FLAGGED_DEF). Ignored files are not in it.
+fm_slot_rerecord_uncommitted_paths() { # <copy>
+  python3 -I -c "$FM_SLOT_FLAGGED_DEF
+$FM_SLOT_STATUS_DEF
+import sys
+
+copy = sys.argv[1]
+env = dict(os.environ, GIT_OPTIONAL_LOCKS='0')
+
+
+def git(*args, ok=(0,)):
+    proc = subprocess.run(['git', '-C', copy, *args], capture_output=True, stdin=subprocess.DEVNULL, env=env)
+    if proc.returncode not in ok:
+        raise RuntimeError('git %s exit %d' % (' '.join(args[:2]), proc.returncode))
+    return proc
+
+
+found = set()
+raw = git('status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none').stdout
+for code, path, other in status_entries(raw):
+    found.add(path)
+    if other:
+        found.add(other)
+found.update(flagged_changed(git, copy))
+for path in sorted(found):
+    sys.stdout.buffer.write(path + b'\0')
+" "$1"
+}
+
+# Proof 7: the manifest scope is the previously recorded scope plus the minimal cover of every path changed on the branch
+# since the manifest base. Reads the manifest, the copy's history and the two lists the verb gathered; prints ok and the
+# report lines (added, rule (c) breadth, side-branch labels, released entries, split), or "<reason><TAB><detail>".
+# Prior entries are normalized to the provisioner's canonical form before every coverage test; new entries must
+# already be canonical.
+fm_slot_rerecord_scope_verdict() { # <manifest> <copy> <head> <own-line-file> <uncommitted-file> <prior-entry>...
+  python3 -I - "$@" <<'PY'
+import json
+import os
+import subprocess
+import sys
+from pathlib import PurePosixPath
+
+manifest, copy, head, own_file, uncommitted_file = sys.argv[1:6]
+prior = sys.argv[6:]
+env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+
+
+def refuse(reason, detail):
+    print("%s\t%s" % (reason, detail))
+    sys.exit(0)
+
+
+def escape(path):
+    out = []
+    for ch in path:
+        if ch == "\\":
+            out.append("\\\\")
+        elif 0x20 <= ord(ch) < 0x7F:
+            out.append(ch)
+        else:
+            out.append("".join("\\x%02x" % b for b in ch.encode("utf-8", "surrogateescape")))
+    return "".join(out)
+
+
+def names(raw):
+    return [part.decode("utf-8", "surrogateescape") for part in raw.split(b"\0") if part]
+
+
+def git(*args):
+    proc = subprocess.run(["git", "-C", copy, *args], capture_output=True, stdin=subprocess.DEVNULL, env=env)
+    if proc.returncode:
+        refuse("scope_invalid", "git %s could not be read in the copy" % args[0])
+    return proc.stdout
+
+
+try:
+    with open(manifest, encoding="utf-8") as handle:
+        record = json.load(handle)
+    if not isinstance(record, dict):
+        raise ValueError
+except (OSError, ValueError):
+    refuse("manifest_unreadable", "the manifest is not a JSON object")
+base = record.get("base_sha") if isinstance(record.get("base_sha"), str) else ""
+new = record.get("owned_paths")
+if not isinstance(new, list) or not new or not all(isinstance(entry, str) for entry in new):
+    refuse("scope_invalid", "owned_paths is not a nonempty list of strings")
+for entry in new:
+    if not entry or "\n" in entry or "\r" in entry:
+        refuse("scope_invalid", "an owned path is empty or not a single line")
+if len(set(new)) != len(new):
+    refuse("scope_invalid", "owned_paths carries a duplicate entry")
+for entry in new:
+    if entry == "." or entry.startswith("/") or ".." in PurePosixPath(entry).parts:
+        refuse("scope_invalid", "%s is '.', absolute, or contains a '..' segment" % escape(entry))
+for entry in new:
+    if PurePosixPath(entry).as_posix() != entry:
+        refuse("scope_not_canonical", "%s is not in canonical form (%s); renew the durable record with the canonical entry" % (escape(entry), escape(PurePosixPath(entry).as_posix())))
+
+changed = set(names(git("diff", "--name-only", "--no-renames", "-z", base, head)))
+tracked = set(names(git("ls-tree", "-r", "-z", "--name-only", base)))
+tracked_dirs = set()
+for path in tracked:
+    parts = path.split("/")
+    for i in range(1, len(parts)):
+        tracked_dirs.add("/".join(parts[:i]))
+
+
+def covers(entry, path):
+    return path == entry or path.startswith(entry + "/")
+
+
+for entry in new:
+    if entry not in tracked and entry not in tracked_dirs:
+        refuse("scope_not_tracked", "%s is not tracked at the manifest base %s" % (escape(entry), base))
+uncovered = sorted(path for path in changed if not any(covers(entry, path) for entry in new))
+if uncovered:
+    refuse("scope_uncovered_change", ", ".join(escape(path) for path in uncovered))
+
+old = [PurePosixPath(entry).as_posix() for entry in prior]
+added_paths = changed - tracked
+
+
+def deepest_tracked(path):
+    parts = path.split("/")
+    for i in range(len(parts) - 1, 0, -1):
+        candidate = "/".join(parts[:i])
+        if candidate in tracked_dirs:
+            return candidate
+    return None
+
+
+ancestors = {deepest_tracked(path) for path in added_paths} - {None}
+rule = {}
+for entry in new:
+    if any(covers(entry_old, entry) for entry_old in old):
+        rule[entry] = "a"
+    elif entry in changed:
+        rule[entry] = "b"
+    elif entry in ancestors:
+        rule[entry] = "c"
+    else:
+        refuse("scope_entry_not_own_work", "%s is neither inside the recorded scope, nor a path the branch changed, nor the deepest tracked directory holding a file the branch added" % escape(entry))
+
+with open(own_file, "rb") as handle:
+    own = set(names(handle.read()))
+with open(uncommitted_file, "rb") as handle:
+    uncommitted = set(names(handle.read()))
+
+
+def newly(path):
+    return not any(covers(entry_old, path) for entry_old in old)
+
+
+side = changed - own
+out = ["ok"]
+added = [entry for entry in new if rule[entry] in ("b", "c")]
+for entry in added:
+    out.append("added_scope=%s rule=%s" % (entry, rule[entry]))
+for entry in new:
+    if rule[entry] != "c":
+        continue
+    breadth = [path for path in tracked if covers(entry, path) and newly(path)]
+    out.append("rule_c_entry=%s added=%d tracked_newly_covered=%d untouched=%d uncommitted_newly_covered=%d" % (
+        entry,
+        len([path for path in added_paths if covers(entry, path)]),
+        len(breadth),
+        len([path for path in breadth if path not in changed]),
+        len([path for path in uncommitted if covers(entry, path) and newly(path)])))
+out.append("added_uncommitted_newly_covered=%d" % len(
+    {path for path in uncommitted for entry in added if covers(entry, path) and newly(path)}))
+for entry in added:
+    cov = [path for path in changed if covers(entry, path)]
+    k = len([path for path in cov if path in side])
+    if cov and k == len(cov):
+        out.append("side_branch_only=%s paths=%d/%d" % (entry, k, len(cov)))
+    elif k:
+        out.append("side_branch_mixed=%s paths=%d/%d" % (entry, k, len(cov)))
+for raw_entry, entry_old in zip(prior, old):
+    if not any(covers(entry, entry_old) for entry in new):
+        out.append("released_scope=%s" % raw_entry)
+out.append("scope_split=prior:%d changed:%d ancestor:%d" % (
+    len([e for e in new if rule[e] == "a"]), len([e for e in new if rule[e] == "b"]), len([e for e in new if rule[e] == "c"])))
+print("\n".join(out))
+PY
+}
+
+# Proof 7, release: no uncommitted path the recorded scope covers may fall outside the new scope. The one owner of this
+# check; it reads the uncommitted set the verb gathered from the copy (fm_slot_rerecord_uncommitted_paths).
+fm_slot_rerecord_prove_no_strand() { # <uncommitted-file> <manifest> <prior-entry>...
+  local verdict
+  verdict=$(python3 -I - "$@" <<'PY'
+import json
+import sys
+from pathlib import PurePosixPath
+
+uncommitted_file, manifest = sys.argv[1:3]
+old = [PurePosixPath(entry).as_posix() for entry in sys.argv[3:]]
+try:
+    new = json.load(open(manifest, encoding="utf-8")).get("owned_paths") or []
+    with open(uncommitted_file, "rb") as handle:
+        uncommitted = [part.decode("utf-8", "surrogateescape") for part in handle.read().split(b"\0") if part]
+except Exception:
+    print("scope_release_strands_work\tthe copy's uncommitted set could not be read, so no stranded work is proved absent")
+    sys.exit(0)
+
+
+def covers(entry, path):
+    return path == entry or path.startswith(entry + "/")
+
+
+stranded = sorted(path for path in uncommitted
+                  if any(covers(entry, path) for entry in old) and not any(covers(entry, path) for entry in new))
+if stranded:
+    print("scope_release_strands_work\t" + ", ".join(stranded))
+else:
+    print("ok")
+PY
+) || verdict=
+  case "$verdict" in
+    ok) return 0 ;;
+    *$'\t'*) fm_slot_rerecord_fail "${verdict%%$'\t'*}" "${verdict#*$'\t'}" ;;
+    *) fm_slot_rerecord_fail scope_release_strands_work 'the strand check could not run, so no stranded work is proved absent' ;;
+  esac
+}
+
+# The one content-proof sequence of rerecord-slot, in two steps so the write path can run its copy proof between them:
+# identity, then base, the default-branch tip, the own-line and uncommitted sets, and scope. Each step writes its files
+# into <work> (identity; base, own-line, uncommitted, scope), returns 0 when every verdict passes, and otherwise loads
+# the refusal (fm_slot_rerecord_fail) and returns 1 for a named refusal or 2 when a read or verdict could not run. A
+# verdict that exits non-zero could not run, whatever it printed.
+fm_slot_rerecord_step_refuse() { # <reason> <detail>
+  fm_slot_rerecord_fail "$1" "$2"
+  return 2
+}
+
+fm_slot_rerecord_identity_step() { # <work> <manifest> <copy> <branch> <task-id>
+  ( fm_slot_rerecord_identity_verdict "$2" "$3" "$4" "$5" ) > "$1/identity" ||
+    { fm_slot_rerecord_step_refuse manifest_unreadable 'the verdict could not be computed'; return; }
+  fm_slot_rerecord_verdict_ok "$1/identity" manifest_unreadable
+}
+
+fm_slot_rerecord_history_step() { # <work> <manifest> <copy> <project> <recorded-base> <head> <prior-entry>...
+  local work=$1 manifest=$2 copy=$3 project=$4 recorded=$5 head=$6 default tip
+  shift 6
+  ( fm_slot_rerecord_base_verdict "$manifest" "$copy" "$project" "$recorded" "$head" ) > "$work/base" ||
+    { fm_slot_rerecord_step_refuse base_invalid 'the verdict could not be computed'; return; }
+  fm_slot_rerecord_verdict_ok "$work/base" base_invalid || return
+  default=$(fm_task_copy_default_branch "$project" 2>/dev/null) || default=
+  tip=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --verify --quiet "refs/remotes/origin/$default^{commit}" 2>/dev/null) || tip=
+  # Without these two reads every added entry would read as side-branch work and no stranded work would be proved absent.
+  ( fm_slot_own_line_paths "$copy" "$tip" "$head" ) > "$work/own-line" 2>"$work/own-line.err" ||
+    { fm_slot_rerecord_step_refuse scope_entry_not_own_work "the task's own first-parent line could not be read from the copy, so no entry can be attributed"; return; }
+  ( fm_slot_rerecord_uncommitted_paths "$copy" ) > "$work/uncommitted" 2>"$work/uncommitted.err" ||
+    { fm_slot_rerecord_step_refuse scope_release_strands_work "the copy's uncommitted set could not be read, so no stranded work is proved absent"; return; }
+  ( fm_slot_rerecord_scope_verdict "$manifest" "$copy" "$head" "$work/own-line" "$work/uncommitted" ${1+"$@"} ) > "$work/scope" ||
+    { fm_slot_rerecord_step_refuse scope_invalid 'the verdict could not be computed'; return; }
+  fm_slot_rerecord_verdict_ok "$work/scope" scope_invalid
+}
+
+# The read-only replay of that sequence against a recorded manifest, as a relaunch's adoption can be replayed. It omits
+# only the write path's own proofs (shape, record, copy, no-strand). Prints the first refusal, or ok and the report lines;
+# exits 1 only when a read or verdict could not run. Writes only its own temporary directory, removed before it returns.
+fm_slot_rerecord_verdict() { # <manifest> <copy> <project> <task-id> <branch> <recorded-base> <prior-entry>...
+  local manifest=$1 copy=$2 project=$3 id=$4 branch=$5 recorded=$6 work head rc=0
+  shift 6
+  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-slot-rerecord-verdict.XXXXXX") || return 1
+  head=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --verify HEAD 2>/dev/null) || head=
+  if fm_slot_rerecord_identity_step "$work" "$manifest" "$copy" "$branch" "$id" &&
+    fm_slot_rerecord_history_step "$work" "$manifest" "$copy" "$project" "$recorded" "$head" ${1+"$@"}; then
+    cat -- "$work/scope"
+  else
+    [ "$?" != 2 ] || rc=1
+    printf '%s\t%s\n' "$FM_SLOT_RERECORD_REASON" "$FM_SLOT_RERECORD_DETAIL"
+  fi
+  rm -rf -- "$work"
+  return "$rc"
+}
+
+fm_slot_rerecord_note_ok() { # <note>
+  case "$1" in
+    *[![:space:]]*) return 0 ;;
+  esac
+  fm_slot_rerecord_fail note_required 'a write needs --note (or --note-file) naming the ruling it carries out'
+}
+
+# The one comparison of the manifest bytes against the digest the operator reviewed (--manifest-sha).
+fm_slot_rerecord_binding_ok() { # <manifest> <operator-sha>
+  local now
+  now=$(fm_slot_rerecord_sha "$1") || now=unreadable
+  [ -n "$2" ] && [ "$now" = "$2" ] && return 0
+  fm_slot_rerecord_fail manifest_sha_mismatch "the manifest sha256 is $now, but --manifest-sha names ${2:-nothing}; review the manifest again and bind the digest fm-control.sh <id> rerecord-slot --check prints"
+}
+
+# The rebind and post-publish fingerprint check: the record, the manifest and the copy HEAD still read as expected.
+fm_slot_rerecord_inputs_unchanged() { # <meta> <record-sha> <manifest> <manifest-sha> <copy> <head>
+  local now
+  now=$(fm_slot_rerecord_sha "$1") || now=unreadable
+  [ "$now" = "$2" ] ||
+    { fm_slot_rerecord_fail input_changed_during_rerecord "the task record changed (sha256 $now, expected $2)"; return 1; }
+  now=$(fm_slot_rerecord_sha "$3") || now=unreadable
+  [ "$now" = "$4" ] ||
+    { fm_slot_rerecord_fail input_changed_during_rerecord "the manifest changed (sha256 $now, expected $4)"; return 1; }
+  now=$(GIT_OPTIONAL_LOCKS=0 git -C "$5" rev-parse --verify HEAD 2>/dev/null) || now=unreadable
+  [ "$now" = "$6" ] ||
+    { fm_slot_rerecord_fail input_changed_during_rerecord "the copy HEAD moved ($now, expected $6)"; return 1; }
+}
+
+# Step 2: the staged record is the snapshot's bytes with its slot block replaced, at the first old slot line, by the
+# manifest's base and its owned_paths verbatim and in manifest order.
+fm_slot_rerecord_stage() { # <snapshot-record> <snapshot-manifest> <staged>
+  python3 -I - "$@" <<'PY'
+import json
+import sys
+
+record, manifest, staged = sys.argv[1:4]
+with open(manifest, encoding="utf-8") as handle:
+    data = json.load(handle)
+block = ("slot_base_sha=%s\n" % data["base_sha"]) + "".join("slot_owned_path=%s\n" % path for path in data["owned_paths"])
+with open(record, "rb") as handle:
+    lines = handle.read().splitlines(keepends=True)
+out = []
+written = False
+for line in lines:
+    if line.startswith(b"slot_base_sha=") or line.startswith(b"slot_owned_path="):
+        if not written:
+            out.append(block.encode("utf-8"))
+            written = True
+        continue
+    out.append(line)
+with open(staged, "wb") as handle:
+    handle.write(b"".join(out))
+PY
+}
+
+# Step 3: read the staged file back: its other lines equal the snapshot's, byte for byte and in order, and adoption's own
+# verdict admits its slot lines against the manifest snapshot.
+fm_slot_rerecord_precheck() { # <staged> <snapshot-record> <snapshot-manifest> <real-copy> <branch>
+  local staged=$1 snapshot=$2 manifest=$3 copy=$4 branch=$5 base verdict line
+  local -a scope=()
+  python3 -I - "$staged" "$snapshot" <<'PY' ||
+import sys
+
+
+def others(path):
+    with open(path, "rb") as handle:
+        return [line for line in handle.read().splitlines(keepends=True)
+                if not (line.startswith(b"slot_base_sha=") or line.startswith(b"slot_owned_path="))]
+
+
+sys.exit(0 if others(sys.argv[1]) == others(sys.argv[2]) else 1)
+PY
+    { fm_slot_rerecord_fail adopt_precheck_failed 'the staged record differs from the prior record outside its slot lines'; return 1; }
+  base=$(sed -n 's/^slot_base_sha=//p' "$staged")
+  while IFS= read -r line; do scope+=("$line"); done < <(sed -n 's/^slot_owned_path=//p' "$staged")
+  [ "${#scope[@]}" -gt 0 ] || { fm_slot_rerecord_fail adopt_precheck_failed 'the staged record names no slot scope'; return 1; }
+  verdict=$(fm_slot_adopt_verdict "$manifest" "$copy" "$branch" "$base" "${scope[@]}") || verdict=
+  [ "${verdict%%$'\t'*}" = ok ] && return 0
+  fm_slot_rerecord_fail adopt_precheck_failed "adoption's verdict on the staged record: ${verdict:-could not run}"
+}
+
+fm_slot_rerecord_archive_verified() { # <archive> <prior-sha>
+  [ "$(fm_slot_rerecord_sha "$1")" = "$2" ]
+}
+
+# Step 4: archive the prior record and write the pending audit record, both under <dir> (0700; files 0600). Each name is
+# reserved exclusively at its smallest free counter. The audit record appears only once whole: it is written to a temp
+# file and hard-linked to its reserved name, which fails rather than overwrite. Sets FM_RR_ARCHIVE and FM_RR_AUDIT.
+fm_slot_rerecord_archive() { # <dir> <snapshot-record> <prior-sha> <audit-body>
+  local dir=$1 snapshot=$2 prior=$3 body=$4 stamp n candidate tmp
+  FM_RR_ARCHIVE=
+  FM_RR_AUDIT=
+  { (umask 077 && mkdir -p -- "$dir") && chmod 700 "$dir"; } ||
+    { fm_slot_rerecord_fail archive_unverified "could not create $dir"; return 1; }
+  stamp=$(date -u +%Y%m%dT%H%M%SZ) || { fm_slot_rerecord_fail archive_unverified 'could not date the archive'; return 1; }
+  n=0
+  while :; do
+    candidate="$dir/prior-meta.$stamp.${prior:0:12}.$n"
+    if [ ! -e "$candidate" ] && [ ! -L "$candidate" ] && (set -C; : > "$candidate") 2>/dev/null; then
+      break
+    fi
+    [ -e "$candidate" ] || [ -L "$candidate" ] ||
+      { fm_slot_rerecord_fail archive_unverified "could not reserve an archive name in $dir"; return 1; }
+    n=$((n + 1))
+  done
+  FM_RR_ARCHIVE=$candidate
+  { cp -p -- "$snapshot" "$candidate" && chmod 600 "$candidate"; } ||
+    { fm_slot_rerecord_fail archive_unverified "could not copy the prior record to $candidate; it is kept for inspection"; return 1; }
+  fm_slot_rerecord_archive_verified "$candidate" "$prior" ||
+    { fm_slot_rerecord_fail archive_unverified "the archive $candidate does not read back with sha256 $prior; it is kept for inspection"; return 1; }
+  tmp=$(mktemp "$dir/.audit.XXXXXX") || { fm_slot_rerecord_fail archive_unverified "could not stage the audit record in $dir"; return 1; }
+  { ( printf 'v1\nresult=pending\narchive=%s\n' "$candidate" && cat -- "$body" ) > "$tmp" && chmod 600 "$tmp"; } ||
+    { rm -f -- "$tmp"; fm_slot_rerecord_fail archive_unverified "could not write the audit record in $dir"; return 1; }
+  n=0
+  while :; do
+    candidate="$dir/$stamp.${prior:0:12}.$n.record"
+    if [ ! -e "$candidate" ] && [ ! -L "$candidate" ] && ln -- "$tmp" "$candidate" 2>/dev/null; then
+      break
+    fi
+    [ -e "$candidate" ] || [ -L "$candidate" ] ||
+      { rm -f -- "$tmp"; fm_slot_rerecord_fail archive_unverified "could not reserve an audit record name in $dir"; return 1; }
+    n=$((n + 1))
+  done
+  rm -f -- "$tmp"
+  FM_RR_AUDIT=$candidate
+}
+
+# Rewrite an audit record's result by temp-and-rename in its own directory. mv runs in the caller's shell.
+fm_slot_rerecord_audit_set() { # <audit> <result>
+  local tmp
+  tmp=$(mktemp "$(dirname -- "$1")/.audit.XXXXXX") || return 1
+  if ! { awk -v result="$2" '!done && /^result=/ { print "result=" result; done = 1; next } { print }' "$1" > "$tmp" &&
+    chmod 600 "$tmp"; }; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+  mv -f -- "$tmp" "$1" || { rm -f -- "$tmp"; return 1; }
+}
+
+fm_slot_rerecord_audit_readable() { # <audit>
+  [ -f "$1" ] && [ ! -L "$1" ] && [ -r "$1" ] || return 1
+  [ -n "$(fm_slot_rerecord_field "$1" result)" ] && [ -n "$(fm_slot_rerecord_field "$1" prior_sha256)" ] &&
+    [ -n "$(fm_slot_rerecord_field "$1" staged_sha256)" ]
+}
+
+# What the EXIT trap does for a run interrupted at <stage> (section 5 step 9 of the design): discard the staged record,
+# keep everything for the reconciliation, roll back, or nothing.
+fm_slot_rerecord_trap_action() { # <stage>
+  case "${1:-}" in
+    staged) printf 'discard\n' ;;
+    published) printf 'rollback\n' ;;
+    publishing|committing|restoring) printf 'keep\n' ;;
+    *) printf 'none\n' ;;
+  esac
+}
+
+fm_slot_rerecord_discard_staged() {
+  [ -z "$FM_RR_STAGED" ] || rm -f -- "$FM_RR_STAGED"
+  FM_RR_STAGED=
+  if [ -n "$FM_RR_AUDIT" ] && [ -f "$FM_RR_AUDIT" ]; then
+    fm_slot_rerecord_audit_set "$FM_RR_AUDIT" refused ||
+      echo "warning: the audit record $FM_RR_AUDIT could not be closed as refused" >&2
+  fi
+  RERECORD_STAGE='done'
+}
+
+# Step 7: after publish the record holds the staged bytes, the manifest and the copy HEAD are unchanged, the live manifest
+# still names this task's lease (owner re-read: the whole verdict output is byte for byte "ok" and one newline, through
+# fm_slot_rerecord_verdict_ok), and the real adoption check admits the published record. The owner re-read's output is
+# written beside <stderr-file>, which the caller already cleans up, and removed once judged.
+fm_slot_rerecord_postcheck() { # <meta> <staged-sha> <manifest> <manifest-sha> <copy> <head> <project> <task-id> <branch> <state-dir> <stderr-file>
+  local meta=$1 staged=$2 manifest=$3 msha=$4 copy=$5 head=$6 project=$7 id=$8 branch=$9 state=${10} err=${11} owner rc=0
+  owner="$err.owner"
+  fm_slot_rerecord_inputs_unchanged "$meta" "$staged" "$manifest" "$msha" "$copy" "$head" ||
+    { fm_slot_rerecord_fail adopt_postcheck_failed "$FM_SLOT_RERECORD_DETAIL"; return 1; }
+  # Run the redirected checks in subshells so a signal never enters the parent's EXIT trap with stdout or stderr
+  # redirected into a snapshot file, and without duping stdout/stderr onto extra fds that backgrounded children inherit.
+  if ! ( fm_slot_rerecord_identity_verdict "$manifest" "$copy" "$branch" "$id" ) > "$owner"; then
+    fm_slot_rerecord_fail adopt_postcheck_failed "the live manifest no longer names this task's lease: the owner re-read could not run"
+    rc=1
+  elif ! fm_slot_rerecord_verdict_ok "$owner" manifest_unreadable whole; then
+    fm_slot_rerecord_fail adopt_postcheck_failed \
+      "the live manifest no longer names this task's lease: $FM_SLOT_RERECORD_REASON${FM_SLOT_RERECORD_DETAIL:+$'\t'$FM_SLOT_RERECORD_DETAIL}"
+    rc=1
+  fi
+  rm -f -- "$owner"
+  [ "$rc" = 0 ] || return 1
+  if ! ( fm_slot_adopt_check "$project" "$copy" "$id" "$branch" "$meta" "$state" ) 2> "$err"; then
+    fm_slot_rerecord_fail adopt_postcheck_failed "adoption refuses the published record ($(sed -n '1{s/^[^:]*: [^:]*: //;s/; [^;]*$//;p;}' "$err" 2>/dev/null))"
+    return 1
+  fi
+}
+
+# Step 8: close the audit record as published. A rename that reports failure is judged by the audit bytes (N1): one that
+# landed is committed, one that did not leaves the stage published for the rollback.
+fm_slot_rerecord_commit() {
+  RERECORD_STAGE=committing
+  if fm_slot_rerecord_audit_set "$FM_RR_AUDIT" published ||
+    [ "$(fm_slot_rerecord_field "$FM_RR_AUDIT" result 2>/dev/null)" = published ]; then
+    RERECORD_STAGE='done'
+    return 0
+  fi
+  RERECORD_STAGE=published
+  return 1
+}
+
+# What the task record holds now, as a clause for a rollback's own messages (fm_slot_rerecord_record_state): <if-staged>
+# when it still holds the published record the rollback was to replace, otherwise what it does hold and the archive.
+fm_slot_rerecord_record_holds() { # <if-staged>
+  case "$(fm_slot_rerecord_record_state)" in
+    staged) printf '%s\n' "$1" ;;
+    prior) printf 'the record holds the prior record, which is also archived at %s\n' "$FM_RR_ARCHIVE" ;;
+    neither) printf 'the record holds bytes that are neither the prior nor the staged record; the prior record is archived at %s\n' "$FM_RR_ARCHIVE" ;;
+    *) printf 'the record could not be read; the prior record is archived at %s\n' "$FM_RR_ARCHIVE" ;;
+  esac
+}
+
+# Step 9: restore the prior record from its archive through a fresh state/ copy and the same publisher, then verify it.
+# The archive is never moved, edited or deleted. Every failure returns 1, even one after which the record reads as the
+# prior bytes (a publish that reported failure after its rename landed): each message says what the record holds now.
+fm_slot_rerecord_rollback() {
+  local restore
+  FM_RR_RESTORE_ERROR=
+  FM_RR_RESTORE_PUBLISHED=0
+  FM_RR_RESTORE_RESULT=
+  fm_slot_rerecord_audit_set "$FM_RR_AUDIT" rolling-back ||
+    echo "warning: the audit record $FM_RR_AUDIT could not be marked rolling-back" >&2
+  RERECORD_STAGE=restoring
+  restore=$(mktemp "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-restore.XXXXXX") ||
+    { echo "error: could not stage the restore of task $FM_RR_ID's record; $(fm_slot_rerecord_record_holds "the prior record is archived at $FM_RR_ARCHIVE")" >&2; return 1; }
+  if ! cp -p -- "$FM_RR_ARCHIVE" "$restore" || [ "$(fm_slot_rerecord_sha "$restore")" != "$FM_RR_P" ]; then
+    rm -f -- "$restore"
+    echo "error: the archive $FM_RR_ARCHIVE of task $FM_RR_ID's prior record could not be copied back intact; $(fm_slot_rerecord_record_holds 'the record was not restored')" >&2
+    return 1
+  fi
+  FM_RR_RESTORE_PUBLISHED=1
+  if ! fm_backlog_atomic_transition publish "$restore" "$FM_RR_META" "task record" "$FM_RR_STATE"; then
+    rm -f -- "$restore"
+    FM_RR_RESTORE_RESULT=failure
+    FM_RR_RESTORE_ERROR=${FM_BACKLOG_TRANSITION_ERROR:-publish failed}
+    # The publish ran, so only the record's bytes say whether it restored the prior record.
+    case "$(fm_slot_rerecord_record_state)" in
+      prior)
+        echo "error: the restore publish of task $FM_RR_ID's record reported failure ($FM_RR_RESTORE_ERROR) after its rename landed; the record holds the prior record, which is also archived at $FM_RR_ARCHIVE" >&2
+        ;;
+      staged)
+        echo "error: task $FM_RR_ID's prior record could not be restored ($FM_RR_RESTORE_ERROR); it is archived at $FM_RR_ARCHIVE" >&2
+        ;;
+      neither)
+        echo "error: the restore publish of task $FM_RR_ID's record reported failure ($FM_RR_RESTORE_ERROR), so whether the prior record was restored is not known; the record holds bytes that are neither the prior nor the staged record; the prior record is archived at $FM_RR_ARCHIVE" >&2
+        ;;
+      *)
+        echo "error: the restore publish of task $FM_RR_ID's record reported failure ($FM_RR_RESTORE_ERROR), so whether the prior record was restored is not known; the record could not be read; the prior record is archived at $FM_RR_ARCHIVE" >&2
+        ;;
+    esac
+    return 1
+  fi
+  FM_RR_RESTORE_RESULT=success
+  # The publish returned success; the record's bytes, read once, say whether it now holds the prior record.
+  case "$(fm_slot_rerecord_record_state)" in
+    prior) ;;
+    staged)
+      echo "error: the restore publish of task $FM_RR_ID's record returned success but the record did not read back as the prior record (sha256 $FM_RR_P); it holds the published record it was to replace, so the prior record was not restored; it is archived at $FM_RR_ARCHIVE" >&2
+      return 1
+      ;;
+    neither)
+      echo "error: the restore publish of task $FM_RR_ID's record returned success but the record did not read back as the prior record (sha256 $FM_RR_P), so whether the prior record was restored is not known; the record holds bytes that are neither the prior nor the staged record; the prior record is archived at $FM_RR_ARCHIVE" >&2
+      return 1
+      ;;
+    *)
+      echo "error: the restore publish of task $FM_RR_ID's record returned success but the record could not be read back, so whether the prior record was restored is not known; the prior record is archived at $FM_RR_ARCHIVE" >&2
+      return 1
+      ;;
+  esac
+  fm_slot_rerecord_audit_set "$FM_RR_AUDIT" rolled-back ||
+    echo "warning: the audit record $FM_RR_AUDIT could not be marked rolled-back" >&2
+  RERECORD_STAGE='done'
+}
+
+# Classify the current record against a pending or rolling-back audit record: whole-record digests first, then the slot
+# block the verb owns.
+fm_slot_rerecord_pending_state() { # <audit> <record>
+  local sha block
+  sha=$(fm_slot_rerecord_sha "$2") || sha=
+  if [ -n "$sha" ] && [ "$sha" = "$(fm_slot_rerecord_field "$1" prior_sha256)" ]; then printf 'untouched-prior\n'; return 0; fi
+  if [ -n "$sha" ] && [ "$sha" = "$(fm_slot_rerecord_field "$1" staged_sha256)" ]; then printf 'untouched-staged\n'; return 0; fi
+  block=$(fm_slot_rerecord_block_sha "$2")
+  if [ "$block" = "$(fm_slot_rerecord_field "$1" staged_block_sha256)" ]; then printf 'superseded-new\n'
+  elif [ "$block" = "$(fm_slot_rerecord_field "$1" prior_block_sha256)" ]; then printf 'superseded-prior\n'
+  else printf 'superseded-other\n'
+  fi
+}
+
+# Step 10: sweep this task's leftover temporaries, then resolve every pending or rolling-back audit record by the record's
+# bytes (write), or report each one and name it in FM_RR_PENDING (check). Returns 1 with the refusal loaded for an unreadable audit record, and 2
+# when a resumed restore failed (its error is already printed).
+fm_slot_rerecord_reconcile_pending() { # <write|check> <project> <copy> <branch>
+  local mode=$1 project=$2 copy=$3 branch=$4 entry audit result state
+  FM_RR_PENDING=
+  FM_RR_RECONCILED=
+  if [ "$mode" = write ]; then
+    for entry in "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord."* "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-restore."* \
+      "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap."*; do
+      { [ -e "$entry" ] || [ -L "$entry" ]; } || continue
+      rm -rf -- "$entry"
+    done
+  fi
+  [ -d "$FM_RR_DIR" ] || return 0
+  for audit in "$FM_RR_DIR"/*.record; do
+    { [ -e "$audit" ] || [ -L "$audit" ]; } || continue
+    fm_slot_rerecord_audit_readable "$audit" ||
+      { fm_slot_rerecord_fail rerecord_audit_unreadable "the audit record $audit cannot be read (not a regular file, unreadable, or missing its result=, prior_sha256= or staged_sha256= line); move it aside to continue, which touches no task state"; return 1; }
+  done
+  for audit in "$FM_RR_DIR"/*.record; do
+    [ -f "$audit" ] || continue
+    result=$(fm_slot_rerecord_field "$audit" result)
+    case "$result" in
+      pending|rolling-back) ;;
+      *) continue ;;
+    esac
+    state=$(fm_slot_rerecord_pending_state "$audit" "$FM_RR_META")
+    if [ "$mode" != write ]; then
+      printf 'pending_audit=%s result=%s state=%s\n' "$audit" "$result" "$state"
+      FM_RR_PENDING=${FM_RR_PENDING:+$FM_RR_PENDING,}${audit##*/}
+      continue
+    fi
+    case "$state" in
+      untouched-prior)
+        FM_RR_CLOSING=$audit
+        if [ "$result" = pending ]; then
+          fm_slot_rerecord_audit_set "$audit" abandoned
+          fm_slot_rerecord_closed "$audit" abandoned "the audit was closed with the task record left unchanged" "the task record was left unchanged"
+        else
+          fm_slot_rerecord_audit_set "$audit" rolled-back
+          fm_slot_rerecord_closed "$audit" rolled-back "the audit was closed with the task record left unchanged" "the task record was left unchanged"
+        fi
+        ;;
+      untouched-staged)
+        FM_RR_CLOSING=$audit
+        FM_RR_AUDIT=$audit
+        FM_RR_ARCHIVE=$(fm_slot_rerecord_field "$audit" archive)
+        FM_RR_P=$(fm_slot_rerecord_field "$audit" prior_sha256)
+        FM_RR_S=$(fm_slot_rerecord_field "$audit" staged_sha256)
+        if [ "$result" = pending ] && fm_slot_rerecord_postcheck "$FM_RR_META" "$FM_RR_S" \
+          "$(fm_slot_rerecord_field "$audit" manifest)" "$(fm_slot_rerecord_field "$audit" manifest_sha256)" \
+          "$copy" "$(fm_slot_rerecord_field "$audit" head)" "$project" "$FM_RR_ID" "$branch" "$FM_RR_STATE" \
+          "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap.adopt-err"; then
+          fm_slot_rerecord_audit_set "$audit" published-recovered
+          fm_slot_rerecord_closed "$audit" published-recovered "the audit was closed with the record left as published" "the record was left as published"
+        else
+          rm -f -- "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap.adopt-err"
+          RERECORD_STAGE=published
+          fm_slot_rerecord_rollback || return 2
+          fm_slot_rerecord_closed "$audit" rolled-back "$(fm_slot_rerecord_record_effect)" "$(fm_slot_rerecord_record_effect)"
+          echo "note: the interrupted re-record of task $FM_RR_ID recorded in $audit was rolled back${FM_SLOT_RERECORD_DETAIL:+ ($FM_SLOT_RERECORD_DETAIL)}" >&2
+        fi
+        rm -f -- "$FM_RR_STATE/.$FM_RR_ID.meta.rerecord-snap.adopt-err"
+        FM_RR_AUDIT=
+        FM_RR_ARCHIVE=
+        FM_RR_P=
+        FM_RR_S=
+        RERECORD_STAGE=
+        ;;
+      superseded-new)
+        FM_RR_CLOSING=$audit
+        fm_slot_rerecord_audit_set "$audit" "$state"
+        fm_slot_rerecord_closed "$audit" "$state" "the audit was closed with the record left as published" "the record was left as published"
+        ;;
+      superseded-prior|superseded-other)
+        FM_RR_CLOSING=$audit
+        fm_slot_rerecord_audit_set "$audit" "$state"
+        fm_slot_rerecord_closed "$audit" "$state" "the audit was closed with the task record left unchanged" "the task record was left unchanged"
+        ;;
+    esac
+  done
 }
 
 # --- The slot move: prove the copy idle, then move it with git, then check what moved ----------

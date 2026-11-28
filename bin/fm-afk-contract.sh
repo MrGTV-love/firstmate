@@ -240,10 +240,6 @@ fm_afk_contract_usage() {
   sed -n '/^# Usage:/,/^# CROSS-SUBSYSTEM LOCK/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'
 }
 
-fm_afk_contract_now_iso() {
-  date -u +%Y-%m-%dT%H:%M:%SZ
-}
-
 # --- record writing ---------------------------------------------------------
 
 fm_afk_contract_validate_iso() {  # <ts>
@@ -524,8 +520,11 @@ fm_afk_contract_cmd_enter() {
     fm_afk_contract_render_readback "$record"
     return
   fi
-  now=$(fm_afk_contract_now_iso)
-  now_epoch=$(date +%s)
+  # One clock read gives both forms, so entered and entered_epoch (and
+  # confirmed and confirmed_epoch) always name the same second.
+  now=$(date -u '+%s %Y-%m-%dT%H:%M:%SZ') || return 1
+  now_epoch=${now%% *}
+  now=${now#* }
   session_entered=$now
   session_entered_epoch=$now_epoch
   # A replacement carries the session entry forward; quiet mode becoming the

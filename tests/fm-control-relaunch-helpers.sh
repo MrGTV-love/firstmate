@@ -497,12 +497,54 @@ if [ -n "${FM_FAKE_META_PUBLISH_MV_FAIL:-}" ]; then
     [ "$path" != "$FM_FAKE_META_PUBLISH_MV_FAIL" ] || exit 1
   done
 fi
+# A rename whose source holds result=published (an audit commit, whatever its time-stamped name) fails.
+if [ -n "${FM_FAKE_PUBLISHED_AUDIT_MV_FAIL:-}" ]; then
+  for path in "$@"; do
+    if [ -f "$path" ] && grep -Fqx 'result=published' "$path"; then
+      exit 1
+    fi
+  done
+fi
 source_path=
 target_path=
 for path in "$@"; do
   source_path=$target_path
   target_path=$path
 done
+# FM_FAKE_MV_CRASH_TARGET with FM_FAKE_MV_CRASH_WHEN=before|after SIGKILLs the caller's shell ($PPID: the verb runs
+# mv directly) right before or after the real mv onto that target, on its FM_FAKE_MV_CRASH_NTH-th such mv (default 1);
+# "before" never runs the mv. FM_FAKE_MV_SIGNAL=<TERM|INT|HUP> instead sends that signal on the same mv, waits (when
+# FM_FAKE_MV_SIGNAL_WAIT=1) until the caller has exited, then runs the real mv; with FM_FAKE_MV_SIGNAL_MATCH=<line> it
+# applies instead to the first mv whose source holds that exact line. Each victim is logged in $FM_FAKE_DIR/mv-killed.
+mv_fault=0
+if [ -n "${FM_FAKE_MV_SIGNAL:-}" ] && [ -n "${FM_FAKE_MV_SIGNAL_MATCH:-}" ]; then
+  if [ ! -e "$FM_FAKE_DIR/mv-signal-matched" ] && [ -f "$source_path" ] && grep -Fqx -- "$FM_FAKE_MV_SIGNAL_MATCH" "$source_path"; then
+    : > "$FM_FAKE_DIR/mv-signal-matched"
+    mv_fault=1
+  fi
+elif [ -n "${FM_FAKE_MV_CRASH_TARGET:-}" ] && [ "$target_path" = "$FM_FAKE_MV_CRASH_TARGET" ]; then
+  mv_count=$(( $(cat "$FM_FAKE_DIR/mv-target-count" 2>/dev/null || printf 0) + 1 ))
+  printf '%s' "$mv_count" > "$FM_FAKE_DIR/mv-target-count"
+  [ "$mv_count" != "${FM_FAKE_MV_CRASH_NTH:-1}" ] || mv_fault=1
+fi
+if [ "$mv_fault" = 1 ]; then
+  victim=$PPID
+  printf '%s\n' "$victim" >> "$FM_FAKE_DIR/mv-killed"
+  if [ -n "${FM_FAKE_MV_SIGNAL:-}" ]; then
+    kill "-$FM_FAKE_MV_SIGNAL" "$victim"
+    if [ "${FM_FAKE_MV_SIGNAL_WAIT:-0}" = 1 ]; then
+      while kill -0 "$victim" 2>/dev/null && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do /bin/sleep 0.01; done
+    fi
+    "$FM_REAL_MV" "$@"
+    rc=$?
+    : > "$FM_FAKE_DIR/mv-signal-done"
+    exit "$rc"
+  fi
+  case "${FM_FAKE_MV_CRASH_WHEN:-before}" in
+    before) fm-crash-inject "$victim"; exit 1 ;;
+    *) "$FM_REAL_MV" "$@"; rc=$?; fm-crash-inject "$victim"; exit "$rc" ;;
+  esac
+fi
 if [ -n "${FM_FAKE_META_WRITER_TARGET:-}" ] \
    && [ "$target_path" = "$FM_FAKE_META_WRITER_TARGET" ] \
    && grep -q '^x_request=' "$source_path" 2>/dev/null; then
@@ -512,6 +554,22 @@ fi
 exec "$FM_REAL_MV" "$@"
 SH
   chmod +x "$1/fakebin/mv"
+}
+
+# make_cp_corrupt_stub <case-dir>: the real cp, then one byte appended to a destination matching FM_FAKE_CP_CORRUPT_GLOB.
+make_cp_corrupt_stub() {
+  cat > "$1/fakebin/cp" <<'SH'
+#!/usr/bin/env bash
+/bin/cp "$@" || exit $?
+dest=
+for arg in "$@"; do dest=$arg; done
+if [ -n "${FM_FAKE_CP_CORRUPT_GLOB:-}" ]; then
+  # shellcheck disable=SC2254
+  case "$dest" in $FM_FAKE_CP_CORRUPT_GLOB) printf 'x' >> "$dest" ;; esac
+fi
+exit 0
+SH
+  chmod +x "$1/fakebin/cp"
 }
 
 make_spawn_return_barrier_stub() {
