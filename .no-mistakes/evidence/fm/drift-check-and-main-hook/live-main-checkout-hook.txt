@@ -1,0 +1,152 @@
+
+### setup: effective hooks path before install
+$ git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target rev-parse --path-format=absolute --git-path hooks
+/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target/.git/hooks
+[exit 0]
+
+### S10 --help prints full header
+  - `install` and `remove` only manage files carrying the Firstmate marker and
+    never overwrite or delete unmanaged hooks or symbolic links.
+[exit 0]
+PASS: --help ends on full Safety sentence
+
+### S8a install from a linked-worktree (slot) copy of the toolbelt
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt-slot/bin/fm-main-checkout-hook.sh install --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target
+fm-main-checkout-hook: installed pre-commit and pre-merge-commit hooks in /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target/.git/hooks
+[exit 0]
+$ cat /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target/.git/hooks/pre-commit
+#!/usr/bin/env bash
+# FIRSTMATE-MANAGED-MAIN-CHECKOUT-HOOK
+guard='/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh'
+if [ ! -x "$guard" ]; then
+  printf 'fm-main-checkout-hook: refused: guard script %s is missing or not executable; reinstall with bin/fm-main-checkout-hook.sh install or remove with bin/fm-main-checkout-hook.sh remove.\n' "$guard" >&2
+  exit 1
+fi
+exec "$guard" check
+[exit 0]
+PASS: wrapper points at primary toolbelt copy, not slot
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh status --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target
+pre-commit: installed (/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target/.git/hooks/pre-commit)
+pre-merge-commit: installed (/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target/.git/hooks/pre-merge-commit)
+[exit 0]
+PASS: status installed exit 0
+
+### S8b delete the slot; hooks must keep working
+$ git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt worktree remove --force /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt-slot
+[exit 0]
+
+### S1 direct commit in primary checkout through real git
+$ git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target commit -m direct primary commit
+fm-main-checkout-hook: refused: direct commit or merge in primary checkout (/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target); use treehouse get --base main -b fm/<topic> or bin/fm-spawn.sh (emergency override: FM_ALLOW_MAIN_COMMIT=1).
+[exit 1]
+PASS: primary commit refused (HEAD unchanged)
+PASS: deny event logged
+
+### S3 linked worktree: commit and --no-ff merge allowed
+$ git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target worktree add -q -b fm/topic /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target-wt main
+[exit 0]
+$ git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target-wt commit -qam linked worktree commit
+[exit 0]
+PASS: linked worktree commit landed
+$ git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target-wt merge --no-ff -m wt merge side
+Merge made by the 'ort' strategy.
+[exit 0]
+PASS: linked worktree --no-ff merge landed
+
+### S2 --no-ff merge in primary checkout refused (pre-merge-commit)
+$ git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target merge --no-ff -m primary merge side2
+fm-main-checkout-hook: refused: direct commit or merge in primary checkout (/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target); use treehouse get --base main -b fm/<topic> or bin/fm-spawn.sh (emergency override: FM_ALLOW_MAIN_COMMIT=1).
+Not committing merge; use 'git commit' to complete the merge.
+[exit 1]
+PASS: primary merge refused (HEAD unchanged)
+
+### S4 FM_ALLOW_MAIN_COMMIT override
+$ env FM_ALLOW_MAIN_COMMIT=0 git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target commit -qm override 0
+fm-main-checkout-hook: refused: direct commit or merge in primary checkout (/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target); use treehouse get --base main -b fm/<topic> or bin/fm-spawn.sh (emergency override: FM_ALLOW_MAIN_COMMIT=1).
+[exit 1]
+PASS: FM_ALLOW_MAIN_COMMIT=0 still refused
+$ env FM_ALLOW_MAIN_COMMIT=true git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target commit -qm override true
+fm-main-checkout-hook: refused: direct commit or merge in primary checkout (/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target); use treehouse get --base main -b fm/<topic> or bin/fm-spawn.sh (emergency override: FM_ALLOW_MAIN_COMMIT=1).
+[exit 1]
+PASS: FM_ALLOW_MAIN_COMMIT=true still refused
+$ env FM_ALLOW_MAIN_COMMIT=1 git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target commit -qm override 1
+[exit 0]
+PASS: FM_ALLOW_MAIN_COMMIT=1 commit landed
+PASS: override event logged (allow, override=true, cleared_by env)
+
+### S5 fail closed when worktree identity cannot be resolved
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh check --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/does-not-exist
+fm-main-checkout-hook: refused: cannot resolve git worktree identity; commit from an isolated worktree created by bin/fm-spawn.sh or treehouse get --base main -b fm/<topic>.
+[exit 1]
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh check
+fm-main-checkout-hook: refused: cannot resolve git worktree identity; commit from an isolated worktree created by bin/fm-spawn.sh or treehouse get --base main -b fm/<topic>.
+[exit 1]
+PASS: check on missing dir exits 1
+PASS: check in non-git dir exits 1
+PASS: source_ok false deny event logged
+
+### S9 guard script missing: wrapper refuses clearly, not exit 127
+$ git -C /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target commit -m guard missing
+fm-main-checkout-hook: refused: guard script /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh is missing or not executable; reinstall with bin/fm-main-checkout-hook.sh install or remove with bin/fm-main-checkout-hook.sh remove.
+[exit 1]
+PASS: missing-guard message printed
+fm-main-checkout-hook: refused: guard script /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh is missing or not executable; reinstall with bin/fm-main-checkout-hook.sh install or remove with bin/fm-main-checkout-hook.sh remove.
+PASS: pre-commit exit is 1 not 127
+
+### S10b remove deletes only managed hooks
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh remove --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target
+fm-main-checkout-hook: removed managed hooks in /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/target/.git/hooks
+[exit 0]
+PASS: managed hooks gone, unmanaged post-commit kept
+
+### S6 unmanaged and symlinked hooks are never overwritten or deleted
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh install --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/unmanaged
+fm-main-checkout-hook: refused: existing pre-merge-commit hook at /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/unmanaged/.git/hooks/pre-merge-commit is unmanaged; remove or integrate it manually before running bin/fm-main-checkout-hook.sh install.
+[exit 1]
+PASS: install refuses unmanaged pre-merge-commit
+PASS: unmanaged bytes unchanged, pre-commit not written
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh remove --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/unmanaged
+fm-main-checkout-hook: refused: hook at /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/unmanaged/.git/hooks/pre-merge-commit is unmanaged and not managed by Firstmate.
+[exit 1]
+PASS: remove refuses unmanaged hook and keeps it
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh install --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/symlinked
+fm-main-checkout-hook: refused: existing pre-commit hook at /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/symlinked/.git/hooks/pre-commit is symlink; remove or integrate it manually before running bin/fm-main-checkout-hook.sh install.
+[exit 1]
+PASS: install refuses symlinked pre-commit; link intact
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh remove --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/symlinked
+fm-main-checkout-hook: refused: hook at /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/symlinked/.git/hooks/pre-commit is symlink and not managed by Firstmate.
+[exit 1]
+PASS: remove refuses symlinked pre-commit; link intact
+
+### S7 core.hooksPath set: install/remove refuse, status inactive
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh install --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath
+fm-main-checkout-hook: refused: core.hooksPath makes Git run hooks from /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath/.husky, not /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath/.git/hooks; unset core.hooksPath or integrate the guard there manually.
+[exit 1]
+PASS: install refuses with core.hooksPath
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh remove --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath
+fm-main-checkout-hook: refused: core.hooksPath makes Git run hooks from /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath/.husky, not /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath/.git/hooks; unset core.hooksPath before running bin/fm-main-checkout-hook.sh remove.
+[exit 1]
+PASS: remove refuses with core.hooksPath
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt/bin/fm-main-checkout-hook.sh status --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath
+hooks: inactive (core.hooksPath makes Git run hooks from /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath/.husky, not /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/hookspath/.git/hooks)
+[exit 1]
+PASS: status inactive exit 1
+
+### S8c install from slot copy refused when primary has no copy
+$ bash /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/tb2-slot/bin/fm-main-checkout-hook.sh install --repo /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/newtarget
+fm-main-checkout-hook: refused: /Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/tb2-slot/bin/fm-main-checkout-hook.sh is in a linked worktree and the primary checkout has no executable copy; run bin/fm-main-checkout-hook.sh install from the primary checkout.
+[exit 1]
+PASS: install from slot refuses without primary copy, writes nothing
+
+### guard events (telemetry) recorded
+{"ts":"2026-11-28T00:51:15Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-28T00:51:16Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-28T00:51:16Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-28T00:51:16Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-28T00:51:16Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-28T00:51:17Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-28T00:51:17Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"env","repeat":1,"override":true,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-28T00:51:17Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"deny","source_ok":false,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+{"ts":"2026-11-28T00:51:17Z","guard":"main-checkout-commit","rule":"main-checkout-commit","task":"","version":"1","system":"firstmate","session":"/Users/charlesabrooker/tmp/fm-hook-live.1D6Idx/toolbelt:unattributed","decision":"deny","source_ok":false,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false,"head":"","base":"","actor":"main","opportunity":true}
+
+SUMMARY: 27 pass, 0 fail

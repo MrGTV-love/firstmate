@@ -1,0 +1,124 @@
+
+### D1 clean primary: detached at origin/main, untracked file does not flag
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home
+OK: primary checkout clean at origin/main (789044861), no stale branches or stray worktrees.
+[exit 0]
+PASS: clean -> OK, exit 0
+
+### D2 primary on branch, HEAD != base, tracked dirty
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home
+DRIFT: primary checkout is on branch 'work' (expected detached origin/main)
+DRIFT: primary checkout HEAD (d7400cd05) != origin/main (789044861) [behind/ahead: 0	1]
+DRIFT: primary checkout has modified tracked files:
+  f.txt
+[exit 1]
+PASS: on-branch flagged
+PASS: HEAD != base flagged
+PASS: tracked dirty flagged
+
+### D7a --warn-only prints drift but exits 0
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --warn-only
+DRIFT: primary checkout is on branch 'work' (expected detached origin/main)
+DRIFT: primary checkout HEAD (d7400cd05) != origin/main (789044861) [behind/ahead: 0	1]
+DRIFT: primary checkout has modified tracked files:
+  f.txt
+[exit 0]
+PASS: --warn-only exit 0 with DRIFT lines
+
+### D3 --max-ahead boundary (3 ahead: max 3 ok, max 2 flagged)
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --max-ahead 3
+OK: primary checkout clean at origin/main (789044861), no stale branches or stray worktrees.
+[exit 0]
+PASS: 3 ahead with --max-ahead 3 not flagged
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --max-ahead 2
+DRIFT: 1 local branch(es) exceed >2 commits ahead or >7d unpushed:
+  ahead (+3 vs origin/main, 0d old, on_origin=1)
+[exit 1]
+PASS: 3 ahead with --max-ahead 2 flagged
+
+### D4 old unpushed branch flagged; same branch after push not flagged
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --max-age-days 7
+DRIFT: 1 local branch(es) exceed >10 commits ahead or >7d unpushed:
+  oldtopic (+1 vs origin/main, 331d old, on_origin=0)
+[exit 1]
+PASS: old unpushed branch flagged on_origin=0
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --max-age-days 7
+OK: primary checkout clean at origin/main (789044861), no stale branches or stray worktrees.
+[exit 0]
+PASS: old pushed branch not flagged
+
+### D5 worktrees: prunable + non-Treehouse flagged, .treehouse/ not flagged
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home
+OK: primary checkout clean at origin/main (789044861), no stale branches or stray worktrees.
+[exit 0]
+PASS: treehouse slot alone not flagged
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home
+DRIFT: 1 prunable worktree(s) (run 'git worktree prune'):
+  /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/gone-wt
+DRIFT: 1 non-Treehouse worktree(s):
+  /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/stray-wt
+[exit 1]
+PASS: prunable worktree flagged
+PASS: stray non-Treehouse worktree flagged, slot and primary not listed
+
+### D8 read-only: repository state identical before and after
+PASS: refs, status, worktree list, .git file hashes unchanged; prunable entry kept
+
+### D6 --repo <linked worktree> reports the primary, same as --repo <primary>
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/.treehouse/pool/slot1
+DRIFT: 1 prunable worktree(s) (run 'git worktree prune'):
+  /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/gone-wt
+DRIFT: 1 non-Treehouse worktree(s):
+  /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/stray-wt
+[exit 1]
+PASS: slot view equals primary view
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/.treehouse/pool/slot1
+OK: primary checkout clean at origin/main (789044861), no stale branches or stray worktrees.
+[exit 0]
+PASS: slot on branch: primary not mislabeled as on-branch, primary not in non-Treehouse list
+
+### D6b bare primary: NOTE, linked worktree from bare repo not mislabeled
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/.treehouse/bpool/s
+NOTE: primary worktree /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/bare.git is a bare repository; skipping primary checkout checks.
+OK: primary checkout clean at origin/main (789044861), no stale branches or stray worktrees.
+[exit 0]
+PASS: bare primary NOTE printed and bare not listed as non-Treehouse
+
+### D7b usage and git errors exit 2
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --max-ahead abc
+fm-drift-check: error: --max-ahead must be a non-negative integer (got 'abc')
+[exit 2]
+PASS: bad --max-ahead exit 2
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --max-age-days -1
+fm-drift-check: error: --max-age-days must be a non-negative integer (got '-1')
+[exit 2]
+PASS: bad --max-age-days exit 2
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --base origin/nope
+fm-drift-check: error: cannot resolve base ref 'origin/nope' in /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home
+[exit 2]
+PASS: unresolvable --base exit 2
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/plain
+fm-drift-check: error: not a git repository: /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/plain
+[exit 2]
+PASS: non-repo exit 2
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/missing
+fm-drift-check: error: repository directory does not exist: /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/missing
+[exit 2]
+PASS: missing dir exit 2
+$ fm-drift-check.sh --bogus
+Read-only repository drift auditor for a Firstmate home or Git checkout.
+Flags:
+  1. Primary checkout not detached at the base ref or having tracked changes.
+  2. Local branches ahead of the base ref by > --max-ahead commits or older
+     than --max-age-days days without an origin/<branch> ref.
+  3. Prunable worktrees or linked worktrees outside Treehouse pools.
+Usage: fm-drift-check.sh [--repo DIR] [--base REF] [--warn-only] [--max-ahead N] [--max-age-days N]
+Exit: 0 when clean (or with --warn-only); 1 when drift is found; 2 on usage or git error.
+[exit 2]
+PASS: unknown flag exit 2
+$ fm-drift-check.sh --repo /Users/charlesabrooker/tmp/fm-drift-live.UrLtO1/home --base HEAD
+OK: primary checkout clean at HEAD (789044861), no stale branches or stray worktrees.
+[exit 0]
+PASS: custom --base ref honored
+
+SUMMARY: 23 pass, 0 fail
