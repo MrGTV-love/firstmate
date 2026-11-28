@@ -59,10 +59,11 @@
 # primary is the single entry point for the lab primary: it runs
 # `tmux -L fm-lab new-session -d -s primary` on the lab's private socket in the
 # caller's directory, with FM_HOME set to the lab and with NO_MISTAKES_GATE,
-# FM_GATE_REFUSE_BYPASS, TMUX and every FM_*_OVERRIDE removed so all paths
-# resolve inside the lab. The pane first runs a holding shell; primary records
-# that shell as task `primary`, and only then lets it exec <command>, so the
-# command never runs unrecorded. When the record fails, primary stops the
+# FM_GATE_REFUSE_BYPASS, TMUX and the FM_ROOT, FM_STATE, FM_DATA, FM_CONFIG and
+# FM_PROJECTS path overrides removed so all paths resolve inside the lab. The
+# pane first runs a holding shell; primary records that shell as task
+# `primary`, and only then lets it exec <command>, so the command never runs
+# unrecorded. When the record fails, primary stops the
 # session and the holding shell and exits 1.
 # teardown keeps the stopped-server proof above, then ends the lab's processes:
 # every live process in a recorded session the lab is proven to own, plus each

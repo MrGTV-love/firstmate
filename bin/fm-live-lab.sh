@@ -101,12 +101,13 @@
 #
 # down refuses any path without the lab record up writes. It kills only the
 # lab's recorded private tmux server and launch pane PIDs, and their descendants;
-# runs bin/fm-lab-home.sh teardown; removes the task temp and launch dirs the
-# lab's spawns kept under /tmp, including a failed spawn's; removes every
-# project entry at or under <lab-root> from the recorded Claude store, following
-# a symlinked store to its target (compare-and-swap atomic replace, unrelated
-# entries kept); reports a changed Pi trust store or a new
-# ~/.treehouse entry without touching either; and removes <lab-root>.
+# runs bin/fm-lab-home.sh teardown, which also ends every process left in a
+# session the lab's spawns recorded (its header, "Lab processes"); removes the
+# task temp and launch dirs the lab's spawns kept under /tmp, including a failed
+# spawn's; removes every project entry at or under <lab-root> from the recorded
+# Claude store, following a symlinked store to its target (compare-and-swap
+# atomic replace, unrelated entries kept); reports a changed Pi trust store or a
+# new ~/.treehouse entry without touching either; and removes <lab-root>.
 # Transcripts under ~/.claude/projects are left as history. The lab never uses
 # Herdr.
 set -u

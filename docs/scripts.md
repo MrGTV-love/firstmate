@@ -46,7 +46,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`fm-model-freshness.sh`](../bin/fm-model-freshness.sh) | Report a dispatch or requested model that a newer model of its family has passed in its harness's catalog ([operator contract](configuration.md#model-freshness)) |
 | `fm-herdr-lab.sh`        | Provision and guardedly operate an isolated, never-default Herdr lab session         |
 | `fm-herdr-lab-viewer.py` | The pty engine behind `fm-herdr-lab.sh viewer`: one real foreground Herdr client on a non-zero window grid |
-| `fm-lab-home.sh`         | Mint disposable lab homes, manage isolated tmux socket directories, end the processes a lab's workers leave, and diagnose refused teardowns |
+| `fm-lab-home.sh`         | Mint disposable lab homes, manage isolated tmux socket directories, start a recorded lab primary, end the processes a lab's workers leave, and diagnose refused teardowns |
 | `fm-live-lab.sh`         | Build and operate a disposable live supervision lab; see its header for usage and readiness contract |
 | `fm-install-herdr.sh`    | Install CI's exact-version Herdr pin with official asset URL, SHA-256, and protocol checks |
 | `fm-install-treehouse.sh`| Install CI's exact-version Treehouse pin for real-Herdr E2E that needs spawn worktrees |
