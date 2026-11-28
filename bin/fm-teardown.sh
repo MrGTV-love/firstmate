@@ -549,6 +549,7 @@
 # never left leased forever. If the treehouse return fails, teardown leaves the
 # leased home and state in place instead of hiding a still-held lease.
 # Usage: fm-teardown.sh <task-id> [--force [--drop-file <path>]] [--legacy-record]
+#        fm-teardown.sh --copy <path> [--record-id <id>]   (by-path teardown, below)
 # Shared slot-root recovery (from the lock-owning main session):
 #   (cd /path/to/project && treehouse status)
 #   If not already leased and the finished task holds the slot claim (or none
@@ -596,6 +597,81 @@
 #   or missing-copy admission above. Every other windowless record, including one with a
 #   spawn_gen, a non-tmux backend, or an ambiguous field, still faces the
 #   validator and refuses.
+#
+# By-path teardown: fm-teardown.sh --copy <path> [--record-id <id>]
+#   The supported removal of ONE nested worktree that no task record names, such
+#   as a copy whose record was lost. It reads no task record and takes no --force,
+#   --drop-file or --legacy-record: each is refused by name with exit 2, and so is
+#   a relative path, a symbolic link or an unknown flag. It reuses the ordinary
+#   foreign-copy code (bin/fm-teardown-nested-lib.sh, "By-path teardown" owns the
+#   mechanics): the same landed-work test, the same recorded-bundle route and the
+#   same non-forced removal; the held-task exception and the ignored-file preserve
+#   below are what differ. docs/agent-control.md owns the operator steps.
+#   The target is a worktree registered strictly inside a project clone under this
+#   home's projects/ or inside a Treehouse pool slot of one, and is removed with
+#   non-forced `git -C <clone> worktree remove` (Vernant's closeout driver when it
+#   carries Vernant's creation lock). A slot, a clone, an unregistered directory, a
+#   path outside this home and any path that is not exactly a registered worktree
+#   refuse. No treehouse call is made, no slot is returned and no branch is deleted.
+#   The copy is removed only when every proof holds, each refusal names its reason,
+#   leaves the copy untouched and exits 1:
+#     - no live task record in this home or any local home names it as worktree=,
+#       home= or prior_worktree=, and a Treehouse slot's owner claim does not name
+#       a task whose record is live in any local home, a claim naming this run's own
+#       record id included (a claim naming no live task is stale; one that cannot
+#       be read refuses);
+#     - no process has it as cwd or holds a file open in it, by a scan of every open
+#       file that refuses when it cannot run, run first and again immediately before
+#       the audit line and the removal; nothing is ever signalled;
+#     - it is a clean worktree root and holds no ignored file that exists nowhere
+#       else outside .claude and .opencode, which are preserved whole (the retained
+#       mode of the ignored-file preserve) in data/<record-id>/nested-copy-preserved
+#       before the removal; ignored files only: .claude or .opencode content that
+#       git does not ignore is untracked and stops git's own non-forced removal;
+#     - it holds no other registered worktree and no other Git repository, found
+#       anywhere in it, .claude and .opencode included: a nested clone, another
+#       project's worktree or a bare repository (HEAD, objects and refs together),
+#       except a bare repository whose every file the copy's own repository tracks
+#       and holds unmodified, with no index flag (assume-unchanged, skip-worktree)
+#       hiding an edit, which is landed content (a fixture): an untracked, ignored,
+#       modified, flagged or unreadable file in it, or a failed git read, counts;
+#     - it carries no lock but Vernant's creation lock, whose launcher process must
+#       be proved gone: a ps that was refused, failed or said anything but "no such
+#       process" counts as possibly alive, and a process-table read made under the
+#       restriction that refused ps proves nothing (rule=lock-launcher-owner);
+#     - its HEAD passes teardown_landed with no branch and the plain no-mistakes
+#       rule (reachable from origin's default branch, or its content already
+#       there), or the recorded-bundle route above: a verified bundle recorded in
+#       data/<record-id>/preservation-bundles.tsv, attended only, and the captain's
+#       land-or-drop call, which for a copy with no task row is ANY open
+#       captain-held row whose reason names the bundle path and every recorded tip.
+#       That exception to the held-task rule is judged where it is granted
+#       (teardown_by_path_exception_clear), by the owner of each proof, whatever ran
+#       before it: a clean stable tree and no unique ignored file, no live record in
+#       any local home, no process in the copy or holding a file in it, no creation
+#       lock launcher that may be alive, no live task's slot claim (the run's own
+#       record id included), no other registered worktree or Git repository, and
+#       the recorded bundle verified again with every recorded tip named by the open
+#       call; its refusal names that row. Locating the copy, the audit record, the
+#       path lock and the lack of any --force are the route's mechanics, not the
+#       widened harm. When no row names the bundle, the refusal prints the exact
+#       bin/fm-captain-hold.sh hold command. Landed work needs no call.
+#   The record id names data/<record-id>/ for the bundle record: --record-id <id>,
+#   or by default `copy-` and the first 16 hex digits of the SHA-256 of the copy's
+#   canonical path, which a refusal prints. An id that names a live task refuses.
+#   After the proofs and before the removal it appends one line to
+#   data/record-less-copy-removals.log: UTC time, record id, clone, copy, HEAD and
+#   the proof (`landed` or `bundle <stored bundle>`), tab separated; a line for the
+#   same id, copy and HEAD is not written twice, and the line is never a proof.
+#   One run holds a lock on the path (state/.teardown-copy-<hash>.lock), so a second
+#   run on it refuses. A rerun proves everything again. A copy already gone that
+#   no clone still registers, every registration list read, exits 0 and names its
+#   audit line, or refuses when no line names it; a gone copy a clone still
+#   registers refuses and names `git worktree prune`, which this mode never runs,
+#   and a registration list or projects folder that cannot be read refuses, for a
+#   present copy too. A registration, or its gitdir, that is a link whose target
+#   cannot be checked (dangling, or inside a folder nobody may search) cannot be
+#   read either: git leaves it out and exits 0, so the refusal names it.
 #
 # Transient / stale worktree git lock recovery (teardown-lock-race): a crew process
 # killed mid-git-operation can leave a .git/worktrees/<wt>/index.lock (or, for a
@@ -777,6 +853,12 @@
 # never blocks cleanup.
 set -eu
 
+# The directory this run started in. A home, state, data or config folder given relative to it is
+# printed absolute in a completing command (teardown_refuse_copy), so the command works from any directory.
+# The trailing "." keeps a final newline of the directory through the capture.
+TEARDOWN_START_PWD=$(pwd -P 2>/dev/null && printf .) || TEARDOWN_START_PWD=
+TEARDOWN_START_PWD=${TEARDOWN_START_PWD%.}
+TEARDOWN_START_PWD=${TEARDOWN_START_PWD%$'\n'}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
@@ -874,6 +956,41 @@ unset _teardown_source
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-nm-run-lib.sh
 . "$SCRIPT_DIR/fm-nm-run-lib.sh"
+# --copy <path> [--record-id <id>] is the by-path mode in this script's header.
+# It reads no task record: the request becomes an ordinary-looking one for a
+# placeholder id, and teardown_by_path_prepare (bin/fm-teardown-nested-lib.sh)
+# replaces that id before anything else uses it.
+TEARDOWN_BY_PATH=
+TEARDOWN_BY_PATH_COPY=
+TEARDOWN_BY_PATH_RECORD_ID=
+if [ "${1:-}" = --copy ]; then
+  [ "$#" -ge 2 ] && [ -n "$2" ] || { echo "error: --copy requires a path" >&2; exit 2; }
+  TEARDOWN_BY_PATH=1
+  TEARDOWN_BY_PATH_COPY=$2
+  shift 2
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --record-id)
+        if [ "$#" -lt 2 ] || ! fm_task_id_path_safe "$2"; then
+          echo "error: --record-id requires a path-safe id" >&2
+          exit 2
+        fi
+        TEARDOWN_BY_PATH_RECORD_ID=$2
+        shift
+        ;;
+      --force|--drop-file|--legacy-record)
+        echo "error: teardown --copy takes no $1: a record-less copy is removed only when every proof holds, and nothing here authorizes discarding work; nothing was changed" >&2
+        exit 2
+        ;;
+      *)
+        echo "error: invalid teardown request" >&2
+        exit 2
+        ;;
+    esac
+    shift
+  done
+  set -- "${TEARDOWN_BY_PATH_RECORD_ID:-by-path-pending}"
+fi
 if [ "$#" -lt 1 ] || ! fm_task_id_path_safe "$1"; then
   echo "error: invalid teardown request" >&2
   exit 2
@@ -904,6 +1021,7 @@ fm_backlog_directory_present "$STATE" "state directory" || {
   echo "error: teardown refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
+[ -z "$TEARDOWN_BY_PATH" ] || ID='by-path pending'
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-project-lock-lib.sh
@@ -935,6 +1053,10 @@ if [ "$FORCE" = --force ] && [ "$(fm_lease_actor)" = branch ]; then
   exit "$FM_LEASE_REFUSE_EXIT"
 fi
 fm_lease_guard "$ID" "teardown (fm-teardown)"
+# By-path mode: ID is not a lease id until here, so the guard above returned at once;
+# teardown_by_path_run takes it for the real id after the lock on the path, so a second
+# run on the same copy refuses there instead of waiting on the lease.
+[ -z "$TEARDOWN_BY_PATH" ] || teardown_by_path_prepare || exit $?
 teardown_friction_outcome retried
 
 # The physical path <path> names, resolved through every link, including one
@@ -1397,6 +1519,10 @@ teardown_release_locks() {
   [ -z "${TEARDOWN_SLOT_PROOF:-}" ] || rm -f "$TEARDOWN_SLOT_PROOF"
   return "$status"
 }
+# The record-driven teardown (everything down to the matching `fi` before
+# pr_number_from_branch) is skipped by --copy, which never reads a task record;
+# the by-path mode runs from the dispatch after task_process_identity_matches.
+if [ -z "$TEARDOWN_BY_PATH" ]; then
 trap teardown_release_locks EXIT
 fm_lock_try_acquire "$CONTROL_LOCK" || {
   echo "error: another lifecycle action is already running for task $ID; nothing was changed" >&2
@@ -2776,6 +2902,7 @@ remove_pr_poll_artifacts() {
     "$state_dir/.pr-ready-reconcile/$id.refused" || return 1
   fm_check_stop_episode_clear "$state_dir" "$id"
 }
+fi
 
 # Resolve the PR number for a worktree branch via gh-axi. Echoes the number on a
 # single match and returns 0; returns non-zero on no match or any lookup failure,
@@ -4700,6 +4827,13 @@ EOF
   echo "REFUSED: leaked $label processes for $ID remain after $max_passes reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2
   return 1
 }
+
+# --copy dispatch: every landed-work and process helper the by-path mode reuses
+# is defined above, and the record-driven teardown was skipped at its guard.
+if [ -n "$TEARDOWN_BY_PATH" ]; then
+  teardown_by_path_main
+  exit $?
+fi
 
 # A Docker compose working directory inside a nested lane (a linked worktree
 # under the task's root) belongs to that lane's task, not to this one. A path

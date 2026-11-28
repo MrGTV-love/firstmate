@@ -29,25 +29,10 @@ if ! declare -F secondmate_registry_parse_line >/dev/null 2>&1; then
   . "$FM_TASK_COPY_LIB_DIR/fm-secondmate-registry-lib.sh"
 fi
 
-# Process observations are tri-state: 0 live, 1 absent, 2 unreadable. A confined
-# worker cannot execute setuid ps (126); reuse the test reaper's sysctl helper.
-# Only a complete, readable PID table proves absence there. No age or ancestry
-# exception releases a lock naming a live PID, including a recycled PID.
-fm_task_copy_confined_launcher_state() {  # <pid>
-  local pid=$1 table observed found=1
-  table=$(python3 "$FM_TASK_COPY_LIB_DIR/fm-proc-info.py" table pid 2>/dev/null) || return 2
-  [ -n "$table" ] || return 2
-  while IFS= read -r observed; do
-    case "$observed" in ''|*[!0-9]*) return 2 ;; esac
-    [ "$observed" != "$pid" ] || found=0
-  done <<< "$table"
-  return "$found"
-}
-
 # Interpret one completed ps observation without executing a process probe.
 # Exit 1 proves absence only with empty stdout and either empty stderr or exactly
 # macOS's not-found line for this PID; any other diagnostic makes that failed read
-# unknown. The acquisition owner handles exit 126.
+# unknown, and so does any other exit, a refused ps (126) included.
 fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
   local pid=$1 rc=$2 observed=$3 diagnostic=$4
   case "$rc" in
@@ -65,15 +50,15 @@ fm_task_copy_ps_observation_state() {  # <pid> <status> <stdout> <stderr>
   esac
 }
 
+# Process observations are tri-state: 0 live, 1 absent, 2 unreadable. Only a
+# completed ps read proves absence: a ps that was refused (126) or failed is
+# unknown (2). No table read made under the restriction that refused ps stands in
+# for it, because such a read can see only part of the table. No age or ancestry
+# exception releases a lock naming a live PID, including a recycled PID.
 fm_task_copy_launcher_state() {  # <pid>
   local pid=$1 observed diagnostic diagnostic_file rc=0
   diagnostic_file=$(mktemp "${TMPDIR:-/tmp}/fm-copy-ps.XXXXXX") || return 2
   observed=$(ps -p "$pid" -o pid= 2>"$diagnostic_file") || rc=$?
-  if [ "$rc" = 126 ]; then
-    rm -f -- "$diagnostic_file"
-    fm_task_copy_confined_launcher_state "$pid"
-    return $?
-  fi
   # Retain even a whitespace-only diagnostic; failed reads are not absence.
   diagnostic=$(cat "$diagnostic_file" && printf '.') || {
     rm -f -- "$diagnostic_file"
@@ -352,12 +337,76 @@ fm_task_copy_same_repository() {  # <path> <project>
   [ "$path_common" = "$proj_common" ]
 }
 
-# Prints the canonical path of every worktree <canonical-clone> has registered
-# strictly inside itself, one per line. A registered copy whose directory is
-# gone keeps its raw path. Fails when the registration list cannot be read, so a
-# caller never takes an unreadable list for an empty one.
-fm_task_copy_registered_nested() {  # <canonical-clone>
-  local clone=$1 field path canon
+# Succeeds when every registration <canonical-clone> keeps can be read. Fails
+# when one cannot, and sets FM_TASK_COPY_UNREADABLE_REGISTRATION to the path of
+# the first part that cannot be read, byte-exact (assigned, never captured as
+# text), so the one scan that finds it is the one that names it; it stays empty
+# when the failure is not a registration (the clone's own Git directory cannot
+# be read). git leaves out a registration it cannot read and still exits 0, so
+# the list alone cannot tell a clone that registers nothing from one whose
+# registrations are hidden: the registration folder must list, and each
+# registration's folder (whatever its name, a leading dot or a newline in it
+# included) must list and its gitdir file read. A registration, or a gitdir,
+# that is a link whose target cannot be checked (dangling, or inside a folder
+# nobody may search) is hidden the same way, so it counts as unreadable too. A
+# registration folder with no gitdir file and no gitdir link is a broken one
+# that git itself ignores, not an unreadable one.
+FM_TASK_COPY_UNREADABLE_REGISTRATION=
+fm_task_copy_registrations_readable() {  # <canonical-clone>
+  local common store entry
+  FM_TASK_COPY_UNREADABLE_REGISTRATION=
+  # The trailing "." keeps a final newline of the path through the capture.
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null && printf .) || return 1
+  common=${common%.}
+  common=${common%$'\n'}
+  store=$common/worktrees
+  [ -e "$store" ] || [ -L "$store" ] || return 0
+  [ -d "$store" ] && [ -r "$store" ] && [ -x "$store" ] || { FM_TASK_COPY_UNREADABLE_REGISTRATION=$store; return 1; }
+  for entry in "$store"/* "$store"/.[!.]* "$store"/..?*; do
+    if [ -L "$entry" ] && [ ! -e "$entry" ]; then FM_TASK_COPY_UNREADABLE_REGISTRATION=$entry; return 1; fi
+    [ -d "$entry" ] || continue
+    if [ ! -r "$entry" ] || [ ! -x "$entry" ]; then FM_TASK_COPY_UNREADABLE_REGISTRATION=$entry; return 1; fi
+    if [ -L "$entry/gitdir" ] && [ ! -e "$entry/gitdir" ]; then FM_TASK_COPY_UNREADABLE_REGISTRATION=$entry/gitdir; return 1; fi
+    [ -e "$entry/gitdir" ] || continue
+    if [ ! -r "$entry/gitdir" ]; then FM_TASK_COPY_UNREADABLE_REGISTRATION=$entry/gitdir; return 1; fi
+  done
+  return 0
+}
+
+# Prints " (registration <path> cannot be read)" with <path> quoted the way
+# printf %q quotes it, so every byte of it, a newline included, survives on one
+# line, and nothing for an empty path. It reads nothing: the path is the one
+# fm_task_copy_registrations_readable recorded.
+fm_task_copy_unreadable_registration_note() {  # <recorded path>
+  [ -n "$1" ] || return 0
+  printf ' (registration %q cannot be read)' "$1"
+}
+
+# Prints the one text every report gives for a registration list that could not
+# be read: "<subject> worktree registration list could not be read", then the
+# note naming the registration fm_task_copy_registrations_readable recorded in
+# FM_TASK_COPY_UNREADABLE_REGISTRATION, and nothing more when it recorded none.
+# Every site that reports a failed fm_task_copy_read_registered_nested uses it,
+# so none drops or misstates the recorded registration.
+fm_task_copy_unreadable_list_text() {  # <subject>
+  printf '%s worktree registration list could not be read%s' "$1" \
+    "$(fm_task_copy_unreadable_registration_note "${FM_TASK_COPY_UNREADABLE_REGISTRATION:-}")"
+}
+
+# Sets FM_TASK_COPY_NESTED to the canonical path of every worktree
+# <canonical-clone> has registered strictly inside itself, one per line, and
+# succeeds. A registered copy whose directory is gone keeps its raw path. Fails
+# when the registration list cannot be read, so a caller never takes an
+# unreadable list for an empty one: then FM_TASK_COPY_NESTED is empty and
+# FM_TASK_COPY_UNREADABLE_REGISTRATION names the registration only when the
+# registration scan (fm_task_copy_registrations_readable) found it unreadable;
+# a git listing that fails, after partial output or none, names none. It runs in
+# the caller's shell (never inside a command substitution) so both stay set.
+FM_TASK_COPY_NESTED=
+fm_task_copy_read_registered_nested() {  # <canonical-clone>
+  local clone=$1 field path canon list=''
+  FM_TASK_COPY_NESTED=
+  fm_task_copy_registrations_readable "$clone" || return 1
   while IFS= read -r -d '' field; do
     case "$field" in
       registration-list-unreadable) return 1 ;;
@@ -365,8 +414,9 @@ fm_task_copy_registered_nested() {  # <canonical-clone>
       *) continue ;;
     esac
     canon=$(fm_task_copy_canonical_dir "$path") || canon=$path
-    case "$canon" in "$clone"/*) printf '%s\n' "$canon" ;; esac
+    case "$canon" in "$clone"/*) list+=$canon$'\n' ;; esac
   done < <(git -C "$clone" worktree list --porcelain -z 2>/dev/null || printf '\0registration-list-unreadable\0')
+  FM_TASK_COPY_NESTED=${list%$'\n'}
 }
 
 # The local copies a task record names, one "<field> <path>" entry each: the

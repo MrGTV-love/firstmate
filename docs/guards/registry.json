@@ -166,6 +166,7 @@
     "slack-command-refusal-line",
     "teardown-entry-preflight",
     "guard-lint-touched-registry",
+    "teardown-by-path",
     "home-state-write",
     "spawn-reconciled-source",
     "backpass-core-role-inputs",
@@ -6164,6 +6165,10 @@
           "match": "fm_refuse_if_gate_agent"
         },
         {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "fm_refuse_if_gate_agent"
+        },
+        {
           "file": "bin/fm-gate-refuse-lib.sh",
           "match": "fm_gate_refuse_event",
           "count": 4
@@ -6527,7 +6532,7 @@
       "sites": [
         {"file":"bin/fm-teardown.sh","match":"teardown-unlanded bypass"},
         {"file": "bin/fm-teardown.sh", "match": "teardown-unlanded deny", "count": 6},
-        {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 14},
+        {"file": "bin/fm-teardown-nested-lib.sh", "match": "teardown_bundle_refuse ", "count": 15},
         {"file": "bin/fm-teardown.sh", "match": "holds bundle-preserved commits that only its data/ keeps"},
         {"file": "bin/fm-teardown.sh", "match": "during cleanup admitted by recorded bundle $bundle", "count": 2},
         {"file": "bin/fm-teardown.sh", "match": "echo \"REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof\" >&2"},
@@ -7714,6 +7719,44 @@
       "exemptions": [],
       "instrumented": true,
       "status": "active"
+    },
+    {
+      "id": "teardown-by-path",
+      "version": "1",
+      "owner": "bin/fm-teardown-nested-lib.sh",
+      "invariant": "A nested worktree that no task record names is removed by path only when the ownership, process, cleanliness and landing proofs of the ordinary foreign-copy release all hold, and the held-task exception its bundle route takes is judged again, row by row, where it is granted.",
+      "layer": "runtime-block",
+      "source": "the copy's registration in its project clone or Treehouse slot, the task records and slot claims of every local home, the projects folder, the process table and the ps read of a creation lock's launcher, the copy's Git status and ignored files, locks, registered worktrees and any other Git repository inside it (a nested clone, another project's worktree or a bare repository not held as tracked, unmodified content), the landed-work and recorded-bundle proofs, and the open captain-held rows, as teardown_by_path_run reads them",
+      "trigger": "teardown --copy <path> refuses when the path is not exactly a registered nested worktree of this home or a registration list or the projects folder cannot be read, a live record or slot claim names it (a claim naming its own record id included), a process holds it as cwd or open file or the scan cannot run, it is dirty, locked by anything but Vernant's creation lock or by that lock with a launcher ps does not prove gone, holds another registered worktree, any other Git repository (a nested clone, another project's worktree or a bare repository whose files are not all tracked and unmodified) or an ignored file that exists nowhere else outside .claude and .opencode (which the removal preserves whole), its HEAD is neither landed nor held by a verified bundle with the captain's call filed, the audit record or the preserve cannot be written, or another run holds the path",
+      "decision": "deny",
+      "fail_direction": "closed",
+      "remedy": "Keep the copy; fix what the refusal names (end the process, land or bundle the commits, file the printed bin/fm-captain-hold.sh call), then rerun FM_HOME=<home> bash bin/fm-teardown.sh --copy <path>; the entry takes no --force.",
+      "budget": 1,
+      "budget_reason": "One refused invocation before owner reconciliation; no per-family cross-invocation counter is currently implemented, so repeated invocations can refuse again. Do not turn that into an automatic retry loop.",
+      "telemetry": "Not instrumented under this family id; existing refusal diagnostics remain in the caller output. This registration adds no event emitter to state/guard-events.jsonl.",
+      "test": "tests/fm-teardown.test.sh",
+      "tier": "B",
+      "harm": "irreversible",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "sites": [
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: $1; nothing was removed.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_by_path_refuse \"$TEARDOWN_BY_PATH_WHY\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "teardown_refuse_copy \"$TEARDOWN_FOREIGN_RULE\" \"copy $copy is not removed: $TEARDOWN_FOREIGN_WHY.\" \"$copy\""
+        }
+      ]
     },
     {
       "id": "home-state-write",

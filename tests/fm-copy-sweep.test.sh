@@ -480,11 +480,84 @@ test_unreadable_registration_is_reported_without_walking_for_copies() {
   add_copy nested
   fm_write_meta "$HOMED/state/owner.meta" "worktree=$SLOT" 'kind=ship'
   FAKE_GIT_FAIL_LIST=1 run_sweep
-  assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed" 'enumeration failure was silently treated as no copies'
+  assert_contains "$OUT" "clone $SLOT was not read: its worktree registration list could not be read" 'enumeration failure was silently treated as no copies'
   assert_not_contains "$OUT" 'HELD-LIVE-TASK nested copies=' 'failed enumeration invented a live copy'
   [ "$(du_calls)" = 0 ] || fail 'failed enumeration walked the directory and measured a copy'
   registered nested || fail 'unreadable enumeration changed a registration'
   pass 'unreadable registered-worktree enumeration reports the gap without a directory-walk fallback'
+}
+
+# git leaves out a registration it cannot read and still exits 0, so a clone whose registration is a
+# link to nothing lists one copy fewer and looks complete. The sweep does not take that list for the
+# clone's registrations: it reads nothing from the clone, removes no copy of it, and names the
+# registration it could not read. With the registration readable the same sweep reaps the clean copy.
+test_a_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone() {
+  local store list rc=0
+  make_world link-held-registration
+  add_copy reap
+  add_copy hidden
+  store=$SLOT/.git/worktrees
+  mv "$store/hidden/gitdir" "$W/hidden-gitdir.saved"
+  ln -s "$W/no-such-target" "$store/hidden/gitdir"
+  [ -L "$store/hidden/gitdir" ] && [ ! -e "$store/hidden/gitdir" ] || fail 'the fixture did not make the registration a link to nothing'
+  list=$(git -C "$SLOT" worktree list --porcelain 2>/dev/null) || rc=$?
+  [ "$rc" = 0 ] || fail "the fixture does not bite: git exited $rc"
+  printf '%s\n' "$list" | grep -qxF "worktree $(copy_path reap)" || fail 'the fixture does not bite: git lost the readable registration too'
+  printf '%s\n' "$list" | grep -qxF "worktree $(copy_path hidden)" && fail 'the fixture does not bite: git still lists the hidden registration'
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "link-held registration: apply failed ($RC): $OUT"
+  assert_contains "$OUT" "clone $SLOT was not read: its worktree registration list could not be read (registration " 'a clone with an unreadable registration was read'
+  assert_contains "$OUT" '.git/worktrees/hidden/gitdir cannot be read)' 'the sweep did not name the registration it could not read'
+  assert_not_contains "$OUT" "REMOVED"$'\t' 'a copy of a clone with an unreadable registration was removed'
+  [ -e "$(copy_path reap)" ] || fail 'the clean copy of a clone with an unreadable registration was removed'
+  registered reap || fail 'the clean copy of a clone with an unreadable registration was unregistered'
+  mv -f "$W/hidden-gitdir.saved" "$store/hidden/gitdir"
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "readable registration: apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path reap)" 'with the registration readable the clean copy was not reaped'
+  pass 'a registration held by a link to nothing keeps every copy of its clone and is named, and a readable one lets the clean copy go'
+}
+
+# A registration whose name begins with a dot is read like any other: held by a link to nothing, it keeps every
+# copy of its clone and the sweep names it.
+test_a_dot_named_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone() {
+  local store name list rc
+  for name in .ghost ..ghost; do
+    make_world "dot-registration-$name"
+    add_copy reap
+    store=$SLOT/.git/worktrees
+    mkdir -p "$store/$name"
+    ln -s "$W/no-such-target" "$store/$name/gitdir"
+    [ -L "$store/$name/gitdir" ] && [ ! -e "$store/$name/gitdir" ] || fail "$name: the fixture did not make the registration a link to nothing"
+    rc=0
+    list=$(git -C "$SLOT" worktree list --porcelain 2>/dev/null) || rc=$?
+    [ "$rc" = 0 ] || fail "$name: the fixture does not bite: git exited $rc"
+    printf '%s\n' "$list" | grep -qxF "worktree $(copy_path reap)" || fail "$name: the fixture does not bite: git lost the readable registration"
+    run_sweep --apply
+    [ "$RC" = 0 ] || fail "$name: apply failed ($RC): $OUT"
+    assert_contains "$OUT" "clone $SLOT was not read: its worktree registration list could not be read (registration " "$name: a clone with an unreadable registration was read"
+    assert_contains "$OUT" ".git/worktrees/$name/gitdir cannot be read)" "$name: the sweep did not name the registration it could not read"
+    assert_not_contains "$OUT" "REMOVED"$'\t' "$name: a copy of a clone with an unreadable registration was removed"
+    [ -e "$(copy_path reap)" ] || fail "$name: the clean copy of such a clone was removed"
+    registered reap || fail "$name: the clean copy of such a clone was unregistered"
+  done
+  pass 'a dot-named registration held by a link to nothing keeps every copy of its clone and is named'
+}
+
+# A git whose `worktree list` prints one nested path and then fails, with every registration readable, is a
+# list that could not be read: the sweep reads nothing from the clone and names no registration.
+test_a_listing_that_fails_after_partial_output_names_no_registration() {
+  make_world partial-listing
+  add_copy reap
+  printf '%s\n' "$(copy_path reap)" > "$W/partial-list"
+  FAKE_GIT_PARTIAL_LIST_FILE="$W/partial-list" run_sweep --apply
+  [ "$RC" = 0 ] || fail "partial listing: apply failed ($RC): $OUT"
+  assert_present "$W/partial-list.log" 'the git stand-in did not print its partial listing'
+  assert_contains "$OUT" "clone $SLOT was not read: its worktree registration list could not be read" 'a listing that failed was read'
+  assert_not_contains "$OUT" '(registration ' 'the sweep named a registration the scan found readable'
+  assert_not_contains "$OUT" "REMOVED"$'\t' 'a copy of a clone whose listing failed was removed'
+  registered reap || fail 'the copy of a clone whose listing failed was unregistered'
+  pass 'a listing that fails after partial output keeps every copy and names no registration'
 }
 
 test_apply_removes_only_the_reapable_copy() {
@@ -861,7 +934,7 @@ test_failed_nested_registration_proof_holds_copy() {
   before=$(shasum -a 256 "$admin/locked")
   FAKE_GIT_FAIL_LIST_AFTER=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
   assert_class locked HELD-DIRTY
-  assert_contains "$OUT" "registered nested copies cannot be listed" "unreadable inner-copy proof was not named"
+  assert_contains "$OUT" "its clone's worktree registration list could not be read, so no inner copy is ruled out" "unreadable inner-copy proof was not named"
   rm -f "$W/git.log.list-count"
   FAKE_GIT_FAIL_LIST_AFTER=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   assert_not_contains "$OUT" "REMOVED"$'\t' "failed inner-copy proof was reported removed"
@@ -887,6 +960,8 @@ SH
   FAKE_GIT_FAIL_LIST_FILE="$W/post-execute-list-fails" FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 1 ] || fail "unproved post-removal registration should fail: $OUT"
   assert_contains "$OUT" "registration after removal could not be proved" "failed post-removal proof was not reported"
+  assert_contains "$OUT" "registration after removal could not be proved: its clone's worktree registration list could not be read; no retention receipt was cleared" \
+    "the failed post-removal proof did not say the registration list could not be read"
   assert_not_contains "$OUT" "REMOVED"$'\t' "unknown registration was reported removed"
   assert_absent "$HOMED/data/copy-sweep.log" "unknown registration was logged as removed"
   assert_equals 1 "$(find "$HOMED/data/copy-sweep/retained" -type f | wc -l | tr -d ' ')" "unknown registration cleared the retention receipt"
@@ -2499,6 +2574,105 @@ test_live_foreign_or_unreleasable_locks_are_kept() {
   pass "a live launcher, a lock that is not Vernant's, and a missing driver all keep their copy untouched"
 }
 
+# A ps in this world that answers for <pid> the way <shape> says (refused: the
+# sandbox refuses it with 126; absent: no such process) and passes every other
+# call to the real ps.
+sweep_fake_launcher_ps() {  # <pid> <refused|absent>
+  local real_ps
+  real_ps=$(command -v ps)
+  cat > "$FAKEBIN/ps" <<SH
+#!/usr/bin/env bash
+if [ "\$*" = "-p $1 -o pid=" ]; then
+  case "$2" in
+    refused) echo 'ps: Operation not permitted' >&2; exit 126 ;;
+    absent) exit 1 ;;
+  esac
+fi
+exec "$real_ps" "\$@"
+SH
+  chmod +x "$FAKEBIN/ps"
+}
+
+# A python3 in this world whose `fm-proc-info.py table pid` answer is a process table built here, never
+# read from the real one (which reads only Darwin's sysctl, so on Linux it is empty): the test shell's own
+# pid and pid 1, which leaves the live launcher out. It is the partial table a confined reader sees when
+# the sandbox that refused ps also hides processes from it. Every other call goes to the real python3.
+sweep_serve_partial_table() {
+  local real_python
+  real_python=$(command -v python3)
+  cat > "$FAKEBIN/python3" <<SH
+#!/usr/bin/env bash
+for last; do :; done
+if [ "\$#" -ge 3 ] && [ "\${@: -2:1}" = table ] && [ "\$last" = pid ]; then
+  printf '%s\n' $$ 1
+  exit 0
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$FAKEBIN/python3"
+}
+
+# On every platform: the table the code under test is served is nonempty, lists only pids, lists at
+# least one other live pid, and leaves the live launcher out, while the launcher itself is alive.
+sweep_assert_partial_table() {  # <launcher-pid>
+  local table listed other_live=
+  table=$(PATH="$FAKEBIN:$ORIGINAL_PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid) || fail "the served process table could not be read"
+  [ -n "$table" ] || fail "the served process table is empty"
+  if printf '%s\n' "$table" | grep -qv '^[0-9][0-9]*$'; then fail "the served process table holds a line that is not a pid"; fi
+  if printf '%s\n' "$table" | grep -qx -- "$1"; then fail "the served process table lists the live launcher"; fi
+  for listed in $table; do
+    [ "$listed" = "$1" ] || ! kill -0 "$listed" 2>/dev/null || other_live=$listed
+  done
+  [ -n "$other_live" ] || fail "the served process table lists no other live pid"
+  kill -0 "$1" 2>/dev/null || fail "the launcher is not alive"
+}
+
+# A refused ps is no proof that a Vernant launcher is gone, even when a
+# table read made under the same restriction leaves it out: the copy is
+# held and the driver is never asked. A readable ps that shows the launcher gone
+# still sends the same kind of copy to the driver.
+test_a_refused_ps_holds_a_locked_copy_the_confined_table_cannot_see() {
+  local admin before rc pid
+  make_locked_copy_case refused-ps-hidden live
+  install_driver "$SLOT" "$W"
+  pid=$LIVE_PID
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  sweep_fake_launcher_ps "$pid" refused
+  sweep_serve_partial_table
+  rc=0
+  PATH="$FAKEBIN:$ORIGINAL_PATH" ps -p "$pid" -o pid= >/dev/null 2>&1 || rc=$?
+  assert_equals 126 "$rc" "the fake ps does not refuse the launcher"
+  sweep_assert_partial_table "$pid"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  kill -0 "$pid" 2>/dev/null || fail "the live launcher ended before the verdict"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  LIVE_PID=
+  [ "$RC" = 0 ] || fail "refused ps: apply failed ($RC): $OUT"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "launcher $pid cannot be observed; absence is not proved" \
+    "a refused ps was not reported as unobservable"
+  assert_absent "$W/closeout.log" "the closeout driver ran for a launcher ps could not observe"
+  [ -e "$(copy_path locked)" ] || fail "the copy of an unobservable launcher was removed"
+  registered locked || fail "the copy of an unobservable launcher was unregistered"
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "the unobservable launcher's lock changed"
+
+  make_locked_copy_case refused-ps-control dead
+  install_driver "$SLOT" "$W"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  pid=$(sed -n 's/.*launcher=\([0-9][0-9]*\).*/\1/p' "$admin/locked")
+  [ -n "$pid" ] || fail "the control lock names no launcher pid"
+  sweep_fake_launcher_ps "$pid" absent
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "readable ps: apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "a launcher ps showed gone did not reach the driver"
+  assert_contains "$(cat "$W/closeout.log" 2>/dev/null)" "--cleanup-worktree $(copy_path locked) --execute-cleanup" \
+    "the driver was not asked to release the copy"
+  [ ! -e "$(copy_path locked)" ] || fail "the driver did not remove the copy"
+  pass "a refused ps holds a Vernant-locked copy even when the confined table cannot see its launcher, and a readable ps that shows the launcher gone still reaches the driver"
+}
+
 test_copy_with_one_untracked_file_and_unpushed_tip_are_kept() {
   local bundle digest tips
   make_world edges
@@ -3351,6 +3525,9 @@ test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report
 test_a_new_youngest_copy_is_named_first_and_the_wake_stays_bounded
 test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 test_unreadable_registration_is_reported_without_walking_for_copies
+test_a_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone
+test_a_dot_named_registration_held_by_a_link_to_nothing_keeps_every_copy_of_its_clone
+test_a_listing_that_fails_after_partial_output_names_no_registration
 test_apply_removes_only_the_reapable_copy
 test_recycled_launcher_lock_is_held
 test_dead_launcher_dirty_copy_is_held
@@ -3402,6 +3579,7 @@ test_two_sweeps_of_one_path_keep_both_preserved_directories
 test_a_removal_with_no_measured_size_says_so
 test_locked_copy_with_an_unpushed_equivalence_is_still_held
 test_live_foreign_or_unreleasable_locks_are_kept
+test_a_refused_ps_holds_a_locked_copy_the_confined_table_cannot_see
 test_copy_with_one_untracked_file_and_unpushed_tip_are_kept
 test_landed_content_without_a_pushed_tip_is_reaped_by_apply
 test_lane_home_project_clone_is_swept

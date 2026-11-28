@@ -3675,9 +3675,8 @@ test_bundle_route_requires_the_captains_call() {
     fi
     (
       cd "$ROOT"
-      export FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
-        FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH"
-      eval "$command"
+      FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+        FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" eval "$command"
     ) > "$case_dir/hold.out" 2>&1 || fail "bundle-call-$shape: the printed command failed: $command: $(cat "$case_dir/hold.out")"
     decoded_backlog "$case_dir" > "$case_dir/backlog.decoded" || fail "bundle-call-$shape: cannot decode the hold reason"
     assert_grep "unlanded commits of task-x1, tips $head:" "$case_dir/backlog.decoded" \
@@ -4123,6 +4122,1960 @@ SH
 }
 
 
+# teardown --copy: the by-path mode removes one nested worktree no task record
+# names (bin/fm-teardown.sh's header, "By-path teardown"). Every case runs the real
+# script as a process over real repositories in a scratch home; the only stand-ins
+# are the forge CLIs, tmux and docker that make_case already shadows, and a git or
+# lsof wrapper where a case needs the removal or the process scan to stall.
+
+# make_by_path_case <name> [project|slot]: a home whose projects/ holds the case's
+# project clone, and a clean worktree BP_COPY nested at .claude/worktrees/stray in
+# the clone that registers it (BP_CLONE): the project clone itself, or a Treehouse
+# pool slot of it. Sets BP_CASE, BP_HOME, BP_CLONE and BP_COPY, all canonical.
+make_by_path_case() {
+  local name=$1 shape=${2:-project} case_dir
+  case_dir=$(make_case "$name")
+  BP_CASE=$case_dir
+  BP_HOME=$case_dir/home
+  mkdir -p "$BP_HOME/state" "$BP_HOME/projects"
+  ln -s "$case_dir/project" "$BP_HOME/projects/project"
+  if [ "$shape" = slot ]; then
+    mkdir -p "$case_dir/pool/1"
+    git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' \
+      "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
+    BP_CLONE=$(cd "$case_dir/pool/1/project" && pwd -P)
+  else
+    BP_CLONE=$(cd "$case_dir/project" && pwd -P)
+  fi
+  BP_COPY=$BP_CLONE/.claude/worktrees/stray
+  mkdir -p "${BP_COPY%/*}"
+  git -C "$case_dir/project" worktree add -q -b fm/stray "$BP_COPY" main
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  by_path_git_logging "$case_dir"
+  chmod +x "$case_dir/fakebin/treehouse"
+}
+
+# A git that records every `worktree remove` it is asked for in git-remove.log and
+# then runs the real one: the removal the mode may make is counted, not assumed.
+by_path_git_logging() {  # <case>
+  cat > "$1/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in *" worktree remove "*) printf '%s\n' "\$*" >> "$1/git-remove.log" ;; esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$1/fakebin/git"
+}
+
+run_by_path() {  # <case> <teardown --copy arguments...>
+  local case_dir=$1
+  shift
+  FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
+    FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" NM_HOME="$case_dir/nm" \
+    PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$@"
+}
+
+# Runs a printed completing command exactly as printed, from a shell that sets none of the three root
+# overrides: only the fixture's code root, nm home and fake tools are supplied, so a root the command
+# does not carry is a root the run does not reach.
+by_path_run_printed() {  # <case> <command text> [directory to run it from]
+  ( cd "${3:-.}" && env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
+    FM_ROOT_OVERRIDE="$1/code-root" NM_HOME="$1/nm" \
+    PATH="$1/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" bash -c "$2" )
+}
+
+by_path_registered() {  # <clone> <copy>
+  git -C "$1" worktree list --porcelain | grep -Fqx "worktree $2"
+}
+
+# The copy is exactly as the case left it: present, registered, at the same HEAD,
+# no audit record written, and no pool return attempted.
+by_path_assert_untouched() {  # <case> <label>
+  assert_present "$BP_COPY" "$2: the copy was removed"
+  by_path_registered "$BP_CLONE" "$BP_COPY" || fail "$2: the copy is no longer registered"
+  assert_equals "$BP_HEAD" "$(git -C "$BP_COPY" rev-parse HEAD)" "$2: the copy's HEAD moved"
+  assert_absent "$1/data/record-less-copy-removals.log" "$2: an audit record was written for a refused run"
+  assert_absent "$1/treehouse.log" "$2: the provider was called"
+  assert_absent "$1/git-remove.log" "$2: git worktree remove was called"
+}
+
+by_path_seed_backlog() {  # <case>
+  printf '%s\n' '# Backlog' '' '## In flight' '' '## Queued' '' '## Done' > "$1/data/backlog.md"
+}
+
+# The recipe in fm-teardown.sh's header, with the record id naming the data directory.
+by_path_record_bundle() {  # <case> <copy> <record-id> <bundle> [revision...]
+  local case_dir=$1 copy=$2 id=$3 bundle=$4 digest tips
+  shift 4
+  mkdir -p "${bundle%/*}" "$case_dir/data/$id"
+  git -C "$copy" bundle create "$bundle" "$@" 2>/dev/null || return 1
+  git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1 || return 1
+  digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
+  tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+  printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$case_dir/data/$id/preservation-bundles.tsv"
+}
+
+by_path_commit() {  # <copy>
+  printf 'recoverable work\n' > "$1/work.txt"
+  git -C "$1" add work.txt
+  git -C "$1" commit -qm 'unpublished work'
+}
+
+# Waits until process <pid> holds a file at or under <path>, as lsof reports it.
+by_path_wait_holder() {  # <pid> <path>
+  local i
+  for i in $(seq 1 100); do
+    "$REAL_LSOF_FOR_TEST" -nP -w -p "$1" -Fn 2>/dev/null | grep -Fq "n$2" && return 0
+    sleep 0.05
+  done
+  fail "process $1 never held $2"
+}
+
+test_by_path_removes_a_landed_record_less_copy() {
+  local shape case_dir rc head
+  for shape in project slot; do
+    make_by_path_case "by-path-landed-$shape" "$shape"
+    case_dir=$BP_CASE
+    head=$(git -C "$BP_COPY" rev-parse HEAD)
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-landed-$shape: a landed record-less copy must be removed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-landed-$shape: the copy is still on disk"
+    by_path_registered "$BP_CLONE" "$BP_COPY" && fail "by-path-landed-$shape: the copy is still registered"
+    assert_present "$BP_CLONE/.git" "by-path-landed-$shape: the enclosing clone was touched"
+    assert_equals "$head" "$(git -C "$case_dir/project" rev-parse main)" "by-path-landed-$shape: main moved"
+    assert_grep 'removed record-less copy' "$case_dir/stderr" "by-path-landed-$shape: no removal line"
+    assert_absent "$case_dir/treehouse.log" "by-path-landed-$shape: a slot return was attempted"
+    assert_equals "-C $BP_CLONE worktree remove $BP_COPY" "$(cat "$case_dir/git-remove.log")" \
+      "by-path-landed-$shape: git worktree remove did not run exactly once for the exact copy in its clone"
+    assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-landed-$shape: not exactly one audit record"
+    assert_equals "$(printf '%s\t%s\t%s' "$BP_COPY" "$head" landed)" "$(cut -f4-6 "$case_dir/data/record-less-copy-removals.log")" \
+      "by-path-landed-$shape: the audit record does not name the copy, HEAD and proof"
+    assert_equals "$BP_CLONE" "$(cut -f3 "$case_dir/data/record-less-copy-removals.log")" "by-path-landed-$shape: the audit record does not name the clone"
+    assert_absent "$case_dir/data/backlog.md" "by-path-landed-$shape: a landed copy touched the backlog"
+  done
+  pass 'teardown --copy removes a landed record-less nested copy, in a project clone or a pool slot, with one audit record and no slot return'
+}
+
+# The captain's land-or-drop call gates the bundle route exactly as it does an
+# ordinary teardown, but any open captain-held row naming the bundle and every
+# recorded tip is the call, because a record-less copy has no row of its own.
+test_by_path_removes_a_bundle_held_copy_only_when_the_captains_call_is_filed() {
+  local case_dir rc command head tips tip stored
+  make_by_path_case by-path-bundle
+  case_dir=$BP_CASE
+  by_path_commit "$BP_COPY"
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  head=$BP_HEAD
+  # A second unpublished tip the bundle also records, so a call naming only some of the recorded tips can be told apart.
+  git -C "$BP_COPY" update-ref refs/heads/fm/second "$(git -C "$BP_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'second unpublished tip')"
+  by_path_record_bundle "$case_dir" "$BP_COPY" rec-1 "$case_dir/bundles/work.bundle" --all || fail 'cannot create the bundle fixture'
+  tips=$(cut -f3 "$case_dir/data/rec-1/preservation-bundles.tsv")
+  [ "$(printf '%s\n' "$tips" | wc -w | tr -d ' ')" -ge 2 ] || fail "by-path-bundle: the fixture does not record at least two tips: $tips"
+  by_path_seed_backlog "$case_dir"
+  # An open captain-held row that names the bundle but only one recorded tip is not the call.
+  run_captain_hold "$case_dir" hold partial-call --owner captain --title 'partial call' --repo project \
+    --reason "Land or drop work: preserved in bundle $case_dir/bundles/work.bundle, recorded tip ${tips%% *}." >/dev/null \
+    || fail 'cannot file the partial call'
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-bundle: a row naming only one recorded tip must not count as the call: $(cat "$case_dir/stderr")"
+  assert_grep 'bundle preservation unavailable' "$case_dir/stderr" 'by-path-bundle: the partial row did not refuse on the bundle route'
+  by_path_assert_untouched "$case_dir" by-path-bundle-partial
+  cp "$case_dir/data/backlog.md" "$case_dir/backlog.before"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-bundle: a verified bundle with no captain's call must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'bundle preservation unavailable' "$case_dir/stderr" 'by-path-bundle: the refusal does not name the bundle route'
+  assert_grep 'is not removed' "$case_dir/stderr" 'by-path-bundle: no named reason'
+  by_path_assert_untouched "$case_dir" by-path-bundle-red
+  cmp -s "$case_dir/backlog.before" "$case_dir/data/backlog.md" || fail 'by-path-bundle: the refused run changed the backlog'
+  command=$(sed -n 's/^File the land-or-drop call as its row, then run the same teardown --copy command again: //p' "$case_dir/stderr")
+  [ -n "$command" ] || fail "by-path-bundle: no hold command was printed: $(cat "$case_dir/stderr")"
+  [[ "$command" == 'bin/fm-captain-hold.sh hold rec-1 --title '* ]] || fail "by-path-bundle: the command holds the wrong row: $command"
+  (
+    cd "$ROOT"
+    FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+      FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" eval "$command"
+  ) > "$case_dir/hold.out" 2>&1 || fail "by-path-bundle: the printed command failed: $command: $(cat "$case_dir/hold.out")"
+  decoded_backlog "$case_dir" > "$case_dir/backlog.decoded" || fail 'by-path-bundle: cannot decode the hold reason'
+  for tip in $tips; do
+    assert_grep "$tip" "$case_dir/backlog.decoded" "by-path-bundle: the call does not name recorded tip $tip"
+  done
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-bundle: the filed call must let the run pass: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-bundle: the bundle-held copy was not removed'
+  by_path_registered "$BP_CLONE" "$BP_COPY" && fail 'by-path-bundle: the removed copy is still registered'
+  assert_equals "-C $BP_CLONE worktree remove $BP_COPY" "$(cat "$case_dir/git-remove.log")" 'by-path-bundle: git worktree remove did not run exactly once for the exact copy'
+  assert_grep "land-or-drop call for bundle $case_dir/bundles/work.bundle is held on task rec-1" "$case_dir/stderr" 'by-path-bundle: the call was not named'
+  stored="$case_dir/data/rec-1/preserved-bundles/$(cut -f2 "$case_dir/data/rec-1/preservation-bundles.tsv").bundle"
+  assert_present "$stored" 'by-path-bundle: the bundle was not stored in data'
+  git -C "$case_dir/project" fetch -q "$stored" "$head:refs/heads/recovered" || fail 'by-path-bundle: the stored bundle does not restore the copy'
+  assert_equals "$head" "$(git -C "$case_dir/project" rev-parse refs/heads/recovered)" 'by-path-bundle: the restored tip differs'
+  assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" 'by-path-bundle: not exactly one audit record'
+  assert_equals rec-1 "$(cut -f2 "$case_dir/data/record-less-copy-removals.log")" 'by-path-bundle: the audit record lost the record id'
+  assert_equals "$(printf '%s\t%s' "$head" "bundle $stored")" "$(cut -f5-6 "$case_dir/data/record-less-copy-removals.log")" 'by-path-bundle: the audit record does not name the HEAD and proof'
+  assert_equals 1 "$(printf '%s\n' "$(tasks-axi show rec-1 --full --file "$case_dir/data/backlog.md")" | grep -Ec '^  hold_kind: *captain$')" \
+    'by-path-bundle: the captain call did not stay open and held'
+  pass 'teardown --copy removes a bundle-held copy only once an open captain-held row names the bundle and every tip'
+}
+
+test_by_path_default_record_id_is_derived_from_the_path_and_printed_in_a_refusal() {
+  local case_dir rc id expected
+  make_by_path_case by-path-default-id
+  case_dir=$BP_CASE
+  by_path_commit "$BP_COPY"
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  expected="copy-$(printf '%s' "$BP_COPY" | shasum -a 256 | cut -c1-16)"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-default-id: an unlanded copy with no bundle must refuse: $(cat "$case_dir/stderr")"
+  assert_grep "$case_dir/data/$expected/preservation-bundles.tsv" "$case_dir/stderr" 'by-path-default-id: the refusal does not name the derived record'
+  id=$(sed -n 's|.* in '"$case_dir"'/data/\(copy-[0-9a-f]*\)/preservation-bundles.tsv.*|\1|p' "$case_dir/stderr" | head -1)
+  assert_equals "$expected" "$id" 'by-path-default-id: the printed id is not the one derived from the canonical path'
+  assert_grep 'run the same teardown --copy command again' "$case_dir/stderr" 'by-path-default-id: the hint names ordinary teardown'
+  by_path_assert_untouched "$case_dir" by-path-default-id
+  pass 'the default bundle record id is derived from the canonical copy path and printed in the refusal'
+}
+
+# TR2: each refusal names its reason and leaves the copy exactly as it was, with a
+# provider stand-in that would succeed.
+test_by_path_refuses_unlanded_commits_with_no_verified_bundle() {
+  local case_dir rc
+  make_by_path_case by-path-unlanded
+  case_dir=$BP_CASE
+  by_path_commit "$BP_COPY"
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-unlanded: unlanded commits with no bundle must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'rule=copy-landed' "$case_dir/stderr" 'by-path-unlanded: the refusal does not name the landing rule'
+  assert_grep 'is not proved landed' "$case_dir/stderr" 'by-path-unlanded: no named reason'
+  assert_grep 'missing preservation record' "$case_dir/stderr" 'by-path-unlanded: the bundle route was not tried'
+  by_path_assert_untouched "$case_dir" by-path-unlanded
+  assert_present "$BP_COPY/work.txt" 'by-path-unlanded: the unlanded work was lost'
+  pass 'teardown --copy refuses unlanded commits that no verified bundle holds'
+}
+
+test_by_path_refuses_a_dirty_or_untracked_tree() {
+  local case_dir rc shape
+  for shape in tracked untracked ignored; do
+    make_by_path_case "by-path-dirty-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    case "$shape" in
+      tracked)
+        # The tracked file is committed and pushed, so the only thing that holds the copy is the edit.
+        printf 'base\n' > "$BP_COPY/tracked.txt"
+        git -C "$BP_COPY" add tracked.txt
+        git -C "$BP_COPY" commit -qm 'tracked file'
+        git -C "$BP_COPY" push -q origin fm/stray
+        git -C "$case_dir/project" fetch -q origin
+        BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+        printf 'edited\n' >> "$BP_COPY/tracked.txt"
+        ;;
+      untracked) printf 'new\n' > "$BP_COPY/untracked.txt" ;;
+      ignored)
+        printf 'secret.txt\n' >> "$(git -C "$BP_COPY" rev-parse --path-format=absolute --git-path info/exclude)"
+        printf 'only here\n' > "$BP_COPY/secret.txt"
+        ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-dirty-$shape: the copy must refuse: $(cat "$case_dir/stderr")"
+    case "$shape" in
+      ignored) assert_grep 'rule=copy-ignored-files' "$case_dir/stderr" "by-path-dirty-$shape: no named rule"
+               assert_grep 'secret.txt' "$case_dir/stderr" "by-path-dirty-$shape: the refusal does not name the file" ;;
+      *) assert_grep 'uncommitted or untracked-unignored changes' "$case_dir/stderr" "by-path-dirty-$shape: no named reason" ;;
+    esac
+    by_path_assert_untouched "$case_dir" "by-path-dirty-$shape"
+  done
+  pass 'teardown --copy refuses tracked edits, untracked files and ignored files that exist nowhere else'
+}
+
+test_by_path_refuses_a_copy_a_process_holds() {
+  local case_dir rc shape pid
+  for shape in cwd open-file; do
+    make_by_path_case "by-path-process-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    if [ "$shape" = cwd ]; then
+      teardown_fixture_start "$BP_COPY" KILL sleep 300
+      pid=$TEARDOWN_FIXTURE_PID
+      by_path_wait_holder "$pid" "$BP_COPY"
+    else
+      # The copy's own .git file is no change to the tree, so only the open handle holds the copy.
+      # shellcheck disable=SC2016 # The child bash expands its own "$1".
+      teardown_fixture_start "$case_dir" KILL bash -c 'exec 3< "$1"; exec sleep 300' bash "$BP_COPY/.git"
+      pid=$TEARDOWN_FIXTURE_PID
+      by_path_wait_holder "$pid" "$BP_COPY/.git"
+    fi
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-process-$shape: a held copy must refuse: $(cat "$case_dir/stderr")"
+    assert_grep "is in use: process $pid " "$case_dir/stderr" "by-path-process-$shape: the refusal does not name the process"
+    by_path_assert_untouched "$case_dir" "by-path-process-$shape"
+    kill -0 "$pid" 2>/dev/null || fail "by-path-process-$shape: the run signalled the holder"
+    teardown_fixture_stop "$pid"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-process-$shape: the copy must go once the process is gone: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-process-$shape: the idle copy was not removed"
+  done
+  pass 'teardown --copy refuses a copy that is a process'"'"'s cwd or holds an open file, never signals it, and removes the copy once it is idle'
+}
+
+test_by_path_refuses_a_path_that_is_not_a_registered_nested_worktree() {
+  local case_dir rc label target
+  make_by_path_case by-path-outside
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  mkdir -p "$case_dir/elsewhere" "$BP_CLONE/.claude/worktrees/plain-dir"
+  git init -q "$case_dir/other-project"
+  git -C "$case_dir/other-project" -c user.email=t@t -c user.name=t commit -q --allow-empty -m base
+  mkdir -p "$case_dir/other-project/.claude/worktrees"
+  git -C "$case_dir/other-project" worktree add -q -b other "$case_dir/other-project/.claude/worktrees/foreign"
+  for label in clone elsewhere unregistered-dir other-home-project outside-the-clone; do
+    case "$label" in
+      clone) target=$BP_CLONE ;;
+      elsewhere) target=$case_dir/elsewhere ;;
+      unregistered-dir) target=$BP_CLONE/.claude/worktrees/plain-dir ;;
+      other-home-project) target=$case_dir/other-project/.claude/worktrees/foreign ;;
+      outside-the-clone) target=$case_dir/wt ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$target" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-outside-$label: must refuse: $(cat "$case_dir/stderr")"
+    assert_grep 'is not a worktree registered strictly inside a project clone of this home' "$case_dir/stderr" "by-path-outside-$label: no named reason"
+    assert_present "$target" "by-path-outside-$label: the path was touched"
+  done
+  by_path_assert_untouched "$case_dir" by-path-outside
+  assert_present "$case_dir/other-project/.claude/worktrees/foreign" 'by-path-outside: another project'"'"'s copy was touched'
+  rc=0
+  run_by_path "$case_dir" "relative/path" > /dev/null 2> "$case_dir/stderr" || rc=$?
+  expect_code 2 "$rc" 'by-path-outside: a relative path is an invalid request'
+  ln -s "$BP_COPY" "$case_dir/link-to-copy"
+  rc=0
+  run_by_path "$case_dir" "$case_dir/link-to-copy" > /dev/null 2> "$case_dir/stderr" || rc=$?
+  expect_code 2 "$rc" 'by-path-outside: a symbolic link is an invalid request'
+  assert_grep 'is a symbolic link' "$case_dir/stderr" 'by-path-outside: no named reason for a link'
+  by_path_assert_untouched "$case_dir" by-path-outside-final
+  pass 'teardown --copy refuses a slot or clone itself, an unregistered directory, another project'"'"'s copy, a copy outside the clone, a relative path and a link'
+}
+
+test_by_path_refuses_a_path_a_live_record_names() {
+  local case_dir rc field
+  for field in worktree prior_worktree home; do
+    make_by_path_case "by-path-record-$field"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" "$field=$BP_COPY" \
+      "project=$case_dir/project" "kind=ship" "mode=no-mistakes" "spawn_gen=by-path-test"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-record-$field: a live record must keep the copy out of this mode: $(cat "$case_dir/stderr")"
+    assert_grep 'rule=active-record-owner' "$case_dir/stderr" "by-path-record-$field: no named rule"
+    assert_grep "task task-x1's active record names it as its $field" "$case_dir/stderr" "by-path-record-$field: no named reason"
+    cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "by-path-record-$field: the record changed"
+    by_path_assert_untouched "$case_dir" "by-path-record-$field"
+  done
+  make_by_path_case by-path-record-id
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  fm_write_meta "$case_dir/state/task-x1.meta" "window=firstmate:fm-task-x1" "kind=ship" "spawn_gen=by-path-test"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" --record-id task-x1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 2 "$rc" 'by-path-record-id: a live task id must not serve as a bundle record id'
+  assert_grep 'names a live task record' "$case_dir/stderr" 'by-path-record-id: no named reason'
+  by_path_assert_untouched "$case_dir" by-path-record-id
+  pass 'teardown --copy refuses a copy a live task record names, and a record id that is a live task'
+}
+
+test_by_path_refuses_a_slot_claimed_by_another_live_task_and_passes_a_stale_claim() {
+  local case_dir rc
+  make_by_path_case by-path-claim slot
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  printf 'task=other-task\nhome=%s\n' "$BP_HOME" > "$case_dir/pool/1/.fm-slot-owner"
+  fm_write_meta "$case_dir/state/other-task.meta" "window=firstmate:fm-other-task" "kind=ship" "spawn_gen=by-path-test"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-claim: a slot claimed by a live task must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'is claimed by task other-task, whose record is live' "$case_dir/stderr" 'by-path-claim: no named reason'
+  by_path_assert_untouched "$case_dir" by-path-claim
+  printf 'garbage with no task line\n' > "$case_dir/pool/1/.fm-slot-owner"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'by-path-claim: an unreadable claim must refuse'
+  assert_grep 'cannot be read, so who the slot belongs to is unknown' "$case_dir/stderr" 'by-path-claim: no named reason for an unreadable claim'
+  by_path_assert_untouched "$case_dir" by-path-claim-unreadable
+  printf 'task=gone-task\nhome=%s\n' "$BP_HOME" > "$case_dir/pool/1/.fm-slot-owner"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-claim: a stale claim names no live task and must not block: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-claim: the copy was not removed'
+  assert_present "$case_dir/pool/1/.fm-slot-owner" 'by-path-claim: the slot claim was dropped'
+  pass 'teardown --copy refuses a pool slot claimed by a live task or by an unreadable claim, and removes the copy under a stale claim without touching it'
+}
+
+test_by_path_refuses_a_bundle_that_fails_verification() {
+  local case_dir rc shape
+  for shape in changed-bytes missing-tip; do
+    make_by_path_case "by-path-badbundle-$shape"
+    case_dir=$BP_CASE
+    by_path_commit "$BP_COPY"
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    by_path_record_bundle "$case_dir" "$BP_COPY" rec-1 "$case_dir/bundles/work.bundle" --all || fail 'cannot create the bundle fixture'
+    by_path_seed_backlog "$case_dir"
+    run_captain_hold "$case_dir" hold rec-1 --owner captain --title 'bundle call' --repo project \
+      --reason "Land or drop the unlanded commits of rec-1: preserved in bundle $case_dir/bundles/work.bundle, recorded tips $(cut -f3 "$case_dir/data/rec-1/preservation-bundles.tsv")." >/dev/null \
+      || fail 'cannot file the captain call'
+    case "$shape" in
+      changed-bytes) printf 'x' >> "$case_dir/bundles/work.bundle" ;;
+      missing-tip)
+        printf 'more work\n' > "$BP_COPY/more.txt"
+        git -C "$BP_COPY" add more.txt
+        git -C "$BP_COPY" commit -qm 'a commit the bundle never saw'
+        BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+        ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-badbundle-$shape: a bundle that fails verification must refuse: $(cat "$case_dir/stderr")"
+    case "$shape" in
+      changed-bytes) assert_grep 'sha256 does not match record' "$case_dir/stderr" "by-path-badbundle-$shape: no named reason" ;;
+      missing-tip) assert_grep 'bundle does not list unlanded tip' "$case_dir/stderr" "by-path-badbundle-$shape: no named reason" ;;
+    esac
+    by_path_assert_untouched "$case_dir" "by-path-badbundle-$shape"
+  done
+  pass 'teardown --copy refuses a recorded bundle whose bytes changed or that lacks a tip the copy holds'
+}
+
+test_by_path_takes_no_force() {
+  local case_dir rc flag
+  make_by_path_case by-path-force
+  case_dir=$BP_CASE
+  by_path_commit "$BP_COPY"
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  printf 'words\n' > "$case_dir/words.txt"
+  for flag in --force --legacy-record '--drop-file '"$case_dir/words.txt"; do
+    rc=0
+    # shellcheck disable=SC2086 # The flag and its operand are separate words.
+    run_by_path "$case_dir" "$BP_COPY" $flag > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 2 "$rc" "by-path-force: $flag is an invalid request here: $(cat "$case_dir/stderr")"
+    assert_grep "teardown --copy takes no ${flag%% *}" "$case_dir/stderr" "by-path-force: $flag has no named reason"
+    by_path_assert_untouched "$case_dir" "by-path-force$flag"
+  done
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" --no-such-flag > /dev/null 2> "$case_dir/stderr" || rc=$?
+  expect_code 2 "$rc" 'by-path-force: an unknown flag is an invalid request'
+  rc=0
+  FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" "$TEARDOWN" --copy > /dev/null 2> "$case_dir/stderr" || rc=$?
+  expect_code 2 "$rc" 'by-path-force: --copy with no path is an invalid request'
+  by_path_assert_untouched "$case_dir" by-path-force-final
+  pass 'teardown --copy takes no --force, --drop-file or --legacy-record and refuses them by name before reading anything'
+}
+
+test_by_path_refuses_a_copy_holding_another_worktree_or_a_foreign_lock() {
+  local case_dir rc
+  make_by_path_case by-path-inner
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  mkdir -p "$BP_COPY/.claude/worktrees"
+  git -C "$case_dir/project" worktree add -q -b fm/inner "$BP_COPY/.claude/worktrees/inner" main
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-inner: a copy holding another worktree must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'holds registered worktree' "$case_dir/stderr" 'by-path-inner: no named reason'
+  by_path_assert_untouched "$case_dir" by-path-inner
+  assert_present "$BP_COPY/.claude/worktrees/inner" 'by-path-inner: the inner worktree was removed'
+  git -C "$case_dir/project" worktree remove "$BP_COPY/.claude/worktrees/inner"
+  git -C "$BP_CLONE" worktree lock --reason 'held by hand' "$BP_COPY"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-inner: a copy locked by something other than Vernant must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'rule=creation-lock-owner' "$case_dir/stderr" 'by-path-inner: no named lock rule'
+  by_path_assert_untouched "$case_dir" by-path-lock
+  pass 'teardown --copy refuses a copy that holds another registered worktree or carries a lock that is not Vernant'"'"'s'
+}
+
+# TR3: a rerun converges, says what it found, and removes nothing it did not prove.
+test_by_path_rerun_after_a_crash_converges() {
+  local case_dir rc head
+  make_by_path_case by-path-rerun
+  case_dir=$BP_CASE
+  head=$(git -C "$BP_COPY" rev-parse HEAD)
+  BP_HEAD=$head
+  # A removal that fails after the audit record was written: the copy is still there.
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in *" worktree remove "*) echo 'fatal: simulated crash during removal' >&2; exit 1 ;; esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-rerun: the failed removal must refuse: $(cat "$case_dir/stderr")"
+  assert_present "$BP_COPY" 'by-path-rerun: the copy went despite the failed removal'
+  assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" 'by-path-rerun: the audit record was not written before the removal'
+  by_path_git_logging "$case_dir"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-rerun: the rerun must converge: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-rerun: the rerun did not remove the copy'
+  assert_equals "-C $BP_CLONE worktree remove $BP_COPY" "$(cat "$case_dir/git-remove.log")" 'by-path-rerun: the rerun did not remove the exact copy exactly once'
+  assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" 'by-path-rerun: the rerun wrote a second audit record'
+  assert_grep 'audit record for this copy and HEAD is already in' "$case_dir/stderr" 'by-path-rerun: the rerun did not say it found the audit record'
+  # The copy is gone and nothing registers it: the audit record says what happened.
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-rerun: a rerun of a finished removal must say so: $(cat "$case_dir/stderr")"
+  assert_grep 'is already gone, and this run removed nothing' "$case_dir/stderr" 'by-path-rerun: no finished-removal message'
+  assert_grep "for HEAD $head" "$case_dir/stderr" 'by-path-rerun: the message does not name the audited HEAD'
+  assert_present "$BP_CLONE/.git" 'by-path-rerun: the clone was touched'
+  # A gone path no audit record names is refused, not reported as done.
+  rc=0
+  run_by_path "$case_dir" "$BP_CLONE/.claude/worktrees/never-existed" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'by-path-rerun: a path that never existed must refuse'
+  assert_grep 'no audit record' "$case_dir/stderr" 'by-path-rerun: no named reason for an unknown missing path'
+  # A directory removed behind git's back leaves a stale registration: never pruned here.
+  git -C "$case_dir/project" worktree add -q -b fm/stale "$BP_CLONE/.claude/worktrees/stale" main
+  rm -rf "$BP_CLONE/.claude/worktrees/stale"
+  rc=0
+  run_by_path "$case_dir" "$BP_CLONE/.claude/worktrees/stale" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'by-path-rerun: a stale registration must refuse'
+  assert_grep 'worktree prune' "$case_dir/stderr" 'by-path-rerun: the stale registration refusal does not name the repair'
+  git -C "$BP_CLONE" worktree list --porcelain | grep -Fq "stale" || fail 'by-path-rerun: the stale registration was pruned'
+  pass 'a teardown --copy rerun converges after a crash, never prunes, and says what it found for a copy already gone'
+}
+
+test_by_path_two_simultaneous_runs_on_one_copy_let_one_proceed() {
+  local case_dir rc pid i
+  make_by_path_case by-path-twice
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  # The first run stalls in its process scan, holding the lock on the path.
+  cat > "$case_dir/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+if [ ! -e "$case_dir/lsof-ran" ]; then
+  : > "$case_dir/lsof-ran"
+  while [ ! -e "$case_dir/lsof-release" ]; do sleep 0.05; done
+fi
+exec "$REAL_LSOF_FOR_TEST" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/lsof"
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/first.out" 2> "$case_dir/first.err" &
+  pid=$!
+  for i in $(seq 1 200); do
+    [ -e "$case_dir/lsof-ran" ] && break
+    sleep 0.05
+  done
+  [ -e "$case_dir/lsof-ran" ] || { kill "$pid" 2>/dev/null; fail 'by-path-twice: the first run never reached its process scan'; }
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/second.out" 2> "$case_dir/second.err" || rc=$?
+  expect_code 1 "$rc" "by-path-twice: the second run must refuse: $(cat "$case_dir/second.err")"
+  assert_grep 'another teardown --copy run holds' "$case_dir/second.err" 'by-path-twice: no named reason'
+  assert_present "$BP_COPY" 'by-path-twice: the refused second run removed the copy'
+  assert_absent "$case_dir/data/record-less-copy-removals.log" 'by-path-twice: the refused second run wrote an audit record'
+  : > "$case_dir/lsof-release"
+  rc=0
+  wait "$pid" || rc=$?
+  expect_code 0 "$rc" "by-path-twice: the first run must finish: $(cat "$case_dir/first.err")"
+  assert_absent "$BP_COPY" 'by-path-twice: the first run did not remove the copy'
+  assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" 'by-path-twice: not exactly one audit record'
+  pass 'two simultaneous teardown --copy runs on one copy: one proceeds, the other refuses and changes nothing'
+}
+
+# TR4: the by-path entry never changes what an ordinary teardown does for a task id.
+test_by_path_entry_leaves_ordinary_teardown_of_a_missing_record_unchanged() {
+  local case_dir rc
+  make_by_path_case by-path-ordinary
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  rc=0
+  FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" "$TEARDOWN" no-such-task > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-ordinary: an id with no record still refuses: $(cat "$case_dir/stderr")"
+  assert_grep 'error: teardown refused:' "$case_dir/stderr" 'by-path-ordinary: the old record error changed'
+  assert_grep 'task record' "$case_dir/stderr" 'by-path-ordinary: the old record error no longer names the record'
+  by_path_assert_untouched "$case_dir" by-path-ordinary
+  pass 'an ordinary teardown of an id with no record still refuses with the old record error'
+}
+
+# A copy in a clone whose own HEAD holds an unpublished commit: only the copy's tips need the
+# bundle, because the clone is neither returned nor swept.
+test_by_path_bundle_covers_the_copy_not_the_clones_own_head() {
+  local case_dir rc
+  make_by_path_case by-path-clone-head
+  case_dir=$BP_CASE
+  git -C "$case_dir/project" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'unpublished work on the clone itself'
+  by_path_commit "$BP_COPY"
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  by_path_record_bundle "$case_dir" "$BP_COPY" rec-1 "$case_dir/bundles/work.bundle" HEAD || fail 'cannot create the bundle fixture'
+  by_path_seed_backlog "$case_dir"
+  run_captain_hold "$case_dir" hold rec-1 --owner captain --title 'bundle call' --repo project \
+    --reason "Land or drop the unlanded commits of rec-1: preserved in bundle $case_dir/bundles/work.bundle, recorded tips $(cut -f3 "$case_dir/data/rec-1/preservation-bundles.tsv")." >/dev/null \
+    || fail 'cannot file the captain call'
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-clone-head: the clone's own unpublished HEAD must not be required in the bundle: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-clone-head: the copy was not removed'
+  assert_equals "$(git -C "$case_dir/project" rev-parse HEAD)" "$(git -C "$BP_CLONE" rev-parse HEAD)" 'by-path-clone-head: the clone moved'
+  pass 'teardown --copy needs a bundle for the copy'"'"'s own tips only, not for the HEAD of the clone that registers it'
+}
+
+# The d1 shape: a copy Vernant'"'"'s start_task_worktree.py created and locked. It goes through Vernant'"'"'s
+# closeout driver, never a plain removal, and a live launcher or a refused plan leaves it untouched.
+by_path_vernant_driver() {  # <case>: the closeout driver stand-in, in the clone that registers the copy
+  local case_dir=$1 exclude
+  exclude=$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' scripts/ >> "$exclude"
+  mkdir -p "$BP_CLONE/scripts/git-stability"
+  cat > "$BP_CLONE/scripts/git-stability/closeout_pr.py" <<SH
+if [ "\${3:-}" != --execute-cleanup ]; then
+  printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout-plan.log"
+  case "\${FM_STUB_PLAN:-ok}" in refuse) echo '{"allowed": false, "reason": "stub_plan_refusal"}'; exit 3 ;; esac
+  echo '{"allowed": true}'
+  exit 0
+fi
+printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout.log"
+git worktree unlock "\$2" && git worktree remove "\$2"
+SH
+  printf '#!/usr/bin/env bash\nexec bash "$@"\n' > "$case_dir/vernant-python"
+  chmod +x "$case_dir/vernant-python"
+}
+
+by_path_locked() {  # <case> <launcher-pid>
+  git -C "$1/project" worktree lock --reason "vernant-session-active owner=launcher:$2 launcher=$2" "$BP_COPY"
+}
+
+test_by_path_releases_a_vernant_locked_copy_through_the_closeout_driver() {
+  local shape case_dir rc
+  for shape in project slot; do
+    make_by_path_case "by-path-vernant-$shape" "$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    by_path_vernant_driver "$case_dir"
+    dead_launcher_pid
+    by_path_locked "$case_dir" "$FOREIGN_DEAD_PID"
+    rc=0
+    FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-vernant-$shape: a landed copy whose launcher is dead goes through the driver: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-vernant-$shape: the locked copy was not removed"
+    by_path_registered "$BP_CLONE" "$BP_COPY" && fail "by-path-vernant-$shape: the copy is still registered"
+    assert_equals 1 "$(wc -l < "$case_dir/closeout.log" | tr -d ' ')" "by-path-vernant-$shape: the driver did not run exactly once"
+    assert_equals "$BP_CLONE|--cleanup-worktree $BP_COPY --execute-cleanup" "$(cat "$case_dir/closeout.log")" "by-path-vernant-$shape: the driver ran with other arguments or from another directory"
+    assert_present "$case_dir/closeout-plan.log" "by-path-vernant-$shape: the driver was not asked for its plan first"
+    assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-vernant-$shape: not exactly one audit record"
+    assert_absent "$case_dir/treehouse.log" "by-path-vernant-$shape: a slot return was attempted"
+  done
+  pass 'teardown --copy hands a Vernant-locked copy to the closeout driver once, plan first, from its clone, and removes it'
+}
+
+test_by_path_leaves_a_vernant_locked_copy_with_a_live_launcher_or_a_refused_plan() {
+  local shape case_dir rc pid
+  for shape in live-launcher refused-plan no-driver; do
+    make_by_path_case "by-path-vernant-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    by_path_vernant_driver "$case_dir"
+    if [ "$shape" = live-launcher ]; then
+      teardown_fixture_start "$case_dir" KILL sleep 300
+      pid=$TEARDOWN_FIXTURE_PID
+      sleep 1
+      by_path_locked "$case_dir" "$pid"
+    else
+      dead_launcher_pid
+      by_path_locked "$case_dir" "$FOREIGN_DEAD_PID"
+    fi
+    [ "$shape" != no-driver ] || rm -rf "$BP_CLONE/scripts"
+    rc=0
+    FM_STUB_PLAN=$([ "$shape" = refused-plan ] && echo refuse || echo ok) \
+      FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-vernant-$shape: must refuse: $(cat "$case_dir/stderr")"
+    case "$shape" in
+      live-launcher) assert_grep 'rule=lock-launcher-owner' "$case_dir/stderr" "by-path-vernant-$shape: no named rule"
+                     kill -0 "$pid" 2>/dev/null || fail "by-path-vernant-$shape: the run signalled the launcher" ;;
+      refused-plan) assert_grep "closeout driver would not release it" "$case_dir/stderr" "by-path-vernant-$shape: no named reason" ;;
+      no-driver) assert_grep 'is not available, so it cannot be released' "$case_dir/stderr" "by-path-vernant-$shape: no named reason" ;;
+    esac
+    by_path_assert_untouched "$case_dir" "by-path-vernant-$shape"
+    assert_absent "$case_dir/closeout.log" "by-path-vernant-$shape: the driver executed a release"
+    git -C "$case_dir/project" worktree list --porcelain | grep -A4 -F "worktree $BP_COPY" | grep -q '^locked' \
+      || fail "by-path-vernant-$shape: the copy is no longer locked"
+  done
+  pass 'teardown --copy leaves a Vernant-locked copy untouched when its launcher is live, the driver refuses its plan or the driver is missing'
+}
+
+# A ps that answers the one launcher-liveness read `ps -p <pid> -o pid=` in the shape under test and
+# passes every other ps call to the real one. The refused, error and diagnostic shapes are the answers
+# of a sandbox that cannot run ps or a ps that failed; absent is the real answer for a process that is
+# not there (status 1, nothing on either stream).
+by_path_fake_launcher_ps() {  # <case> <pid> <refused|error|diagnostic|absent>
+  cat > "$1/fakebin/ps" <<SH
+#!/usr/bin/env bash
+if [ "\$*" = "-p $2 -o pid=" ]; then
+  case "$3" in
+    refused) echo 'ps: Operation not permitted' >&2; exit 126 ;;
+    error) echo 'ps: cannot read the process table' >&2; exit 3 ;;
+    diagnostic) echo 'ps: kern.proc.pid: Operation not permitted' >&2; exit 1 ;;
+    absent) exit 1 ;;
+  esac
+fi
+exec "$REAL_PS_FOR_TEST" "\$@"
+SH
+  chmod +x "$1/fakebin/ps"
+}
+
+# A python3 whose `fm-proc-info.py table pid` answer is a process table built here, never read from the
+# real one (which reads only Darwin's sysctl, so on Linux it is empty): the test shell's own pid and pid 1,
+# which leaves the live launcher out. It is the partial table a confined reader sees when the sandbox that
+# refused ps also hides processes from it. Every other call goes to the real python3.
+by_path_serve_partial_table() {  # <case>
+  local real_python
+  real_python=$(command -v python3)
+  cat > "$1/fakebin/python3" <<SH
+#!/usr/bin/env bash
+for last; do :; done
+if [ "\$#" -ge 3 ] && [ "\${@: -2:1}" = table ] && [ "\$last" = pid ]; then
+  printf '%s\n' $$ 1
+  exit 0
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$1/fakebin/python3"
+}
+
+# On every platform: the table the code under test is served is nonempty, lists only pids, lists at least
+# one other live pid, and leaves the live launcher out, while the launcher itself is alive.
+by_path_assert_partial_table() {  # <case> <launcher-pid> <label>
+  local table pid listed other_live=
+  table=$(PATH="$1/fakebin:$PATH" python3 "$ROOT/bin/fm-proc-info.py" table pid) || fail "$3: the served process table could not be read"
+  [ -n "$table" ] || fail "$3: the served process table is empty"
+  if printf '%s\n' "$table" | grep -qv '^[0-9][0-9]*$'; then fail "$3: the served process table holds a line that is not a pid"; fi
+  if printf '%s\n' "$table" | grep -qx -- "$2"; then fail "$3: the served process table lists the live launcher"; fi
+  for listed in $table; do
+    [ "$listed" != "$2" ] || continue
+    pid=$listed
+    if kill -0 "$pid" 2>/dev/null; then other_live=$pid; fi
+  done
+  [ -n "$other_live" ] || fail "$3: the served process table lists no other live pid"
+  kill -0 "$2" 2>/dev/null || fail "$3: the launcher is not alive"
+}
+
+# Only a proven absence counts as a launcher gone: a ps that was refused, failed or said something
+# other than "no such process" about a live launcher leaves the Vernant-locked copy where it is, and
+# the same copy with a launcher ps proves absent is still released. A refused ps is never settled by a
+# table read made under the same restriction (refused-hidden: the launcher is alive but the table the
+# confined reader sees leaves it out), because such a table is only part of the table.
+test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_it_proves_gone() {
+  local shape case_dir rc pid
+  for shape in refused refused-hidden error diagnostic absent; do
+    make_by_path_case "by-path-launcher-ps-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    by_path_vernant_driver "$case_dir"
+    if [ "$shape" = absent ]; then
+      dead_launcher_pid
+      pid=$FOREIGN_DEAD_PID
+    else
+      teardown_fixture_start "$case_dir" KILL sleep 300
+      pid=$TEARDOWN_FIXTURE_PID
+    fi
+    by_path_fake_launcher_ps "$case_dir" "$pid" "${shape%-hidden}"
+    if [ "$shape" = refused-hidden ]; then
+      by_path_serve_partial_table "$case_dir"
+      by_path_assert_partial_table "$case_dir" "$pid" "by-path-launcher-ps-$shape"
+    fi
+    by_path_locked "$case_dir" "$pid"
+    rc=0
+    FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = absent ]; then
+      expect_code 0 "$rc" "by-path-launcher-ps-$shape: a launcher ps proves absent must not keep the copy: $(cat "$case_dir/stderr")"
+      assert_absent "$BP_COPY" "by-path-launcher-ps-$shape: the copy was not removed"
+      assert_equals 1 "$(wc -l < "$case_dir/closeout.log" | tr -d ' ')" "by-path-launcher-ps-$shape: the driver did not run exactly once"
+    else
+      expect_code 1 "$rc" "by-path-launcher-ps-$shape: a live launcher ps cannot prove gone must keep the copy: $(cat "$case_dir/stderr")"
+      assert_grep 'rule=lock-launcher-owner' "$case_dir/stderr" "by-path-launcher-ps-$shape: no named rule"
+      assert_grep "ps could not show that it is gone, so the copy is kept: run this teardown again where ps can answer for pid $pid; end that process only after you confirm pid $pid is the launcher named by the lock (a pid can be reused)" "$case_dir/stderr" "by-path-launcher-ps-$shape: the refusal does not name the next step"
+      kill -0 "$pid" 2>/dev/null || fail "by-path-launcher-ps-$shape: the launcher is gone"
+      by_path_assert_untouched "$case_dir" "by-path-launcher-ps-$shape"
+      assert_absent "$case_dir/closeout.log" "by-path-launcher-ps-$shape: the driver executed a release"
+      git -C "$case_dir/project" worktree list --porcelain | grep -A4 -F "worktree $BP_COPY" | grep -q '^locked' \
+        || fail "by-path-launcher-ps-$shape: the copy is no longer locked"
+    fi
+  done
+  pass 'teardown --copy keeps a Vernant-locked copy when ps cannot prove its launcher gone, even when a confined table read cannot see it, and releases it when ps proves the launcher absent'
+}
+
+# A pool slot's owner claim names a task id. A by-path run is no task, but its bundle record id is
+# operator-chosen, so a claim that names that very id is no proof the slot is this run's: the id is
+# resolved against the live task records of every local home, and only a claim with no live record
+# is stale.
+test_by_path_resolves_a_slot_claim_naming_the_record_id_in_every_local_home() {
+  local shape case_dir rc mate
+  for shape in live-record-in-another-home no-record; do
+    make_by_path_case "by-path-claim-id-$shape" slot
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    mate=$case_dir/mate-home
+    mkdir -p "$mate/state" "$mate/data" "$BP_HOME/data"
+    printf -- '- mate-x - fixture scope (home: %s; scope: fixture; projects: project; added 2026-11-25)\n' "$mate" > "$BP_HOME/data/secondmates.md"
+    printf 'task=shared-id\nhome=%s\n' "$mate" > "$case_dir/pool/1/.fm-slot-owner"
+    if [ "$shape" = live-record-in-another-home ]; then
+      fm_write_meta "$mate/state/shared-id.meta" "window=firstmate:fm-shared-id" "kind=ship" "spawn_gen=by-path-test"
+    fi
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" --record-id shared-id > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = live-record-in-another-home ]; then
+      expect_code 1 "$rc" "by-path-claim-id-$shape: a claim naming a live task of another home must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'is claimed by task shared-id, whose record is live' "$case_dir/stderr" "by-path-claim-id-$shape: no named reason"
+      by_path_assert_untouched "$case_dir" "by-path-claim-id-$shape"
+    else
+      expect_code 0 "$rc" "by-path-claim-id-$shape: a claim naming no live task is stale and must not block: $(cat "$case_dir/stderr")"
+      assert_absent "$BP_COPY" "by-path-claim-id-$shape: the copy was not removed"
+      assert_present "$case_dir/pool/1/.fm-slot-owner" "by-path-claim-id-$shape: the slot claim was dropped"
+    fi
+  done
+  pass 'teardown --copy resolves a slot claim that names its own record id against the live records of every local home, and passes it only when no home holds one'
+}
+
+# git whose worktree list always fails, everything else real: a clone whose registration list
+# cannot be read.
+by_path_git_unreadable_list() {  # <case>
+  cat > "$1/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in *" worktree list "*) echo 'fatal: cannot read the worktree list' >&2; exit 128 ;; esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$1/fakebin/git"
+}
+
+# A registration list that cannot be read is not an empty one: a present copy is refused for it.
+test_by_path_refuses_a_present_copy_when_a_registration_list_cannot_be_read() {
+  local case_dir rc
+  make_by_path_case by-path-unreadable-list-present
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  by_path_git_unreadable_list "$case_dir"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-unreadable-list-present: a present copy whose clone list cannot be read must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be read' "$case_dir/stderr" 'by-path-unreadable-list-present: the refusal does not say the list could not be read'
+  by_path_assert_untouched "$case_dir" by-path-unreadable-list-present
+  by_path_git_logging "$case_dir"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-unreadable-list-present: with a readable list the same copy goes: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-unreadable-list-present: the copy was not removed'
+  pass 'teardown --copy refuses a present copy when a clone registration list cannot be read, and removes it when the list reads'
+}
+
+# A gone copy with an audit line is reported done only when every registration list could be read: a
+# list that cannot be read may hide a clone that still registers it.
+test_by_path_refuses_a_gone_copy_when_a_registration_list_cannot_be_read() {
+  local case_dir rc
+  make_by_path_case by-path-unreadable-list-gone
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-unreadable-list-gone: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-unreadable-list-gone: the copy was not removed'
+  assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" 'by-path-unreadable-list-gone: not exactly one audit record'
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-unreadable-list-gone: with readable lists a finished removal is reported: $(cat "$case_dir/stderr")"
+  assert_grep 'is already gone, and this run removed nothing' "$case_dir/stderr" 'by-path-unreadable-list-gone: no finished-removal message with readable lists'
+  by_path_git_unreadable_list "$case_dir"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-unreadable-list-gone: a gone copy must not be reported done while a list cannot be read: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be read' "$case_dir/stderr" 'by-path-unreadable-list-gone: the refusal does not say the list could not be read'
+  if grep -Fq 'already gone' "$case_dir/stderr"; then fail 'by-path-unreadable-list-gone: a gone copy was reported done'; fi
+  assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" 'by-path-unreadable-list-gone: the refused rerun changed the audit record'
+  pass 'teardown --copy does not report a gone copy done while a clone registration list cannot be read'
+}
+
+# git leaves out a registration it cannot read and still exits 0, so a list that comes back short is
+# not proof that no clone registers a gone copy. The registration folder, one registration's folder
+# and its gitdir file are each made unreadable with a real permission bit (git itself is not
+# replaced): the gone copy is refused as "could not be read", never reported done, and the stale
+# registration is left as it was. With every part readable the same fixture refuses for the stale
+# registration and names the repair, which shows the unreadable part is what changed the answer.
+test_by_path_does_not_report_a_gone_copy_done_while_a_registration_cannot_be_read() {
+  local shape case_dir rc store entry obstacle mode
+  [ "$(id -u)" != 0 ] || { pass 'skipped as root: a permission bit does not stop root'; return 0; }
+  for shape in store-folder entry-folder gitdir-file; do
+    make_by_path_case "by-path-store-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-store-$shape: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-store-$shape: the copy was not removed"
+    # The same path registered again and then removed behind git's back: a stale registration, for a
+    # path the audit record names.
+    git -C "$case_dir/project" worktree add -q -b "fm/stale-$shape" "$BP_COPY" main
+    rm -rf "$BP_COPY"
+    store=$BP_CLONE/.git/worktrees
+    entry=
+    for obstacle in "$store"/*; do
+      [ "$(cat "$obstacle/gitdir" 2>/dev/null)" = "$BP_COPY/.git" ] && entry=${obstacle##*/}
+    done
+    [ -n "$entry" ] || fail "by-path-store-$shape: the stale registration is not in the fixture"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-store-$shape: with every part readable the stale registration must refuse: $(cat "$case_dir/stderr")"
+    assert_grep 'worktree prune' "$case_dir/stderr" "by-path-store-$shape: the readable control does not name the repair"
+    case "$shape" in
+      store-folder) obstacle=$store; mode=755 ;;
+      entry-folder) obstacle=$store/$entry; mode=755 ;;
+      gitdir-file) obstacle=$store/$entry/gitdir; mode=644 ;;
+    esac
+    chmod 000 "$obstacle"
+    if [ "$shape" = gitdir-file ]; then
+      if cat "$obstacle" >/dev/null 2>&1; then chmod "$mode" "$obstacle"; fail "by-path-store-$shape: the fixture does not make the gitdir file unreadable"; fi
+    elif ls -A "$obstacle" >/dev/null 2>&1; then
+      chmod "$mode" "$obstacle"; fail "by-path-store-$shape: the fixture does not make the folder unreadable"
+    fi
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    chmod "$mode" "$obstacle"
+    expect_code 1 "$rc" "by-path-store-$shape: a gone copy must not be reported done while a registration cannot be read: $(cat "$case_dir/stderr")"
+    assert_grep 'could not be read' "$case_dir/stderr" "by-path-store-$shape: the refusal does not say the registration could not be read"
+    if grep -Fq 'already gone' "$case_dir/stderr"; then fail "by-path-store-$shape: a gone copy was reported done"; fi
+    git -C "$BP_CLONE" worktree list --porcelain | grep -Fqx "worktree $BP_COPY" || fail "by-path-store-$shape: the stale registration was pruned"
+    assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-store-$shape: the refused run changed the audit record"
+    assert_equals 1 "$(wc -l < "$case_dir/git-remove.log" | tr -d ' ')" "by-path-store-$shape: the refused run called git worktree remove"
+  done
+  # A present copy whose registration cannot be read is refused for that, not for being unregistered.
+  make_by_path_case by-path-store-present
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  store=$BP_CLONE/.git/worktrees
+  chmod 000 "$store"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  chmod 755 "$store"
+  expect_code 1 "$rc" "by-path-store-present: a present copy whose registration cannot be read must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be read' "$case_dir/stderr" 'by-path-store-present: the refusal does not say the registration could not be read'
+  by_path_assert_untouched "$case_dir" by-path-store-present
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-store-present: with the registration readable the same copy goes: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-store-present: the copy was not removed'
+  pass 'teardown --copy treats a registration folder, registration or gitdir file it cannot read as a list it cannot read'
+}
+
+# A registration held by a link whose target cannot be checked is hidden from git the way an unreadable
+# one is: git leaves it out and exits 0. <shape> says which part is the link and why its target cannot
+# be checked: gitdir-link-* is the registration's gitdir file, entry-link-* is the registration folder
+# itself; *-dangling points at nothing (unreadable for any user), *-untraversable points into a folder
+# with no search permission (<case>/sealed, mode 000 until the caller restores it). <kind> existing turns
+# the registration <store>/<name> into the link; planted makes a new registration <name> out of it.
+by_path_hide_registration() {  # <case> <store> <name> <shape> <existing|planted>
+  local case_dir=${1:?} store=${2:?} name=${3:?} shape=${4:?} kind=${5:?}
+  mkdir -p "$case_dir/sealed"
+  case "$shape" in
+    gitdir-link-dangling)
+      [ "$kind" != planted ] || mkdir -p "$store/$name"
+      rm -f "${store:?}/${name:?}/gitdir"
+      ln -s "$case_dir/no-such-target" "$store/$name/gitdir" ;;
+    gitdir-link-untraversable)
+      [ "$kind" != planted ] || mkdir -p "$store/$name"
+      if [ -e "$store/$name/gitdir" ]; then mv "$store/$name/gitdir" "$case_dir/sealed/gitdir"; else printf 'unread\n' > "$case_dir/sealed/gitdir"; fi
+      ln -s "$case_dir/sealed/gitdir" "$store/$name/gitdir"
+      chmod 000 "$case_dir/sealed" ;;
+    entry-link-dangling)
+      rm -rf "${store:?}/${name:?}"
+      ln -s "$case_dir/no-such-target" "$store/$name" ;;
+    entry-link-untraversable)
+      if [ -d "$store/$name" ]; then mv "$store/$name" "$case_dir/sealed/entry"; else mkdir "$case_dir/sealed/entry"; fi
+      ln -s "$case_dir/sealed/entry" "$store/$name"
+      chmod 000 "$case_dir/sealed" ;;
+    *) fail "by_path_hide_registration: unknown shape $shape" ;;
+  esac
+}
+
+# The registration folder name of <copy> in <clone>'s store, found by its gitdir content.
+by_path_registration_entry() {  # <clone> <copy>
+  local obstacle entry=
+  for obstacle in "$1/.git/worktrees"/*; do
+    [ "$(cat "$obstacle/gitdir" 2>/dev/null)" = "$2/.git" ] && entry=${obstacle##*/}
+  done
+  [ -n "$entry" ] || return 1
+  printf '%s\n' "$entry"
+}
+
+# The part the hide function made unreadable: the link itself.
+by_path_hidden_part() {  # <store> <name> <shape>
+  case "$3" in gitdir-*) printf '%s\n' "$1/$2/gitdir" ;; *) printf '%s\n' "$1/$2" ;; esac
+}
+
+# A registration held by a link whose target cannot be checked is an unreadable registration, so the
+# copy it hides is kept and the refusal names the registration, for a present copy and for a gone copy
+# that has an audit line (never reported "already gone"). Each fixture bites: git itself exits 0 and
+# leaves the registration out. The dangling cases run as any user; the untraversable ones need a
+# permission bit root ignores and are skipped as root, saying so.
+test_by_path_refuses_a_copy_whose_registration_is_held_by_a_link_that_cannot_be_checked() {
+  local shape scenario label case_dir rc store entry hidden list skipped=
+  for shape in gitdir-link-dangling gitdir-link-untraversable entry-link-dangling entry-link-untraversable; do
+    case "$shape" in
+      *-untraversable) [ "$(id -u)" != 0 ] || { skipped="$skipped $shape"; continue; } ;;
+    esac
+    for scenario in present gone; do
+      label="by-path-link-$shape-$scenario"
+      make_by_path_case "$label"
+      case_dir=$BP_CASE
+      BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+      store=$BP_CLONE/.git/worktrees
+      if [ "$scenario" = gone ]; then
+        rc=0
+        run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        expect_code 0 "$rc" "$label: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "$label: the copy was not removed"
+        # The same path registered again and then removed behind git's back: a stale registration.
+        git -C "$case_dir/project" worktree add -q -b "fm/stale-$label" "$BP_COPY" main
+        rm -rf "${BP_COPY:?}"
+      fi
+      entry=$(by_path_registration_entry "$BP_CLONE" "$BP_COPY") || fail "$label: the registration is not in the fixture"
+      by_path_hide_registration "$case_dir" "$store" "$entry" "$shape" existing
+      hidden=$(by_path_hidden_part "$store" "$entry" "$shape")
+      [ -L "$hidden" ] || { chmod 755 "$case_dir/sealed" 2>/dev/null; fail "$label: the fixture did not make the registration a link"; }
+      if [ -e "$hidden" ]; then chmod 755 "$case_dir/sealed" 2>/dev/null; fail "$label: the fixture's link target can still be checked"; fi
+      rc=0
+      list=$(git -C "$BP_CLONE" worktree list --porcelain 2>/dev/null) || rc=$?
+      if [ "$rc" != 0 ] || printf '%s\n' "$list" | grep -Fqx "worktree $BP_COPY"; then
+        chmod 755 "$case_dir/sealed" 2>/dev/null
+        fail "$label: the fixture does not bite: git exited $rc and still lists the registration"
+      fi
+      rc=0
+      run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      chmod 755 "$case_dir/sealed" 2>/dev/null || true
+      expect_code 1 "$rc" "$label: a registration held by an unreadable link must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'could not be read' "$case_dir/stderr" "$label: the refusal does not say the registration could not be read"
+      assert_grep "$hidden" "$case_dir/stderr" "$label: the refusal does not name the registration $hidden"
+      if grep -Fq 'already gone' "$case_dir/stderr"; then fail "$label: a copy was reported done"; fi
+      [ -L "$hidden" ] || fail "$label: the refused run changed the registration"
+      assert_absent "$case_dir/treehouse.log" "$label: the provider was called"
+      if [ "$scenario" = present ]; then
+        assert_present "$BP_COPY" "$label: the copy was removed"
+        assert_absent "$case_dir/data/record-less-copy-removals.log" "$label: an audit record was written for a refused run"
+        assert_absent "$case_dir/git-remove.log" "$label: git worktree remove was called"
+      else
+        assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "$label: the refused run changed the audit record"
+        assert_equals 1 "$(wc -l < "$case_dir/git-remove.log" | tr -d ' ')" "$label: the refused run called git worktree remove"
+      fi
+    done
+  done
+  if [ -n "$skipped" ]; then pass "skipped as root, a permission bit does not stop root:$skipped"; fi
+  pass 'teardown --copy keeps a copy, and does not report a gone copy done, while a registration is held by a link that cannot be checked, and names that registration'
+}
+
+# Another registration the clone keeps, held by a link that cannot be checked, is not hidden by the
+# readable registration beside it (the copy's own), whichever sorts first; once it is gone the same
+# copy goes. A registration folder with neither a gitdir file nor a gitdir link is a broken
+# registration git ignores, and the copy still goes with it beside.
+test_by_path_refuses_while_another_registration_is_held_by_a_link_that_cannot_be_checked() {
+  local spec shape name label case_dir rc store hidden list
+  for spec in gitdir-link-dangling:a-ghost gitdir-link-dangling:z-ghost gitdir-link-untraversable:a-ghost entry-link-dangling:z-ghost entry-link-untraversable:z-ghost; do
+    shape=${spec%%:*}
+    name=${spec##*:}
+    case "$shape" in
+      *-untraversable) [ "$(id -u)" != 0 ] || continue ;;
+    esac
+    label="by-path-link-sibling-$shape-$name"
+    make_by_path_case "$label"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    store=$BP_CLONE/.git/worktrees
+    by_path_hide_registration "$case_dir" "$store" "$name" "$shape" planted
+    hidden=$(by_path_hidden_part "$store" "$name" "$shape")
+    if [ -e "$hidden" ]; then chmod 755 "$case_dir/sealed" 2>/dev/null; fail "$label: the fixture's link target can still be checked"; fi
+    rc=0
+    list=$(git -C "$BP_CLONE" worktree list --porcelain 2>/dev/null) || rc=$?
+    if [ "$rc" != 0 ] || ! printf '%s\n' "$list" | grep -Fqx "worktree $BP_COPY"; then
+      chmod 755 "$case_dir/sealed" 2>/dev/null
+      fail "$label: the fixture does not bite: git exited $rc and does not list the readable registration"
+    fi
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    chmod 755 "$case_dir/sealed" 2>/dev/null || true
+    expect_code 1 "$rc" "$label: a registration held by an unreadable link must refuse beside a readable one: $(cat "$case_dir/stderr")"
+    assert_grep 'could not be read' "$case_dir/stderr" "$label: the refusal does not say the registration could not be read"
+    assert_grep "$hidden" "$case_dir/stderr" "$label: the refusal does not name the registration $hidden"
+    by_path_assert_untouched "$case_dir" "$label"
+    rm -rf "${store:?}/${name:?}"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$label: with the link gone the same copy goes: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "$label: the copy was not removed"
+  done
+  make_by_path_case by-path-link-sibling-no-gitdir
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  mkdir -p "$BP_CLONE/.git/worktrees/broken-no-gitdir"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-link-sibling-no-gitdir: a registration folder with no gitdir is a broken one git ignores and must not refuse: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-link-sibling-no-gitdir: the copy was not removed'
+  pass 'teardown --copy refuses beside a readable registration while another is held by a link that cannot be checked, and still proceeds beside a registration folder with no gitdir'
+}
+
+# A registration whose name begins with a dot (`.ghost`, `..ghost`) is a registration like any other: the
+# scan reads every name under the store but `.` and `..`, so one held by a link to nothing, beside the
+# readable registration of the copy (or of a gone copy's stale registration), refuses, for a present copy and
+# for an audited gone copy, and the refusal names the registration that failed.
+test_by_path_refuses_while_a_dot_named_registration_is_held_by_a_link_to_nothing() {
+  local spec shape name scenario label case_dir rc store hidden list
+  for spec in gitdir-link-dangling:..ghost gitdir-link-dangling:.ghost entry-link-dangling:..ghost; do
+    shape=${spec%%:*}
+    name=${spec##*:}
+    for scenario in present gone; do
+      label="by-path-dot-$shape-$name-$scenario"
+      make_by_path_case "$label"
+      case_dir=$BP_CASE
+      BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+      store=$BP_CLONE/.git/worktrees
+      if [ "$scenario" = gone ]; then
+        rc=0
+        run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        expect_code 0 "$rc" "$label: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "$label: the copy was not removed"
+        git -C "$case_dir/project" worktree add -q -b "fm/stale-dot-$shape-${name//./}" "$BP_COPY" main
+        rm -rf "${BP_COPY:?}"
+      fi
+      by_path_hide_registration "$case_dir" "$store" "$name" "$shape" planted
+      hidden=$(by_path_hidden_part "$store" "$name" "$shape")
+      [ -L "$hidden" ] && [ ! -e "$hidden" ] || fail "$label: the fixture's link is not a link to nothing"
+      rc=0
+      list=$(git -C "$BP_CLONE" worktree list --porcelain 2>/dev/null) || rc=$?
+      if [ "$rc" != 0 ] || ! printf '%s\n' "$list" | grep -Fqx "worktree $BP_COPY"; then
+        fail "$label: the fixture does not bite: git exited $rc and does not list the readable registration"
+      fi
+      rc=0
+      run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 1 "$rc" "$label: a dot-named registration held by a link to nothing must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'could not be read' "$case_dir/stderr" "$label: the refusal does not say the registration could not be read"
+      assert_grep "$hidden" "$case_dir/stderr" "$label: the refusal does not name the registration $hidden"
+      if grep -Fq 'already gone' "$case_dir/stderr"; then fail "$label: a copy was reported done"; fi
+      if [ "$scenario" = present ]; then
+        by_path_assert_untouched "$case_dir" "$label"
+      else
+        assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "$label: the refused run changed the audit record"
+        assert_equals 1 "$(wc -l < "$case_dir/git-remove.log" | tr -d ' ')" "$label: the refused run called git worktree remove"
+      fi
+    done
+  done
+  pass 'teardown --copy reads registrations whose names begin with a dot, refusing for a present copy and a gone copy and naming the one that failed'
+}
+
+# A registration path reaches the refusal byte-exact: a registration whose name holds a newline, held by a
+# link to nothing beside the readable one, is named in full, %q-quoted on one line.
+test_by_path_names_a_registration_whose_name_holds_a_newline() {
+  local case_dir rc store name hidden want
+  make_by_path_case by-path-newline-registration
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  store=$BP_CLONE/.git/worktrees
+  name=..ghost$'\n'suffix
+  by_path_hide_registration "$case_dir" "$store" "$name" gitdir-link-dangling planted
+  hidden=$(by_path_hidden_part "$store" "$name" gitdir-link-dangling)
+  [ -L "$store/$name/gitdir" ] && [ ! -e "$store/$name/gitdir" ] || fail 'by-path-newline-registration: the fixture is not a link to nothing'
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-newline-registration: must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be read' "$case_dir/stderr" 'by-path-newline-registration: the refusal does not say the registration could not be read'
+  printf -v want '(registration %q cannot be read)' "$store/$name/gitdir"
+  assert_grep "$want" "$case_dir/stderr" "by-path-newline-registration: the refusal does not name the full registration path $want"
+  by_path_assert_untouched "$case_dir" by-path-newline-registration
+  [ -n "$hidden" ] || fail 'by-path-newline-registration: no hidden part'
+  pass 'teardown --copy names a registration whose name holds a newline in full'
+}
+
+# A git whose `worktree list` prints one nested path and then fails, with every registration readable, is a
+# list that could not be read: the refusal says so and names no registration, because the registration scan
+# found none unreadable. The listed path is not taken for one.
+test_by_path_names_no_registration_when_the_listing_fails_after_partial_output() {
+  local case_dir rc
+  make_by_path_case by-path-partial-list
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" worktree list "*) printf 'worktree %s\0' "$BP_COPY"; exit 128 ;;
+  *" worktree remove "*) printf '%s\n' "\$*" >> "$case_dir/git-remove.log" ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-partial-list: a listing that fails must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be read' "$case_dir/stderr" 'by-path-partial-list: the refusal does not say the list could not be read'
+  assert_no_grep '(registration ' "$case_dir/stderr" 'by-path-partial-list: the refusal named a registration the scan found readable'
+  by_path_assert_untouched "$case_dir" by-path-partial-list
+  pass 'teardown --copy names no registration when the git listing fails after partial output'
+}
+
+# Git repositories the copy's own clone does not register, such as a separate clone or a worktree of
+# another project under .claude/ (which the clean proof skips), would go with the copy and their
+# commits with them. Every one found is refused; the same copy goes once it holds none.
+test_by_path_refuses_an_unregistered_nested_repository_under_the_copy() {
+  local shape case_dir rc nested other
+  for shape in clone other-worktree; do
+    make_by_path_case "by-path-nested-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    nested=$BP_COPY/.claude/nested-$shape
+    mkdir -p "${nested%/*}"
+    # .claude/ is ignored in the clone, as it is in a real project, so git worktree remove
+    # does not see the nested repository either.
+    printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    case "$shape" in
+      clone)
+        git clone -q "$case_dir/project" "$nested" || fail "by-path-nested-$shape: cannot clone the fixture"
+        ;;
+      other-worktree)
+        other=$case_dir/other-project
+        git init -q -b main "$other" || fail "by-path-nested-$shape: cannot create the other project"
+        git -C "$other" commit -q --allow-empty -m 'other project' || fail "by-path-nested-$shape: cannot commit in the other project"
+        git -C "$other" worktree add -q -b fm/other "$nested" main || fail "by-path-nested-$shape: cannot add the other worktree"
+        ;;
+    esac
+    printf 'unpushed work\n' > "$nested/unpushed.txt"
+    git -C "$nested" add unpushed.txt
+    git -C "$nested" commit -qm 'unpushed work in a repository nothing registers'
+    BP_NESTED_HEAD=$(git -C "$nested" rev-parse HEAD)
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-nested-$shape: a copy holding an unregistered repository must refuse: $(cat "$case_dir/stderr")"
+    assert_grep "nested-$shape" "$case_dir/stderr" "by-path-nested-$shape: the refusal does not name the repository"
+    assert_present "$nested/unpushed.txt" "by-path-nested-$shape: the nested repository's work is gone"
+    assert_equals "$BP_NESTED_HEAD" "$(git -C "$nested" rev-parse HEAD)" "by-path-nested-$shape: the nested repository's HEAD moved"
+    by_path_assert_untouched "$case_dir" "by-path-nested-$shape"
+    rm -rf "$nested"
+    [ "$shape" != other-worktree ] || git -C "$other" worktree prune
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-nested-$shape: the same copy without the nested repository must go: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-nested-$shape: the copy was not removed"
+  done
+  pass 'teardown --copy refuses a copy holding an unregistered Git repository or another project worktree, and removes the same copy once it holds none'
+}
+
+# The audit record is written before anything is removed, so a record that cannot be written leaves
+# the copy where it is. A directory or a dangling link at the record path refuses for any user.
+test_by_path_refuses_when_the_audit_record_cannot_be_written() {
+  local shape case_dir rc record
+  for shape in directory dangling-link; do
+    make_by_path_case "by-path-audit-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    record=$case_dir/data/record-less-copy-removals.log
+    mkdir -p "$case_dir/data"
+    case "$shape" in
+      directory) mkdir "$record" ;;
+      dangling-link) ln -s "$case_dir/no-such-target" "$record" ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-audit-$shape: a record that cannot be written must refuse: $(cat "$case_dir/stderr")"
+    assert_grep 'cannot be written, and nothing is removed without it' "$case_dir/stderr" "by-path-audit-$shape: no named reason"
+    assert_present "$BP_COPY" "by-path-audit-$shape: the copy was removed without its audit record"
+    by_path_registered "$BP_CLONE" "$BP_COPY" || fail "by-path-audit-$shape: the copy is no longer registered"
+    assert_equals "$BP_HEAD" "$(git -C "$BP_COPY" rev-parse HEAD)" "by-path-audit-$shape: the copy's HEAD moved"
+    assert_absent "$case_dir/git-remove.log" "by-path-audit-$shape: git worktree remove was called"
+    rm -rf "$record"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-audit-$shape: with a writable record path the copy goes: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-audit-$shape: the copy was not removed"
+    assert_equals 1 "$(wc -l < "$record" | tr -d ' ')" "by-path-audit-$shape: not exactly one audit record"
+  done
+  pass 'teardown --copy removes nothing when its audit record cannot be written, and removes the copy with one audit line once it can'
+}
+
+# A bundle-held copy with the captain's call filed: the one fixture on which the by-path exception to
+# the held-task rule is the only thing that lets the removal through. Sets BP_HEAD and BP_BUNDLE_CALL.
+by_path_bundle_held_case() {  # <name> [project|slot]
+  local case_dir tips
+  make_by_path_case "$1" "${2:-project}"
+  case_dir=$BP_CASE
+  by_path_commit "$BP_COPY"
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  by_path_record_bundle "$case_dir" "$BP_COPY" rec-1 "$case_dir/bundles/work.bundle" --all || fail 'cannot create the bundle fixture'
+  tips=$(cut -f3 "$case_dir/data/rec-1/preservation-bundles.tsv")
+  by_path_seed_backlog "$case_dir"
+  run_captain_hold "$case_dir" hold bundle-call --owner captain --title 'bundle call' --repo project \
+    --reason "Land or drop the unlanded commits of rec-1: preserved in bundle $case_dir/bundles/work.bundle, recorded tips $tips." >/dev/null \
+    || fail 'cannot file the captain call'
+}
+
+# A git that runs <case>/plant.sh once, at the first `git bundle verify`: every check before the
+# route's own bundle verification has passed by then, and the by-path exception is the next one, so
+# harm made here is judged by the exception itself. It also logs every `worktree remove`.
+by_path_plant_at_first_verify() {  # <case>
+  cat > "$1/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" bundle verify "*)
+    if [ ! -e "$1/planted" ]; then
+      : > "$1/planted"
+      bash "$1/plant.sh" >/dev/null 2>&1 </dev/null
+    fi ;;
+  *" worktree remove "*) printf '%s\n' "\$*" >> "$1/git-remove.log" ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$1/fakebin/git"
+}
+
+# plant.sh lines that start <command> in the background and wait for it to write its own pid to
+# <case>/planted.pid, which it does once it holds the copy.
+by_path_plant_process() {  # <case> <command>
+  printf '%s &\n' "$2"
+  # shellcheck disable=SC2016 # plant.sh, not this shell, expands $(seq 100).
+  printf 'for _ in $(seq 100); do [ -s %q ] && break; sleep 0.05; done\n' "$1/planted.pid"
+}
+
+# The by-path exception to the held-task rule lets a bundle-held copy go on a captain-held row alone.
+# Its harm rows are judged where the exception is granted: H1 a live task record in any local home names
+# the copy, H2 a live task's claim on the copy's slot (a claim naming the run's own record id too),
+# H3 other work no bundle holds inside the copy (a registered worktree, or a Git repository or worktree
+# no clone registers, a bare repository included, under ignored .claude too), H4 a commit the bundle
+# record does not hold, H5 a process in the copy or holding a file open in it, H6 a Vernant creation
+# lock whose launcher is live, H7 a dirty tree or an ignored file that exists nowhere else. Each harm is
+# made at the first `git bundle verify`, after every earlier check has passed, so the exception is the
+# check that refuses it: its refusal names the row, and the final REFUSED line names it too. The control
+# run, and a dead launcher, with every row clear, remove the same bundle-held copy.
+test_by_path_exception_to_the_held_task_rule_judges_each_harm_row() {
+  local shape case_dir rc mate nested other pid rule reason last record tip
+  for shape in control h1-record-this-home h1-record-other-home h2-claim-record-id h3-nested-clone h3-other-worktree h3-registered-worktree h3-bare-repository h4-missing-tip h5-process-cwd h5-open-file h6-live-launcher h6-dead-launcher h7-dirty-tree h7-unique-ignored; do
+    case "$shape" in h2-*) by_path_bundle_held_case "by-path-exc-$shape" slot ;; *) by_path_bundle_held_case "by-path-exc-$shape" ;; esac
+    case_dir=$BP_CASE
+    mate=$case_dir/mate-home
+    nested=$BP_COPY/.claude/nested
+    pid=
+    record=$case_dir/data/rec-1/preservation-bundles.tsv
+    mkdir -p "$mate/state" "$mate/data" "$BP_HOME/data" "$case_dir/staged"
+    printf -- '- mate-x - fixture scope (home: %s; scope: fixture; projects: project; added 2026-11-25)\n' "$mate" > "$BP_HOME/data/secondmates.md"
+    by_path_plant_at_first_verify "$case_dir"
+    : > "$case_dir/plant.sh"
+    case "$shape" in
+      h1-record-this-home)
+        rule=active-record-owner reason="task task-x1's active record names it"
+        fm_write_meta "$case_dir/staged/task-x1.meta" "window=firstmate:fm-task-x1" "kind=ship" "home=$BP_COPY" "spawn_gen=by-path-test"
+        printf 'mv %q %q\n' "$case_dir/staged/task-x1.meta" "$case_dir/state/task-x1.meta" > "$case_dir/plant.sh" ;;
+      h1-record-other-home)
+        rule=active-record-owner reason="task task-x1's active record names it"
+        fm_write_meta "$case_dir/staged/task-x1.meta" "window=firstmate:fm-task-x1" "kind=ship" "prior_worktree=$BP_COPY" "spawn_gen=by-path-test"
+        printf 'mv %q %q\n' "$case_dir/staged/task-x1.meta" "$mate/state/task-x1.meta" > "$case_dir/plant.sh" ;;
+      h2-claim-record-id)
+        rule=active-record-owner reason='is claimed by task rec-1, whose record is live'
+        printf 'task=rec-1\nhome=%s\n' "$mate" > "$case_dir/staged/claim"
+        fm_write_meta "$case_dir/staged/rec-1.meta" "window=firstmate:fm-rec-1" "kind=ship" "spawn_gen=by-path-test"
+        printf 'mv %q %q\nmv %q %q\n' "$case_dir/staged/claim" "$case_dir/pool/1/.fm-slot-owner" \
+          "$case_dir/staged/rec-1.meta" "$mate/state/rec-1.meta" > "$case_dir/plant.sh" ;;
+      h3-nested-clone)
+        rule=registered-copy-proven reason='that no clone registers'
+        printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        mkdir -p "${nested%/*}"
+        git clone -q "$case_dir/project" "$case_dir/staged/nested" || fail "by-path-exc-$shape: cannot clone the fixture"
+        printf 'unpushed work\n' > "$case_dir/staged/nested/unpushed.txt"
+        git -C "$case_dir/staged/nested" add unpushed.txt
+        git -C "$case_dir/staged/nested" commit -qm 'unpushed work in a repository nothing registers'
+        BP_NESTED_HEAD=$(git -C "$case_dir/staged/nested" rev-parse HEAD)
+        printf 'mv %q %q\n' "$case_dir/staged/nested" "$nested" > "$case_dir/plant.sh" ;;
+      h3-other-worktree)
+        rule=registered-copy-proven reason='that no clone registers'
+        printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        mkdir -p "${nested%/*}"
+        other=$case_dir/other-project
+        git init -q -b main "$other" || fail "by-path-exc-$shape: cannot create the other project"
+        git -C "$other" commit -q --allow-empty -m 'other project' || fail "by-path-exc-$shape: cannot commit in the other project"
+        printf 'git -C %q worktree add -q -b fm/other %q main\nprintf %q > %q\ngit -C %q add unpushed.txt\ngit -C %q commit -qm %q\n' \
+          "$other" "$nested" 'unpushed work\n' "$nested/unpushed.txt" "$nested" "$nested" 'unpushed work in a repository nothing registers' > "$case_dir/plant.sh" ;;
+      h3-registered-worktree)
+        rule=registered-copy-proven reason='holds registered worktree'
+        printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        mkdir -p "$BP_COPY/.claude"
+        printf 'git -C %q worktree add -q -b fm/inner %q HEAD\n' "$BP_COPY" "$BP_COPY/.claude/inner" > "$case_dir/plant.sh" ;;
+      h3-bare-repository)
+        rule=registered-copy-proven reason='that no clone registers'
+        printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        nested=$BP_COPY/.claude/backup.git
+        mkdir -p "${nested%/*}"
+        git clone -q --bare "$case_dir/project" "$case_dir/staged/backup.git" || fail "by-path-exc-$shape: cannot create the bare repository"
+        BP_NESTED_HEAD=$(git --git-dir="$case_dir/staged/backup.git" commit-tree 'HEAD^{tree}' -p HEAD -m 'unlanded commit only a bare repository holds')
+        git --git-dir="$case_dir/staged/backup.git" update-ref refs/heads/unlanded "$BP_NESTED_HEAD"
+        printf 'mv %q %q\n' "$case_dir/staged/backup.git" "$nested" > "$case_dir/plant.sh" ;;
+      h4-missing-tip)
+        rule=copy-preserved reason="record does not list unlanded tip $BP_HEAD"
+        tip=$(git -C "$case_dir/project" rev-parse main)
+        awk -F'\t' -v OFS='\t' -v tip="$tip" '{ $3 = tip; print }' "$record" > "$case_dir/staged/record"
+        printf 'mv %q %q\n' "$case_dir/staged/record" "$record" > "$case_dir/plant.sh" ;;
+      h5-process-cwd)
+        rule=process-cwd-owner reason='is running in it'
+        # shellcheck disable=SC2016 # $1 is expanded by the planted bash, not here.
+        by_path_plant_process "$case_dir" "$(printf '(cd %q && exec bash -c %q bash %q)' "$BP_COPY" 'echo $$ > "$1"; exec sleep 300' "$case_dir/planted.pid")" > "$case_dir/plant.sh" ;;
+      h5-open-file)
+        rule=process-cwd-owner reason='is in use: process'
+        # shellcheck disable=SC2016 # $1 and $2 are expanded by the planted bash, not here.
+        by_path_plant_process "$case_dir" "$(printf 'bash -c %q bash %q %q' 'exec 3< "$1"; echo $$ > "$2"; exec sleep 300' "$BP_COPY/.git" "$case_dir/planted.pid")" > "$case_dir/plant.sh" ;;
+      h6-live-launcher | h6-dead-launcher)
+        rule=lock-launcher-owner reason='launcher'
+        by_path_vernant_driver "$case_dir"
+        if [ "$shape" = h6-live-launcher ]; then
+          teardown_fixture_start "$case_dir" KILL sleep 300
+          pid=$TEARDOWN_FIXTURE_PID
+        else
+          dead_launcher_pid
+          pid=$FOREIGN_DEAD_PID
+        fi
+        printf 'git -C %q worktree lock --reason %q %q\n' "$case_dir/project" \
+          "vernant-session-active owner=launcher:$pid launcher=$pid" "$BP_COPY" > "$case_dir/plant.sh" ;;
+      h7-dirty-tree)
+        rule=copy-preserved reason='uncommitted'
+        printf 'printf %q >> %q\n' 'an edit no commit holds\n' "$BP_COPY/work.txt" > "$case_dir/plant.sh" ;;
+      h7-unique-ignored)
+        rule=copy-ignored-files reason='ignored files that exist nowhere else: secret.txt'
+        printf '%s\n' secret.txt >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        printf 'printf %q > %q\n' 'exists nowhere else\n' "$BP_COPY/secret.txt" > "$case_dir/plant.sh" ;;
+    esac
+    rc=0
+    FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ -s "$case_dir/planted.pid" ]; then
+      pid=$(cat "$case_dir/planted.pid")
+      teardown_fixture_track "$pid"
+    fi
+    assert_present "$case_dir/planted" "by-path-exc-$shape: the route never reached its own bundle verification: $(cat "$case_dir/stderr")"
+    if [ "$shape" = control ] || [ "$shape" = h6-dead-launcher ]; then
+      expect_code 0 "$rc" "by-path-exc-$shape: with every harm row clear the bundle-held copy goes: $(cat "$case_dir/stderr")"
+      assert_absent "$BP_COPY" "by-path-exc-$shape: the copy was not removed"
+      [ "$shape" != h6-dead-launcher ] || assert_equals 1 "$(wc -l < "$case_dir/closeout.log" | tr -d ' ')" "by-path-exc-$shape: the closeout driver did not run exactly once"
+      assert_grep "land-or-drop call for bundle $case_dir/bundles/work.bundle is held on task bundle-call" "$case_dir/stderr" "by-path-exc-$shape: the call was not named"
+      assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-exc-$shape: not exactly one audit record"
+    else
+      expect_code 1 "$rc" "by-path-exc-$shape: a harm row that holds must refuse the bundle-held copy: $(cat "$case_dir/stderr")"
+      assert_grep 'the by-path exception to the held-task rule does not apply' "$case_dir/stderr" "by-path-exc-$shape: the exception did not refuse: $(cat "$case_dir/stderr")"
+      assert_grep " rule=$rule " "$case_dir/stderr" "by-path-exc-$shape: the typed refusal does not name rule $rule: $(cat "$case_dir/stderr")"
+      last=$(grep '^REFUSED:' "$case_dir/stderr" | tail -n 1)
+      case "$last" in
+        *"(rule=$rule): "*"$reason"*) ;;
+        *) fail "by-path-exc-$shape: the final REFUSED line does not name rule $rule and its reason ($reason): $last" ;;
+      esac
+      by_path_assert_untouched "$case_dir" "by-path-exc-$shape"
+      assert_absent "$case_dir/data/rec-1/preserved-bundles" "by-path-exc-$shape: the bundle was stored for a refused run"
+      case "$shape" in
+        h3-nested-clone | h3-other-worktree)
+          assert_present "$nested/unpushed.txt" "by-path-exc-$shape: the nested repository's work is gone"
+          git -C "$nested" cat-file -e "$(git -C "$nested" rev-parse HEAD)" || fail "by-path-exc-$shape: the nested repository lost its commit" ;;
+        h3-bare-repository)
+          git --git-dir="$nested" cat-file -e "$BP_NESTED_HEAD" || fail "by-path-exc-$shape: the bare repository lost its commit" ;;
+        h3-registered-worktree)
+          assert_present "$BP_COPY/.claude/inner" "by-path-exc-$shape: the inner worktree is gone" ;;
+        h5-process-cwd | h5-open-file | h6-live-launcher)
+          kill -0 "$pid" 2>/dev/null || fail "by-path-exc-$shape: the run signalled the process"
+          case "$shape" in
+            h5-open-file) assert_grep "human-only-exit: Which task or person owns process $pid, which holds $BP_COPY/.git open in $BP_COPY?" "$case_dir/stderr" "by-path-exc-$shape: the owner question does not name the holder and the file it holds open: $(cat "$case_dir/stderr")" ;;
+            h5-process-cwd) assert_grep "human-only-exit: Which task or person owns process $pid, which is running in $BP_COPY?" "$case_dir/stderr" "by-path-exc-$shape: the owner question does not name the process running in the copy: $(cat "$case_dir/stderr")" ;;
+            h6-live-launcher) assert_grep "human-only-exit: Is launcher $pid, named in the creation lock on $BP_COPY" "$case_dir/stderr" "by-path-exc-$shape: the owner question does not name the launcher: $(cat "$case_dir/stderr")" ;;
+          esac
+          assert_no_grep 'process unknown' "$case_dir/stderr" "by-path-exc-$shape: the owner question names no process"
+          assert_no_grep 'launcher unknown' "$case_dir/stderr" "by-path-exc-$shape: the owner question names no launcher"
+          [ "$shape" != h6-live-launcher ] || assert_absent "$case_dir/closeout.log" "by-path-exc-$shape: the driver executed a release" ;;
+      esac
+    fi
+    [ -z "$pid" ] || teardown_fixture_stop "$pid"
+  done
+  pass 'the by-path exception to the held-task rule itself refuses each harm row made after every earlier check, names that row in the final REFUSED line, and removes the bundle-held copy while every row is clear'
+}
+
+# A by-path exception row that only could not read its input is no policy judgment: a failed process
+# scan, an unreadable slot claim, a repository scan that cannot finish and a malformed bundle record,
+# each made at the first `git bundle verify`, refuse with rule inspection-unavailable, and no policy
+# refusal or friction event is recorded for them.
+test_by_path_exception_gives_an_unreadable_input_no_policy_row() {
+  local shape case_dir rc last reason
+  for shape in lsof-failed claim-unreadable scan-unfinished record-malformed; do
+    case "$shape" in claim-*) by_path_bundle_held_case "by-path-exc-unread-$shape" slot ;; *) by_path_bundle_held_case "by-path-exc-unread-$shape" ;; esac
+    case_dir=$BP_CASE
+    by_path_plant_at_first_verify "$case_dir"
+    : > "$case_dir/plant.sh"
+    case "$shape" in
+      lsof-failed)
+        reason='the process scan failed'
+        # shellcheck disable=SC2016 # The fake lsof, not this shell, expands its own arguments.
+        printf '#!/usr/bin/env bash\n[ "${1:-}" != -nP ] || [ ! -e %q ] || exit 1\nexec %q "$@"\n' "$case_dir/planted" "$REAL_LSOF_FOR_TEST" > "$case_dir/fakebin/lsof"
+        chmod +x "$case_dir/fakebin/lsof" ;;
+      claim-unreadable)
+        reason='cannot be read, so who the slot belongs to is unknown'
+        printf 'mkdir %q\n' "$case_dir/pool/1/.fm-slot-owner" > "$case_dir/plant.sh" ;;
+      scan-unfinished)
+        reason='could not be scanned for other Git repositories'
+        printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+        printf 'mkdir -p %q\nchmod 000 %q\n' "$BP_COPY/.claude/sealed" "$BP_COPY/.claude/sealed" > "$case_dir/plant.sh" ;;
+      record-malformed)
+        reason='malformed preservation record'
+        printf 'printf %q > %q\n' 'not a bundle record\n' "$case_dir/data/rec-1/preservation-bundles.tsv" > "$case_dir/plant.sh" ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ ! -d "$BP_COPY/.claude/sealed" ] || chmod 755 "$BP_COPY/.claude/sealed"
+    assert_present "$case_dir/planted" "by-path-exc-unread-$shape: the route never reached its own bundle verification: $(cat "$case_dir/stderr")"
+    expect_code 1 "$rc" "by-path-exc-unread-$shape: an unreadable input must still refuse: $(cat "$case_dir/stderr")"
+    assert_grep 'the by-path exception to the held-task rule does not apply' "$case_dir/stderr" "by-path-exc-unread-$shape: the exception did not refuse: $(cat "$case_dir/stderr")"
+    last=$(grep '^REFUSED:' "$case_dir/stderr" | tail -n 1)
+    case "$last" in
+      *"(rule=inspection-unavailable): "*"$reason"*) ;;
+      *) fail "by-path-exc-unread-$shape: the final REFUSED line does not name rule inspection-unavailable and its reason ($reason): $last" ;;
+    esac
+    if grep -q '^REFUSED: guard=' "$case_dir/stderr"; then fail "by-path-exc-unread-$shape: an unreadable input was refused as a policy row: $(cat "$case_dir/stderr")"; fi
+    assert_absent "$BP_HOME/state/friction.jsonl" "by-path-exc-unread-$shape: a friction event was recorded for an unreadable input"
+    by_path_assert_untouched "$case_dir" "by-path-exc-unread-$shape"
+  done
+  pass 'an exception row that only could not read its input refuses with rule inspection-unavailable and records no policy refusal'
+}
+
+# The exception's own reason is the last word: harm that appears after every earlier check has passed (a
+# nested repository planted at the first `git bundle verify`) is refused by the by-path exception, and the
+# final REFUSED line names that row, not the generic "HEAD is not proved landed" envelope.
+test_by_path_exception_refusal_keeps_its_own_reason() {
+  local case_dir rc nested
+  by_path_bundle_held_case by-path-exc-reason
+  case_dir=$BP_CASE
+  printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+  nested=$BP_COPY/.claude/planted
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" bundle verify "*)
+    if [ ! -e "$case_dir/planted" ]; then
+      : > "$case_dir/planted"
+      mkdir -p "$BP_COPY/.claude"
+      "$REAL_GIT_FOR_TEST" clone -q "$case_dir/project" "$nested"
+    fi ;;
+  *" worktree remove "*) printf '%s\n' "\$*" >> "$case_dir/git-remove.log" ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" --record-id rec-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-exc-reason: harm planted after the early checks must refuse: $(cat "$case_dir/stderr")"
+  assert_present "$nested/.git" 'by-path-exc-reason: the planted repository was not planted'
+  assert_grep 'bundle preservation unavailable' "$case_dir/stderr" 'by-path-exc-reason: the exception did not refuse'
+  grep '^REFUSED:' "$case_dir/stderr" | tail -n 1 | grep -Fq 'no clone registers' || fail "by-path-exc-reason: the final REFUSED line does not carry the exception's reason: $(cat "$case_dir/stderr")"
+  if grep '^REFUSED:' "$case_dir/stderr" | grep -Fq 'is not proved landed'; then fail 'by-path-exc-reason: a REFUSED line is the generic landing envelope'; fi
+  by_path_assert_untouched "$case_dir" by-path-exc-reason
+  pass 'a refusal by the by-path exception keeps the exception own reason as the final REFUSED text'
+}
+
+# A bare repository carries no .git entry; the scan finds it by its HEAD, objects and refs together, under
+# ignored .claude too, and a commit only it holds is never deleted with the copy.
+test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude() {
+  local case_dir rc nested commit
+  make_by_path_case by-path-bare
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+  nested=$BP_COPY/.claude/backup.git
+  mkdir -p "${nested%/*}"
+  git clone -q --bare "$case_dir/project" "$nested" || fail 'by-path-bare: cannot create the bare repository'
+  commit=$(git --git-dir="$nested" commit-tree 'HEAD^{tree}' -p HEAD -m 'unlanded commit only a bare repository holds')
+  git --git-dir="$nested" update-ref refs/heads/unlanded "$commit"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-bare: a copy holding a bare repository must refuse: $(cat "$case_dir/stderr")"
+  assert_grep "$nested" "$case_dir/stderr" 'by-path-bare: the refusal does not name the bare repository'
+  git --git-dir="$nested" cat-file -e "$commit" || fail 'by-path-bare: the bare repository lost its commit'
+  by_path_assert_untouched "$case_dir" by-path-bare
+  rm -rf "$nested"
+  rc=0
+  run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-bare: the same copy without the bare repository must go: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-bare: the copy was not removed'
+  pass 'teardown --copy refuses a copy holding a bare repository with an unpushed commit under .claude, and removes the same copy once it holds none'
+}
+
+# .claude and .opencode are preserved whole (the retained mode) before the removal: a unique ignored file
+# there is found in data/<record-id>/nested-copy-preserved afterwards instead of being lost or refused.
+# One that git does not ignore is untracked content and stops git's own non-forced removal, and a preserve
+# that cannot publish leaves the copy where it is.
+test_by_path_preserves_claude_whole_and_removes_the_copy() {
+  local shape case_dir rc kept command root want
+  for shape in ignored not-ignored preserve-cannot-publish; do
+    make_by_path_case "by-path-claude-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    mkdir -p "$BP_COPY/.claude/sub" "$BP_COPY/.opencode"
+    printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+    printf 'unique note\n' > "$BP_COPY/.claude/sub/note.txt"
+    printf 'unique opencode state\n' > "$BP_COPY/.opencode/state.json"
+    [ "$shape" = not-ignored ] || printf '%s\n' .claude/ .opencode/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    if [ "$shape" = preserve-cannot-publish ]; then
+      mkdir -p "$case_dir/data/pres-1"
+      printf 'a file where the preserve parent must be a directory\n' > "$case_dir/data/pres-1/nested-copy-preserved"
+    fi
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" --record-id pres-1 > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    case "$shape" in
+      ignored)
+        expect_code 0 "$rc" "by-path-claude-$shape: a copy whose only unique files sit under .claude and .opencode must go: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "by-path-claude-$shape: the copy was not removed"
+        kept=$(find "$case_dir/data/pres-1/nested-copy-preserved" -type d -name files -print -quit 2>/dev/null)
+        [ -n "$kept" ] || fail "by-path-claude-$shape: nothing was preserved under data/pres-1/nested-copy-preserved"
+        assert_equals 'unique settings' "$(cat "$kept/.claude/settings.local.json")" "by-path-claude-$shape: .claude/settings.local.json was not preserved with its bytes"
+        assert_equals 'unique note' "$(cat "$kept/.claude/sub/note.txt")" "by-path-claude-$shape: .claude/sub/note.txt was not preserved with its bytes"
+        assert_equals 'unique opencode state' "$(cat "$kept/.opencode/state.json")" "by-path-claude-$shape: .opencode/state.json was not preserved with its bytes" ;;
+      not-ignored)
+        expect_code 1 "$rc" "by-path-claude-$shape: untracked, not ignored .claude content stops git's own removal: $(cat "$case_dir/stderr")"
+        by_path_assert_untouched "$case_dir" "by-path-claude-$shape"
+        assert_present "$BP_COPY/.claude/settings.local.json" "by-path-claude-$shape: the settings file is gone" ;;
+      preserve-cannot-publish)
+        expect_code 1 "$rc" "by-path-claude-$shape: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+        assert_grep 'could not be preserved' "$case_dir/stderr" "by-path-claude-$shape: no named reason"
+        grep '^completing-command: ' "$case_dir/stderr" | grep -Fq -- "fm-teardown.sh --copy $BP_COPY --record-id pres-1" \
+          || fail "by-path-claude-$shape: the completing command is not the --copy form: $(grep '^completing-command: ' "$case_dir/stderr")"
+        assert_present "$BP_COPY/.claude/settings.local.json" "by-path-claude-$shape: the settings file is gone"
+        by_path_registered "$BP_CLONE" "$BP_COPY" || fail "by-path-claude-$shape: the copy is no longer registered"
+        assert_absent "$case_dir/git-remove.log" "by-path-claude-$shape: git worktree remove was called"
+        # The printed command is the whole retry: it is run as printed, from a shell with none of the
+        # three root overrides, so it must carry the roots this run used (the fixture sets all three).
+        command=$(sed -n 's/^completing-command: //p' "$case_dir/stderr")
+        [ -n "$command" ] || fail "by-path-claude-$shape: no completing command was printed"
+        for root in state data config; do
+          printf -v want 'FM_%s_OVERRIDE=%q' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$case_dir/$root"
+          [[ "$command" == *" $want "* ]] || fail "by-path-claude-$shape: the completing command does not carry $want: $command"
+        done
+        rm -f "$case_dir/data/pres-1/nested-copy-preserved"
+        rc=0
+        by_path_run_printed "$case_dir" "$command" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        expect_code 0 "$rc" "by-path-claude-$shape: with the obstacle gone the printed command completes the copy: $(cat "$case_dir/stderr")"
+        assert_absent "$BP_COPY" "by-path-claude-$shape: the copy was not removed"
+        kept=$(find "$case_dir/data/pres-1/nested-copy-preserved" -type d -name files -print -quit 2>/dev/null)
+        [ -n "$kept" ] || fail "by-path-claude-$shape: the printed command did not preserve under the data folder the refused run used"
+        assert_equals 'unique settings' "$(cat "$kept/.claude/settings.local.json")" "by-path-claude-$shape: the retried preserve lost .claude/settings.local.json"
+        assert_absent "$BP_HOME/data" "by-path-claude-$shape: the printed command wrote under the home's own data folder, not the run's" ;;
+    esac
+  done
+  pass 'teardown --copy preserves .claude and .opencode whole and removes the copy, refuses when git does not ignore them, and keeps the copy when the preserve cannot publish'
+}
+
+# A home, state, data and config folder given relative to the directory a run starts in is printed in the
+# completing command as the absolute folder it named, so the printed text works from any directory: run from
+# another folder with none of the overrides, it completes against the folders the refused run used.
+test_by_path_completing_command_names_the_absolute_roots_of_relative_roots() {
+  local case_dir rc command want base root kept
+  make_by_path_case by-path-relative-roots
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  base=$(cd "$case_dir" && pwd -P)
+  mkdir -p "$BP_COPY/.claude" "$case_dir/data/pres-1" "$case_dir/elsewhere"
+  printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+  printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'a file where the preserve parent must be a directory\n' > "$case_dir/data/pres-1/nested-copy-preserved"
+  rc=0
+  ( cd "$case_dir" && env FM_HOME=home FM_STATE_OVERRIDE=state FM_DATA_OVERRIDE=data FM_CONFIG_OVERRIDE=config \
+    FM_ROOT_OVERRIDE="$case_dir/code-root" NM_HOME="$case_dir/nm" \
+    PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 ) \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-relative-roots: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be preserved' "$case_dir/stderr" 'by-path-relative-roots: no named reason'
+  command=$(sed -n 's/^completing-command: //p' "$case_dir/stderr")
+  [ -n "$command" ] || fail "by-path-relative-roots: no completing command: $(cat "$case_dir/stderr")"
+  printf -v want ' FM_HOME=%q ' "$base/home"
+  [[ "$command" == *"$want"* ]] || fail "by-path-relative-roots: the printed command does not name the absolute home$want: $command"
+  for root in state data config; do
+    printf -v want ' FM_%s_OVERRIDE=%q ' "$(printf '%s' "$root" | tr '[:lower:]' '[:upper:]')" "$base/$root"
+    [[ "$command" == *"$want"* ]] || fail "by-path-relative-roots: the printed command does not name the absolute folder$want: $command"
+  done
+  case "$command" in *=state\ *|*=data\ *|*=config\ *|*FM_HOME=home\ *) fail "by-path-relative-roots: the printed command names a relative folder: $command" ;; esac
+  rm -f "$case_dir/data/pres-1/nested-copy-preserved"
+  rc=0
+  by_path_run_printed "$case_dir" "$command" "$case_dir/elsewhere" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-relative-roots: the printed command failed from another folder: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-relative-roots: the copy was not removed'
+  kept=$(find "$case_dir/data/pres-1/nested-copy-preserved" -type d -name files -print -quit 2>/dev/null)
+  [ -n "$kept" ] || fail 'by-path-relative-roots: nothing was preserved under the data folder the refused run used'
+  assert_equals 'unique settings' "$(cat "$kept/.claude/settings.local.json")" 'by-path-relative-roots: the preserved bytes differ'
+  assert_equals '' "$(ls -A "$case_dir/elsewhere")" 'by-path-relative-roots: the printed command wrote into the folder it was run from'
+  pass 'a teardown --copy completing command names absolute folders for relative roots and completes from another directory'
+}
+
+# A root reaches the completing command byte-exact or not at all. A data folder whose name ends in a newline
+# is refused before any removal step ("data directory contains an invalid control byte"), so no completing
+# command is printed and the reason is named. A config folder whose name ends in a newline reaches the
+# preservation refusal: it is printed %q-quoted on one line, and the printed command, run from another
+# directory, completes the copy.
+test_by_path_completing_command_keeps_every_byte_of_a_root() {
+  local case_dir rc command want rootnl root kept
+  for root in data config; do
+    make_by_path_case "by-path-root-bytes-$root"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    rootnl=$case_dir/$root-nl$'\n'
+    mkdir -p "$BP_COPY/.claude" "$rootnl" "$case_dir/data/pres-1" "$case_dir/elsewhere"
+    [ -d "$rootnl" ] && [ ! -e "$case_dir/$root-nl" ] || fail "by-path-root-bytes-$root: the fixture did not make a folder whose name ends in a newline"
+    printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+    printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'a file where the preserve parent must be a directory\n' > "$case_dir/data/pres-1/nested-copy-preserved"
+    rc=0
+    if [ "$root" = data ]; then
+      FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
+        FM_DATA_OVERRIDE="$rootnl" FM_CONFIG_OVERRIDE="$case_dir/config" NM_HOME="$case_dir/nm" \
+        PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      [ "$rc" != 0 ] || fail "by-path-root-bytes-$root: a data folder holding a newline must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'data directory contains an invalid control byte' "$case_dir/stderr" "by-path-root-bytes-$root: the reason is not named"
+      assert_no_grep 'completing-command:' "$case_dir/stderr" "by-path-root-bytes-$root: a completing command was printed for a root it cannot carry"
+      by_path_assert_untouched "$case_dir" "by-path-root-bytes-$root"
+      continue
+    fi
+    FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
+      FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$rootnl" NM_HOME="$case_dir/nm" \
+      PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-root-bytes-$root: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+    command=$(sed -n 's/^completing-command: //p' "$case_dir/stderr")
+    [ -n "$command" ] || fail "by-path-root-bytes-$root: no completing command: $(cat "$case_dir/stderr")"
+    [ "$(printf '%s\n' "$command" | wc -l | tr -d ' ')" = 1 ] || fail "by-path-root-bytes-$root: the completing command is not one line: $command"
+    printf -v want ' FM_CONFIG_OVERRIDE=%q ' "$rootnl"
+    [[ "$command" == *"$want"* ]] || fail "by-path-root-bytes-$root: the printed command does not name the exact config folder$want: $command"
+    rm -f "$case_dir/data/pres-1/nested-copy-preserved"
+    rc=0
+    by_path_run_printed "$case_dir" "$command" "$case_dir/elsewhere" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-root-bytes-$root: the printed command failed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-root-bytes-$root: the copy was not removed"
+    kept=$(find "$case_dir/data/pres-1/nested-copy-preserved" -type d -name files -print -quit 2>/dev/null)
+    [ -n "$kept" ] || fail "by-path-root-bytes-$root: nothing was preserved under the data folder the refused run used"
+  done
+  pass 'a teardown --copy completing command carries a root byte-exact, a final newline included, or prints none and names why'
+}
+
+# Whether a root is a different folder from its default is decided from one canonical spelling, not from how
+# FM_HOME is spelled: with no override set, FM_HOME given with a trailing slash, two trailing slashes or a
+# repeated slash inside prints only FM_HOME, and the printed command completes against the same folders.
+test_by_path_completing_command_prints_no_override_for_any_spelling_of_a_default_home() {
+  local spelling case_dir rc command home
+  for spelling in trailing-slash double-trailing-slash inner-double-slash; do
+    make_by_path_case "by-path-home-$spelling"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    case "$spelling" in
+      trailing-slash) home=$BP_HOME/ ;;
+      double-trailing-slash) home=$BP_HOME// ;;
+      inner-double-slash) home=$case_dir//home ;;
+    esac
+    mkdir -p "$BP_COPY/.claude" "$BP_HOME/data/pres-1" "$BP_HOME/config"
+    printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+    printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'a file where the preserve parent must be a directory\n' > "$BP_HOME/data/pres-1/nested-copy-preserved"
+    rc=0
+    env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
+      FM_HOME="$home" FM_ROOT_OVERRIDE="$case_dir/code-root" NM_HOME="$case_dir/nm" \
+      PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-home-$spelling: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+    command=$(sed -n 's/^completing-command: FM_FRICTION_OPERATION_ID=[^ ]* FM_FRICTION_EPISODE_ID=[^ ]* //p' "$case_dir/stderr")
+    [ -n "$command" ] || fail "by-path-home-$spelling: no completing command: $(cat "$case_dir/stderr")"
+    case "$command" in *OVERRIDE*) fail "by-path-home-$spelling: a default home printed an override: $command" ;; esac
+    rm -f "$BP_HOME/data/pres-1/nested-copy-preserved"
+    rc=0
+    by_path_run_printed "$case_dir" "$command" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-home-$spelling: the printed command failed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-home-$spelling: the copy was not removed"
+    assert_present "$BP_HOME/data/pres-1/nested-copy-preserved" "by-path-home-$spelling: nothing was preserved under the home data folder"
+  done
+  pass 'a teardown --copy completing command prints no override for any spelling of a default home'
+}
+
+# A run whose state, data and config folders are the home's own defaults prints the completing command
+# it always printed, with no root override on it; the same refusal under a home whose roots differ
+# prints each differing root (test_by_path_preserves_claude_whole_and_removes_the_copy runs that text).
+test_by_path_completing_command_prints_a_root_only_when_it_differs_from_the_home_default() {
+  local case_dir rc command want
+  make_by_path_case by-path-default-roots
+  case_dir=$BP_CASE
+  BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+  mkdir -p "$BP_COPY/.claude" "$BP_HOME/data/pres-1" "$BP_HOME/config"
+  printf 'unique settings\n' > "$BP_COPY/.claude/settings.local.json"
+  printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'a file where the preserve parent must be a directory\n' > "$BP_HOME/data/pres-1/nested-copy-preserved"
+  rc=0
+  env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
+    FM_HOME="$BP_HOME" FM_ROOT_OVERRIDE="$case_dir/code-root" NM_HOME="$case_dir/nm" \
+    PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" "$TEARDOWN" --copy "$BP_COPY" --record-id pres-1 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "by-path-default-roots: a preserve that cannot publish must keep the copy: $(cat "$case_dir/stderr")"
+  assert_grep 'could not be preserved' "$case_dir/stderr" 'by-path-default-roots: no named reason'
+  command=$(sed -n 's/^completing-command: FM_FRICTION_OPERATION_ID=[^ ]* FM_FRICTION_EPISODE_ID=[^ ]* //p' "$case_dir/stderr")
+  [ -n "$command" ] || fail "by-path-default-roots: no completing command: $(cat "$case_dir/stderr")"
+  printf -v want 'FM_HOME=%q bash %q --copy %q --record-id %q' "$BP_HOME" "$ROOT/bin/fm-teardown.sh" "$BP_COPY" pres-1
+  assert_equals "$want" "$command" 'by-path-default-roots: the printed command is not the one printed before roots were carried'
+  case "$command" in *OVERRIDE*) fail "by-path-default-roots: a default root was printed as an override: $command" ;; esac
+  rm -f "$BP_HOME/data/pres-1/nested-copy-preserved"
+  rc=0
+  by_path_run_printed "$case_dir" "$command" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "by-path-default-roots: the printed command completes the copy: $(cat "$case_dir/stderr")"
+  assert_absent "$BP_COPY" 'by-path-default-roots: the copy was not removed'
+  assert_present "$BP_HOME/data/pres-1/nested-copy-preserved" 'by-path-default-roots: nothing was preserved under the home data folder'
+  pass 'a teardown --copy completing command prints a state, data or config root only when it differs from the home default'
+}
+
+# An unreadable projects folder is not an empty one: a gone copy with an audit line is not reported done
+# while the folder that lists the clones cannot be read. A link to nothing is unreadable for any user; a
+# listing that fails is made by a ls that fails for that folder.
+test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read() {
+  local shape case_dir rc
+  for shape in dangling-link listing-fails; do
+    make_by_path_case "by-path-projects-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-projects-$shape: the removal that leaves the audit line must succeed: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-projects-$shape: the copy was not removed"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-projects-$shape: with a readable folder a finished removal is reported: $(cat "$case_dir/stderr")"
+    assert_grep 'is already gone, and this run removed nothing' "$case_dir/stderr" "by-path-projects-$shape: no finished-removal message with a readable folder"
+    case "$shape" in
+      dangling-link)
+        rm -rf "$BP_HOME/projects"
+        ln -s "$case_dir/no-such-folder" "$BP_HOME/projects" ;;
+      listing-fails)
+        cat > "$case_dir/fakebin/ls" <<SH
+#!/usr/bin/env bash
+for last; do :; done
+if [ "\$last" = "$BP_HOME/projects" ]; then echo 'ls: cannot read the folder' >&2; exit 1; fi
+exec /bin/ls "\$@"
+SH
+        chmod +x "$case_dir/fakebin/ls" ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "by-path-projects-$shape: a gone copy must not be reported done while the projects folder cannot be read: $(cat "$case_dir/stderr")"
+    assert_grep 'could not be read' "$case_dir/stderr" "by-path-projects-$shape: the refusal does not say the folder could not be read"
+    if grep -Fq 'already gone' "$case_dir/stderr"; then fail "by-path-projects-$shape: a gone copy was reported done"; fi
+    assert_equals 1 "$(wc -l < "$case_dir/data/record-less-copy-removals.log" | tr -d ' ')" "by-path-projects-$shape: the refused rerun changed the audit record"
+  done
+  pass 'teardown --copy does not report a gone copy done while the projects folder cannot be read'
+}
+
+# A bare repository whose every file the copy's own repository tracks and holds unmodified is landed
+# content (a fixture) and does not count as another repository; with one untracked ref, one untracked
+# object or one modified file, or when git cannot be read about it, it counts and the run refuses. The
+# fixture sits under ignored .claude, force-added, so the clean proof does not see an untracked file
+# there and only the scan can. The same scan serves the ordinary held close
+# (tests/fm-teardown-cleanup.test.sh).
+test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed() {
+  local shape case_dir rc nested head
+  for shape in tracked-clean untracked-ref untracked-object modified-file unreadable; do
+    make_by_path_case "by-path-bare-tracked-$shape"
+    case_dir=$BP_CASE
+    printf '%s\n' .claude/ >> "$(git -C "$BP_CLONE" rev-parse --path-format=absolute --git-path info/exclude)"
+    nested=$BP_COPY/.claude/fixtures/repo.git
+    mkdir -p "${nested%/*}"
+    git clone -q --bare "$case_dir/project" "$nested" || fail "by-path-bare-tracked-$shape: cannot create the bare fixture"
+    git -C "$BP_COPY" add -f .claude/fixtures/repo.git
+    git -C "$BP_COPY" commit -qm 'track a bare fixture repository'
+    git -C "$BP_COPY" push -q origin HEAD:main || fail "by-path-bare-tracked-$shape: cannot land the fixture commit on origin"
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    head=$(git --git-dir="$nested" rev-parse HEAD)
+    case "$shape" in
+      untracked-ref) printf '%s\n' "$head" > "$nested/refs/heads/untracked-ref" ;;
+      untracked-object) printf 'an object nothing tracks\n' | git --git-dir="$nested" hash-object -w --stdin >/dev/null ;;
+      modified-file) printf 'changed after it was committed\n' >> "$nested/description" ;;
+      unreadable)
+        cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in *" --ignored=traditional "*) echo 'fatal: cannot read the status' >&2; exit 128 ;; esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+        chmod +x "$case_dir/fakebin/git" ;;
+    esac
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = tracked-clean ]; then
+      expect_code 0 "$rc" "by-path-bare-tracked-$shape: a tracked, clean bare fixture must not stop the removal: $(cat "$case_dir/stderr")"
+      assert_absent "$BP_COPY" "by-path-bare-tracked-$shape: the copy was not removed"
+    else
+      expect_code 1 "$rc" "by-path-bare-tracked-$shape: a bare repository git does not hold landed must refuse: $(cat "$case_dir/stderr")"
+      git --git-dir="$nested" cat-file -e "$head" || fail "by-path-bare-tracked-$shape: the bare repository lost its commit"
+      case "$shape" in
+        untracked-ref | untracked-object | unreadable)
+          assert_grep "$nested" "$case_dir/stderr" "by-path-bare-tracked-$shape: the refusal does not name the bare repository" ;;
+      esac
+      by_path_assert_untouched "$case_dir" "by-path-bare-tracked-$shape"
+    fi
+  done
+  pass 'teardown --copy ignores a tracked, clean bare fixture and refuses one with an untracked ref, an untracked object, a modified file or an unreadable status'
+}
+
+# A process that begins holding the copy after the first holder scan has returned and before the
+# removal. The proofs the mode reuses read working directories again (pids_with_cwd_under), so a
+# late cwd is refused by them; a late open file is refused only by the holder scan that runs again
+# immediately before the audit line and the removal. A gated fake lsof starts the holder at that
+# exact point: the first full scan answers truly, and only then does the holder start.
+test_by_path_refuses_a_holder_that_starts_after_the_first_scan() {
+  local shape case_dir rc pid
+  for shape in open-file cwd; do
+    make_by_path_case "by-path-late-$shape"
+    case_dir=$BP_CASE
+    BP_HEAD=$(git -C "$BP_COPY" rev-parse HEAD)
+    cat > "$case_dir/fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = -nP ] && [ ! -e "$BP_LATE_DIR/first-scan-done" ]; then
+  : > "$BP_LATE_DIR/first-scan-done"
+  out=$("$REAL_LSOF_FOR_TEST" "$@"); rc=$?
+  if [ "$BP_LATE_SHAPE" = open-file ]; then
+    bash -c 'exec 3< "$1"; echo $$ > "$2"; exec sleep 300' bash "$BP_LATE_COPY/.git" "$BP_LATE_DIR/late.pid" >/dev/null 2>&1 </dev/null &
+  else
+    (cd "$BP_LATE_COPY" && exec bash -c 'echo $$ > "$1"; exec sleep 300' bash "$BP_LATE_DIR/late.pid") >/dev/null 2>&1 </dev/null &
+  fi
+  for _ in $(seq 100); do [ -s "$BP_LATE_DIR/late.pid" ] && break; sleep 0.05; done
+  printf '%s\n' "$out"
+  exit "$rc"
+fi
+exec "$REAL_LSOF_FOR_TEST" "$@"
+SH
+    chmod +x "$case_dir/fakebin/lsof"
+    rc=0
+    BP_LATE_SHAPE=$shape BP_LATE_DIR=$case_dir BP_LATE_COPY=$BP_COPY \
+      run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ -s "$case_dir/late.pid" ] || fail "by-path-late-$shape: the gated lsof never started the late holder"
+    pid=$(cat "$case_dir/late.pid")
+    teardown_fixture_track "$pid"
+    assert_present "$case_dir/first-scan-done" "by-path-late-$shape: the first scan did not run"
+    expect_code 1 "$rc" "by-path-late-$shape: a holder that started after the first scan must still refuse: $(cat "$case_dir/stderr")"
+    if [ "$shape" = open-file ]; then
+      assert_grep "is in use: process $pid " "$case_dir/stderr" "by-path-late-$shape: the repeated scan did not name the late holder"
+    else
+      assert_grep 'rule=process-cwd-owner' "$case_dir/stderr" "by-path-late-$shape: the reused proof did not refuse the late cwd"
+    fi
+    by_path_assert_untouched "$case_dir" "by-path-late-$shape"
+    kill -0 "$pid" 2>/dev/null || fail "by-path-late-$shape: the run signalled the late holder"
+    teardown_fixture_stop "$pid"
+    rc=0
+    run_by_path "$case_dir" "$BP_COPY" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "by-path-late-$shape: the copy must go once the late holder is gone: $(cat "$case_dir/stderr")"
+    assert_absent "$BP_COPY" "by-path-late-$shape: the idle copy was not removed"
+  done
+  pass 'teardown --copy refuses a holder that starts after the first scan: a late cwd by the reused proof, a late open file by the scan repeated before the removal'
+}
+
 teardown_test_cases=(
 test_empty_recorded_slot_nested_drop
 test_recorded_slot_lost_lease_still_refuses
@@ -4263,6 +6216,48 @@ test_bundle_sweep_keeps_anchored_and_landed_prior_ignored_files
 test_bundle_removed_copy_sweep_refuses_before_retire
 test_foreign_bundle_sweep_keeps_anchored_prior_ignored_files
 test_foreign_bundle_preservation_keeps_other_proofs
+test_by_path_removes_a_landed_record_less_copy
+test_by_path_removes_a_bundle_held_copy_only_when_the_captains_call_is_filed
+test_by_path_default_record_id_is_derived_from_the_path_and_printed_in_a_refusal
+test_by_path_refuses_unlanded_commits_with_no_verified_bundle
+test_by_path_refuses_a_dirty_or_untracked_tree
+test_by_path_refuses_a_copy_a_process_holds
+test_by_path_refuses_a_path_that_is_not_a_registered_nested_worktree
+test_by_path_refuses_a_path_a_live_record_names
+test_by_path_refuses_a_slot_claimed_by_another_live_task_and_passes_a_stale_claim
+test_by_path_refuses_a_bundle_that_fails_verification
+test_by_path_takes_no_force
+test_by_path_refuses_a_copy_holding_another_worktree_or_a_foreign_lock
+test_by_path_rerun_after_a_crash_converges
+test_by_path_two_simultaneous_runs_on_one_copy_let_one_proceed
+test_by_path_entry_leaves_ordinary_teardown_of_a_missing_record_unchanged
+test_by_path_bundle_covers_the_copy_not_the_clones_own_head
+test_by_path_releases_a_vernant_locked_copy_through_the_closeout_driver
+test_by_path_leaves_a_vernant_locked_copy_with_a_live_launcher_or_a_refused_plan
+test_by_path_keeps_a_copy_whose_launcher_ps_cannot_prove_gone_and_releases_one_it_proves_gone
+test_by_path_resolves_a_slot_claim_naming_the_record_id_in_every_local_home
+test_by_path_refuses_a_present_copy_when_a_registration_list_cannot_be_read
+test_by_path_refuses_a_gone_copy_when_a_registration_list_cannot_be_read
+test_by_path_does_not_report_a_gone_copy_done_while_a_registration_cannot_be_read
+test_by_path_refuses_a_copy_whose_registration_is_held_by_a_link_that_cannot_be_checked
+test_by_path_refuses_while_another_registration_is_held_by_a_link_that_cannot_be_checked
+test_by_path_refuses_while_a_dot_named_registration_is_held_by_a_link_to_nothing
+test_by_path_names_a_registration_whose_name_holds_a_newline
+test_by_path_names_no_registration_when_the_listing_fails_after_partial_output
+test_by_path_refuses_an_unregistered_nested_repository_under_the_copy
+test_by_path_refuses_when_the_audit_record_cannot_be_written
+test_by_path_exception_to_the_held_task_rule_judges_each_harm_row
+test_by_path_exception_gives_an_unreadable_input_no_policy_row
+test_by_path_exception_refusal_keeps_its_own_reason
+test_by_path_refuses_a_bare_repository_holding_an_unpushed_commit_under_claude
+test_by_path_counts_a_bare_repository_only_when_git_does_not_hold_it_landed
+test_by_path_preserves_claude_whole_and_removes_the_copy
+test_by_path_completing_command_prints_a_root_only_when_it_differs_from_the_home_default
+test_by_path_completing_command_names_the_absolute_roots_of_relative_roots
+test_by_path_completing_command_keeps_every_byte_of_a_root
+test_by_path_completing_command_prints_no_override_for_any_spelling_of_a_default_home
+test_by_path_refuses_a_gone_copy_when_the_projects_folder_cannot_be_read
+test_by_path_refuses_a_holder_that_starts_after_the_first_scan
 )
 
 fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"

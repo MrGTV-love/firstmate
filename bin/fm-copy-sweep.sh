@@ -609,10 +609,11 @@ enumerate_clones() {
   done
 }
 
-# The registered worktrees strictly inside <clone>; bin/fm-task-copy-lib.sh owns
-# the enumeration.
+# Sets FM_TASK_COPY_NESTED to the registered worktrees strictly inside <clone>,
+# and on failure FM_TASK_COPY_UNREADABLE_REGISTRATION to the registration that
+# could not be read, if any; bin/fm-task-copy-lib.sh owns the enumeration.
 list_nested() {  # <clone>
-  fm_task_copy_registered_nested "$1"
+  fm_task_copy_read_registered_nested "$1"
 }
 
 # --- bounded commands --------------------------------------------------------
@@ -1138,11 +1139,12 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
     return 0
   fi
-  if ! nested=$(list_nested "$clone"); then
+  if ! list_nested "$clone"; then
     CLASS=HELD-DIRTY
-    REASON="its registered nested copies cannot be listed, so no inner copy is ruled out"
+    REASON="$(fm_task_copy_unreadable_list_text "its clone's"), so no inner copy is ruled out"
     return 0
   fi
+  nested=$FM_TASK_COPY_NESTED
   while IFS= read -r inner; do
     case "$inner" in "$copy"/*) ;; *) continue ;; esac
     [ -d "$inner" ] || continue
@@ -1354,10 +1356,11 @@ record_live_nested_copy() {  # <copy> <clone>
 
 scan_clone() {  # <pool> <container> <clone>
   local pool=$1 container=$2 clone=$3 copy nested
-  if ! nested=$(list_nested "$clone"); then
-    add_note "clone $clone was not read: its registered worktrees cannot be listed"
+  if ! list_nested "$clone"; then
+    add_note "clone $clone was not read: $(fm_task_copy_unreadable_list_text its)"
     return 0
   fi
+  nested=$FM_TASK_COPY_NESTED
   # A dedicated descriptor keeps every command inside the loop off its input.
   while IFS= read -r copy <&4; do
     [ -n "$copy" ] || continue
@@ -1750,7 +1753,7 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
-  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity
+  local driver_slots=0 driver_limit deferred='' registered enumeration_rc want now activity moved why head_read after after_read unread
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1776,7 +1779,8 @@ apply_removals() {
         continue
         ;;
     esac
-    head=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || head=unknown
+    head_read=1
+    head=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || { head=unknown; head_read=0; }
     branch=$(git -C "$copy" symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=detached
     preserve_dir=
     earlier=0
@@ -1807,7 +1811,8 @@ apply_removals() {
       err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
       if [ "$release_rc" != 2 ]; then
         enumeration_rc=0
-        registered=$(list_nested "$clone") || enumeration_rc=$?
+        list_nested "$clone" || enumeration_rc=$?
+        registered=$FM_TASK_COPY_NESTED
         if ! { copy_still_holds "$copy" "$identity" "$lock_hash" \
           && [ "$enumeration_rc" = 0 ] && grep -qxF "$copy" <<< "$registered"; }; then
           driver_slots=$((driver_slots + 1))
@@ -1842,10 +1847,27 @@ apply_removals() {
       # before the last source/preserve comparison and non-force removal.
       scan_processes
       classify "$copy" "$clone" "$pool" "$container"
-      if [ "$CLASS" != REAPABLE-PROVEN ] || [ "$(git -C "$copy" rev-parse HEAD 2>/dev/null)" != "$head" ]; then
+      # A report names a cause only from a read that worked: "changed after
+      # preservation" needs both HEAD reads to have succeeded and differ; a read
+      # that failed is named instead, with no claim about the copy.
+      unread=
+      after=
+      after_read=1
+      after=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || after_read=0
+      [ "$head_read" = 1 ] || unread="the copy's HEAD could not be read before preservation"
+      [ "$after_read" = 1 ] || unread="${unread:+$unread, and }the copy's HEAD could not be read after preservation"
+      moved=0
+      [ -n "$unread" ] || [ "$after" = "$head" ] || moved=1
+      if [ "$CLASS" != REAPABLE-PROVEN ] || [ "$moved" = 1 ] || [ -n "$unread" ]; then
         discard_unlocked_preserve "$copy" "$identity" "$release_id"
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"copy changed after preservation; the copy was left"$'\n'
+        # The report also gives classify's own class and reason when the
+        # reclassification is not REAPABLE-PROVEN.
+        why=
+        [ "$moved" = 0 ] || why="copy changed after preservation"
+        [ -z "$unread" ] || why="${why:+$why; }$unread"
+        [ "$CLASS" = REAPABLE-PROVEN ] || why="${why:+$why; }it is now $CLASS: $REASON"
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"$(printf '%s' "$why" | tr '\n\t' '  '); the copy was left"$'\n'
         continue
       fi
       want=
@@ -1869,11 +1891,12 @@ apply_removals() {
         continue
       fi
     fi
-    if ! registered=$(list_nested "$clone"); then
+    if ! list_nested "$clone"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved; no retention receipt was cleared"$'\n'
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved: $(fm_task_copy_unreadable_list_text "its clone's"); no retention receipt was cleared"$'\n'
       continue
     fi
+    registered=$FM_TASK_COPY_NESTED
     if [ -e "$copy" ] || [ -L "$copy" ] || grep -qxF "$copy" <<< "$registered"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
       REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it is still present or registered after its removal"$'\n'

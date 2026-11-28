@@ -2949,11 +2949,16 @@ run_foreign_teardown() {
   # RETAINED_UNSET_PYTHON=1: the variable is truly unset for the run (not set to an empty
   # string), the production default shape.
   [ -z "${RETAINED_UNSET_PYTHON:-}" ] || py=(-u FM_TEARDOWN_VERNANT_PYTHON)
-  env "${py[@]}" "$@" FM_HOME="$case_dir/home" \
-    FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
-    FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
+  # FOREIGN_RELATIVE_ROOTS=1: the home and the three roots are given relative to the case folder, which is
+  # the directory the run starts in.
+  local fm_home=$case_dir/home state=${FOREIGN_ROOTS_BASE:-$case_dir}/state data=${FOREIGN_ROOTS_BASE:-$case_dir}/data
+  local config=${FOREIGN_ROOTS_BASE:-$case_dir}/config workdir=.
+  if [ -n "${FOREIGN_RELATIVE_ROOTS:-}" ]; then fm_home=home state=state data=data config=config workdir=$case_dir; fi
+  ( cd "$workdir" && env "${py[@]}" "$@" FM_HOME="$fm_home" \
+    FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$state" \
+    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     NM_HOME="$case_dir/nm" PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
-    "$TEARDOWN" task-x1 ${FOREIGN_TEARDOWN_ARGS[@]+"${FOREIGN_TEARDOWN_ARGS[@]}"} > "$case_dir/stdout" 2> "$case_dir/stderr" || status=$?
+    "$TEARDOWN" task-x1 ${FOREIGN_TEARDOWN_ARGS[@]+"${FOREIGN_TEARDOWN_ARGS[@]}"} ) > "$case_dir/stdout" 2> "$case_dir/stderr" || status=$?
   printf -v "$rc_var" '%s' "$status"
   retained_observe "$status" "$@"
 }
@@ -3019,15 +3024,17 @@ assert_foreign_ignored_preserved_and_released() {
 }
 
 # run_printed_route <route> <rc-var>: runs a printed completing command through
-# the real teardown with only this fixture's external-tool and home-layout
-# environment, leaving its streams in the case.
+# the real teardown as printed, from a shell that sets none of the state, data
+# and config overrides, with only this fixture's external-tool and code-root
+# environment: a root the command does not carry is a root the run does not
+# reach. FOREIGN_REPLAY_DIR, when set, is the directory it runs from. Its streams stay in the case.
 run_printed_route() {
   local route=$1 rc_var=$2 status=0
-  env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" \
-    FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
-    FM_DATA_OVERRIDE="$FOREIGN_CASE/data" FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" \
+  ( cd "${FOREIGN_REPLAY_DIR:-.}" && env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE \
+    FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" \
+    FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" \
     NM_HOME="$FOREIGN_CASE/nm" PATH="$FOREIGN_CASE/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
-    bash -c "$route" > "$FOREIGN_CASE/completed.stdout" 2> "$FOREIGN_CASE/completed.stderr" || status=$?
+    bash -c "$route" ) > "$FOREIGN_CASE/completed.stdout" 2> "$FOREIGN_CASE/completed.stderr" || status=$?
   printf -v "$rc_var" '%s' "$status"
 }
 
