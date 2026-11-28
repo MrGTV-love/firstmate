@@ -169,7 +169,8 @@
     "teardown-by-path",
     "home-state-write",
     "spawn-reconciled-source",
-    "backpass-core-role-inputs"
+    "backpass-core-role-inputs",
+    "disk-free-floor"
   ],
   "guards": [
     {
@@ -3776,6 +3777,35 @@
         {
           "file": "bin/fm-teardown.sh",
           "match": "echo \"REFUSED: task $record_id's cleanup target $canonical overlaps Git common-dir storage $copy_common for task $(basename \"$other_meta\" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force.\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: the copy-clearance scan for task $1 ran past its ${2}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it released the lock without changing anything; retry the teardown\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "echo \"REFUSED: $2 ran past its ${1}s scan deadline (FM_TEARDOWN_SCAN_DEADLINE_SECS) while holding the project lock, so it stopped before the next step and released the lock; nothing more was changed; retry the teardown\" >&2"
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "[ \"$1\" -le 0 ] || [ \"$SECONDS\" -lt \"$1\" ] || teardown_scan_deadline_refuse \"$2\" \"$3\""
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "teardown_clearance_deadline_refuse \"$record_id\" \"$scan_limit\"",
+          "count": 2
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "[ \"$released\" != 3 ] || teardown_scan_deadline_refuse \"$scan_limit\" \"the peer walk for task $ID\""
+        },
+        {
+          "file": "bin/fm-teardown-nested-lib.sh",
+          "match": "3) teardown_scan_deadline_refuse \"$scan_limit\" \"the ownership walk for foreign copy $(fm_refuse_text \"$copy\") in task $ID's pool slot\" ;;"
+        },
+        {
+          "file": "bin/fm-teardown.sh",
+          "match": "echo \"REFUSED: task $record_id's copy-clearance scan could not create its scratch file under ${TMPDIR:-/tmp}, so no other holder of $canonical is proved absent; nothing was changed; fix the directory (or TMPDIR) and retry the teardown\" >&2"
         }
       ]
     },
@@ -6746,6 +6776,35 @@
       "remedy": "bin/fm-mem-guard.py --json (prints the measured pressure and the verdict used by the recovery playbook); after an admission refusal the backlog item stays queued, so repeat its bin/fm-spawn.sh <task> <project-clone> dispatch with the same arguments once bin/fm-mem-guard.sh sample shows pressure below 2",
       "budget": 1,
       "test": "tests/fm-mem-guard.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "disk-free-floor",
+      "owner": "bin/fm-disk-floor-lib.sh",
+      "sites": [
+        {"file": "bin/fm-disk-floor-lib.sh", "match": "deferred: disk free floor refused"},
+        {"file": "bin/fm-disk-floor-lib.sh", "match": "error: disk free floor refused"},
+        {"file": "bin/fm-disk-floor-lib.sh", "match": "fm-guard-event.sh\" disk-free-floor"}
+      ],
+      "invariant": "a new spawn, no-mistakes run or brief-named stack start never starts while the volume it writes to has less free disk than the floor",
+      "layer": "runtime-block",
+      "source": "df -Pk on the nearest existing ancestor of the path the step writes to, and config/disk-free-floor (default 20 GiB)",
+      "trigger": "whole free GiB on the volume is below the floor when a fresh bin/fm-spawn.sh spawn, a fresh no-mistakes run start through bin/fm-mem-guard.sh run or bin/fm-cpu-pass.sh pipeline-start, or a bin/fm-stack-start.sh stack start begins; a relaunch and every teardown never ask",
+      "remedy": "bin/fm-disk-floor-lib.sh free <path> prints the free GiB the guard reads; after freeing space on that volume repeat the deferred dispatch with the same arguments, because the backlog item stays queued (a malformed config/disk-free-floor refuses with exit 2 until it holds one positive whole number of GiB)",
+      "budget": 1,
+      "test": "tests/fm-disk-floor.test.sh",
       "tier": "B",
       "harm": "reversible",
       "remedy_verified": "fixture"
