@@ -387,7 +387,7 @@ fm_test_spawn_script() {
   if [ ! -x "$tree/bin/fm-spawn.sh" ]; then
     rm -rf "$tree.part"
     git clone -q --no-hardlinks "$ROOT" "$tree.part" >/dev/null 2>&1 || return 1
-    (cd "$ROOT" && tar --exclude=.git --exclude=graft --exclude=node_modules -cf - .) | (cd "$tree.part" && tar -xf -) || return 1
+    (cd "$ROOT" && tar --exclude=./.git --exclude=./graft --exclude=./node_modules --exclude=./tests --exclude=./.worktrees --exclude=./.repair-worktrees --exclude=./.scratch --exclude=./.cache-npm --exclude=./.lavish --exclude=./_research --exclude='*.pkg' -cf - .) | (cd "$tree.part" && tar -xf -) || return 1
     printf '#!/bin/sh\nexit 0\n' > "$tree.part/bin/fm-home-summary-refresh.sh"
     chmod +x "$tree.part/bin/fm-home-summary-refresh.sh"
     mv "$tree.part" "$tree" 2>/dev/null || rm -rf "$tree.part"

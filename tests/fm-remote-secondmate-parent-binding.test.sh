@@ -119,7 +119,10 @@ pass "remote provisioning publishes durable parent state before its completion m
 # --- the remote host's tracked code root, real git repos, one project --------
 (
   cd "$ROOT" || exit
-  tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .
+  tar --exclude=./.git --exclude=./.no-mistakes --exclude=./data --exclude=./state --exclude=./config \
+    --exclude=./tests --exclude=./graft --exclude=./projects \
+    --exclude=./.worktrees --exclude=./.repair-worktrees --exclude=./.scratch --exclude=./.cache-npm \
+    --exclude=./.lavish --exclude=./_research --exclude=./node_modules --exclude='*.pkg' -cf - .
 ) | (cd "$REMOTE_ROOT" && tar -xf -)
 install_remote_herdr_fixture "$REMOTE_ROOT" "$HERDR_STATE" "$HERDR_LOG" \
   "$TMP_ROOT/herdr-send-fail" "$TMP_ROOT/herdr.sock"

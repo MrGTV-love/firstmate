@@ -72,7 +72,10 @@ trap cleanup EXIT
 # the same clone and fast-forward path as a second Mac.
 (
   cd "$ROOT" || exit
-  tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .
+  tar --exclude=./.git --exclude=./.no-mistakes --exclude=./data --exclude=./state --exclude=./config \
+    --exclude=./tests --exclude=./graft --exclude=./projects \
+    --exclude=./.worktrees --exclude=./.repair-worktrees --exclude=./.scratch --exclude=./.cache-npm \
+    --exclude=./.lavish --exclude=./_research --exclude=./node_modules --exclude='*.pkg' -cf - .
 ) | (cd "$REMOTE_ROOT" && tar -xf -)
 cat > "$REMOTE_ROOT/bin/tmux" <<SH
 #!/usr/bin/env bash
@@ -613,7 +616,7 @@ pass "remote seed rollback preserves serialized competing routes"
 # remote relay log through the capped writer.
 SEED_PARENT_ROOT="$TMP_ROOT/seed-parent-code"
 mkdir -p "$SEED_PARENT_ROOT"
-(cd "$ROOT" && tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .) | (cd "$SEED_PARENT_ROOT" && tar -xf -)
+(cd "$ROOT" && tar --exclude=./.git --exclude=./.no-mistakes --exclude=./data --exclude=./state --exclude=./config --exclude=./tests --exclude=./graft --exclude=./projects --exclude=./.worktrees --exclude=./.repair-worktrees --exclude=./.scratch --exclude=./.cache-npm --exclude=./.lavish --exclude=./_research --exclude=./node_modules --exclude='*.pkg' -cf - .) | (cd "$SEED_PARENT_ROOT" && tar -xf -)
 "$REAL_GIT" -C "$SEED_PARENT_ROOT" init -q -b main
 "$REAL_GIT" -C "$SEED_PARENT_ROOT" add .
 "$REAL_GIT" -C "$SEED_PARENT_ROOT" -c user.email=test@example.com -c user.name=Test commit -qm 'parent fixture root'

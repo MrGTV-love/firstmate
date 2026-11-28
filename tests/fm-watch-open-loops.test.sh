@@ -852,63 +852,83 @@ SH
 }
 
 test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery() {
-  local filter number=0 dir state fakebin out pid digest surfaced stale_mtime
+  local filter number=0 dir state fakebin out pid digest surfaced stale_mtime sample valid_out
+  # shellcheck source=bin/fm-open-loops-validate-lib.sh
+  . "$ROOT/bin/fm-open-loops-validate-lib.sh"
+  dir=$(make_case "ledger-corrupt-schema-matrix")
+  state="$dir/state"
+  publish_ledger "$state" unchanged-obligation
+  cp "$state/open-loops.json" "$dir/valid-ledger.json"
+  valid_out=$(fm_open_loops_extract_overdue_ids "$dir/valid-ledger.json") \
+    || fail "valid control ledger was rejected by fm_open_loops_extract_overdue_ids"
+  [ -n "$valid_out" ] || fail "valid control ledger produced no overdue row identity"
+
+  # Exercise all 16 schema-corruption variants directly against the canonical
+  # production validator instead of multiplying them by 16 live watcher daemons.
   for filter in empty malformed multiple 'del(.schema)' '.schema = "other.v1"' \
     '.generated_epoch = null' 'del(.home)' '.home = ""' '.complete = null' \
     '.rows = {}' '.rows[0].id = null' '.rows[0].overdue = "true"' \
     '.rows[0].current_identity = null' '.rows[0].current_identity = 7' \
     '.rows[0].current_identity = ""' '.rows[0].current_identity = "gggggggggggggggggggggggg"'; do
     number=$((number + 1))
-    dir=$(make_case "ledger-corrupt-recovery-$number")
-    state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
-    install_failing_helper "$fakebin"
-    publish_ledger "$state" unchanged-obligation
-    cp "$state/open-loops.json" "$dir/valid-ledger.json"
-    watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
-    pid=$!
-    wait_watch_exit "$pid" \
-      || { reap "$pid"; fail "$filter initial overdue ledger did not wake"; }
-    ack_stopped_cycle "$state" || fail "$filter initial overdue wake could not be acknowledged"
-    digest=$(cat "$state/.open-loops-surfaced")
-    surfaced=$(file_mtime "$state/.open-loops-surfaced")
-    printf 'continuous outage\n' > "$state/.open-loops-stale-surfaced"
-    stale_mtime=$(file_mtime "$state/.open-loops-stale-surfaced")
+    sample="$dir/corrupt-$number.json"
     case "$filter" in
-      empty) : > "$state/open-loops.json" ;;
-      malformed) printf '{\n' > "$state/open-loops.json" ;;
-      multiple) cat "$dir/valid-ledger.json" "$dir/valid-ledger.json" > "$state/open-loops.json" ;;
-      *) jq "$filter" "$dir/valid-ledger.json" > "$state/open-loops.json" ;;
+      empty) : > "$sample" ;;
+      malformed) printf '{\n' > "$sample" ;;
+      multiple) cat "$dir/valid-ledger.json" "$dir/valid-ledger.json" > "$sample" ;;
+      *) jq "$filter" "$dir/valid-ledger.json" > "$sample" ;;
     esac
-    watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=60 \
-      FM_OPEN_LOOPS_RESURFACE=21600 FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
-    pid=$!
-    wait_poll_cycle "$state" "$pid" \
-      || { reap "$pid"; fail "$filter fresh corrupt ledger woke unexpectedly"; }
-    [ "$(cat "$state/.open-loops-stale-surfaced" 2>/dev/null)" = 'continuous outage' ] \
-      && [ "$(file_mtime "$state/.open-loops-stale-surfaced")" = "$stale_mtime" ] \
-      || { reap "$pid"; fail "$filter fresh corrupt ledger falsely ended its outage cooldown"; }
-    [ "$(cat "$state/.open-loops-surfaced")" = "$digest" ] \
-      && [ "$(file_mtime "$state/.open-loops-surfaced")" = "$surfaced" ] \
-      || { reap "$pid"; fail "$filter fresh corrupt ledger changed overdue suppression"; }
-    set_mtime "$(( $(date +%s) - 600 ))" "$state/open-loops.json"
-    wait_poll_cycle "$state" "$pid" \
-      || { reap "$pid"; fail "$filter continuous corrupt outage lost its cooldown"; }
-    [ "$(file_mtime "$state/.open-loops-stale-surfaced")" = "$stale_mtime" ] \
-      || { reap "$pid"; fail "$filter continuous outage advanced stale suppression"; }
-    [ ! -s "$state/.wake-queue" ] \
-      || { reap "$pid"; fail "$filter continuous corrupt outage queued another wake"; }
-    jq '.complete = false' "$dir/valid-ledger.json" > "$state/open-loops.json"
-    wait_poll_cycle "$state" "$pid" \
-      || { reap "$pid"; fail "$filter valid degraded recovery re-alerted unchanged overdue rows"; }
-    [ ! -e "$state/.open-loops-stale-surfaced" ] \
-      || { reap "$pid"; fail "$filter valid degraded publication did not end stale suppression"; }
-    [ "$(cat "$state/.open-loops-surfaced")" = "$digest" ] \
-      && [ "$(file_mtime "$state/.open-loops-surfaced")" = "$surfaced" ] \
-      || { reap "$pid"; fail "$filter valid degraded recovery changed overdue suppression"; }
-    [ ! -s "$state/.wake-queue" ] \
-      || { reap "$pid"; fail "$filter valid degraded recovery queued unchanged overdue rows"; }
-    reap "$pid"
+    if fm_open_loops_extract_overdue_ids "$sample" >/dev/null; then
+      fail "$filter corrupt ledger was accepted by fm_open_loops_extract_overdue_ids"
+    fi
   done
+
+  # Drive one end-to-end live watcher daemon cycle through corrupt -> aged
+  # corrupt -> valid degraded recovery to prove cooldown preservation.
+  dir=$(make_case "ledger-corrupt-recovery-live")
+  state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_failing_helper "$fakebin"
+  publish_ledger "$state" unchanged-obligation
+  cp "$state/open-loops.json" "$dir/valid-ledger.json"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
+  pid=$!
+  wait_watch_exit "$pid" \
+    || { reap "$pid"; fail "malformed initial overdue ledger did not wake"; }
+  ack_stopped_cycle "$state" || fail "malformed initial overdue wake could not be acknowledged"
+  digest=$(cat "$state/.open-loops-surfaced")
+  surfaced=$(file_mtime "$state/.open-loops-surfaced")
+  printf 'continuous outage\n' > "$state/.open-loops-stale-surfaced"
+  stale_mtime=$(file_mtime "$state/.open-loops-stale-surfaced")
+  printf '{\n' > "$state/open-loops.json"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=60 \
+    FM_OPEN_LOOPS_RESURFACE=21600 FM_OPEN_LOOPS_BIN="$fakebin/failing-open-loops"
+  pid=$!
+  wait_poll_cycle "$state" "$pid" \
+    || { reap "$pid"; fail "malformed fresh corrupt ledger woke unexpectedly"; }
+  [ "$(cat "$state/.open-loops-stale-surfaced" 2>/dev/null)" = 'continuous outage' ] \
+    && [ "$(file_mtime "$state/.open-loops-stale-surfaced")" = "$stale_mtime" ] \
+    || { reap "$pid"; fail "malformed fresh corrupt ledger falsely ended its outage cooldown"; }
+  [ "$(cat "$state/.open-loops-surfaced")" = "$digest" ] \
+    && [ "$(file_mtime "$state/.open-loops-surfaced")" = "$surfaced" ] \
+    || { reap "$pid"; fail "malformed fresh corrupt ledger changed overdue suppression"; }
+  set_mtime "$(( $(date +%s) - 600 ))" "$state/open-loops.json"
+  wait_poll_cycle "$state" "$pid" \
+    || { reap "$pid"; fail "malformed continuous corrupt outage lost its cooldown"; }
+  [ "$(file_mtime "$state/.open-loops-stale-surfaced")" = "$stale_mtime" ] \
+    || { reap "$pid"; fail "malformed continuous outage advanced stale suppression"; }
+  [ ! -s "$state/.wake-queue" ] \
+    || { reap "$pid"; fail "malformed continuous corrupt outage queued another wake"; }
+  jq '.complete = false' "$dir/valid-ledger.json" > "$state/open-loops.json"
+  wait_poll_cycle "$state" "$pid" \
+    || { reap "$pid"; fail "malformed valid degraded recovery re-alerted unchanged overdue rows"; }
+  [ ! -e "$state/.open-loops-stale-surfaced" ] \
+    || { reap "$pid"; fail "malformed valid degraded publication did not end stale suppression"; }
+  [ "$(cat "$state/.open-loops-surfaced")" = "$digest" ] \
+    && [ "$(file_mtime "$state/.open-loops-surfaced")" = "$surfaced" ] \
+    || { reap "$pid"; fail "malformed valid degraded recovery changed overdue suppression"; }
+  [ ! -s "$state/.wake-queue" ] \
+    || { reap "$pid"; fail "malformed valid degraded recovery queued unchanged overdue rows"; }
+  reap "$pid"
   pass "fresh corrupt ledgers preserve continuous-outage and overdue cooldowns while valid degraded reports rearm stale incidents"
 }
 

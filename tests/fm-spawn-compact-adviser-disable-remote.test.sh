@@ -47,7 +47,10 @@ CONTRARY=0
 # tracked there, and the remote side runs the real scripts under test.
 (
   cd "$ROOT" || exit
-  tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .
+  tar --exclude=./.git --exclude=./.no-mistakes --exclude=./data --exclude=./state --exclude=./config \
+    --exclude=./tests --exclude=./graft --exclude=./projects \
+    --exclude=./.worktrees --exclude=./.repair-worktrees --exclude=./.scratch --exclude=./.cache-npm \
+    --exclude=./.lavish --exclude=./_research --exclude=./node_modules --exclude='*.pkg' -cf - .
 ) | (cd "$REMOTE_ROOT" && tar -xf -)
 
 # The remote host's own non-second-mate tooling only has to stay resolvable;

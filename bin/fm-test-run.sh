@@ -282,9 +282,19 @@ PER_SCRIPT_TIMEOUT_SECS=0
 # its output.
 PROGRESS_GUARD=0
 
-# How many separate-runner shards the portable serial remainder splits into.
+# How many separate-runner shards the true-serial portable remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=25
+PORTABLE_SERIAL_SHARDS=12
+
+# How many separate-runner shards the concurrent-safe family remainder splits
+# into, and the --jobs concurrency CI passes on each shard. Every member belongs
+# to list_concurrent_safe_families, and the runner isolates distinct families
+# into separate concurrent phases automatically.
+PORTABLE_FAMILY_PARALLEL_SHARDS=8
+PORTABLE_FAMILY_PARALLEL_JOBS=3
+
+# How many separate-runner shards the real-Herdr family splits into.
+REAL_HERDR_SHARDS=3
 
 # How many scripts each portable-parallel job is modeled to run at once. The
 # lane membership is exactly the proven-isolated set, whose recorded four-way
@@ -446,8 +456,10 @@ family_for_basename() {
     fm-documentation-audiences.test.sh|fm-ensure-agents-md.test.sh|fm-forge-detect.test.sh|fm-grok-harness.test.sh|\
     fm-fork-free-helpers.test.sh|fm-friction-ledger.test.sh|\
     fm-harness-precedence.test.sh|\
-    fm-kimi-harness.test.sh|fm-devin-harness.test.sh|fm-muse-harness.test.sh|fm-rovo-harness.test.sh|fm-agy-harness.test.sh|fm-omp-harness.test.sh|fm-herdr-lab.test.sh|fm-lint.test.sh|fm-lint-policy.test.sh|fm-lint-slots.test.sh|fm-lint-report.test.sh|\
-    fm-lint-workflows.test.sh|\
+    fm-kimi-harness.test.sh|fm-devin-harness.test.sh|fm-muse-harness.test.sh|fm-rovo-harness.test.sh|fm-agy-harness.test.sh|\
+    fm-omp-harness.test.sh|fm-omp-harness-extensions.test.sh|fm-omp-harness-watch.test.sh|\
+    fm-herdr-lab.test.sh|fm-lint.test.sh|fm-lint-policy.test.sh|fm-lint-slots.test.sh|fm-lint-report.test.sh|\
+    fm-lint-workflows.test.sh|fm-test-size-guard.test.sh|\
     fm-operational-input.test.sh|fm-pi-primary-types.test.sh|\
     fm-calm-claude-mod.test.sh|\
     fm-harness-adapter-references.test.sh|fm-project-mode.test.sh|\
@@ -487,7 +499,7 @@ family_for_basename() {
     fm-backend-herdr-agent-exit-shell-e2e.test.sh|\
     fm-herdr-attached-viewer-live-e2e.test.sh|fm-herdr-session-cleanup-e2e.test.sh|\
     fm-backend-herdr-smoke.test.sh|fm-backend-herdr-workspace-per-home-e2e.test.sh|\
-    fm-spawn-acquisition-herdr-e2e.test.sh|\
+    fm-spawn-acquisition-herdr-e2e.test.sh|fm-spawn-acquisition-herdr-on-e2e.test.sh|\
     fm-control-herdr-smoke.test.sh)
       printf '%s\n' real-herdr-gated
       ;;
@@ -576,8 +588,9 @@ family_for_basename() {
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|fm-pr-ready-reconcile.test.sh|\
     fm-pr-merge.test.sh|fm-pr-merge-forges.test.sh|fm-pr-merge-checks.test.sh|\
     fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
-    fm-review-diff.test.sh|fm-review-record.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
-    fm-teardown-cleanup.test.sh|fm-teardown-real-treehouse.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|\
+    fm-review-diff.test.sh|fm-review-record.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|fm-teardown-pool-nested.test.sh|\
+    fm-teardown-cleanup.test.sh|fm-teardown-docker.test.sh|fm-teardown-retained.test.sh|fm-teardown-closeout.test.sh|\
+    fm-teardown-real-treehouse.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|\
     fm-open-loops-episodes.test.sh|fm-open-loops-steer-result.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
@@ -655,6 +668,12 @@ list_known_lanes() {
   local i
   printf '%s\n' portable-parallel-1
   printf '%s\n' portable-parallel-2
+  printf '%s\n' portable-family-parallel
+  i=1
+  while [ "$i" -le "$PORTABLE_FAMILY_PARALLEL_SHARDS" ]; do
+    printf 'portable-family-parallel-%sof%s\n' "$i" "$PORTABLE_FAMILY_PARALLEL_SHARDS"
+    i=$((i + 1))
+  done
   printf '%s\n' portable-serial
   i=1
   while [ "$i" -le "$PORTABLE_SERIAL_SHARDS" ]; do
@@ -662,6 +681,11 @@ list_known_lanes() {
     i=$((i + 1))
   done
   printf '%s\n' real-herdr-gated
+  i=1
+  while [ "$i" -le "$REAL_HERDR_SHARDS" ]; do
+    printf 'real-herdr-gated-%sof%s\n' "$i" "$REAL_HERDR_SHARDS"
+    i=$((i + 1))
+  done
 }
 
 # Exact proven-isolated candidate set (same paths as
@@ -859,14 +883,13 @@ is_proven_isolated_script() {
   list_has_line "$1" "$(list_proven_isolated)"
 }
 
-# The portable serial remainder: every tests/*.test.sh that is neither
-# proven-isolated nor real-herdr-gated. Watcher, lock, AFK, real tmux, daemon,
-# secondmate lifecycle, bootstrap, the live-harness-optin family, GUI-backend,
-# and other unproven work stays here. Derived rather than enumerated so a newly added test
-# lands here by default instead of falling out of every lane.
-list_portable_serial() {
-  local s base fam proven_set all
+# Concurrent-safe family remainder: every tests/*.test.sh that is not in the
+# proven-isolated set and not real-herdr-gated, whose family carries a recorded
+# concurrent proof (list_concurrent_safe_families).
+list_portable_family_parallel() {
+  local s base fam proven_set safe_fams all
   proven_set=$(list_proven_isolated)
+  safe_fams=$(list_concurrent_safe_families)
   all=$(all_repo_tests) || return 1
   while IFS= read -r s; do
     [ -n "$s" ] || continue
@@ -876,6 +899,36 @@ list_portable_serial() {
       continue
     fi
     if list_has_line "$s" "$proven_set"; then
+      continue
+    fi
+    if ! list_has_line "$fam" "$safe_fams"; then
+      continue
+    fi
+    printf '%s\n' "$s" || return 1
+  done <<<"$all"
+}
+
+# The portable serial remainder: every tests/*.test.sh that is neither
+# proven-isolated, in a concurrent-safe family, nor real-herdr-gated. Unproven
+# stateful suites, live-harness-optin, GUI-backend, and unclassified work stay
+# here. Derived rather than enumerated so a newly added test lands here by
+# default instead of falling out of every lane.
+list_portable_serial() {
+  local s base fam proven_set safe_fams all
+  proven_set=$(list_proven_isolated)
+  safe_fams=$(list_concurrent_safe_families)
+  all=$(all_repo_tests) || return 1
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    base=${s##*/}
+    fam=$(family_for_basename "$base")
+    if [ "$fam" = "real-herdr-gated" ]; then
+      continue
+    fi
+    if list_has_line "$s" "$proven_set"; then
+      continue
+    fi
+    if list_has_line "$fam" "$safe_fams"; then
       continue
     fi
     printf '%s\n' "$s" || return 1
@@ -1039,7 +1092,9 @@ tests/fm-nm-test-contract.test.sh 2319
 tests/fm-no-mistakes-required.test.sh 769
 tests/fm-omp-composer-box-live-e2e.test.sh 491
 tests/fm-omp-fallback-chain-live-e2e.test.sh 885
-tests/fm-omp-harness.test.sh 814932
+tests/fm-omp-harness.test.sh 270000
+tests/fm-omp-harness-extensions.test.sh 270000
+tests/fm-omp-harness-watch.test.sh 275000
 tests/fm-omp-primary-live-e2e.test.sh 953
 tests/fm-omp-reboot-live-e2e.test.sh 777
 tests/fm-omp-stale-wake-live-e2e.test.sh 1061
@@ -1150,7 +1205,9 @@ tests/fm-skill-pick.test.sh 142156
 tests/fm-slack-deadline.test.sh 198406
 tests/fm-slack-intake-unchanged.test.sh 4517
 tests/fm-slack-secret-scan.test.sh 25525
-tests/fm-slack-watch.test.sh 696773
+tests/fm-slack-watch.test.sh 240000
+tests/fm-slack-watch-edge.test.sh 230000
+tests/fm-slack-watch-intake.test.sh 225000
 tests/fm-spawn-acquisition-cleanup.test.sh 37389
 tests/fm-spawn-claude-api-key-guard.test.sh 93245
 tests/fm-spawn-claude-start-confirm.test.sh 63776
@@ -1182,10 +1239,15 @@ tests/fm-task-inbox.test.sh 94266
 tests/fm-tasks-axi.test.sh 107392
 tests/fm-teamclaude-launch-live-e2e.test.sh 842
 tests/fm-teamclaude-launch.test.sh 13609
-tests/fm-teardown-cleanup.test.sh 1005601
+tests/fm-teardown-cleanup.test.sh 255000
+tests/fm-teardown-closeout.test.sh 250000
+tests/fm-teardown-docker.test.sh 255000
 tests/fm-teardown-endpoint-safety.test.sh 89444
-tests/fm-teardown-pool.test.sh 520244
+tests/fm-teardown-pool.test.sh 260000
+tests/fm-teardown-pool-nested.test.sh 260000
+tests/fm-teardown-retained.test.sh 250000
 tests/fm-teardown.test.sh 321463
+tests/fm-test-size-guard.test.sh 3000
 tests/fm-test-fixture-cleanup.test.sh 4736
 tests/fm-test-fixtures.test.sh 18329
 tests/fm-test-isolation-proof.test.sh 4963
@@ -1321,6 +1383,112 @@ portable_serial_weight_for() {
   '
 }
 
+# Measured real-Herdr suite durations (ms) from run 46061107502 fm-test-timing-herdr.json.
+real_herdr_weight_hints() {
+  cat <<'EOF'
+tests/fm-spawn-acquisition-herdr-e2e.test.sh 642000
+tests/fm-spawn-acquisition-herdr-on-e2e.test.sh 642000
+tests/fm-backend-herdr-presentation-e2e.test.sh 502200
+tests/fm-backend-herdr-recovery-lock-e2e.test.sh 127200
+tests/fm-afk-inject-herdr-e2e.test.sh 58800
+tests/fm-backend-herdr-launcher-workspace-e2e.test.sh 51600
+tests/fm-afk-launch.test.sh 51000
+tests/fm-backend-herdr-workspace-per-home-e2e.test.sh 25200
+tests/fm-control-herdr-smoke.test.sh 14400
+tests/fm-backend-autodetect-smoke.test.sh 12000
+tests/fm-backend-herdr-prune-safety-e2e.test.sh 6600
+tests/fm-backend-herdr-smoke.test.sh 4800
+tests/fm-herdr-attached-viewer-live-e2e.test.sh 3000
+tests/fm-backend-herdr-focus-flash-e2e.test.sh 2400
+tests/fm-herdr-session-cleanup-e2e.test.sh 2400
+tests/fm-backend-herdr-respawn-idem-e2e.test.sh 2400
+tests/fm-backend-herdr-eventwait-smoke.test.sh 1800
+tests/fm-backend-herdr-stale-active-tab-e2e.test.sh 1200
+tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh 600
+EOF
+}
+
+portable_family_parallel_assignments() (
+  set -o pipefail
+  { portable_serial_weight_hints || return 1; printf '%s\n' '--' || return 1; list_portable_family_parallel; } \
+    | awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+        $0 == "--" { scripts = 1; next }
+        !scripts { if (NF && !($1 in w)) w[$1] = $2; next }
+        NF { printf "%s\t%s\n", (($0 in w) ? w[$0] : def), $0 }
+      ' \
+    | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2 \
+    | awk -F '\t' -v shards="$PORTABLE_FAMILY_PARALLEL_SHARDS" '
+        BEGIN { for (i = 1; i <= shards; i++) { loads[i] = 0; counts[i] = 0 } }
+        {
+          best = 1
+          for (i = 2; i <= shards; i++)
+            if (loads[i] < loads[best] || (loads[i] == loads[best] && counts[i] < counts[best])) best = i
+          loads[best] += $1
+          counts[best]++
+          printf "%s\t%s\n", best, $2
+        }
+      '
+)
+
+real_herdr_assignments() (
+  set -o pipefail
+  { real_herdr_weight_hints || return 1; printf '%s\n' '--' || return 1; select_family_list real-herdr-gated; } \
+    | awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+        $0 == "--" { scripts = 1; next }
+        !scripts { if (NF && !($1 in w)) w[$1] = $2; next }
+        NF { printf "%s\t%s\n", (($0 in w) ? w[$0] : def), $0 }
+      ' \
+    | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2 \
+    | awk -F '\t' -v shards="$REAL_HERDR_SHARDS" '
+        BEGIN { for (i = 1; i <= shards; i++) { loads[i] = 0; counts[i] = 0 } }
+        {
+          best = 1
+          for (i = 2; i <= shards; i++)
+            if (loads[i] < loads[best] || (loads[i] == loads[best] && counts[i] < counts[best])) best = i
+          loads[best] += $1
+          counts[best]++
+          printf "%s\t%s\n", best, $2
+        }
+      '
+)
+
+select_family_list() {
+  local want=$1 s base fam all
+  all=$(all_repo_tests) || return 1
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    base=${s##*/}
+    fam=$(family_for_basename "$base")
+    if [ "$fam" = "$want" ]; then
+      printf '%s\n' "$s"
+    fi
+  done <<<"$all"
+}
+
+parse_sharded_lane_index() {  # <lane> <prefix> <configured-shards>
+  local lane=$1 prefix=$2 configured=$3 spec index count
+  spec=${lane#"$prefix"}
+  index=${spec%%of*}
+  count=${spec#*of}
+  case "$spec" in
+    *of*) ;;
+    *) die "unknown lane '$lane' (see --list-lanes)" ;;
+  esac
+  case "$index" in
+    ''|*[!0-9]*) die "unknown lane '$lane' (see --list-lanes)" ;;
+  esac
+  case "$count" in
+    ''|*[!0-9]*) die "unknown lane '$lane' (see --list-lanes)" ;;
+  esac
+  if [ "$count" -ne "$configured" ]; then
+    die "lane '$lane' asks for $count shards but this runner is configured for $configured (see --list-lanes)"
+  fi
+  if [ "$index" -lt 1 ] || [ "$index" -gt "$configured" ]; then
+    die "lane '$lane' shard index is outside 1..$configured (see --list-lanes)"
+  fi
+  printf '%s\n' "$index"
+}
+
 # Longest-processing-time assignment of the serial remainder to
 # PORTABLE_SERIAL_SHARDS bins, printing "<shard>\t<script>" for every script.
 # Deterministic: candidates are ordered by hint descending then path, and ties
@@ -1338,12 +1506,13 @@ portable_serial_assignments() (
       ' \
     | LC_ALL=C sort -t$'\t' -k1,1nr -k2,2 \
     | awk -F '\t' -v shards="$PORTABLE_SERIAL_SHARDS" '
-        BEGIN { for (i = 1; i <= shards; i++) loads[i] = 0 }
+        BEGIN { for (i = 1; i <= shards; i++) { loads[i] = 0; counts[i] = 0 } }
         {
           best = 1
           for (i = 2; i <= shards; i++)
-            if (loads[i] < loads[best]) best = i
+            if (loads[i] < loads[best] || (loads[i] == loads[best] && counts[i] < counts[best])) best = i
           loads[best] += $1
+          counts[best]++
           printf "%s\t%s\n", best, $2
         }
       '
@@ -1401,6 +1570,25 @@ select_lane() {
         found=1
       done < <(list_portable_parallel_2)
       ;;
+    portable-family-parallel)
+      while IFS= read -r s; do
+        [ -n "$s" ] || continue
+        add_script "$s"
+        found=1
+      done < <(list_portable_family_parallel)
+      ;;
+    portable-family-parallel-*)
+      shard=$(parse_sharded_lane_index "$want" "portable-family-parallel-" "$PORTABLE_FAMILY_PARALLEL_SHARDS")
+      assignments=$(portable_family_parallel_assignments) \
+        || die "could not generate complete portable family-parallel shard assignments"
+      while IFS=$'\t' read -r idx s; do
+        [ -n "$s" ] || continue
+        if [ "$idx" = "$shard" ]; then
+          add_script "$s"
+          found=1
+        fi
+      done <<<"$assignments"
+      ;;
     portable-serial)
       while IFS= read -r s; do
         [ -n "$s" ] || continue
@@ -1424,6 +1612,18 @@ select_lane() {
     real-herdr-gated)
       select_family real-herdr-gated
       found=1
+      ;;
+    real-herdr-gated-*)
+      shard=$(parse_sharded_lane_index "$want" "real-herdr-gated-" "$REAL_HERDR_SHARDS")
+      assignments=$(real_herdr_assignments) \
+        || die "could not generate complete real-herdr-gated shard assignments"
+      while IFS=$'\t' read -r idx s; do
+        [ -n "$s" ] || continue
+        if [ "$idx" = "$shard" ]; then
+          add_script "$s"
+          found=1
+        fi
+      done <<<"$assignments"
       ;;
     *)
       die "unknown lane '$want' (see --list-lanes)"
@@ -1463,9 +1663,27 @@ run_coverage_guard() {
     return 1
   fi
 
-  # Serial (whole lane and each CI shard) + Herdr lane listings without
-  # disturbing a caller's selection.
+  # Family-parallel, serial (whole lane and each CI shard), and Herdr shards
+  # without disturbing a caller's selection.
   saved_scripts=("${SCRIPTS[@]+"${SCRIPTS[@]}"}")
+  SCRIPTS=()
+  select_lane portable-family-parallel
+  printf '%s\n' "${SCRIPTS[@]+"${SCRIPTS[@]}"}" | LC_ALL=C sort -u >"$tmp/family_parallel"
+  : >"$tmp/family_parallel_shards_raw"
+  shard=1
+  while [ "$shard" -le "$PORTABLE_FAMILY_PARALLEL_SHARDS" ]; do
+    SCRIPTS=()
+    select_lane "portable-family-parallel-${shard}of${PORTABLE_FAMILY_PARALLEL_SHARDS}"
+    if [ "${#SCRIPTS[@]}" -eq 0 ]; then
+      log "coverage guard: portable family-parallel shard $shard of $PORTABLE_FAMILY_PARALLEL_SHARDS is empty"
+      SCRIPTS=("${saved_scripts[@]+"${saved_scripts[@]}"}")
+      rm -rf "$tmp"
+      return 1
+    fi
+    printf '%s\n' "${SCRIPTS[@]+"${SCRIPTS[@]}"}" >>"$tmp/family_parallel_shards_raw"
+    shard=$((shard + 1))
+  done
+
   SCRIPTS=()
   select_lane portable-serial
   printf '%s\n' "${SCRIPTS[@]+"${SCRIPTS[@]}"}" | LC_ALL=C sort -u >"$tmp/serial"
@@ -1494,7 +1712,53 @@ run_coverage_guard() {
   SCRIPTS=()
   select_family real-herdr-gated
   printf '%s\n' "${SCRIPTS[@]+"${SCRIPTS[@]}"}" | LC_ALL=C sort -u >"$tmp/herdr"
+  : >"$tmp/herdr_shards_raw"
+  shard=1
+  while [ "$shard" -le "$REAL_HERDR_SHARDS" ]; do
+    SCRIPTS=()
+    select_lane "real-herdr-gated-${shard}of${REAL_HERDR_SHARDS}"
+    if [ "${#SCRIPTS[@]}" -eq 0 ]; then
+      log "coverage guard: real-herdr-gated shard $shard of $REAL_HERDR_SHARDS is empty"
+      SCRIPTS=("${saved_scripts[@]+"${saved_scripts[@]}"}")
+      rm -rf "$tmp"
+      return 1
+    fi
+    printf '%s\n' "${SCRIPTS[@]+"${SCRIPTS[@]}"}" >>"$tmp/herdr_shards_raw"
+    shard=$((shard + 1))
+  done
   SCRIPTS=("${saved_scripts[@]+"${saved_scripts[@]}"}")
+
+  LC_ALL=C sort "$tmp/family_parallel_shards_raw" | uniq -d >"$tmp/family_parallel_shard_dups"
+  if [ -s "$tmp/family_parallel_shard_dups" ]; then
+    log "coverage guard: portable family-parallel shards share scripts:"
+    cat "$tmp/family_parallel_shard_dups" >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+  LC_ALL=C sort -u "$tmp/family_parallel_shards_raw" >"$tmp/family_parallel_shards"
+  missing=$(comm -23 "$tmp/family_parallel" "$tmp/family_parallel_shards" || true)
+  extra=$(comm -13 "$tmp/family_parallel" "$tmp/family_parallel_shards" || true)
+  if [ -n "$missing" ] || [ -n "$extra" ]; then
+    log "coverage guard: portable family-parallel shards must equal the portable family-parallel lane"
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  LC_ALL=C sort "$tmp/herdr_shards_raw" | uniq -d >"$tmp/herdr_shard_dups"
+  if [ -s "$tmp/herdr_shard_dups" ]; then
+    log "coverage guard: real-herdr-gated shards share scripts:"
+    cat "$tmp/herdr_shard_dups" >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+  LC_ALL=C sort -u "$tmp/herdr_shards_raw" >"$tmp/herdr_shards"
+  missing=$(comm -23 "$tmp/herdr" "$tmp/herdr_shards" || true)
+  extra=$(comm -13 "$tmp/herdr" "$tmp/herdr_shards" || true)
+  if [ -n "$missing" ] || [ -n "$extra" ]; then
+    log "coverage guard: real-herdr-gated shards must equal the real-herdr-gated family"
+    rm -rf "$tmp"
+    return 1
+  fi
 
   # Every serial script runs in exactly one CI shard: no duplicate work across
   # runners, and no script silently left out of the required lane.
@@ -1516,7 +1780,8 @@ run_coverage_guard() {
     return 1
   fi
 
-  for pair in "shards_union:serial" "shards_union:herdr" "serial:herdr"; do
+  for pair in "shards_union:family_parallel" "shards_union:serial" "shards_union:herdr" \
+              "family_parallel:serial" "family_parallel:herdr" "serial:herdr"; do
     a=${pair%%:*}
     b=${pair#*:}
     comm -12 "$tmp/$a" "$tmp/$b" >"$tmp/overlap"
@@ -1528,7 +1793,7 @@ run_coverage_guard() {
     fi
   done
 
-  cat "$tmp/shards_union" "$tmp/serial" "$tmp/herdr" | LC_ALL=C sort >"$tmp/union_raw"
+  cat "$tmp/shards_union" "$tmp/family_parallel" "$tmp/serial" "$tmp/herdr" | LC_ALL=C sort >"$tmp/union_raw"
   uniq -d "$tmp/union_raw" >"$tmp/union_dups"
   if [ -s "$tmp/union_dups" ]; then
     log "coverage guard: duplicate scripts across lanes:"
@@ -1607,7 +1872,7 @@ run_coverage_guard() {
     return 1
   fi
 
-  printf 'FM_TEST_COVERAGE ok total=%s parallel=%s parallel_max_ms=%s parallel_imbalance_ms=%s parallel_unhinted=%s parallel_jobs=%s parallel_effective_jobs=%s parallel_makespan_ms=%s parallel_budget_ms=%s serial=%s serial_shards=%s serial_unhinted=%s serial_max_ms=%s serial_budget_ms=%s serial_indivisible_ms=%s herdr=%s\n' \
+  printf 'FM_TEST_COVERAGE ok total=%s parallel=%s parallel_max_ms=%s parallel_imbalance_ms=%s parallel_unhinted=%s parallel_jobs=%s parallel_effective_jobs=%s parallel_makespan_ms=%s parallel_budget_ms=%s family_parallel=%s family_parallel_shards=%s family_parallel_jobs=%s serial=%s serial_shards=%s serial_unhinted=%s serial_max_ms=%s serial_budget_ms=%s serial_indivisible_ms=%s herdr=%s herdr_shards=%s\n' \
     "$(wc -l <"$tmp/all" | tr -d ' ')" \
     "$(wc -l <"$tmp/shards_union" | tr -d ' ')" \
     "$parallel_max_ms" \
@@ -1617,13 +1882,17 @@ run_coverage_guard() {
     "$parallel_effective_jobs" \
     "$parallel_makespan_ms" \
     "$PORTABLE_PARALLEL_MAX_MSPAN_MS" \
+    "$(wc -l <"$tmp/family_parallel" | tr -d ' ')" \
+    "$PORTABLE_FAMILY_PARALLEL_SHARDS" \
+    "$PORTABLE_FAMILY_PARALLEL_JOBS" \
     "$(wc -l <"$tmp/serial" | tr -d ' ')" \
     "$PORTABLE_SERIAL_SHARDS" \
     "$unhinted" \
     "$serial_max_ms" \
     "$PORTABLE_SERIAL_MAX_WEIGHT_MS" \
     "$serial_indivisible_ms" \
-    "$(wc -l <"$tmp/herdr" | tr -d ' ')"
+    "$(wc -l <"$tmp/herdr" | tr -d ' ')" \
+    "$REAL_HERDR_SHARDS"
   rm -rf "$tmp"
   return 0
 }
@@ -1884,6 +2153,32 @@ families_for_changed_path() {
     tests/watch-lifecycle-expiry.mjs)
       printf '%s\n' __script__:fm-pi-watch-extension.test.sh
       printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' __script__:fm-omp-harness-watch.test.sh
+      ;;
+    bin/fm-open-loops-validate-lib.sh)
+      printf '%s\n' watcher-wake-lock
+      ;;
+    bin/fm-test-size-guard.sh|docs/guards/test-file-line-budget.tsv)
+      printf '%s\n' __script__:fm-test-size-guard.test.sh
+      ;;
+    .omp/*)
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' __script__:fm-omp-harness-extensions.test.sh
+      printf '%s\n' __script__:fm-omp-harness-watch.test.sh
+      families_for_test_reference "$path" || true
+      ;;
+    bin/fm-slack*|bin/fm_slack*.py)
+      printf '%s\n' __script__:fm-slack-watch.test.sh
+      printf '%s\n' __script__:fm-slack-watch-edge.test.sh
+      printf '%s\n' __script__:fm-slack-watch-intake.test.sh
+      printf '%s\n' __script__:fm-slack-intake-unchanged.test.sh
+      printf '%s\n' __script__:fm-slack-secret-scan.test.sh
+      printf '%s\n' __script__:fm-slack-deadline.test.sh
+      printf '%s\n' __script__:fm-slack-reply.test.sh
+      printf '%s\n' __script__:fm-wake-queue.test.sh
+      if [ -e "$path" ]; then
+        families_for_unmapped_bin "$path" || true
+      fi
       ;;
     tests/assets/gh-http-shim.sh)
       # The HTTP-faithful gh double behind fm_gh_http_shim.
@@ -2124,6 +2419,7 @@ families_for_changed_path() {
       # typecheck and the live guards that load the real harness.
       printf '%s\n' __script__:fm-pi-watch-extension.test.sh
       printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' __script__:fm-omp-harness-watch.test.sh
       printf '%s\n' __script__:fm-watch-recovery-loop.test.sh
       printf '%s\n' __script__:fm-calm-pi-extension.test.sh
       printf '%s\n' __script__:fm-pi-primary-types.test.sh
