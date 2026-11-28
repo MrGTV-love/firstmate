@@ -45,9 +45,10 @@ no-mistakes); a direct-PR or local-only task without either has no pipeline
 group. When a subject starts no-mistakes( but no matching run recorded any
 invocation, the pipeline group is absent unknown.
 A recorded provider, matched exactly as a canonical family name or a Zhipu
-route name, can resolve an otherwise unknown model alias, but a Zhipu provider
-fills zhipu only for an empty model, so a recorded malformed or unrecognized
-model stays unknown; conflicting provider/model families are unreadable unknown. An invocation that records no
+route name, can resolve an otherwise unknown model alias, except that a Zhipu
+provider fills zhipu only for an empty model and a malformed or non-ASCII
+Zhipu-family model id stays unknown under every provider; conflicting
+provider/model families are unreadable unknown. An invocation that records no
 model and no provider is absent unknown unless its agent is exactly claude. Every invocation counts, including
 cancelled and errored ones. An invocation with an empty model takes a family
 from its agent only when the agent is exactly claude (anthropic); any other
@@ -139,8 +140,8 @@ gemma, grok, kimi, llama, glm, and the exact native Claude names opus,
 sonnet, haiku, which are deliberately anthropic because Claude records bare
 model names); route prefixes ending in / are dropped, and zai/z-ai are
 recognized only as Zhipu pipeline provider names, never as bare model ids.
-A zhipu-family id whose last segment is not alphanumeric runs joined by single
-. _ : or - stays unknown. Stored typed family fields
+A zhipu-family id containing any non-ASCII character or whose last segment is
+not ASCII alphanumeric runs joined by single . _ : or - stays unknown. Stored typed family fields
 never decide independence. Uncovered-group refusals name each uncovered family,
 reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
@@ -256,6 +257,16 @@ def nonempty(value, field):
     return value
 
 
+def zhipu_rejected(value):
+    if not isinstance(value, str) or not value:
+        return False
+    tail = value.casefold().rsplit("/", 1)[-1]
+    name = re.match(r"([a-z]*)(\d*)", tail)
+    if FAMILIES.get(name.group(1)) != "zhipu":
+        return False
+    return not value.isascii() or not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail)
+
+
 def model(value, field):
     if not isinstance(value, str) or not re.fullmatch(r"[^\s\x00]+", value):
         raise RecordError(f"{field} must be an exact model id")
@@ -264,7 +275,7 @@ def model(value, field):
     if name.group(1) == "o" and name.group(2):
         return "openai"
     family = FAMILIES.get(name.group(1), "unknown")
-    if family == "zhipu" and (not value.isascii() or not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail)):
+    if family == "zhipu" and zhipu_rejected(value):
         return "unknown"
     return family
 
@@ -502,11 +513,12 @@ def derived_authors(home, pr, head, task, base):
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
                         # Never let a Zhipu provider promote a non-empty malformed
-                        # or unrecognized model id from unknown into zhipu.
+                        # or unrecognized model id, and never let any provider fill
+                        # a malformed or non-ASCII Zhipu-family model id.
                         provider_family = PROVIDER_FAMILIES.get(provider) if isinstance(provider, str) else None
                         if provider_family:
                             if item["family"] == "unknown":
-                                if provider_family != "zhipu" or not exact_model:
+                                if (provider_family != "zhipu" or not exact_model) and not zhipu_rejected(exact_model):
                                     item["family"] = provider_family
                             elif item["family"] != provider_family:
                                 item["family"] = "unknown"

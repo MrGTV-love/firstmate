@@ -1221,6 +1221,9 @@ db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-11', 
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm!!!', 'zai')")
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm-5.4\u017f', 'zai')")
 db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'mystery-12', 'z-ai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm---', 'openai')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'glm-5.4\u017f-2', 'anthropic')")
+db.execute("INSERT INTO agent_invocations VALUES ('r-prov', 'pi', 'z\u00e4i/glm-5.4', 'openai')")
 db.commit()
 PY2
   case_dir=$(make_case zhipu-provider-no-widening claude-opus-5-5)
@@ -1228,9 +1231,9 @@ PY2
     || fail "record provider-boundary PASS"
   out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$RECORD" plan --pr "$URL" --head "$HEAD1" \
     --task task-x1 --base "$BASE") || fail "plan failed on non-zhipu provider alias db"
-  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] | length == 6' <<<"$out" >/dev/null \
-    || fail "gpt/OpenAI/moonshot-long-s and malformed/non-ASCII zai/z-ai models must all stay no-mistakes:unknown: $out"
-  "$JQ_BIN" -e '.groups["no-mistakes:openai"] == null and .groups["no-mistakes:moonshot"] == null and .groups["no-mistakes:zhipu"] == null' \
+  "$JQ_BIN" -e '.groups["no-mistakes:unknown"] | length == 9' <<<"$out" >/dev/null \
+    || fail "gpt/OpenAI/moonshot-long-s and malformed/non-ASCII zhipu models under any provider must all stay no-mistakes:unknown: $out"
+  "$JQ_BIN" -e '.groups["no-mistakes:openai"] == null and .groups["no-mistakes:anthropic"] == null and .groups["no-mistakes:moonshot"] == null and .groups["no-mistakes:zhipu"] == null' \
     <<<"$out" >/dev/null || fail "malformed models and non-Zhipu providers must not widen attribution: $out"
 
   # 5. Positive sensitivity control: removing zhipu/glm makes zai/glm-5.4 refuse as unknown.
@@ -1262,7 +1265,7 @@ PY2
 import sys
 p = sys.argv[1]
 s = open(p).read()
-n1 = '    if family == "zhipu" and (not value.isascii() or not re.fullmatch(r"[a-z0-9]+(?:[._:-][a-z0-9]+)*", tail)):\n        return "unknown"\n'
+n1 = '    if family == "zhipu" and zhipu_rejected(value):\n        return "unknown"\n'
 n2 = 'provider_family = PROVIDER_FAMILIES.get(provider)'
 assert s.count(n1) == 1 and s.count(n2) == 1, "protection lines not found"
 s = s.replace(n1, '').replace(n2, 'provider_family = FAMILIES.get(provider.casefold())')
@@ -1286,14 +1289,29 @@ PY2
 import sys
 p = sys.argv[1]
 s = open(p).read()
-n3 = '                                if provider_family != "zhipu" or not exact_model:\n                                    item["family"] = provider_family\n'
+n3 = '                                if (provider_family != "zhipu" or not exact_model) and not zhipu_rejected(exact_model):\n                                    item["family"] = provider_family\n'
 assert s.count(n3) == 1, "empty-model fill guard not found"
-open(p, "w").write(s.replace(n3, '                                item["family"] = provider_family\n'))
+open(p, "w").write(s.replace(n3, '                                if not zhipu_rejected(exact_model):\n                                    item["family"] = provider_family\n'))
 PY2
   out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_fill_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
     --task task-x1 --base "$BASE") || fail "weak fill control plan failed"
   "$JQ_BIN" -e '.groups["no-mistakes:zhipu"] != null' <<<"$out" >/dev/null \
     || fail "protection control: dropping Zhipu empty-model fill guard alone must promote malformed zai/z-ai rows to no-mistakes:zhipu: $out"
+
+  local weak_nonzhipu_copy="$TMP_ROOT/zhipu-weak-nonzhipu-control-bin"
+  cp -R "$ROOT/bin" "$weak_nonzhipu_copy"
+  python3 - "$weak_nonzhipu_copy/fm-review-record.py" <<'PY2' || fail "plant non-zhipu fill sensitivity control"
+import sys
+p = sys.argv[1]
+s = open(p).read()
+n4 = '                                if (provider_family != "zhipu" or not exact_model) and not zhipu_rejected(exact_model):\n                                    item["family"] = provider_family\n'
+assert s.count(n4) == 1, "non-zhipu fill guard not found"
+open(p, "w").write(s.replace(n4, '                                if provider_family != "zhipu" or not exact_model:\n                                    item["family"] = provider_family\n'))
+PY2
+  out=$(NM_HOME="$nm_prov" FM_HOME="$case_dir/home" "$weak_nonzhipu_copy/fm-review-record.py" plan --pr "$URL" --head "$HEAD1" \
+    --task task-x1 --base "$BASE") || fail "weak non-zhipu fill control plan failed"
+  "$JQ_BIN" -e '.groups["no-mistakes:openai"] != null and .groups["no-mistakes:anthropic"] != null' <<<"$out" >/dev/null \
+    || fail "protection control: dropping zhipu_rejected guard alone must let openai/anthropic fill malformed/non-ASCII glm rows: $out"
   pass "zhipu/glm family covers other families, refuses same-family self-review, and keeps unknown ids and non-Zhipu provider aliases closed"
 }
 
