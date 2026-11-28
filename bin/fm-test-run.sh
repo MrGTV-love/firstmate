@@ -1153,6 +1153,7 @@ tests/fm-project-origin.test.sh 690
 tests/fm-public-followup.test.sh 531543
 tests/fm-quota-array-dispatch-live-e2e.test.sh 645
 tests/fm-quota-choose.test.sh 4494
+tests/fm-record-paths-scan.test.sh 60000
 tests/fm-remote-backlog-handoff.test.sh 158878
 tests/fm-remote-delta-read.test.sh 6830
 tests/fm-remote-doctor.test.sh 52399
@@ -1259,6 +1260,7 @@ tests/fm-teardown-endpoint-safety.test.sh 89444
 tests/fm-teardown-pool.test.sh 260000
 tests/fm-teardown-pool-nested.test.sh 260000
 tests/fm-teardown-retained.test.sh 250000
+tests/fm-teardown-scan-bounds.test.sh 180000
 tests/fm-teardown.test.sh 321463
 tests/fm-test-size-guard.test.sh 3000
 tests/fm-test-fixture-cleanup.test.sh 4736
