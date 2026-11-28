@@ -1102,6 +1102,125 @@ test_verified_reclaim_keeps_new_sidecar() {
   pass "session-lock: a verified reclaim keeps the new sidecar beside the new pid"
 }
 
+# fm_session_lock_inspect may call a recorded holder stale only when the process
+# read proves the pid is absent. kill is stubbed to fail (a dead holder or EPERM)
+# and ps stands in with a chosen exit status, stdout and stderr.
+inspect_state() {  # <ps-rc> <ps-stdout> <ps-stderr> [kill-rc]
+  local dir fakebin
+  dir="$TMP_ROOT/inspect-state"
+  rm -rf "$dir"
+  fakebin=$(fm_fakebin "$dir")
+  mkdir -p "$dir/state"
+  printf '4242\n' > "$dir/state/.lock"
+  cat > "$fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+printf '%s' "${FM_TEST_PS_OUT-}"
+printf '%s' "${FM_TEST_PS_ERR-}" >&2
+exit "${FM_TEST_PS_RC:-0}"
+SH
+  chmod +x "$fakebin/ps"
+  FM_TEST_PS_RC=$1 FM_TEST_PS_OUT=$2 FM_TEST_PS_ERR=$3 FM_TEST_KILL_RC=${4:-1} \
+    lib_eval "$fakebin" "fm_session_lock_inspect '$dir/state'; printf '%s' \"\$FM_LOCK_INSPECT_STATE\""
+}
+
+# The 126 rows: ps refuses to run, so the read falls back to python3. TABLE is
+# what the stand-in python3 prints (empty for none), TABLE_RC its exit status.
+inspect_state_confined() {  # <python-rc> <python-stdout>
+  local dir fakebin
+  dir="$TMP_ROOT/inspect-state-confined"
+  rm -rf "$dir"
+  fakebin=$(fm_fakebin "$dir")
+  mkdir -p "$dir/state"
+  printf '4242\n' > "$dir/state/.lock"
+  printf '#!/usr/bin/env bash\nexit 126\n' > "$fakebin/ps"
+  cat > "$fakebin/python3" <<'SH'
+#!/usr/bin/env bash
+printf '%s' "${FM_TEST_PY_OUT-}"
+exit "${FM_TEST_PY_RC:-0}"
+SH
+  chmod +x "$fakebin/ps" "$fakebin/python3"
+  FM_TEST_PY_RC=$1 FM_TEST_PY_OUT=$2 FM_TEST_KILL_RC=1 \
+    lib_eval "$fakebin" "fm_session_lock_inspect '$dir/state'; printf '%s' \"\$FM_LOCK_INSPECT_STATE\""
+}
+
+# Every row runs before the verdict, so a failing run names each wrong row.
+INSPECT_WRONG=
+expect_inspect() {  # <case> <expected> <got>
+  [ "$3" = "$2" ] || INSPECT_WRONG="$INSPECT_WRONG
+  $1: state is '$3', expected '$2'"
+}
+
+test_inspect_stale_needs_proven_absence() {
+  local pid_line
+  pid_line=$'ps: process id too large: 4242\n'
+  expect_inspect 'ps exit 1, empty stdout, empty stderr' stale "$(inspect_state 1 '' '')"
+  expect_inspect 'ps exit 1 with the macOS not-found line' stale "$(inspect_state 1 '' "$pid_line")"
+  expect_inspect 'ps exit 1 with a diagnostic' unknown \
+    "$(inspect_state 1 '' $'ps: error: cannot read the process table\n')"
+  expect_inspect 'ps exit 1 with whitespace-only stderr' unknown "$(inspect_state 1 '' $' \n')"
+  expect_inspect 'ps exit 1 with another pid in the not-found line' unknown \
+    "$(inspect_state 1 '' $'ps: process id too large: 4243\n')"
+  expect_inspect 'ps exit 1 with non-empty stdout' unknown "$(inspect_state 1 $'claude\n' '')"
+  expect_inspect 'ps exit 2' unknown "$(inspect_state 2 '' '')"
+  expect_inspect 'ps exit 127' unknown "$(inspect_state 127 '' '')"
+  expect_inspect 'ps exit 0 with a row (live process, kill refused)' unknown \
+    "$(inspect_state 0 $'bash\n' '')"
+  expect_inspect 'ps exit 126, fallback exit 1 with empty output' unknown "$(inspect_state_confined 1 '')"
+  expect_inspect 'ps exit 126, fallback table without the pid' stale \
+    "$(inspect_state_confined 0 $'1\n77\n')"
+  expect_inspect 'ps exit 126, fallback table with the pid' unknown \
+    "$(inspect_state_confined 0 $'1\n4242\n')"
+  expect_inspect 'ps exit 126, fallback table unreadable' unknown "$(inspect_state_confined 0 $'1\nx\n')"
+  expect_inspect 'kill succeeds and ps names a verified harness' held \
+    "$(inspect_state 0 $'claude\n' '' 0)"
+  [ -z "$INSPECT_WRONG" ] || fail "inspect states differ from the absence rule:$INSPECT_WRONG"
+  pass "session-lock: inspect calls a holder stale only when the process read proves absence"
+}
+
+# fm-lock.sh status prints a process read that fails without proving absence as
+# unknown, and keeps the stale line for a read that proves absence. The lock
+# names pid 999999, which no live process holds, so the stand-in ps decides.
+lock_status_line() {  # <fm-lock.sh> <ps-rc>
+  local dir fakebin
+  dir="$TMP_ROOT/lock-status"
+  rm -rf "$dir"
+  fakebin=$(fm_fakebin "$dir")
+  mkdir -p "$dir/state"
+  printf '999999\n' > "$dir/state/.lock"
+  printf '#!/usr/bin/env bash\nexit %s\n' "$2" > "$fakebin/ps"
+  chmod +x "$fakebin/ps"
+  env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID PATH="$fakebin:$PATH" FM_HOME="$dir" "$1" status
+}
+
+# Names each status row that differs; empty when both rows hold.
+lock_status_wrong() {  # <fm-lock.sh>
+  local got
+  got=$(lock_status_line "$1" 2)
+  [ "$got" = 'lock: unknown (process read failed, holder pid 999999 not proven dead)' ] \
+    || printf '  failed read (ps exit 2): got %s\n' "$got"
+  got=$(lock_status_line "$1" 1)
+  [ "$got" = 'lock: stale (pid 999999 dead or not a harness)' ] \
+    || printf '  proven absence (ps exit 1): got %s\n' "$got"
+}
+
+test_lock_status_never_prints_a_failed_read_as_stale() {
+  local wrong mutant_dir
+  wrong=$(lock_status_wrong "$ROOT/bin/fm-lock.sh")
+  [ -z "$wrong" ] || fail "fm-lock.sh status rows differ:"$'\n'"$wrong"
+  # The mutant restores the old mapping: a failed read falls through to stale.
+  mutant_dir="$TMP_ROOT/lock-status-mutant"
+  mkdir -p "$mutant_dir"
+  ln -s "$ROOT"/bin/* "$mutant_dir/"
+  rm -f "$mutant_dir/fm-lock.sh"
+  grep -v '^    read-failed) ' "$ROOT/bin/fm-lock.sh" > "$mutant_dir/fm-lock.sh"
+  chmod +x "$mutant_dir/fm-lock.sh"
+  ! cmp -s "$ROOT/bin/fm-lock.sh" "$mutant_dir/fm-lock.sh" || fail "the old-mapping mutant did not change fm-lock.sh"
+  wrong=$(lock_status_wrong "$mutant_dir/fm-lock.sh")
+  [ "$wrong" = "  failed read (ps exit 2): got lock: stale (pid 999999 dead or not a harness)" ] \
+    || fail "the old-mapping mutant was not caught by the failed-read row alone:"$'\n'"$wrong"
+  pass "session-lock: status prints a failed process read as unknown and a proven absence as stale"
+}
+
 test_version_named_session_is_identified_on_both_platforms
 test_harness_at_namespace_pid1_is_examined
 test_ordinary_paths_are_never_harness_processes
@@ -1109,6 +1228,8 @@ test_harness_beyond_a_gap_never_owns_the_lock
 test_competing_version_named_session_is_seen_as_live
 test_same_session_id_owns_a_recycled_background_chain
 test_anchor_pid_is_the_model_loop_process_only_for_a_trusted_id
+test_inspect_stale_needs_proven_absence
+test_lock_status_never_prints_a_failed_read_as_stale
 test_e2e_version_named_session_claims_the_home
 test_e2e_daemon_parented_session_claims_the_home
 test_e2e_daemon_parented_version_named_session_keeps_its_lock
