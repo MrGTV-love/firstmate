@@ -2056,7 +2056,7 @@ fm_slot_rerecord_step_refuse() { # <reason> <detail>
 }
 
 fm_slot_rerecord_identity_step() { # <work> <manifest> <copy> <branch> <task-id>
-  fm_slot_rerecord_identity_verdict "$2" "$3" "$4" "$5" > "$1/identity" ||
+  ( fm_slot_rerecord_identity_verdict "$2" "$3" "$4" "$5" ) > "$1/identity" ||
     { fm_slot_rerecord_step_refuse manifest_unreadable 'the verdict could not be computed'; return; }
   fm_slot_rerecord_verdict_ok "$1/identity" manifest_unreadable
 }
@@ -2064,17 +2064,17 @@ fm_slot_rerecord_identity_step() { # <work> <manifest> <copy> <branch> <task-id>
 fm_slot_rerecord_history_step() { # <work> <manifest> <copy> <project> <recorded-base> <head> <prior-entry>...
   local work=$1 manifest=$2 copy=$3 project=$4 recorded=$5 head=$6 default tip
   shift 6
-  fm_slot_rerecord_base_verdict "$manifest" "$copy" "$project" "$recorded" "$head" > "$work/base" ||
+  ( fm_slot_rerecord_base_verdict "$manifest" "$copy" "$project" "$recorded" "$head" ) > "$work/base" ||
     { fm_slot_rerecord_step_refuse base_invalid 'the verdict could not be computed'; return; }
   fm_slot_rerecord_verdict_ok "$work/base" base_invalid || return
   default=$(fm_task_copy_default_branch "$project" 2>/dev/null) || default=
   tip=$(GIT_OPTIONAL_LOCKS=0 git -C "$copy" rev-parse --verify --quiet "refs/remotes/origin/$default^{commit}" 2>/dev/null) || tip=
   # Without these two reads every added entry would read as side-branch work and no stranded work would be proved absent.
-  fm_slot_own_line_paths "$copy" "$tip" "$head" > "$work/own-line" 2>"$work/own-line.err" ||
+  ( fm_slot_own_line_paths "$copy" "$tip" "$head" ) > "$work/own-line" 2>"$work/own-line.err" ||
     { fm_slot_rerecord_step_refuse scope_entry_not_own_work "the task's own first-parent line could not be read from the copy, so no entry can be attributed"; return; }
-  fm_slot_rerecord_uncommitted_paths "$copy" > "$work/uncommitted" 2>"$work/uncommitted.err" ||
+  ( fm_slot_rerecord_uncommitted_paths "$copy" ) > "$work/uncommitted" 2>"$work/uncommitted.err" ||
     { fm_slot_rerecord_step_refuse scope_release_strands_work "the copy's uncommitted set could not be read, so no stranded work is proved absent"; return; }
-  fm_slot_rerecord_scope_verdict "$manifest" "$copy" "$head" "$work/own-line" "$work/uncommitted" ${1+"$@"} > "$work/scope" ||
+  ( fm_slot_rerecord_scope_verdict "$manifest" "$copy" "$head" "$work/own-line" "$work/uncommitted" ${1+"$@"} ) > "$work/scope" ||
     { fm_slot_rerecord_step_refuse scope_invalid 'the verdict could not be computed'; return; }
   fm_slot_rerecord_verdict_ok "$work/scope" scope_invalid
 }
@@ -2210,7 +2210,7 @@ fm_slot_rerecord_archive() { # <dir> <snapshot-record> <prior-sha> <audit-body>
   fm_slot_rerecord_archive_verified "$candidate" "$prior" ||
     { fm_slot_rerecord_fail archive_unverified "the archive $candidate does not read back with sha256 $prior; it is kept for inspection"; return 1; }
   tmp=$(mktemp "$dir/.audit.XXXXXX") || { fm_slot_rerecord_fail archive_unverified "could not stage the audit record in $dir"; return 1; }
-  { { printf 'v1\nresult=pending\narchive=%s\n' "$candidate" && cat -- "$body"; } > "$tmp" && chmod 600 "$tmp"; } ||
+  { ( printf 'v1\nresult=pending\narchive=%s\n' "$candidate" && cat -- "$body" ) > "$tmp" && chmod 600 "$tmp"; } ||
     { rm -f -- "$tmp"; fm_slot_rerecord_fail archive_unverified "could not write the audit record in $dir"; return 1; }
   n=0
   while :; do
@@ -2274,7 +2274,9 @@ fm_slot_rerecord_postcheck() { # <meta> <staged-sha> <manifest> <manifest-sha> <
   owner="$err.owner"
   fm_slot_rerecord_inputs_unchanged "$meta" "$staged" "$manifest" "$msha" "$copy" "$head" ||
     { fm_slot_rerecord_fail adopt_postcheck_failed "$FM_SLOT_RERECORD_DETAIL"; return 1; }
-  if ! fm_slot_rerecord_identity_verdict "$manifest" "$copy" "$branch" "$id" > "$owner"; then
+  # Run the redirected checks in subshells so a signal never enters the parent's EXIT trap with stdout or stderr
+  # redirected into a snapshot file, and without duping stdout/stderr onto extra fds that backgrounded children inherit.
+  if ! ( fm_slot_rerecord_identity_verdict "$manifest" "$copy" "$branch" "$id" ) > "$owner"; then
     fm_slot_rerecord_fail adopt_postcheck_failed "the live manifest no longer names this task's lease: the owner re-read could not run"
     rc=1
   elif ! fm_slot_rerecord_verdict_ok "$owner" manifest_unreadable whole; then
@@ -2284,7 +2286,7 @@ fm_slot_rerecord_postcheck() { # <meta> <staged-sha> <manifest> <manifest-sha> <
   fi
   rm -f -- "$owner"
   [ "$rc" = 0 ] || return 1
-  if ! fm_slot_adopt_check "$project" "$copy" "$id" "$branch" "$meta" "$state" 2> "$err"; then
+  if ! ( fm_slot_adopt_check "$project" "$copy" "$id" "$branch" "$meta" "$state" ) 2> "$err"; then
     fm_slot_rerecord_fail adopt_postcheck_failed "adoption refuses the published record ($(sed -n '1{s/^[^:]*: [^:]*: //;s/; [^;]*$//;p;}' "$err" 2>/dev/null))"
     return 1
   fi

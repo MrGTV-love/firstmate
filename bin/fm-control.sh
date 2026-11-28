@@ -421,8 +421,6 @@ REASSOCIATE_ACTIVE=0
 # directory, and the task spawn lock it holds to exit. Initialized here so an inherited value cannot select a trap action.
 RERECORD_STAGE=
 RERECORD_SNAP=
-# 1 once rerecord-slot has saved its own stdout and stderr on fds 5 and 6 for the EXIT trap (do_rerecord_slot).
-RERECORD_FDS=
 CONTROL_SPAWN_LOCK=
 CONTROL_SPAWN_LOCK_HELD=0
 # The extra locks reassociate --also holds for its other tasks.
@@ -464,9 +462,6 @@ RELAUNCH_PAIR_DIR=
 #   "error: before stopping, ..." (a signal before publish, or an error no message above reports); none when nothing acted.
 control_cleanup() {
   local status=$? extra_lock published=0 named named_audit whose="the earlier interrupted run's"
-  # A signal can run this trap while a rerecord-slot step's own redirect is active (the post-publish check's
-  # "2> <snapshot>/adopt-err"); everything the trap prints goes to the verb's own stdout and stderr instead.
-  [ "$RERECORD_FDS" != 1 ] || exec 1>&5 2>&6
   if [ -n "$RERECORD_SNAP" ]; then
     whose="this run's"
     if [ -n "${FM_RR_S:-}" ] && [ -z "${FM_RR_STAGED:-}" ]; then published=1; fi
@@ -3136,10 +3131,6 @@ do_rerecord_slot() {
   local -a prior=() scope=()
   local journal="$STATE/$ID.control-relaunch"
 
-  # The EXIT trap prints this run's outcome; save the verb's own stdout and stderr for it (control_cleanup).
-  exec 5>&1 6>&2
-  RERECORD_FDS=1
-
   # 1. A1: the lock-owning main Firstmate only (one rule for the write and for --check).
   # shellcheck source=bin/fm-session-lock-lib.sh
   . "$SCRIPT_DIR/fm-session-lock-lib.sh"
@@ -3298,7 +3289,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
   FM_RR_S=$staged_sha
   note_json=$(python3 -I -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$NOTE") \
     || rerecord_die "could not encode the note; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
-  {
+  (
     echo "task=$ID"
     echo "prior_sha256=$prior_sha"
     echo "staged=$FM_RR_STAGED"
@@ -3312,7 +3303,7 @@ for path in json.load(open(sys.argv[1], encoding="utf-8"))["owned_paths"]:
     echo "head=$head"
     sed -n '2,$p' "$snap/scope"
     echo "note=$note_json"
-  } > "$snap/audit-body" || rerecord_die "could not prepare the audit record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
+  ) > "$snap/audit-body" || rerecord_die "could not prepare the audit record; $(fm_slot_rerecord_changes stopping 'nothing was changed')"
   fm_slot_rerecord_archive "$FM_RR_DIR" "$snap/record" "$prior_sha" "$snap/audit-body" || rerecord_refuse
   fm_slot_rerecord_inputs_unchanged "$META" "$prior_sha" "$manifest" "$manifest_sha" "$copy" "$head" || rerecord_refuse
   fm_slot_rerecord_binding_ok "$manifest" "$RERECORD_MANIFEST_SHA" || rerecord_refuse

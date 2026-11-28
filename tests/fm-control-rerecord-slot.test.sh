@@ -1798,6 +1798,39 @@ test_R9b_hup_in_published_rolls_back() { rr_expect_signal_rollback R9b HUP 129; 
 test_R9c_int_in_published_rolls_back() { RR_SIGINT_DEFAULT=1 rr_expect_signal_rollback R9c INT 130; }
 test_R9f_term_inside_the_adoption_check_redirect_rolls_back() { rr_expect_signal_rollback R9f TERM 143 rr_signal_in_adopt_check; }
 
+# A backgrounded child that closes or redirects its own stdin/stdout/stderr must not inherit duplicated copies of the
+# verb's stdout/stderr pipes and hang callers capturing output (e.g. out=$(fm-control.sh ... rerecord-slot)).
+test_R9g_rerecord_does_not_leak_extra_stdout_stderr_fds() {
+  local bg_pid='' wd='' out rc alive=0
+  rr_make_f R9g
+  rr_wrap fm-slot-provision-lib.sh fm_slot_rerecord_archive
+  rr_shim fm-slot-provision-lib.sh "fm_slot_rerecord_archive() { real_fm_slot_rerecord_archive \"\$@\" || return; /bin/sleep 30 </dev/null >/dev/null 2>&1 & echo \$! > '$RR_DIR/bg.pid'; }"
+  (
+    sleep 10
+    if [ -f "$RR_DIR/bg.pid" ]; then
+      printf 'hung\n' > "$RR_DIR/r9g.hung"
+      kill "$(cat "$RR_DIR/bg.pid" 2>/dev/null || true)" 2>/dev/null || true
+    fi
+  ) </dev/null >/dev/null 2>&1 &
+  wd=$!
+  out=$(rr_write); rc=$?
+  kill "$wd" 2>/dev/null || true
+  wait "$wd" 2>/dev/null || true
+  if [ -f "$RR_DIR/bg.pid" ]; then
+    bg_pid=$(cat "$RR_DIR/bg.pid" 2>/dev/null || true)
+    if [ -n "$bg_pid" ] && kill -0 "$bg_pid" 2>/dev/null; then
+      alive=1
+      kill "$bg_pid" 2>/dev/null || true
+    fi
+  fi
+  [ ! -f "$RR_DIR/r9g.hung" ] || fail "R9g: command substitution hung waiting for backgrounded child to close inherited stdout/stderr fd"
+  expect_code 0 "$rc" "R9g"$'\n'"$out"
+  assert_contains "$out" "rerecord-slot $RR_ID: base " "R9g"
+  [ -n "$bg_pid" ] || fail "R9g: background child was never started"
+  [ "$alive" = 1 ] || fail "R9g: background child exited before command substitution returned"
+  rr_ok R9g "backgrounded child stayed alive while caller stdout/stderr pipe reached EOF immediately"
+}
+
 # rr_signal_run [match-line]: TERM sent by the mv stub to the verb while its publish mv (or, with a match line, the mv
 # whose source holds that line) is still to land; the stub waits for the verb to exit before its mv lands.
 rr_signal_run() {
@@ -2588,6 +2621,7 @@ test_R9c_int_in_published_rolls_back
 test_R9d_term_while_the_publish_is_pending
 test_R9e_term_while_the_commit_rename_is_pending
 test_R9f_term_inside_the_adoption_check_redirect_rolls_back
+test_R9g_rerecord_does_not_leak_extra_stdout_stderr_fds
 test_L22_term_during_a_step_3_restore_rename_names_the_kept_audit
 test_R10_an_unverified_archive_refuses
 test_R11_an_unreadable_audit_record_refuses_until_moved_aside
