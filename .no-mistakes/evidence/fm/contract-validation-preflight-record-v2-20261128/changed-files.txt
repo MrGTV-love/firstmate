@@ -1,0 +1,1 @@
+.agents/skills/firstmate-coding-guidelines/SKILL.md
