@@ -33,9 +33,11 @@ The packing target stays at 1200000 ms, and the 60-minute job timeout is unchang
 On 2026-10-24 the four unhinted `tests/fm-retired-jev-write-*.test.sh` retirement suites, packed at the 45000 ms default weight, join main's twenty-one serial shards, which still pass `--check-coverage` (`serial_shards=21 serial_unhinted=10 serial_max_ms=1155486`); the packing target and job timeout are unchanged.
 They were left at the default because the change that added them read the refcheck guard as forbidding retired ids in the hint table; that guard masks a file which names the retirement test's path before matching the retired id, so the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) measured and hinted them.
 On 2026-10-27 the unhinted `tests/fm-retired-persistent-cd-guard.test.sh` retirement suite and `tests/fm-home-writes.test.sh` behavioral suite, each packed at the 45000 ms default weight until a green CI run measures it, joined the twenty-one serial shards then, which passed `--check-coverage` (`serial_shards=21 serial_unhinted=5 serial_max_ms=1193769`); the [2026-10-28 refresh](#refresh-the-hints-and-shard-count) measured both and moved the lane to twenty-four shards.
-On 2026-11-25 the unhinted `tests/fm-control-rerecord-slot.test.sh` behavioral suite, packed at the 45000 ms default weight until a green CI run measures it, joined the twenty-five serial shards on serial shard 10, which still pass `--check-coverage` after the 2026-11-26 merge of main (`serial_shards=25 serial_unhinted=25 serial_max_ms=1190534 serial_budget_ms=1200000`); the packing target, shard count and job timeout are unchanged.
-With it at the default weight the 360 serial members sum to 29758793 ms (335 hinted plus 25 at 45000 ms), which leaves 241207 ms of lane slack (25 x 1200000 - 29758793), less than the one 1200000 ms target the [shard-count rule](#portable-serial-ci-shards) asks for.
-The shortfall predates this suite: without it the lane sums to 29713793 ms and leaves 286207 ms.
+On 2026-11-25 the unhinted `tests/fm-control-rerecord-slot.test.sh` behavioral suite, packed at the 45000 ms default weight until a green CI run measures it, joined the twenty-five serial shards.
+After the 2026-11-27 merge of main added `tests/fm-record-paths-scan.test.sh` and `tests/fm-teardown-scan-bounds.test.sh`, twenty-five shards failed `--check-coverage`: serial shard 1 packed 1201559 ms, above the 1200000 ms target and beyond its own largest script (1005601 ms).
+The lane then moved to twenty-six shards, which pass `--check-coverage` with the suite on serial shard 18 (`serial_shards=26 serial_unhinted=25 serial_max_ms=1155456 serial_budget_ms=1200000`); the packing target and job timeout are unchanged, and `PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-six.
+With the suite at the default weight the 364 serial members sum to 30035793 ms (339 hinted plus 25 at 45000 ms), which leaves 1164207 ms of lane slack (26 x 1200000 - 30035793), less than the one 1200000 ms target the [shard-count rule](#portable-serial-ci-shards) asks for.
+Without it the lane sums to 29990793 ms and leaves 1209207 ms.
 Refreshing the hints and choosing the shard count again is tracked separately.
 The guard checks each shard on its own: it refuses a shard whose packed sum is above the target and above that shard's own largest script.
 So a shard that holds one indivisible script alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
@@ -407,7 +409,7 @@ Replaying each run's recorded script durations through the twenty-four-shard mem
 This is a replay of recorded durations, not a measured CI run.
 The refreshed serial hints sum to 28352649 ms, so twenty-four shards still pass `--check-coverage` (`serial_shards=24 serial_unhinted=0 serial_max_ms=1181663 serial_budget_ms=1200000`) but leave only 447351 ms of lane slack (24 x 1200000 - 28352649), less than one 1200000 ms target, and the [shard-count rule](#portable-serial-ci-shards) refuses them.
 Twenty-five leave 1647351 ms and pass (`serial_shards=25 serial_unhinted=0 serial_max_ms=1134269 serial_budget_ms=1200000`), so twenty-five is the fewest serial shards that pass and keep one target of slack.
-`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-five.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` then all named twenty-five; the [2026-11-27 change](#verification-inputs) moved them to twenty-six.
 The same scripts run, so serial-script minutes do not change, but the twenty-fifth shard adds one job's setup; the twenty-five-shard assignment has not been replayed.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
@@ -503,7 +505,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses thirty-one long-lived Linux jobs (twenty-five serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses thirty-two long-lived Linux jobs (twenty-six serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession and coalesces main pushes into one group per branch, so a burst of merges queues one pending run for the newest commit and never cancels the running one.
 The compliance workflow keeps its own event semantics.
