@@ -1,0 +1,10 @@
+ok - a new spawn below the floor exits 75 with one message naming free GiB, floor, path and config file, and creates nothing
+ok - exactly 20 GiB admits, 20 GiB minus 1 KiB refuses at 19 GiB, and more admits
+ok - teardown runs at 1 GiB free and is never refused by the floor
+ok - df failing, printing nothing or printing garbage admits the spawn with one warning and a warn event
+ok - config/disk-free-floor overrides the floor, an absent file means 20, and a malformed file refuses naming itself
+ok - a path that does not exist yet is measured on its nearest existing ancestor, never admitted as unreadable
+ok - the no-mistakes run start refuses at 19 GiB free and admits at 20 GiB through fm-mem-guard.sh run
+ok - fm-disk-floor-lib.sh admit defers at 3 GiB free with 75 and admits at 20 GiB silently
+ok - the stack start defers at 19.999 GiB, runs at 20 GiB passing its exit status through, and admits an unreadable meter with a warning
+ok - a df that prints a valid line then exits 1 admits the spawn with one warning and a warn event, at low and plentiful values

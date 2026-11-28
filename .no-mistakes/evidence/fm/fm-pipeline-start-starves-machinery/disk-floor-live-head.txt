@@ -1,0 +1,120 @@
+real df: 70 GiB free on the volume holding /Users/charlesabrooker/tmp/fm-disk-floor-live.head
+stub check: /Users/charlesabrooker/.local/bin/no-mistakes
+
+stub resolves to: /Users/charlesabrooker/tmp/fm-disk-floor-live.head/s1-fresh-below/bin/no-mistakes
+=== s1
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start -- no-mistakes axi run --intent floor-fresh
+exit=75
+--- stderr
+deferred: disk free floor refused no-mistakes run start: 70 GiB free on the volume holding /Users/charlesabrooker/tmp/fm-disk-floor-live.head/s1-fresh-below/wt, below the floor of 999999 GiB (/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s1-fresh-below/fmhome/config/disk-free-floor); nothing was started - free space on that volume, or lower the floor in that file, and start it again
+--- stdout
+--- stub.log
+(stub never ran)
+--- pool entries
+
+=== s2
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.sh pipeline-start -- no-mistakes axi run --intent floor-fresh
+exit=3
+--- stderr
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s2-fresh-above/pool start_repo=unknown start_branch=unknown
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --intent floor-fresh
+--- pool entries
+pipeline-start.lock
+
+=== s3
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start --only-fresh -- no-mistakes axi run --wait
+exit=3
+--- stderr
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --wait
+--- pool entries
+
+=== s4
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-mem-guard.sh run -- no-mistakes axi run --intent floor-memguard
+exit=75
+--- stderr
+deferred: disk free floor refused no-mistakes run start: 70 GiB free on the volume holding /Users/charlesabrooker/tmp/fm-disk-floor-live.head/s4-memguard-fresh-below/wt, below the floor of 999999 GiB (/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s4-memguard-fresh-below/fmhome/config/disk-free-floor); nothing was started - free space on that volume, or lower the floor in that file, and start it again
+--- stdout
+--- stub.log
+(stub never ran)
+--- pool entries
+
+=== s5
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-mem-guard.sh run -- bash -c echo other-command-ran; exit 4
+exit=4
+--- stderr
+--- stdout
+other-command-ran
+--- stub.log
+(stub never ran)
+--- pool entries
+
+=== s6
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start -- no-mistakes axi run --intent floor-malformed
+exit=2
+--- stderr
+error: disk free floor refused no-mistakes run start: /Users/charlesabrooker/tmp/fm-disk-floor-live.head/s6-malformed/fmhome/config/disk-free-floor must hold one positive whole number of GiB of at most six digits, with no leading zero (got 'twenty'); fix or remove that file and start again
+--- stdout
+--- stub.log
+(stub never ran)
+--- pool entries
+
+=== s7
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-duration.py run --pipeline-priority machinery floor-key -- no-mistakes axi run --intent floor-duration
+exit=75
+--- stderr
+deferred: disk free floor refused no-mistakes run start: 70 GiB free on the volume holding /Users/charlesabrooker/tmp/fm-disk-floor-live.head/s7-duration-below/wt, below the floor of 999999 GiB (/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s7-duration-below/fmhome/config/disk-free-floor); nothing was started - free space on that volume, or lower the floor in that file, and start it again
+--- stdout
+--- stub.log
+(stub never ran)
+--- pool entries
+
+=== s7b
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-duration.py run --pipeline-priority machinery floor-key -- no-mistakes axi run --wait
+exit=3
+--- stderr
+calibration: "0 of 5 samples for floor-key on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "floor-key elapsed=0.2s output_bytes=0 tree_cpu=0.00s"
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --wait
+--- pool entries
+
+=== s8
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start -- bash -c echo 999999 >'/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s8-nested-fresh-floor-drops/fmhome/config/disk-free-floor'; no-mistakes axi run --intent nested-second; echo inner-exit=$?
+exit=0
+--- stderr
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s8-nested-fresh-floor-drops/pool start_repo=unknown start_branch=unknown
+deferred: disk free floor refused no-mistakes run start: 70 GiB free on the volume holding /Users/charlesabrooker/tmp/fm-disk-floor-live.head/s8-nested-fresh-floor-drops/wt, below the floor of 999999 GiB (/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s8-nested-fresh-floor-drops/fmhome/config/disk-free-floor); nothing was started - free space on that volume, or lower the floor in that file, and start it again
+--- stdout
+inner-exit=75
+--- stub.log
+(stub never ran)
+--- pool entries
+pipeline-start.lock
+
+=== s9
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-mem-guard.sh run -- no-mistakes axi run --wait
+exit=75
+--- stderr
+deferred: disk free floor refused no-mistakes run start: 70 GiB free on the volume holding /Users/charlesabrooker/tmp/fm-disk-floor-live.head/s9-memguard-reattach-below/wt, below the floor of 999999 GiB (/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s9-memguard-reattach-below/fmhome/config/disk-free-floor); nothing was started - free space on that volume, or lower the floor in that file, and start it again
+--- stdout
+--- stub.log
+(stub never ran)
+--- pool entries
+
+=== s10
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-mem-guard.sh run -- no-mistakes axi run --intent floor-memguard-above
+exit=3
+--- stderr
+fm-cpu-pass: pipeline-start admitted: counted=0 limit=6 basis=fallback launched=0 pending=0 starts=0 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-disk-floor-live.head/s10-memguard-fresh-above/pool start_repo=unknown start_branch=unknown
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --intent floor-memguard-above
+--- pool entries
+pipeline-start.lock
+

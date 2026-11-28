@@ -1,0 +1,145 @@
+=== g1
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/g1-unmapped/unmapped) bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.sh launch-gate -- agent --print
+exit=75
+--- stderr
+fm-cpu-pass: launch-gate refused: unmapped worktree: worktree /Users/charlesabrooker/tmp/fm-r2-live/g1-unmapped/unmapped, attempt 42563:1795861342997519000; no run records /Users/charlesabrooker/tmp/fm-r2-live/g1-unmapped/unmapped; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+--- stdout
+--- stub.log
+(stub never ran)
+--- pool entries
+
+--- durable status records under FM_HOME
+1795861343	1	check	launch-gate-unmapped	check: launch-gate: launch-gate refused: unmapped worktree: worktree /Users/charlesabrooker/tmp/fm-r2-live/g1-unmapped/unmapped, attempt 42563:1795861342997519000; no run records /Users/charlesabrooker/tmp/fm-r2-live/g1-unmapped/unmapped; next action: launch the agent from a run worktree; a launch outside any run is not gated work
+
+=== g2
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/g2-review-passthrough/wt) bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.sh launch-gate -- agent --print
+exit=7
+--- stderr
+--- stdout
+--- stub.log
+stub agent ran in /Users/charlesabrooker/tmp/fm-r2-live/g2-review-passthrough/wt with args: --print stdin=hello-stdin
+--- pool entries
+attempt-c91dcfdc60858a0c7221f5d0e2a2f36d.json
+pipeline-start.lock
+
+=== g3
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/g3-ambiguous/wt) bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.sh launch-gate -- agent --print
+exit=75
+--- stderr
+fm-cpu-pass: launch-gate refused: ambiguous worktree: worktree /Users/charlesabrooker/tmp/fm-r2-live/g3-ambiguous/wt, attempt 46043:1795861345312950000; runs run-rev,run-dup all record /Users/charlesabrooker/tmp/fm-r2-live/g3-ambiguous/wt; next action: resolve which run owns this worktree; the next fix round enters the gate again
+--- stdout
+--- stub.log
+(stub never ran)
+--- pool entries
+
+=== g4
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/g4-db-unreadable/wt) bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.sh launch-gate -- agent --print
+exit=75
+--- stderr
+fm-cpu-pass: launch-gate refused: run database unreadable: worktree /Users/charlesabrooker/tmp/fm-r2-live/g4-db-unreadable/wt, attempt 47880:1795861346263347000; file is not a database; next action: restore read access to the run database; the next fix round enters the gate again
+--- stdout
+--- stub.log
+(stub never ran)
+--- pool entries
+
+=== h1
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/h1-pressure-hold/wt) bash bin/fm-cpu-pass.sh pipeline-start -- no-mistakes axi run --intent held   [native pressure 2]
+--- after 8 s at pressure 2: still running=yes
+--- stub.log so far
+(stub never ran)
+--- stderr so far
+fm-cpu-pass: pipeline-start waiting: overload: memory: native memory pressure level 2 (2 or higher defers) counted=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-r2-live/h1-pressure-hold/pool start_repo=unknown start_branch=unknown
+--- flip native pressure to 1 at 10:22:34Z
+exit=3
+--- stderr
+fm-cpu-pass: pipeline-start waiting: overload: memory: native memory pressure level 2 (2 or higher defers) counted=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-r2-live/h1-pressure-hold/pool start_repo=unknown start_branch=unknown
+fm-cpu-pass: pipeline-start admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-r2-live/h1-pressure-hold/pool start_repo=unknown start_branch=unknown
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --intent held
+--- pool entries
+pipeline-start.lock
+
+=== h2
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/h2-pressure-control/wt) bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.sh pipeline-start -- no-mistakes axi run --intent control
+exit=3
+--- stderr
+fm-cpu-pass: pipeline-start admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-r2-live/h2-pressure-control/pool start_repo=unknown start_branch=unknown
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --intent control
+--- pool entries
+pipeline-start.lock
+
+=== f1
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/f1-intent-equals/wt) python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start --only-fresh -- no-mistakes axi run --intent=fresh-eq
+exit=3
+--- stderr
+fm-cpu-pass: pipeline-start admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-r2-live/f1-intent-equals/pool start_repo=unknown start_branch=unknown
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --intent=fresh-eq
+--- pool entries
+pipeline-start.lock
+
+=== f2
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/f2-rerun/wt) python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start --only-fresh -- no-mistakes rerun
+exit=3
+--- stderr
+fm-cpu-pass: pipeline-start admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-r2-live/f2-rerun/pool start_repo=unknown start_branch=unknown
+--- stdout
+--- stub.log
+stub no-mistakes ran: rerun
+--- pool entries
+pipeline-start.lock
+
+=== f3
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/f3-abs-path-intent-file/wt) python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start --only-fresh -- env /Users/charlesabrooker/tmp/fm-r2-live/f3-abs-path-intent-file/bin/no-mistakes axi run --intent-file /Users/charlesabrooker/tmp/fm-r2-live/f3-abs-path-intent-file/intent.txt
+exit=3
+--- stderr
+fm-cpu-pass: pipeline-start admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-r2-live/f3-abs-path-intent-file/pool start_repo=unknown start_branch=unknown
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --intent-file /Users/charlesabrooker/tmp/fm-r2-live/f3-abs-path-intent-file/intent.txt
+--- pool entries
+pipeline-start.lock
+
+=== f4
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/f4-reattach-status/wt) python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start --only-fresh -- no-mistakes axi status
+exit=3
+--- stderr
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi status
+--- pool entries
+
+=== f5
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/f5-respond/wt) python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-cpu-pass.py pipeline-start --only-fresh -- no-mistakes axi respond --action approve
+exit=3
+--- stderr
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi respond --action approve
+--- pool entries
+
+=== m1
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/m1-memguard-fresh/wt) bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-mem-guard.sh run -- no-mistakes axi run --intent via-memguard
+exit=3
+--- stderr
+fm-cpu-pass: pipeline-start admitted: counted=1 limit=6 basis=fallback launched=0 pending=0 starts=1 priority=other checkout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS pool=/Users/charlesabrooker/tmp/fm-r2-live/m1-memguard-fresh/pool start_repo=unknown start_branch=unknown
+--- stdout
+--- stub.log
+stub no-mistakes ran: axi run --intent via-memguard
+--- pool entries
+pipeline-start.lock
+
+=== m2
+$ (cd /Users/charlesabrooker/tmp/fm-r2-live/m2-memguard-other/wt) bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M8GN40RVRDBGJBFS5C07BBGS/bin/fm-mem-guard.sh run -- bash -c echo other-command-ran; exit 4
+exit=4
+--- stderr
+--- stdout
+other-command-ran
+--- stub.log
+(stub never ran)
+--- pool entries
+
