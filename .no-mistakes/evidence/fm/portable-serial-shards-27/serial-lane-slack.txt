@@ -1,0 +1,9 @@
+serial lane members (from --list --lane portable-serial): 365
+hinted=339 unhinted=26 sum_ms=30080793
+shards=25 capacity_ms=30000000 lane_slack_ms=-80793 one_target_rule(>=1200000)=REFUSED
+shards=26 capacity_ms=31200000 lane_slack_ms=1119207 one_target_rule(>=1200000)=REFUSED
+shards=27 capacity_ms=32400000 lane_slack_ms=2319207 one_target_rule(>=1200000)=PASS
+
+per-shard packed sums at 27 shards (sum of per-lane --list membership):
+duplicate members across 27 shards: 0
+distinct members across 27 shards: 365

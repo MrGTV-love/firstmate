@@ -1,0 +1,58 @@
+## Serial lane sum and slack (sum from the 1-shard guard run: 30080793 ms)
+shards=25 slack_ms=-80793
+shards=26 slack_ms=1119207
+shards=27 slack_ms=2319207
+
+## CI matrix parsed from .github/workflows/ci.yml (PyYAML)
+shard_values= [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+job_total= 27 contiguous_1_to_n= True
+FM_SERIAL_LANE template= portable-serial-${{ matrix.shard }}of${{ strategy.job-total }}
+
+## bin/fm-test-run.sh --list-lanes (serial lanes)
+portable-serial-1of27 portable-serial-2of27 portable-serial-3of27 portable-serial-4of27 portable-serial-5of27 portable-serial-6of27 portable-serial-7of27 portable-serial-8of27 portable-serial-9of27 portable-serial-10of27 portable-serial-11of27 portable-serial-12of27 portable-serial-13of27 portable-serial-14of27 portable-serial-15of27 portable-serial-16of27 portable-serial-17of27 portable-serial-18of27 portable-serial-19of27 portable-serial-20of27 portable-serial-21of27 portable-serial-22of27 portable-serial-23of27 portable-serial-24of27 portable-serial-25of27 portable-serial-26of27 portable-serial-27of27 
+count=27
+
+## Each CI lane name the matrix will build (portable-serial-<shard>of27) selects scripts
+shard 1: 9 scripts
+shard 2: 10 scripts
+shard 3: 13 scripts
+shard 4: 13 scripts
+shard 5: 12 scripts
+shard 6: 13 scripts
+shard 7: 14 scripts
+shard 8: 13 scripts
+shard 9: 13 scripts
+shard 10: 13 scripts
+shard 11: 13 scripts
+shard 12: 15 scripts
+shard 13: 14 scripts
+shard 14: 15 scripts
+shard 15: 14 scripts
+shard 16: 14 scripts
+shard 17: 14 scripts
+shard 18: 14 scripts
+shard 19: 14 scripts
+shard 20: 15 scripts
+shard 21: 14 scripts
+shard 22: 15 scripts
+shard 23: 14 scripts
+shard 24: 14 scripts
+shard 25: 15 scripts
+shard 26: 14 scripts
+shard 27: 14 scripts
+union_lines=365 unique=365 serial_lane=365
+union of 27 shards == portable-serial lane exactly (no gaps, no duplicates)
+
+## Adversarial: old 25-shard lane name and out-of-range index are refused
+$ bin/fm-test-run.sh --list --lane portable-serial-1of25
+fm-test-run: lane 'portable-serial-1of25' asks for 25 portable serial shards but this runner is configured for 27 (see --list-lanes)
+exit=2
+$ bin/fm-test-run.sh --list --lane portable-serial-25of26
+fm-test-run: lane 'portable-serial-25of26' asks for 26 portable serial shards but this runner is configured for 27 (see --list-lanes)
+exit=2
+$ bin/fm-test-run.sh --list --lane portable-serial-28of27
+fm-test-run: lane 'portable-serial-28of27' shard index is outside 1..27 (see --list-lanes)
+exit=2
+$ bin/fm-test-run.sh --list --lane portable-serial-0of27
+fm-test-run: lane 'portable-serial-0of27' shard index is outside 1..27 (see --list-lanes)
+exit=2

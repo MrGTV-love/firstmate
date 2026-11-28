@@ -1,0 +1,3 @@
+$ # temporary local edit: PORTABLE_SERIAL_SHARDS=25 (restored afterwards)
+$ bin/fm-test-run.sh --list --lane portable-serial-1of25 | grep fm-ci-workflow
+tests/fm-ci-workflow.test.sh

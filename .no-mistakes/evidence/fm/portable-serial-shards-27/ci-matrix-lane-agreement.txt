@@ -1,0 +1,21 @@
+$ python3 parse .github/workflows/ci.yml (semantic YAML load)
+job=tests-portable-serial name='Behavior portable serial ${{ matrix.shard }}' shard_count=27 shards_are_1..N=True
+
+$ bin/fm-test-run.sh --list-lanes | grep -c portable-serial-
+27
+portable-serial-1of27
+portable-serial-27of27
+
+# every CI lane name portable-serial-<k>of<job-total=27> accepted by runner:
+accepted=27/27
+
+# adversarial: stale 25-shard lane name and out-of-range index
+$ bin/fm-test-run.sh --list --lane portable-serial-1of25
+fm-test-run: lane 'portable-serial-1of25' asks for 25 portable serial shards but this runner is configured for 27 (see --list-lanes)
+exit=2
+$ bin/fm-test-run.sh --list --lane portable-serial-28of27
+fm-test-run: lane 'portable-serial-28of27' shard index is outside 1..27 (see --list-lanes)
+exit=2
+$ bin/fm-test-run.sh --list --lane portable-serial-1of26
+fm-test-run: lane 'portable-serial-1of26' asks for 26 portable serial shards but this runner is configured for 27 (see --list-lanes)
+exit=2

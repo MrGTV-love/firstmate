@@ -1,0 +1,22 @@
+FM_TEST_BEGIN 2026-11-28T06:48:11Z tests/fm-ci-workflow.test.sh family=unclassified expected_gate_skip=none
+ok - both pull_request workflows upload the actual checked merge tree and parent for the run attempt
+fm-lint.sh: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1
+fm-lint.sh: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1
+fm-lint.sh: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1
+fm-lint.sh: reducing --jobs 2 to inherited FM_CPU_PASS_HELD=1
+ok - CI matrices cover every executable serial lane and canonical lint root exactly once
+ok - a newer push to one PR supersedes that PR's in-flight CI
+ok - distinct PRs get distinct concurrency groups
+ok - main pushes share one group per branch and never cancel the running run
+ok - every ci.yml job carries a finite timeout
+ok - every ci.yml job belongs to one of the three timeout tiers
+ok - fast tier jobs share one 5 minute tripwire
+ok - normal tier jobs share one 60 minute budget
+ok - Herdr keeps a 60 minute step tripwire under a 120 minute job backstop
+ok - both portable parallel jobs pass the concurrency the model starts from
+FM_TEST_END 2026-11-28T06:49:24Z tests/fm-ci-workflow.test.sh exit=0 duration_ms=72598 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8GE7R9HGR5VRB4TCFEMEC61/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=81686
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=72598 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-ci-workflow.test.sh duration_ms=72598
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M8GE7R9HGR5VRB4TCFEMEC61/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

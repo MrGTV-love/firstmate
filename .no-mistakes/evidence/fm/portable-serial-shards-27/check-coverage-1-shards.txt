@@ -1,0 +1,6 @@
+$ # temporary local edit: PORTABLE_SERIAL_SHARDS=1 (restored afterwards)
+287:PORTABLE_SERIAL_SHARDS=1
+$ bin/fm-test-run.sh --check-coverage
+fm-test-run: coverage guard: portable serial shard 1 of 1 packs 30080793ms above the 1200000ms target and beyond its own largest script (1005601ms), so the excess is packing
+fm-test-run: refresh CI hints and rebalance or add shards; do not raise the job timeout: docs/fm-test-portable-shards.md
+exit=1
