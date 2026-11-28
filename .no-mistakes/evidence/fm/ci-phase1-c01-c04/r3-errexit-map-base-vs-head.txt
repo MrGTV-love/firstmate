@@ -1,0 +1,51 @@
+Per-case errexit state: base c4a207ac3 (cleanup+pool combined) vs HEAD (6 split files), via real fm_test_run_cases + real registries + fm_test_before_case, case bodies replaced by $- probes.
+base cases:      392  head cases:      391
+diff base head:
+38d37
+< test_a_run_without_the_per_task_lifecycle_locks_calls_the_driver_twice_so_the_overlap_check_discriminates on
+(only difference: the pruned source-patching sed meta-test, removed by C-04 intent)
+
+previous round (HEAD~1) cases whose errexit differed from base: 39
+> test_child_pool_return_custody_refusal_keeps_slot on
+> test_child_return_custody_refusal_keeps_non_pool_worktree on
+> test_completed_teardown_records_one_landed_work_allow on
+> test_current_pool_copy_tears_down_without_a_status_listing on
+> test_current_pool_proof_asks_treehouse on
+> test_endpoint_refusal_after_reservation_survives_session_start on
+> test_forced_child_missing_adapter_sibling_refuses_before_cleanup on
+> test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup on
+> test_idle_reap_retries_a_closed_task_whose_return_stalled on
+> test_idle_reap_return_waits_for_project_custody_after_closure on
+> test_lane_registry_scan_reads_each_distinct_registry_once on
+> test_legacy_pool_teardown_keeps_its_return_pending_record_across_the_stamp on
+> test_legacy_stamp_rollback_rebinds_the_return_pending_record on
+> test_missing_adapter_sibling_refuses_before_cleanup on
+> test_missing_startup_source_refuses_before_cleanup on
+> test_non_pool_returns_recheck_registered_copies on
+> test_pool_return_rechecks_work_after_waiting_for_project_custody on
+> test_refusal_before_cleanup_takes_no_pool_reservation on
+> test_retained_sources_still_reach_the_ordinary_refusal on
+> test_return_missing_slot_reports_canonicalization_refusal on
+> test_return_pending_occupied_marker_path_refuses_and_the_retry_finishes on
+> test_return_pending_unreadable_generation_refuses_and_the_retry_finishes on
+> test_return_pending_write_failure_refuses_and_the_retry_finishes on
+> test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd on
+> test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap on
+> test_superseded_pool_copy_tears_down_without_touching_the_current_pool on
+> test_task_teardown_preserves_another_homes_abandoned_worker on
+> test_teardown_follows_the_installed_treehouse_lease_support on
+> test_teardown_never_holds_up_a_steer_to_another_task on
+> test_unlanded_superseded_pool_copy_is_refused_and_the_landed_retry_finishes on
+> test_unlanded_work_in_an_older_pool_folder_is_refused_before_any_return on
+> test_unprovable_pool_state_keeps_project_custody_through_return on
+> test_unreadable_pool_status_never_leases_by_name on
+> test_unreadable_startup_source_refuses_before_cleanup on
+> test_unverified_pool_reservation_preserves_processes on
+> test_vernant_slot_manifest_retirement on
+> test_waited_return_lock_error_is_not_reported_as_contention on
+> test_wrong_lease_from_an_earlier_teardown_is_released_only_when_it_is_this_tasks on
+> test_wrong_lease_repair_releases_only_the_same_named_slot on
+
+HEAD errexit tally:
+  42 off
+ 349 on

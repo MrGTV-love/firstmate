@@ -1,0 +1,47 @@
+$ bin/fm-test-size-guard.sh   (HEAD tree)
+FM_TEST_SIZE_GUARD ok total=424 max_lines=1000 grandfathered=115
+rc=0
+
+$ wc -l tests/fm-test-run.test.sh tests/fm-teardown-scan-bounds.test.sh
+    3552 tests/fm-test-run.test.sh
+    1035 tests/fm-teardown-scan-bounds.test.sh
+    4587 total
+
+$ grep -c budget rows
+115
+
+$ bin/fm-test-size-guard.sh --help
+fm-test-size-guard.sh - enforce the 1,000-line single-file cap and burn-down
+ratchet on tests/*.test.sh.
+
+Usage:
+  bin/fm-test-size-guard.sh [--root <dir>]
+
+Policy:
+- Every new tests/*.test.sh file must be at most 1000 lines.
+- Existing grandfathered files listed in docs/guards/test-file-line-budget.tsv
+  ("<path>\t<max_lines>") may stay at or below their recorded ceiling, and may
+  never grow past it.
+- Entries in the budget file whose test file no longer exists or has already
+  shrunk to <= 1000 lines are reported as stale so the ratchet burns down.
+
+Recorded user decisions:
+- A ceiling is a baseline, not a moving limit: a grandfathered file that
+  shrinks but stays above 1000 lines keeps its ceiling, so concurrent PRs do
+  not conflict on the budget file.
+- Files produced by splitting a grandfathered monolith stay grandfathered at
+  their split ceilings, and sourced tests/*-helpers.sh files are not
+  *.test.sh files, so the cap does not apply to them.
+rc=0
+
+$ bin/fm-test-size-guard.sh --write-budget   (removed flag)
+fm-test-size-guard: unknown argument: --write-budget
+rc=2
+
+$ bin/fm-test-size-guard.sh --max-lines 5000   (removed flag)
+fm-test-size-guard: unknown argument: --max-lines 5000
+rc=2
+
+$ bin/fm-test-size-guard.sh --budget /tmp/x.tsv   (removed flag)
+fm-test-size-guard: unknown argument: --budget /tmp/x.tsv
+rc=2

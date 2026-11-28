@@ -1,0 +1,25 @@
+Disposable root: git archive HEAD tests docs/guards -> /tmp/nm-t3/sg; guard = real bin/fm-test-size-guard.sh --root /tmp/nm-t3/sg
+
+## baseline copy
+FM_TEST_SIZE_GUARD ok total=424 max_lines=1000 grandfathered=115
+rc=0
+
+## adversarial: new 1001-line tests/fm-brand-new.test.sh
+fm-test-size-guard: tests/fm-brand-new.test.sh: 1001 lines exceeds the 1000-line cap for new test files (split into focused suites <= 1000 lines)
+rc=1
+
+## boundary: new file at exactly 1000 lines
+FM_TEST_SIZE_GUARD ok total=425 max_lines=1000 grandfathered=115
+rc=0
+
+## adversarial: grandfathered tests/fm-test-run.test.sh grows 3552 -> 3553
+fm-test-size-guard: tests/fm-test-run.test.sh: 3553 lines exceeds grandfathered ceiling 3552 (split the file instead of growing legacy debt)
+rc=1
+
+## adversarial: main's tests/fm-teardown-scan-bounds.test.sh grows 1035 -> 1036
+fm-test-size-guard: tests/fm-teardown-scan-bounds.test.sh: 1036 lines exceeds grandfathered ceiling 1035 (split the file instead of growing legacy debt)
+rc=1
+
+## burn-down: scan-bounds shrinks to 1000 lines (stale row)
+fm-test-size-guard: tests/fm-teardown-scan-bounds.test.sh: 1000 lines is now <= 1000; remove stale entry from docs/guards/test-file-line-budget.tsv
+rc=1

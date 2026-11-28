@@ -1,0 +1,14 @@
+state file: /Users/charlesabrooker/tmp/fm-slack-watch.4GYaUF/home.p32xUx/state/slack-watch/state.json
+--- present row+field (jq) vs original Python inspector
+field=ts jq=[900.000001] python=[900.000001] equal=yes
+field=options jq=[[{"value":"ship","label":"Ship it","hint":"Deploy now"},{"value":"wait","label":"Wait","hint":"Hold current"}]] python=[[{'value': 'ship', 'label': 'Ship it', 'hint': 'Deploy now'}, {'value': 'wait', 'label': 'Wait', 'hint': 'Hold current'}]] equal=NO
+--- missing thread row
+jq rc=5 out=[jq: error (at /Users/charlesabrooker/tmp/fm-slack-watch.4GYaUF/home.p32xUx/state/slack-watch/state.json:0): no thread with key no-such-task]
+python: StopIteration
+--- missing field
+jq rc=5 out=[jq: error (at /Users/charlesabrooker/tmp/fm-slack-watch.4GYaUF/home.p32xUx/state/slack-watch/state.json:0): thread with-options has no field no_such_field]
+python: KeyError: 'no_such_field'
+--- regression sim: drop 'options' from the stored thread, then capture under set -e
+jq: error (at /Users/charlesabrooker/tmp/fm-slack-watch.4GYaUF/home.p32xUx/state/slack-watch/state.json:61): thread with-options has no field options
+
+(regression-sim) outer driver stopped at the bash -c line: set -e aborted the capture; "NOT ABORTED" never printed.
