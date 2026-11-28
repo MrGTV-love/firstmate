@@ -169,7 +169,8 @@
     "home-state-write",
     "spawn-reconciled-source",
     "backpass-core-role-inputs",
-    "main-checkout-commit"
+    "main-checkout-commit",
+    "disk-free-floor"
   ],
   "guards": [
     {
@@ -6742,6 +6743,35 @@
       "remedy": "bin/fm-mem-guard.py --json (prints the measured pressure and the verdict used by the recovery playbook); after an admission refusal the backlog item stays queued, so repeat its bin/fm-spawn.sh <task> <project-clone> dispatch with the same arguments once bin/fm-mem-guard.sh sample shows pressure below 2",
       "budget": 1,
       "test": "tests/fm-mem-guard.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "open",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "disk-free-floor",
+      "owner": "bin/fm-disk-floor-lib.sh",
+      "sites": [
+        {"file": "bin/fm-disk-floor-lib.sh", "match": "deferred: disk free floor refused"},
+        {"file": "bin/fm-disk-floor-lib.sh", "match": "error: disk free floor refused"},
+        {"file": "bin/fm-disk-floor-lib.sh", "match": "fm-guard-event.sh\" disk-free-floor"}
+      ],
+      "invariant": "a new spawn, no-mistakes run or brief-named stack start never starts while the volume it writes to has less free disk than the floor",
+      "layer": "runtime-block",
+      "source": "df -Pk on the nearest existing ancestor of the path the step writes to, and config/disk-free-floor (default 20 GiB)",
+      "trigger": "whole free GiB on the volume is below the floor when a fresh bin/fm-spawn.sh spawn, a fresh no-mistakes run start through bin/fm-mem-guard.sh run or bin/fm-cpu-pass.sh pipeline-start, or a bin/fm-stack-start.sh stack start begins; a relaunch and every teardown never ask",
+      "remedy": "bin/fm-disk-floor-lib.sh free <path> prints the free GiB the guard reads; after freeing space on that volume repeat the deferred dispatch with the same arguments, because the backlog item stays queued (a malformed config/disk-free-floor refuses with exit 2 until it holds one positive whole number of GiB)",
+      "budget": 1,
+      "test": "tests/fm-disk-floor.test.sh",
       "tier": "B",
       "harm": "reversible",
       "remedy_verified": "fixture"

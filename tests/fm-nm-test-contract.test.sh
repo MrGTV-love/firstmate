@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Contract: parsed .no-mistakes.yaml must leave commands.test absent or empty
-# and must integrate newer main by merge (rebase.strategy: merge).
+# Contract: parsed .no-mistakes.yaml must leave commands.test absent or empty,
+# integrate newer main by merge (rebase.strategy: merge), and keep test
+# instructions targeted, synchronous in the foreground, and lab-bounded.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -40,3 +41,25 @@ puts r.is_a?(Hash) ? r["strategy"].to_s : ""
 }
 
 test_nm_integrates_main_by_merge
+
+test_nm_test_instructions_stay_targeted_and_foreground() {
+  command -v ruby >/dev/null 2>&1 \
+    || fail "ruby is required to parse .no-mistakes.yaml for this contract"
+  local text
+  text=$(ruby -ryaml -e '
+doc = YAML.load_file(ARGV[0]) || {}
+t = doc["test"]
+puts t.is_a?(Hash) ? t["instructions"].to_s : ""
+' "$NM") || fail "failed to parse .no-mistakes.yaml as YAML"
+  printf '%s' "$text" | grep -qi 'targeted' \
+    || fail "test.instructions must require targeted validation so local Test stays fast"
+  printf '%s' "$text" | grep -qi 'foreground' \
+    || fail "test.instructions must require synchronous foreground test execution"
+  printf '%s' "$text" | grep -q 'bin/fm-herdr-lab.sh' \
+    || fail "test.instructions must retain the bin/fm-herdr-lab.sh boundary"
+  printf '%s' "$text" | grep -q 'bin/fm-lab-home.sh' \
+    || fail "test.instructions must retain the bin/fm-lab-home.sh boundary"
+  pass "no-mistakes test.instructions enforces targeted foreground checks and lab boundaries"
+}
+
+test_nm_test_instructions_stay_targeted_and_foreground
