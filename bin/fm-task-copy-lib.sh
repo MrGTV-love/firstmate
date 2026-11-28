@@ -92,6 +92,25 @@ fm_task_copy_canonical_dir() {  # <path>
   ( cd "$target" && pwd -P )
 }
 
+# The same canonical path assigned to <out-var> without a fork: a command substitution
+# forks a subshell, Bash 3.2 does not act on SIGTERM while it reads one's pipe, and a
+# fork that never finishes (the stall of data/fm-teardown-pure-bash-spin/report.md) then holds
+# its parent past the signal. The working directory and OLDPWD are put back; a caller's
+# own directory that is gone is replaced by /.
+fm_task_copy_canonical_dir_to() {  # <out-var> <path>
+  local _fm_cd_out=$1 _fm_cd_target=$2 _fm_cd_saved=$PWD _fm_cd_old=${OLDPWD-} _fm_cd_real
+  printf -v "$_fm_cd_out" '%s' ''
+  [ -n "$_fm_cd_target" ] || return 1
+  [ -d "$_fm_cd_target" ] || return 1
+  if ! cd -P -- "$_fm_cd_target"; then
+    return 1
+  fi
+  _fm_cd_real=$PWD
+  cd -- "$_fm_cd_saved" 2>/dev/null || cd / || true
+  OLDPWD=$_fm_cd_old
+  printf -v "$_fm_cd_out" '%s' "$_fm_cd_real"
+}
+
 fm_task_copy_paths_overlap() {  # <canonical-a> <canonical-b>
   local a=$1 b=$2
   [ -n "$a" ] && [ -n "$b" ] || return 1
@@ -350,20 +369,37 @@ fm_task_copy_registered_nested() {  # <canonical-clone>
   done < <(git -C "$clone" worktree list --porcelain -z 2>/dev/null || printf '\0registration-list-unreadable\0')
 }
 
-# The local copies a task record names, one "<field> <path>" line each: the
+# The local copies a task record names, one "<field> <path>" entry each: the
 # last worktree= and home= values (the values every reader of those fields
-# uses) and every prior_worktree= line.
-fm_task_copy_record_paths() {  # <meta>
+# uses) and every prior_worktree= line. Filled into FM_TASK_COPY_RECORD_PATHS by
+# pure bash, with no process substitution and no command substitution: a
+# per-record loop that read these through `< <(...)` kept one pipe fd open per
+# record until its function returned, and Bash 3.2 faulted in its next fork once
+# a pipe reached fd 256 (data/fm-teardown-pure-bash-spin/report.md). A caller
+# that makes other calls while it walks the entries copies the array first,
+# because a nested call refills it.
+FM_TASK_COPY_RECORD_PATHS=()
+fm_task_copy_record_paths_to() {  # <meta>
   local meta=$1 value line
+  FM_TASK_COPY_RECORD_PATHS=()
   for value in worktree home; do
-    line=$(fm_meta_get "$meta" "$value")
-    [ -z "$line" ] || printf '%s %s\n' "$value" "$line"
+    fm_meta_get_to line "$meta" "$value"
+    [ -z "$line" ] || FM_TASK_COPY_RECORD_PATHS+=("$value $line")
   done
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
-      prior_worktree=?*) printf 'prior_worktree %s\n' "${line#prior_worktree=}" ;;
+      prior_worktree=?*) FM_TASK_COPY_RECORD_PATHS+=("prior_worktree ${line#prior_worktree=}") ;;
     esac
   done < "$meta" 2>/dev/null || true
+}
+
+# The same entries, one "<field> <path>" line each, for a caller that wants text.
+fm_task_copy_record_paths() {  # <meta>
+  local entry
+  fm_task_copy_record_paths_to "$1"
+  for entry in ${FM_TASK_COPY_RECORD_PATHS[@]+"${FM_TASK_COPY_RECORD_PATHS[@]}"}; do
+    printf '%s\n' "$entry"
+  done
 }
 
 fm_task_copy_ancestor_current() {
@@ -402,7 +438,16 @@ fm_task_copy_ancestor_current() {
 # re-points together in one call, and checks those against each other itself.
 # Returns 0 on overlap, setting FM_TASK_COPY_OTHER_ID and
 # FM_TASK_COPY_OTHER_FIELD;
-# 1 for no overlap or a missing path; 2 when the scan cannot be completed.
+# 1 for no overlap or a missing path; 2 when the scan cannot be completed; 3 when
+# the walk ran past FM_TASK_COPY_SCAN_LIMIT_SECS (below).
+#
+# FM_TASK_COPY_SCAN_LIMIT_SECS: a caller that holds a lock other processes wait on
+# sets it, for the one call, to the seconds the walk may run; 0 (the default) is
+# unbounded. This library does not know whether any lock is held: the caller says
+# so by setting the value. The walk reads only. It checks the clock before each
+# task record (a pure-bash walk cannot be interrupted), and past the limit it
+# stops with status 3 before reading that record, having changed nothing and
+# signalled nothing. The caller decides what to refuse.
 #
 # Identity, not spelling: the same record reached through a differently
 # resolved state dir (e.g. a symlinked $FM_HOME) is still <record-meta>. A
@@ -416,10 +461,16 @@ fm_task_copy_ancestor_current() {
 FM_TASK_COPY_OTHER_ID=
 FM_TASK_COPY_OTHER_FIELD=
 FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
+FM_TASK_COPY_SCAN_LIMIT_SECS=0
 fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta>...]
   local record_meta=$1 record_state=$2 path=$3
-  local target state_dir other_meta line field other_path other_real skip
+  local target state_dir other_meta line field other_path other_real skip scan_end=0 released
+  local -a rec_lines=()
   shift 3
+  case "${FM_TASK_COPY_SCAN_LIMIT_SECS:-0}" in
+    ''|*[!0-9]*) ;;
+    *) [ "$((10#$FM_TASK_COPY_SCAN_LIMIT_SECS))" -le 0 ] || scan_end=$((SECONDS + 10#$FM_TASK_COPY_SCAN_LIMIT_SECS)) ;;
+  esac
   FM_TASK_COPY_OTHER_ID=
   FM_TASK_COPY_OTHER_FIELD=
   target=$(fm_task_copy_canonical_dir "$path") || return 1
@@ -430,6 +481,7 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
+      [ "$scan_end" -le 0 ] || [ "$SECONDS" -lt "$scan_end" ] || return 3
       [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ] && continue
       # An unreadable record cannot be read as "names no overlapping copy": the scan cannot be completed.
       [ -r "$other_meta" ] || {
@@ -439,27 +491,40 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
       for skip in "$@"; do
         [ "${other_meta##*/}" = "${skip##*/}" ] && [ "$other_meta" -ef "$skip" ] && continue 2
       done
-      while IFS= read -r line || [ -n "$line" ]; do
+      fm_task_copy_record_paths_to "$other_meta"
+      rec_lines=(${FM_TASK_COPY_RECORD_PATHS[@]+"${FM_TASK_COPY_RECORD_PATHS[@]}"})
+      for line in ${rec_lines[@]+"${rec_lines[@]}"}; do
         field=${line%% *}
         other_path=${line#* }
         [ -n "$other_path" ] || continue
         other_real=$(fm_task_copy_canonical_dir "$other_path") || continue
         fm_task_copy_paths_overlap "$other_real" "$target" || continue
         fm_task_copy_ancestor_current "$other_meta" "$record_state" "$field" "$other_real" "$target" && continue
-        if [ "$field" = prior_worktree ] && [ -n "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" ] \
-           && fm_task_copy_prior_root_released "$other_meta" "$other_real" "$target" \
-             "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" "${FM_LOCAL_FIRSTMATE_STATES[@]}"; then
-          continue
+        if [ "$field" = prior_worktree ] && [ -n "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" ]; then
+          released=0
+          FM_TASK_COPY_SCAN_END=$scan_end
+          fm_task_copy_prior_root_released "$other_meta" "$other_real" "$target" \
+            "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" "${FM_LOCAL_FIRSTMATE_STATES[@]}" || released=$?
+          FM_TASK_COPY_SCAN_END=0
+          case "$released" in
+            0) continue ;;
+            3) return 3 ;;
+          esac
         fi
         FM_TASK_COPY_OTHER_ID=$(basename "$other_meta" .meta)
         FM_TASK_COPY_OTHER_FIELD=$field
         return 0
-      done < <(fm_task_copy_record_paths "$other_meta")
+      done
     done
   done
   return 1
 }
 
+# FM_TASK_COPY_SCAN_END: the SECONDS value a caller that holds a lock hands to the inner pass
+# below, for the one call, so that its pass over every record ends where the caller's own walk
+# must end; 0 (the default) is unbounded. Like the limit above it is a fact the caller states, set
+# around the call and put back to 0 after it.
+FM_TASK_COPY_SCAN_END=0
 # Whether the prior_worktree= <root> of record <other-meta> is a pool slot root
 # that task has left, so that it does not keep <target>, a copy of the retiring
 # task strictly inside <root>, from being cleaned up. bin/fm-control.sh
@@ -479,9 +544,17 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
 #     or home=; a copy of some record inside <root> belongs to that record.
 # <state-dir>... are the local Firstmate state directories to scan, as
 # fm_local_firstmate_state_dirs produced them. <root> and <target> are canonical.
+# Returns 0 when released, 1 when not (or when that cannot be told), and 3 when its pass
+# over the records ran past FM_TASK_COPY_SCAN_END: it checks the clock before each record, reads
+# only, and changes and signals nothing. A caller must read 3 as "stop", never as "not
+# released", because every caller counts a failure as an overlap that keeps the copy.
 fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-meta> <state-dir>...
-  local other=$1 root=$2 target=$3 retiring=$4 kind project wt state_dir meta field path real line named
+  local other=$1 root=$2 target=$3 retiring=$4 kind project wt state_dir meta field path real line named scan_end=0
   shift 4
+  case "${FM_TASK_COPY_SCAN_END:-0}" in
+    ''|*[!0-9]*) ;;
+    *) scan_end=$((10#$FM_TASK_COPY_SCAN_END)) ;;
+  esac
   case "$target" in "$root"/*) ;; *) return 1 ;; esac
   kind=$(fm_meta_get "$other" kind)
   case "${kind:-ship}" in ship|scout) ;; *) return 1 ;; esac
@@ -500,6 +573,7 @@ fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-m
   for state_dir in "$@"; do
     for meta in "$state_dir"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      [ "$scan_end" -le 0 ] || [ "$SECONDS" -lt "$scan_end" ] || return 3
       [ "${meta##*/}" = "${other##*/}" ] && [ "$meta" -ef "$other" ] && continue
       [ "${meta##*/}" = "${retiring##*/}" ] && [ "$meta" -ef "$retiring" ] && continue
       for field in worktree home; do

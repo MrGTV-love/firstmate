@@ -574,6 +574,7 @@ family_for_basename() {
     fm-spawn-compact-adviser-disable-remote.test.sh|\
     fm-spawn-herdr-launch-shell.test.sh|\
     fm-project-capacity.test.sh|\
+    fm-disk-floor.test.sh|fm-disk-floor-relaunch.test.sh|\
     fm-teardown-endpoint-safety.test.sh)
       printf '%s\n' backend-dispatch
       ;;
@@ -969,6 +970,8 @@ tests/fm-cursor-primary.test.sh 81994
 tests/fm-daemon.test.sh 56162
 tests/fm-devin-harness.test.sh 5494
 tests/fm-devin-signals-live-e2e.test.sh 1059
+tests/fm-disk-floor-relaunch.test.sh 12000
+tests/fm-disk-floor.test.sh 25000
 tests/fm-dispatch-capacity.test.sh 5387
 tests/fm-dispatch-resolve.test.sh 243463
 tests/fm-documentation-audiences.test.sh 4471
@@ -1096,6 +1099,7 @@ tests/fm-project-origin.test.sh 690
 tests/fm-public-followup.test.sh 531543
 tests/fm-quota-array-dispatch-live-e2e.test.sh 645
 tests/fm-quota-choose.test.sh 4494
+tests/fm-record-paths-scan.test.sh 60000
 tests/fm-remote-backlog-handoff.test.sh 158878
 tests/fm-remote-delta-read.test.sh 6830
 tests/fm-remote-doctor.test.sh 52399
@@ -1199,6 +1203,7 @@ tests/fm-teardown-cleanup.test.sh 1005601
 tests/fm-teardown-endpoint-safety.test.sh 89444
 tests/fm-teardown-pool-real-treehouse.test.sh 3000
 tests/fm-teardown-pool.test.sh 520244
+tests/fm-teardown-scan-bounds.test.sh 180000
 tests/fm-teardown.test.sh 321463
 tests/fm-test-fixture-cleanup.test.sh 4736
 tests/fm-test-fixtures.test.sh 18329

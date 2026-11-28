@@ -621,6 +621,23 @@ test_spawn_tree_follows_untracked_content() (
   second=$(ROOT="$dir/repo" TMPDIR="$dir/tmp" FM_TEST_STUB_SUMMARY_REFRESH=1 fm_test_spawn_script) || fail "the second non-ASCII tree could not be built"
   [ "$first" != "$second" ] || fail "an untracked non-ASCII file whose content changed reused the tree built for the old content: $first"
   pass "the private spawn tree changes when an untracked file with a non-ASCII name changes content"
+  # Earlier state keys for the same checkout are pruned and object storage is shared.
+  local first_dir second_dir other_dir other_tree
+  first_dir=$(dirname "$(dirname "$first")")
+  second_dir=$(dirname "$(dirname "$second")")
+  [ ! -e "$first_dir" ] || fail "stale spawn tree for the same checkout was not pruned: $first_dir"
+  [ -f "$second_dir/.git/objects/info/alternates" ] || fail "spawn tree duplicated git object storage instead of sharing alternates: $second_dir"
+  mkdir -p "$dir/repo2/bin"
+  git init -q "$dir/repo2"
+  printf '#!/bin/sh\n' >"$dir/repo2/bin/fm-spawn.sh"
+  chmod +x "$dir/repo2/bin/fm-spawn.sh"
+  git -C "$dir/repo2" add bin
+  git -C "$dir/repo2" -c user.name=t -c user.email=t@e.invalid commit -qm init
+  other_tree=$(ROOT="$dir/repo2" TMPDIR="$dir/tmp" FM_TEST_STUB_SUMMARY_REFRESH=1 fm_test_spawn_script) || fail "second checkout tree could not be built"
+  other_dir=$(dirname "$(dirname "$other_tree")")
+  [ -d "$second_dir" ] || fail "building a tree for repo2 pruned repo1's active spawn tree"
+  [ -d "$other_dir" ] || fail "repo2's spawn tree was not created"
+  pass "the private spawn tree shares git objects and prunes stale keys only for its own checkout"
 )
 
 # The real-treehouse gates skip only for what a script or case uses, and name exactly what is missing. A host treehouse
