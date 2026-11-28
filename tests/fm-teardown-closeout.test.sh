@@ -2347,7 +2347,7 @@ test_an_aged_record_of_an_unchanged_kept_copy_still_asks_the_driver_nothing() {
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: the closing run asked the driver again"
   run_foreign_teardown rc FM_STUB_CLOSEOUT=retained
   assert_equals "1 1" "$(retained_call_count) $(retained_tar_count)" "retained-aged-$age: a run after the close asked the driver"
-  pass "a record 30 and 400 days old (its time fields and every file time) of an unchanged kept copy still asks the driver nothing, before and after the close"
+  pass "a record 400 days old (its time fields and every file time) of an unchanged kept copy still asks the driver nothing, before and after the close"
 }
 
 

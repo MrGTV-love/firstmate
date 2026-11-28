@@ -3827,7 +3827,7 @@ SH
     run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   watcher_pid=$!
-  for i in $(seq 1 100); do
+  for i in $(seq 1 500); do
     [ -d "$state/.control-task-a.lock" ] && break
     sleep 0.02
   done

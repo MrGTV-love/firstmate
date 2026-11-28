@@ -126,7 +126,7 @@ The portable parallel lanes are the confirmation for the three new paths, and a 
 
 ## Family concurrency proofs
 
-`bin/fm-test-isolation-proof.sh --pool <family>` runs the same concurrent proof over a whole `bin/fm-test-run.sh` family, for a stateful family that stays serial on CI but can earn bounded local concurrency.
+`bin/fm-test-isolation-proof.sh --pool <family>` runs the same concurrent proof over a whole `bin/fm-test-run.sh` family, for a stateful family that can earn bounded concurrency. An admitted family runs concurrently both locally and in the `tests-portable-family-parallel` CI lane, at `--jobs 3`.
 A family is admitted to `list_concurrent_safe_families` in `bin/fm-test-run.sh` only by a passing proof recorded here.
 Admission is by family rather than by script, so a script that joins an admitted family afterwards runs concurrently on that family's recorded result without appearing in it.
 

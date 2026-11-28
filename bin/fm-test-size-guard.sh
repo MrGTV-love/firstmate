@@ -12,6 +12,14 @@
 #   never grow past it.
 # - Entries in the budget file whose test file no longer exists or has already
 #   shrunk to <= --max-lines are reported as stale so the ratchet burns down.
+#
+# Recorded user decisions:
+# - A ceiling is a baseline, not a moving limit: a grandfathered file that
+#   shrinks but stays above --max-lines keeps its ceiling, so concurrent PRs do
+#   not conflict on the budget file.
+# - Files produced by splitting a grandfathered monolith stay grandfathered at
+#   their split ceilings, and sourced tests/*-helpers.sh files are not
+#   *.test.sh files, so the cap does not apply to them.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)

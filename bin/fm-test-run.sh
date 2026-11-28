@@ -827,10 +827,10 @@ EOF
 }
 
 # Families whose scripts are proven safe to run concurrently WITH EACH OTHER
-# under the bounded local scheduler. Deliberately separate from the
-# proven-isolated set, which must stay exactly equal to the portable CI shard
-# union (see the coverage guard); these families keep their serial CI lane and
-# only gain concurrency for a local run.
+# under the bounded scheduler. Deliberately separate from the proven-isolated
+# set, which must stay exactly equal to the portable CI shard union (see the
+# coverage guard); these families form the tests-portable-family-parallel CI
+# lane, which runs them with --jobs 3, and also gain concurrency locally.
 #
 # Membership is empirical, never assumed:
 # `bin/fm-test-isolation-proof.sh --pool <family> --jobs 4` is the owner of the
@@ -2023,11 +2023,37 @@ select_family() {
   [ "$found" -eq 1 ] || die "no tests mapped to family '$want'"
 }
 
+# The given needles, one per line, plus the basename of every tests/*-helpers.sh
+# that names one of them directly or through another such helper. A test that
+# sources a helper reaches every needle that helper names.
+reference_needles() {  # <needle>...
+  local needle h base seen=' ' grown=1
+  local -a args=()
+  for needle in "$@"; do
+    args+=(-e "$needle")
+    printf '%s\n' "$needle"
+  done
+  while [ "$grown" -eq 1 ]; do
+    grown=0
+    for h in tests/*-helpers.sh; do
+      [ -f "$h" ] || continue
+      base=${h##*/}
+      case $seen in *" $base "*) continue ;; esac
+      if grep -Fq "${args[@]}" "$h"; then
+        args+=(-e "$base")
+        seen="$seen$base "
+        grown=1
+        printf '%s\n' "$base"
+      fi
+    done
+  done
+}
+
 families_for_test_reference() {  # <needle>...
   local s needle
   local found=0
   local -a needles=()
-  for needle in "$@"; do needles+=(-e "$needle"); done
+  while IFS= read -r needle; do needles+=(-e "$needle"); done <<<"$(reference_needles "$@")"
   while IFS= read -r s; do
     [ -n "$s" ] || continue
     if grep -Fq "${needles[@]}" "$s"; then
@@ -2043,11 +2069,13 @@ families_for_test_reference() {  # <needle>...
 # evidence, so it selects per script: one real-Herdr E2E sourcing a shared
 # helper must not drag in every other script of that expensive family.
 scripts_for_test_reference() {
-  local needle=$1 s
+  local s needle
   local found=0
+  local -a needles=()
+  while IFS= read -r needle; do needles+=(-e "$needle"); done <<<"$(reference_needles "$1")"
   while IFS= read -r s; do
     [ -n "$s" ] || continue
-    if grep -Fq "$needle" "$s"; then
+    if grep -Fq "${needles[@]}" "$s"; then
       printf '__script__:%s\n' "$(basename "$s")"
       found=1
     fi
@@ -2644,17 +2672,6 @@ families_for_changed_path() {
         families_for_test_reference "fixtures/$fixture_ref" \
           || printf '%s\n' "__unmapped__:$path"
       fi
-      ;;
-    tests/wake-helpers.sh)
-      # The supervision and triage groups inherit this helper through shared fixtures.
-      families_for_test_reference wake-helpers.sh fm-supervision-host-helpers.sh fm-watch-triage-helpers.sh \
-        || printf '%s\n' "__unmapped__:$path"
-      ;;
-    tests/git-lock-helpers.sh)
-      # tests/fm-teardown-helpers.sh sources this helper.
-      # The reference scan reads only tests/*.test.sh, so name the module too.
-      families_for_test_reference git-lock-helpers.sh fm-teardown-helpers.sh \
-        || printf '%s\n' "__unmapped__:$path"
       ;;
     tests/lib.sh|tests/*-helpers.sh|tests/fixtures.sh|tests/*-fixture.sh)
       # Shared top-level test files, selected by the suites that name them.
@@ -3383,6 +3400,7 @@ declare -a WORKER_SCRIPTS=()
 # Invoked indirectly by the EXIT trap below.
 # shellcheck disable=SC2329
 cleanup_run() {
+  chmod -R u+w "$RUN_TMP" 2>/dev/null || true
   rm -rf "$RUN_TMP"
 }
 

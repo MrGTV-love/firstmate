@@ -447,6 +447,48 @@ test_supervision_groups_share_coverage_and_changed_selection() {
   pass "both triage groups retain watcher coverage and direct/transitive changed selection"
 }
 
+# A split moves shared setup into a sourced tests/*-helpers.sh. A source path
+# that only such a helper names, directly or through another helper it sources,
+# must still select every suite that sources it.
+test_changed_selection_reaches_suites_through_sourced_helper() {
+  local tmp repo listed script
+  tmp=$(fm_test_tmproot fm-test-run-sourced-helper)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  : >"$repo/bin/fm-tasks-axi.sh"
+  mkdir -p "$repo/tests/fixtures/demo-split"
+  : >"$repo/tests/fixtures/demo-split/case.json"
+  printf '# bin/fm-tasks-axi.sh\n# fm-demo-inner-helpers.sh\n' >"$repo/tests/fm-demo-split-helpers.sh"
+  printf '# tests/fixtures/demo-split/case.json\n' >"$repo/tests/fm-demo-inner-helpers.sh"
+  for script in fm-demo-split.test.sh fm-demo-split-edge.test.sh; do
+    printf '#!/usr/bin/env bash\n# fm-demo-split-helpers.sh\n' >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-demo-unrelated.test.sh"
+  chmod +x "$repo/tests/fm-demo-unrelated.test.sh"
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm sourced-helper-fixture
+
+  printf '\n' >>"$repo/bin/fm-tasks-axi.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "a bin path named only by a sourced helper failed changed selection"
+  for script in fm-demo-split.test.sh fm-demo-split-edge.test.sh; do
+    assert_contains "$listed" "tests/$script" "bin/fm-tasks-axi.sh selects $script through its sourced helper"
+  done
+  assert_not_contains "$listed" "tests/fm-demo-unrelated.test.sh" "bin/fm-tasks-axi.sh must not widen to a suite that does not source the helper"
+  git -C "$repo" add bin
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm sourced-helper-bin-change
+
+  printf '{}\n' >"$repo/tests/fixtures/demo-split/case.json"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "a fixture named only by a nested sourced helper failed changed selection"
+  for script in fm-demo-split.test.sh fm-demo-split-edge.test.sh; do
+    assert_contains "$listed" "tests/$script" "the demo-split fixture selects $script through its nested helper"
+  done
+  rm -rf "$tmp"
+  pass "a path named only by a sourced or nested helper selects every suite that sources it"
+}
+
 test_captain_hold_groups_share_helper_changed_selection() {
   local tmp repo listed listed_alone script group
   local -a groups=(archive cleanup keyed-answers lifecycle reconcile sweep)
@@ -3382,6 +3424,7 @@ test_changed_task_copy_lib_selects_retained_and_secondmate
 test_changed_dependency_selection_and_unmapped_failure
 test_changed_wake_classifier_selects_both_consumers
 test_supervision_groups_share_coverage_and_changed_selection
+test_changed_selection_reaches_suites_through_sourced_helper
 test_captain_hold_groups_share_helper_changed_selection
 test_partition_checks_judge_loss_and_duplication
 test_teardown_groups_register_each_case_once

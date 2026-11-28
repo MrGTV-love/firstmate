@@ -340,9 +340,14 @@ The measurements are CI `duration_ms` records; the totals, replays, and the shar
 
 ## Portable serial remainder
 
-`portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
-It keeps watcher, lock, AFK, real tmux, daemon, secondmate lifecycle, bootstrap, the `live-harness-optin` family, GUI-backend, and other unproven work serial.
+`portable-serial` includes every `tests/*.test.sh` that is not proven-isolated, not `real-herdr-gated`, and not in a family listed by `list_concurrent_safe_families`.
+It keeps lock, AFK, real tmux, daemon, the `live-harness-optin` family, GUI-backend, and other unproven work serial.
 Membership is derived rather than enumerated, so a newly added test lands here by default.
+
+## Portable family-parallel lane
+
+`portable-family-parallel` holds the remaining scripts of the families in `list_concurrent_safe_families`, each admitted by a family proof in [fm-test-isolation-proof.md](fm-test-isolation-proof.md#family-concurrency-proofs).
+The CI job `tests-portable-family-parallel` splits that lane into `portable-family-parallel-<k>of<n>` shards and runs each shard with `--jobs 3`.
 
 ## Portable serial CI shards
 
@@ -429,8 +434,8 @@ Measure native-Windows-only scripts through the focused Git Bash runner and reta
 ## Coverage guard
 
 `bin/fm-test-run.sh --check-coverage` verifies that both parallel lanes partition the proven-isolated set.
-It also verifies that the parallel lanes, portable serial lane, and real-Herdr family are disjoint and cover every `tests/*.test.sh` script.
-It separately verifies that the portable serial CI shards are non-empty, disjoint, and together equal the portable serial lane.
+It also verifies that the parallel lanes, portable family-parallel lane, portable serial lane, and real-Herdr family are disjoint and cover every `tests/*.test.sh` script.
+It separately verifies that the portable family-parallel and portable serial CI shards are non-empty, disjoint, and together equal their lanes.
 Its hint-coverage and modeled-budget checks are described in [Portable serial CI shards](#portable-serial-ci-shards); neither replaces inspection of actual CI timing artifacts.
 
 Merge-integration fixtures preserve teardown's completion and custody prerequisites: capacity releases an unfinished worker only through retained captain-authorized discard words, and a missing-copy spend case records its merged PR before ordinary completion. Neither fixture bypasses process auditing or local-slot ownership.

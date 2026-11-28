@@ -64,6 +64,7 @@ cleanup() {
     # it, so stop the whole worker tree.
     ( . "$ROOT/bin/fm-remote-job-lib.sh"; fm_remote_job_stop_worker_tree "$worker_pid" ) || true
   fi
+  chmod -R u+w "$TMP_ROOT" 2>/dev/null || true
   rm -rf -- "$TMP_ROOT"
 }
 trap cleanup EXIT
