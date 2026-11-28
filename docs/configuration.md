@@ -1255,7 +1255,7 @@ Focused fixture regressions are in [`tests/fm-github-accounting.test.sh`](../tes
 
 ### Completion and discard
 
-Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch.
+Ship and scout completion requires delivery evidence or the captain's own words, not merely a stopped worker or a pushed branch; the one exception is the `--duplicate-of <id>` close of a never-dispatched duplicate row.
 [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh)'s header owns direct completion admission, retained drop records, and the supported completion and restart grammar.
 [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#cleanup-never-closes-a-captain-call) owns the separate unresolved-question gate, which delivery or discard cannot bypass.
 A ship or scout task with a live record completes only through [`bin/fm-teardown.sh`](../bin/fm-teardown.sh), whose header owns landing proofs, missing-copy admission, report requirements, and captain-authorized forced discard.

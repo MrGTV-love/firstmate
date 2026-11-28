@@ -19,8 +19,8 @@
 # Decoded reasons use quoted strings so embedded line breaks remain intact.
 #
 # Supported completion grammar: an optional `task` noun, `done` or `close`,
-# exactly one ID, and --pr, --report, --note, --drop-file, --keep, --no-prune,
-# --json, or --help. Valued options accept split or = forms; --keep requires a
+# exactly one ID, and --pr, --report, --note, --drop-file, --duplicate-of, --keep,
+# --no-prune, --json, or --help. Valued options accept split or = forms; --keep requires a
 # non-negative count. `start` and `reopen` accept the same noun and single-ID
 # forms with only --json or --help. Exact unconsumed --help prints help without
 # mutation and may omit the ID; a help token consumed as a value is refused.
@@ -72,6 +72,33 @@
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.
+#   - `done`/`close` --duplicate-of <id> (split or = form, once, a plain id) is the one
+#     close that needs neither proof nor the captain's words, because no work can be lost:
+#     it records the fixed note "duplicate of <id>" on a ship or scout row, and only
+#     when, inside the same locks, the row is exactly `queued no no` (no hold, no blocked-by
+#     edge), no other row waits on it, and none of this exists: its task record, a
+#     state/<id>.status, .inbox, .launch-models, .backlog-close, .control-exit or
+#     .control-relaunch file or another state/.control-<id>* file, any ref in its
+#     project repository whose last name part is <id> or ends in <id> after a /, -, _
+#     or . (so a branch under any branch prefix), a `git worktree list` copy whose path
+#     holds an <id> component, data/<id>/skipped-copies.tsv, or any entry in data/<id>/
+#     besides plain brief.md and dod.md. The project repository is the one the row's
+#     repo field names, resolved as bin/fm-dispatch-project.py resolves it: $FM_HOME
+#     itself for repo firstmate, else $FM_PROJECTS_OVERRIDE or $FM_HOME/projects. A copy
+#     is seen only when `git worktree list` shows a path with an <id> part or when the
+#     task branch is checked out in it (the branch check refuses that branch). The
+#     survivor must be another row that exists with no body line starting "duplicate of ";
+#     a Done survivor must have finished by a merged PR or a report (a pr: or report:
+#     link), so one closed by the captain's drop ("dropped") or by a "preserved in bundle
+#     ..., not landed" note refuses. An unreadable repository, a
+#     missing repo field, or an unreadable row, backlog, or directory refuses. Combining
+#     it with --drop-file, --pr, --report, or --note refuses, as does any row that is
+#     not a queued ship or scout. Not covered (owner: Main): a leased treehouse slot
+#     whose path holds no <id> part and which is on another branch or detached (git lists
+#     it, yet it passes the copy check; only the branch check, the task-record check, and
+#     the data/<id>/ allowlist protect it), a branch that exists only on the remote, a
+#     direct tasks-axi call that skips this wrapper, and a survivor closed by another
+#     call between the check and the close (the survivor row is not locked).
 # FM_TASKS_AXI_REFUSE_OPEN_CALL=1 (set only by bin/fm-pr-close-items.sh) makes that guard
 # also refuse an open captain hold on a row of any kind, inside the lock; without it a
 # row that is not a ship or scout closes as before.
@@ -173,6 +200,13 @@ done
 
 command -v tasks-axi >/dev/null 2>&1 || fail "tasks-axi is not on PATH; run bin/fm-bootstrap.sh for the install command"
 
+parse_duplicate_of() {  # <survivor-id>; one use per completion, a plain id
+  TASK_DUP_COUNT=$((TASK_DUP_COUNT + 1))
+  [ "$TASK_DUP_COUNT" -eq 1 ] || fail "--duplicate-of may be given only once; run tasks-axi directly for other grammar"
+  [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]] || fail "--duplicate-of requires one plain task id, not '$1'; run tasks-axi directly for other grammar"
+  TASK_DUP=$1
+}
+
 parse_task_mutation() {
   local tokens=("$@") i=0 expect='' token bounded=0
   TASK_COMMAND=
@@ -182,6 +216,8 @@ parse_task_mutation() {
   TASK_REPORT=
   TASK_DROP=
   TASK_NOTE=0
+  TASK_DUP=
+  TASK_DUP_COUNT=0
   [ "${tokens[0]:-}" != task ] || i=1
   TASK_COMMAND=${tokens[i]:-}
   case "$TASK_COMMAND" in
@@ -203,6 +239,7 @@ parse_task_mutation() {
       case "$expect" in
         --pr) TASK_PR=$token ;; --report) TASK_REPORT=$token ;;
         --drop-file) TASK_DROP=$token ;; --note) TASK_NOTE=1 ;;
+        --duplicate-of) parse_duplicate_of "$token" ;;
       esac
       expect=''
       continue
@@ -212,9 +249,9 @@ parse_task_mutation() {
         *:--help) TASK_HELP=1; continue ;;
         *:--json) continue ;;
         done:--no-prune|close:--no-prune) continue ;;
-        done:--pr|close:--pr|done:--report|close:--report|done:--drop-file|close:--drop-file|done:--note|close:--note|done:--keep|close:--keep)
+        done:--pr|close:--pr|done:--report|close:--report|done:--drop-file|close:--drop-file|done:--note|close:--note|done:--keep|close:--keep|done:--duplicate-of|close:--duplicate-of)
           expect=$token; continue ;;
-        done:--pr=*|close:--pr=*|done:--report=*|close:--report=*|done:--drop-file=*|close:--drop-file=*|done:--note=*|close:--note=*|done:--keep=*|close:--keep=*)
+        done:--pr=*|close:--pr=*|done:--report=*|close:--report=*|done:--drop-file=*|close:--drop-file=*|done:--note=*|close:--note=*|done:--keep=*|close:--keep=*|done:--duplicate-of=*|close:--duplicate-of=*)
           expect=${token%%=*}
           token=${token#*=}
           case "$token" in
@@ -223,6 +260,7 @@ parse_task_mutation() {
           case "$expect" in
             --pr) TASK_PR=$token ;; --report) TASK_REPORT=$token ;;
             --drop-file) TASK_DROP=$token ;; --note) TASK_NOTE=1 ;;
+            --duplicate-of) parse_duplicate_of "$token" ;;
             --keep) [[ "$token" =~ ^[0-9]+$ ]] || fail "--keep requires a non-negative count; run tasks-axi directly for other grammar" ;;
           esac
           expect=''
@@ -262,13 +300,181 @@ task_mutation_cleanup() {
   fi
 }
 
+# --duplicate-of: close a never-dispatched row as a duplicate of a surviving item, with no
+# captain words, only when no work can exist for the row. Each check below is one function
+# that refuses with `fail` (exit 2, nothing written), runs inside the locks guard_completion
+# holds, and reads only the filesystem, git, and the backlog. Anything unreadable refuses.
+dup_present() { [ -e "$1" ] || [ -L "$1" ]; }
+
+dup_git() {  # <project-dir> <git args...>; the caller's GIT_* variables never pick another repository
+  local dir=$1
+  shift
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE -u GIT_CEILING_DIRECTORIES \
+    GIT_OPTIONAL_LOCKS=0 git -C "$dir" "$@"
+}
+
+dup_refuse_row_state() {  # <id>: only a queued row with no hold and no blocked-by edge
+  [ "$FM_BACKLOG_ROW_STATE" = "queued no no" ] && [ -z "$FM_BACKLOG_ROW_HOLD_KIND" ] \
+    || fail "$1 is not a plain queued row (state '$FM_BACKLOG_ROW_STATE', hold kind '${FM_BACKLOG_ROW_HOLD_KIND:--}'); only a queued row with no hold and no blocked-by edge closes as a duplicate"
+}
+
+dup_refuse_task_record() {  # <id>
+  ! dup_present "$task_state/$1.meta" \
+    || fail "$1 has a task record ($task_state/$1.meta), so work may exist; complete it with bin/fm-teardown.sh $1, which owns the landing proof"
+}
+
+dup_refuse_dispatch_files() {  # <id>: status, inbox, launch models, an end-of-run marker, or another control file
+  local id=$1 path own_owner
+  # The lock this command holds is a link to its owner directory beside it; neither is a dispatch file.
+  own_owner=$(readlink "$TASK_CONTROL_LOCK" 2>/dev/null) || own_owner=
+  for path in "$task_state/$id.status" "$task_state/$id.inbox" "$task_state/$id.launch-models" \
+    "$task_state/$id.backlog-close" "$task_state/$id.control-exit" "$task_state/$id.control-relaunch" \
+    "$task_state"/.control-"$id"*; do
+    [ "${path##*/}" != "${TASK_CONTROL_LOCK##*/}" ] && [ "${path##*/}" != "${own_owner##*/}" ] || continue
+    ! dup_present "$path" || fail "$id has a dispatch file ($path), so it was started"
+  done
+}
+
+dup_project_dir() {  # <id> <repo-from-the-row>: sets DUP_PROJECT to the repository's own directory
+  local id=$1 repo=$2 projects dir prefix
+  case "$repo" in ''|-|.|..|*[!A-Za-z0-9._-]*) fail "$id has no usable repo field ('$repo'), so its project cannot be checked for work" ;; esac
+  if [ "$repo" = firstmate ]; then
+    dir=$FM_HOME
+  else
+    projects=${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}
+    case "$projects" in /*) ;; *) projects="$CALLER_DIR/$projects" ;; esac
+    dir="$projects/$repo"
+  fi
+  [ -d "$dir" ] || fail "the project $repo of $id is not at $dir, so its branches and copies cannot be checked"
+  prefix=$(dup_git "$dir" rev-parse --show-prefix 2>/dev/null) && [ -z "$prefix" ] \
+    || fail "$dir is not a git repository of its own, so the branches and copies of $id cannot be checked"
+  DUP_PROJECT=$dir
+}
+
+dup_refuse_branch() {  # <id> <project-dir>: any ref whose last part is the id or ends in it after a separator
+  local id=$1 refs ref
+  refs=$(dup_git "$2" for-each-ref --format='%(refname)') \
+    || fail "the refs of $2 cannot be read, so a branch of $id cannot be ruled out"
+  while IFS= read -r ref; do
+    case "${ref##*/}" in "$id"|*[-_.]"$id") fail "$id has a branch ($ref), so work may exist" ;; esac
+  done <<< "$refs"
+}
+
+dup_refuse_copy() {  # <id> <project-dir>: a copy git lists under the id, or one the spawn recorded
+  local id=$1 list line path first=1
+  ! dup_present "$DATA/$id/skipped-copies.tsv" \
+    || fail "$id has a recorded copy ($DATA/$id/skipped-copies.tsv), so work may exist"
+  list=$(dup_git "$2" worktree list --porcelain) \
+    || fail "the copies of $2 cannot be listed, so a copy of $id cannot be ruled out"
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*)
+        path=${line#worktree }
+        if [ "$first" = 1 ]; then first=0; continue; fi
+        case "/$path/" in *"/$id/"*) fail "$id has a copy ($path), so work may exist" ;; esac
+        ;;
+    esac
+  done <<< "$list"
+}
+
+dup_refuse_work_dir() {  # <id>: data/<id>/ holds at most the brief and the definition of done
+  local id=$1 dir="$DATA/$1" entries entry
+  dup_present "$dir" || return 0
+  { [ -d "$dir" ] && [ ! -L "$dir" ]; } || fail "$dir is not a plain directory, so what $id holds cannot be checked"
+  entries=$(find "$dir" -mindepth 1 -maxdepth 1 2>/dev/null) || fail "$dir cannot be read, so what $id holds cannot be checked"
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    case "${entry##*/}" in
+      brief.md|dod.md) { [ -f "$entry" ] && [ ! -L "$entry" ]; } || fail "$entry is not a plain file, so what $id holds cannot be checked" ;;
+      *) fail "$id holds $entry; only brief.md and dod.md are allowed in $dir" ;;
+    esac
+  done <<< "$entries"
+}
+
+dup_show_field() {  # <show-output> <key>: the decoded value of one field of `show --full`
+  local raw
+  raw=$(printf '%s\n' "$1" | sed -n "s/^  $2: //p" | head -1)
+  case "$raw" in
+    '"'*) perl -MJSON::PP -e 'print JSON::PP->new->allow_nonref->decode($ARGV[0]), "\n"' -- "$raw" 2>/dev/null ;;
+    *) printf '%s\n' "$raw" ;;
+  esac
+}
+
+dup_refuse_survivor() {  # <id> <survivor-id>: a row that exists, is no duplicate close, and when Done finished by a PR or report
+  local id=$1 keep=$2 out rc=0 state body links line
+  out=$(fm_backlog_row_show "$DATA" "$keep" --full) || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    if printf '%s\n' "$out" | grep -q '^code: NOT_FOUND$'; then
+      fail "the surviving item $keep is not in the backlog, so $id would be lost"
+    fi
+    fail "the surviving item $keep cannot be read: $(printf '%s\n' "$out" | sed -n '1p')"
+  fi
+  state=$(dup_show_field "$out" state) && [ -n "$state" ] || fail "the surviving item $keep has no readable state"
+  body=$(dup_show_field "$out" body) || fail "the surviving item $keep has no readable body"
+  links=$(dup_show_field "$out" links) || fail "the surviving item $keep has no readable links"
+  while IFS= read -r line; do
+    case "$line" in "duplicate of "*) fail "the surviving item $keep is itself closed as a duplicate ($line); name the item that remains" ;; esac
+  done <<< "$body"
+  [ "$state" = "done" ] || return 0
+  while IFS= read -r line; do
+    case "$line" in
+      dropped|"Deliverable of the finished work: dropped") fail "the surviving item $keep was closed by the captain's drop, so its work did not survive; ask the captain about $id" ;;
+      "preserved in bundle /"*", not landed"|"Deliverable of the finished work: preserved in bundle /"*", not landed") fail "the surviving item $keep was closed with its work preserved in a bundle, not landed, so its work did not survive; ask the captain about $id" ;;
+    esac
+  done <<< "$body"
+  [[ ",$links" =~ ,(pr|report): ]] \
+    || fail "the surviving item $keep is Done without a merged PR or a report, so its work did not survive; ask the captain about $id"
+}
+
+dup_refuse_dependents() {  # <id>: closing the row would unblock any row that waits on it
+  local id=$1 out line dep deps rest
+  out=$(fm_backlog_row_list "$DATA" --fields deps --limit 100000) \
+    || fail "the backlog cannot be listed, so the rows that wait on $id cannot be found"
+  while IFS= read -r line; do
+    case "$line" in '  '[!\ ]*) ;; *) continue ;; esac
+    line=${line#  }
+    dep=${line%%,*}
+    case "$dep" in '"'*'"') dep=${dep#\"}; dep=${dep%\"} ;; esac
+    case "$line" in
+      *'"') rest=${line%\"}; deps=${rest##*,\"} ;;
+      *) deps=${line##*,} ;;
+    esac
+    case ",$deps," in *",blocked-by:$id,"*) ;; *) continue ;; esac
+    [ "$dep" != "$id" ] || continue
+    fail "$dep waits on $id (blocked-by), and closing $id would unblock it while the surviving item is not done"
+  done <<< "$out"
+}
+
+guard_duplicate() {  # <id> <survivor-id> <other-proof> <note-flag>
+  local id=$1 keep=$2 other=$3 note=$4 out repo
+  { [ -z "$other" ] && [ "$note" = 0 ]; } \
+    || fail "a duplicate close is its own completion; do not combine --duplicate-of with --drop-file, --pr, --report, or --note"
+  case "$id" in .|..) fail "unsupported task id '$id'" ;; esac
+  [ "$keep" != "$id" ] || fail "$id cannot be a duplicate of itself"
+  case "$FM_BACKLOG_ROW_KIND" in ship|scout) ;; *) fail "$id is not a ship or scout row; a duplicate close covers only those" ;; esac
+  dup_refuse_row_state "$id"
+  dup_refuse_task_record "$id"
+  dup_refuse_dispatch_files "$id"
+  out=$(fm_backlog_row_show "$DATA" "$id") || fail "cannot read the row of $id: $(printf '%s\n' "$out" | sed -n '1p')"
+  repo=$(printf '%s\n' "$out" | sed -n 's/^  repo: *//p' | head -1 | tr -d '"')
+  dup_project_dir "$id" "$repo"
+  dup_refuse_branch "$id" "$DUP_PROJECT"
+  dup_refuse_copy "$id" "$DUP_PROJECT"
+  dup_refuse_work_dir "$id"
+  dup_refuse_survivor "$id" "$keep"
+  dup_refuse_dependents "$id"
+  GUARD_ARGS=(--note "duplicate of $keep")
+  # The ledger records no deliverable for a duplicate close; --duplicate-of reads as evidence none.
+  LEDGER_CLOSE_ARGS=(--duplicate-of "$keep")
+}
+
 guard_completion() {
   local id=$TASK_ID pr=$TASK_PR report=$TASK_REPORT drop note=$TASK_NOTE proof=()
   drop=$(absolute_from_caller "$TASK_DROP")
   case "$TASK_COMMAND" in done|close) ;; *) return 0 ;; esac
   [ "$TASK_CONTROL_LOCK_HELD" = 1 ] || return 0
   fm_backlog_row_probe "$DATA" "$id" || {
-    [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && return 0
+    [ "$FM_BACKLOG_ROW_RESULT" = not_found ] && { [ -z "$TASK_DUP" ] || fail "$id is not in the backlog, so there is no row to close as a duplicate"; return 0; }
     fail "cannot identify the task being completed: ${FM_BACKLOG_ROW_ERROR:-unreadable backlog}"
   }
   # Opt-in for bin/fm-pr-close-items.sh only: refuse an open owner call for every row kind,
@@ -276,6 +482,10 @@ guard_completion() {
   if [ "${FM_TASKS_AXI_REFUSE_OPEN_CALL:-}" = 1 ] && [ "${FM_BACKLOG_ROW_STATE%% *}" != "done" ] \
     && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
     fail "$id is an open owner call (a captain hold); resolve it with bin/fm-captain-hold.sh before completing it"
+  fi
+  if [ -n "$TASK_DUP" ]; then
+    guard_duplicate "$id" "$TASK_DUP" "$pr$report$drop" "$note"
+    return 0
   fi
   case "$FM_BACKLOG_ROW_KIND" in ship|scout) ;; *) return 0 ;; esac
   [ ! -e "${FM_STATE_OVERRIDE:-$FM_HOME/state}/$id.meta" ] \
@@ -355,6 +565,18 @@ if [ "$GUARD_STRIP_DROP" = 1 ]; then
     kept+=("$arg")
   done
   ARGS=("${kept[@]}" "${GUARD_ARGS[@]}")
+fi
+
+if [ -n "$TASK_DUP" ]; then
+  # The survivor's id stays out of tasks-axi's grammar; an approved close carries only the fixed note.
+  kept=()
+  skip=0
+  for arg in "${ARGS[@]}"; do
+    if [ "$skip" = 1 ]; then skip=0; continue; fi
+    case "$arg" in --duplicate-of) skip=1; continue ;; --duplicate-of=*) continue ;; esac
+    kept+=("$arg")
+  done
+  ARGS=("${kept[@]}" ${GUARD_ARGS[@]+"${GUARD_ARGS[@]}"})
 fi
 
 cd "$FM_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $FM_BACKLOG_AXI_ROOT"
