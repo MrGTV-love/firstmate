@@ -579,21 +579,25 @@ case "${FM_TEST_PROCESS_TABLE:-shell}:$*" in
   descendant:*-p*) printf 'omp\n' ;;
   descendant-unreadable:*-axo*) printf '4242 1 zsh\n4243 4242 node\n' ;;
   descendant-unreadable:*-p*) exit 1 ;;
+  bun-then-agent:*-axo*) printf '4242 1 zsh\n1999999998 4242 bun\n1999999999 4242 omp\n' ;;
+  bun-then-agent:*-p\ 1999999998*|bun-descendant:*-p*) printf 'bun /elsewhere/src/cli.ts\n' ;;
+  bun-then-agent:*-p*) printf 'omp\n' ;;
+  bun-descendant:*-axo*) printf '4242 1 zsh\n1999999998 4242 bun\n' ;;
   *) printf '4242 1 zsh\n' ;;
 esac
 SH
   chmod +x "$psbin"
-  for mode in foreground shell descendant descendant-unreadable other failed empty mismatch malformed unreadable missing; do
+  for mode in foreground shell descendant descendant-unreadable bun-then-agent bun-descendant other failed empty mismatch malformed unreadable missing; do
     expected='unknown unreadable refused'
     case "$mode" in
       foreground)
         body='{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":4242,"foreground_processes":[{"pid":4243,"name":"omp","argv0":"omp","argv":["omp"]}]}}}'
         expected='live alive refused' ;;
-      shell|descendant|descendant-unreadable|unreadable|missing)
+      shell|descendant|descendant-unreadable|bun-then-agent|bun-descendant|unreadable|missing)
         body=$(shell_only_process_info 4242)
         case "$mode" in
           shell) expected='no-agent dead husk' ;;
-          descendant) expected='live alive refused' ;;
+          descendant|bun-then-agent) expected='live alive refused' ;;
         esac ;;
       other)
         body='{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":4242,"foreground_processes":[{"pid":4243,"name":"less","argv0":"less"}]}}}' ;;

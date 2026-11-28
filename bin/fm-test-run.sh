@@ -528,7 +528,7 @@ family_for_basename() {
     fm-launch-prompt-signals-live-e2e.test.sh|fm-claude-nested-home-live-e2e.test.sh|\
     fm-pi-seeded-home-trust-live-e2e.test.sh|\
     fm-herdr-version-floor-live-e2e.test.sh|\
-    fm-herdr-pi-stale-registration-live-e2e.test.sh|\
+    fm-herdr-pi-stale-registration-live-e2e.test.sh|fm-omp-identity-live-e2e.test.sh|\
     fm-worker-account-live-e2e.test.sh|fm-teamclaude-launch-live-e2e.test.sh|\
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
@@ -557,7 +557,7 @@ family_for_basename() {
     fm-control.test.sh|fm-control-relaunch.test.sh|\
     fm-control-relaunch-recovery.test.sh|fm-control-relaunch-backends.test.sh|\
     fm-control-reassociate.test.sh|\
-    fm-launch-proof.test.sh|\
+    fm-launch-proof.test.sh|fm-omp-identity.test.sh|\
     fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
     fm-send-inbox.test.sh|fm-spawn-batch.test.sh|\
@@ -1044,6 +1044,8 @@ tests/fm-no-mistakes-required.test.sh 769
 tests/fm-omp-composer-box-live-e2e.test.sh 491
 tests/fm-omp-fallback-chain-live-e2e.test.sh 885
 tests/fm-omp-harness.test.sh 814932
+tests/fm-omp-identity-live-e2e.test.sh 3000
+tests/fm-omp-identity.test.sh 40000
 tests/fm-omp-primary-live-e2e.test.sh 953
 tests/fm-omp-reboot-live-e2e.test.sh 777
 tests/fm-omp-stale-wake-live-e2e.test.sh 1061

@@ -2192,7 +2192,7 @@ fm_backend_herdr_pane_process_state() {  # <session> <pane_id>
 # the settle retry.
 fm_backend_herdr_pane_process_state_sample() {  # <session> <pane_id>
   local session=$1 pane_id=$2 info shell_pid count i pid name argv0 args verdict
-  local others=0 ps_bin rows
+  local others=0 ps_bin rows bun_hit=0
   info=$(fm_backend_herdr_cli "$session" pane process-info --pane "$pane_id" 2>/dev/null) \
     || { printf 'unreadable'; return 0; }
   printf '%s' "$info" | jq -e --arg pane "$pane_id" '
@@ -2246,6 +2246,10 @@ fm_backend_herdr_pane_process_state_sample() {  # <session> <pane_id>
       printf 'agent'
       return 0
     fi
+    # A restored omp can still be alive here as its Bun runtime, which the
+    # classifier reads as `other`. A descendant that may be the installed omp, or
+    # whose identity cannot be read, keeps the pane occupied rather than agent-free.
+    [ "$bun_hit" = 1 ] || ! fm_agent_process_bun_may_be_omp "$name" "$argv0" "$pid" || bun_hit=1
   done <<EOF
 $(printf '%s\n' "$rows" | awk -v shell="$shell_pid" '
   {
@@ -2268,6 +2272,7 @@ $(printf '%s\n' "$rows" | awk -v shell="$shell_pid" '
     }
   }')
 EOF
+  [ "$bun_hit" = 0 ] || { printf 'other'; return 0; }
   printf 'shell'
 }
 

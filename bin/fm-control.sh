@@ -94,8 +94,11 @@
 # not own the home lock is refused, as for authorize-continuation and
 # reassociate. It refuses, naming the missing proof, unless all of these hold:
 #   (1) window and herdr_pane_id agree, and the worktree and pane exist;
-#   (2) the launch-proof owner resolves one foreground PID whose process name
-#       or argv[0] is omp;
+#   (2) the launch-proof owner resolves one foreground PID that is omp by its
+#       process name or argv[0], or is the installed omp's Bun runtime run as
+#       its interactive agent (bin/fm-omp-identity.py: actual executable and
+#       entry script equal to the one installed identity, interactive role,
+#       terminal input, and the task session file held open for writing);
 #   (3) that PID's kernel cwd is inside this task's recorded worktree and is
 #       not inside another task's worktree that is as deep or deeper;
 #   (4) no other local task claims the pane;
@@ -112,8 +115,16 @@
 # to maintain and is refused unchanged too. A recorded PID
 # that is gone, or that a process other than omp has since reused, does not
 # block repair. The repair writes version=1, the unchanged spawn_gen, the
-# live pid, task_session_file, and current_session_file, publishing by rename
-# only while the record still holds the bytes the proofs were gathered from.
+# live pid, task_session_file, and current_session_file. Publication claims the
+# record by an atomic rename, confirms the claimed bytes are the compared ones,
+# and links the new record in only where nothing exists, so a writer that
+# published in the gap keeps its record. While the path is empty an omp
+# extension started after this rule reads a claim of its own generation, so
+# such a writer keeps the task anchor; an older writer relies on the kept
+# claim, which adopt names. A failed
+# install restores the claim, and a claim that cannot be restored, or whose
+# task_session_file the record at the path does not keep, is kept and named,
+# never deleted.
 # It never unlocks a session, touches project files, starts or stops an agent,
 # or sends lifecycle input.
 # This widens lifecycle authorization: a repaired record can authorize a
@@ -389,6 +400,9 @@ CONTROL_LOCK_HELD=0
 CONTROL_META_LOCK=
 CONTROL_META_LOCK_HELD=0
 CONTROL_META_TMP=
+# Adopt claims the session record by rename before it publishes (see the adopt verb).
+CONTROL_RECORD_CLAIM=
+CONTROL_RECORD_PATH=
 CONTROL_PROJECT_LOCK=
 CONTROL_PROJECT_LOCK_HELD=0
 REASSOCIATE_ACTIVE=0
@@ -411,6 +425,23 @@ control_cleanup() {
     reassociate_rollback || true
   fi
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
+  if [ -n "$CONTROL_RECORD_CLAIM" ] && [ -e "$CONTROL_RECORD_CLAIM" ]; then
+    # An interrupted or failed adopt gives the claimed record back unless a writer already
+    # replaced it. The claim is the last copy of the old record and its task anchor, so it is
+    # removed only once the record path holds it or a record keeping its task_session_file.
+    local claimed_anchor
+    claimed_anchor=$(jq -r '.task_session_file // empty' "$CONTROL_RECORD_CLAIM" 2>/dev/null) || claimed_anchor=
+    if ln -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" 2>/dev/null \
+      || cmp -s -- "$CONTROL_RECORD_CLAIM" "$CONTROL_RECORD_PATH" \
+      || { [ -n "$claimed_anchor" ] \
+        && [ "$claimed_anchor" = "$(jq -r '.task_session_file // empty' "$CONTROL_RECORD_PATH" 2>/dev/null)" ]; }; then
+      rm -f -- "$CONTROL_RECORD_CLAIM"
+    elif [ -e "$CONTROL_RECORD_PATH" ]; then
+      echo "adopt kept the original session record at $CONTROL_RECORD_CLAIM: the record another writer published at $CONTROL_RECORD_PATH does not keep its task_session_file; compare them before removing the kept copy" >&2
+    else
+      echo "adopt could not restore the original session record at $CONTROL_RECORD_PATH; its only surviving copy is kept at $CONTROL_RECORD_CLAIM - restore it with: ln -- '$CONTROL_RECORD_CLAIM' '$CONTROL_RECORD_PATH'" >&2
+    fi
+  fi
   [ -z "$RELAUNCH_PAIR_DIR" ] || rm -rf -- "$RELAUNCH_PAIR_DIR"
   if [ "$CONTROL_META_LOCK_HELD" = 1 ]; then
     CONTROL_META_LOCK_HELD=0
@@ -1551,10 +1582,16 @@ if [ "$VERB" = adopt ]; then
   adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
   adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
     | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
+  if [ "$adoption_recorded_pid" = "$adoption_pid" ] \
+    && [ -n "$(printf '%s' "$adoption_prior" | jq -r '.start // empty' 2>/dev/null)" ] \
+    && [ "$(printf '%s' "$adoption_prior" | jq -r '.start // empty')" != "$(printf '%s' "$adoption_record" | jq -r '.start // empty')" ]; then
+    echo "adopt note: the record's adopted process start identity differs from the live process, so the record is stale: another process now holds PID $adoption_pid; it is not this task's adopted agent and fm-control will not stop it, so stop that process first, and only then relaunch the task so a fresh launch writes a new record" >&2
+  fi
   [ "$adoption_recorded_pid" != "$adoption_pid" ] \
     || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"
-  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; then
+  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_may_own_record "$adoption_recorded_pid"; then
     echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
+    echo "adopt note: a live Bun process counts as a possible omp writer unless its raw arguments prove another program: argv[0] not a bun, no script argument, a script argument whose name is not cli.ts (bun run dev, bun test, bun dev or bun x), or an absolute cli.ts outside a src directory; a relative cli.ts or src/cli.ts script argument is unresolved, so it keeps this record" >&2
     exit 1
   fi
   # Only a positively readable unpinned process cannot run the extension's
@@ -1571,8 +1608,26 @@ if [ "$VERB" = adopt ]; then
   [ "$adoption_record" = "$adoption_recheck" ] \
     && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
     || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
-  mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
-    || die "adopt could not publish the session record; original record preserved"
+  # The omp extension rewrites the record by rename and without these locks, so a
+  # writer can publish after the last comparison. Claim the record by an atomic
+  # rename, confirm the claimed bytes are the compared ones, and install the new
+  # record only where nothing exists: a writer that published in the gap keeps its
+  # record, and a record that changed is handed back instead of overwritten.
+  CONTROL_RECORD_PATH="$STATE/$ID.omp-session.json"
+  CONTROL_RECORD_CLAIM="$STATE/.$ID.omp-session.claim.$$"
+  mv -- "$CONTROL_RECORD_PATH" "$CONTROL_RECORD_CLAIM" \
+    || die "adopt could not claim the session record; original record preserved"
+  if [ "$adoption_prior" != "$(cat "$CONTROL_RECORD_CLAIM" 2>/dev/null)" ]; then
+    die "adopt needs stable foreground, session, and generation proof; retry after they settle"
+  fi
+  if ! ln -- "$CONTROL_META_TMP" "$CONTROL_RECORD_PATH" 2>/dev/null; then
+    if [ -e "$CONTROL_RECORD_PATH" ]; then
+      die "adopt refused: another writer published the session record while adoption claimed it; that record was not overwritten"
+    fi
+    die "adopt could not install the new session record although no other writer published one (an I/O failure); the original record is being restored, and if that also fails its only copy is kept at $CONTROL_RECORD_CLAIM"
+  fi
+  rm -f -- "$CONTROL_RECORD_CLAIM" "$CONTROL_META_TMP"
+  CONTROL_RECORD_CLAIM=
   CONTROL_META_TMP=
   printf 'adopted: %s\n' "$ID"
   exit 0

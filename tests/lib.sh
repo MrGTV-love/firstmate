@@ -633,6 +633,43 @@ fm_test_cleanup() {
   fm_test_remove_tree "$FM_TEST_SHELL_DIR"
 }
 
+# Test-only seam for the omp identity rule (bin/fm-omp-identity.py). Production holds one
+# fixed installed root and reads no environment variable that could move it, so a test
+# that needs a scratch installed tree puts the directory this writes first on PATH and
+# sets FM_TEST_OMP_ROOT: the python3 it holds runs fm-omp-identity.py through a runner
+# that passes that root to installed_identity(root=...). Without FM_TEST_OMP_ROOT it
+# runs the real script untouched, and nothing under bin/ reads FM_TEST_OMP_ROOT.
+fm_test_omp_root_shim() { # <dir>
+  local dir=$1 real
+  real=$(command -v python3) || return 1
+  mkdir -p "$dir" || return 1
+  cat > "$dir/omp-identity-root-runner.py" <<'PY'
+import importlib.util
+import sys
+
+root, path = sys.argv[1], sys.argv[2]
+spec = importlib.util.spec_from_file_location("fm_omp_identity", path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+original = module.installed_identity
+module.installed_identity = lambda: original(root)
+sys.exit(module.main([path] + sys.argv[3:]))
+PY
+  local real_q runner_q
+  real_q=$(printf '%q' "$real")
+  runner_q=$(printf '%q' "$dir/omp-identity-root-runner.py")
+  cat > "$dir/python3" <<SH
+#!/bin/sh
+if [ "\${1:-}" = -I ] && [ -n "\${FM_TEST_OMP_ROOT:-}" ]; then
+  case "\${2:-}" in
+    */fm-omp-identity.py) script=\$2; shift 2; exec $real_q -I $runner_q "\$FM_TEST_OMP_ROOT" "\$script" "\$@" ;;
+  esac
+fi
+exec $real_q "\$@"
+SH
+  chmod +x "$dir/python3"
+}
+
 fm_test_tmproot() {
   local prefix=${1:-fm-test} root tmp_base
   tmp_base=$(fm_test_tmpdir)

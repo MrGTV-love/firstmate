@@ -71,6 +71,12 @@ if [ -f "$D/holder-pid" ] && [ "${1:-}" = -p ] && [ "${2:-}" = "$(cat "$D/holder
     '-o args=') cat "$D/holder-args"; printf '\n'; exit 0 ;;
   esac
 fi
+# A descendant of the pane's shell: the process table lists it under the shell pid 4242.
+if [ -f "$D/descendant-pid" ]; then
+  case "$*" in
+    '-axo pid=,ppid=,comm=') printf '4242 1 bash\n%s 4242 %s\n' "$(cat "$D/descendant-pid")" "$(cat "$D/descendant-comm")"; exit 0 ;;
+  esac
+fi
 live_pane=false
 for marker in "$D"/herdr-live-*; do
   [ ! -f "$marker" ] || live_pane=true
@@ -979,6 +985,13 @@ case "${1:-} ${2:-}" in
         if [ -f "$D/recovery-foreign-foreground" ]; then
           printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"python3","argv":["python3","-c","input()"],"cmdline":"python3 -c input()"}]}}}\n' \
             "$(cat "$D/herdr-pane")" "$pid"
+          exit 0
+        fi
+        if [ -f "$D/recovery-shell-foreground" ]; then
+          # The shell is back in the foreground; any agent is only a descendant of it.
+          jq -nc --arg pane "$(cat "$D/herdr-pane")" \
+            '{result:{type:"pane_process_info",process_info:{pane_id:$pane,shell_pid:4242,
+              foreground_processes:[{pid:4242,name:"bash",argv0:"bash",argv:["bash"]}]}}}'
           exit 0
         fi
         harness=omp
