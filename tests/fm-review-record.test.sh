@@ -1279,6 +1279,32 @@ test_carry_over_sweeps_dead_pid_scratch_and_keeps_live_scratch() {
   pass "carry-over sweeps dead-PID and aged legacy scratch directories while preserving live ones"
 }
 
+test_carry_over_sweep_leaves_links_and_files_alone() {
+  # A dead-PID name on a symbolic link or a plain file is not a leftover
+  # scratch directory: the sweep must not follow the link or remove either.
+  local case_dir live out rc=0 dead_pid state outside
+  case_dir=$(make_carry_case carry-scratch-sweep-links)
+  carry_refs "$case_dir"
+  record_review "$case_dir" "$REVIEWED" PASS sonnet '{"ship":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  live=$(merge_trunk_into_pr "$case_dir")
+  true &
+  dead_pid=$!
+  wait "$dead_pid"
+  state="$case_dir/home/state"
+  outside="$case_dir/outside-target"
+  mkdir -p "$outside/proof.git"
+  printf 'keep\n' > "$outside/proof.git/config"
+  ln -s "$outside" "$state/.review-carry-${dead_pid}-link"
+  printf 'plain\n' > "$state/.review-carry-${dead_pid}-file"
+  out=$(verify_on "$case_dir" "$live" "$TRUNK") || rc=$?
+  expect_code 0 "$rc" "carry-over must succeed beside a linked or plain scratch name: $out"
+  [ -L "$state/.review-carry-${dead_pid}-link" ] || fail "a symbolic link named like dead-PID scratch must not be removed"
+  [ "$(cat "$outside/proof.git/config")" = keep ] || fail "the sweep must not follow a symbolic link into its target"
+  [ -f "$state/.review-carry-${dead_pid}-file" ] || fail "a plain file named like dead-PID scratch must not be removed"
+  rm -f "$state/.review-carry-${dead_pid}-link" "$state/.review-carry-${dead_pid}-file"
+  pass "the carry-over sweep leaves symbolic links, their targets and plain files alone"
+}
+
 test_carry_over_refuses_after_a_rewrite_was_itself_read() {
   # A same-tree rewrite carries from R, but once the rewrite has its own read,
   # the head it replaced is a reviewed head off the newest reviewed head's
@@ -1345,6 +1371,7 @@ fm_test_run_cases \
   test_carry_over_ignores_global_config_and_global_attributes \
   test_carry_over_scratch_lives_beside_the_review_records \
   test_carry_over_sweeps_dead_pid_scratch_and_keeps_live_scratch \
+  test_carry_over_sweep_leaves_links_and_files_alone \
   test_carry_over_refuses_when_the_state_directory_takes_no_scratch \
   test_carry_over_refuses_after_a_rewrite_was_itself_read \
   test_carry_over_ignores_a_merge_driver_in_the_task_worktree \
