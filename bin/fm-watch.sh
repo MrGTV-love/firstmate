@@ -2941,9 +2941,8 @@ watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
 # forge call dies with its pass and the persisted admission cursor lets the next
 # tick start after that record.
 PR_READY_RECONCILE_PID=
-PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
 # Seconds of silence that stop one pass; the helper reads the same setting for each of its own reads.
-case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
+PR_READY_RECONCILE_TIMEOUT=$(fm_pr_ready_reconcile_secs)
 pr_ready_reconcile_tick() {
   if [ -n "$PR_READY_RECONCILE_PID" ]; then
     kill -0 "$PR_READY_RECONCILE_PID" 2>/dev/null && return 0

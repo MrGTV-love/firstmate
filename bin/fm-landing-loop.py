@@ -72,9 +72,6 @@ MAX_INFLIGHT = int(os.environ.get("FM_LANDING_LOOP_MAX_INFLIGHT", "1") or 1)
 RETRY_SECS = int(os.environ.get("FM_LANDING_LOOP_RETRY_SECS", "1800") or 1800)
 GH_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_GH_TIMEOUT", "60") or 60)
 GIT_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_GIT_TIMEOUT", "120") or 120)
-RECONCILE_STALL_SECS = os.environ.get("FM_PR_READY_RECONCILE_TIMEOUT", "")
-if not re.fullmatch(r"[1-9][0-9]*", RECONCILE_STALL_SECS):
-    RECONCILE_STALL_SECS = "120"
 DEFAULT_CMD_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_CMD_TIMEOUT", "120") or 120)
 UPDATE_TIMEOUT = int(os.environ.get("FM_LANDING_LOOP_UPDATE_TIMEOUT", "7200") or 7200)
 UPDATE_POLL_SECS = int(os.environ.get("FM_LANDING_LOOP_UPDATE_POLL_SECS", "120") or 120)
@@ -202,7 +199,6 @@ exit 0
         ["bash", "-c", script, "fm-landing-loop", str(BIN), dedup,
          f"check: landing-loop {task}: {text}", str(marker_file)],
         home,
-        timeout=30,
     )
     if sent.returncode in (0, 3):
         emitted[dedup] = int(time.time())
@@ -628,30 +624,15 @@ def update_worker(run_dir_str, fd_str, req_fd_str):
                 stdout, stderr = proc.communicate(timeout=UPDATE_TIMEOUT)
                 rc = proc.returncode
             except subprocess.TimeoutExpired:
-                # Signal SIGTERM first so fm-duration.py's signal handler forwards
-                # SIGTERM to its child's separate process group (bin/fm-duration.py:1829).
-                # A second SIGTERM triggers fm-duration.py's SIGKILL escalation before
-                # we fall back to killing the wrapper group directly.
-                stdout, stderr = "", ""
+                # One SIGTERM to the wrapper group starts fm-duration.py's own stop:
+                # it signals its child's separate process group and owns the
+                # TERM-to-KILL escalation with no guessed grace number
+                # (bin/fm-duration.py header), so wait for that stop to finish.
                 try:
                     os.killpg(proc.pid, signal.SIGTERM)
                 except OSError:
                     proc.terminate()
-                try:
-                    stdout, stderr = proc.communicate(timeout=5)
-                except subprocess.TimeoutExpired:
-                    try:
-                        os.killpg(proc.pid, signal.SIGTERM)
-                    except OSError:
-                        pass
-                    try:
-                        stdout, stderr = proc.communicate(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        try:
-                            os.killpg(proc.pid, signal.SIGKILL)
-                        except OSError:
-                            proc.kill()
-                        stdout, stderr = proc.communicate()
+                stdout, stderr = proc.communicate()
                 rc = 124
             log_path.write_text((stdout or "") + (stderr or ""), encoding="utf-8")
             tail = [
@@ -893,14 +874,22 @@ def run_step(home, no_reconcile=False, repo_filter=None):
             reconcile_bin = str(BIN / "fm-pr-ready-reconcile.sh")
             if os.environ.get("FM_TEST_SEAM") == "1" and os.environ.get("FM_LANDING_LOOP_RECONCILE_BIN"):
                 reconcile_bin = os.environ["FM_LANDING_LOOP_RECONCILE_BIN"]
+            # The watcher's stall interval (fm_pr_ready_reconcile_secs) bounds the pass
+            # and is handed down to the helper's own reads.
+            script = (
+                '. "$1/fm-timeout-lib.sh" || exit 127\n'
+                'FM_PR_READY_RECONCILE_TIMEOUT=$(fm_pr_ready_reconcile_secs)\n'
+                'export FM_PR_READY_RECONCILE_TIMEOUT\n'
+                'exec "$2" "$1/fm-duration.py" keep-going "$FM_PR_READY_RECONCILE_TIMEOUT" -- "$3"\n'
+            )
             try:
                 rc = subprocess.run(
-                    [sys.executable, str(BIN / "fm-duration.py"), "keep-going", RECONCILE_STALL_SECS, "--", reconcile_bin],
+                    ["bash", "-c", script, "fm-landing-loop", str(BIN), sys.executable, reconcile_bin],
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     check=False,
-                    env={**home.env(), "FM_PR_READY_RECONCILE_TIMEOUT": RECONCILE_STALL_SECS},
+                    env=home.env(),
                 ).returncode
             except OSError:
                 rc = 127
