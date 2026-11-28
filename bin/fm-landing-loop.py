@@ -2,10 +2,12 @@
 """Standalone PR landing loop: reconcile, update stale bases serially, and let carried PASSes merge.
 
 Usage (FM_HOME names the absolute home; FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE select state/config):
-  fm-landing-loop.py step                                          one bounded pass (launchd entrypoint)
-  fm-landing-loop.py plan [--json]                                 read-only plan of candidates and trains
-  fm-landing-loop.py train [--repo O/R] [--prs N,M] [--max K] [--build --worktree DIR --branch B]
+  fm-landing-loop.py step [--repo O/R]                             one bounded pass (launchd entrypoint)
+  fm-landing-loop.py plan [--repo O/R] [--json]                    read-only plan of candidates and trains
+  fm-landing-loop.py train [--repo O/R] [--prs N,M] [--max K] [--base B] [--json]
+                           [--build --worktree DIR --branch B]
                                                                    plan or build a non-conflicting Train-member batch branch
+                                                                   (members must target --base, default main; --max default 5)
   fm-landing-loop.py status [--json]                               print durable landing-loop state
   fm-landing-loop.py events [--limit N]                            print recent landing-loop events
 
@@ -35,11 +37,19 @@ merge gate or weakening any guard:
      conflicts and failed updates, with normal-case deduplication per (task, wake kind, full head
      SHA) and at-least-once crash recovery, never on routine updates, held rows, or landings.
 
-Durable state lives under <state>/.landing-loop/: lock, state.json, events.jsonl, inflight.json,
-and per-update logs/results under runs/.
+Durable state lives under <state>/.landing-loop/: lock, state.json (in-flight, backoff, completed-head
+and emitted-wake records), events.jsonl, emitted-wakes.log, per-update logs/results under runs/, and
+train --build intent files under trains/.
 Exit status: 0 on normal pass/command, 2 on usage or configuration error.
-step --no-reconcile skips phase 1 and FM_LANDING_LOOP_RECONCILE_BIN replaces the reconcile helper,
-both honored only when FM_TEST_SEAM=1.
+--repo, else FM_LANDING_LOOP_REPO, limits registered candidates to one owner/repo; train --prs
+requires --repo and reads those PR numbers from it. Other settings, in seconds:
+FM_LANDING_LOOP_RETRY_SECS (1800) backs off a failed head, FM_LANDING_LOOP_GH_TIMEOUT (60) bounds
+each gh call and no-mistakes status read, FM_LANDING_LOOP_GIT_TIMEOUT (120) each git proof or build command,
+FM_LANDING_LOOP_CMD_TIMEOUT (120) any other helper, FM_LANDING_LOOP_UPDATE_TIMEOUT (7200) one
+no-mistakes rerun, and FM_LANDING_LOOP_UPDATE_POLL_SECS (120) the direct-PR head-advance poll.
+step --no-reconcile skips phase 1, FM_LANDING_LOOP_RECONCILE_BIN replaces the reconcile helper, and
+FM_LANDING_LOOP_DURATION_BIN replaces bin/fm-duration.py for the no-mistakes rerun, all honored only
+when FM_TEST_SEAM=1.
 """
 import argparse
 import fcntl
