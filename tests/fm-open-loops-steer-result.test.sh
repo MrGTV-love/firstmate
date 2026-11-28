@@ -36,11 +36,15 @@ snapshot.chmod(0o755)
 peek = code / 'bin/fm-peek.sh'
 peek.write_text('#!/bin/sh\nprintf "waiting for validation\\n"\n')
 peek.chmod(0o755)
+send = code / 'bin/fm-send.sh'
+send.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$FM_HOME/sent"\n')
+send.chmod(0o755)
 base = int(time.time())
 iso = lambda stamp: dt.datetime.fromtimestamp(stamp, dt.timezone.utc).isoformat()
 
 class Case:
-    def __init__(self, name, limit=None, category='unanswered_question', kind='ship'):
+    def __init__(self, name, limit=None, category='unanswered_question', kind='ship', tree=None):
+        self.code = tree or code
         self.home = (world / name).resolve()
         for part in ('state', 'data', 'config', 'projects', 'user', 'tmp'):
             (self.home / part).mkdir(parents=True)
@@ -82,7 +86,7 @@ class Case:
             schema='fm-fleet-home-input.v1', tasks=[self.task], backlog=dict(present=True, records=[]))))
 
     def cli(self, *args, expected=0):
-        result = subprocess.run([str(code / 'bin/fm-open-loops.sh'), *args],
+        result = subprocess.run([str(self.code / 'bin/fm-open-loops.sh'), *args],
                                 env=dict(self.env, FM_OPEN_LOOPS_NOW=str(self.now)), text=True, capture_output=True)
         if expected is not None:
             assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
@@ -110,7 +114,7 @@ class Case:
             self.collect()
         presented = self.cli('--present-overdue').stdout
         checked = self.cli('--check-actions', expected=None)
-        assert (self.ident in presented) is wanted, (wanted, presented)
+        assert (self.ident in presented) is wanted, (self.home.name, wanted, presented)
         assert (self.ident in checked.stdout) is wanted, (wanted, checked.stdout)
         if wanted:
             assert 'steered, result not observed' in presented, presented
@@ -212,7 +216,7 @@ for mode in ('ack-only', 'actual-report', 'pending-reply'):
         os.utime(handled, (c.now, c.now))
         if mode == 'actual-report':
             with c.status.open('a') as stream:
-                stream.write(f'working [at={c.now}]: reported the validation outcome and remaining blocker\n')
+                stream.write(f'blocked [at={c.now}]: reported the validation outcome; waiting on the original decision\n')
     c.now = base + 899
     c.actionable(False)
     c.now = base + 900
@@ -224,6 +228,137 @@ for mode in ('ack-only', 'actual-report', 'pending-reply'):
         reply.write_text(delivery + f'phase=resolved\nresolved_epoch={c.now}\n')
         c.actionable(False)
 print('PASS: formal silence steers ignore transport-only activity but keep genuine reports and resolved replies', flush=True)
+
+# A plain working line is not a result: only a typed status or a resolved reply settles a silence steer,
+# whatever second the line carries relative to the delivery.
+for mode in ('ack-and-working-same-second', 'working-after-ack', 'working-before-steer-same-second'):
+    c = Case('plain-working-' + mode, category='silent_report')
+    assert c.row['limit_seconds'] == 900
+    if mode == 'working-before-steer-same-second':
+        with c.status.open('a') as stream:
+            stream.write(f'working [at={base}]: status written in the second the steer is delivered\n')
+    message = c.delivery(); c.steer()
+    c.now = base + 800
+    handled = c.home / 'state/worker.inbox/handled'
+    handled.mkdir()
+    message.rename(handled / '001.msg')
+    os.utime(handled, (c.now, c.now))
+    if mode != 'working-before-steer-same-second':
+        later = c.now + (1 if mode == 'working-after-ack' else 0)
+        with c.status.open('a') as stream:
+            stream.write(f'working [at={later}]: acknowledged the inbox; no report yet\n')
+    c.now = base + 899
+    c.actionable(False)
+    c.now = base + 900
+    c.actionable(True, refresh=False)
+    c.actionable(True)
+print('PASS: an acknowledgement-only or pre-steer plain working status never settles a silence steer', flush=True)
+
+# Control: a typed report that follows the acknowledgement and a plain working line still settles the steer.
+c = Case('plain-working-then-typed-report', category='silent_report')
+message = c.delivery(); c.steer()
+c.now = base + 800
+handled = c.home / 'state/worker.inbox/handled'
+handled.mkdir()
+message.rename(handled / '001.msg')
+os.utime(handled, (c.now, c.now))
+with c.status.open('a') as stream:
+    stream.write(f'working [at={c.now}]: acknowledged the inbox; no report yet\n')
+c.now = base + 850
+with c.status.open('a') as stream:
+    stream.write(f'blocked [at={c.now}]: reported the validation outcome; waiting on the original decision\n')
+c.now = base + 900
+c.actionable(False)
+print('PASS: a typed report after an acknowledgement and a plain working line still settles a silence steer', flush=True)
+
+# A typed failed status, or a secondmate typed done status, keeps the ordinary silence cadence and check-in.
+def cadence(kind, verb, tree=None, prefix=''):
+    c = Case(prefix + 'cadence-' + verb + '-' + kind, category='silent_report', kind=kind, tree=tree)
+    with c.status.open('a') as stream:
+        stream.write(f'{verb} [at={base}]: reported the validation outcome\n')
+    c.now = base + 899
+    c.collect()
+    assert not c.current()['overdue'], (c.home.name, c.current())
+    c.now = base + 900
+    c.collect()
+    row = c.current()
+    assert row['overdue'] and not row.get('informational'), (c.home.name, row)
+    assert c.ident in c.cli('--present-overdue').stdout, c.home.name
+    assert json.loads(c.cli('--check-in', 'worker', '--json').stdout).get('check_in') == 'sent', c.home.name
+    assert (c.home / 'sent').read_text().startswith('worker --answers-none '), c.home.name
+for kind, verb in (('ship', 'failed'), ('secondmate', 'done')):
+    cadence(kind, verb)
+print('PASS: a typed failed or secondmate done status keeps the silence row visible and allows a check-in', flush=True)
+
+# Mutant: a failed line treated as an exclusion again must fail the cadence case above.
+mutant = world / 'mutant'
+shutil.copytree(code / 'bin', mutant / 'bin', symlinks=True)
+(mutant / 'bin/fm_open_loops.py').rename(mutant / 'bin/fm_open_loops_base.py')
+(mutant / 'bin/fm_open_loops.py').write_text(
+    'import sys\nfrom pathlib import Path\nsys.path.insert(0, str(Path(__file__).resolve().parent))\n'
+    'import fm_open_loops_base as real\n'
+    'status = real.Collector.report_status\n'
+    'def report_status(self, task_id):\n'
+    '    fields = status(self, task_id)\n'
+    '    return fields[:2] + (fields[2] or fields[1] == "failed",) + fields[3:]\n'
+    'real.Collector.report_status = report_status\n'
+    'sys.exit(real.main())\n')
+try:
+    cadence('ship', 'failed', tree=mutant, prefix='mutant-')
+except AssertionError as caught:
+    assert caught.args and caught.args[0][0] == 'mutant-cadence-failed-ship', caught
+else:
+    raise AssertionError('mutation survived: a failed exclusion left the cadence-failed-ship case passing')
+print('PASS: mutation caught: a failed status treated as an exclusion fails the cadence case', flush=True)
+
+# A typed failed or secondmate done line settles a silence steer only in a later second than the delivery.
+for kind, verb, same in (('ship', 'failed', False), ('secondmate', 'done', False), ('ship', 'failed', True)):
+    c = Case('typed-' + verb + '-' + kind + ('-same-second' if same else ''), category='silent_report', kind=kind)
+    if same:
+        with c.status.open('a') as stream:
+            stream.write(f'{verb} [at={base}]: status written in the second the steer is delivered\n')
+    message = c.delivery(); c.steer()
+    c.now = base + 800
+    handled = c.home / 'state/worker.inbox/handled'
+    handled.mkdir()
+    message.rename(handled / '001.msg')
+    os.utime(handled, (c.now, c.now))
+    if not same:
+        with c.status.open('a') as stream:
+            stream.write(f'{verb} [at={c.now}]: reported the validation outcome\n')
+    c.now = base + 899
+    c.actionable(False)
+    c.now = base + 900
+    c.actionable(same, refresh=False)
+    c.actionable(same)
+print('PASS: a later-second typed failed or secondmate done line settles a silence steer; a same-second one does not',
+      flush=True)
+
+# A reply resolved in the delivery's own second cannot be ordered after it; only a later-second reply settles.
+for mode in ('reply-same-second', 'reply-later-second'):
+    c = Case('silence-' + mode, category='silent_report')
+    reply_dir = c.home / 'state/pending-replies'
+    reply_dir.mkdir()
+    reply = reply_dir / '0123456789abcdef'
+    question = 'corr_id=0123456789abcdef\ntask_id=worker\ndelivered_epoch=' + str(base - 60) + '\n'
+    reply.write_text(question + 'phase=delivered\n')
+    message = c.delivery()
+    if mode == 'reply-same-second':
+        reply.write_text(question + f'phase=resolved\nresolved_epoch={base}\n')
+    c.steer()
+    if mode == 'reply-later-second':
+        c.now = base + 1
+        reply.write_text(question + f'phase=resolved\nresolved_epoch={c.now}\n')
+    c.now = base + 800
+    handled = c.home / 'state/worker.inbox/handled'
+    handled.mkdir()
+    message.rename(handled / '001.msg')
+    os.utime(handled, (c.now, c.now))
+    c.now = base + 899
+    c.actionable(False)
+    c.now = base + 900
+    c.actionable(mode == 'reply-same-second')
+print('PASS: a reply resolved in the steer second never settles it; a later-second reply still does', flush=True)
 
 # Loss of a source that requires a live worker is not evidence that the steer succeeded.
 for category, kind in (('stalled_worker', 'ship'), ('silent_report', 'ship'), ('silent_report', 'secondmate')):

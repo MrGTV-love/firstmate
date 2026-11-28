@@ -417,9 +417,10 @@ class Collector:
         handled = inbox / "handled"
         # rename preserves the message's send mtime; directory mtime records the acknowledgement move.
         ack_at = mtime(handled) if any(handled.glob("[0-9]*.msg")) else None
-        reply_at = max((int(r["resolved_epoch"]) for r in records
-                        if r.get("phase") == "resolved" and r.get("resolved_epoch", "").isdigit()
-                        and int(r["resolved_epoch"]) <= self.now), default=None)
+        resolved = [(r.get("corr_id"), int(r["resolved_epoch"])) for r in records
+                    if r.get("phase") == "resolved" and r.get("resolved_epoch", "").isdigit()
+                    and int(r["resolved_epoch"]) <= self.now]
+        reply_at = max((at for _, at in resolved), default=None)
         stamps = [s for s in (status_at, ack_at, reply_at) if s is not None and s <= self.now]
         dispatched = mtime(self.state / (ident + ".meta"))
         since = max(stamps, default=dispatched if dispatched is not None and dispatched <= self.now else None)
@@ -447,11 +448,14 @@ class Collector:
             evidence += "; no report yet: clock starts at dispatch"
         row = self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
                        since, evidence=evidence, informational=informational, consumer_task=ident)
-        if not excluded and (pending or (ack_at is not None and since == ack_at)):
-            # Transport activity may reset the ordinary check-in cadence, but
-            # only a report or resolved reply can settle a recorded steer.
-            self.silence_transport[row["id"]] = max(
-                (stamp for stamp in (status_at, reply_at) if stamp is not None and stamp <= self.now), default=-1)
+        if not excluded:
+            # A status or acknowledgement may reset the ordinary check-in cadence, but a plain status line is
+            # never a result and a second-resolution stamp cannot order it against the delivery. Only a resolved
+            # reply or typed failed/secondmate done line provably after the delivery, or a typed status
+            # excluded above, settles a recorded steer.
+            typed = verb == "failed" or (task["kind"] == "secondmate" and verb == "done")
+            self.silence_transport[row["id"]] = resolved + (
+                [(verb, status_at)] if typed and status_at is not None and status_at <= self.now else [])
         if long_wait:
             row["limit_seconds"] = pause_limit
             row["overdue"] = not informational and (row["age_seconds"] is None or row["age_seconds"] >= pause_limit)
@@ -1361,7 +1365,8 @@ class Collector:
                     observed = report["rows"][slot]
                     sent = action.get("sent_epoch", action.get("at_epoch"))
                     if ident not in self.silence_transport or type(sent) is not int \
-                            or self.silence_transport[ident] >= sent or observed.get("stale") \
+                            or any(at > sent or corr == action.get("evidence")
+                                   for corr, at in self.silence_transport[ident]) or observed.get("stale") \
                             or observed["limit_seconds"] != row["limit_seconds"]:
                         continue
                     new_source = observed.get("source") or {}
