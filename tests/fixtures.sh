@@ -370,11 +370,13 @@ make_spawn_fakebin() {
 # history (spawn's own history gate reads it) and is named by the checkout's HEAD, diff and untracked files (name and
 # content), so it is built once per distinct state of the code under test.
 fm_test_spawn_script() {
-  local key tree
+  local root_real root_key key prefix tree stage old
   if [ "${FM_TEST_STUB_SUMMARY_REFRESH:-0}" != 1 ]; then
     printf '%s\n' "$ROOT/bin/fm-spawn.sh"
     return
   fi
+  root_real=$(cd "$ROOT" && pwd -P) || return 1
+  root_key=$(printf '%s\n' "$root_real" | shasum -a 256 | cut -c1-12) || return 1
   key=$(
     set -o pipefail
     { git -C "$ROOT" rev-parse HEAD; git -C "$ROOT" diff HEAD; git -C "$ROOT" ls-files -o --exclude-standard -z | sort -z |
@@ -383,14 +385,30 @@ fm_test_spawn_script() {
         printf '%s %s\n' "$hash" "$untracked"
       done; } 2>/dev/null | shasum -a 256 | cut -c1-16
   ) || return 1
-  tree="${TMPDIR:-/tmp}/fm-spawn-tree-$(id -u)-$key"
+  prefix="${TMPDIR:-/tmp}/fm-spawn-tree-$(id -u)-$root_key-"
+  tree="${prefix}$key"
   if [ ! -x "$tree/bin/fm-spawn.sh" ]; then
-    rm -rf "$tree.part"
-    git clone -q --no-hardlinks "$ROOT" "$tree.part" >/dev/null 2>&1 || return 1
-    (cd "$ROOT" && tar --exclude=.git --exclude=graft --exclude=node_modules -cf - .) | (cd "$tree.part" && tar -xf -) || return 1
-    printf '#!/bin/sh\nexit 0\n' > "$tree.part/bin/fm-home-summary-refresh.sh"
-    chmod +x "$tree.part/bin/fm-home-summary-refresh.sh"
-    mv "$tree.part" "$tree" 2>/dev/null || rm -rf "$tree.part"
+    stage="$tree.part.$$"
+    rm -rf "$stage"
+    if ! git clone -q --shared "$ROOT" "$stage" >/dev/null 2>&1; then
+      rm -rf "$stage"
+      git clone -q --no-hardlinks "$ROOT" "$stage" >/dev/null 2>&1 || return 1
+    fi
+    (cd "$ROOT" && tar --exclude=.git --exclude=graft --exclude=node_modules -cf - .) | (cd "$stage" && tar -xf -) || { rm -rf "$stage"; return 1; }
+    printf '#!/bin/sh\nexit 0\n' > "$stage/bin/fm-home-summary-refresh.sh"
+    chmod +x "$stage/bin/fm-home-summary-refresh.sh"
+    if ! mv "$stage" "$tree" 2>/dev/null; then
+      rm -rf "$stage"
+    fi
+    # Prune earlier state keys for this same checkout so repeated edits do not
+    # accumulate hundreds of MB per edit in TMPDIR.
+    for old in "${prefix}"*; do
+      [ -d "$old" ] || continue
+      case "$old" in
+        "$tree"|*.part.*) continue ;;
+      esac
+      rm -rf "$old" 2>/dev/null || true
+    done
   fi
   printf '%s\n' "$tree/bin/fm-spawn.sh"
 }
