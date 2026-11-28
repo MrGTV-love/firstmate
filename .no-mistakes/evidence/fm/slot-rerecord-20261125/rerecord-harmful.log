@@ -1,0 +1,29 @@
+ok - H1: refuses owner_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H2: refuses worktree_path_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H3: refuses base_not_forward; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H4: refuses base_not_on_default; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H5: refuses base_not_merge_base; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H6: refuses scope_entry_not_own_work: docs.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H7: refuses scope_entry_not_own_work: tools; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H8: refuses scope_uncovered_change: tools/x.sh; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9: refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9b: refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9c: refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9d: refuses scope_release_strands_work: src/other.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H9e: refuses scope_release_strands_work: src/sp ace.txt; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H10: refuses manifest_shadowed; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H11: refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H12: refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H12b: refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H13a: refuses actor_not_main; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H13b: refuses session_lock_not_owned; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H13c: refuses note_required; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H14: refuses manifest_sha_mismatch; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H15: refuses local_only_source_unsupported; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H17: refuses scope_entry_not_own_work: tools; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H18: refuses base_not_merge_base; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H19: refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H19b: refuses agent_not_proven_stopped; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H20: refuses launch_in_progress; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H21: refuses relaunch_unfinished; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
+ok - H22: refuses backlog_close_pending; rec_inventory, manifest inventory, sentinel and send-keys log unchanged
