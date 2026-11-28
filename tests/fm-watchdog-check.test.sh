@@ -259,6 +259,38 @@ test_absent_lock_is_missing_session() {
   pass "an absent session lock reads session-missing"
 }
 
+# A live lock holder whose process read fails is not proven gone: the check
+# reports unknown-session and runs no recovery. A stale beacon makes a readable
+# live holder a stale-watcher recovery, so only the failed read stops it here.
+test_unreadable_live_holder_is_unknown_session() {
+  local home dir fakebin pid episode_before
+  home=$(make_home unreadable)
+  dir=$(dirname "$home")
+  pid=$(cat "$home/state/.lock")
+  stale_beat "$home"
+  write_ledger "$home" rewake "$(dead_pid)"
+  write_stubs "$home" "$(healing_resume "$home")"
+  printf 'attempts=1 last_attempt=1 last_alarm=0\n' > "$home/state/.watchdog-episode"
+  episode_before=$(cat "$home/state/.watchdog-episode")
+  fakebin=$(fm_fakebin "$dir")
+  cat > "$fakebin/ps" <<STUB
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  [ "\$arg" = "$pid" ] && { echo 'ps: operation not permitted' >&2; exit 2; }
+done
+exec $(command -v ps) "\$@"
+STUB
+  chmod +x "$fakebin/ps"
+  kill -0 "$pid" || fail "the live holder fixture did not start"
+  run_check "$home" PATH="$fakebin:$PATH"
+  expect_code 0 "$CODE" "unreadable holder exit"
+  assert_equals "watchdog: unknown-session - lock holder cannot be read; no recovery run" "$OUT" "unreadable holder verdict"
+  assert_absent "$dir/resume.calls" "an unreadable live holder must not be resumed"
+  assert_absent "$dir/arm.calls" "an unreadable live holder must not have its watcher stopped"
+  assert_equals "$episode_before" "$(cat "$home/state/.watchdog-episode")" "an unreadable holder leaves the episode unchanged"
+  pass "a live lock holder whose process read fails reads unknown-session and runs no recovery"
+}
+
 test_failed_recovery_alarms_after_threshold() {
   local home dir
   home=$(make_home fail dead)
@@ -665,6 +697,7 @@ test_dead_arm_owner_is_named
 test_live_arm_owner_is_not_dead_arm
 test_missing_session_relaunches
 test_absent_lock_is_missing_session
+test_unreadable_live_holder_is_unknown_session
 test_failed_recovery_alarms_after_threshold
 test_missing_resume_command_fails_and_logs
 test_noop_attempts_alarm_on_original_schedule

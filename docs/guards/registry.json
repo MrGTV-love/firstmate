@@ -1941,8 +1941,8 @@
       "owner": "bin/fm-lock.sh",
       "invariant": "Only one verified live primary session mutates a home's fleet.",
       "layer": "runtime-block",
-      "source": "the current session identity and verified liveness/ancestry of the recorded session-lock owner; existing decision points: site:bin/fm-lock.sh:5ca693258f",
-      "trigger": "refuses the session lock while another live firstmate session holds it",
+      "source": "the current session identity and verified liveness/ancestry of the recorded session-lock owner; existing decision points: site:bin/fm-lock.sh:5ca693258f, site:bin/fm-lock.sh:c21ba7e89d",
+      "trigger": "refuses the session lock while another live firstmate session holds it, or while the recorded holder exists but its process cannot be read",
       "decision": "deny",
       "fail_direction": "closed",
       "remedy": "Remain read-only until the recorded owner exits or releases its lock, then retry FM_HOME=<home> bash bin/fm-lock.sh; never delete a live owner's lock.",
@@ -1963,6 +1963,11 @@
           "file": "bin/fm-lock.sh",
           "match": "refuse_live_owner \"$old\"",
           "count": 2
+        },
+        {
+          "file": "bin/fm-lock.sh",
+          "match": "refuse_unreadable_owner \"$old\"",
+          "count": 3
         }
       ]
     },

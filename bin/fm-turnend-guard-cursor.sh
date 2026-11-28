@@ -270,7 +270,11 @@ current_session_still_ours() {
 if ! fm_session_lock_owned_by_self "$STATE"; then
   LOCK_PID=$(cat "$STATE/.lock" 2>/dev/null || true)
   case "$LOCK_PID" in ''|*[!0-9]*) exit 0 ;; esac
-  fm_harness_pid_alive "$LOCK_PID" && exit 0
+  # Only a proven dead or non-harness holder (1) is recoverable; a live harness
+  # (0) or one whose process read failed (2) leaves the lock alone.
+  alive_rc=0
+  fm_harness_pid_alive "$LOCK_PID" || alive_rc=$?
+  [ "$alive_rc" -eq 1 ] || exit 0
   "$SCRIPT_DIR/fm-lock.sh" >/dev/null 2>&1 || exit 0
   fm_session_lock_owned_by_self "$STATE" || exit 0
 fi

@@ -190,6 +190,14 @@ refuse_live_owner() {  # <recorded-pid>
   exit 1
 }
 
+# fm_harness_pid_alive answered 2: kill -0 says pid $1 exists but its process
+# read failed, so nothing proves the holder dead. Refuse and leave the lock as
+# it is; taking it here could steal it from a live session.
+refuse_unreadable_owner() {  # <recorded-pid>
+  echo "error: cannot read process $1; holder not proven dead; operate read-only until resolved" >&2
+  exit 1
+}
+
 if [ "${1:-}" = release ]; then
   fm_session_lock_is_native_web || {
     echo 'error: native Web ownership is required to release this lock' >&2
@@ -217,7 +225,10 @@ if [ -f "$LOCK" ] && [ ! -L "$LOCK" ]; then
     confirm_own_lock "$old"
     old=$(cat "$LOCK" 2>/dev/null || true)
   fi
-  if fm_harness_pid_alive "$old"; then
+  alive_rc=0
+  fm_harness_pid_alive "$old" || alive_rc=$?
+  [ "$alive_rc" -ne 2 ] || refuse_unreadable_owner "$old"
+  if [ "$alive_rc" -eq 0 ]; then
     refuse_live_owner "$old"
   fi
 fi
@@ -241,10 +252,16 @@ if [ -e "$LOCK" ] || [ -L "$LOCK" ]; then
     echo "error: session lock is unreadable; operate read-only until resolved" >&2
     exit 1
   }
-  if fm_harness_pid_alive "$old"; then
+  alive_rc=0
+  fm_harness_pid_alive "$old" || alive_rc=$?
+  [ "$alive_rc" -ne 2 ] || refuse_unreadable_owner "$old"
+  if [ "$alive_rc" -eq 0 ]; then
     fm_session_lock_owned_by_self "$STATE" && confirm_own_lock "$old"
     old=$(cat "$LOCK" 2>/dev/null || true)
-    if fm_harness_pid_alive "$old"; then
+    alive_rc=0
+    fm_harness_pid_alive "$old" || alive_rc=$?
+    [ "$alive_rc" -ne 2 ] || refuse_unreadable_owner "$old"
+    if [ "$alive_rc" -eq 0 ]; then
       refuse_live_owner "$old"
     fi
   fi

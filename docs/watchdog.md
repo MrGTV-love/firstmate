@@ -20,7 +20,7 @@ It reads the home's existing evidence, optionally runs an operator-owned resume 
 ## What one check does
 
 Each run reads `state/.last-watcher-beat`, the session lock, and the Claude auto-arm ledger `state/.claude-autoarm-epoch` through the helpers in `bin/fm-wake-lib.sh`.
-It reaches one verdict: `idle`, `healthy`, `session-missing`, `dead-arm-owner`, or `stale-watcher`.
+It reaches one verdict: `idle`, `healthy`, `session-missing`, `unknown-session`, `dead-arm-owner`, or `stale-watcher`.
 A launchd job runs outside every harness, so the check derives the supervision model from the ledger: a Claude primary when the ledger exists, a persistent watcher otherwise.
 `FM_SUPERVISION_MODEL` pins the model when that guess is wrong.
 Pi and omp homes use the extension model and are not covered by the derivation.
@@ -72,5 +72,5 @@ The installer bakes the `PATH` of the shell that runs it into the agent, because
 - It does not cover Pi or omp extension supervision, secondmate homes' own supervision, or the away-mode daemon's injection path.
 - The root cause of any particular death is out of scope here.
 
-`tests/fm-watchdog-check.test.sh` covers the fresh, idle, stale-watcher, dead-arm-owner, and missing-session verdicts, the home-scoped stop, the retry interval, the failed-recovery and no-op attempt wording, the alarm threshold, title, and rate limit, and the installer, all against temporary homes.
+`tests/fm-watchdog-check.test.sh` covers the fresh, idle, stale-watcher, dead-arm-owner, missing-session, and unknown-session verdicts, the home-scoped stop, the retry interval, the failed-recovery and no-op attempt wording, the alarm threshold, title, and rate limit, and the installer, all against temporary homes.
 `tests/fm-work-progress.test.sh` proves that an old beacon cannot stop a productive watcher, while a genuinely inactive holder is stopped with its evidence logged and a superseded stop proof cannot signal a replacement.
