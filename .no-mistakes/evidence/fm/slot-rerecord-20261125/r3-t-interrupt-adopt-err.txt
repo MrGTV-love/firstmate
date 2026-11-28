@@ -1,0 +1,87 @@
+
+### T delay=adopts: TERM a write run
+linked /Users/charlesabrooker/tmp/fm-lab.WP84Pu/state/.rrt.meta.rerecord-snap.SGb6nI/adopt-err
+sent TERM
+/Users/charlesabrooker/.no-mistakes/evidence/01M8F5K7F1PNN9YAGYXASRKWDP/rr-live-interrupt.sh: line 35: 45556 Terminated: 15          ( unset FM_TASK_ID FM_SUPERVISION_ACTOR; exec ${XTRACE:+bash -x} "$CONTROL" "$RR_ID" rerecord-slot --manifest-sha "$(msha)" --note "$NOTE" ) > "$FX/run.out" 2>&1
+interrupted run exit=143
+--- raw interrupted-run output (708 bytes):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WP84Pu
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: this run published task rrt's record and then restored the prior record from /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012555Z.b5a16cee0f46.0; the audit record /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/20261128T012555Z.b5a16cee0f46.0.record is rolled-back; no manifest, copy or journal was changed
+--- end raw
+--- bytes the trap wrote into the snapshot's adopt-err file (hard link kept after the trap removed it):
+--- end adopt-err
+record after interrupt: prior
+audit 20261128T012555Z.b5a16cee0f46.0.record result=rolled-back
+temporaries: 
+
+### T delay=adopts: the next write run
+$ fm-control rrt rerecord-slot --manifest-sha 30cb6664cea62aeff0c1c144309bdeabfbfb11f337d810fe9a23a719f87a02dc --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+rerecord-slot rrt: base 249d303d7fe488e91a417e047a9ca4374215dce2 -> 0c82e80536da820688c5e4968f8c6b393610c731; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012605Z.b5a16cee0f46.0
+exit=0
+record after next run: renewed
+audit 20261128T012555Z.b5a16cee0f46.0.record result=rolled-back
+audit 20261128T012605Z.b5a16cee0f46.0.record result=published
+OPEN_AUDITS_AFTER_NEXT_RUN=0
+
+### T delay=adopts: TERM a write run
+linked /Users/charlesabrooker/tmp/fm-lab.WP84Pu/state/.rrt.meta.rerecord-snap.sgzZdm/adopt-err
+sent TERM
+/Users/charlesabrooker/.no-mistakes/evidence/01M8F5K7F1PNN9YAGYXASRKWDP/rr-live-interrupt.sh: line 35: 96639 Terminated: 15          ( unset FM_TASK_ID FM_SUPERVISION_ACTOR; exec ${XTRACE:+bash -x} "$CONTROL" "$RR_ID" rerecord-slot --manifest-sha "$(msha)" --note "$NOTE" ) > "$FX/run.out" 2>&1
+interrupted run exit=143
+--- raw interrupted-run output (708 bytes):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WP84Pu
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: this run published task rrt's record and then restored the prior record from /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012623Z.0609162e364d.0; the audit record /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/20261128T012623Z.0609162e364d.0.record is rolled-back; no manifest, copy or journal was changed
+--- end raw
+--- bytes the trap wrote into the snapshot's adopt-err file (hard link kept after the trap removed it):
+--- end adopt-err
+record after interrupt: prior
+audit 20261128T012623Z.0609162e364d.0.record result=rolled-back
+temporaries: 
+
+### T delay=adopts: the next write run
+$ fm-control rrt rerecord-slot --manifest-sha 4776307a41a07fa000ea3d789f381f3c3cd5c298199ccef89388f91fb544ea53 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+rerecord-slot rrt: base d0bf72723601f59af9d190b11aa0811784867a21 -> 40bf6b77cb01d7f8c5ebe2a9a9b7995846c30951; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012642Z.0609162e364d.0
+exit=0
+record after next run: renewed
+audit 20261128T012623Z.0609162e364d.0.record result=rolled-back
+audit 20261128T012642Z.0609162e364d.0.record result=published
+OPEN_AUDITS_AFTER_NEXT_RUN=0
+
+### T delay=adopts: TERM a write run
+linked /Users/charlesabrooker/tmp/fm-lab.WP84Pu/state/.rrt.meta.rerecord-snap.ed8Hqm/adopt-err
+sent TERM
+/Users/charlesabrooker/.no-mistakes/evidence/01M8F5K7F1PNN9YAGYXASRKWDP/rr-live-interrupt.sh: line 35: 66352 Terminated: 15          ( unset FM_TASK_ID FM_SUPERVISION_ACTOR; exec ${XTRACE:+bash -x} "$CONTROL" "$RR_ID" rerecord-slot --manifest-sha "$(msha)" --note "$NOTE" ) > "$FX/run.out" 2>&1
+interrupted run exit=143
+--- raw interrupted-run output (708 bytes):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WP84Pu
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: this run published task rrt's record and then restored the prior record from /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012653Z.fce5e6c236f6.0; the audit record /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/20261128T012653Z.fce5e6c236f6.0.record is rolled-back; no manifest, copy or journal was changed
+--- end raw
+--- bytes the trap wrote into the snapshot's adopt-err file (hard link kept after the trap removed it):
+--- end adopt-err
+record after interrupt: prior
+audit 20261128T012653Z.fce5e6c236f6.0.record result=rolled-back
+temporaries: 
+
+### T delay=adopts: the next write run
+$ fm-control rrt rerecord-slot --manifest-sha 2082d273bebb8920cb4e58822ed16303bde2a5f12b983508e99b5cc71cad0bf5 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+rerecord-slot rrt: base ae49da9a5a80cf382484b96804f1af30b36b4df9 -> bac1f87ebac7535bfe81545e007d1ecf3606fdd8; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012705Z.fce5e6c236f6.0
+exit=0
+record after next run: renewed
+audit 20261128T012653Z.fce5e6c236f6.0.record result=rolled-back
+audit 20261128T012705Z.fce5e6c236f6.0.record result=published
+OPEN_AUDITS_AFTER_NEXT_RUN=0

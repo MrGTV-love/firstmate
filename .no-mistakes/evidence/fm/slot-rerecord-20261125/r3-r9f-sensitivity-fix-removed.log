@@ -1,0 +1,7 @@
+not ok - R9f: the trap must say what the run did (missing: 'rerecord-slot rrt: this run published task rrt's record and then restored the prior record from /Users/charlesabrooker/tmp/fm-control-relaunch.uwzZUy/rr-R9f-1822/home/data/rrt/slot-rerecord/prior-meta.20261128T013404Z.3c99c837a05e.0; the audit record /Users/charlesabrooker/tmp/fm-control-relaunch.uwzZUy/rr-R9f-1822/home/data/rrt/slot-rerecord/20261128T013404Z.3c99c837a05e.0.record is rolled-back; no manifest, copy or journal was changed')
+--- output ---
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1

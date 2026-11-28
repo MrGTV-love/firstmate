@@ -1,0 +1,76 @@
+
+### T delay=pubs: TERM a write run
+record changed after 248 polls
+sent TERM
+/Users/charlesabrooker/.no-mistakes/evidence/01M8F5K7F1PNN9YAGYXASRKWDP/rr-live-interrupt.sh: line 35: 20342 Terminated: 15          ( unset FM_TASK_ID FM_SUPERVISION_ACTOR; exec ${XTRACE:+bash -x} "$CONTROL" "$RR_ID" rerecord-slot --manifest-sha "$(msha)" --note "$NOTE" ) > "$FX/run.out" 2>&1
+interrupted run exit=143
+--- raw interrupted-run output (682 bytes):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WP84Pu
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: this run stopped while publishing task rrt's record, so that rename may still land; the record now holds this run's published record; the audit record /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/20261128T012721Z.9a192f45a437.0.record is left pending for the next write run to reconcile; no manifest, copy or journal was changed
+--- end raw
+record after interrupt: renewed
+audit 20261128T012721Z.9a192f45a437.0.record result=pending
+temporaries: 
+
+### T delay=pubs: the next write run
+$ fm-control rrt rerecord-slot --manifest-sha d1a34e4c6a40dbe2b87de350d50f3b0d37fb71b7693439845cf0f3e1bdbc7691 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+rerecord-slot rrt: already recorded
+rerecord-slot rrt: before finding it already recorded, this run reconciled earlier interrupted runs: audit /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/20261128T012721Z.9a192f45a437.0.record published-recovered (the audit was closed with the record left as published); no manifest, copy or journal was changed
+exit=0
+record after next run: renewed
+audit 20261128T012721Z.9a192f45a437.0.record result=published-recovered
+OPEN_AUDITS_AFTER_NEXT_RUN=0
+
+### T delay=pub+0.05s: TERM a write run
+record changed after 238 polls
+then waited 0.05s
+sent TERM
+/Users/charlesabrooker/.no-mistakes/evidence/01M8F5K7F1PNN9YAGYXASRKWDP/rr-live-interrupt.sh: line 35: 72383 Terminated: 15          ( unset FM_TASK_ID FM_SUPERVISION_ACTOR; exec ${XTRACE:+bash -x} "$CONTROL" "$RR_ID" rerecord-slot --manifest-sha "$(msha)" --note "$NOTE" ) > "$FX/run.out" 2>&1
+interrupted run exit=143
+--- raw interrupted-run output (708 bytes):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WP84Pu
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+rerecord-slot rrt: this run published task rrt's record and then restored the prior record from /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012742Z.6b9748e7077d.0; the audit record /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/20261128T012742Z.6b9748e7077d.0.record is rolled-back; no manifest, copy or journal was changed
+--- end raw
+record after interrupt: prior
+audit 20261128T012742Z.6b9748e7077d.0.record result=rolled-back
+temporaries: 
+
+### T delay=pub+0.05s: the next write run
+$ fm-control rrt rerecord-slot --manifest-sha 8e59acfdb7da7e690e3b9b4e28c203b9f02f725c8283ba91463e78c6688139f5 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+rerecord-slot rrt: base 31301383c7b270da8101685095204eceeac99dfe -> 3b098873dc59183818a12f8490eb7a1c6dff741f; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012752Z.6b9748e7077d.0
+exit=0
+record after next run: renewed
+audit 20261128T012742Z.6b9748e7077d.0.record result=rolled-back
+audit 20261128T012752Z.6b9748e7077d.0.record result=published
+OPEN_AUDITS_AFTER_NEXT_RUN=0
+
+### T delay=0.3s: TERM a write run
+sent TERM
+/Users/charlesabrooker/.no-mistakes/evidence/01M8F5K7F1PNN9YAGYXASRKWDP/rr-live-interrupt.sh: line 35: 17142 Terminated: 15          ( unset FM_TASK_ID FM_SUPERVISION_ACTOR; exec ${XTRACE:+bash -x} "$CONTROL" "$RR_ID" rerecord-slot --manifest-sha "$(msha)" --note "$NOTE" ) > "$FX/run.out" 2>&1
+interrupted run exit=143
+--- raw interrupted-run output (0 bytes):
+--- end raw
+record after interrupt: prior
+temporaries: 
+
+### T delay=0.3s: the next write run
+$ fm-control rrt rerecord-slot --manifest-sha b98facd81004e45763b99f35bbc75e14f0abf3819f541fa9ce68a0cef3816496 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+rerecord-slot rrt: base ae5dcb27ef90e52375a35a030f2dcc3487d040bb -> c4e5b726d53da5d5a1b08c958119979b09bbdd5e; scope 3 entries (2 added, 0 released, 0 side-branch); prior record archived at /Users/charlesabrooker/tmp/fm-lab.WP84Pu/data/rrt/slot-rerecord/prior-meta.20261128T012802Z.b7cef556c597.0
+exit=0
+record after next run: renewed
+audit 20261128T012802Z.b7cef556c597.0.record result=published
+OPEN_AUDITS_AFTER_NEXT_RUN=0

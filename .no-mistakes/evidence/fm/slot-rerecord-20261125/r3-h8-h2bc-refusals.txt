@@ -1,0 +1,26 @@
+
+### H8 manifest bytes change after the operator reviewed --check (project renews again, same scope, new bytes) -> refuses manifest_sha_mismatch
+manifest_sha256=8796d1cca240aaf1458ccffb64f18175736e1c4f80c42023bdfa6013b9a1a2ca
+write_would=pass
+reviewed=8796d1cca240aaf1458ccffb64f18175736e1c4f80c42023bdfa6013b9a1a2ca now=2400a2740af0440cfdb539f5766ba491ea7e2c32e745e310c7ca8cca3eedcf34
+$ fm-control rrt rerecord-slot --manifest-sha 8796d1cca240aaf1458ccffb64f18175736e1c4f80c42023bdfa6013b9a1a2ca --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+error: slot rerecord refused: manifest_sha_mismatch: the manifest sha256 is 2400a2740af0440cfdb539f5766ba491ea7e2c32e745e310c7ca8cca3eedcf34, but --manifest-sha names 8796d1cca240aaf1458ccffb64f18175736e1c4f80c42023bdfa6013b9a1a2ca; review the manifest again and bind the digest fm-control.sh <id> rerecord-slot --check prints; no record, manifest, copy or journal was changed
+exit=1
+H8_WROTE_NOTHING=yes
+
+### H2b manifest base is still the old recorded base M0 while scope grew -> refuses (base not the merge-base)
+$ fm-control rrt rerecord-slot --manifest-sha bc2a076b4a155de289ce4f7f5a8a8dd5242a7d33571613ef94a662cfa49bd08c --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: base_not_merge_base: the manifest base 469a8bcad1c8fb61d60c043ecbc07d5ff37c4140 is not merge-base(origin/main, HEAD) = fc6d59275beb392bdc3a8303bcd2ac3e7d86e9b6; renew the durable record against the current merge-base (this verb never fetches: if origin/main is stale, fetch it in the primary clone first); no record, manifest, copy or journal was changed
+exit=1
+H2b_WROTE_NOTHING=yes
+
+### H2c manifest base points backward to an ancestor of the recorded base -> refuses
+$ fm-control rrt rerecord-slot --manifest-sha 5b07c53b163b47fdc04acba968ddfcd3d7fae14d477b1d21bd1cb345a6e42358 --note Lab\ ruling\ L-1:\ re-record\ the\ renewed\ slot\ after\ the\ authorized\ forward\ merge
+error: slot rerecord refused: base_not_forward: the recorded base 84898b812caa9f8dc57d1df4dec90ab52080b119 is not an ancestor of the manifest base ed92e0968861dfa1fdcf5f06b83d193805747ebc; no record, manifest, copy or journal was changed
+exit=1
+H2c_WROTE_NOTHING=yes

@@ -1,0 +1,35 @@
+
+### S0 fixture: M0=677b2b990d1699afabc1ce07813151dd1e492016 M1=d570150a1903836a6bb7e9f8ffd2d972d05365b4 HEAD=a8bb69ad4e117c4bdab79b9dbff34acbab762635
+slot_base_sha=677b2b990d1699afabc1ce07813151dd1e492016
+slot_owned_path=src
+
+### S0 before renewal: the project has not renewed the durable record; a check refuses
+$ fm-control rrt rerecord-slot --check
+error: slot rerecord refused: base_not_merge_base: the manifest base 677b2b990d1699afabc1ce07813151dd1e492016 is not merge-base(origin/main, HEAD) = d570150a1903836a6bb7e9f8ffd2d972d05365b4; renew the durable record against the current merge-base (this verb never fetches: if origin/main is stale, fetch it in the primary clone first); no record, manifest, copy or journal was changed
+exit=1
+
+### S0 durable record renewed by the project
+{"base_ref": "origin/main", "base_sha": "d570150a1903836a6bb7e9f8ffd2d972d05365b4", "branch": "fm/rrt", "created_at_iso": "2026-11-28T01:22:49.172462+00:00", "lifecycle_state": "worktree_active", "owned_paths": ["src", "lib", "tools/x.sh"], "owner_id": "rrt", "repo_root": "/Users/charlesabrooker/tmp/fm-rr-fx.LWFsUT/proj", "worktree_path": "/Users/charlesabrooker/tmp/fm-rr-fx.LWFsUT/wt"}
+
+### S1 --check reports what the write would do and writes nothing
+record_sha256=76118a4adbe443f1469208e540bc7a0006470d41b4ac7579dc4e54c0538801b9
+manifest_sha256=e102ebf9ad31be01b221c191d6612a5bd540ef0a6601513a9ae2fe84240af63f
+copy_head=a8bb69ad4e117c4bdab79b9dbff34acbab762635
+copy_status=
+audit_dir_entries=
+$ fm-control rrt rerecord-slot --check
+added_scope=lib rule=c
+added_scope=tools/x.sh rule=b
+rule_c_entry=lib added=1 tracked_newly_covered=1 untouched=1 uncommitted_newly_covered=0
+added_uncommitted_newly_covered=0
+scope_split=prior:1 changed:1 ancestor:1
+manifest_sha256=e102ebf9ad31be01b221c191d6612a5bd540ef0a6601513a9ae2fe84240af63f
+base=677b2b990d1699afabc1ce07813151dd1e492016 -> d570150a1903836a6bb7e9f8ffd2d972d05365b4
+launch_proof=ok
+journal_proof=absent
+backlog_close_proof=ok
+stopped_proof=ok
+write_would=pass
+command: bin/fm-control.sh rrt rerecord-slot --manifest-sha e102ebf9ad31be01b221c191d6612a5bd540ef0a6601513a9ae2fe84240af63f --note '<the ruling this carries out>'
+exit=0
+CHECK_WROTE_NOTHING=yes
