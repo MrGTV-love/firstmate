@@ -1,0 +1,20 @@
+# UNINTENDED LIVE MUTATION (test-driver mistake, not a product failure)
+# Step 10 ran the plist program line `python3 bin/fm-landing-loop.py step` (real gh, no test seam) in lab home 1.
+# That home still held 4 ship metas (real-434/465/473/474) pointing at real MrGTV-love/firstmate PRs, mode=direct-PR.
+# The pass did exactly what the product is meant to do:
+--- landing-loop events ---
+1795833109 real-434 a8c5a2815e4e wake:conflict: https://github.com/MrGTV-love/firstmate/pull/434 has merge conflicts against main; needs conflict resolution
+1795833109 real-465 486adcbbf074 update-started: updating onto main (2440b75c60) via direct-PR
+--- run output.log ---
+$ gh api -X PUT repos/MrGTV-love/firstmate/pulls/465/update-branch -f expected_head_sha=486adcbbf074885caab97318bae72f6cfe646ab6
+{"message":"Updating pull request branch.","url":"https://api.github.com/repos/MrGTV-love/firstmate/pulls/465"}
+--- run result.json ---
+{"rc": 0, "detail": "updated MrGTV-love/firstmate#465 server-side from 486adcbbf0 to e3e8619078", "at": 1795833114}
+--- GitHub now: newest commit on PR #465 ---
+{"message":"Merge branch 'main' into repair/session-task-delivery-review-order-20261126111605-77462-10785","parents":["486adcbbf074885caab97318bae72f6cfe646ab6","2440b75c60e72a9a31771805a26e3653b7b14ca5"],"sha":"e3e8619078f063a18112bb747fe9af1beb95a771"}
+--- reconcile/auto-review on the same pass: no review started, nothing merged ---
+{"pr":"https://github.com/MrGTV-love/firstmate/pull/434","phase":"pull request is CONFLICTING"}
+{"pr":"https://github.com/MrGTV-love/firstmate/pull/465","phase":"review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset"}
+{"pr":"https://github.com/MrGTV-love/firstmate/pull/473","phase":"review runner unavailable: FM_REVIEW_RUNNER and config/review-runner are both unset"}
+{"pr":"https://github.com/MrGTV-love/firstmate/pull/474","phase":"forge merge state is UNSTABLE, not green"}
+--- no new comments or reviews on any of the 4 PRs; all still OPEN (checked via gh api) ---

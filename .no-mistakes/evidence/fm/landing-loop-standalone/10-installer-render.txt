@@ -1,0 +1,19 @@
+$ FM_HOME=<lab> bin/fm-landing-loop-install.sh install --interval 90 --print > rendered.plist
+exit=0
+$ plutil -lint rendered.plist
+10-rendered-agent.plist: OK
+--- parsed with plistlib ---
+{'Label': 'com.firstmate.landing-loop.100872637', 'ProgramArguments': ['/usr/bin/env', 'python3', '<root>/bin/fm-landing-loop.py', 'step'], 'StartInterval': 90, 'RunAtLoad': True, 'WorkingDirectory': '<lab>', 'StandardOutPath': '<lab>/state/.landing-loop.launchd.log', 'EnvironmentVariables.FM_HOME': '<lab>'}
+assertions: label=cksum(FM_HOME), StartInterval=90, ProgramArguments ends <root>/bin/fm-landing-loop.py step, FM_HOME=lab -> OK
+--- the plist program line, run by hand exactly as launchd would (env FM_HOME + /usr/bin/env python3 ... step) ---
+# WARNING: this home still held 4 real-PR ship metas from step 03. This pass therefore also acted on them:
+# it queued a conflict wake for #434 and called GitHub update-branch on real PR #465. See 12-UNINTENDED-real-pr-465-update-branch.txt.
+exit=0
+{"at":1795833104,"rc":0}
+--- guards ---
+error: interval must be at least 30 seconds
+exit=1
+error: interval must be whole seconds
+exit=1
+error: FM_TEST_SEAM=1 requires both FM_LANDING_LOOP_AGENT_DIR and FM_LANDING_LOOP_LAUNCHCTL
+exit=1 (seam without overrides fails closed, never touches ~/Library/LaunchAgents)

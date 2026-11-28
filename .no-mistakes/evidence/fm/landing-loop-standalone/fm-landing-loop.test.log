@@ -1,0 +1,23 @@
+warning: You appear to have cloned an empty repository.
+warning: You appear to have cloned an empty repository.
+ok - landing loop admits one clean stale-base PR at a time in PR-number order and reaps completion
+warning: You appear to have cloned an empty repository.
+ok - conflicting stale-base PR is held without launching a rerun and wakes Main once
+warning: You appear to have cloned an empty repository.
+ok - conflict and failed-update wakes for the same head are deduplicated per kind, so neither hides the other
+warning: You appear to have cloned an empty repository.
+ok - direct-PR proves merge-tree, updates server-side via expected_head_sha, waits for head advance, and fails into backoff + wake if stalled
+warning: You appear to have cloned an empty repository.
+ok - dirty no-mistakes worktree is held without launching rerun or waking Main
+warning: You appear to have cloned an empty repository.
+ok - no-mistakes axi status fails closed on exit error, statusless or branchless answers, and this branch's live run; ignores a sibling branch's run; treats ci_monitor_interrupted as terminal
+warning: You appear to have cloned an empty repository.
+ok - detached update timeout forwards SIGTERM through wrapper and terminates nested child process group
+warning: You appear to have cloned an empty repository.
+ok - failed update records backoff and wakes Main once
+warning: You appear to have cloned an empty repository.
+ok - train command proves cumulative conflict-free batch, reports every excluded requested PR, protects existing branches, builds under merge.ff=only, and emits canonical Train-member closes block
+warning: You appear to have cloned an empty repository.
+ok - train without --prs keeps members in the first candidate's repository and reports the others as excluded
+ok - step runs the reconcile helper under the stall rule, records its status, stops a silent pass with its tree, and refuses --no-reconcile outside the test seam
+ok - launchd installer renders the agent, waits out asynchronous bootout on reinstall and uninstall, refuses a stuck reinstall without touching the plist, and enforces test-seam overrides

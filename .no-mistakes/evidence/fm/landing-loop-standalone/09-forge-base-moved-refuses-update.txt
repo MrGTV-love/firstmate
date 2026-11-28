@@ -1,0 +1,7 @@
+1
+=== base tip moves on GitHub (live tip eeee...) after the loop proved PR #107 against daa65660f6 ===
+  task-g: backoff behind=1 https://github.com/lab/app/pull/107 (waiting after failed update: live main advanced (eeeeeeeeee != proved daa65660f6) before update-branch)
+--- update-branch calls for #107 (must be 0) ---
+0
+--- wake for task-g ---
+landing-loop:task-g:update-failed:ea97ac90c940728ce0e709e504280f8e806e02b9	check: landing-loop task-g: base update for https://github.com/lab/app/pull/107 failed: live main advanced (eeeeeeeeee != proved daa65660f6) before update-branch (log: <lab>/state/.landing-loop/runs/task-g-ea97ac90c9-1795833055/output.log)

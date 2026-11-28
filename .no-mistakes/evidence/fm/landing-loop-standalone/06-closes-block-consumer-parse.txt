@@ -1,0 +1,7 @@
+$ fm_pr_closes_parse <train PR body opening with emitted closes_block> https://github.com/MrGTV-love/firstmate/pull/99999
+status	block
+member	https://github.com/MrGTV-love/firstmate/pull/455
+member	https://github.com/MrGTV-love/firstmate/pull/456
+member	https://github.com/MrGTV-love/firstmate/pull/457
+member	https://github.com/MrGTV-love/firstmate/pull/458
+end	complete

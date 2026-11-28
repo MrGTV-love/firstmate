@@ -1,0 +1,23 @@
+$ bin/fm-landing-loop.py step   # real fm-pr-ready-reconcile.sh, no test seam
+exit=0
+$ bin/fm-landing-loop.py status --json
+{
+ "backoff": {},
+ "completed_heads": {},
+ "emitted_wakes": {},
+ "inflight": {},
+ "last_reconcile": {
+  "at": 1795832514,
+  "rc": 0
+ },
+ "last_step_at": 1795832514,
+ "tasks": {},
+ "v": 1
+}
+--- state tree diff (before -> after) ---
+2a3,7
+> <lab>/state/.landing-loop
+> <lab>/state/.landing-loop/lock
+> <lab>/state/.landing-loop/state.json
+> <lab>/state/.pr-ready-reconcile
+> <lab>/state/.pr-ready-reconcile/cursor

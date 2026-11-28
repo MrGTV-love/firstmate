@@ -1,0 +1,10 @@
+$ bin/fm-landing-loop.py train --repo MrGTV-love/firstmate --prs 434,455,456,457,458,459,9999 --max 4 --worktree <clone>
+train base=main (2440b75c60) selected=4 excluded=3
+  + #455 ec40789d21 https://github.com/MrGTV-love/firstmate/pull/455
+  + #456 4cc6aedf15 https://github.com/MrGTV-love/firstmate/pull/456
+  + #457 dfded3d4e6 https://github.com/MrGTV-love/firstmate/pull/457
+  + #458 f7638b33c9 https://github.com/MrGTV-love/firstmate/pull/458
+  - https://github.com/MrGTV-love/firstmate/pull/9999 (could not read PR from forge)
+  - https://github.com/MrGTV-love/firstmate/pull/434 (conflicts with train batch)
+  - https://github.com/MrGTV-love/firstmate/pull/459 (batch cap (4) reached)
+exit=0

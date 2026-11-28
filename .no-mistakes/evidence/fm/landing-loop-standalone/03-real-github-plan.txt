@@ -1,0 +1,65 @@
+$ bin/fm-landing-loop.py plan   # real GitHub, read-only, 4 registered direct-PR ship tasks
+# 434 conflict   behind=-   real-434 (PR has merge conflicts with base)
+# 465 update     behind=3   real-465 (behind main by 3 (checks green))
+# 473 at-tip     behind=0   real-473 (already contains base tip; handled by auto-review/merge lane)
+# 474 red-checks behind=1   real-474 (red checks without PASS: PR must be raised via no-mistakes, Behavior portable family-parallel 1, Behavior portable family-parallel 8)
+python3 bin/fm-landing-loop.py plan  0.39s user 0.33s system 12% cpu 5.801 total
+exit=0
+
+$ bin/fm-landing-loop.py plan --json
+{
+ "tasks": [
+  {
+   "task": "real-434",
+   "pr": "https://github.com/MrGTV-love/firstmate/pull/434",
+   "number": 434,
+   "mode": "direct-PR",
+   "action": "conflict",
+   "reason": "PR has merge conflicts with base",
+   "behind_by": null,
+   "head": "a8c5a2815e4e5256c2b05ed3a3d385d47850ae0a",
+   "base_name": "main",
+   "base_tip": null
+  },
+  {
+   "task": "real-465",
+   "pr": "https://github.com/MrGTV-love/firstmate/pull/465",
+   "number": 465,
+   "mode": "direct-PR",
+   "action": "update",
+   "reason": "behind main by 3 (checks green)",
+   "behind_by": 3,
+   "head": "486adcbbf074885caab97318bae72f6cfe646ab6",
+   "base_name": "main",
+   "base_tip": "2440b75c60e72a9a31771805a26e3653b7b14ca5"
+  },
+  {
+   "task": "real-473",
+   "pr": "https://github.com/MrGTV-love/firstmate/pull/473",
+   "number": 473,
+   "mode": "direct-PR",
+   "action": "at-tip",
+   "reason": "already contains base tip; handled by auto-review/merge lane",
+   "behind_by": 0,
+   "head": "843be1f3634b17a781f2386ab160614df73d9802",
+   "base_name": "main",
+   "base_tip": "2440b75c60e72a9a31771805a26e3653b7b14ca5"
+  },
+  {
+   "task": "real-474",
+   "pr": "https://github.com/MrGTV-love/firstmate/pull/474",
+   "number": 474,
+   "mode": "direct-PR",
+   "action": "red-checks",
+   "reason": "red checks without PASS: PR must be raised via no-mistakes, Behavior portable family-parallel 1, Behavior portable family-parallel 8",
+   "behind_by": 1,
+   "head": "bd677fd3a1e0546b76637693146d46e52eeec830",
+   "base_name": "main",
+   "base_tip": "2440b75c60e72a9a31771805a26e3653b7b14ca5"
+  }
+ ],
+ "max_inflight": 1
+}
+# independent cross-check with plain git merge-tree in the disposable clone
+PR #465 merge-tree exit=0 (0=clean,1=conflict) conflicted-files: 
+PR #434 merge-tree exit=1 (0=clean,1=conflict) conflicted-files: bin/fm-review-record.py docs/configuration.md tests/fm-review-record.test.sh 

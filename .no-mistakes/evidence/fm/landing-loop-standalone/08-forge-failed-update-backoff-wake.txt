@@ -1,0 +1,37 @@
+# note: an earlier pass ran while wt-e/wt-f did not exist yet; both were "held (worktree missing)" with no wake and no update.
+=== after 10 passes with failing updates (no-mistakes rerun fails; GitHub update-branch returns 422) ===
+last_step_at=1795833033 inflight=0
+  task-a: updated behind=1 https://github.com/lab/app/pull/101 (update already ran for this head; waiting for forge head to advance)
+  task-b: updated behind=1 https://github.com/lab/app/pull/102 (update already ran for this head; waiting for forge head to advance)
+  task-c: conflict behind=1 https://github.com/lab/app/pull/103 (conflicts with current base tip)
+  task-d: at-tip behind=0 https://github.com/lab/app/pull/104 (already contains base tip; handled by auto-review/merge lane)
+  task-e: backoff behind=1 https://github.com/lab/app/pull/105 (waiting after failed update: simulated rerun failure: gate refused)
+  task-f: backoff behind=1 https://github.com/lab/app/pull/106 (waiting after failed update: update-branch failed (exit 1): HTTP 422: merge conflict)
+--- backoff records ---
+{
+  "task-e": {
+    "head": "358c7c7ad96d83a9ce84d3fe1ddeb598e97e86ec",
+    "reason": "simulated rerun failure: gate refused",
+    "until": 1795834802
+  },
+  "task-f": {
+    "head": "babdefde7ab60c1cae41e2f8a74506d7da9513d9",
+    "reason": "update-branch failed (exit 1): HTTP 422: merge conflict",
+    "until": 1795834806
+  }
+}
+--- Main wake queue (key, payload) ---
+landing-loop:task-c:conflict:67ac14303f11418a4002396c109ac0d55158e37a	check: landing-loop task-c: https://github.com/lab/app/pull/103 has merge conflicts against main; needs conflict resolution
+landing-loop:task-e:update-failed:358c7c7ad96d83a9ce84d3fe1ddeb598e97e86ec	check: landing-loop task-e: base update for https://github.com/lab/app/pull/105 failed: simulated rerun failure: gate refused (log: <lab>/state/.landing-loop/runs/task-e-358c7c7ad9-1795833000/output.log)
+landing-loop:task-f:update-failed:babdefde7ab60c1cae41e2f8a74506d7da9513d9	check: landing-loop task-f: base update for https://github.com/lab/app/pull/106 failed: update-branch failed (exit 1): HTTP 422: merge conflict (log: <lab>/state/.landing-loop/runs/task-f-babdefde7a-1795833004/output.log)
+--- rerun attempts for task-e (must be 1, backoff stops retry) ---
+1
+--- update-branch attempts for #106 (must be 1) ---
+1
+--- events (new) ---
+1795833000 task-e 358c7c7ad96d update-started: updating onto main (daa65660f6) via no-mistakes
+1795833002 task-e 358c7c7ad96d update-failed: simulated rerun failure: gate refused
+1795833003 task-e 358c7c7ad96d wake:update-failed: base update for https://github.com/lab/app/pull/105 failed: simulated rerun failure: gate refused (log: <lab>/state/.landing-loop/runs/task-e-358c7c7ad9-1795833000/output.log)
+1795833004 task-f babdefde7ab6 update-started: updating onto main (daa65660f6) via direct-PR
+1795833006 task-f babdefde7ab6 update-failed: update-branch failed (exit 1): HTTP 422: merge conflict
+1795833007 task-f babdefde7ab6 wake:update-failed: base update for https://github.com/lab/app/pull/106 failed: update-branch failed (exit 1): HTTP 422: merge conflict (log: <lab>/state/.landing-loop/runs/task-f-babdefde7a-1795833004/output.log)

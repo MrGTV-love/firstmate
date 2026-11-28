@@ -1,0 +1,69 @@
+=== pass 1: plan, then step (MAX_INFLIGHT default 1) ===
+# 101 update     behind=1   task-a (behind main by 1 (checks green))
+# 102 update     behind=1   task-b (behind main by 1 (checks green))
+# 103 conflict   behind=1   task-c (conflicts with current base tip)
+# 104 update     behind=1   task-d (behind main by 1 (checks green))
+step exit=0
+--- status ---
+last_step_at=1795832879 inflight=1
+  task-a: inflight behind=1 https://github.com/lab/app/pull/101 (launched no-mistakes base update)
+  task-b: update behind=1 https://github.com/lab/app/pull/102 (behind main by 1 (checks green))
+  task-c: conflict behind=1 https://github.com/lab/app/pull/103 (conflicts with current base tip)
+  task-d: update behind=1 https://github.com/lab/app/pull/104 (behind main by 1 (checks green))
+--- Main wake queue (state/.wake-queue: ts, type, key, payload) ---
+1795832879	check	landing-loop:task-c:conflict:67ac14303f11418a4002396c109ac0d55158e37a	check: landing-loop task-c: https://github.com/lab/app/pull/103 has merge conflicts against main; needs conflict resolution
+--- no-mistakes rerun calls (ts, cwd, args) ---
+1795832878 <forge>/wt-a rerun
+
+=== pass 2 while task-a update is still running ===
+--- status ---
+last_step_at=1795832882 inflight=1
+  task-a: inflight behind=None https://github.com/lab/app/pull/101 (base update already running)
+  task-b: update behind=1 https://github.com/lab/app/pull/102 (behind main by 1 (checks green))
+  task-c: conflict behind=1 https://github.com/lab/app/pull/103 (conflicts with current base tip)
+  task-d: update behind=1 https://github.com/lab/app/pull/104 (behind main by 1 (checks green))
+--- Main wake queue (state/.wake-queue: ts, type, key, payload) ---
+1795832879	check	landing-loop:task-c:conflict:67ac14303f11418a4002396c109ac0d55158e37a	check: landing-loop task-c: https://github.com/lab/app/pull/103 has merge conflicts against main; needs conflict resolution
+--- no-mistakes rerun calls (ts, cwd, args) ---
+1795832878 <forge>/wt-a rerun
+
+=== pass 3 after task-a rerun finished ===
+--- status ---
+last_step_at=1795832890 inflight=1
+  task-a: updated behind=1 https://github.com/lab/app/pull/101 (update already ran for this head; waiting for forge head to advance)
+  task-b: inflight behind=1 https://github.com/lab/app/pull/102 (launched no-mistakes base update)
+  task-c: conflict behind=1 https://github.com/lab/app/pull/103 (conflicts with current base tip)
+  task-d: update behind=1 https://github.com/lab/app/pull/104 (behind main by 1 (checks green))
+--- Main wake queue (state/.wake-queue: ts, type, key, payload) ---
+1795832879	check	landing-loop:task-c:conflict:67ac14303f11418a4002396c109ac0d55158e37a	check: landing-loop task-c: https://github.com/lab/app/pull/103 has merge conflicts against main; needs conflict resolution
+--- no-mistakes rerun calls (ts, cwd, args) ---
+1795832878 <forge>/wt-a rerun
+1795832890 <forge>/wt-b rerun
+
+=== after 8 more passes ===
+--- status ---
+last_step_at=1795832925 inflight=0
+  task-a: updated behind=1 https://github.com/lab/app/pull/101 (update already ran for this head; waiting for forge head to advance)
+  task-b: updated behind=1 https://github.com/lab/app/pull/102 (update already ran for this head; waiting for forge head to advance)
+  task-c: conflict behind=1 https://github.com/lab/app/pull/103 (conflicts with current base tip)
+  task-d: at-tip behind=0 https://github.com/lab/app/pull/104 (already contains base tip; handled by auto-review/merge lane)
+--- Main wake queue (state/.wake-queue: ts, type, key, payload) ---
+1795832879	check	landing-loop:task-c:conflict:67ac14303f11418a4002396c109ac0d55158e37a	check: landing-loop task-c: https://github.com/lab/app/pull/103 has merge conflicts against main; needs conflict resolution
+--- no-mistakes rerun calls (ts, cwd, args) ---
+1795832878 <forge>/wt-a rerun
+1795832890 <forge>/wt-b rerun
+--- fm-duration args recorded for each no-mistakes rerun ---
+run --pipeline-priority merge-train fm-landing-update-task-a
+run --pipeline-priority merge-train fm-landing-update-task-b
+--- gh calls: update-branch ---
+api -X PUT repos/lab/app/pulls/104/update-branch -f expected_head_sha=a8a6bf36e91fa116459f6970ed9d25e70613c3a0
+--- task-d local worktree HEAD (must stay a8a6bf36e9) ---
+a8a6bf36e9
+--- events ---
+1795832878 task-a 1c03d5e282ca update-started: updating onto main (daa65660f6) via no-mistakes
+1795832879 task-c 67ac14303f11 wake:conflict: https://github.com/lab/app/pull/103 has merge conflicts against main; needs conflict resolution
+1795832888 task-a 1c03d5e282ca update-completed: no-mistakes rerun completed
+1795832890 task-b fac890a663d3 update-started: updating onto main (daa65660f6) via no-mistakes
+1795832893 task-b fac890a663d3 update-completed: no-mistakes rerun completed
+1795832894 task-d a8a6bf36e91f update-started: updating onto main (daa65660f6) via direct-PR
+1795832898 task-d a8a6bf36e91f update-completed: updated lab/app#104 server-side from a8a6bf36e9 to ffffffffff

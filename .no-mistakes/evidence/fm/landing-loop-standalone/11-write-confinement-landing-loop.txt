@@ -1,0 +1,20 @@
+$ bash tests/fm-write-confinement.test.sh  -> exit 0
+PASS source boundary: env, Python and child shell lose fake credential; operational floor survives; explicit auth retention preserves empty/absent semantics
+PASS generated source boundary: destination-only unexported values and quoted data survive; fake credential absent; invalid names emit no executable source
+PASS harness route: every harness keeps work plumbing and only its own store selector, and no harness keeps a fake provider key; the floor omits inbox and duration names
+PASS toolchain route: a set JAVA_HOME reaches the worker, an unset home path stays unset, and VIRTUAL_ENV, PYTHONPATH, NODE_OPTIONS and a fake provider key do not; --harness refuses outside the generated prefix
+ok - T5 a-e, gate push, duration, procevent and fleet-ledger writes, and refused writes and renames per protected asset class under the omp and Claude profiles
+--- landing-loop keys per profile run (baseline=unconfined writable->false refused; confined->true refused) ---
+claude baseline:
+"refused-landing-loop-request": false
+"refused-landing-loop-state": false
+claude baseline fresh container:
+claude baseline archive branch file:
+"refused-landing-loop-request": true
+"refused-landing-loop-state": true
+omp baseline:
+"refused-landing-loop-request": false
+"refused-landing-loop-state": false
+omp baseline archive branch file:
+"refused-landing-loop-request": true
+"refused-landing-loop-state": true

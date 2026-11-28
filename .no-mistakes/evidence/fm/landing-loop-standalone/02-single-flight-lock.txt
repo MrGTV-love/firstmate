@@ -1,0 +1,5 @@
+before: [last_step_at,last_reconcile.at]=[1795832514,1795832514]
+holder: took flock on .landing-loop/lock
+second step while lock held: exit=0 elapsed=0.06s stdout='' stderr=''
+after:  [last_step_at,last_reconcile.at]=[1795832514,1795832514]
+reconcile cursor mtime unchanged: yes

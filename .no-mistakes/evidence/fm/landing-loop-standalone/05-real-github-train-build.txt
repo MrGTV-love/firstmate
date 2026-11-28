@@ -1,0 +1,70 @@
+$ bin/fm-landing-loop.py train --repo MrGTV-love/firstmate --prs 434,455,456,457,458 --worktree <clone> --branch lab/train-1 --build --json
+exit=0
+{
+  "base_tip": "2440b75c60e72a9a31771805a26e3653b7b14ca5",
+  "selected": [
+    {
+      "pr": "https://github.com/MrGTV-love/firstmate/pull/455",
+      "head": "ec40789d210dd562d90d69a85b4b4675bec9d289"
+    },
+    {
+      "pr": "https://github.com/MrGTV-love/firstmate/pull/456",
+      "head": "4cc6aedf152cdb1126dd838bf569cf62953d2653"
+    },
+    {
+      "pr": "https://github.com/MrGTV-love/firstmate/pull/457",
+      "head": "dfded3d4e6915ac58f6794a97112c51efbf6741c"
+    },
+    {
+      "pr": "https://github.com/MrGTV-love/firstmate/pull/458",
+      "head": "f7638b33c950568a1517d27d24f18a31811e482f"
+    }
+  ],
+  "excluded": [
+    {
+      "pr": "https://github.com/MrGTV-love/firstmate/pull/434",
+      "head": "a8c5a2815e4e5256c2b05ed3a3d385d47850ae0a",
+      "reason": "conflicts with train batch"
+    }
+  ],
+  "final_tree": "d3e3da289b2da4b54a75beabf9da65048e2b5bc8",
+  "branch": "lab/train-1",
+  "built_head": "5cd41300c1b197691902e25aa927127b5c0221f7",
+  "intent_file": "<lab>/state/.landing-loop/trains/lab_train-1.intent.txt"
+}
+--- closes_block (as emitted) ---
+<!-- firstmate-backlog-closes:begin -->
+Train-member: https://github.com/MrGTV-love/firstmate/pull/455
+Train-member: https://github.com/MrGTV-love/firstmate/pull/456
+Train-member: https://github.com/MrGTV-love/firstmate/pull/457
+Train-member: https://github.com/MrGTV-love/firstmate/pull/458
+<!-- firstmate-backlog-closes:end -->
+
+--- closes block parsed by the repo owner bin/fm-pr-closes-lib.sh? see below ---
+--- built branch in clone ---
+5cd41300c train: merge PR #458 (f7638b33c9)
+bcd3f7d2d train: merge PR #457 (dfded3d4e6)
+b770c0f28 train: merge PR #456 (4cc6aedf15)
+afadc7e31 train: merge PR #455 (ec40789d21)
+2440b75c6 feat(bin): refuse new spawns, pipeline runs, and stack starts below the 20 GiB free-disk floor (#468)
+8b0521f3c Keep local no-mistakes Test step targeted and synchronous in foreground (#470)
+HEAD^{tree}=d3e3da289b2da4b54a75beabf9da65048e2b5bc8  final_tree=d3e3da289b2da4b54a75beabf9da65048e2b5bc8
+member ec40789d210dd562d90d69a85b4b4675bec9d289 is ancestor of lab/train-1
+member 4cc6aedf152cdb1126dd838bf569cf62953d2653 is ancestor of lab/train-1
+member dfded3d4e6915ac58f6794a97112c51efbf6741c is ancestor of lab/train-1
+member f7638b33c950568a1517d27d24f18a31811e482f is ancestor of lab/train-1
+--- intent file ---
+Compound merge train landing 4 conflict-free PRs (#455, #456, #457, #458) onto main (2440b75c60).
+
+Include this closes block at the very top of the PR body:
+<!-- firstmate-backlog-closes:begin -->
+Train-member: https://github.com/MrGTV-love/firstmate/pull/455
+Train-member: https://github.com/MrGTV-love/firstmate/pull/456
+Train-member: https://github.com/MrGTV-love/firstmate/pull/457
+Train-member: https://github.com/MrGTV-love/firstmate/pull/458
+<!-- firstmate-backlog-closes:end -->
+--- events ---
+1795832681 train:lab_train-1 5cd41300c1b1 train-built: built lab/train-1 with 4 members (#455, #456, #457, #458)
+--- refuses to reuse an existing branch ---
+error: branch lab/train-1 already exists; pick a new branch name to preserve existing commits
+exit=1
